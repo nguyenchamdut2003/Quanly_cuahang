@@ -45,6 +45,10 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+app.get('/healthz', function(req, res) {
+  res.status(200).json({ status: 'ok' });
+});
+
 // middleware to inject user and current store into views
 app.use(async (req, res, next) => {
   res.locals.user = req.user || null;

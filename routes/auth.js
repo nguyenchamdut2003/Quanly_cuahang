@@ -13,12 +13,6 @@ router.get('/google/callback',
       const user = req.user;
       if (!user) return res.redirect('/?error=user_not_found');
 
-      if (user.vai_tro !== 'admin' || user.trang_thai !== 'active') {
-        return req.logout(function() {
-          res.redirect('/?error=admin_required');
-        });
-      }
-
       return res.redirect('/');
     } catch (error) {
       next(error);

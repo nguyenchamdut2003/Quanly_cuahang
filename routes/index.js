@@ -259,12 +259,6 @@ router.get('/', async function(req, res, next) {
       return res.render('login', { title: 'Đăng nhập', query: req.query || {} });
     }
 
-    if (!req.user || req.user.vai_tro !== 'admin' || req.user.trang_thai !== 'active') {
-      return req.logout(function() {
-        res.render('login', { title: 'Đăng nhập', error: 'admin_required', query: req.query || {} });
-      });
-    }
-
     const dashboard = await getDashboardData(req.user);
     res.render('index', { title: 'Tổng quan - KiotViet ERP', user: req.user, dashboard });
   } catch (error) {
