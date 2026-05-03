@@ -1,0 +1,357 @@
+﻿<%
+  const safeInvoices = Array.isArray(locals.invoices) ? locals.invoices : [];
+  const invoicePayload = safeInvoices.map(i => ({
+    _id: String(i._id),
+    ma_hoa_don: i.ma_hoa_don || '',
+    ngay_ban: i.ngay_ban,
+    tong_tien: i.tong_tien || 0,
+    thanh_toan: i.thanh_toan || 0,
+    nguoi_ban: i.nguoi_ban_id?.ho_ten || i.nguoi_ban_id?.username || 'Admin',
+    khach_hang: i.khach_hang_id?.ten_khach_hang || '',
+    khach_hang_id: i.khach_hang_id ? String(i.khach_hang_id._id) : ''
+  }));
+  const productPayload = (Array.isArray(locals.products) ? locals.products : []).map(p => ({
+    _id: String(p._id),
+    ma_hang: p.ma_hang || '',
+    ten_hang: p.ten_hang || '',
+    gia_ban: p.gia_ban || 0,
+    ton_kho: p.ton_kho || 0
+  }));
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    *{box-sizing:border-box}html,body{height:100%;margin:0}body{overflow:hidden;background:#e9edf2;color:#0f172a}.topbar{height:64px;background:#0070f4;color:#fff;display:flex;align-items:center;gap:18px;padding:0 8px}.topbar .search{width:524px;flex:0 0 524px}.search{position:relative;max-width:100%}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:44px;border:0;border-radius:6px;padding:0 12px 0 36px;font-size:16px;outline:none}.topbar-scan{height:32px;width:32px;border:0;background:transparent;color:#9dccff;font-size:20px}.tab{height:54px;background:#fff;color:#111827;padding:0 14px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:14px;font-weight:800;font-size:18px;align-self:flex-end;min-width:150px}.add-tab{height:32px;width:32px;border-radius:50%;border:1px solid rgba(255,255,255,.9);background:#0070f4;color:#fff;font-size:16px}.top-actions{margin-left:auto;display:flex;align-items:center;gap:24px;font-size:20px}.top-actions span{font-size:17px;font-weight:700}.return-app{height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(0,1fr) 570px;gap:0;padding:0}.left{display:flex;flex-direction:column;min-width:0;min-height:0;background:#e9edf2}.right{margin:14px 10px 12px 0;background:#fff;border-radius:10px;display:flex;flex-direction:column;padding:16px 20px;min-height:0}.cart{flex:0 0 min(360px,42vh);min-height:0;overflow:auto;padding:14px 6px 0 12px}.return-row{height:96px;background:#fff;border:1px solid #d7dde5;border-radius:10px;margin-bottom:2px;display:grid;grid-template-columns:38px 150px minmax(220px,1fr) 110px 110px 110px 36px;align-items:center;padding:0 20px;box-shadow:0 2px 8px rgba(15,23,42,.12)}.code{font-size:18px}.name{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qty-wrap{text-align:center}.line-input{height:30px;border:0;border-bottom:1px solid #c2cad3;text-align:center;font-size:18px;outline:none;width:84px;background:transparent}.origin{font-size:15px;color:#475569;margin-top:6px}.num{text-align:right;font-weight:800}.return-swap{height:62px;background:#0070f4;display:flex;align-items:center;padding:0 8px;gap:18px}.return-swap .search{width:524px;flex:0 0 524px}.return-swap:after{content:'\f02a';font-family:'Font Awesome 6 Free';font-weight:900;color:#9dccff;font-size:22px}.swap-cart{flex:1;min-height:120px;padding-top:8px}.note{height:72px;background:#fff;border-radius:10px;margin:12px 12px 12px;padding:24px 32px;color:#667085;font-size:18px}.right-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:18px;align-items:center;font-size:18px;margin-bottom:16px}.right-head span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.customer{height:42px;background:#eef0f3;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 12px;color:#0070f4;font-weight:800;font-size:18px;margin-bottom:22px}.link-line{font-size:22px;font-weight:800;color:#00a651;margin-bottom:18px}.link-line a{color:#0070f4;text-decoration:none;font-weight:500}.sum-line{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px;gap:12px;align-items:center;margin:19px 0;font-size:18px}.sum-line input{height:32px;border:0;border-bottom:1px solid #c2cad3;text-align:right;font-size:20px;outline:none}.sum-line strong{font-weight:800}.payable{color:#0070f4;font-size:22px}.submit{margin-top:auto;height:66px;border:0;border-radius:10px;background:#0070f4;color:#fff;font-weight:900;font-size:22px;cursor:pointer}.product-results{display:none;position:absolute;top:48px;left:0;width:100%;background:#fff;color:#111827;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 12px 26px rgba(0,0,0,.18);z-index:80;max-height:320px;overflow:auto}.product-result{height:44px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}.product-result:hover{background:#f0f7ff}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:22px;z-index:100}.modal-backdrop.open{display:flex}.modal{width:1404px;max-width:calc(100vw - 80px);height:618px;background:#fff;border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.35);padding:26px 36px;position:relative}.modal h2{margin:0 0 24px;font-size:20px}.close{position:absolute;right:34px;top:28px;border:0;background:#fff;font-size:28px;color:#6b7280;cursor:pointer}.modal-grid{display:grid;grid-template-columns:235px minmax(0,1fr);gap:38px}.filter-card{background:#fff;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:18px 20px;margin-bottom:28px}.filter-card h3{margin:0 0 20px;font-size:16px}.filter-input{width:100%;height:46px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none}.invoice-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-table table{width:100%;border-collapse:collapse}.invoice-table th{height:46px;background:#338cf2;color:#fff;text-align:left;padding:0 12px;font-size:16px}.invoice-table td{height:49px;border-bottom:1px solid #dde3ea;padding:0 12px;font-size:16px}.invoice-table a{color:#006dff;text-decoration:none}.choose{height:30px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.pager{height:66px;display:flex;align-items:center;justify-content:flex-end;gap:12px}.page-btn{width:38px;height:38px;border-radius:8px;border:0;background:#fff;color:#111827;font-weight:800;cursor:pointer}.page-btn.active{background:#0070f4;color:#fff}.page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick{position:absolute;right:36px;bottom:28px;height:44px;border:0;border-radius:7px;background:#0070f4;color:#fff;font-weight:800;font-size:16px;padding:0 26px}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="itemSearch" placeholder="T&#236;m h&#224;ng tr&#7843; (F3)" onfocus="handleItemSearch(true)" oninput="handleItemSearch()"><div id="productResults" class="product-results"></div></div>
+    <button class="topbar-scan" type="button"><i class="fa-solid fa-barcode"></i></button>
+    <div class="tab">Tr&#7843; h&#224;ng 1 <i class="fa-solid fa-xmark"></i></div>
+    <button class="add-tab" type="button" onclick="openInvoiceModal()"><i class="fa-solid fa-plus"></i></button>
+    <i class="fa-solid fa-caret-down"></i>
+    <div class="top-actions">
+      <i class="fa-solid fa-briefcase"></i>
+      <i class="fa-solid fa-reply"></i>
+      <i class="fa-solid fa-rotate"></i>
+      <i class="fa-solid fa-print"></i>
+      <span>0376946978</span>
+      <i class="fa-solid fa-bars"></i>
+    </div>
+  </div>
+  <main class="return-app">
+    <section class="left">
+      <div id="returnItems" class="cart"></div>
+      <div class="return-swap"><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="swapSearch" placeholder="T&#236;m h&#224;ng &#273;&#7893;i (F7)" onfocus="handleSwapSearch(true)" oninput="handleSwapSearch()"><div id="swapResults" class="product-results"></div></div></div>
+      <div id="swapItems" class="cart swap-cart"></div>
+      <div class="note"><i class="fa-solid fa-pen"></i> Ghi ch&#250; &#273;&#417;n h&#224;ng</div>
+    </section>
+    <section class="right">
+      <div class="right-head"><span id="sellerName">Nguy&#7877;n V&#259;n Nguy&#7877;n</span><span><%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %></span></div>
+      <div class="customer"><i class="fa-solid fa-user"></i> <span id="customerName">Ch&#432;a ch&#7885;n kh&#225;ch h&#224;ng</span></div>
+      <div class="link-line">Tr&#7843; h&#224;ng / <a id="invoiceLink" href="#">Ch&#432;a ch&#7885;n h&#243;a &#273;&#417;n</a></div>
+      <div class="sum-line"><span>T&#7893;ng gi&#225; g&#7889;c h&#224;ng mua</span><span id="originTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>T&#7893;ng ti&#7873;n h&#224;ng tr&#7843;</span><span id="returnTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>Gi&#7843;m gi&#225;</span><span></span><input id="discount" value="0" oninput="renderTotals()"></div>
+      <div class="sum-line"><span>Ph&#237; tr&#7843; h&#224;ng</span><span></span><input id="returnFee" value="0" oninput="renderTotals()"></div>
+      <div class="sum-line"><strong>C&#7847;n tr&#7843; kh&#225;ch</strong><span></span><strong id="payable" class="payable num">0</strong></div>
+      <button class="submit" type="button" onclick="submitReturn()">TR&#7842; H&#192;NG</button>
+    </section>
+  </main>
+  <div id="invoiceModal" class="modal-backdrop">
+    <div class="modal">
+      <button type="button" class="close" onclick="closeInvoiceModal()">&times;</button>
+      <h2>Ch&#7885;n h&#243;a &#273;&#417;n tr&#7843; h&#224;ng</h2>
+      <div class="modal-grid">
+        <aside>
+          <div class="filter-card">
+            <h3>T&#236;m ki&#7871;m</h3>
+            <input class="filter-input" id="invoiceSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#243;a &#273;&#417;n">
+            <input class="filter-input" id="shipmentSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; v&#7853;n &#273;&#417;n b&#225;n">
+            <input class="filter-input" id="customerSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo kh&#225;ch h&#224;ng ho&#7863;c &#272;T">
+            <input class="filter-input" id="itemCodeSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#224;ng">
+            <input class="filter-input" id="itemNameSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo t&#234;n h&#224;ng">
+          </div>
+          <div class="filter-card">
+            <h3>Th&#7901;i gian</h3>
+            <input class="filter-input" id="fromDateSearch" type="date" onchange="loadInvoices(1)">
+            <input class="filter-input" id="toDateSearch" type="date" onchange="loadInvoices(1)" placeholder="&#272;&#7871;n ng&#224;y">
+          </div>
+        </aside>
+        <section>
+          <div class="invoice-table">
+            <table>
+              <thead><tr><th>M&#227; h&#243;a &#273;&#417;n</th><th>Th&#7901;i gian <i class="fa-solid fa-caret-down"></i></th><th>Ng&#432;&#7901;i b&#225;n</th><th>Kh&#225;ch h&#224;ng</th><th class="num">T&#7893;ng c&#7897;ng</th><th></th></tr></thead>
+              <tbody id="invoiceRows"></tbody>
+            </table>
+            <div class="pager" id="invoicePager"></div>
+          </div>
+        </section>
+      </div>
+      <button class="quick" onclick="quickReturn()" type="button">Tr&#7843; nhanh</button>
+    </div>
+  </div>
+  <script>
+    const invoices = <%- JSON.stringify(invoicePayload) %>;
+    const products = <%- JSON.stringify(productPayload) %>;
+    const initialInvoiceId = new URLSearchParams(window.location.search).get('invoice_id') || '';
+    let selectedInvoice = null;
+    let returnItems = [];
+    let swapItems = [];
+    const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
+
+    function openInvoiceModal(){
+      const modal = document.getElementById('invoiceModal');
+      if (!modal) return;
+      modal.classList.add('open');
+      loadInvoices(1);
+    }
+    function closeInvoiceModal(){
+      const modal = document.getElementById('invoiceModal');
+      if (modal) modal.classList.remove('open');
+    }
+    let invoiceSearchTimer = null;
+    let invoicePage = 1;
+    function scheduleInvoiceSearch(){
+      clearTimeout(invoiceSearchTimer);
+      invoiceSearchTimer = setTimeout(() => loadInvoices(1), 250);
+    }
+    async function loadInvoices(page = invoicePage){
+      invoicePage = page;
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '7',
+        invoice_code: invoiceSearch.value.trim(),
+        shipment_code: shipmentSearch.value.trim(),
+        customer: customerSearch.value.trim(),
+        item_code: itemCodeSearch.value.trim(),
+        item_name: itemNameSearch.value.trim(),
+        from_date: fromDateSearch.value,
+        to_date: toDateSearch.value
+      });
+      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">&#272;ang t&#7843;i d&#7919; li&#7879;u...</td></tr>';
+      try {
+        const res = await fetch('/don-hang/tra-hang/invoices/search?' + params.toString());
+        const result = await res.json();
+        if(!result.success) throw new Error(result.message || 'Khong tai duoc danh sach hoa don');
+        renderInvoices(result.data || [], result.pagination || { page: 1, limit: 7, total: 0, pages: 1 });
+      } catch (error) {
+        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Khong tai duoc danh sach hoa don</td></tr>';
+        invoicePager.innerHTML = '';
+      }
+    }
+    function renderInvoices(rows, pagination){
+      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmt(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Ch&#7885;n</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Kh&#244;ng t&#236;m th&#7845;y h&#243;a &#273;&#417;n ph&#249; h&#7907;p</td></tr>';
+      renderInvoicePager(pagination);
+    }
+    function renderInvoicePager(pagination){
+      const total = Number(pagination.total || 0);
+      const limit = Number(pagination.limit || 7);
+      const page = Number(pagination.page || 1);
+      const pages = Math.max(Number(pagination.pages || 1), 1);
+      const start = total ? (page - 1) * limit + 1 : 0;
+      const end = Math.min(page * limit, total);
+      const pageNumbers = [];
+      const first = Math.max(1, Math.min(page - 2, pages - 4));
+      const last = Math.min(pages, first + 4);
+      for(let p = first; p <= last; p++) pageNumbers.push(p);
+      invoicePager.innerHTML = `
+        <button class="page-btn" type="button" onclick="loadInvoices(1)" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-angles-left"></i></button>
+        <button class="page-btn" type="button" onclick="loadInvoices(${page - 1})" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
+        ${pageNumbers.map(p => `<button class="page-btn ${p === page ? 'active' : ''}" type="button" onclick="loadInvoices(${p})">${p}</button>`).join('')}
+        <button class="page-btn" type="button" onclick="loadInvoices(${page + 1})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="page-btn" type="button" onclick="loadInvoices(${pages})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-angles-right"></i></button>
+        <span>Hi&#7875;n th&#7883; ${start} - ${end} tr&#234;n t&#7893;ng s&#7889; ${total} h&#243;a &#273;&#417;n</span>`;
+    }
+    async function selectInvoice(id){
+      const res = await fetch(`/don-hang/tra-hang/invoice/${id}`);
+      const result = await res.json();
+      if(!result.success) return alert(result.message || 'Khong tai duoc hoa don');
+      selectedInvoice = result.data.invoice;
+      returnItems = result.data.items.map(item => ({
+        hang_hoa_id: item.hang_hoa_id?._id || item.hang_hoa_id,
+        ma_hang: item.hang_hoa_id?.ma_hang || '',
+        ten_hang: item.hang_hoa_id?.ten_hang || '',
+        so_luong_goc: Number(item.so_luong || 0),
+        so_luong: 0,
+        don_gia: Number(item.don_gia || 0),
+        thanh_tien_goc: Number(item.thanh_tien || 0)
+      }));
+      sellerName.textContent = selectedInvoice.nguoi_ban_id?.ho_ten || selectedInvoice.nguoi_ban_id?.username || 'Hoang - Kinh Doanh';
+      customerName.textContent = selectedInvoice.khach_hang_id?.ten_khach_hang || 'Kh\u00e1ch l\u1ebb';
+      invoiceLink.textContent = `${selectedInvoice.ma_hoa_don} - ${sellerName.textContent}`;
+      closeInvoiceModal();
+      itemSearch.value = '';
+      productResults.style.display = 'none';
+      renderItems();
+    }
+    function quickReturn(){
+      closeInvoiceModal();
+      customerName.textContent = 'Kh\u00e1ch l\u1ebb';
+      invoiceLink.textContent = 'Tr\u1ea3 nhanh';
+      selectedInvoice = null;
+      returnItems = [];
+      renderItems();
+    }
+    function handleItemSearch(showAll = false){
+      if(selectedInvoice){
+        productResults.style.display = 'none';
+        renderItems();
+        return;
+      }
+      const q = itemSearch.value.trim().toLowerCase();
+      if(!q && !showAll){
+        productResults.style.display = 'none';
+        renderItems();
+        return;
+      }
+      const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 20);
+      productResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addQuickItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmt(p.gia_ban)}</strong></div>`).join('');
+      productResults.style.display = rows.length ? 'block' : 'none';
+    }
+    function handleSwapSearch(showAll = false){
+      const q = swapSearch.value.trim().toLowerCase();
+      if(!q && !showAll){
+        swapResults.style.display = 'none';
+        return;
+      }
+      const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 20);
+      swapResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addSwapItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmt(p.gia_ban)}</strong></div>`).join('');
+      swapResults.style.display = rows.length ? 'block' : 'none';
+    }
+    function addSwapItem(id){
+      const product = products.find(p => p._id === id);
+      if(!product) return;
+      const existing = swapItems.find(i => String(i.hang_hoa_id) === String(id));
+      if(existing){
+        existing.so_luong += 1;
+      } else {
+        swapItems.push({
+          hang_hoa_id: product._id,
+          ma_hang: product.ma_hang,
+          ten_hang: product.ten_hang,
+          so_luong_goc: Number(product.ton_kho || 999),
+          so_luong: 1,
+          don_gia: Number(product.gia_ban || 0),
+          thanh_tien_goc: Number(product.gia_ban || 0)
+        });
+      }
+      swapSearch.value = '';
+      swapResults.style.display = 'none';
+      renderSwapItems();
+    }
+    function addQuickItem(id, source = 'return'){
+      const product = products.find(p => p._id === id);
+      if(!product) return;
+      const existing = returnItems.find(i => String(i.hang_hoa_id) === String(id));
+      if(existing){
+        existing.so_luong += 1;
+      } else {
+        returnItems.push({
+          hang_hoa_id: product._id,
+          ma_hang: product.ma_hang,
+          ten_hang: product.ten_hang,
+          so_luong_goc: Number(product.ton_kho || 999),
+          so_luong: 1,
+          don_gia: Number(product.gia_ban || 0),
+          thanh_tien_goc: Number(product.gia_ban || 0)
+        });
+      }
+      if(source === 'swap'){
+        swapSearch.value = '';
+        swapResults.style.display = 'none';
+      } else {
+        itemSearch.value = '';
+        productResults.style.display = 'none';
+      }
+      renderItems();
+    }
+    function renderItems(){
+      const q = itemSearch.value.trim().toLowerCase();
+      const rows = returnItems.filter(i => !q || i.ma_hang.toLowerCase().includes(q) || i.ten_hang.toLowerCase().includes(q));
+      const returnItemsEl = document.getElementById('returnItems');
+      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Ch&#7885;n h&#243;a &#273;&#417;n &#273;&#7875; l&#7845;y h&#224;ng tr&#7843;</div>';
+      renderTotals();
+    }
+    function renderSwapItems(){
+      const rows = swapItems;
+      const swapItemsEl = document.getElementById('swapItems');
+      swapItemsEl.innerHTML = rows.length ? rows.map(item => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeSwapItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '';
+    }
+    function setQty(id, value){
+      const item = returnItems.find(i => String(i.hang_hoa_id) === String(id));
+      if(!item) return;
+      item.so_luong = Math.max(0, Math.min(num(value), item.so_luong_goc));
+      renderItems();
+    }
+    function setPrice(id, value){
+      const item = returnItems.find(i => String(i.hang_hoa_id) === String(id));
+      if(!item) return;
+      item.don_gia = num(value);
+      renderItems();
+    }
+    function removeItem(id){ returnItems = returnItems.filter(i => String(i.hang_hoa_id) !== String(id)); renderItems(); }
+    function setSwapQty(id, value){
+      const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
+      if(!item) return;
+      item.so_luong = Math.max(0, Math.min(num(value), item.so_luong_goc));
+      renderSwapItems();
+    }
+    function setSwapPrice(id, value){
+      const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
+      if(!item) return;
+      item.don_gia = num(value);
+      renderSwapItems();
+    }
+    function removeSwapItem(id){ swapItems = swapItems.filter(i => String(i.hang_hoa_id) !== String(id)); renderSwapItems(); }
+    function renderTotals(){
+      const origin = returnItems.reduce((sum, item) => sum + item.thanh_tien_goc, 0);
+      const total = returnItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
+      const payableValue = Math.max(total - num(discount.value) - num(returnFee.value), 0);
+      originTotal.textContent = fmt(origin);
+      returnTotal.textContent = fmt(total);
+      payable.textContent = fmt(payableValue);
+    }
+    async function submitReturn(){
+      if(!selectedInvoice){
+        openInvoiceModal();
+        return;
+      }
+      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ hang_hoa_id: i.hang_hoa_id, so_luong: i.so_luong, don_gia: i.don_gia }));
+      if(!items.length) return alert('Vui long nhap so luong hang tra');
+      const exchangeItems = swapItems.filter(i => i.so_luong > 0);
+      const selectedCustomerId = selectedInvoice?.khach_hang_id?._id || selectedInvoice?.khach_hang_id || null;
+      if(exchangeItems.length && !selectedCustomerId) return alert('Vui long chon khach hang truoc khi dat don doi');
+      const payload = {
+        hoa_don_id: selectedInvoice?._id || null,
+        khach_hang_id: selectedCustomerId,
+        items,
+        giam_gia: num(discount.value),
+        phi_tra_hang: num(returnFee.value),
+        ghi_chu: ''
+      };
+      const res = await fetch('/don-hang/tra-hang/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+      const result = await res.json();
+      if(!result.success) return alert(result.message || 'Khong tao duoc phieu tra hang');
+      window.location.href = '/don-hang/tra-hang';
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      loadInvoices(1);
+      if (initialInvoiceId) selectInvoice(initialInvoiceId);
+    });
+    document.addEventListener('click', event => {
+      if (!itemSearch.contains(event.target) && !productResults.contains(event.target)) productResults.style.display = 'none';
+      if (!swapSearch.contains(event.target) && !swapResults.contains(event.target)) swapResults.style.display = 'none';
+    });
+  </script>
+</body>
+</html>
+
+
+

@@ -1,0 +1,1205 @@
+<%
+  const safeProducts = Array.isArray(locals.products) ? locals.products : [];
+  const safeCategories = Array.isArray(locals.categories) ? locals.categories : [];
+  const safeBrands = Array.isArray(locals.brands) ? locals.brands : [];
+  const safeSuppliers = Array.isArray(locals.suppliers) ? locals.suppliers : [];
+  const safeStores = Array.isArray(locals.stores) ? locals.stores : [];
+  const safeLocations = Array.isArray(locals.locations) ? locals.locations : [];
+  const safeFilters = locals.filters || {};
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel='stylesheet' href='/stylesheets/style.css' />
+  <style>
+    .hh-modal-overlay{display:none;position:fixed;z-index:3000;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center}
+    .hh-modal-overlay.open{display:flex}
+    .hh-modal{background:#fff;width:780px;max-width:96vw;max-height:92vh;border-radius:8px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+    .hh-modal form{display:flex;flex:1;min-height:0;flex-direction:column}
+    .hh-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #e8e8e8}
+    .hh-modal-header h2{font-size:16px;font-weight:700;color:#222;margin:0}
+    .hh-modal-header button{background:none;border:none;font-size:18px;cursor:pointer;color:#666;line-height:1}
+    .hh-tabs{display:flex;gap:0;border-bottom:1px solid #e8e8e8;padding:0 20px}
+    .hh-tab{padding:10px 16px;font-size:14px;color:#555;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+    .hh-tab.active{color:#0070f4;border-bottom-color:#0070f4;font-weight:600}
+    .hh-body{flex:1;min-height:0;overflow-y:auto;padding:16px 20px}
+    .hh-body::-webkit-scrollbar{width:8px}
+    .hh-body::-webkit-scrollbar-track{background:#f5f5f5}
+    .hh-body::-webkit-scrollbar-thumb{background:#c9c9c9;border-radius:8px}
+    .hh-body::-webkit-scrollbar-thumb:hover{background:#9f9f9f}
+    .hh-tab-pane{display:none}.hh-tab-pane.active{display:block}
+    .hh-top-row{display:flex;gap:16px}
+    .hh-top-left{flex:1}
+    .hh-top-right{width:160px;display:flex;flex-direction:column;gap:8px}
+    .hh-img-upload-btn{display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d9d9d9;border-radius:4px;padding:8px 12px;cursor:pointer;font-size:13px;color:#333;background:#fafafa;transition:.2s}
+    .hh-img-upload-btn:hover{background:#e6f0ff;border-color:#0070f4;color:#0070f4}
+    .hh-img-hint{font-size:11px;color:#999;text-align:center}
+    .hh-img-previews{display:flex;flex-direction:column;gap:6px}
+    .hh-img-preview{width:100%;height:50px;object-fit:cover;border-radius:4px;border:1px solid #eee}
+    .hh-field{margin-bottom:12px}
+    .hh-field label{display:block;font-size:13px;color:#333;margin-bottom:4px}
+    .hh-field label span.req{color:#ff4d4f}
+    .hh-input{width:100%;border:1px solid #d9d9d9;border-radius:4px;padding:7px 10px;font-size:14px;outline:none;transition:.2s;box-sizing:border-box}
+    .hh-input:focus{border-color:#0070f4;box-shadow:0 0 0 2px rgba(0,112,244,.1)}
+    .hh-input::placeholder{color:#bbb}
+    .hh-row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .hh-label-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+    .hh-label-row label{font-size:13px;color:#333}
+    .hh-label-row .hh-create-link{font-size:12px;color:#0070f4;cursor:pointer;text-decoration:none}
+    .hh-label-row .hh-create-link:hover{text-decoration:underline}
+    .hh-section{border:1px solid #e8e8e8;border-radius:6px;margin-bottom:12px;overflow:hidden}
+    .hh-section-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;cursor:pointer;background:#fafafa;user-select:none}
+    .hh-section-head h3{font-size:14px;font-weight:700;color:#222;margin:0}
+    .hh-section-head i{font-size:12px;color:#888;transition:.3s}
+    .hh-section-body{padding:12px 14px;border-top:1px solid #eee}
+    .hh-section.collapsed .hh-section-body{display:none}
+    .hh-section.collapsed .hh-section-head i{transform:rotate(-90deg)}
+    .hh-num{text-align:right}
+    .hh-weight-row{display:flex;gap:8px}
+    .hh-weight-row .hh-input{flex:1}
+    .hh-weight-row select.hh-input{width:80px;flex:none}
+    .hh-unit-setup{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+    .hh-unit-desc{font-size:13px;color:#555;max-width:70%}
+    .btn-thiet-lap{background:#fff;border:1px solid #0070f4;color:#0070f4;border-radius:4px;padding:7px 16px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+    .btn-thiet-lap:hover{background:#e6f0ff}
+    .hh-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid #e8e8e8;background:#fff}
+    .hh-footer-left{display:flex;align-items:center;gap:8px}
+    .hh-footer-left input[type=checkbox]{width:16px;height:16px;accent-color:#0070f4;cursor:pointer}
+    .hh-footer-left label{font-size:14px;color:#222;cursor:pointer}
+    .hh-footer-left .hh-info-icon{color:#aaa;font-size:13px;cursor:pointer}
+    .hh-footer-right{display:flex;gap:8px}
+    .btn-bo-qua{background:#fff;border:1px solid #d9d9d9;color:#333;border-radius:4px;padding:8px 16px;font-size:14px;cursor:pointer}
+    .btn-bo-qua:hover{background:#f5f5f5}
+    .btn-luu-tiep{background:#0070f4;color:#fff;border:none;border-radius:4px 0 0 4px;padding:8px 16px;font-size:14px;font-weight:600;cursor:pointer}
+    .btn-luu-tiep:hover{background:#0062d6}
+    .btn-luu{background:#0070f4;color:#fff;border:none;border-radius:0 4px 4px 0;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer;border-left:1px solid rgba(255,255,255,.3)}
+    .btn-luu:hover{background:#0062d6}
+    .btn-split-wrap{display:flex}
+    .hh-price-note{display:flex;align-items:center;gap:4px;font-size:12px;color:#0070f4;cursor:pointer;margin-bottom:8px}
+    .mo-ta-textarea{min-height:100px;resize:vertical}
+    .hh-section-desc{font-size:12px;color:#888;margin-bottom:10px}
+    .product-page{height:calc(100vh - 98px);display:flex;flex-direction:column;background:#f3f6f9}
+    .product-shell{flex:1;min-height:0;display:grid;grid-template-columns:245px minmax(0,1fr);gap:14px;padding:14px 18px}
+    .product-sidebar{background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:12px;overflow-y:auto}
+    .product-title{font-size:18px;font-weight:700;color:#111827;margin:0 0 14px}
+    .filter-block{margin-bottom:18px}
+    .filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .filter-title{font-size:13px;font-weight:700;color:#374151}
+    .filter-link{font-size:12px;color:#0070f4;text-decoration:none;cursor:pointer}
+    .filter-control{width:100%;height:34px;border:1px solid #dde3ea;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
+    .filter-control:focus{border-color:#0070f4;box-shadow:0 0 0 2px rgba(0,112,244,.08)}
+    .radio-filter{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .radio-filter input{accent-color:#0070f4}
+    .radio-filter span{flex:1;height:32px;display:flex;align-items:center;justify-content:space-between;border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:0 10px;color:#374151;font-size:13px}
+    .product-main{min-width:0;display:flex;flex-direction:column;gap:10px}
+    .product-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .product-search{position:relative;flex:1;max-width:520px}
+    .product-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af}
+    .product-search input{width:100%;height:36px;border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:0 40px 0 36px;font-size:14px;outline:none}
+    .product-search input:focus{border-color:#0070f4;box-shadow:0 0 0 2px rgba(0,112,244,.08)}
+    .product-search button{position:absolute;right:5px;top:5px;width:26px;height:26px;border:none;background:#fff;color:#6b7280;border-radius:4px;cursor:pointer}
+    .product-search button:hover,.tool-icon:hover{background:#eef4ff;color:#0070f4}
+    .toolbar-actions{display:flex;align-items:center;gap:8px}
+    .create-menu-wrap{position:relative}
+    .create-menu{display:none;position:absolute;top:42px;right:0;width:235px;background:#fff;border:1px solid #e5e7eb;border-radius:7px;box-shadow:0 14px 34px rgba(15,23,42,.2);z-index:50;overflow:hidden}
+    .create-menu.open{display:block}
+    .create-menu button{width:100%;height:40px;border:none;background:#fff;text-align:left;padding:0 16px;color:#30343b;font-size:13px;cursor:pointer}
+    .create-menu button:hover{background:#f3f6fa}
+    .kv-btn{height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#374151;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .kv-btn.primary{border-color:#86bfff;color:#0070f4}
+    .kv-btn:hover{background:#f8fbff;border-color:#8fc2ff;color:#0070f4}
+    .tool-icon{width:36px;height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;color:#667085;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .product-table-wrap{flex:1;min-height:0;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:auto}
+    .product-table{width:100%;min-width:1080px;border-collapse:collapse}
+    .product-table thead th{position:sticky;top:0;z-index:2;background:#eaf3ff;color:#374151;font-size:13px;font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid #d8e8fb;white-space:nowrap}
+    .product-table tbody td{padding:13px 12px;border-bottom:1px solid #edf0f3;color:#374151;font-size:13px;vertical-align:middle}
+    .product-table tbody tr:hover{background:#f5f7fa}
+    .product-row{cursor:pointer}
+    .product-row.expanded{background:#f6fbff;outline:2px solid #2d9cff;outline-offset:-2px}
+    .product-table .num{text-align:right;font-weight:600;color:#6b7280}
+    .check-col{width:36px;text-align:center}
+    .star-col{width:36px;text-align:center}
+    .row-check{width:16px;height:16px;accent-color:#0070f4;cursor:pointer}
+    .star-btn{border:none;background:transparent;color:#a6adb7;cursor:pointer;font-size:15px}
+    .star-btn.active{color:#f5a623}
+    .product-code{font-weight:700;color:#374151}
+    .product-empty{padding:54px 16px;text-align:center;color:#8b95a1}
+    .detail-row{display:none}
+    .detail-row.open{display:table-row}
+    .detail-cell{padding:0!important;border:2px solid #2d9cff!important;border-top:none!important;background:#fff}
+    .detail-tabs{display:flex;gap:28px;padding:12px 22px 0;border-bottom:1px solid #eef1f5}
+    .detail-tab{padding:0 0 9px;border:none;border-bottom:2px solid transparent;background:transparent;color:#5f6b7a;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+    .detail-tab.active{color:#0070f4;border-bottom-color:#0070f4}
+    .detail-content{padding:16px 22px 14px}
+    .detail-pane{display:none}
+    .detail-pane.active{display:block}
+    .detail-head{display:flex;gap:16px;margin-bottom:16px}
+    .detail-image{width:96px;height:86px;border-radius:6px;background:#eef5ff;display:flex;align-items:center;justify-content:center;color:#4aa3ff;font-size:42px;overflow:hidden}
+    .detail-image img{width:100%;height:100%;object-fit:cover}
+    .detail-name{font-size:18px;font-weight:700;color:#374151;margin:0 0 10px}
+    .detail-meta{color:#5f6b7a;font-size:13px;margin-bottom:8px}
+    .detail-badges{display:flex;gap:7px;flex-wrap:wrap}
+    .detail-badge{background:#f3f4f6;border-radius:4px;color:#4b5563;font-size:12px;font-weight:700;padding:4px 7px}
+    .detail-badge.warn{background:#fff6e5;color:#b7791f}
+    .detail-grid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:18px 28px;margin-bottom:18px}
+    .detail-label{font-size:12px;color:#6b7280;margin-bottom:7px}
+    .detail-value{font-size:13px;color:#374151;font-weight:600;border-bottom:1px solid #edf0f3;padding-bottom:9px;min-height:28px}
+    .detail-link{color:#0070f4;font-size:13px;font-weight:700;text-decoration:none}
+    .detail-actions{display:flex;align-items:center;justify-content:space-between;border-top:1px solid #edf0f3;padding-top:12px}
+    .detail-actions-left,.detail-actions-right{display:flex;align-items:center;gap:10px}
+    .detail-action-btn{height:32px;border:1px solid transparent;background:#fff;color:#4b5563;border-radius:5px;padding:0 10px;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;cursor:pointer}
+    .detail-action-btn:hover{background:#f3f7fb}
+    .detail-action-btn.primary{background:#0070f4;color:#fff;border-color:#0070f4}
+    .detail-action-btn.primary:hover{background:#0062d6}
+    .detail-mini-table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    .detail-mini-table th{height:36px;background:#eef0f2;color:#374151;font-size:12px;font-weight:700;text-align:left;padding:0 12px}
+    .detail-mini-table td{height:44px;border-bottom:1px solid #edf0f3;color:#4b5563;font-size:13px;padding:0 12px}
+    .detail-mini-table .num{text-align:right;color:#4b5563}
+    .detail-status{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#f3f4f6;color:#374151;padding:0 8px;font-size:12px}
+    .lot-toolbar{display:grid;grid-template-columns:minmax(220px,280px) 1fr 110px 150px;align-items:center;gap:12px;margin:10px 10px 28px}
+    .lot-search{position:relative}
+    .lot-search input{width:100%;height:32px;border:1px solid #9fcdf7;border-radius:6px;padding:0 34px 0 12px;font-size:13px;outline:none}
+    .lot-search i{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#6b7280}
+    .lot-empty{height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#374151;font-size:13px;font-weight:700}
+    .lot-empty-icon{width:62px;height:62px;border-radius:50%;background:#e9f5ff;color:#4d9fe8;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 0 0 12px rgba(233,245,255,.55)}
+    .lot-footer{border-top:1px solid #edf0f3;padding:13px 10px 4px}
+    .combo-section{display:none}
+    .combo-mode .combo-section{display:block}
+    .service-mode .stock-section,.service-mode .position-section,.service-mode .combo-section{display:none}
+    .combo-mode .stock-section{display:none}
+    .combo-mode .cost-field{display:none}
+    .combo-component-search{width:320px;max-width:100%;height:30px;border:1px solid #cfd8e3;border-radius:6px;padding:0 12px;font-size:13px;outline:none}
+    .combo-table{width:100%;border-collapse:collapse;margin-top:12px}
+    .combo-table th{height:34px;background:#f0f2f5;color:#111827;font-size:12px;font-weight:700;text-align:left;padding:0 10px}
+    .combo-table td{height:44px;border-bottom:1px solid #edf0f3;color:#526173;font-size:13px;text-align:center}
+    .selected-bar{display:none;align-items:center;gap:10px;color:#374151;font-size:13px}
+    .selected-bar.show{display:flex}
+    .mobile-filter-toggle{display:none}
+    @media(max-width:900px){
+      .product-page{height:auto;min-height:calc(100vh - 98px)}
+      .product-shell{grid-template-columns:1fr;padding:10px}
+      .product-sidebar{display:none}
+      .product-sidebar.open{display:block}
+      .mobile-filter-toggle{display:inline-flex}
+      .product-toolbar{align-items:stretch;flex-direction:column}
+      .product-search{max-width:none}
+      .toolbar-actions{flex-wrap:wrap}
+    }
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+
+  <form id="filterForm" method="GET" action="/hang-hoa" class="product-page">
+    <div class="product-shell">
+      <aside class="product-sidebar" id="productSidebar">
+        <h1 class="product-title">Hàng hóa</h1>
+
+        <div class="filter-block">
+          <div class="filter-head">
+            <span class="filter-title">Nhóm hàng</span>
+            <a class="filter-link" onclick="quickCreate('nhom')">Tạo mới</a>
+          </div>
+          <select class="filter-control" name="nhom_hang_id" onchange="submitFilters()">
+            <option value="">Chọn nhóm hàng</option>
+            <% safeCategories.forEach(c => { %>
+              <option value="<%= c._id %>" <%= safeFilters.nhom_hang_id == c._id ? 'selected' : '' %>><%= c.ten_nhom_hang %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Tồn kho</div>
+          <select class="filter-control" name="ton_kho" onchange="submitFilters()">
+            <option value="" <%= !safeFilters.ton_kho ? 'selected' : '' %>>Tất cả</option>
+            <option value="con" <%= safeFilters.ton_kho === 'con' ? 'selected' : '' %>>Còn hàng</option>
+            <option value="het" <%= safeFilters.ton_kho === 'het' ? 'selected' : '' %>>Hết hàng</option>
+            <option value="duoi_dinh_muc" <%= safeFilters.ton_kho === 'duoi_dinh_muc' ? 'selected' : '' %>>Dưới định mức</option>
+          </select>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Dự kiến hết hàng</div>
+          <label class="radio-filter">
+            <input type="radio" checked>
+            <span>Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span>
+          </label>
+          <label class="radio-filter">
+            <input type="radio">
+            <span>Tùy chỉnh <i class="fa-regular fa-calendar"></i></span>
+          </label>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Thời gian tạo</div>
+          <label class="radio-filter">
+            <input type="radio" checked>
+            <span>Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span>
+          </label>
+          <label class="radio-filter">
+            <input type="radio">
+            <span>Tùy chỉnh <i class="fa-regular fa-calendar"></i></span>
+          </label>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Nhà cung cấp</div>
+          <select class="filter-control" name="nha_cung_cap_id" onchange="submitFilters()">
+            <option value="">Chọn nhà cung cấp</option>
+            <% safeSuppliers.forEach(s => { %>
+              <option value="<%= s._id %>" <%= safeFilters.nha_cung_cap_id == s._id ? 'selected' : '' %>><%= s.ten_ncc %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Vị trí</div>
+          <select class="filter-control" name="vi_tri_id" onchange="submitFilters()">
+            <option value="">Chọn vị trí</option>
+            <% safeLocations.forEach(v => { %>
+              <option value="<%= v._id %>" <%= safeFilters.vi_tri_id == v._id ? 'selected' : '' %>><%= v.ten_vi_tri %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Loại hàng</div>
+          <select class="filter-control" name="loai_hang" onchange="submitFilters()">
+            <option>Chọn loại hàng</option>
+            <option>Hàng hóa</option>
+          </select>
+        </div>
+
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:8px">Bán trực tiếp</div>
+          <select class="filter-control" name="ban_truc_tiep" onchange="submitFilters()">
+            <option value="" <%= !safeFilters.ban_truc_tiep ? 'selected' : '' %>>Tất cả</option>
+            <option value="true" <%= safeFilters.ban_truc_tiep === 'true' ? 'selected' : '' %>>Có</option>
+            <option value="false" <%= safeFilters.ban_truc_tiep === 'false' ? 'selected' : '' %>>Không</option>
+          </select>
+        </div>
+      </aside>
+
+      <main class="product-main">
+        <div class="product-toolbar">
+          <div class="product-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã, tên hàng">
+            <button type="submit" title="Tìm kiếm"><i class="fa-solid fa-sliders"></i></button>
+          </div>
+
+          <div class="toolbar-actions">
+            <div class="create-menu-wrap" id="createMenuWrap">
+              <button type="button" class="kv-btn primary" onclick="toggleCreateMenu(event)">
+                <i class="fa-solid fa-plus"></i> Tạo mới <i class="fa-solid fa-chevron-down" style="font-size:10px"></i>
+              </button>
+              <div class="create-menu" id="createMenu">
+                <button type="button" onclick="openCreateType('hang_hoa')">Hàng hóa</button>
+                <button type="button" onclick="openCreateType('dich_vu')">Dịch vụ</button>
+                <button type="button" onclick="openCreateType('combo')">Combo - đóng gói</button>
+              </div>
+            </div>
+            <button type="button" class="kv-btn" onclick="document.getElementById('importFile').click()">
+              <i class="fa-solid fa-file-import"></i> Import file
+            </button>
+            <input type="file" id="importFile" accept=".csv" style="display:none" onchange="importProductsFile(this)">
+            <button type="button" class="kv-btn" onclick="exportProductsCsv()">
+              <i class="fa-solid fa-file-export"></i> Xuất file
+            </button>
+            <button type="button" class="tool-icon mobile-filter-toggle" onclick="toggleFilters()" title="Bộ lọc"><i class="fa-solid fa-filter"></i></button>
+            <button type="button" class="tool-icon" onclick="resetFilters()" title="Làm mới"><i class="fa-solid fa-rotate"></i></button>
+            <button type="button" class="tool-icon" title="Thiết lập"><i class="fa-solid fa-gear"></i></button>
+            <button type="button" class="tool-icon" title="Trợ giúp"><i class="fa-regular fa-circle-question"></i></button>
+          </div>
+        </div>
+
+        <div class="selected-bar" id="selectedBar">
+          <strong id="selectedCount">0</strong> hàng hóa đã chọn
+        </div>
+
+        <div class="product-table-wrap">
+          <table class="product-table">
+            <thead>
+              <tr>
+                <th class="check-col"><input type="checkbox" class="row-check" id="checkAll" onchange="toggleAllRows(this)"></th>
+                <th class="star-col"><i class="fa-regular fa-star"></i></th>
+                <th>Mã hàng</th>
+                <th>Tên hàng</th>
+                <th>Nhóm hàng</th>
+                <th class="num">Giá bán</th>
+                <th class="num">Giá vốn</th>
+                <th class="num">Tồn kho</th>
+                <th class="num">Khách đặt</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% safeProducts.forEach(p => { %>
+                <tr class="product-row" data-id="<%= p._id %>" onclick="toggleProductDetail('<%= p._id %>')">
+                  <td class="check-col"><input type="checkbox" class="row-check product-check" value="<%= p._id %>" onclick="event.stopPropagation()" onchange="updateSelectedRows()"></td>
+                  <td class="star-col"><button type="button" class="star-btn" data-id="<%= p._id %>" onclick="event.stopPropagation();toggleFavorite(this)"><i class="fa-regular fa-star"></i></button></td>
+                  <td class="product-code"><%= p.ma_hang %></td>
+                  <td><%= p.ten_hang %></td>
+                  <td><%= p.nhom_hang_id ? p.nhom_hang_id.ten_nhom_hang : '' %></td>
+                  <td class="num"><%= (p.gia_ban||0).toLocaleString('vi-VN') %></td>
+                  <td class="num"><%= (p.gia_von||0).toLocaleString('vi-VN') %></td>
+                  <td class="num"><%= (p.ton_kho||0).toLocaleString('vi-VN') %></td>
+                  <td class="num">0</td>
+                </tr>
+                <tr class="detail-row" id="detail-<%= p._id %>">
+                  <td colspan="9" class="detail-cell">
+                    <div class="detail-tabs">
+                      <button type="button" class="detail-tab active" onclick="switchDetailTab(event,'<%= p._id %>','info')">Thông tin</button>
+                      <button type="button" class="detail-tab" onclick="switchDetailTab(event,'<%= p._id %>','note')">Mô tả, ghi chú</button>
+                      <button type="button" class="detail-tab" onclick="switchDetailTab(event,'<%= p._id %>','card')">Thẻ kho</button>
+                      <button type="button" class="detail-tab" onclick="switchDetailTab(event,'<%= p._id %>','stock')">Tồn kho</button>
+                      <button type="button" class="detail-tab" onclick="switchDetailTab(event,'<%= p._id %>','lot')">Lô - hạn sử dụng</button>
+                      <button type="button" class="detail-tab" onclick="switchDetailTab(event,'<%= p._id %>','channel')">Liên kết kênh bán</button>
+                    </div>
+                    <div class="detail-content">
+                      <div class="detail-pane active" data-detail-pane="<%= p._id %>-info">
+                        <div class="detail-head">
+                          <div class="detail-image">
+                            <% if (p.anh_san_pham && p.anh_san_pham.length) { %>
+                              <img src="<%= p.anh_san_pham[0] %>" alt="<%= p.ten_hang %>">
+                            <% } else { %>
+                              <i class="fa-solid fa-image"></i>
+                            <% } %>
+                          </div>
+                          <div>
+                            <h2 class="detail-name"><%= p.ten_hang %></h2>
+                            <div class="detail-meta">Nhóm hàng: <strong><%= p.nhom_hang_id ? p.nhom_hang_id.ten_nhom_hang : 'Chưa có' %></strong></div>
+                            <div class="detail-badges">
+                              <span class="detail-badge"><%= p.loai_hang === 'dich_vu' ? 'Dịch vụ' : (p.loai_hang === 'combo' ? 'Combo - đóng gói' : 'Hàng hóa') %></span>
+                              <% if (p.quan_ly_theo_lo) { %><span class="detail-badge">Lô, hạn sử dụng</span><% } %>
+                              <% if (p.ban_truc_tiep) { %><span class="detail-badge">Bán trực tiếp</span><% } %>
+                              <span class="detail-badge warn">Không tích điểm</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="detail-grid">
+                          <div><div class="detail-label">Mã hàng</div><div class="detail-value"><%= p.ma_hang %></div></div>
+                          <div><div class="detail-label">Định mức tồn</div><div class="detail-value"><%= (p.dinh_muc_ton_thap||0).toLocaleString('vi-VN') %> - <%= (p.dinh_muc_ton_cao||0).toLocaleString('vi-VN') %></div></div>
+                          <div><div class="detail-label">Giá vốn</div><div class="detail-value"><%= (p.gia_von||0).toLocaleString('vi-VN') %></div></div>
+                          <div><div class="detail-label">Giá bán</div><div class="detail-value"><%= (p.gia_ban||0).toLocaleString('vi-VN') %></div></div>
+                          <div><div class="detail-label">Thương hiệu</div><div class="detail-value"><%= p.thuong_hieu_id ? p.thuong_hieu_id.ten_thuong_hieu : 'Chưa có' %></div></div>
+                          <div><div class="detail-label">Vị trí</div><div class="detail-value"><%= p.vi_tri_id ? p.vi_tri_id.ten_vi_tri : 'Chưa có' %></div></div>
+                          <div><div class="detail-label">Trọng lượng</div><div class="detail-value"><%= p.trong_luong ? (p.trong_luong + ' ' + p.don_vi_trong_luong) : 'Chưa có' %></div></div>
+                          <div><div class="detail-label">Đơn vị tính</div><div class="detail-value"><%= p.don_vi_tinh || 'cái' %></div></div>
+                        </div>
+                        <a href="#" class="detail-link" onclick="event.preventDefault()">Thêm thuộc tính</a>
+                      </div>
+
+                      <div class="detail-pane" data-detail-pane="<%= p._id %>-note">
+                        <div class="detail-value" style="border-bottom:none;min-height:78px"><%= p.mo_ta || 'Chưa có mô tả, ghi chú' %></div>
+                      </div>
+
+                      <div class="detail-pane" data-detail-pane="<%= p._id %>-card">
+                        <div class="product-empty" style="padding:42px 16px">Chưa có dữ liệu thẻ kho</div>
+                      </div>
+
+                      <div class="detail-pane" data-detail-pane="<%= p._id %>-stock">
+                        <table class="detail-mini-table">
+                          <thead>
+                            <tr>
+                              <th>Chi nhánh</th>
+                              <th class="num">Tồn kho</th>
+                              <th class="num">KH đặt</th>
+                              <th>Dự kiến hết hàng</th>
+                              <th>Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td></td>
+                              <td class="num"><%= (p.ton_kho||0).toLocaleString('vi-VN') %></td>
+                              <td class="num">0</td>
+                              <td></td>
+                              <td></td>
+                            </tr>
+                            <% if (safeStores.length > 0) { %>
+                              <% safeStores.forEach((store, index) => { %>
+                                <tr>
+                                  <td><%= store.ten_cua_hang || 'Chi nhánh trung tâm' %></td>
+                                  <td class="num"><%= index === 0 ? (p.ton_kho||0).toLocaleString('vi-VN') : '0' %></td>
+                                  <td class="num">0</td>
+                                  <td><%= (p.ton_kho||0) > 0 && index === 0 ? '30 ngày' : '0 ngày' %></td>
+                                  <td><span class="detail-status"><%= store.trang_thai || 'Đang kinh doanh' %></span></td>
+                                </tr>
+                              <% }) %>
+                            <% } else { %>
+                              <tr>
+                                <td>Chi nhánh trung tâm</td>
+                                <td class="num"><%= (p.ton_kho||0).toLocaleString('vi-VN') %></td>
+                                <td class="num">0</td>
+                                <td><%= (p.ton_kho||0) > 0 ? '30 ngày' : '0 ngày' %></td>
+                                <td><span class="detail-status">Đang kinh doanh</span></td>
+                              </tr>
+                            <% } %>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div class="detail-pane" data-detail-pane="<%= p._id %>-lot">
+                        <table class="detail-mini-table">
+                          <thead>
+                            <tr>
+                              <th>Số lô</th>
+                              <th>Hạn sử dụng</th>
+                              <th class="num">Số lượng</th>
+                              <th>Trạng thái</th>
+                            </tr>
+                          </thead>
+                        </table>
+                        <div class="lot-toolbar">
+                          <div class="lot-search">
+                            <input type="text" placeholder="Tìm theo lô, hạn sử dụng">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                          </div>
+                          <div></div>
+                          <div class="num">0</div>
+                          <select class="filter-control">
+                            <option>Còn hàng</option>
+                            <option>Hết hàng</option>
+                          </select>
+                        </div>
+                        <div class="lot-empty">
+                          <div class="lot-empty-icon"><i class="fa-solid fa-inbox"></i></div>
+                          <div>Không tìm thấy kết quả nào phù hợp</div>
+                        </div>
+                        <div class="lot-footer">
+                          <button type="button" class="detail-action-btn" onclick="exportProductLots('<%= p.ma_hang %>')"><i class="fa-solid fa-file-export"></i> Xuất file</button>
+                        </div>
+                      </div>
+
+                      <div class="detail-pane" data-detail-pane="<%= p._id %>-channel">
+                        <div class="product-empty" style="padding:42px 16px">Chưa liên kết kênh bán</div>
+                      </div>
+
+                      <div class="detail-actions">
+                        <div class="detail-actions-left">
+                          <button type="button" class="detail-action-btn" onclick="deleteProduct('<%= p._id %>')"><i class="fa-regular fa-trash-can"></i> Xóa</button>
+                          <button type="button" class="detail-action-btn" onclick="copyProduct('<%= p._id %>')"><i class="fa-regular fa-copy"></i> Sao chép</button>
+                        </div>
+                        <div class="detail-actions-right">
+                          <button type="button" class="detail-action-btn primary" onclick="editProduct('<%= p._id %>')"><i class="fa-solid fa-pen"></i> Chỉnh sửa</button>
+                          <button type="button" class="detail-action-btn"><i class="fa-solid fa-print"></i> In tem mã</button>
+                          <button type="button" class="detail-action-btn"><i class="fa-solid fa-ellipsis"></i></button>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+              <% if(!safeProducts.length) { %>
+                <tr><td colspan="9" class="product-empty">Không tìm thấy hàng hóa phù hợp</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </form>
+
+  <!-- ===== MODAL TẠO HÀNG HÓA ===== -->
+  <div class="hh-modal-overlay" id="hhModal">
+    <div class="hh-modal">
+      <div class="hh-modal-header">
+        <h2 id="hhModalTitle">Tạo hàng hóa</h2>
+        <button onclick="closeHHModal()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <div class="hh-tabs">
+        <div class="hh-tab active" onclick="switchTab('thongtin',this)">Thông tin</div>
+        <div class="hh-tab" onclick="switchTab('mota',this)">Mô tả</div>
+      </div>
+
+      <form id="hhForm" enctype="multipart/form-data">
+        <input type="hidden" name="loai_hang" id="inp-loaihang" value="hang_hoa">
+        <div class="hh-body">
+
+          <!-- TAB THÔNG TIN -->
+          <div class="hh-tab-pane active" id="tab-thongtin">
+            <div class="hh-top-row">
+              <div class="hh-top-left">
+                <div class="hh-field">
+                  <label>Mã hàng</label>
+                  <input class="hh-input" type="text" name="ma_hang" placeholder="Tự động">
+                </div>
+                <!-- Tên hàng -->
+                <div class="hh-field">
+                  <label>Tên hàng <span class="req">*</span></label>
+                  <input class="hh-input" type="text" name="ten_hang" placeholder="Bắt buộc" required>
+                </div>
+                <!-- Nhóm hàng & Thương hiệu -->
+                <div class="hh-row2">
+                  <div class="hh-field">
+                    <div class="hh-label-row">
+                      <label>Nhóm hàng</label>
+                      <a class="hh-create-link" onclick="quickCreate('nhom')">Tạo mới</a>
+                    </div>
+                    <select class="hh-input" name="nhom_hang_id" id="sel-nhom">
+                      <option value="">Chọn nhóm hàng (Bắt buộc)</option>
+                      <% safeCategories.forEach(c => { %>
+                      <option value="<%= c._id %>"><%= c.ten_nhom_hang %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="hh-field">
+                    <div class="hh-label-row">
+                      <label>Thương hiệu</label>
+                      <a class="hh-create-link" onclick="quickCreate('thuonghieu')">Tạo mới</a>
+                    </div>
+                    <select class="hh-input" name="thuong_hieu_id" id="sel-thuonghieu">
+                      <option value="">Chọn thương hiệu</option>
+                      <% safeBrands.forEach(b => { %>
+                      <option value="<%= b._id %>"><%= b.ten_thuong_hieu %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thêm ảnh bên phải -->
+              <div class="hh-top-right">
+                <label class="hh-img-upload-btn" for="imgInput">
+                  <i class="fas fa-camera"></i> Thêm ảnh
+                </label>
+                <input type="file" id="imgInput" name="anh_san_pham" accept="image/*" multiple style="display:none" onchange="previewImgs(this)">
+                <div class="hh-img-hint">Mỗi ảnh không quá 2 MB</div>
+                <div class="hh-img-previews" id="imgPreviews"></div>
+              </div>
+            </div>
+
+            <div class="hh-section combo-section" id="sec-combo">
+              <div class="hh-section-head" onclick="toggleSection('sec-combo')">
+                <h3>Hàng thành phần</h3>
+                <i class="fas fa-chevron-up"></i>
+              </div>
+              <div class="hh-section-body">
+                <input class="combo-component-search" type="text" placeholder="Thêm hàng thành phần" disabled>
+                <table class="combo-table">
+                  <thead>
+                    <tr>
+                      <th>STT</th>
+                      <th>Mã hàng</th>
+                      <th>Tên hàng thành phần</th>
+                      <th>Số lượng</th>
+                      <th>Giá vốn</th>
+                      <th>Tổng giá vốn</th>
+                      <th>Giá bán</th>
+                      <th>Tổng giá bán</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td colspan="8">Chưa có hàng thành phần</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- SECTION: Giá vốn, giá bán -->
+            <div class="hh-section" id="sec-gia">
+              <div class="hh-section-head" onclick="toggleSection('sec-gia')">
+                <h3>Giá vốn, giá bán</h3>
+                <i class="fas fa-chevron-up"></i>
+              </div>
+              <div class="hh-section-body">
+                <div class="hh-price-note">
+                  <i class="fas fa-gem" style="color:#0070f4"></i> Thiết lập giá
+                </div>
+                <div class="hh-row2">
+                  <div class="hh-field">
+                    <label>Giá vốn</label>
+                    <input class="hh-input hh-num" type="text" name="gia_von" value="8,000" id="inp-giavon">
+                  </div>
+                  <div class="hh-field">
+                    <label>Giá bán</label>
+                    <input class="hh-input hh-num" type="text" name="gia_ban" value="10,000" id="inp-giaban">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION: Tồn kho -->
+            <div class="hh-section stock-section" id="sec-ton">
+              <div class="hh-section-head" onclick="toggleSection('sec-ton')">
+                <h3>Tồn kho</h3>
+                <i class="fas fa-chevron-up"></i>
+              </div>
+              <div class="hh-section-body">
+                <p class="hh-section-desc">Quản lý số lượng tồn kho và định mức tồn. Khi tồn kho chạm đến định mức, bạn sẽ nhận được cảnh báo từ KiotViet.</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                  <div class="hh-field">
+                    <label>Quản lý theo lô, hạn sử dụng</label>
+                    <select class="hh-input" name="quan_ly_theo_lo" id="sel-lo">
+                      <option value="false">Có</option>
+                      <option value="true">Không</option>
+                    </select>
+                  </div>
+                  <div class="hh-field">
+                    <label>Định mức tồn thấp nhất</label>
+                    <input class="hh-input hh-num" type="text" name="dinh_muc_ton_thap" value="0">
+                  </div>
+                  <div class="hh-field">
+                    <label>Định mức tồn cao nhất</label>
+                    <input class="hh-input hh-num" type="text" name="dinh_muc_ton_cao" value="999,999,999">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION: Vị trí, trọng lượng -->
+            <div class="hh-section position-section" id="sec-vitri">
+              <div class="hh-section-head" onclick="toggleSection('sec-vitri')">
+                <h3>Vị trí, trọng lượng</h3>
+                <i class="fas fa-chevron-up"></i>
+              </div>
+              <div class="hh-section-body">
+                <p class="hh-section-desc">Quản lý việc sắp xếp kho, vị trí bán hàng hoặc trọng lượng hàng hóa</p>
+                <div class="hh-row2">
+                  <div class="hh-field">
+                    <div class="hh-label-row">
+                      <label>Vị trí</label>
+                      <a class="hh-create-link" onclick="quickCreate('vitri')">Tạo mới</a>
+                    </div>
+                    <select class="hh-input" name="vi_tri_id" id="sel-vitri">
+                      <option value="">Chọn vị trí</option>
+                      <% safeLocations.forEach(v => { %>
+                      <option value="<%= v._id %>"><%= v.ten_vi_tri %></option>
+                      <% }) %>
+                    </select>
+                  </div>
+                  <div class="hh-field">
+                    <label>Trọng lượng</label>
+                    <div class="hh-weight-row">
+                      <input class="hh-input hh-num" type="text" name="trong_luong" value="0">
+                      <select class="hh-input" name="don_vi_trong_luong">
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                        <option value="mg">mg</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION: Đơn vị tính và thuộc tính -->
+            <div class="hh-section" id="sec-donvi">
+              <div class="hh-section-head" onclick="toggleSection('sec-donvi')">
+                <h3>Quản lý theo đơn vị tính và thuộc tính</h3>
+                <i class="fas fa-chevron-up"></i>
+              </div>
+              <div class="hh-section-body">
+                <div class="hh-unit-setup">
+                  <p class="hh-unit-desc">Tạo nhiều hàng hoá khác đơn vị tính (chai, lốc, thùng) hoặc đặc điểm (hương vị, dung tích, màu sắc). Mỗi hàng hóa có 1 mã hàng riêng.</p>
+                  <button type="button" class="btn-thiet-lap">Thiết lập</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB MÔ TẢ -->
+          <div class="hh-tab-pane" id="tab-mota">
+            <div class="hh-field">
+              <label>Mô tả hàng hóa</label>
+              <textarea class="hh-input mo-ta-textarea" name="mo_ta" placeholder="Nhập mô tả chi tiết về hàng hóa..."></textarea>
+            </div>
+            <div class="hh-field">
+              <label>Đơn vị tính</label>
+              <input class="hh-input" type="text" name="don_vi_tinh" placeholder="VD: cái, hộp, kg..." value="cái">
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="hh-footer">
+          <div class="hh-footer-left">
+            <input type="checkbox" id="chk-bantructiep" name="ban_truc_tiep" value="true" checked>
+            <label for="chk-bantructiep">Bán trực tiếp</label>
+            <i class="fas fa-info-circle hh-info-icon" title="Cho phép bán mặt hàng này tại quầy"></i>
+          </div>
+          <div class="hh-footer-right">
+            <button type="button" class="btn-bo-qua" onclick="closeHHModal()">Bỏ qua</button>
+            <div class="btn-split-wrap">
+              <button type="button" class="btn-luu-tiep" onclick="submitHH(true)">Lưu &amp; Tạo thêm hàng</button>
+              <button type="button" class="btn-luu" onclick="submitHH(false)">Lưu</button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mini modal tạo nhanh -->
+  <div id="quickModal" style="display:none;position:fixed;z-index:4000;inset:0;background:rgba(0,0,0,.4);align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:8px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.18)">
+      <h3 id="quickTitle" style="font-size:15px;font-weight:700;margin-bottom:14px">Tạo mới</h3>
+      <input id="quickInput" class="hh-input" type="text" placeholder="Nhập tên...">
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+        <button class="btn-bo-qua" onclick="closeQuick()">Hủy</button>
+        <button style="background:#0070f4;color:#fff;border:none;border-radius:4px;padding:8px 18px;font-size:14px;cursor:pointer;font-weight:600" onclick="saveQuick()">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="categoryModal" style="display:none;position:fixed;z-index:4100;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;width:650px;box-shadow:0 20px 46px rgba(0,0,0,.28);overflow:hidden">
+      <div style="height:76px;display:flex;align-items:center;justify-content:space-between;padding:0 30px">
+        <h3 style="font-size:24px;font-weight:800;margin:0">Tạo nhóm hàng</h3>
+        <button type="button" onclick="closeCategoryModal()" style="border:0;background:#fff;font-size:30px;color:#5b646f;cursor:pointer">&times;</button>
+      </div>
+      <div style="padding:0 30px 34px">
+        <label style="display:block;font-size:14px;margin-bottom:8px">Tên nhóm</label>
+        <input id="categoryNameInput" class="hh-input" style="height:40px;border-radius:8px;margin-bottom:18px">
+        <label style="display:block;font-size:14px;margin-bottom:8px">Nhóm cha</label>
+        <select id="categoryParentInput" class="hh-input" style="height:40px;border-radius:8px">
+          <option value="">Chọn nhóm hàng</option>
+          <% safeCategories.forEach(c => { %>
+            <option value="<%= c._id %>"><%= c.ten_nhom_hang %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div style="height:80px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 30px">
+        <button type="button" class="btn-bo-qua" style="height:50px;border-radius:10px;padding:0 22px;font-size:16px;font-weight:800" onclick="closeCategoryModal()">Bỏ qua</button>
+        <button type="button" style="height:50px;border:0;border-radius:10px;background:#0070f4;color:#fff;font-size:18px;font-weight:900;padding:0 24px;cursor:pointer" onclick="saveCategory()">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  const productsForExport = <%- JSON.stringify(safeProducts.map(p => ({
+    ma_hang: p.ma_hang || '',
+    ten_hang: p.ten_hang || '',
+    nhom_hang: p.nhom_hang_id ? p.nhom_hang_id.ten_nhom_hang : '',
+    gia_ban: p.gia_ban || 0,
+    gia_von: p.gia_von || 0,
+    ton_kho: p.ton_kho || 0,
+    khach_dat: 0
+  }))) %>;
+  const productsData = <%- JSON.stringify(safeProducts.map(p => ({
+    _id: String(p._id),
+    ma_hang: p.ma_hang || '',
+    ten_hang: p.ten_hang || '',
+    loai_hang: p.loai_hang || 'hang_hoa',
+    mo_ta: p.mo_ta || '',
+    don_vi_tinh: p.don_vi_tinh || 'cái',
+    nhom_hang_id: p.nhom_hang_id ? String(p.nhom_hang_id._id) : '',
+    thuong_hieu_id: p.thuong_hieu_id ? String(p.thuong_hieu_id._id) : '',
+    vi_tri_id: p.vi_tri_id ? String(p.vi_tri_id._id) : '',
+    gia_von: p.gia_von || 0,
+    gia_ban: p.gia_ban || 0,
+    dinh_muc_ton_thap: p.dinh_muc_ton_thap || 0,
+    dinh_muc_ton_cao: p.dinh_muc_ton_cao || 999999999,
+    trong_luong: p.trong_luong || 0,
+    don_vi_trong_luong: p.don_vi_trong_luong || 'g',
+    quan_ly_theo_lo: !!p.quan_ly_theo_lo,
+    ban_truc_tiep: p.ban_truc_tiep !== false
+  }))) %>;
+  const productsById = productsData.reduce((acc, product) => {
+    acc[product._id] = product;
+    return acc;
+  }, {});
+  let editingProductId = null;
+
+  function submitFilters() {
+    document.getElementById('filterForm').submit();
+  }
+
+  function resetFilters() {
+    window.location.href = '/hang-hoa';
+  }
+
+  function toggleFilters() {
+    document.getElementById('productSidebar').classList.toggle('open');
+  }
+
+  function toggleProductDetail(id) {
+    document.querySelectorAll('.detail-row').forEach(row => {
+      if (row.id !== 'detail-' + id) row.classList.remove('open');
+    });
+    document.querySelectorAll('.product-row').forEach(row => {
+      row.classList.toggle('expanded', row.dataset.id === id && !document.getElementById('detail-' + id).classList.contains('open'));
+      if (row.dataset.id !== id) row.classList.remove('expanded');
+    });
+    const detail = document.getElementById('detail-' + id);
+    const willOpen = !detail.classList.contains('open');
+    detail.classList.toggle('open', willOpen);
+    const row = document.querySelector('.product-row[data-id="' + id + '"]');
+    if (row) row.classList.toggle('expanded', willOpen);
+  }
+
+  function switchDetailTab(event, productId, tabName) {
+    event.stopPropagation();
+    const detail = document.getElementById('detail-' + productId);
+    if (!detail) return;
+    detail.querySelectorAll('.detail-tab').forEach(tab => tab.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    detail.querySelectorAll('.detail-pane').forEach(pane => pane.classList.remove('active'));
+    const pane = detail.querySelector('[data-detail-pane="' + productId + '-' + tabName + '"]');
+    if (pane) pane.classList.add('active');
+  }
+
+  function toggleAllRows(source) {
+    document.querySelectorAll('.product-check').forEach(cb => {
+      cb.checked = source.checked;
+    });
+    updateSelectedRows();
+  }
+
+  function updateSelectedRows() {
+    const checks = Array.from(document.querySelectorAll('.product-check'));
+    const selected = checks.filter(cb => cb.checked).length;
+    const bar = document.getElementById('selectedBar');
+    document.getElementById('selectedCount').textContent = selected;
+    bar.classList.toggle('show', selected > 0);
+
+    const checkAll = document.getElementById('checkAll');
+    if (checkAll) {
+      checkAll.checked = checks.length > 0 && selected === checks.length;
+      checkAll.indeterminate = selected > 0 && selected < checks.length;
+    }
+  }
+
+  function getFavoriteIds() {
+    try {
+      return JSON.parse(localStorage.getItem('favoriteProducts') || '[]');
+    } catch(e) {
+      return [];
+    }
+  }
+
+  function setFavoriteIds(ids) {
+    localStorage.setItem('favoriteProducts', JSON.stringify(ids));
+  }
+
+  function applyFavoriteState() {
+    const ids = getFavoriteIds();
+    document.querySelectorAll('.star-btn').forEach(btn => {
+      const active = ids.includes(btn.dataset.id);
+      btn.classList.toggle('active', active);
+      btn.innerHTML = active ? '<i class="fa-solid fa-star"></i>' : '<i class="fa-regular fa-star"></i>';
+    });
+  }
+
+  function toggleFavorite(btn) {
+    const ids = getFavoriteIds();
+    const id = btn.dataset.id;
+    const next = ids.includes(id) ? ids.filter(x => x !== id) : ids.concat(id);
+    setFavoriteIds(next);
+    applyFavoriteState();
+  }
+
+  function exportProductsCsv() {
+    const headers = ['Mã hàng','Tên hàng','Nhóm hàng','Giá bán','Giá vốn','Tồn kho','Khách đặt'];
+    const rows = productsForExport.map(p => [
+      p.ma_hang, p.ten_hang, p.nhom_hang, p.gia_ban, p.gia_von, p.ton_kho, p.khach_dat
+    ]);
+    const csv = [headers].concat(rows).map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'danh-sach-hang-hoa.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function exportProductLots(productCode) {
+    const headers = ['Mã hàng','Số lô','Hạn sử dụng','Số lượng','Trạng thái'];
+    const csv = [headers].map(row => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'lo-han-su-dung-' + productCode + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function csvCell(value) {
+    const text = String(value == null ? '' : value);
+    return '"' + text.replace(/"/g, '""') + '"';
+  }
+
+  function formatFormNumber(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? n.toLocaleString('vi-VN') : '0';
+  }
+
+  function setFormValue(form, name, value) {
+    const field = form.elements[name];
+    if (!field) return;
+    if (field.type === 'checkbox') field.checked = !!value;
+    else field.value = value == null ? '' : value;
+  }
+
+  function fillProductForm(product) {
+    const form = document.getElementById('hhForm');
+    setProductType(product.loai_hang || 'hang_hoa');
+    setFormValue(form, 'ma_hang', product.ma_hang);
+    setFormValue(form, 'ten_hang', product.ten_hang);
+    setFormValue(form, 'nhom_hang_id', product.nhom_hang_id);
+    setFormValue(form, 'thuong_hieu_id', product.thuong_hieu_id);
+    setFormValue(form, 'gia_von', formatFormNumber(product.gia_von));
+    setFormValue(form, 'gia_ban', formatFormNumber(product.gia_ban));
+    setFormValue(form, 'quan_ly_theo_lo', String(product.quan_ly_theo_lo));
+    setFormValue(form, 'dinh_muc_ton_thap', formatFormNumber(product.dinh_muc_ton_thap));
+    setFormValue(form, 'dinh_muc_ton_cao', formatFormNumber(product.dinh_muc_ton_cao));
+    setFormValue(form, 'vi_tri_id', product.vi_tri_id);
+    setFormValue(form, 'trong_luong', formatFormNumber(product.trong_luong));
+    setFormValue(form, 'don_vi_trong_luong', product.don_vi_trong_luong);
+    setFormValue(form, 'mo_ta', product.mo_ta);
+    setFormValue(form, 'don_vi_tinh', product.don_vi_tinh);
+    document.getElementById('chk-bantructiep').checked = !!product.ban_truc_tiep;
+  }
+
+  function editProduct(id) {
+    const product = productsById[id];
+    if (!product) return;
+    editingProductId = id;
+    document.getElementById('hhModalTitle').textContent = 'Chỉnh sửa hàng hóa';
+    document.querySelector('.btn-luu-tiep').style.display = 'none';
+    document.getElementById('imgPreviews').innerHTML = '';
+    document.getElementById('hhModal').classList.add('open');
+    fillProductForm(product);
+    document.getElementById('hhModalTitle').textContent = 'Chỉnh sửa ' + productTypeLabel(product.loai_hang || 'hang_hoa').toLowerCase();
+  }
+
+  function copyProduct(id) {
+    const product = productsById[id];
+    if (!product) return;
+    openHHModal(product.loai_hang || 'hang_hoa');
+    product.ma_hang = '';
+    fillProductForm(Object.assign({}, product, { ten_hang: product.ten_hang + ' - Sao chép' }));
+  }
+
+  async function deleteProduct(id) {
+    const product = productsById[id];
+    if (!product) return;
+    if (!confirm('Xóa hàng hóa "' + product.ten_hang + '"?')) return;
+    try {
+      const res = await fetch('/hang-hoa/' + id + '/delete', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message || (data.success ? 'Đã xóa hàng hóa' : 'Không xóa được hàng hóa'));
+      if (data.success) location.reload();
+    } catch(e) {
+      alert('Không xóa được hàng hóa');
+    }
+  }
+
+  async function importProductsFile(input) {
+    if (!input.files || !input.files[0]) return;
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    try {
+      const res = await fetch('/hang-hoa/import', { method: 'POST', body: fd });
+      const data = await res.json();
+      alert(data.message || (data.success ? 'Import thành công' : 'Import thất bại'));
+      if (data.success) location.reload();
+    } catch(e) {
+      alert('Không import được file');
+    } finally {
+      input.value = '';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    applyFavoriteState();
+    updateSelectedRows();
+  });
+
+  // ---- Tab switching ----
+  function switchTab(name, el) {
+    document.querySelectorAll('.hh-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.hh-tab-pane').forEach(p=>p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-'+name).classList.add('active');
+  }
+
+  function productTypeLabel(type) {
+    return type === 'dich_vu' ? 'Dịch vụ' : type === 'combo' ? 'Combo - đóng gói' : 'Hàng hóa';
+  }
+
+  function toggleCreateMenu(event) {
+    event.stopPropagation();
+    document.getElementById('createMenu').classList.toggle('open');
+  }
+
+  function openCreateType(type) {
+    document.getElementById('createMenu').classList.remove('open');
+    openHHModal(type);
+  }
+
+  document.addEventListener('click', function(e) {
+    const wrap = document.getElementById('createMenuWrap');
+    if (wrap && !wrap.contains(e.target)) document.getElementById('createMenu').classList.remove('open');
+  });
+
+  function setProductType(type) {
+    const modal = document.querySelector('.hh-modal');
+    const normalized = ['hang_hoa', 'dich_vu', 'combo'].includes(type) ? type : 'hang_hoa';
+    document.getElementById('inp-loaihang').value = normalized;
+    modal.classList.toggle('service-mode', normalized === 'dich_vu');
+    modal.classList.toggle('combo-mode', normalized === 'combo');
+    document.getElementById('hhModalTitle').textContent = 'Tạo ' + productTypeLabel(normalized).toLowerCase();
+    const costField = document.getElementById('inp-giavon')?.closest('.hh-field');
+    if (costField) costField.style.display = normalized === 'combo' ? 'none' : '';
+    const unitInput = document.querySelector('[name="don_vi_tinh"]');
+    if (unitInput && normalized === 'dich_vu') unitInput.value = 'lần';
+    if (unitInput && normalized !== 'dich_vu' && !unitInput.value) unitInput.value = 'cái';
+  }
+
+  // ---- Modal open/close ----
+  function openHHModal(type = 'hang_hoa') {
+    editingProductId = null;
+    document.getElementById('hhModalTitle').textContent = 'Tạo hàng hóa';
+    document.querySelector('.btn-luu-tiep').style.display = '';
+    document.getElementById('hhModal').classList.add('open');
+    document.getElementById('hhForm').reset();
+    document.getElementById('imgPreviews').innerHTML='';
+    setProductType(type);
+  }
+  function closeHHModal() {
+    document.getElementById('hhModal').classList.remove('open');
+  }
+  document.getElementById('hhModal').addEventListener('click', function(e){
+    if(e.target===this) closeHHModal();
+  });
+
+  // ---- Collapse sections ----
+  function toggleSection(id) {
+    document.getElementById(id).classList.toggle('collapsed');
+  }
+
+  // ---- Image preview ----
+  function previewImgs(input) {
+    const box = document.getElementById('imgPreviews');
+    box.innerHTML = '';
+    Array.from(input.files).slice(0,4).forEach(f => {
+      const img = document.createElement('img');
+      img.className = 'hh-img-preview';
+      img.src = URL.createObjectURL(f);
+      box.appendChild(img);
+    });
+  }
+
+  // ---- Format number inputs ----
+  document.querySelectorAll('.hh-num').forEach(inp => {
+    inp.addEventListener('focus', function(){ this.value = this.value.replace(/,/g,''); });
+    inp.addEventListener('blur', function(){
+      const n = parseFloat(this.value.replace(/,/g,''));
+      if(!isNaN(n)) this.value = n.toLocaleString('vi-VN');
+    });
+  });
+
+  // ---- Submit ----
+  async function submitHH(continueAdd) {
+    const form = document.getElementById('hhForm');
+    const fd = new FormData(form);
+    // Convert formatted number fields
+    ['gia_von','gia_ban','dinh_muc_ton_thap','dinh_muc_ton_cao','trong_luong'].forEach(k => {
+      const v = fd.get(k);
+      if(v) fd.set(k, v.replace(/\./g,'').replace(/,/g,''));
+    });
+    fd.set('ban_truc_tiep', document.getElementById('chk-bantructiep').checked ? 'true' : 'false');
+    try {
+      const endpoint = editingProductId ? `/hang-hoa/${editingProductId}/update` : '/hang-hoa/add';
+      const res = await fetch(endpoint, { method:'POST', body: fd });
+      const data = await res.json();
+      if(data.success) {
+        if(continueAdd && !editingProductId) { form.reset(); document.getElementById('imgPreviews').innerHTML=''; }
+        else { closeHHModal(); location.reload(); }
+      } else { alert(data.message || 'Có lỗi xảy ra'); }
+    } catch(e) { alert('Lỗi kết nối'); }
+  }
+
+  // ---- Quick create ----
+  let _quickType = '';
+  function quickCreate(type) {
+    _quickType = type;
+    if (type === 'nhom') {
+      document.getElementById('categoryNameInput').value = '';
+      document.getElementById('categoryParentInput').value = '';
+      document.getElementById('categoryModal').style.display = 'flex';
+      setTimeout(() => document.getElementById('categoryNameInput').focus(), 50);
+      return;
+    }
+    const titles = {nhom:'Tạo nhóm hàng mới', thuonghieu:'Tạo thương hiệu mới', vitri:'Tạo vị trí mới'};
+    document.getElementById('quickTitle').textContent = titles[type]||'Tạo mới';
+    document.getElementById('quickInput').value = '';
+    const m = document.getElementById('quickModal');
+    m.style.display = 'flex';
+  }
+  function closeQuick() {
+    document.getElementById('quickModal').style.display = 'none';
+  }
+  function closeCategoryModal() {
+    document.getElementById('categoryModal').style.display = 'none';
+  }
+  async function saveCategory() {
+    const nameInput = document.getElementById('categoryNameInput');
+    const parentInput = document.getElementById('categoryParentInput');
+    const val = nameInput.value.trim();
+    if(!val) return alert('Vui lòng nhập tên nhóm');
+    try {
+      const res = await fetch('/hang-hoa/nhom-hang/add', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ten_nhom_hang: val, nhom_cha_id: parentInput.value})
+      });
+      const data = await res.json();
+      if(data.success) {
+        const formSelect = document.getElementById('sel-nhom');
+        if(formSelect) {
+          const opt = document.createElement('option');
+          opt.value = data.data._id;
+          opt.textContent = val;
+          opt.selected = true;
+          formSelect.appendChild(opt);
+        }
+        const filterSelect = document.querySelector('select[name="nhom_hang_id"]');
+        if(filterSelect) {
+          const opt = document.createElement('option');
+          opt.value = data.data._id;
+          opt.textContent = val;
+          filterSelect.appendChild(opt);
+        }
+        const parentOption = document.createElement('option');
+        parentOption.value = data.data._id;
+        parentOption.textContent = val;
+        parentInput.appendChild(parentOption);
+        closeCategoryModal();
+      } else { alert(data.message || 'Không tạo được nhóm hàng'); }
+    } catch(e) { alert('Lỗi kết nối'); }
+  }
+  async function saveQuick() {
+    const val = document.getElementById('quickInput').value.trim();
+    if(!val) return alert('Vui lòng nhập tên');
+    const endpoints = {nhom:'/hang-hoa/nhom-hang/add', thuonghieu:'/hang-hoa/thuong-hieu/add', vitri:'/hang-hoa/vi-tri/add'};
+    const bodies = {nhom:{ten_nhom_hang:val}, thuonghieu:{ten_thuong_hieu:val}, vitri:{ten_vi_tri:val}};
+    const selIds = {nhom:'sel-nhom', thuonghieu:'sel-thuonghieu', vitri:'sel-vitri'};
+    try {
+      const res = await fetch(endpoints[_quickType], {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(bodies[_quickType])
+      });
+      const data = await res.json();
+      if(data.success) {
+        const sel = document.getElementById(selIds[_quickType]);
+        const opt = document.createElement('option');
+        opt.value = data.data._id; opt.textContent = val; opt.selected = true;
+        sel.appendChild(opt);
+        closeQuick();
+      } else { alert(data.message); }
+    } catch(e) { alert('Lỗi'); }
+  }
+  </script>
+</body>
+</html>

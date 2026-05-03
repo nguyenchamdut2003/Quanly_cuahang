@@ -1,0 +1,204 @@
+<%
+  const safeReport = locals.report || {};
+  const rows = Array.isArray(safeReport.rows) ? safeReport.rows : [];
+  const chartRows = Array.isArray(safeReport.chartRows) ? safeReport.chartRows : [];
+  const totals = safeReport.totals || {};
+  const range = safeReport.range || {};
+  const filters = safeReport.filters || {};
+  const viewMode = safeReport.viewMode || 'chart';
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const generatedAt = safeReport.generatedAt ? new Date(safeReport.generatedAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN');
+  const reportUrl = `/bao-cao/ban-hang?view=report&from=${range.from || ''}&to=${range.to || ''}`;
+  const chartUrl = `/bao-cao/ban-hang?view=chart&from=${range.from || ''}&to=${range.to || ''}`;
+  const exportUrl = `/bao-cao/ban-hang/export.csv?from=${range.from || ''}&to=${range.to || ''}`;
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{background:#f3f6f9;color:#20242a}.page{height:calc(100vh - 112px);padding:22px 60px 0;display:grid;grid-template-columns:282px minmax(0,1fr);gap:14px;overflow:hidden}.title{grid-column:1 / -1;font-size:25px;font-weight:800;margin:0 0 6px}.filters{background:#fff;border-radius:8px;padding:14px;overflow:auto}.filter-block{margin-bottom:24px}.filter-title{font-size:17px;font-weight:800;margin-bottom:12px}.mode-row{display:flex;gap:8px}.mode-btn{height:36px;border:1px solid #cfd8e3;border-radius:20px;background:#fff;padding:0 16px;font-size:16px;text-decoration:none;color:#1f2937;display:inline-flex;align-items:center;font-weight:600}.mode-btn.active{background:#0070f4;border-color:#0070f4;color:#fff;font-weight:800}.line{height:1px;background:#e5e9ee;margin:20px 0}.select,.input{height:36px;width:100%;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 12px;font-size:15px;color:#1f2937}.input::placeholder{color:#8b95a1}.radio-row{display:flex;align-items:center;gap:9px;margin:9px 0}.radio-row input[type=radio]{width:18px;height:18px;accent-color:#0070f4}.date-box{height:36px;border:1px solid #cfd8e3;border-radius:8px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;flex:1;background:#fff}.date-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-left:26px;margin-top:8px}.btn{height:36px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 14px;font-weight:800;cursor:pointer;text-decoration:none;color:#111827;display:inline-flex;align-items:center;gap:8px}.btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}.filter-actions{display:flex;gap:8px}.content{min-width:0;overflow:hidden}.chart-card{height:calc(100vh - 250px);min-height:560px;background:#fff;position:relative;padding:16px 0 0}.chart-title{text-align:center;font-size:18px;color:#344054;margin-bottom:20px}.chart-wrap{height:500px;padding:0 6px 0 0}.loan-banner{margin-top:22px;height:76px;border:1px solid #9ee7be;background:#f2fff7;border-radius:8px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;color:#111827}.loan-left{display:flex;align-items:center;gap:18px}.money-icon{width:26px;height:26px;border-radius:50%;background:#00a651;color:#fff;display:flex;align-items:center;justify-content:center}.report-shell{background:#8c98a6;height:calc(100vh - 176px);overflow:auto;position:relative}.viewer-bar{height:40px;display:flex;align-items:center;justify-content:center;gap:20px;color:#fff;position:sticky;top:0;background:#8c98a6;z-index:2}.viewer-bar button,.viewer-bar a{border:0;background:transparent;color:#fff;font-size:16px;text-decoration:none;cursor:pointer}.viewer-page{width:970px;min-height:690px;background:#fff;margin:0 auto 26px;padding:18px 16px 40px;box-shadow:0 1px 2px rgba(0,0,0,.12)}.doc-meta{font-size:14px;color:#444;margin-bottom:4px}.doc-title{text-align:center;font-size:29px;font-weight:800;margin:4px 0 12px}.doc-sub{text-align:center;color:#444;line-height:1.9}.report-table{margin-top:12px;width:100%;border-collapse:collapse;font-size:15px}.report-table th{height:48px;background:#b9e9fb;color:#27313f;font-weight:800;text-align:left;border:1px solid #c9d8df;padding:0 12px}.report-table th.num,.report-table td.num{text-align:right}.report-table td{height:50px;border-bottom:1px solid #d4d8dd;padding:0 12px;text-align:left}.total-row td{background:#f6f1d8;font-weight:800}.toggle{width:16px;height:16px;border:1px solid #333;display:inline-flex;align-items:center;justify-content:center;margin-right:8px;cursor:pointer;font-size:12px;line-height:1}.date-link{color:#006dff;font-weight:800;text-decoration:none}.detail-row td{background:#fff;color:#475467}.negative{color:#d11111}.chat{position:fixed;right:14px;bottom:10px;background:#0070f4;color:#fff;border-radius:8px;height:36px;display:flex;align-items:center;gap:6px;padding:0 12px;font-weight:800}@media print{body{background:#fff}.topbar,.nav-bar,.filters,.viewer-bar,.chat{display:none!important}.page{display:block;height:auto;padding:0}.title{display:none}.report-shell{background:#fff;overflow:visible;height:auto}.viewer-page{box-shadow:none;margin:0;width:auto;min-height:auto}}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+
+  <form class="page" method="GET" action="/bao-cao/ban-hang">
+    <input type="hidden" name="view" value="<%= viewMode %>">
+    <h1 class="title">Báo cáo bán hàng</h1>
+
+    <aside class="filters">
+      <% if (viewMode === 'report') { %>
+        <div class="filter-block">
+          <a class="btn" href="<%= exportUrl %>"><i class="fa-solid fa-file-export"></i> Xuất tất cả</a>
+        </div>
+      <% } %>
+
+      <div class="filter-block">
+        <div class="filter-title">Kiểu hiển thị<%= viewMode === 'report' ? ' <span style="color:#0070f4">•</span>' : '' %></div>
+        <div class="mode-row">
+          <a class="mode-btn <%= viewMode === 'chart' ? 'active' : '' %>" href="<%= chartUrl %>">Biểu đồ</a>
+          <a class="mode-btn <%= viewMode === 'report' ? 'active' : '' %>" href="<%= reportUrl %>">Báo cáo</a>
+        </div>
+        <div class="line"></div>
+        <% if (viewMode === 'report') { %>
+          <select class="select" name="layout"><option>Hiển thị dọc</option><option>Hiển thị ngang</option></select>
+        <% } %>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Mối quan tâm</div>
+        <select class="select" name="focus">
+          <option value="time" <%= filters.focus === 'time' ? 'selected' : '' %>>Thời gian</option>
+          <option value="customer" <%= filters.focus === 'customer' ? 'selected' : '' %>>Khách hàng</option>
+          <option value="product" <%= filters.focus === 'product' ? 'selected' : '' %>>Hàng hóa</option>
+        </select>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Bảng giá</div>
+        <input class="input" name="price_table" value="<%= filters.price_table || '' %>" placeholder="Chọn bảng giá">
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Thời gian</div>
+        <label class="radio-row">
+          <input type="radio" checked>
+          <span class="date-box">Tuần này <i class="fa-solid fa-chevron-right"></i></span>
+        </label>
+        <div class="date-pair">
+          <input class="input" type="date" name="from" value="<%= range.from || '' %>">
+          <input class="input" type="date" name="to" value="<%= range.to || '' %>">
+        </div>
+        <label class="radio-row">
+          <input type="radio">
+          <span class="date-box">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span>
+        </label>
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Phương thức bán hàng</div>
+        <input class="input" name="sale_method" value="<%= filters.sale_method || '' %>" placeholder="Chọn phương thức bán hàng">
+      </div>
+
+      <div class="filter-block">
+        <div class="filter-title">Kênh bán</div>
+        <input class="input" name="channel" value="<%= filters.channel || '' %>" placeholder="Chọn kênh bán">
+      </div>
+
+      <div class="filter-actions">
+        <button class="btn primary" type="submit">Lọc</button>
+        <a class="btn" href="/bao-cao/ban-hang?view=<%= viewMode %>">Bỏ lọc</a>
+      </div>
+    </aside>
+
+    <main class="content">
+      <% if (viewMode === 'chart') { %>
+        <section class="chart-card">
+          <div class="chart-title">Doanh thu thuần tuần này</div>
+          <div class="chart-wrap"><canvas id="salesChart"></canvas></div>
+        </section>
+        <div class="loan-banner">
+          <div class="loan-left">
+            <div class="money-icon"><i class="fa-solid fa-sack-dollar"></i></div>
+            <div><strong>Muốn tăng doanh thu, tăng vốn ngay</strong><br>4,500+ shop đã vay, 1,500+ tỷ giải ngân</div>
+          </div>
+          <i class="fa-solid fa-chevron-right" style="color:#00a651"></i>
+        </div>
+      <% } else { %>
+        <section class="report-shell">
+          <div class="viewer-bar">
+            <button type="button"><i class="fa-solid fa-rotate-left"></i></button>
+            <button type="button"><i class="fa-solid fa-rotate-right"></i></button>
+            <button type="button"><i class="fa-solid fa-arrows-rotate"></i></button>
+            <button type="button"><i class="fa-solid fa-backward-fast"></i></button>
+            <button type="button"><i class="fa-solid fa-backward-step"></i></button>
+            <span style="background:#fff;color:#111;padding:4px 14px">1</span><strong>/ 1</strong>
+            <button type="button"><i class="fa-solid fa-forward-step"></i></button>
+            <button type="button"><i class="fa-solid fa-forward-fast"></i></button>
+            <a href="<%= exportUrl %>"><i class="fa-solid fa-file-lines"></i></a>
+            <a href="<%= exportUrl %>"><i class="fa-solid fa-cloud-arrow-down"></i></a>
+            <button type="button" onclick="window.print()"><i class="fa-solid fa-print"></i></button>
+            <button type="button"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            <button type="button"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+            <button type="button"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <button type="button"><i class="fa-solid fa-expand"></i></button>
+          </div>
+          <div class="viewer-page">
+            <div class="doc-meta">Ngày lập: <%= generatedAt %></div>
+            <div class="doc-title">Báo cáo bán hàng theo thời gian</div>
+            <div class="doc-sub">
+              <div>Từ ngày <%= rows.length ? rows[rows.length - 1].label : '' %> đến ngày <%= rows.length ? rows[0].label : '' %></div>
+              <div>Chi nhánh: <%= safeReport.branchName || 'Chi nhánh trung tâm' %></div>
+              <div>Bảng giá: Tất cả</div>
+            </div>
+            <table class="report-table">
+              <thead>
+                <tr><th>Thời gian</th><th class="num">Doanh thu</th><th class="num">Giá trị trả</th><th class="num">Doanh thu thuần</th></tr>
+              </thead>
+              <tbody>
+                <tr class="total-row"><td></td><td class="num"><%= fmt(totals.revenue) %></td><td class="num"><%= fmt(totals.returned) %></td><td class="num" style="color:#006dff"><%= fmt(totals.netRevenue) %></td></tr>
+                <% rows.forEach(row => { %>
+                  <tr>
+                    <td><span class="toggle" onclick="toggleDetail('<%= row.key %>', this)">+</span><a class="date-link" href="#"><%= row.label %></a></td>
+                    <td class="num"><%= fmt(row.revenue) %></td>
+                    <td class="num"><%= fmt(row.returned) %></td>
+                    <td class="num"><%= fmt(row.netRevenue) %></td>
+                  </tr>
+                  <tr class="detail-row detail-<%= row.key %>" hidden>
+                    <td>Hóa đơn: <%= row.invoiceCount %> | Trả hàng: <%= row.returnCount %></td>
+                    <td class="num"><%= fmt(row.revenue) %></td>
+                    <td class="num negative">-<%= fmt(row.returned) %></td>
+                    <td class="num"><%= fmt(row.netRevenue) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      <% } %>
+    </main>
+  </form>
+
+  <div class="chat"><i class="fa-regular fa-comment-dots"></i> 1900 6522</div>
+
+  <script>
+    const chartRows = <%- JSON.stringify(chartRows) %>;
+    if (document.getElementById('salesChart')) {
+      const ctx = document.getElementById('salesChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartRows.map(item => item.shortLabel),
+          datasets: [{
+            label: 'Doanh thu thuần',
+            data: chartRows.map(item => item.netRevenue),
+            borderColor: '#0070f4',
+            backgroundColor: 'rgba(0,112,244,.08)',
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 0,
+            fill: false
+          }]
+        },
+        options: {
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => Number(ctx.raw || 0).toLocaleString('vi-VN') } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: '#344054' } },
+            y: { beginAtZero: true, grid: { color: '#e5e9ee' }, ticks: { callback: v => Number(v).toLocaleString('vi-VN') } }
+          }
+        }
+      });
+    }
+    function toggleDetail(key, btn) {
+      document.querySelectorAll('.detail-' + key).forEach(row => row.hidden = !row.hidden);
+      btn.textContent = btn.textContent === '+' ? '-' : '+';
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+<%
+  const safeReturns = Array.isArray(locals.returns) ? locals.returns : [];
+  const safeFilters = locals.filters || {};
+  const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
+  const selectedTypes = Array.isArray(safeFilters.loai_tra_hang) ? safeFilters.loai_tra_hang : (safeFilters.loai_tra_hang ? [safeFilters.loai_tra_hang] : []);
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const userName = user => user?.ho_ten || user?.username || user?.ten_dang_nhap || '';
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px clamp(12px,5vw,80px) 0}.sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}.title{font-size:20px;font-weight:700;margin:0 0 16px}.filter{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;margin-bottom:10px}.check{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px}.check input,.radio input{accent-color:#0070f4}.radio{display:flex;align-items:center;gap:9px;margin-top:9px}.pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#8b95a1;padding:0 10px;font-size:13px}.main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;justify-content:space-between;gap:12px}.search{position:relative;flex:1;max-width:470px}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px}.search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff}.actions{display:flex;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.btn.primary{border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1160px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;font-size:12px;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.table tbody tr{cursor:pointer}.return-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}.empty{height:560px;text-align:center;color:#111827}.empty-box{display:flex;height:100%;align-items:center;justify-content:center;flex-direction:column;gap:8px}.empty-icon{width:96px;height:96px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:34px}.empty-note{color:#111827}.empty-sub{color:#111827}.status{display:inline-flex;align-items:center;padding:3px 8px;border-radius:4px;background:#dcfce7;color:#15803d;font-weight:700;font-size:12px}.status.cancel{background:#fee2e2;color:#b91c1c}.detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.return-detail{padding:0 18px 14px;min-height:280px}.detail-tabs{height:40px;display:flex;align-items:flex-end;border-bottom:1px solid #e5e9ee}.detail-tab{height:40px;border:0;background:#fff;color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700;padding:0 0 8px;font-size:14px}.detail-head{display:flex;justify-content:space-between;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 22px;margin-top:12px}.mini-field label{display:block;font-size:12px;margin-bottom:5px}.mini-input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 9px;font-size:12px}.detail-link{color:#006dff;text-decoration:none;font-weight:700}.items-table{width:100%;border-collapse:collapse;margin-top:12px}.items-table th{height:32px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 8px}.items-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;margin-top:14px}.note{width:100%;height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:12px}.total-line{display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px}.loading-detail{height:160px;display:flex;align-items:center;justify-content:center;color:#667085}
+    .page{overflow:hidden}.shell{padding:14px 16px 0!important;width:100%;overflow:hidden}.main{overflow:hidden}.toolbar{min-width:0}.actions{flex:0 0 auto}.table-wrap{max-width:100%;overflow:auto}.table{min-width:1080px}.return-detail{padding:0 16px 12px;overflow:hidden}.detail-head,.detail-bottom,.detail-actions{min-width:0}.detail-head>div:first-child{min-width:0}.detail-meta{grid-template-columns:repeat(3,minmax(0,216px));max-width:720px}.items-table{table-layout:fixed}.items-table th,.items-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-bottom{grid-template-columns:minmax(0,1fr) minmax(220px,280px)}.detail-actions{gap:12px}.detail-action-group{min-width:0;flex-wrap:wrap}
+    .invoice-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:30px;z-index:1000}.invoice-modal-backdrop.open{display:flex}.invoice-modal{width:1435px;max-width:calc(100vw - 64px);min-height:625px;background:#fff;border-radius:14px;box-shadow:0 22px 48px rgba(0,0,0,.35);padding:28px 36px 32px;position:relative}.invoice-modal h2{margin:0 0 28px;font-size:20px}.invoice-close{position:absolute;right:28px;top:24px;border:0;background:transparent;color:#7a8794;font-size:28px;cursor:pointer}.invoice-modal-grid{display:grid;grid-template-columns:268px minmax(0,1fr);gap:42px}.invoice-filter-card{background:#fff;border-radius:6px;box-shadow:0 10px 26px rgba(15,23,42,.14);padding:14px 20px 20px;margin-bottom:32px}.invoice-filter-card h3{margin:0 0 18px;font-size:16px}.invoice-filter-input{width:100%;height:44px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none;color:#111827}.invoice-filter-input::placeholder{color:#7a8794}.invoice-pick-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-pick-table table{width:100%;border-collapse:collapse;table-layout:fixed}.invoice-pick-table th{height:53px;background:#338cf2;color:#fff;text-align:left;padding:0 14px;font-size:16px}.invoice-pick-table td{height:56px;border-bottom:1px solid #dde3ea;padding:0 14px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.invoice-pick-table a{color:#006dff;text-decoration:none}.invoice-choose{height:34px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.invoice-pager{height:74px;display:flex;align-items:center;justify-content:flex-end;gap:18px}.invoice-page-btn{min-width:42px;height:42px;border-radius:8px;border:0;background:#fff;color:#111827;font-size:16px;cursor:pointer}.invoice-page-btn.active{background:#0070f4;color:#fff;font-weight:800}.invoice-page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick-return{position:absolute;right:36px;bottom:32px;height:49px;border:0;border-radius:8px;background:#0070f4;color:#fff;font-size:17px;font-weight:800;padding:0 30px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form class="page" method="GET" action="/don-hang/tra-hang">
+    <div class="shell">
+      <aside class="sidebar">
+        <h1 class="title">Trả hàng</h1>
+        <div class="filter">
+          <div class="filter-title">Loại trả hàng</div>
+          <label class="check"><input type="checkbox" name="loai_tra_hang" value="theo_hoa_don" <%= !selectedTypes.length || selectedTypes.includes('theo_hoa_don') ? 'checked' : '' %> onchange="this.form.submit()"> Theo hóa đơn</label>
+          <label class="check"><input type="checkbox" name="loai_tra_hang" value="tra_nhanh" <%= !selectedTypes.length || selectedTypes.includes('tra_nhanh') ? 'checked' : '' %> onchange="this.form.submit()"> Trả nhanh</label>
+          <label class="check"><input type="checkbox" name="loai_tra_hang" value="chuyen_hoan" <%= !selectedTypes.length || selectedTypes.includes('chuyen_hoan') ? 'checked' : '' %> onchange="this.form.submit()"> Chuyển hoàn</label>
+        </div>
+        <div class="filter">
+          <div class="filter-title">Trạng thái</div>
+          <label class="check"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã trả</label>
+          <label class="check"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+        </div>
+        <div class="filter">
+          <div class="filter-title">Thời gian</div>
+          <label class="radio"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
+          <input class="control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
+          <input class="control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+        </div>
+        <div class="filter"><div class="filter-title">Người tạo</div><input class="control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo"></div>
+        <div class="filter"><div class="filter-title">Người nhận trả</div><input class="control" name="nguoi_nhan_tra" value="<%= safeFilters.nguoi_nhan_tra || '' %>" placeholder="Chọn người nhận trả"></div>
+        <div class="filter"><div class="filter-title">Kênh bán <a style="float:right;color:#0070f4;text-decoration:none" href="#">Tạo mới</a></div><input class="control" name="kenh_ban" value="<%= safeFilters.kenh_ban || '' %>" placeholder="Chọn kênh bán"></div>
+        <div class="filter"><div class="filter-title">Loại thu khác</div><input class="control" name="loai_thu_khac" value="<%= safeFilters.loai_thu_khac || '' %>" placeholder="Chọn loại thu khác"></div>
+      </aside>
+      <main class="main">
+        <div class="toolbar">
+          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"><button><i class="fa-solid fa-sliders"></i></button></div>
+          <div class="actions">
+            <button type="button" class="btn primary" onclick="openInvoiceModal()"><i class="fa-solid fa-plus"></i> Trả hàng</button>
+            <a href="/don-hang/tra-hang/export.csv" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <span class="icon"><i class="fa-solid fa-list"></i></span>
+            <span class="icon"><i class="fa-solid fa-gear"></i></span>
+            <span class="icon"><i class="fa-regular fa-circle-question"></i></span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã trả hàng</th><th>Người bán</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Tổng tiền hàng</th><th class="num">Cần trả khách</th><th class="num">Đã trả khách</th><th>Trạng thái</th></tr></thead>
+            <tbody>
+              <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td></td></tr>
+              <% if (safeReturns.length) { %>
+                <% safeReturns.forEach(item => { %>
+                  <tr class="return-row" data-return-row="<%= item._id %>" onclick="toggleReturnDetail('<%= item._id %>')">
+                    <td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td>
+                    <td class="star-col"><i class="fa-regular fa-star"></i></td>
+                    <td><%= item.ma_phieu_tra %></td>
+                    <td><%= userName(item.nguoi_tao_id) %></td>
+                    <td><%= item.ngay_tra ? new Date(item.ngay_tra).toLocaleString('vi-VN') : '' %></td>
+                    <td><%= item.khach_hang_id?.ma_khach_hang || '' %></td>
+                    <td><%= item.khach_hang_id?.ten_khach_hang || '' %></td>
+                    <td class="num"><%= fmt(item.tong_tien_tra) %></td>
+                    <td class="num"><%= fmt(item.tong_tien_tra) %></td>
+                    <td class="num"><%= fmt(item.tong_tien_tra) %></td>
+                    <td><span class="status <%= item.trang_thai === 'cancelled' ? 'cancel' : '' %>"><%= item.trang_thai === 'cancelled' ? 'Đã hủy' : 'Đã trả' %></span></td>
+                  </tr>
+                  <tr class="detail-row" data-return-detail="<%= item._id %>"><td class="detail-cell" colspan="11"><div class="return-detail"><div class="loading-detail">Đang tải thông tin phiếu trả...</div></div></td></tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="11" class="empty"><div class="empty-box"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><strong>Không tìm thấy kết quả</strong><div class="empty-sub">Không tìm thấy giao dịch nào phù hợp trong tháng này.<br>Nhấn vào <a href="/don-hang/tra-hang/create">đây</a> để tiếp tục tìm kiếm.</div></div></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </form>
+  <div id="invoiceModal" class="invoice-modal-backdrop">
+    <div class="invoice-modal">
+      <button type="button" class="invoice-close" onclick="closeInvoiceModal()">&times;</button>
+      <h2>Ch&#7885;n h&#243;a &#273;&#417;n tr&#7843; h&#224;ng</h2>
+      <div class="invoice-modal-grid">
+        <aside>
+          <div class="invoice-filter-card">
+            <h3>T&#236;m ki&#7871;m</h3>
+            <input class="invoice-filter-input" id="invoiceSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#243;a &#273;&#417;n">
+            <input class="invoice-filter-input" id="shipmentSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; v&#7853;n &#273;&#417;n b&#225;n">
+            <input class="invoice-filter-input" id="customerSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo kh&#225;ch h&#224;ng ho&#7863;c &#272;T">
+            <input class="invoice-filter-input" id="itemCodeSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#224;ng">
+            <input class="invoice-filter-input" id="itemNameSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo t&#234;n h&#224;ng">
+          </div>
+          <div class="invoice-filter-card">
+            <h3>Th&#7901;i gian</h3>
+            <input class="invoice-filter-input" id="fromDateSearch" type="date" onchange="loadInvoices(1)">
+            <input class="invoice-filter-input" id="toDateSearch" type="date" onchange="loadInvoices(1)" placeholder="&#272;&#7871;n ng&#224;y">
+          </div>
+        </aside>
+        <section>
+          <div class="invoice-pick-table">
+            <table>
+              <thead>
+                <tr><th style="width:190px">M&#227; h&#243;a &#273;&#417;n</th><th style="width:180px">Th&#7901;i gian <i class="fa-solid fa-caret-down"></i></th><th>Nh&#226;n vi&#234;n</th><th>Kh&#225;ch h&#224;ng</th><th class="num" style="width:150px">T&#7893;ng c&#7897;ng</th><th style="width:130px"></th></tr>
+              </thead>
+              <tbody id="invoiceRows"></tbody>
+            </table>
+            <div class="invoice-pager" id="invoicePager"></div>
+          </div>
+        </section>
+      </div>
+      <button class="quick-return" type="button" onclick="window.location.href='/don-hang/tra-hang/create'">Tr&#7843; nhanh</button>
+    </div>
+  </div>
+  <script>
+    const money = value => Number(value || 0).toLocaleString('vi-VN');
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    let invoiceSearchTimer = null;
+    let invoicePage = 1;
+
+    function openInvoiceModal() {
+      const modal = document.getElementById('invoiceModal');
+      if (!modal) return;
+      modal.classList.add('open');
+      loadInvoices(1);
+    }
+
+    function closeInvoiceModal() {
+      const modal = document.getElementById('invoiceModal');
+      if (modal) modal.classList.remove('open');
+    }
+
+    function scheduleInvoiceSearch() {
+      clearTimeout(invoiceSearchTimer);
+      invoiceSearchTimer = setTimeout(() => loadInvoices(1), 250);
+    }
+
+    async function loadInvoices(page = invoicePage) {
+      invoicePage = page;
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '7',
+        invoice_code: invoiceSearch.value.trim(),
+        shipment_code: shipmentSearch.value.trim(),
+        customer: customerSearch.value.trim(),
+        item_code: itemCodeSearch.value.trim(),
+        item_name: itemNameSearch.value.trim(),
+        from_date: fromDateSearch.value,
+        to_date: toDateSearch.value
+      });
+      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">&#272;ang t&#7843;i d&#7919; li&#7879;u...</td></tr>';
+      try {
+        const res = await fetch('/don-hang/tra-hang/invoices/search?' + params.toString());
+        const result = await res.json();
+        if (!result.success) throw new Error(result.message || 'Khong tai duoc danh sach hoa don');
+        renderInvoices(result.data || [], result.pagination || { page: 1, limit: 7, total: 0, pages: 1 });
+      } catch (error) {
+        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Khong tai duoc danh sach hoa don</td></tr>';
+        invoicePager.innerHTML = '';
+      }
+    }
+
+    function renderInvoices(rows, pagination) {
+      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="chooseInvoice('${i._id}');return false">${escapeHtml(i.ma_hoa_don)}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' })}</td><td>${escapeHtml(i.nguoi_ban)}</td><td>${escapeHtml(i.khach_hang)}</td><td class="num">${money(i.thanh_toan || i.tong_tien)}</td><td><button class="invoice-choose" onclick="chooseInvoice('${i._id}')" type="button">Ch&#7885;n</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Kh&#244;ng t&#236;m th&#7845;y h&#243;a &#273;&#417;n ph&#249; h&#7907;p</td></tr>';
+      renderInvoicePager(pagination);
+    }
+
+    function renderInvoicePager(pagination) {
+      const total = Number(pagination.total || 0);
+      const limit = Number(pagination.limit || 7);
+      const page = Number(pagination.page || 1);
+      const pages = Math.max(Number(pagination.pages || 1), 1);
+      const start = total ? (page - 1) * limit + 1 : 0;
+      const end = Math.min(page * limit, total);
+      const pageNumbers = [];
+      const first = Math.max(1, Math.min(page - 2, pages - 4));
+      const last = Math.min(pages, first + 4);
+      for (let p = first; p <= last; p++) pageNumbers.push(p);
+      invoicePager.innerHTML = `
+        <button class="invoice-page-btn" type="button" onclick="loadInvoices(1)" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-angles-left"></i></button>
+        <button class="invoice-page-btn" type="button" onclick="loadInvoices(${page - 1})" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
+        ${pageNumbers.map(p => `<button class="invoice-page-btn ${p === page ? 'active' : ''}" type="button" onclick="loadInvoices(${p})">${p}</button>`).join('')}
+        <button class="invoice-page-btn" type="button" onclick="loadInvoices(${page + 1})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
+        <button class="invoice-page-btn" type="button" onclick="loadInvoices(${pages})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-angles-right"></i></button>
+        <span>Hi&#7875;n th&#7883; ${start} - ${end} tr&#234;n t&#7893;ng s&#7889; ${total} h&#243;a &#273;&#417;n</span>`;
+    }
+
+    function chooseInvoice(id) {
+      window.location.href = '/don-hang/tra-hang/create?invoice_id=' + encodeURIComponent(id);
+    }
+
+    async function toggleReturnDetail(id) {
+      const row = document.querySelector('[data-return-row="' + id + '"]');
+      const detailRow = document.querySelector('[data-return-detail="' + id + '"]');
+      if (!detailRow) return;
+      const shouldOpen = !detailRow.classList.contains('open');
+      document.querySelectorAll('.detail-row').forEach(item => item.classList.remove('open'));
+      document.querySelectorAll('.return-row').forEach(item => item.classList.remove('active'));
+      if (!shouldOpen) return;
+      detailRow.classList.add('open');
+      row?.classList.add('active');
+      if (detailRow.dataset.loaded === 'true') return;
+      const res = await fetch('/don-hang/tra-hang/' + id + '/detail');
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không tải được phiếu trả hàng');
+      detailRow.querySelector('.return-detail').innerHTML = renderReturnDetail(data.data);
+      detailRow.dataset.loaded = 'true';
+    }
+
+    function renderReturnDetail(data) {
+      const slip = data.returnSlip;
+      const invoice = data.invoice || slip.hoa_don_id || {};
+      const customer = slip.khach_hang_id || {};
+      const items = data.items || [];
+      const total = items.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
+      const fee = Math.max(total - Number(slip.tong_tien_tra || 0), 0);
+      const itemRows = items.map(item => {
+        const product = item.hang_hoa_id || {};
+        const price = Number(item.don_gia || 0);
+        return `<tr><td><a href="#" class="detail-link">${escapeHtml(product.ma_hang || '')}</a></td><td>${escapeHtml(product.ten_hang || '')}</td><td class="num">${money(item.so_luong)}</td><td class="num">${money(price)}</td><td class="num">0</td><td class="num">${money(price)}</td><td class="num"><strong>${money(item.thanh_tien)}</strong></td></tr>`;
+      }).join('') || '<tr><td colspan="7" class="loading-detail">Phiếu trả chưa có hàng hóa</td></tr>';
+
+      return `
+        <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
+        <div class="detail-head">
+          <div>
+            <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <a href="#" class="detail-link"><i class="fa-regular fa-pen-to-square"></i></a> <span>${escapeHtml(slip.ma_phieu_tra || '')}</span> <span class="status ${slip.trang_thai === 'cancelled' ? 'cancel' : ''}">${slip.trang_thai === 'cancelled' ? 'Đã hủy' : 'Đã trả'}</span></div>
+            <div class="detail-meta">
+              <div class="mini-field"><label>Người tạo</label><span>${escapeHtml(slip.nguoi_tao_id?.ho_ten || slip.nguoi_tao_id?.username || '')}</span></div>
+              <div class="mini-field"><label>Người nhận trả</label><input class="mini-input" value="${escapeHtml(slip.nguoi_tao_id?.ho_ten || slip.nguoi_tao_id?.username || '')}"></div>
+              <div class="mini-field"><label>Ngày trả</label><input class="mini-input" value="${escapeHtml(new Date(slip.ngay_tra || slip.created_at).toLocaleString('vi-VN'))}"></div>
+              <div class="mini-field"><label>Mã hóa đơn</label><a class="detail-link" href="/don-hang/hoa-don">${escapeHtml(slip.hoa_don_id?.ma_hoa_don || invoice.ma_hoa_don || '')}</a></div>
+              <div class="mini-field"><label>Kênh bán</label><input class="mini-input" value="Bán trực tiếp"></div>
+              <div class="mini-field"><label>Bảng giá</label><input class="mini-input" value="Bảng giá chung"></div>
+            </div>
+          </div>
+          <div>${escapeHtml(invoice.cua_hang_id?.ten_cua_hang || 'Chi nhánh trung tâm')}</div>
+        </div>
+        <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Giá trả hàng</th><th class="num">Giảm giá</th><th class="num">Giá nhập lại</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <div class="detail-bottom">
+          <textarea class="note" placeholder="Ghi chú...">${escapeHtml(slip.ghi_chu || '')}</textarea>
+          <div>
+            <div class="total-line"><span>Tổng tiền hàng trả (${items.length})</span><strong>${money(total)}</strong></div>
+            <div class="total-line"><span>Giảm giá phiếu trả</span><span>0</span></div>
+            <div class="total-line"><span>Phí trả hàng</span><span>${money(fee)}</span></div>
+            <div class="total-line"><span>Cần trả khách</span><strong>${money(slip.tong_tien_tra)}</strong></div>
+            <div class="total-line"><span>Đã trả khách</span><strong>${money(slip.tong_tien_tra)}</strong></div>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <div class="detail-action-group"><button type="button" class="btn"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/tra-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+          <div class="detail-action-group"><button type="button" class="btn solid"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
+        </div>`;
+    }
+  </script>
+</body>
+</html>

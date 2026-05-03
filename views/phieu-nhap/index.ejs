@@ -1,0 +1,197 @@
+<%
+  const safeTickets = Array.isArray(locals.tickets) ? locals.tickets : [];
+  const safeFilters = locals.filters || {};
+  const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const statusLabel = status => status === 'draft' ? 'Phiếu tạm' : status === 'cancelled' ? 'Đã hủy' : 'Đã nhập hàng';
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .po-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
+    .po-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 12% 0}
+    .po-sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
+    .po-title{font-size:20px;font-weight:700;color:#111827;margin:0 0 16px}
+    .filter-block{margin-bottom:22px}
+    .filter-title{font-size:13px;font-weight:700;color:#111827;margin-bottom:10px}
+    .check-line{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:#111827}
+    .check-line input{width:14px;height:14px;accent-color:#0070f4}
+    .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}
+    .radio-line input{accent-color:#0070f4}
+    .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
+    .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#8b95a1;padding:0 10px;font-size:13px;outline:none}
+    .po-main{min-width:0;display:flex;flex-direction:column;gap:10px}
+    .po-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .po-search{position:relative;flex:1;max-width:470px}
+    .po-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}
+    .po-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px;font-size:13px;outline:none}
+    .po-search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff;color:#374151;cursor:pointer}
+    .toolbar-actions{display:flex;align-items:center;gap:8px}
+    .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .kv-btn.primary{border-color:#0070f4;color:#0070f4}
+    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}
+    .po-table{width:100%;min-width:1080px;border-collapse:collapse}
+    .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:700;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
+    .po-table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
+    .po-table tbody tr{cursor:pointer}
+    .po-table tbody tr:hover{background:#f7fbff}
+    .po-table .num{text-align:right}
+    .check-col,.star-col{width:36px;text-align:center}
+    .row-check{width:15px;height:15px;accent-color:#0070f4}
+    .star-col{color:#8b95a1}
+    .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:700}
+    .status-badge.draft{background:#fff4d6;color:#9a6700}
+    .po-empty{height:260px;text-align:center;color:#7a8794}
+    .po-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .po-footer select{height:24px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 22px 0 8px;font-size:12px}
+    @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form id="poFilterForm" method="GET" action="/phieu-nhap" class="po-page">
+    <div class="po-shell">
+      <aside class="po-sidebar">
+        <h1 class="po-title">Nhập hàng</h1>
+        <div class="filter-block">
+          <div class="filter-title">Trạng thái</div>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã nhập hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Thời gian</div>
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
+          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
+          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Người tạo</div>
+          <input class="filter-control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo">
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Người nhập</div>
+          <input class="filter-control" name="nha_cung_cap" value="<%= safeFilters.nha_cung_cap || '' %>" placeholder="Chọn nhà cung cấp">
+        </div>
+      </aside>
+
+      <main class="po-main">
+        <div class="po-toolbar">
+          <div class="po-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu nhập">
+            <button type="submit"><i class="fa-solid fa-sliders"></i></button>
+          </div>
+          <div class="toolbar-actions">
+            <a class="kv-btn primary" href="/phieu-nhap/create"><i class="fa-solid fa-plus"></i> Nhập hàng</a>
+            <a class="kv-btn" href="/phieu-nhap/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <button type="button" class="tool-icon"><i class="fa-solid fa-list"></i></button>
+            <button type="button" class="tool-icon"><i class="fa-solid fa-gear"></i></button>
+            <button type="button" class="tool-icon"><i class="fa-regular fa-circle-question"></i></button>
+          </div>
+        </div>
+
+        <div class="po-table-wrap">
+          <table class="po-table">
+            <thead>
+              <tr>
+                <th class="check-col"><input class="row-check" type="checkbox"></th>
+                <th class="star-col"><i class="fa-regular fa-star"></i></th>
+                <th>Mã nhập hàng</th>
+                <th>Thời gian</th>
+                <th>Mã NCC</th>
+                <th>Nhà cung cấp</th>
+                <th class="num">Cần trả NCC</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td></td><td></td><td></td><td></td><td></td><td></td>
+                <td class="num"><strong>0</strong></td><td></td>
+              </tr>
+              <% if (safeTickets.length) { %>
+                <% safeTickets.forEach(t => { %>
+                  <tr onclick="openTicketDetail('<%= t._id %>')">
+                    <td class="check-col"><input class="row-check" type="checkbox"></td>
+                    <td class="star-col"><i class="fa-regular fa-star"></i></td>
+                    <td><%= t.ma_phieu_nhap %></td>
+                    <td><%= new Date(t.ngay_nhap || t.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) %></td>
+                    <td><%= t.nha_cung_cap_id ? t.nha_cung_cap_id.ma_ncc : '' %></td>
+                    <td><%= t.nha_cung_cap_id ? t.nha_cung_cap_id.ten_ncc : '' %></td>
+                    <td class="num"><%= fmt(t.tong_tien) %></td>
+                    <td><span class="status-badge <%= t.trang_thai === 'draft' ? 'draft' : '' %>"><%= statusLabel(t.trang_thai) %></span></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="8" class="po-empty">Chưa có phiếu nhập hàng</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="po-footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+      </main>
+    </div>
+  </form>
+  <div id="ticketModal" style="display:none;position:fixed;z-index:3000;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+    <div style="width:760px;max-width:94vw;max-height:86vh;background:#fff;border-radius:8px;box-shadow:0 18px 42px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden">
+      <div style="height:54px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid #edf0f3">
+        <h2 id="ticketTitle" style="font-size:18px;margin:0">Phiếu nhập</h2>
+        <button type="button" onclick="closeTicketDetail()" style="border:0;background:#fff;font-size:18px;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="ticketBody" style="padding:16px;overflow:auto"></div>
+      <div style="height:58px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 16px;border-top:1px solid #edf0f3">
+        <button id="completeBtn" type="button" onclick="completeTicket()" class="kv-btn primary">Hoàn thành</button>
+        <button id="cancelBtn" type="button" onclick="cancelTicket()" class="kv-btn">Hủy phiếu</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let currentTicketId = '';
+    function fmtMoney(value) { return Number(value || 0).toLocaleString('vi-VN'); }
+    function closeTicketDetail() { document.getElementById('ticketModal').style.display = 'none'; }
+    async function openTicketDetail(id) {
+      currentTicketId = id;
+      const res = await fetch('/phieu-nhap/' + id + '/detail');
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không tải được phiếu nhập');
+      const ticket = data.data.ticket;
+      const items = data.data.items || [];
+      document.getElementById('ticketTitle').textContent = ticket.ma_phieu_nhap;
+      document.getElementById('completeBtn').style.display = ticket.trang_thai === 'draft' ? '' : 'none';
+      document.getElementById('cancelBtn').style.display = ticket.trang_thai !== 'cancelled' ? '' : 'none';
+      document.getElementById('ticketBody').innerHTML = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;margin-bottom:14px;font-size:13px">
+          <div><strong>Nhà cung cấp:</strong> ${ticket.nha_cung_cap_id?.ten_ncc || ''}</div>
+          <div><strong>Trạng thái:</strong> ${ticket.trang_thai}</div>
+          <div><strong>Thời gian:</strong> ${new Date(ticket.ngay_nhap || ticket.created_at).toLocaleString('vi-VN')}</div>
+          <div><strong>Tổng tiền:</strong> ${fmtMoney(ticket.tong_tien)}</div>
+        </div>
+        <table class="po-table" style="min-width:0">
+          <thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">SL</th><th class="num">Đơn giá</th><th class="num">Thành tiền</th></tr></thead>
+          <tbody>${items.map(i => `<tr><td>${i.hang_hoa_id?.ma_hang || ''}</td><td>${i.hang_hoa_id?.ten_hang || ''}</td><td class="num">${fmtMoney(i.so_luong)}</td><td class="num">${fmtMoney(i.don_gia_nhap)}</td><td class="num">${fmtMoney(i.thanh_tien)}</td></tr>`).join('')}</tbody>
+        </table>`;
+      document.getElementById('ticketModal').style.display = 'flex';
+    }
+    async function completeTicket() {
+      if (!currentTicketId) return;
+      const res = await fetch('/phieu-nhap/' + currentTicketId + '/complete', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message || 'Đã xử lý');
+      if (data.success) location.reload();
+    }
+    async function cancelTicket() {
+      if (!currentTicketId || !confirm('Hủy phiếu nhập này?')) return;
+      const res = await fetch('/phieu-nhap/' + currentTicketId + '/cancel', { method: 'POST' });
+      const data = await res.json();
+      alert(data.message || 'Đã xử lý');
+      if (data.success) location.reload();
+    }
+  </script>
+</body>
+</html>

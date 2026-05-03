@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .order-placeholder{min-height:calc(100vh - 98px);background:#f3f6f9;padding:18px 12%}
+    .order-card{background:#fff;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:24px}
+    .order-card h1{font-size:20px;margin:0 0 8px;color:#111827}
+    .order-card p{font-size:14px;color:#667085;margin:0 0 18px}
+    .order-card a{height:34px;border:1px solid #0070f4;color:#0070f4;border-radius:6px;padding:0 12px;display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-size:13px;font-weight:700}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <main class="order-placeholder">
+    <section class="order-card">
+      <h1><%= heading %></h1>
+      <p><%= description %></p>
+      <a href="/don-hang"><i class="fa-solid fa-arrow-left"></i> Đặt hàng</a>
+    </section>
+  </main>
+</body>
+</html>

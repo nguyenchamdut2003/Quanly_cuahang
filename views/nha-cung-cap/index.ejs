@@ -1,0 +1,454 @@
+<%
+  const safeSuppliers = Array.isArray(locals.suppliers) ? locals.suppliers : [];
+  const safeGroups = Array.isArray(locals.groups) ? locals.groups : [];
+  const safeDetails = locals.supplierDetails || {};
+  const safeFilters = locals.filters || {};
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtDate = value => value ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .supplier-page{height:calc(100vh - 98px);display:flex;flex-direction:column;background:#f3f6f9}
+    .supplier-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 12% 0}
+    .supplier-sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
+    .supplier-title{font-size:20px;font-weight:700;color:#111827;margin:0 0 16px}
+    .filter-block{margin-bottom:20px}
+    .filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+    .filter-title{font-size:13px;font-weight:700;color:#111827}
+    .filter-link{font-size:13px;color:#0070f4;text-decoration:none;cursor:pointer}
+    .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
+    .range-input{display:flex;height:30px;border:1px solid #cfd8e3;border-radius:6px;overflow:hidden;margin-top:7px;background:#fff}
+    .range-input span{width:46px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border-right:1px solid #d7dde5}
+    .range-input input{flex:1;border:0;padding:0 10px;outline:none;font-size:13px}
+    .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}
+    .radio-line input{accent-color:#0070f4}
+    .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
+    .pill-group{display:flex;gap:7px;flex-wrap:wrap}
+    .pill{height:30px;border:1px solid #cfd8e3;border-radius:999px;background:#fff;padding:0 12px;color:#111827;font-size:13px;cursor:pointer}
+    .pill.active{background:#0070f4;border-color:#0070f4;color:#fff;font-weight:700}
+    .supplier-main{min-width:0;display:flex;flex-direction:column;gap:10px}
+    .supplier-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .supplier-search{position:relative;flex:1;max-width:470px}
+    .supplier-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}
+    .supplier-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px;font-size:13px;outline:none}
+    .supplier-search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff;color:#374151;cursor:pointer}
+    .toolbar-actions{display:flex;align-items:center;gap:8px}
+    .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .kv-btn.primary{border-color:#0070f4;color:#0070f4}
+    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .supplier-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}
+    .supplier-table{width:100%;min-width:1080px;border-collapse:collapse}
+    .supplier-table th{height:36px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:700;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
+    .supplier-table td{height:42px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
+    .supplier-table .num{text-align:right}
+    .supplier-table tbody tr{cursor:pointer}
+    .supplier-table tbody tr:hover{background:#f7fbff}
+    .supplier-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}
+    .check-col{width:36px;text-align:center}
+    .row-check{width:15px;height:15px;accent-color:#0070f4}
+    .supplier-detail-row{display:none;cursor:default}
+    .supplier-detail-row.open{display:table-row}
+    .supplier-detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}
+    .supplier-detail{min-height:300px}
+    .detail-tabs{height:42px;display:flex;align-items:flex-end;gap:28px;border-bottom:1px solid #e5e9ee;padding:0 18px}
+    .detail-tab{height:42px;border:0;background:#fff;color:#111827;font-size:14px;cursor:pointer;padding:0 0 9px}
+    .detail-tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700}
+    .detail-panel{display:none;padding:16px 18px 18px}
+    .detail-panel.active{display:block}
+    .info-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
+    .info-title{font-size:16px;font-weight:800}
+    .info-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
+    .muted{color:#7a8794}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:20px}
+    .info-field{border-bottom:1px solid #e5e9ee;padding-bottom:9px}
+    .info-field label{display:block;font-size:12px;color:#111827;margin-bottom:8px}
+    .detail-link{color:#0070f4;text-decoration:none;font-weight:700}
+    .note-line{display:flex;align-items:center;gap:10px;margin-top:24px}
+    .detail-actions{height:54px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;padding:0 12px}
+    .detail-action-group{display:flex;align-items:center;gap:8px}
+    .mini-table{width:100%;border-collapse:collapse}
+    .mini-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 10px}
+    .mini-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 10px}
+    .status-chip{display:inline-flex;align-items:center;height:20px;border-radius:4px;background:#dcfce7;color:#008a2e;padding:0 6px;font-size:12px;font-weight:700}
+    .debt-filter{display:flex;justify-content:flex-end;margin:2px 0 16px}
+    .debt-filter select{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 34px 0 10px;font-size:13px}
+    .detail-empty{height:120px;text-align:center;color:#7a8794}
+    .supplier-empty{height:260px;text-align:center;color:#7a8794}
+    .supplier-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .supplier-footer select{height:24px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 22px 0 8px;font-size:12px}
+    .supplier-modal-overlay{display:none;position:fixed;z-index:3000;inset:0;background:rgba(0,0,0,.52);align-items:flex-start;justify-content:center;padding-top:62px}
+    .supplier-modal-overlay.open{display:flex}
+    .supplier-modal{width:900px;max-width:94vw;max-height:88vh;background:#fff;border-radius:8px;box-shadow:0 18px 42px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+    .supplier-modal-header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
+    .supplier-modal-header h2{font-size:18px;margin:0;color:#111827}
+    .supplier-modal-header button{border:0;background:#fff;font-size:18px;color:#4b5563;cursor:pointer}
+    .supplier-form{display:flex;flex-direction:column;min-height:0}
+    .supplier-modal-body{padding:10px 22px 18px;overflow:auto}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
+    .field label{display:block;font-size:12px;color:#374151;margin-bottom:6px}
+    .input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:14px;outline:none}
+    .textarea{height:50px;padding-top:8px;resize:vertical}
+    .input:focus{border-color:#0070f4;box-shadow:0 0 0 2px rgba(0,112,244,.1)}
+    .modal-section{border:1px solid #e1e6ec;border-radius:7px;margin-top:12px;padding:14px 12px}
+    .section-title{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;color:#111827;margin-bottom:12px}
+    .supplier-modal-footer{height:64px;border-top:1px solid #edf0f3;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 22px}
+    .btn-cancel{height:38px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 18px;font-weight:700;cursor:pointer}
+    .btn-save{height:38px;border:0;background:#0070f4;color:#fff;border-radius:6px;padding:0 18px;font-weight:700;cursor:pointer}
+    @media(max-width:1100px){.supplier-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form id="supplierFilterForm" method="GET" action="/nha-cung-cap" class="supplier-page">
+    <div class="supplier-shell">
+      <aside class="supplier-sidebar">
+        <h1 class="supplier-title">Nhà cung cấp</h1>
+        <div class="filter-block">
+          <div class="filter-head"><span class="filter-title">Nhóm nhà cung cấp</span><a class="filter-link">Tạo mới</a></div>
+          <select class="filter-control" name="nhom_ncc" onchange="this.form.submit()"><option value="all">Tất cả các nhóm</option><% safeGroups.forEach(group => { %><option value="<%= group %>" <%= safeFilters.nhom_ncc === group ? 'selected' : '' %>><%= group %></option><% }) %></select>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Tổng mua</div>
+          <label style="font-size:12px;color:#667085;margin-top:10px;display:block">Giá trị</label>
+          <div class="range-input"><span>Từ</span><input name="tong_mua_from" value="<%= safeFilters.tong_mua_from || '' %>" placeholder="Nhập giá trị"></div>
+          <div class="range-input"><span>Tới</span><input name="tong_mua_to" value="<%= safeFilters.tong_mua_to || '' %>" placeholder="Nhập giá trị"></div>
+          <label style="font-size:12px;color:#667085;margin-top:14px;display:block">Thời gian</label>
+          <label class="radio-line"><input type="radio" checked><span class="radio-pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label>
+          <label class="radio-line"><input type="radio"><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Nợ hiện tại</div>
+          <div class="range-input"><span>Từ</span><input name="tong_no_from" value="<%= safeFilters.tong_no_from || '' %>" placeholder="Nhập giá trị"></div>
+          <div class="range-input"><span>Tới</span><input name="tong_no_to" value="<%= safeFilters.tong_no_to || '' %>" placeholder="Nhập giá trị"></div>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title" style="margin-bottom:10px">Trạng thái</div>
+          <div class="pill-group">
+            <button type="button" class="pill <%= !safeFilters.trang_thai ? 'active' : '' %>" onclick="filterStatus('')">Tất cả</button>
+            <button type="button" class="pill <%= safeFilters.trang_thai === 'active' ? 'active' : '' %>" onclick="filterStatus('active')">Đang hoạt động</button>
+            <button type="button" class="pill <%= safeFilters.trang_thai === 'inactive' ? 'active' : '' %>" onclick="filterStatus('inactive')">Ngừng hoạt động</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="supplier-main">
+        <div class="supplier-toolbar">
+          <div class="supplier-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã, tên, số điện thoại">
+            <button type="submit"><i class="fa-solid fa-sliders"></i></button>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" class="kv-btn primary" onclick="openSupplierModal()"><i class="fa-solid fa-plus"></i> Nhà cung cấp</button>
+            <button type="button" class="kv-btn" onclick="alert('Import CSV sẽ được bổ sung khi bạn chốt mẫu file.')"><i class="fa-solid fa-file-import"></i> Import file</button>
+            <a class="kv-btn" href="/nha-cung-cap/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a>
+            <button type="button" class="tool-icon"><i class="fa-solid fa-list"></i></button>
+            <button type="button" class="tool-icon"><i class="fa-solid fa-gear"></i></button>
+            <button type="button" class="tool-icon"><i class="fa-regular fa-circle-question"></i></button>
+          </div>
+        </div>
+
+        <div class="supplier-table-wrap">
+          <table class="supplier-table">
+            <thead>
+              <tr>
+                <th class="check-col"><input class="row-check" type="checkbox"></th>
+                <th>Mã nhà cung cấp</th>
+                <th>Tên nhà cung cấp</th>
+                <th>Điện thoại</th>
+                <th>Email</th>
+                <th class="num">Nợ cần trả hiện tại</th>
+                <th class="num">Tổng mua</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td></td><td></td><td></td><td></td><td></td>
+                <td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td>
+              </tr>
+              <% if (safeSuppliers.length) { %>
+                <% safeSuppliers.forEach(s => { const detail = safeDetails[String(s._id)] || { imports: [], returns: [], debts: [] }; %>
+                  <tr class="supplier-row" data-supplier-row="<%= s._id %>" onclick="toggleSupplierDetails('<%= s._id %>')">
+                    <td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td>
+                    <td><%= s.ma_ncc %></td>
+                    <td><%= s.ten_ncc %></td>
+                    <td><%= s.sdt || '' %></td>
+                    <td><%= s.email || '' %></td>
+                    <td class="num"><%= fmt(s.tong_no) %></td>
+                    <td class="num"><%= fmt(s.tong_mua) %></td>
+                  </tr>
+                  <tr class="supplier-detail-row" data-supplier-detail="<%= s._id %>">
+                    <td class="supplier-detail-cell" colspan="7">
+                      <div class="supplier-detail">
+                        <div class="detail-tabs">
+                          <button type="button" class="detail-tab active" data-tab="info" onclick="showSupplierTab(event,'<%= s._id %>','info')">Thông tin</button>
+                          <button type="button" class="detail-tab" data-tab="history" onclick="showSupplierTab(event,'<%= s._id %>','history')">Lịch sử nhập/trả hàng</button>
+                          <button type="button" class="detail-tab" data-tab="debt" onclick="showSupplierTab(event,'<%= s._id %>','debt')">Nợ cần trả nhà cung cấp</button>
+                        </div>
+
+                        <div class="detail-panel active" data-panel="info">
+                          <div class="info-head">
+                            <div>
+                              <div><span class="info-title"><%= s.ten_ncc %></span> <span><%= s.ma_ncc %></span></div>
+                              <div class="info-meta">
+                                <span>Người tạo: <%= s.nguoi_tao_id?.ho_ten || user?.ho_ten || 'Admin' %></span>
+                                <span>|</span>
+                                <span>Ngày tạo: <%= s.created_at ? new Date(s.created_at).toLocaleDateString('vi-VN') : '' %></span>
+                                <span>|</span>
+                                <span>Nhóm nhà cung cấp: <span class="muted"><%= s.nhom_ncc || 'Chưa có' %></span></span>
+                              </div>
+                            </div>
+                            <div>Chi nhánh trung tâm</div>
+                          </div>
+                          <div class="info-grid">
+                            <div class="info-field"><label>Điện thoại</label><span class="muted"><%= s.sdt || 'Chưa có' %></span></div>
+                            <div class="info-field"><label>Email</label><span class="muted"><%= s.email || 'Chưa có' %></span></div>
+                          </div>
+                          <div class="info-field" style="margin-top:18px"><label>Địa chỉ</label><span class="muted"><%= s.dia_chi || 'Chưa có' %></span></div>
+                          <div style="margin-top:24px"><a class="detail-link" href="#" onclick="event.preventDefault()">Thêm thông tin xuất hóa đơn</a></div>
+                          <div class="note-line"><i class="fa-regular fa-pen-to-square"></i><span><%= s.ghi_chu || 'Chưa có ghi chú' %></span></div>
+                        </div>
+
+                        <div class="detail-panel" data-panel="history">
+                          <table class="mini-table">
+                            <thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th class="num">Tổng cộng</th><th>Trạng thái</th></tr></thead>
+                            <tbody>
+                              <% if (detail.imports.length || detail.returns.length) { %>
+                                <% detail.imports.forEach(item => { %>
+                                  <tr><td><a class="detail-link" href="/phieu-nhap"><%= item.ma_phieu_nhap %></a></td><td><%= fmtDate(item.ngay_nhap || item.created_at) %></td><td><%= item.nguoi_tao_id?.ho_ten || '' %></td><td class="num"><%= fmt(item.tong_tien) %></td><td><span class="status-chip"><%= item.trang_thai === 'draft' ? 'Phiếu tạm' : 'Đã nhập hàng' %></span></td></tr>
+                                <% }) %>
+                                <% detail.returns.forEach(item => { %>
+                                  <tr><td><a class="detail-link" href="/phieu-nhap/tra-hang-nhap"><%= item.ma_phieu_tra_nhap %></a></td><td><%= fmtDate(item.ngay_tra || item.created_at) %></td><td><%= item.nguoi_tao_id?.ho_ten || '' %></td><td class="num"><%= fmt(item.tong_tien_tra) %></td><td><span class="status-chip">Đã trả hàng</span></td></tr>
+                                <% }) %>
+                              <% } else { %>
+                                <tr><td colspan="5" class="detail-empty">Chưa có lịch sử nhập/trả hàng</td></tr>
+                              <% } %>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div class="detail-panel" data-panel="debt">
+                          <div class="debt-filter"><select><option>Tất cả giao dịch</option></select></div>
+                          <table class="mini-table">
+                            <thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Loại</th><th class="num">Giá trị</th><th class="num">Nợ cần trả nhà cung cấp</th></tr></thead>
+                            <tbody>
+                              <% if (detail.debts.length || detail.imports.length) { %>
+                                <% detail.debts.forEach(item => { const code = item.phieu_nhap_id?.ma_phieu_nhap || item.phieu_thu_chi_id?.ma_phieu || ''; %>
+                                  <tr><td><a class="detail-link" href="#"><%= code || 'Giao dịch' %></a></td><td><%= fmtDate(item.ngay || item.created_at) %></td><td><%= item.loai === 'chi' ? 'Thanh toán' : item.loai === 'thu' ? 'Điều chỉnh' : 'Nhập hàng' %></td><td class="num"><%= fmt(Math.abs(item.so_tien || 0)) %></td><td class="num"><%= fmt(item.so_tien) %></td></tr>
+                                <% }) %>
+                                <% if (!detail.debts.length) { detail.imports.forEach(item => { %>
+                                  <tr><td><a class="detail-link" href="/phieu-nhap"><%= item.ma_phieu_nhap %></a></td><td><%= fmtDate(item.ngay_nhap || item.created_at) %></td><td>Nhập hàng</td><td class="num"><%= fmt(item.tong_tien) %></td><td class="num"><%= fmt(item.tong_tien) %></td></tr>
+                                <% }) } %>
+                              <% } else { %>
+                                <tr><td colspan="5" class="detail-empty">Chưa có giao dịch công nợ</td></tr>
+                              <% } %>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div class="detail-actions">
+                          <div class="detail-action-group">
+                            <button type="button" class="kv-btn" onclick="event.stopPropagation();deleteSupplierById('<%= s._id %>')"><i class="fa-regular fa-trash-can"></i> Xóa</button>
+                          </div>
+                          <div class="detail-action-group">
+                            <button type="button" class="kv-btn primary" onclick="event.stopPropagation();editSupplier('<%= s._id %>')"><i class="fa-solid fa-pen"></i> Chỉnh sửa</button>
+                            <button type="button" class="kv-btn" onclick="event.stopPropagation();toggleSupplierStatus('<%= s._id %>','<%= s.trang_thai === 'inactive' ? 'active' : 'inactive' %>')"><i class="fa-solid fa-lock"></i> <%= s.trang_thai === 'inactive' ? 'Hoạt động lại' : 'Ngừng hoạt động' %></button>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="7" class="supplier-empty">Chưa có nhà cung cấp</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="supplier-footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+      </main>
+    </div>
+  </form>
+
+  <div class="supplier-modal-overlay" id="supplierModal">
+    <div class="supplier-modal">
+      <div class="supplier-modal-header">
+        <h2 id="supplierModalTitle">Tạo nhà cung cấp</h2>
+        <button type="button" onclick="closeSupplierModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form class="supplier-form" id="supplierForm">
+        <input type="hidden" name="_id">
+        <div class="supplier-modal-body">
+          <div class="form-grid">
+            <div class="field"><label>Tên nhà cung cấp</label><input class="input" name="ten_ncc" placeholder="Bắt buộc" required autofocus></div>
+            <div class="field"><label>Mã nhà cung cấp</label><input class="input" name="ma_ncc" placeholder="Tự động"></div>
+            <div class="field"><label>Điện thoại</label><input class="input" name="sdt"></div>
+            <div class="field"><label>Email</label><input class="input" name="email" placeholder="email@gmail.com"></div>
+          </div>
+          <section class="modal-section">
+            <div class="section-title">Địa chỉ <i class="fa-solid fa-chevron-up"></i></div>
+            <div class="field" style="margin-bottom:12px"><label>Địa chỉ</label><input class="input" name="dia_chi" placeholder="Nhập địa chỉ"></div>
+            <div class="form-grid">
+              <div class="field"><label>Khu vực</label><input class="input" name="tinh_thanh" placeholder="Chọn Tỉnh/Thành phố"></div>
+              <div class="field"><label>Phường/Xã</label><input class="input" name="phuong_xa" placeholder="Chọn Phường/Xã"></div>
+            </div>
+          </section>
+          <section class="modal-section">
+            <div class="section-title">Nhóm nhà cung cấp, ghi chú <i class="fa-solid fa-chevron-up"></i></div>
+            <div class="field" style="margin-bottom:12px"><label>Nhóm nhà cung cấp</label><input class="input" name="nhom_ncc" placeholder="Chọn nhóm nhà cung cấp"></div>
+            <div class="field"><label>Ghi chú</label><textarea class="input textarea" name="ghi_chu" placeholder="Nhập ghi chú"></textarea></div>
+          </section>
+          <section class="modal-section">
+            <div class="section-title">Thông tin xuất hóa đơn <i class="fa-solid fa-chevron-up"></i></div>
+            <div class="form-grid">
+              <div class="field"><label>Tên công ty</label><input class="input" name="ten_cong_ty" placeholder="Nhập tên công ty"></div>
+              <div class="field"><label>Mã số thuế</label><input class="input" name="ma_so_thue" placeholder="Nhập mã số thuế"></div>
+            </div>
+          </section>
+        </div>
+        <div class="supplier-modal-footer">
+          <button type="button" class="btn-cancel" id="deleteSupplierBtn" onclick="deleteSupplier()" style="margin-right:auto;color:#d92d20;display:none">Xóa</button>
+          <button type="button" class="btn-cancel" onclick="closeSupplierModal()">Bỏ qua</button>
+          <button type="button" class="btn-save" onclick="saveSupplier()">Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const suppliersData = <%- JSON.stringify(safeSuppliers.map(s => ({
+      _id: String(s._id),
+      ma_ncc: s.ma_ncc || '',
+      ten_ncc: s.ten_ncc || '',
+      sdt: s.sdt || '',
+      email: s.email || '',
+      dia_chi: s.dia_chi || '',
+      tinh_thanh: s.tinh_thanh || '',
+      phuong_xa: s.phuong_xa || '',
+      nhom_ncc: s.nhom_ncc || '',
+      ghi_chu: s.ghi_chu || '',
+      ten_cong_ty: s.ten_cong_ty || '',
+      ma_so_thue: s.ma_so_thue || '',
+      trang_thai: s.trang_thai || 'active'
+    }))) %>;
+
+    function filterStatus(status) {
+      const params = new URLSearchParams(new FormData(document.getElementById('supplierFilterForm')));
+      if (status) params.set('trang_thai', status); else params.delete('trang_thai');
+      window.location.href = '/nha-cung-cap?' + params.toString();
+    }
+
+    function openSupplierModal() {
+      document.getElementById('supplierForm').reset();
+      document.getElementById('supplierModalTitle').textContent = 'Tạo nhà cung cấp';
+      document.querySelector('[name="_id"]').value = '';
+      document.getElementById('deleteSupplierBtn').style.display = 'none';
+      document.getElementById('supplierModal').classList.add('open');
+    }
+
+    function setField(name, value) {
+      const el = document.querySelector('[name="' + name + '"]');
+      if (el) el.value = value || '';
+    }
+
+    function toggleSupplierDetails(id) {
+      document.querySelectorAll('.supplier-detail-row').forEach(row => {
+        row.classList.toggle('open', row.dataset.supplierDetail === id && !row.classList.contains('open'));
+      });
+      document.querySelectorAll('.supplier-row').forEach(row => {
+        row.classList.toggle('active', row.dataset.supplierRow === id && document.querySelector('[data-supplier-detail="' + id + '"]').classList.contains('open'));
+      });
+    }
+
+    function showSupplierTab(event, id, tab) {
+      event.stopPropagation();
+      const detail = document.querySelector('[data-supplier-detail="' + id + '"]');
+      if (!detail) return;
+      detail.querySelectorAll('.detail-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+      detail.querySelectorAll('.detail-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === tab));
+    }
+
+    function editSupplier(id) {
+      const supplier = suppliersData.find(s => s._id === id);
+      if (!supplier) return;
+      document.getElementById('supplierForm').reset();
+      document.getElementById('supplierModalTitle').textContent = 'Chỉnh sửa nhà cung cấp';
+      Object.keys(supplier).forEach(key => setField(key, supplier[key]));
+      document.getElementById('deleteSupplierBtn').style.display = '';
+      document.getElementById('supplierModal').classList.add('open');
+    }
+
+    function closeSupplierModal() {
+      document.getElementById('supplierModal').classList.remove('open');
+    }
+
+    document.getElementById('supplierModal').addEventListener('click', function(e) {
+      if (e.target === this) closeSupplierModal();
+    });
+
+    async function saveSupplier() {
+      const form = document.getElementById('supplierForm');
+      const fd = new FormData(form);
+      try {
+        const payload = Object.fromEntries(fd.entries());
+        const endpoint = payload._id ? ('/nha-cung-cap/' + payload._id + '/update') : '/nha-cung-cap/add';
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.success) return alert(data.message || 'Không lưu được nhà cung cấp');
+        closeSupplierModal();
+        location.reload();
+      } catch (error) {
+        alert('Lỗi kết nối khi lưu nhà cung cấp');
+      }
+    }
+
+    async function deleteSupplier() {
+      const id = document.querySelector('[name="_id"]').value;
+      if (!id) return;
+      if (!confirm('Xóa nhà cung cấp này?')) return;
+      try {
+        const res = await fetch('/nha-cung-cap/' + id + '/delete', { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) return alert(data.message || 'Không xóa được nhà cung cấp');
+        closeSupplierModal();
+        location.reload();
+      } catch (error) {
+        alert('Lỗi kết nối khi xóa nhà cung cấp');
+      }
+    }
+
+    async function deleteSupplierById(id) {
+      const currentId = document.querySelector('[name="_id"]').value;
+      document.querySelector('[name="_id"]').value = id;
+      await deleteSupplier();
+      document.querySelector('[name="_id"]').value = currentId;
+    }
+
+    async function toggleSupplierStatus(id, status) {
+      const supplier = suppliersData.find(s => s._id === id);
+      if (!supplier) return;
+      try {
+        const res = await fetch('/nha-cung-cap/' + id + '/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...supplier, trang_thai: status })
+        });
+        const data = await res.json();
+        if (!data.success) return alert(data.message || 'Không cập nhật được trạng thái nhà cung cấp');
+        location.reload();
+      } catch (error) {
+        alert('Lỗi kết nối khi cập nhật trạng thái nhà cung cấp');
+      }
+    }
+  </script>
+</body>
+</html>

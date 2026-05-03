@@ -1,0 +1,48 @@
+<%
+  const safeDocs = Array.isArray(locals.docs) ? locals.docs : [];
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .page{height:calc(100vh - 98px);background:#f3f6f9;padding:14px 12%;display:flex;flex-direction:column;gap:10px}
+    .bar{display:flex;align-items:center;justify-content:space-between}
+    h1{font-size:20px;margin:0}.actions{display:flex;gap:8px}.btn{height:32px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;font-weight:700;cursor:pointer;text-decoration:none;color:#111827;display:inline-flex;align-items:center;gap:7px}.btn.primary{border-color:#0070f4;color:#0070f4}
+    .table-wrap{flex:1;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;border-collapse:collapse}.table th{height:38px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;text-align:left;padding:0 10px;font-size:13px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.num{text-align:right}.empty{text-align:center;color:#667085;height:240px}
+    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:3000;align-items:center;justify-content:center}.modal.open{display:flex}.box{width:620px;background:#fff;border-radius:8px;box-shadow:0 18px 42px rgba(0,0,0,.25);overflow:hidden}.head,.foot{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid #edf0f3}.foot{border-top:1px solid #edf0f3;border-bottom:0;justify-content:flex-end;gap:8px}.body{padding:16px 18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field label{display:block;font-size:12px;margin-bottom:6px}.input{width:100%;height:32px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px}.textarea{height:64px;padding-top:8px;resize:vertical}.close{border:0;background:#fff;font-size:18px;cursor:pointer}.save{background:#0070f4;color:#fff;border-color:#0070f4}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <main class="page">
+    <div class="bar"><h1>Hóa đơn đầu vào</h1><div class="actions"><button class="btn primary" onclick="openModal()"><i class="fa-solid fa-plus"></i> Hóa đơn</button><a class="btn" href="/phieu-nhap">Nhập hàng</a></div></div>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Mã hóa đơn</th><th>Thời gian</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th class="num">Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody>
+      <% if (safeDocs.length) { %>
+        <% safeDocs.forEach(d => { %><tr><td><%= d.ma_hoa_don %></td><td><%= new Date(d.ngay_hoa_don).toLocaleString('vi-VN') %></td><td><%= d.nha_cung_cap_id ? d.nha_cung_cap_id.ten_ncc : '' %></td><td><%= d.phieu_nhap_id ? d.phieu_nhap_id.ma_phieu_nhap : '' %></td><td class="num"><%= fmt(d.tong_tien) %></td><td>Hoàn thành</td></tr><% }) %>
+      <% } else { %><tr><td colspan="6" class="empty">Chưa có hóa đơn đầu vào</td></tr><% } %>
+    </tbody></table></div>
+  </main>
+  <div class="modal" id="docModal"><div class="box"><div class="head"><h2 style="font-size:18px;margin:0">Tạo hóa đơn đầu vào</h2><button class="close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button></div><div class="body">
+    <div class="grid">
+      <div class="field"><label>Mã hóa đơn</label><input id="maHoaDon" class="input" placeholder="Tự động"></div>
+      <div class="field"><label>Ngày hóa đơn</label><input id="ngayHoaDon" class="input" type="date" value="<%= new Date().toISOString().slice(0,10) %>"></div>
+      <div class="field"><label>Nhà cung cấp</label><select id="nccId" class="input"><option value="">Chọn nhà cung cấp</option><% suppliers.forEach(s => { %><option value="<%= s._id %>"><%= s.ten_ncc %></option><% }) %></select></div>
+      <div class="field"><label>Phiếu nhập</label><select id="pnId" class="input"><option value="">Không chọn</option><% receipts.forEach(r => { %><option value="<%= r._id %>"><%= r.ma_phieu_nhap %></option><% }) %></select></div>
+      <div class="field"><label>Tổng tiền</label><input id="tongTien" class="input" type="number" value="0"></div>
+      <div class="field"><label>Ghi chú</label><textarea id="ghiChu" class="input textarea"></textarea></div>
+    </div>
+  </div><div class="foot"><button class="btn" onclick="closeModal()">Bỏ qua</button><button class="btn save" onclick="saveDoc()">Lưu</button></div></div></div>
+  <script>
+    function openModal(){document.getElementById('docModal').classList.add('open')}
+    function closeModal(){document.getElementById('docModal').classList.remove('open')}
+    async function saveDoc(){
+      const res = await fetch('/phieu-nhap/hoa-don-dau-vao/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ma_hoa_don:maHoaDon.value,ngay_hoa_don:ngayHoaDon.value,nha_cung_cap_id:nccId.value,phieu_nhap_id:pnId.value,tong_tien:tongTien.value,ghi_chu:ghiChu.value})});
+      const data = await res.json(); if(!data.success) return alert(data.message || 'Không lưu được'); location.reload();
+    }
+  </script>
+</body>
+</html>

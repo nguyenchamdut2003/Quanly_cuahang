@@ -1,0 +1,181 @@
+<header class="kv-header">
+  <!-- Top Bar -->
+  <div class="kv-topbar">
+    <div></div>
+    <div class="kv-top-actions">
+      <div class="kv-action-item user-dropdown-container">
+        <% if (locals.user) { %>
+          <%
+            const store = locals.currentStore || null;
+            const storeName = store?.ten_cua_hang || 'Thông tin cửa hàng';
+            const storeInitial = (storeName || 'C').trim().charAt(0).toUpperCase();
+            const storeAddress = [
+              store?.dia_chi_gui_hang || store?.dia_chi,
+              store?.phuong_xa,
+              store?.quan_huyen,
+              store?.tinh_thanh
+            ].filter(Boolean).join(', ');
+            const storeEditUrl = store?._id ? `/cua-hang?open=${store._id}` : '/cua-hang';
+          %>
+          <div class="kv-user-avatar">
+            <span><%= storeInitial %></span>
+          </div>
+          <div class="user-dropdown-menu">
+            <div class="header-store-info">
+              <strong><%= storeName %></strong>
+              <% if (store?.ma_cua_hang) { %>
+                <small>Mã cửa hàng: <%= store.ma_cua_hang %></small>
+              <% } %>
+              <% if (store?.sdt) { %>
+                <small>Điện thoại: <%= store.sdt %></small>
+              <% } %>
+              <% if (store?.email) { %>
+                <small>Email: <%= store.email %></small>
+              <% } %>
+              <% if (storeAddress) { %>
+                <small>Địa chỉ: <%= storeAddress %></small>
+              <% } %>
+              <% if (store?.trang_thai) { %>
+                <small>Trạng thái: <%= store.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></small>
+              <% } %>
+              <% if (!store) { %>
+                <small>Chưa có cửa hàng. Bấm bên dưới để thêm thông tin.</small>
+              <% } %>
+            </div>
+            <a href="<%= storeEditUrl %>" class="dropdown-item">
+              <i class="fa-solid fa-store"></i> Xem và sửa cửa hàng
+            </a>
+            <a href="/auth/logout" class="dropdown-item">
+              <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
+            </a>
+          </div>
+          <% } else { %>
+            <div class="kv-user-avatar">
+              <i class="fa-solid fa-user"></i>
+            </div>
+            <div class="user-dropdown-menu login-modal">
+              <h3 class="login-title">Đăng nhập</h3>
+              <p class="login-subtitle">Chào mừng bạn quay lại!</p>
+              <a href="/auth/google" class="btn-google-login">
+                <i class="fa-brands fa-google"></i> Đăng nhập bằng Google
+              </a>
+            </div>
+            <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Bar -->
+  <div class="kv-navbar">
+    <nav class="kv-nav-links">
+      <a href="/" class="nav-item">Tổng quan</a>
+      <div class="nav-dropdown" id="hangHoaNav">
+        <button type="button" class="nav-item nav-dropdown-trigger">Hàng hóa</button>
+        <div class="nav-mega-menu">
+          <div class="nav-mega-col">
+            <a href="/hang-hoa" class="nav-mega-item">Danh sách hàng hóa</a>
+            <a href="/hang-hoa/thiet-lap-gia" class="nav-mega-item">Thiết lập giá</a>
+          </div>
+          <div class="nav-mega-col">
+            <a href="/kiem-kho" class="nav-mega-item">Kiểm kho</a>
+            <a href="/xuat-dung-noi-bo" class="nav-mega-item">
+              <span>Xuất dùng nội bộ</span>
+            </a>
+            <a href="#" class="nav-mega-item">Xuất hủy</a>
+          </div>
+        </div>
+      </div>
+      <div class="nav-dropdown" id="muaHangNav">
+        <button type="button" class="nav-item nav-dropdown-trigger">Mua hàng</button>
+        <div class="nav-mega-menu nav-mega-menu--purchase">
+          <div class="nav-mega-col">
+            <div class="nav-mega-heading">Nhà cung cấp</div>
+            <a href="/nha-cung-cap" class="nav-mega-item">Nhà cung cấp</a>
+            <a href="/phieu-nhap/hoa-don-dau-vao" class="nav-mega-item">
+              <span>Hóa đơn đầu vào</span>
+            </a>
+          </div>
+          <div class="nav-mega-col">
+            <div class="nav-mega-heading">Mua hàng</div>
+            <a href="/phieu-nhap" class="nav-mega-item">Nhập hàng</a>
+            <a href="/phieu-nhap/tra-hang-nhap" class="nav-mega-item">Trả hàng nhập</a>
+          </div>
+        </div>
+      </div>
+      <div class="nav-dropdown" id="donHangNav">
+        <button type="button" class="nav-item nav-dropdown-trigger">Đơn hàng</button>
+        <div class="nav-mega-menu nav-mega-menu--single nav-order-menu">
+          <div class="nav-mega-col">
+            <a href="/don-hang" class="nav-mega-item">Đặt hàng</a>
+            <a href="/don-hang/hoa-don" class="nav-mega-item">Hóa đơn</a>
+            <a href="/don-hang/tra-hang" class="nav-mega-item">Trả hàng</a>
+            <a href="/don-hang/doi-tac-giao-hang" class="nav-mega-item nav-mega-item--separated">Đối tác giao hàng</a>
+            <a href="/don-hang/van-don" class="nav-mega-item">Vận đơn</a>
+          </div>
+        </div>
+      </div>
+      <a href="/khach-hang" class="nav-item">Khách hàng</a>
+      <a href="/so-quy" class="nav-item">Sổ quỹ</a>
+      <div class="nav-dropdown" id="baoCaoNav">
+        <button type="button" class="nav-item nav-dropdown-trigger">Báo cáo</button>
+        <div class="nav-mega-menu nav-mega-menu--single nav-report-menu">
+          <div class="nav-mega-col">
+            <div class="nav-mega-heading">Báo cáo</div>
+            <a href="/bao-cao/cuoi-ngay" class="nav-mega-item">Cuối ngày</a>
+            <a href="/bao-cao/ban-hang" class="nav-mega-item">Bán hàng</a>
+            <a href="/bao-cao/dat-hang" class="nav-mega-item">Đặt hàng</a>
+            <a href="/bao-cao/hang-hoa" class="nav-mega-item">Hàng hóa</a>
+            <a href="/bao-cao/khach-hang" class="nav-mega-item">Khách hàng</a>
+            <a href="/bao-cao/nha-cung-cap" class="nav-mega-item">Nhà cung cấp</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="kv-nav-right">
+      <a href="/ban-hang" class="btn-ban-hang">
+        <i class="fa-solid fa-cart-shopping"></i> Bán hàng
+      </a>
+    </div>
+  </div>
+</header>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const dropdownContainer = document.querySelector('.user-dropdown-container');
+    const dropdownMenu = document.querySelector('.user-dropdown-menu');
+
+    // Generic nav dropdown handler
+    document.querySelectorAll('.nav-dropdown').forEach(function(navDrop) {
+      const trigger = navDrop.querySelector('.nav-dropdown-trigger');
+      if (trigger) {
+        trigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          // Close other dropdowns
+          document.querySelectorAll('.nav-dropdown').forEach(function(other) {
+            if (other !== navDrop) other.classList.remove('open');
+          });
+          navDrop.classList.toggle('open');
+        });
+      }
+    });
+
+    if (dropdownContainer && dropdownMenu) {
+      dropdownContainer.addEventListener('click', function (e) {
+        e.stopPropagation();
+        dropdownMenu.classList.toggle('show');
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      if (dropdownContainer && !dropdownContainer.contains(e.target)) {
+        dropdownMenu && dropdownMenu.classList.remove('show');
+      }
+      document.querySelectorAll('.nav-dropdown').forEach(function(navDrop) {
+        if (!navDrop.contains(e.target)) {
+          navDrop.classList.remove('open');
+        }
+      });
+    });
+  });
+</script>

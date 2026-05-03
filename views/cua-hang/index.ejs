@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <style>
+      .main-content {
+        padding: 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .kv-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .kv-table th {
+        background-color: #f8f9fa;
+        text-align: left;
+        padding: 12px 16px;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+        color: #495057;
+      }
+      .kv-table tr.main-row {
+        cursor: pointer;
+        border-bottom: 1px solid #eee;
+        transition: background 0.2s;
+      }
+      .kv-table tr.main-row:hover {
+        background-color: #e6f7ff;
+      }
+      .kv-table td {
+        padding: 12px 16px;
+        font-size: 14px;
+        color: #333;
+      }
+      .detail-row {
+        display: none;
+        background-color: #fafafa;
+      }
+      .detail-row.active {
+        display: table-row;
+      }
+      .detail-content {
+        padding: 20px;
+        border-left: 4px solid #0070f4;
+      }
+      .detail-tabs {
+        display: flex;
+        gap: 20px;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 20px;
+      }
+      .tab-item {
+        padding: 8px 0;
+        cursor: pointer;
+        color: #666;
+        font-weight: 500;
+        position: relative;
+      }
+      .tab-item.active {
+        color: #0070f4;
+      }
+      .tab-item.active::after {
+        content: "";
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: #0070f4;
+      }
+      .btn-add {
+        background-color: #0070f4;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      /* Modal Styles */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+      }
+      .modal-content {
+        background-color: #fff;
+        margin: 5% auto;
+        padding: 20px;
+        width: 600px;
+        border-radius: 8px;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+      }
+      .form-group input, .form-group select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <%- include('../partials/header') %>
+
+    <div class="main-content">
+      <div class="page-header">
+        <h1>Quản lý cửa hàng</h1>
+        <button class="btn-add" onclick="openModal()">+ Thêm mới</button>
+      </div>
+
+      <table class="kv-table">
+        <thead>
+          <tr>
+            <th>Mã cửa hàng</th>
+            <th>Tên cửa hàng</th>
+            <th>Điện thoại</th>
+            <th>Địa chỉ</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% stores.forEach(store => { %>
+            <tr class="main-row" onclick="toggleDetail('<%= store._id %>')">
+              <td><strong><%= store.ma_cua_hang %></strong></td>
+              <td><%= store.ten_cua_hang %></td>
+              <td><%= store.sdt %></td>
+              <td><%= store.dia_chi_gui_hang %></td>
+              <td>
+                <span class="badge" style="background: <%= store.trang_thai === 'active' ? '#52c41a' : '#ff4d4f' %>; position: static;">
+                  <%= store.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
+                </span>
+              </td>
+            </tr>
+            <tr class="detail-row" id="detail-<%= store._id %>">
+              <td colspan="5">
+                <div class="detail-content">
+                  <div class="detail-tabs">
+                    <div class="tab-item active">Thông tin</div>
+                    <div class="tab-item">Lịch sử hoạt động</div>
+                  </div>
+                  
+                  <form onsubmit="handleEdit(event, '<%= store._id %>')">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                      <div class="form-group">
+                        <label>Tên cửa hàng</label>
+                        <input type="text" name="ten_cua_hang" value="<%= store.ten_cua_hang %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Điện thoại</label>
+                        <input type="text" name="sdt" value="<%= store.sdt %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Email</label>
+                        <input type="text" name="email" value="<%= store.email %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Địa chỉ (Số nhà, đường)</label>
+                        <input type="text" name="dia_chi_gui_hang" value="<%= store.dia_chi_gui_hang %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Tỉnh/Thành</label>
+                        <input type="text" name="tinh_thanh" value="<%= store.tinh_thanh %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Quận/Huyện</label>
+                        <input type="text" name="quan_huyen" value="<%= store.quan_huyen %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Phường/Xã</label>
+                        <input type="text" name="phuong_xa" value="<%= store.phuong_xa %>">
+                      </div>
+                      <div class="form-group">
+                        <label>Trạng thái</label>
+                        <select name="trang_thai">
+                          <option value="active" <%= store.trang_thai === 'active' ? 'selected' : '' %>>Đang hoạt động</option>
+                          <option value="inactive" <%= store.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style="text-align: right; margin-top: 10px;">
+                      <button type="submit" class="btn-add">Cập nhật</button>
+                    </div>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal Thêm Mới -->
+    <div id="addModal" class="modal">
+      <div class="modal-content">
+        <h3>Thêm cửa hàng mới</h3>
+        <hr style="margin: 15px 0;">
+        <form onsubmit="handleAdd(event)">
+          <div class="form-group">
+            <label>Mã cửa hàng *</label>
+            <input type="text" name="ma_cua_hang" required placeholder="VD: CH001">
+          </div>
+          <div class="form-group">
+            <label>Tên cửa hàng *</label>
+            <input type="text" name="ten_cua_hang" required>
+          </div>
+          <div class="form-group">
+            <label>Điện thoại</label>
+            <input type="text" name="sdt">
+          </div>
+          <div class="form-group">
+            <label>Địa chỉ (Số nhà, đường)</label>
+            <input type="text" name="dia_chi_gui_hang">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label>Tỉnh/Thành</label>
+              <input type="text" name="tinh_thanh">
+            </div>
+            <div class="form-group">
+              <label>Quận/Huyện</label>
+              <input type="text" name="quan_huyen">
+            </div>
+            <div class="form-group">
+              <label>Phường/Xã</label>
+              <input type="text" name="phuong_xa">
+            </div>
+          </div>
+          <div style="text-align: right; gap: 10px; display: flex; justify-content: flex-end;">
+            <button type="button" onclick="closeModal()" style="padding: 8px 16px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Hủy</button>
+            <button type="submit" class="btn-add">Lưu</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      function toggleDetail(id) {
+        const row = document.getElementById('detail-' + id);
+        const isActive = row.classList.contains('active');
+        
+        // Đóng tất cả các row khác trước
+        document.querySelectorAll('.detail-row').forEach(r => r.classList.remove('active'));
+        
+        if (!isActive) {
+          row.classList.add('active');
+        }
+      }
+
+      function openModal() {
+        document.getElementById('addModal').style.display = 'block';
+      }
+
+      function closeModal() {
+        document.getElementById('addModal').style.display = 'none';
+      }
+
+      async function handleAdd(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+          const res = await fetch('/cua-hang/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          const result = await res.json();
+          if (result.success) {
+            alert(result.message);
+            location.reload();
+          } else {
+            alert(result.message);
+          }
+        } catch (err) {
+          alert("Lỗi kết nối server");
+        }
+      }
+
+      async function handleEdit(e, id) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+
+        try {
+          const res = await fetch('/cua-hang/edit/' + id, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          const result = await res.json();
+          if (result.success) {
+            alert(result.message);
+            location.reload();
+          } else {
+            alert(result.message);
+          }
+        } catch (err) {
+          alert("Lỗi kết nối server");
+        }
+      }
+
+      // Đóng modal khi click ra ngoài
+      window.onclick = function(event) {
+        const modal = document.getElementById('addModal');
+        if (event.target == modal) {
+          closeModal();
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        const openId = new URLSearchParams(window.location.search).get('open');
+        if (!openId) return;
+
+        const row = document.getElementById('detail-' + openId);
+        if (row) {
+          row.classList.add('active');
+          row.scrollIntoView({ block: 'center' });
+        }
+      });
+    </script>
+  </body>
+</html>

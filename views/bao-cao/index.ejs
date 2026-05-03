@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      .report-container {
+        padding: 20px;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      .report-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .tab-btn {
+        padding: 10px 25px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+        color: #666;
+      }
+      .tab-btn.active {
+        background: #0070f4;
+        color: #fff;
+        border-color: #0070f4;
+      }
+      .chart-card {
+        background: #fff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+      }
+    </style>
+  </head>
+  <body>
+    <%- include('../partials/header') %>
+
+    <div class="report-container">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1><i class="fa-solid fa-chart-line"></i> <%= locals.heading || title || 'Báo cáo' %></h1>
+        <div class="report-tabs">
+          <button class="tab-btn active" onclick="loadData('day', this)">Theo ngày</button>
+          <button class="tab-btn" onclick="loadData('week', this)">Theo tuần</button>
+          <button class="tab-btn" onclick="loadData('month', this)">Theo tháng</button>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <canvas id="revenueChart"></canvas>
+      </div>
+    </div>
+
+    <script>
+      let myChart = null;
+
+      async function loadData(type, btn) {
+        // Update tabs UI
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        try {
+          const res = await fetch(`/bao-cao/data?type=${type}`);
+          const result = await res.json();
+          
+          if (result.success) {
+            renderChart(result.data, type);
+          }
+        } catch (err) {
+          console.error("Lỗi tải báo cáo:", err);
+        }
+      }
+
+      function renderChart(data, type) {
+        const labels = data.map(item => {
+          if (type === 'week') return "Tuần " + item._id;
+          return item._id;
+        });
+        const values = data.map(item => item.totalRevenue);
+
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        
+        if (myChart) {
+          myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Doanh thu (VNĐ)',
+              data: values,
+              backgroundColor: 'rgba(0, 112, 244, 0.7)',
+              borderColor: '#0070f4',
+              borderWidth: 1,
+              borderRadius: 5
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return value.toLocaleString() + ' đ';
+                  }
+                }
+              }
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return 'Doanh thu: ' + context.raw.toLocaleString() + ' đ';
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // Load initial data
+      document.addEventListener('DOMContentLoaded', () => {
+        loadData('day', document.querySelector('.tab-btn.active'));
+      });
+    </script>
+  </body>
+</html>

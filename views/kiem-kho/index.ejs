@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+  </head>
+  <body>
+    <%- include('../partials/header') %>
+
+    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>Danh sách phiếu kiểm kho</h1>
+        <a href="/kiem-kho/create" class="btn-ban-hang" style="background: #0070f4; color: #fff; text-decoration: none;">+ Kiểm kho</a>
+      </div>
+
+      <table class="kv-table">
+        <thead>
+          <tr>
+            <th>Mã phiếu</th>
+            <th>Ngày kiểm</th>
+            <th>Cửa hàng</th>
+            <th>Người tạo</th>
+            <th style="text-align: right;">SL Thực tế</th>
+            <th style="text-align: right;">SL Lệch</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% tickets.forEach(t => { %>
+            <tr class="main-row">
+              <td><strong><%= t.ma_kiem_kho %></strong></td>
+              <td><%= new Date(t.ngay_kiem).toLocaleDateString('vi-VN') %></td>
+              <td><%= t.cua_hang_id ? t.cua_hang_id.ten_cua_hang : 'N/A' %></td>
+              <td><%= t.nguoi_tao_id ? t.nguoi_tao_id.ho_ten : 'N/A' %></td>
+              <td style="text-align: right;"><%= t.tong_so_luong_thuc_te || 0 %></td>
+              <td style="text-align: right; color: <%= (t.tong_so_luong_lech || 0) !== 0 ? '#ff4d4f' : '#52c41a' %>">
+                <%= (t.tong_so_luong_lech || 0) > 0 ? '+' + (t.tong_so_luong_lech || 0) : (t.tong_so_luong_lech || 0) %>
+              </td>
+              <td>
+                <span class="badge" style="background: #52c41a; position: static;">Hoàn thành</span>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>

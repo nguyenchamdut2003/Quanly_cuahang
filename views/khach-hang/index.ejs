@@ -1,0 +1,214 @@
+<%
+  const safeCustomers = Array.isArray(locals.customers) ? locals.customers : [];
+  const safeGroups = Array.isArray(locals.groups) ? locals.groups : [];
+  const safeDetails = locals.detailMap || {};
+  const safeFilters = locals.filters || {};
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtDate = value => value ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 12% 0}.sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}.title{font-size:20px;font-weight:700;margin:0 0 16px}.filter{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;margin-bottom:10px}.radio{display:flex;align-items:center;gap:9px;margin-top:9px}.radio input{accent-color:#0070f4}.pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#667085;padding:0 10px;font-size:13px}.seg{display:flex;gap:8px;flex-wrap:wrap}.seg button,.seg a{height:30px;border:1px solid #cfd8e3;border-radius:16px;padding:0 14px;display:flex;align-items:center;text-decoration:none;color:#111827;background:#fff;font-size:13px;cursor:pointer}.seg .active{background:#0070f4;color:#fff;border-color:#0070f4}.main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;justify-content:space-between;gap:12px}.search{position:relative;flex:1;max-width:470px}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px}.search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff}.actions{display:flex;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.btn.primary{border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1040px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;font-size:12px;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.table tbody tr{cursor:pointer}.customer-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}.check-col{width:36px;text-align:center}.num{text-align:right}.row-link{color:#006dff;text-decoration:none;font-weight:700}.footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}.footer select{height:24px;border:1px solid #cfd8e3;border-radius:6px}.detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.customer-detail{padding:0 18px 14px;min-height:300px}.detail-tabs{height:42px;display:flex;align-items:flex-end;gap:26px;border-bottom:1px solid #e5e9ee}.detail-tab{height:42px;border:0;background:#fff;color:#111827;padding:0 0 9px;font-size:14px;cursor:pointer}.detail-tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700}.detail-panel{display:none;padding-top:16px}.detail-panel.active{display:block}.info-head{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:18px;margin-bottom:20px}.profile-avatar{width:92px;height:92px;border-radius:50%;background:#e8f3ff;color:#65a6f5;display:flex;align-items:center;justify-content:center;font-size:54px}.info-title{font-size:16px;font-weight:800}.info-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}.info-field{border-bottom:1px solid #e5e9ee;padding-bottom:8px}.info-field label{display:block;font-size:12px;margin-bottom:8px}.muted{color:#7a8794}.mini-table{width:100%;border-collapse:collapse}.mini-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 10px}.mini-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 10px}.detail-empty{height:140px;text-align:center;color:#667085}.detail-actions{height:44px;border-top:1px solid #e5e9ee;display:flex;justify-content:space-between;align-items:center;margin-top:18px}.detail-action-group{display:flex;gap:8px}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:20px;z-index:1000}.modal-backdrop.open{display:flex}.modal{width:900px;max-width:calc(100vw - 80px);max-height:calc(100vh - 40px);background:#fff;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}.modal-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}.modal-head h2{margin:0;font-size:20px}.modal-close{border:0;background:#fff;font-size:24px;color:#475467;cursor:pointer}.modal-body{padding:16px 22px 76px;overflow:auto;display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:20px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}.field label{display:block;font-size:12px;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:14px}.field textarea{height:50px;padding-top:8px;resize:none}.full{grid-column:1 / -1}.panel{border:1px solid #e1e6ec;border-radius:6px;padding:12px;margin-top:16px}.panel-title{font-weight:800;margin-bottom:12px;display:flex;justify-content:space-between}.avatar{width:170px;height:170px;border-radius:50%;background:#f1f3f6;border:1px dashed #cfd8e3;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#667085;text-align:center;margin-top:18px}.avatar button{height:34px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;font-weight:700}.modal-foot{position:absolute}.fixed-foot{height:62px;border-top:1px solid #e5e9ee;background:#fff;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 22px}.save{height:38px;border:0;border-radius:7px;background:#0070f4;color:#fff;font-weight:800;padding:0 18px}.cancel{height:38px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;padding:0 18px;font-weight:700}.group-inline{display:flex;justify-content:space-between;align-items:center}.group-inline a{color:#0070f4;text-decoration:none;font-size:12px}.empty{text-align:center;color:#667085;height:300px}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form class="page" method="GET" action="/khach-hang">
+    <div class="shell">
+      <aside class="sidebar">
+        <h1 class="title">Khách hàng</h1>
+        <div class="filter">
+          <div class="filter-title group-inline"><span>Nhóm khách hàng</span><a href="#" onclick="openGroupModal();return false">Tạo mới</a></div>
+          <select class="control" name="nhom_khach_hang_id" onchange="this.form.submit()">
+            <option value="all">Tất cả các nhóm</option>
+            <% safeGroups.forEach(group => { %>
+              <option value="<%= group._id %>" <%= String(safeFilters.nhom_khach_hang_id || '') === String(group._id) ? 'selected' : '' %>><%= group.ten_nhom %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="filter"><div class="filter-title">Ngày tạo</div><input class="control" type="date" name="created_from" value="<%= safeFilters.created_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="created_to" value="<%= safeFilters.created_to || '' %>" onchange="this.form.submit()"></div>
+        <div class="filter"><div class="filter-title">Người tạo</div><input class="control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo"></div>
+        <div class="filter"><div class="filter-title">Loại khách hàng</div><div class="seg"><button type="button" class="<%= !safeFilters.loai_khach_hang || safeFilters.loai_khach_hang === 'all' ? 'active' : '' %>" onclick="setCustomerFilter('loai_khach_hang','')">Tất cả</button><button type="button" class="<%= safeFilters.loai_khach_hang === 'ca_nhan' ? 'active' : '' %>" onclick="setCustomerFilter('loai_khach_hang','ca_nhan')">Cá nhân</button><button type="button" class="<%= safeFilters.loai_khach_hang === 'cong_ty' ? 'active' : '' %>" onclick="setCustomerFilter('loai_khach_hang','cong_ty')">Công ty</button></div></div>
+        <div class="filter"><div class="filter-title">Giới tính</div><div class="seg"><button type="button" class="<%= !safeFilters.gioi_tinh || safeFilters.gioi_tinh === 'all' ? 'active' : '' %>" onclick="setCustomerFilter('gioi_tinh','')">Tất cả</button><button type="button" class="<%= safeFilters.gioi_tinh === 'nam' ? 'active' : '' %>" onclick="setCustomerFilter('gioi_tinh','nam')">Nam</button><button type="button" class="<%= safeFilters.gioi_tinh === 'nu' ? 'active' : '' %>" onclick="setCustomerFilter('gioi_tinh','nu')">Nữ</button></div></div>
+        <div class="filter"><div class="filter-title">Sinh nhật</div><input class="control" type="date" name="birthday_from" value="<%= safeFilters.birthday_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="birthday_to" value="<%= safeFilters.birthday_to || '' %>" onchange="this.form.submit()"></div>
+        <div class="filter"><div class="filter-title">Ngày giao dịch cuối</div><input class="control" type="date" name="last_tx_from" value="<%= safeFilters.last_tx_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="last_tx_to" value="<%= safeFilters.last_tx_to || '' %>" onchange="this.form.submit()"></div>
+        <div class="filter"><div class="filter-title">Tổng bán</div><input class="control" name="tong_ban_from" value="<%= safeFilters.tong_ban_from || '' %>" placeholder="Từ"><input class="control" name="tong_ban_to" value="<%= safeFilters.tong_ban_to || '' %>" placeholder="Tới"></div>
+        <div class="filter"><div class="filter-title">Nợ hiện tại</div><input class="control" name="tong_no_from" value="<%= safeFilters.tong_no_from || '' %>" placeholder="Từ"><input class="control" name="tong_no_to" value="<%= safeFilters.tong_no_to || '' %>" placeholder="Tới"></div>
+        <div class="filter"><div class="filter-title">Khu vực giao hàng</div><input class="control" name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" placeholder="Chọn Tỉnh/TP - Quận/Huyện"></div>
+      </aside>
+      <main class="main">
+        <div class="toolbar">
+          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã, tên, số điện thoại"><button><i class="fa-solid fa-sliders"></i></button></div>
+          <div class="actions">
+            <button type="button" class="btn primary" onclick="openCustomerModal()"><i class="fa-solid fa-plus"></i> Khách hàng</button>
+            <button type="button" class="btn" onclick="document.getElementById('importFile').click()"><i class="fa-solid fa-file-import"></i> Import file</button>
+            <input id="importFile" type="file" accept=".csv" hidden onchange="importCustomers(this)">
+            <span class="icon"><i class="fa-solid fa-ellipsis"></i></span>
+            <span class="icon"><i class="fa-solid fa-list"></i></span>
+            <span class="icon"><i class="fa-solid fa-gear"></i></span>
+            <span class="icon"><i class="fa-regular fa-circle-question"></i></span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th>Mã khách hàng</th><th>Tên khách hàng</th><th>Điện thoại</th><th class="num">Nợ hiện tại</th><th class="num">Tổng bán</th><th class="num">Tổng bán trừ trả hàng</th></tr></thead>
+            <tbody>
+              <tr><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td></tr>
+              <% if (safeCustomers.length) { %>
+                <% safeCustomers.forEach(customer => { const detail = safeDetails[String(customer._id)] || { addresses: [], debts: [], invoices: [] }; %>
+                  <tr class="customer-row" data-customer-row="<%= customer._id %>" onclick="toggleCustomerDetail('<%= customer._id %>')">
+                    <td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td>
+                    <td><a href="#" class="row-link" onclick="event.preventDefault();event.stopPropagation();toggleCustomerDetail('<%= customer._id %>')"><%= customer.ma_khach_hang %></a></td>
+                    <td><%= customer.ten_khach_hang %></td>
+                    <td><%= customer.sdt || '' %></td>
+                    <td class="num"><%= fmt(customer.tong_no) %></td>
+                    <td class="num"><%= fmt(customer.tong_ban) %></td>
+                    <td class="num"><%= fmt(customer.tong_ban_tru_tra) %></td>
+                  </tr>
+                  <tr class="detail-row" data-customer-detail="<%= customer._id %>">
+                    <td class="detail-cell" colspan="7">
+                      <div class="customer-detail">
+                        <div class="detail-tabs">
+                          <button type="button" class="detail-tab active" data-tab="info" onclick="showCustomerTab(event,'<%= customer._id %>','info')">Thông tin</button>
+                          <button type="button" class="detail-tab" data-tab="address" onclick="showCustomerTab(event,'<%= customer._id %>','address')">Địa chỉ nhận hàng</button>
+                          <button type="button" class="detail-tab" data-tab="debt" onclick="showCustomerTab(event,'<%= customer._id %>','debt')">Nợ cần thu từ khách</button>
+                        </div>
+                        <div class="detail-panel active" data-panel="info">
+                          <div class="info-head">
+                            <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
+                            <div>
+                              <div><span class="info-title"><%= customer.ten_khach_hang %></span> <span><%= customer.ma_khach_hang %></span></div>
+                              <div class="info-meta"><span>Người tạo: <%= customer.nguoi_tao_id?.ho_ten || user?.ho_ten || 'Admin' %></span><span>|</span><span>Ngày tạo: <%= customer.created_at ? new Date(customer.created_at).toLocaleDateString('vi-VN') : '' %></span><span>|</span><span>Nhóm khách: <span class="muted"><%= customer.nhom_khach_hang_id?.ten_nhom || 'Chưa có' %></span></span></div>
+                            </div>
+                            <div>Chi nhánh trung tâm</div>
+                          </div>
+                          <div class="info-grid">
+                            <div class="info-field"><label>Điện thoại</label><span class="muted"><%= customer.sdt || 'Chưa có' %></span></div>
+                            <div class="info-field"><label>Sinh nhật</label><span class="muted"><%= customer.ngay_sinh ? new Date(customer.ngay_sinh).toLocaleDateString('vi-VN') : 'Chưa có' %></span></div>
+                            <div class="info-field"><label>Giới tính</label><span class="muted"><%= customer.gioi_tinh || 'Chưa có' %></span></div>
+                            <div class="info-field"><label>Email</label><span class="muted"><%= customer.email || 'Chưa có' %></span></div>
+                            <div class="info-field"><label>Facebook</label><span class="muted"><%= customer.facebook || 'Chưa có' %></span></div>
+                            <div></div>
+                            <div class="info-field" style="grid-column:1/-1"><label>Địa chỉ</label><span class="muted"><%= customer.dia_chi_nhan || 'Chưa có' %></span></div>
+                          </div>
+                          <div style="margin-top:18px"><a class="row-link" href="#" onclick="event.preventDefault()">Thêm thông tin xuất hóa đơn</a></div>
+                          <div style="margin-top:20px"><i class="fa-regular fa-pen-to-square"></i> <%= customer.ghi_chu || 'Chưa có ghi chú' %></div>
+                          <div class="detail-actions"><div><button type="button" class="btn" onclick="event.stopPropagation();deleteCustomerInline('<%= customer._id %>')"><i class="fa-regular fa-trash-can"></i> Xóa</button></div><div class="detail-action-group"><button type="button" class="btn solid" onclick="event.stopPropagation();editCustomer('<%= customer._id %>')"><i class="fa-solid fa-pen"></i> Chỉnh sửa</button><button type="button" class="btn" onclick="event.stopPropagation();deleteCustomerInline('<%= customer._id %>')"><i class="fa-solid fa-lock"></i> Ngừng hoạt động</button></div></div>
+                        </div>
+                        <div class="detail-panel" data-panel="address">
+                          <table class="mini-table"><thead><tr><th>Tên địa chỉ</th><th>Tên người nhận</th><th>Số điện thoại</th><th>Địa chỉ nhận</th><th>Ngày tạo</th></tr></thead><tbody>
+                            <% if (detail.addresses.length) { %>
+                              <% detail.addresses.forEach(address => { %><tr><td><%= address.mac_dinh ? 'Mặc định' : 'Địa chỉ nhận hàng' %></td><td><%= customer.ten_khach_hang %></td><td><%= customer.sdt || '' %></td><td><%= [address.dia_chi,address.phuong_xa,address.quan_huyen,address.tinh_thanh].filter(Boolean).join(', ') %></td><td></td></tr><% }) %>
+                            <% } else { %><tr><td colspan="5" class="detail-empty">Không tìm thấy kết quả nào phù hợp</td></tr><% } %>
+                          </tbody></table><div class="detail-actions"><span></span><button type="button" class="btn solid"><i class="fa-solid fa-plus"></i> Địa chỉ mới</button></div>
+                        </div>
+                        <div class="detail-panel" data-panel="debt">
+                          <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><select class="control" style="width:180px"><option>Tất cả giao dịch</option></select></div>
+                          <table class="mini-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Loại</th><th class="num">Giá trị</th><th class="num">Dư nợ khách hàng</th></tr></thead><tbody>
+                            <% if (detail.debts.length || detail.invoices.length) { %>
+                              <% detail.debts.forEach(item => { const code = item.hoa_don_id?.ma_hoa_don || item.phieu_thu_chi_id?.ma_phieu || ''; %><tr><td><a class="row-link" href="#"><%= code || 'Giao dịch' %></a></td><td><%= fmtDate(item.ngay || item.created_at) %></td><td><%= item.loai === 'thu' ? 'Thanh toán' : 'Bán hàng' %></td><td class="num"><%= fmt(Math.abs(item.so_tien || 0)) %></td><td class="num"><%= fmt(item.so_tien) %></td></tr><% }) %>
+                              <% if (!detail.debts.length) { detail.invoices.forEach(item => { %><tr><td><a class="row-link" href="/don-hang/hoa-don"><%= item.ma_hoa_don %></a></td><td><%= fmtDate(item.ngay_ban || item.created_at) %></td><td>Bán hàng</td><td class="num"><%= fmt(item.thanh_toan || item.tong_tien) %></td><td class="num"><%= fmt(item.thanh_toan || item.tong_tien) %></td></tr><% }) } %>
+                            <% } else { %><tr><td colspan="5" class="detail-empty">Không tìm thấy kết quả nào phù hợp</td></tr><% } %>
+                          </tbody></table><div class="detail-actions"><div class="detail-action-group"><a class="btn" href="/khach-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file công nợ</a><a class="btn" href="/khach-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div><div class="detail-action-group"><button type="button" class="btn solid">Thanh toán</button><button type="button" class="btn">Điều chỉnh</button><button type="button" class="btn">Chiết khấu thanh toán</button><button type="button" class="btn">Tạo QR</button></div></div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="7" class="empty">Chưa có khách hàng</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="footer">Hiển thị <select><option>15 dòng</option></select></div>
+      </main>
+    </div>
+  </form>
+
+  <div id="customerModal" class="modal-backdrop">
+    <form class="modal" onsubmit="saveCustomer(event)">
+      <div class="modal-head"><h2 id="modalTitle">Tạo khách hàng</h2><button type="button" class="modal-close" onclick="closeCustomerModal()">&times;</button></div>
+      <div class="modal-body">
+        <div>
+          <input type="hidden" name="_id" id="customerId">
+          <div class="form-grid">
+            <div class="field"><label>Tên khách hàng</label><input name="ten_khach_hang" id="tenKhachHang" placeholder="Bắt buộc" required autofocus></div>
+            <div class="field"><label>Mã khách hàng</label><input name="ma_khach_hang" id="maKhachHang" placeholder="Tự động"></div>
+            <div class="field"><label>Điện thoại 1</label><input name="sdt" id="sdt"></div>
+            <div class="field"><label>Điện thoại 2</label><input name="sdt2" id="sdt2"></div>
+            <div class="field"><label>Email</label><input name="email" id="email" placeholder="email@gmail.com"></div>
+            <div class="field"><label>Facebook</label><input name="facebook" id="facebook" placeholder="facebook.com/username"></div>
+            <div class="field"><label>Sinh nhật</label><input type="date" name="ngay_sinh" id="ngaySinh"></div>
+            <div class="field"><label>Giới tính</label><select name="gioi_tinh" id="gioiTinh"><option value="">Chọn giới tính</option><option value="nam">Nam</option><option value="nu">Nữ</option><option value="khac">Khác</option></select></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Địa chỉ <i class="fa-solid fa-chevron-up"></i></div>
+            <div class="form-grid">
+              <div class="field full"><label>Địa chỉ</label><input name="dia_chi_nhan" id="diaChi" placeholder="Nhập địa chỉ"></div>
+              <div class="field"><label>Khu vực</label><input name="tinh_thanh" id="tinhThanh" placeholder="Chọn Tỉnh/Thành phố"></div>
+              <div class="field"><label>Phường/Xã</label><input name="phuong_xa" id="phuongXa" placeholder="Chọn Phường/Xã"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Nhóm khách hàng, ghi chú <i class="fa-solid fa-chevron-up"></i></div>
+            <div class="field"><label>Nhóm khách hàng</label><select name="nhom_khach_hang_id" id="nhomKhachHang"><option value="">Chọn nhóm khách hàng</option><% safeGroups.forEach(group => { %><option value="<%= group._id %>"><%= group.ten_nhom %></option><% }) %></select></div>
+            <div class="field" style="margin-top:12px"><label>Ghi chú</label><textarea name="ghi_chu" id="ghiChu" placeholder="Nhập ghi chú"></textarea></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title">Thông tin xuất hóa đơn <i class="fa-solid fa-chevron-up"></i></div>
+            <div class="field" style="margin-bottom:12px"><label>Loại khách hàng</label><label style="display:inline-flex;gap:8px;align-items:center;margin-right:18px"><input type="radio" name="loai_khach_hang" value="ca_nhan" checked> Cá nhân</label><label style="display:inline-flex;gap:8px;align-items:center"><input type="radio" name="loai_khach_hang" value="cong_ty"> Tổ chức/ Hộ kinh doanh</label></div>
+            <div class="form-grid">
+              <div class="field"><label>Tên người mua</label><input name="ten_nguoi_mua" id="tenNguoiMua" placeholder="Nhập tên người mua"></div>
+              <div class="field"><label>Mã số thuế</label><input name="ma_so_thue" id="maSoThue" placeholder="Nhập mã số thuế"></div>
+              <div class="field full"><label>Tên công ty</label><input name="ten_cong_ty" id="tenCongTy" placeholder="Nhập tên công ty"></div>
+            </div>
+          </div>
+        </div>
+        <aside><div class="avatar"><button type="button">Thêm ảnh</button><span>Ảnh không được vượt quá<br>2MB</span></div></aside>
+      </div>
+      <div class="fixed-foot"><button class="cancel" type="button" onclick="closeCustomerModal()">Bỏ qua</button><button class="save" type="submit">Lưu</button></div>
+    </form>
+  </div>
+
+  <div id="groupModal" class="modal-backdrop">
+    <form class="modal" style="width:420px" onsubmit="saveGroup(event)">
+      <div class="modal-head"><h2>Tạo nhóm khách hàng</h2><button type="button" class="modal-close" onclick="closeGroupModal()">&times;</button></div>
+      <div style="padding:16px 22px 24px">
+        <div class="field"><label>Tên nhóm</label><input name="ten_nhom" required placeholder="Nhập tên nhóm"></div>
+        <div class="field" style="margin-top:12px"><label>Mô tả</label><textarea name="mo_ta" placeholder="Nhập mô tả"></textarea></div>
+      </div>
+      <div class="fixed-foot"><button class="cancel" type="button" onclick="closeGroupModal()">Bỏ qua</button><button class="save" type="submit">Lưu</button></div>
+    </form>
+  </div>
+
+  <script>
+    const customers = <%- JSON.stringify(safeCustomers.map(c => ({
+      _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '',
+      sdt: c.sdt || '', sdt2: c.sdt2 || '', email: c.email || '', facebook: c.facebook || '',
+      ngay_sinh: c.ngay_sinh ? new Date(c.ngay_sinh).toISOString().slice(0,10) : '',
+      gioi_tinh: c.gioi_tinh || '', loai_khach_hang: c.loai_khach_hang || 'ca_nhan',
+      dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', phuong_xa: c.phuong_xa || '',
+      nhom_khach_hang_id: c.nhom_khach_hang_id ? String(c.nhom_khach_hang_id._id || c.nhom_khach_hang_id) : '',
+      ghi_chu: c.ghi_chu || '', ten_nguoi_mua: c.ten_nguoi_mua || '', ten_cong_ty: c.ten_cong_ty || '', ma_so_thue: c.ma_so_thue || ''
+    }))) %>;
+    function setCustomerFilter(key,value){const form=document.querySelector('form.page');let input=form.querySelector('[name="'+key+'"]');if(!input){input=document.createElement('input');input.type='hidden';input.name=key;form.appendChild(input)}input.value=value;form.submit()}
+    function openCustomerModal(){modalTitle.textContent='Tạo khách hàng';document.querySelector('#customerModal form').reset();customerId.value='';maKhachHang.disabled=false;customerModal.classList.add('open');setTimeout(()=>tenKhachHang.focus(),50)}
+    function closeCustomerModal(){customerModal.classList.remove('open')}
+    function toggleCustomerDetail(id){const row=document.querySelector('[data-customer-row="'+id+'"]');const detail=document.querySelector('[data-customer-detail="'+id+'"]');if(!detail)return;const open=!detail.classList.contains('open');document.querySelectorAll('.detail-row').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.customer-row').forEach(x=>x.classList.remove('active'));if(!open)return;detail.classList.add('open');row?.classList.add('active')}
+    function showCustomerTab(event,id,tab){event.stopPropagation();const detail=document.querySelector('[data-customer-detail="'+id+'"]');if(!detail)return;detail.querySelectorAll('.detail-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.tab===tab));detail.querySelectorAll('.detail-panel').forEach(panel=>panel.classList.toggle('active',panel.dataset.panel===tab))}
+    async function deleteCustomerInline(id){if(!confirm('Ngừng hoạt động khách hàng này?'))return;const res=await fetch('/khach-hang/'+id,{method:'DELETE'});const result=await res.json();if(!result.success)return alert(result.message||'Không cập nhật được khách hàng');location.reload()}
+    function editCustomer(id){const c=customers.find(x=>x._id===id);if(!c)return;openCustomerModal();modalTitle.textContent='Cập nhật khách hàng';customerId.value=c._id;maKhachHang.value=c.ma_khach_hang;maKhachHang.disabled=true;tenKhachHang.value=c.ten_khach_hang;sdt.value=c.sdt;sdt2.value=c.sdt2;email.value=c.email;facebook.value=c.facebook;ngaySinh.value=c.ngay_sinh;gioiTinh.value=c.gioi_tinh;diaChi.value=c.dia_chi_nhan;tinhThanh.value=c.tinh_thanh;phuongXa.value=c.phuong_xa;nhomKhachHang.value=c.nhom_khach_hang_id;ghiChu.value=c.ghi_chu;tenNguoiMua.value=c.ten_nguoi_mua;tenCongTy.value=c.ten_cong_ty;maSoThue.value=c.ma_so_thue;document.querySelectorAll('input[name=loai_khach_hang]').forEach(r=>r.checked=r.value===c.loai_khach_hang)}
+    async function saveCustomer(e){e.preventDefault();const form=e.target;const data=Object.fromEntries(new FormData(form).entries());if(maKhachHang.disabled)delete data.ma_khach_hang;const id=data._id;delete data._id;const res=await fetch(id?`/khach-hang/${id}`:'/khach-hang/add',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await res.json();if(!result.success)return alert(result.message||'Không lưu được khách hàng');location.reload()}
+    function openGroupModal(){groupModal.classList.add('open')}
+    function closeGroupModal(){groupModal.classList.remove('open')}
+    async function saveGroup(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());const res=await fetch('/khach-hang/groups/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await res.json();if(!result.success)return alert(result.message||'Không tạo được nhóm');location.reload()}
+    async function importCustomers(input){if(!input.files.length)return;const data=new FormData();data.append('file',input.files[0]);const res=await fetch('/khach-hang/import',{method:'POST',body:data});const result=await res.json();if(!result.success)return alert(result.message||'Không import được khách hàng');alert(result.message);location.reload()}
+  </script>
+</body>
+</html>

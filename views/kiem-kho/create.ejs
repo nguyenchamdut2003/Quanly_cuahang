@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <style>
+      .kiemkho-container {
+        display: grid;
+        grid-template-columns: 1fr 350px;
+        gap: 20px;
+        padding: 20px;
+        background-color: #f0f2f5;
+        min-height: calc(100vh - 100px);
+      }
+      .left-panel, .right-panel {
+        background: #fff;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      }
+      .search-box {
+        position: relative;
+        margin-bottom: 20px;
+      }
+      .search-box input {
+        width: 100%;
+        padding: 12px 40px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+      }
+      .search-box i {
+        position: absolute;
+        left: 15px;
+        top: 15px;
+        color: #999;
+      }
+      .kk-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .kk-table th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #eee;
+      }
+      .kk-table td {
+        padding: 12px 10px;
+        border-bottom: 1px solid #eee;
+      }
+      .input-thuc-te {
+        width: 80px;
+        padding: 6px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: right;
+        background: #fffbe6;
+      }
+      .lech-positive { color: #52c41a; font-weight: bold; }
+      .lech-negative { color: #ff4d4f; font-weight: bold; }
+      .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #ddd;
+        z-index: 1000;
+        max-height: 250px;
+        overflow-y: auto;
+        display: none;
+      }
+      .search-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+      }
+      .search-item:hover { background: #e6f7ff; }
+      .btn-finish {
+        width: 100%;
+        padding: 15px;
+        background: #52c41a;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <%- include('../partials/header') %>
+
+    <div class="kiemkho-container">
+      <div class="left-panel">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+          <a href="/kiem-kho" style="color: #666;"><i class="fa-solid fa-arrow-left"></i></a>
+          <h2 style="margin: 0;">Kiểm kho</h2>
+        </div>
+
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="kkSearch" placeholder="Tìm hàng hóa theo mã hoặc tên...">
+          <div id="kkResults" class="search-results"></div>
+        </div>
+
+        <table class="kk-table">
+          <thead>
+            <tr>
+              <th width="40">STT</th>
+              <th width="120">Mã hàng</th>
+              <th>Tên hàng</th>
+              <th width="100" style="text-align: right;">Hệ thống</th>
+              <th width="100" style="text-align: right;">Thực tế</th>
+              <th width="100" style="text-align: right;">Lệch</th>
+              <th width="40"></th>
+            </tr>
+          </thead>
+          <tbody id="kkBody">
+            <!-- Items added here -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="right-panel">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+          <span><strong>Người tạo:</strong> <%= user.ho_ten %></span>
+          <span><%= new Date().toLocaleString('vi-VN') %></span>
+        </div>
+
+        <div class="form-group">
+          <label>Cửa hàng kiểm</label>
+          <select id="storeId" class="form-control" style="width: 100%; padding: 8px; margin-top: 5px;">
+            <% stores.forEach(s => { %>
+              <option value="<%= s._id %>"><%= s.ten_cua_hang %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Ghi chú</label>
+          <textarea id="ghiChu" style="width: 100%; padding: 8px; margin-top: 5px; height: 80px;"></textarea>
+        </div>
+
+        <div style="margin-top: 30px; border-top: 1px dashed #ddd; padding-top: 20px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <span>Tổng SL thực tế:</span>
+            <span id="totalThucTe" style="font-weight: bold;">0</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Tổng lệch:</span>
+            <span id="totalLech" style="font-weight: bold;">0</span>
+          </div>
+        </div>
+
+        <button class="btn-finish" onclick="saveKiemKho()">
+          <i class="fa-solid fa-check-double"></i> HOÀN THÀNH
+        </button>
+      </div>
+    </div>
+
+    <script>
+      let kkItems = [];
+      const products = <%- JSON.stringify(products) %>;
+
+      const searchInput = document.getElementById('kkSearch');
+      const resultsDiv = document.getElementById('kkResults');
+
+      searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        if (!query) {
+          resultsDiv.style.display = 'none';
+          return;
+        }
+
+        const filtered = products.filter(p => 
+          p.ten_hang.toLowerCase().includes(query) || 
+          p.ma_hang.toLowerCase().includes(query)
+        );
+
+        resultsDiv.innerHTML = filtered.map(p => `
+          <div class="search-item" onclick="addKKItem('${p._id}')">
+            <span>${p.ten_hang} (${p.ma_hang})</span>
+            <span style="float: right; color: #999;">Tồn: ${p.ton_kho}</span>
+          </div>
+        `).join('');
+        resultsDiv.style.display = 'block';
+      });
+
+      function addKKItem(id) {
+        const product = products.find(p => p._id === id);
+        if (!product) return;
+
+        if (kkItems.find(i => i.hang_hoa_id === id)) return alert("Hàng hóa này đã có trong danh sách");
+
+        kkItems.push({
+          hang_hoa_id: id,
+          ma_hang: product.ma_hang,
+          ten_hang: product.ten_hang,
+          ton_kho_he_thong: product.ton_kho,
+          so_luong_thuc_te: product.ton_kho
+        });
+
+        renderKK();
+        searchInput.value = '';
+        resultsDiv.style.display = 'none';
+      }
+
+      function renderKK() {
+        const body = document.getElementById('kkBody');
+        let totalTT = 0;
+        let totalL = 0;
+
+        body.innerHTML = kkItems.map((item, index) => {
+          const lech = item.so_luong_thuc_te - item.ton_kho_he_thong;
+          totalTT += item.so_luong_thuc_te;
+          totalL += lech;
+
+          return `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${item.ma_hang}</td>
+              <td>${item.ten_hang}</td>
+              <td style="text-align: right;">${item.ton_kho_he_thong}</td>
+              <td style="text-align: right;">
+                <input type="number" class="input-thuc-te" value="${item.so_luong_thuc_te}" onchange="updateTT('${item.hang_hoa_id}', this.value)">
+              </td>
+              <td style="text-align: right;" class="${lech > 0 ? 'lech-positive' : (lech < 0 ? 'lech-negative' : '')}">
+                ${lech > 0 ? '+' + lech : lech}
+              </td>
+              <td><i class="fa-solid fa-xmark" style="color: #ccc; cursor: pointer;" onclick="removeKK('${item.hang_hoa_id}')"></i></td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('totalThucTe').innerText = totalTT;
+        document.getElementById('totalLech').innerText = totalL;
+      }
+
+      function updateTT(id, val) {
+        const item = kkItems.find(i => i.hang_hoa_id === id);
+        if (item) item.so_luong_thuc_te = Number(val);
+        renderKK();
+      }
+
+      function removeKK(id) {
+        kkItems = kkItems.filter(i => i.hang_hoa_id !== id);
+        renderKK();
+      }
+
+      async function saveKiemKho() {
+        if (kkItems.length === 0) return alert("Chưa có hàng hóa nào để kiểm");
+
+        const data = {
+          cua_hang_id: document.getElementById('storeId').value,
+          ghi_chu: document.getElementById('ghiChu').value,
+          items: kkItems
+        };
+
+        try {
+          const res = await fetch('/kiem-kho/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          const result = await res.json();
+          if (result.success) {
+            alert(result.message);
+            window.location.href = '/kiem-kho';
+          } else {
+            alert(result.message);
+          }
+        } catch (err) {
+          alert("Lỗi khi lưu phiếu kiểm kho");
+        }
+      }
+    </script>
+  </body>
+</html>

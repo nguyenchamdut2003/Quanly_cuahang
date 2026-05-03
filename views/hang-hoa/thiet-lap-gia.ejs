@@ -1,0 +1,268 @@
+<%
+  const safeProducts = Array.isArray(locals.products) ? locals.products : [];
+  const safeCategories = Array.isArray(locals.categories) ? locals.categories : [];
+  const safeFilters = locals.filters || {};
+  const pageInfo = locals.pagination || { page: 1, limit: 15, total: 0, totalPages: 1 };
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fromRow = pageInfo.total ? ((pageInfo.page - 1) * pageInfo.limit) + 1 : 0;
+  const toRow = Math.min(pageInfo.page * pageInfo.limit, pageInfo.total || 0);
+  const pageUrl = nextPage => {
+    const params = Object.assign({}, safeFilters, { page: nextPage, limit: pageInfo.limit });
+    const query = Object.keys(params)
+      .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
+      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+      .join('&');
+    return '/hang-hoa/thiet-lap-gia' + (query ? '?' + query : '');
+  };
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .price-page{height:calc(100vh - 98px);background:#f1f3f5;display:flex;flex-direction:column;overflow:hidden}
+    .price-topbar{height:58px;background:#fff;border-bottom:1px solid #dce3ea;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 210px;gap:12px}
+    .price-search{position:relative;max-width:760px;flex:1}
+    .price-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}
+    .price-search input{width:100%;height:34px;border:1px solid #cfd8e3;border-radius:5px;padding:0 36px;font-size:13px;outline:none}
+    .price-search input:focus,.price-filter-control:focus,.price-input:focus{border-color:#2d9cff;box-shadow:0 0 0 2px rgba(45,156,255,.12)}
+    .price-actions{display:flex;align-items:center;gap:8px}
+    .price-btn{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:5px;padding:0 12px;font-size:13px;font-weight:600;color:#374151;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .price-btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}
+    .price-btn:hover{border-color:#7fbfff;color:#0070f4;background:#f8fbff}
+    .price-btn.primary:hover{background:#0064dc;color:#fff}
+    .price-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:10px;padding:0 18px 0 210px}
+    .price-sidebar{background:#fff;padding:14px 12px;overflow:auto}
+    .price-filter{margin-bottom:18px}
+    .price-filter-title{font-size:13px;font-weight:700;color:#111827;margin-bottom:10px}
+    .price-filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
+    .price-filter-stack{display:flex;flex-direction:column;gap:8px}
+    .price-main{min-width:0;display:flex;flex-direction:column}
+    .price-table-wrap{flex:1;min-height:0;background:#fff;overflow:auto}
+    .price-table{width:100%;min-width:1040px;border-collapse:collapse}
+    .price-table th{height:42px;background:#fff;color:#111827;font-size:13px;font-weight:700;text-align:left;border-bottom:1px solid #e2e8f0;padding:0 10px;white-space:nowrap}
+    .price-table td{height:41px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;vertical-align:middle}
+    .price-table tbody tr:hover{background:#f7fbff}
+    .price-table .num{text-align:right}
+    .price-code{width:136px;color:#005cb8}
+    .price-name{min-width:360px}
+    .price-small-col{width:100px}
+    .price-edit-col{width:132px}
+    .price-input{width:112px;height:23px;border:1px solid #cfd8e3;border-radius:7px;text-align:right;padding:0 6px;font-size:13px;outline:none}
+    .price-input.changed{border-color:#0070f4;background:#f2f8ff}
+    .price-empty{height:260px;text-align:center;color:#7a8794}
+    .price-footer{height:30px;background:#f1f3f5;display:flex;align-items:center;gap:10px;font-size:12px;color:#111827}
+    .price-footer select{height:24px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 22px 0 8px;font-size:12px}
+    .pager{display:flex;align-items:center;gap:8px;margin-left:18px}
+    .pager a,.pager span{min-width:28px;height:22px;border-radius:7px;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+    .pager .current{border:1px solid #cfd8e3;background:#fff}
+    .pager .disabled{color:#c4ccd5}
+    .price-status{margin-left:auto;color:#4b5563}
+    @media(max-width:1100px){
+      .price-topbar,.price-shell{padding-left:12px}
+      .price-shell{grid-template-columns:220px minmax(0,1fr)}
+    }
+    @media(max-width:780px){
+      .price-page{height:auto;min-height:calc(100vh - 98px);overflow:visible}
+      .price-topbar{height:auto;align-items:stretch;flex-direction:column;padding:10px}
+      .price-shell{grid-template-columns:1fr;padding:10px}
+      .price-sidebar{order:1}
+      .price-main{order:2;min-height:520px}
+      .price-actions{flex-wrap:wrap}
+    }
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+
+  <form id="priceFilterForm" method="GET" action="/hang-hoa/thiet-lap-gia" class="price-page">
+    <div class="price-topbar">
+      <div class="price-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Tìm kiếm theo mã, tên hàng">
+      </div>
+      <div class="price-actions">
+        <button type="submit" class="price-btn"><i class="fa-solid fa-filter"></i> Lọc</button>
+        <button type="button" class="price-btn primary" onclick="savePrices()"><i class="fa-solid fa-floppy-disk"></i> Lưu giá</button>
+      </div>
+    </div>
+
+    <div class="price-shell">
+      <aside class="price-sidebar">
+        <div class="price-filter">
+          <div class="price-filter-title">Nhóm hàng</div>
+          <select class="price-filter-control" name="nhom_hang_id" onchange="submitPriceFilters()">
+            <option value="">Chọn nhóm hàng</option>
+            <% safeCategories.forEach(c => { %>
+              <option value="<%= c._id %>" <%= safeFilters.nhom_hang_id == c._id ? 'selected' : '' %>><%= c.ten_nhom_hang %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="price-filter">
+          <div class="price-filter-title">Tồn kho</div>
+          <select class="price-filter-control" name="ton_kho" onchange="submitPriceFilters()">
+            <option value="" <%= !safeFilters.ton_kho ? 'selected' : '' %>>Tất cả</option>
+            <option value="con" <%= safeFilters.ton_kho === 'con' ? 'selected' : '' %>>Còn hàng</option>
+            <option value="het" <%= safeFilters.ton_kho === 'het' ? 'selected' : '' %>>Hết hàng</option>
+          </select>
+        </div>
+
+        <div class="price-filter">
+          <div class="price-filter-title">Giá bán</div>
+          <div class="price-filter-stack">
+            <select class="price-filter-control" name="gia_ban_dk" onchange="togglePriceValue()">
+              <option value="">Chọn điều kiện</option>
+              <option value="eq" <%= safeFilters.gia_ban_dk === 'eq' ? 'selected' : '' %>>Bằng</option>
+              <option value="gt" <%= safeFilters.gia_ban_dk === 'gt' ? 'selected' : '' %>>Lớn hơn</option>
+              <option value="gte" <%= safeFilters.gia_ban_dk === 'gte' ? 'selected' : '' %>>Lớn hơn hoặc bằng</option>
+              <option value="lt" <%= safeFilters.gia_ban_dk === 'lt' ? 'selected' : '' %>>Nhỏ hơn</option>
+              <option value="lte" <%= safeFilters.gia_ban_dk === 'lte' ? 'selected' : '' %>>Nhỏ hơn hoặc bằng</option>
+            </select>
+            <input class="price-filter-control" name="gia_ban_value" value="<%= safeFilters.gia_ban_value || '' %>" placeholder="Chọn giá so sánh">
+          </div>
+        </div>
+      </aside>
+
+      <main class="price-main">
+        <div class="price-table-wrap">
+          <table class="price-table">
+            <thead>
+              <tr>
+                <th class="price-code">Mã hàng</th>
+                <th class="price-name">Tên hàng</th>
+                <th class="num price-small-col">Tồn kho</th>
+                <th class="num price-small-col">Giá vốn</th>
+                <th class="num price-edit-col">Giá bán</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (safeProducts.length) { %>
+                <% safeProducts.forEach(p => { %>
+                  <tr>
+                    <td class="price-code"><%= p.ma_hang %></td>
+                    <td class="price-name"><%= p.ten_hang %></td>
+                    <td class="num"><%= fmt(p.ton_kho) %></td>
+                    <td class="num"><%= fmt(p.gia_von) %></td>
+                    <td class="num">
+                      <input class="price-input" data-id="<%= p._id %>" data-original="<%= p.gia_ban || 0 %>" value="<%= fmt(p.gia_ban) %>" oninput="markChanged(this)" onfocus="unformatPrice(this)" onblur="formatPriceInput(this)">
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="5" class="price-empty">Không tìm thấy hàng hóa phù hợp</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="price-footer">
+          <span>Hiển thị</span>
+          <select name="limit" onchange="submitPriceFilters()">
+            <% [10, 15, 20, 50].forEach(size => { %>
+              <option value="<%= size %>" <%= pageInfo.limit === size ? 'selected' : '' %>><%= size %> dòng</option>
+            <% }) %>
+          </select>
+          <div class="pager">
+            <a class="<%= pageInfo.page <= 1 ? 'disabled' : '' %>" href="<%= pageUrl(1) %>"><i class="fa-solid fa-backward-step"></i></a>
+            <a class="<%= pageInfo.page <= 1 ? 'disabled' : '' %>" href="<%= pageUrl(Math.max(pageInfo.page - 1, 1)) %>"><i class="fa-solid fa-chevron-left"></i></a>
+            <span class="current"><%= pageInfo.page %></span>
+            <a class="<%= pageInfo.page >= pageInfo.totalPages ? 'disabled' : '' %>" href="<%= pageUrl(Math.min(pageInfo.page + 1, pageInfo.totalPages)) %>"><i class="fa-solid fa-chevron-right"></i></a>
+            <a class="<%= pageInfo.page >= pageInfo.totalPages ? 'disabled' : '' %>" href="<%= pageUrl(pageInfo.totalPages) %>"><i class="fa-solid fa-forward-step"></i></a>
+          </div>
+          <strong><%= fromRow %> - <%= toRow %> trong <%= pageInfo.total %> hàng hóa</strong>
+          <span class="price-status" id="priceStatus"></span>
+        </div>
+      </main>
+    </div>
+  </form>
+
+  <script>
+    const priceForm = document.getElementById('priceFilterForm');
+
+    function buildPageUrl(page) {
+      const params = new URLSearchParams(new FormData(priceForm));
+      params.set('page', page);
+      return '/hang-hoa/thiet-lap-gia?' + params.toString();
+    }
+
+    document.querySelectorAll('.pager a').forEach(link => {
+      const icon = link.querySelector('i');
+      if (!icon || link.classList.contains('disabled')) {
+        link.addEventListener('click', e => e.preventDefault());
+        return;
+      }
+      const isFirst = icon.classList.contains('fa-backward-step');
+      const isPrev = icon.classList.contains('fa-chevron-left');
+      const isNext = icon.classList.contains('fa-chevron-right');
+      const page = isFirst ? 1 : isPrev ? <%= Math.max(pageInfo.page - 1, 1) %> : isNext ? <%= Math.min(pageInfo.page + 1, pageInfo.totalPages) %> : <%= pageInfo.totalPages %>;
+      link.href = buildPageUrl(page);
+    });
+
+    function submitPriceFilters() {
+      const pageInput = document.createElement('input');
+      pageInput.type = 'hidden';
+      pageInput.name = 'page';
+      pageInput.value = '1';
+      priceForm.appendChild(pageInput);
+      priceForm.submit();
+    }
+
+    function numberValue(value) {
+      const parsed = Number(String(value || '').replace(/\./g, '').replace(/,/g, '').trim());
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function unformatPrice(input) {
+      input.value = String(numberValue(input.value));
+      input.select();
+    }
+
+    function formatPriceInput(input) {
+      input.value = numberValue(input.value).toLocaleString('vi-VN');
+      markChanged(input);
+    }
+
+    function markChanged(input) {
+      const changed = numberValue(input.value) !== Number(input.dataset.original || 0);
+      input.classList.toggle('changed', changed);
+      document.getElementById('priceStatus').textContent = document.querySelectorAll('.price-input.changed').length ? 'Có thay đổi chưa lưu' : '';
+    }
+
+    async function savePrices() {
+      const changedInputs = Array.from(document.querySelectorAll('.price-input.changed'));
+      if (!changedInputs.length) {
+        document.getElementById('priceStatus').textContent = 'Không có thay đổi';
+        return;
+      }
+
+      const prices = changedInputs.map(input => ({
+        id: input.dataset.id,
+        gia_ban: numberValue(input.value)
+      }));
+
+      try {
+        const res = await fetch('/hang-hoa/thiet-lap-gia/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prices })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          alert(data.message || 'Không cập nhật được giá');
+          return;
+        }
+        changedInputs.forEach(input => {
+          input.dataset.original = String(numberValue(input.value));
+          input.classList.remove('changed');
+        });
+        document.getElementById('priceStatus').textContent = data.message || 'Đã lưu giá';
+      } catch (error) {
+        alert('Lỗi kết nối khi lưu giá');
+      }
+    }
+  </script>
+</body>
+</html>

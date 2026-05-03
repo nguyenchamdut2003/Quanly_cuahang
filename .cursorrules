@@ -1,0 +1,83 @@
+0. ngôn ngữ trên web là tiếng việt còn các thuộc tính ở bảng thì làm bằng tiếng anh
+1. Cấu trúc thư mục & Phân quyền (Role-based)
+Dự án được phân chia rõ ràng theo 2 vai trò: Admin và User. AI phải phân tách code vào các thư mục tương ứng:
+
+Đăng nhập sử dụng middleware để check đăng nhập mỗi khi vào trang.
+
+sử dụng Cloudinary để lưu ảnh vào server nhé, chọn ảnh từ thiết bị https://cloudinary.com/
+🏗️ 2. Phân tách kiến trúc MVC
+2.1. Model (Thư mục /models)
+Nhiệm vụ: Chỉ chứa định nghĩa Schema (Mongoose/Sequelize) và logic kết nối/truy vấn dữ liệu thô.
+
+Qấm: Không xử lý logic nghiệp vụ (business logic) hoặc gửi HTTP response tại đây.
+
+2.2. Controller (Thư mục /controllers)
+Nhiệm vụ: Xử lý logic nghiệp vụ chính.
+
+Quy tắc:
+
+Nhận dữ liệu từ req, gọi hàm từ /models.
+
+Thực hiện tính toán, điều kiện logic và điều phối dữ liệu.
+
+Trả về dữ liệu qua res.render() (UI) hoặc res.json() (API).
+
+Bắt buộc: Luôn bọc code trong khối try-catch để xử lý lỗi ngoại lệ.
+
+2.3. Routes (Thư mục /routes)
+Nhiệm vụ: Định nghĩa danh sách các điểm cuối (endpoints).
+
+Quy tắc: Không viết logic code bên trong file route. Chỉ import controller và gán vào các method (GET, POST, PUT, DELETE).
+
+2.4. Views (Thư mục /views)
+Nhiệm vụ: Chứa các file giao diện .ejs.
+
+Quy tắc: Chỉ sử dụng logic hiển thị cơ bản (if/else, forEach). Không viết logic xử lý dữ liệu phức tạp tại đây.
+
+🛡️ 3. Tiêu chuẩn An toàn & Kiểm tra Dữ liệu (Strict Check)
+Đây là quy tắc tối thượng để tránh crash ứng dụng:
+
+Kiểm tra Tồn tại: Luôn kiểm tra undefined, null trước khi truy cập bất kỳ thuộc tính nào của Object.
+
+Sử dụng Guard Clauses: Ưu tiên trả về lỗi sớm để tránh lồng ghép if-else quá sâu.
+
+Ví dụ: if (!data) return res.redirect('/error');
+
+Optional Chaining: Sử dụng cú pháp ?. khi truy cập dữ liệu sâu.
+
+Kiểm tra Kiểu dữ liệu:
+
+Chuỗi: Phải check .trim() !== ''.
+
+Mảng: Phải check Array.isArray() và .length > 0.
+
+⚙️ 4. Cấu hình & Bảo mật
+Biến môi trường: Tuyệt đối không hardcode API Key, Password, Port. Phải dùng process.env.
+
+Middleware: Luôn kiểm tra quyền truy cập (Authorization) trước khi cho phép vào các route thuộc thư mục /admin.
+
+Xử lý lỗi tập trung: Trong catch(err), sử dụng next(err) để chuyển lỗi về middleware xử lý tập trung thay vì xử lý rời rạc.
+
+📝 5. Ví dụ về tiêu chuẩn Code (Best Practice)
+✅ ĐÚNG: Sử dụng Guard Clause và Kiểm tra kỹ lưỡng
+exports.getUserProfile = async (req, res, next) => {
+    try {
+        const userId = req.params?.id;
+        if (!userId) return res.status(400).send("ID không hợp lệ");
+
+        const user = await User.findById(userId);
+        
+        // Check null/undefined
+        if (!user) {
+            return res.status(404).render('user/error', { message: "Người dùng không tồn tại" });
+        }
+
+        res.render('user/profile', { user });
+    } catch (error) {
+        next(error); 
+    }
+};
+
+models/model.js chỉ dùng để kết nối database
+models/tên file .js dùng để định nghĩa schema
+

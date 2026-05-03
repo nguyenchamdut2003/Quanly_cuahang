@@ -1,0 +1,166 @@
+<%
+  const data = locals.dashboard || {};
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const money = value => fmt(value) + ' đ';
+  const topProducts = data.topProducts || [];
+  const topCustomers = data.topCustomers || [];
+  const activities = data.activities || [];
+  const alerts = data.alerts || {};
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body{background:#f3f6f9}.dashboard{height:calc(100vh - 98px);display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;padding:0 12%;overflow:hidden}.main{min-width:0;overflow:auto;padding:10px 0 0}.side{background:#fff;border-radius:6px;margin-top:10px;overflow:auto;box-shadow:0 1px 4px rgba(0,0,0,.08)}.card{background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:10px}.summary{padding:12px 16px}.card-title{font-size:14px;font-weight:800;margin:0 0 12px}.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.summary-item{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;min-height:62px}.summary-item+.summary-item{border-left:1px solid #e5e9ee;padding-left:22px}.badge-icon{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px}.badge-icon.blue{background:#0b7cff}.badge-icon.orange{background:#ff7a1a}.metric-label{font-size:12px;color:#344054;margin-bottom:3px}.metric-value{font-size:22px;font-weight:900;color:#111827;line-height:1}.metric-sub{font-size:12px;color:#667085;margin-top:4px}.chart-card{padding:14px 16px;height:318px}.chart-head{display:flex;align-items:center;justify-content:space-between}.chart-title{display:flex;align-items:center;gap:8px}.chart-title strong{font-size:14px}.mini-value{background:#edf5ff;color:#006dff;border-radius:5px;padding:2px 7px;font-weight:800}.select{height:28px;border:1px solid #cfd8e3;border-radius:5px;background:#fff;padding:0 8px}.tabs{display:flex;gap:24px;margin:14px 0 8px;padding-left:12px}.tab{height:30px;color:#475467;font-size:13px;border:0;background:none;cursor:pointer}.tab.active{color:#006dff;border-bottom:2px solid #006dff}.chart-wrap{height:230px}.lower{display:grid;grid-template-columns:1fr 1fr;gap:10px}.list-card{height:378px;padding:14px 16px;display:flex;flex-direction:column}.list-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.list-head h3{font-size:14px;margin:0}.list-actions{display:flex;gap:8px}.list-actions .select{font-size:12px}.rank-list{overflow:auto}.rank-row{display:grid;grid-template-columns:26px minmax(0,1fr) 90px;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #edf0f3}.rank-num{width:22px;height:22px;border-radius:50%;background:#edf5ff;color:#006dff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}.rank-name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rank-sub{font-size:12px;color:#667085;margin-top:2px}.rank-value{text-align:right;font-weight:800}.empty{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085;gap:8px}.empty-icon{width:66px;height:66px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:26px}.promo{height:62px;display:grid;grid-template-columns:34px 1fr 16px;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid #edf0f3}.promo-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff}.promo-icon.green{background:#09ad5d}.promo-icon.blue{background:#1677ff}.promo h4{font-size:13px;margin:0}.promo p{font-size:12px;color:#667085;margin:2px 0 0}.warning{display:grid;grid-template-columns:26px 1fr 14px;gap:8px;align-items:center;padding:12px;border-bottom:1px solid #edf0f3}.warning i:first-child{color:#ff7a1a}.warning strong{font-size:12px}.activity{padding:12px}.activity h3{font-size:13px;margin:0 0 10px}.activity-list{max-height:600px;overflow:auto}.activity-item{display:grid;grid-template-columns:28px 1fr;gap:8px;padding:8px 0;position:relative}.activity-item:before{content:'';position:absolute;left:13px;top:35px;bottom:-8px;border-left:1px dotted #cbd5e1}.activity-item:last-child:before{display:none}.act-icon{width:26px;height:26px;border-radius:50%;border:1px solid #dbe2ea;background:#fff;color:#667085;display:flex;align-items:center;justify-content:center;font-size:12px;z-index:1}.act-text{font-size:12px;color:#344054;line-height:1.35}.act-text strong{color:#006dff}.act-time{display:block;color:#98a2b3;margin-top:3px}.bottom-note{height:38px;border:1px solid #87bdff;background:#eef7ff;border-radius:5px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:12px}.bottom-note i{color:#006dff;margin-right:8px}.bottom-note button{height:25px;border:1px solid #006dff;background:#fff;color:#006dff;border-radius:5px;font-weight:800;padding:0 12px}.bottom-note .close{border:0;background:transparent;color:#111827;padding:0 4px}
+  </style>
+</head>
+<body>
+  <%- include('partials/header') %>
+  <main class="dashboard">
+    <section class="main">
+      <div class="card summary">
+        <h2 class="card-title">Kết quả bán hàng hôm nay</h2>
+        <div class="summary-grid">
+          <div class="summary-item">
+            <div class="badge-icon blue"><i class="fa-solid fa-dollar-sign"></i></div>
+            <div>
+              <div class="metric-label">Doanh thu</div>
+              <div class="metric-value"><%= fmt(data.todaySale?.total) %></div>
+              <div class="metric-sub"><%= fmt(data.todaySale?.count) %> hóa đơn</div>
+            </div>
+          </div>
+          <div class="summary-item">
+            <div class="badge-icon orange"><i class="fa-solid fa-rotate-left"></i></div>
+            <div>
+              <div class="metric-label">Trả hàng</div>
+              <div class="metric-value"><%= fmt(data.todayReturn?.total) %></div>
+              <div class="metric-sub"><%= fmt(data.todayReturn?.count) %> phiếu</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="chart-head">
+          <div class="chart-title"><strong>Doanh thu thuần</strong><span class="mini-value" id="chartTotal"><%= fmt(data.chart?.day?.total ?? data.netRevenue) %></span></div>
+        </div>
+        <div class="tabs">
+          <button class="tab active" type="button" data-chart-mode="day">Theo ngày</button>
+          <button class="tab" type="button" data-chart-mode="month">Theo tháng</button>
+          <button class="tab" type="button" data-chart-mode="year">Theo năm</button>
+        </div>
+        <div class="chart-wrap"><canvas id="revenueChart"></canvas></div>
+      </div>
+
+      <div class="lower">
+        <div class="card list-card">
+          <div class="list-head">
+            <h3>Top 10 hàng bán chạy</h3>
+            <div class="list-actions"><select class="select"><option>Theo doanh thu thuần</option></select><select class="select"><option>Tháng này</option></select></div>
+          </div>
+          <% if (topProducts.length) { %>
+            <div class="rank-list">
+              <% topProducts.forEach((item, index) => { %>
+                <div class="rank-row">
+                  <div class="rank-num"><%= index + 1 %></div>
+                  <div><div class="rank-name"><%= item.name %></div><div class="rank-sub"><%= item.code %> · SL <%= fmt(item.quantity) %></div></div>
+                  <div class="rank-value"><%= money(item.revenue) %></div>
+                </div>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div class="empty"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><div>Chưa có dữ liệu</div></div>
+          <% } %>
+        </div>
+        <div class="card list-card">
+          <div class="list-head"><h3>Top 10 khách mua nhiều nhất</h3><select class="select"><option>Tháng này</option></select></div>
+          <% if (topCustomers.length) { %>
+            <div class="rank-list">
+              <% topCustomers.forEach((item, index) => { %>
+                <div class="rank-row">
+                  <div class="rank-num"><%= index + 1 %></div>
+                  <div><div class="rank-name"><%= item.name %></div><div class="rank-sub"><%= item.code %> · <%= fmt(item.count) %> hóa đơn</div></div>
+                  <div class="rank-value"><%= money(item.total) %></div>
+                </div>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <div class="empty"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><div>Chưa có dữ liệu</div></div>
+          <% } %>
+        </div>
+      </div>
+
+      <div class="bottom-note">
+        <div><i class="fa-regular fa-circle-check"></i><strong>Dữ liệu test đã sẵn sàng</strong><br><span>Có <%= fmt(alerts.customerCount) %> khách hàng, <%= fmt(alerts.supplierCount) %> nhà cung cấp và dữ liệu giao dịch mẫu.</span></div>
+        <div><button type="button" onclick="location.href='/bao-cao/ban-hang'">Xem báo cáo</button><button type="button" class="close" onclick="this.closest('.bottom-note').remove()">×</button></div>
+      </div>
+    </section>
+
+    <aside class="side">
+      <div class="warning"><i class="fa-solid fa-box-open"></i><strong>Có <%= fmt(alerts.lowStockCount) %> hàng hóa dưới định mức tồn và <%= fmt(alerts.shippingCount) %> vận đơn đang giao.</strong><i class="fa-solid fa-chevron-down"></i></div>
+      <div class="activity">
+        <h3>Hoạt động gần đây</h3>
+        <div class="activity-list">
+          <% if (activities.length) { %>
+            <% activities.forEach(item => { %>
+              <div class="activity-item">
+                <div class="act-icon"><i class="fa-solid <%= item.icon %>"></i></div>
+                <div class="act-text"><strong><%= item.actor %></strong> <%= item.text %> với giá trị <strong><%= fmt(item.value) %></strong><span class="act-time"><%= item.relative %></span></div>
+              </div>
+            <% }) %>
+          <% } else { %>
+            <div class="empty" style="height:180px"><div class="empty-icon"><i class="fa-regular fa-clock"></i></div><div>Chưa có hoạt động</div></div>
+          <% } %>
+        </div>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const chartData = <%- JSON.stringify(data.chart || {}) %>;
+    const formatMoney = value => Number(value || 0).toLocaleString('vi-VN');
+    const getChartMode = mode => chartData[mode] || { labels: [], values: [], total: 0 };
+    const ctx = document.getElementById('revenueChart').getContext('2d');
+    const initialChart = getChartMode('day');
+    const revenueChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: initialChart.labels,
+        datasets: [{
+          data: initialChart.values,
+          borderColor: '#0070f4',
+          backgroundColor: 'rgba(0,112,244,.06)',
+          borderWidth: 2,
+          pointRadius: 2,
+          tension: .3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatMoney(ctx.raw) + ' đ' } } },
+        scales: {
+          y: { beginAtZero: true, grid: { color: '#edf0f3' }, ticks: { color: '#667085', callback: value => formatMoney(value) } },
+          x: { grid: { display: false }, ticks: { color: '#667085', maxTicksLimit: 8 } }
+        }
+      }
+    });
+
+    document.querySelectorAll('[data-chart-mode]').forEach(button => {
+      button.addEventListener('click', () => {
+        const nextChart = getChartMode(button.dataset.chartMode);
+        document.querySelectorAll('[data-chart-mode]').forEach(item => item.classList.remove('active'));
+        button.classList.add('active');
+        revenueChart.data.labels = nextChart.labels;
+        revenueChart.data.datasets[0].data = nextChart.values;
+        revenueChart.update();
+        document.getElementById('chartTotal').textContent = formatMoney(nextChart.total);
+      });
+    });
+  </script>
+</body>
+</html>

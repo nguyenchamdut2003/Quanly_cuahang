@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>
+    <%= title %>
+  </title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    body {
+      overflow: hidden;
+      background: #e9edf2
+    }
+
+    .order-create {
+      height: calc(100vh - 98px);
+      display: grid;
+      grid-template-columns: minmax(0, 45fr) minmax(360px, 30fr) minmax(320px, 25fr);
+      gap: 10px;
+      padding: 12px 10px 0
+    }
+
+    .left,
+    .middle,
+    .right {
+      background: #fff;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden
+    }
+
+    .left {
+      background: #e9edf2
+    }
+
+    .top-search {
+      height: 38px;
+      position: relative;
+      margin-bottom: 10px
+    }
+
+    .top-search i {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #667085
+    }
+
+    .top-search input {
+      width: 460px;
+      max-width: 100%;
+      height: 38px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 0 12px 0 36px;
+      font-size: 14px
+    }
+
+    .search-results {
+      display: none;
+      position: absolute;
+      top: 42px;
+      left: 0;
+      width: 460px;
+      background: #fff;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      box-shadow: 0 8px 22px rgba(0, 0, 0, .14);
+      z-index: 50;
+      max-height: 300px;
+      overflow: auto
+    }
+
+    .search-item {
+      height: 42px;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      cursor: pointer
+    }
+
+    .search-item:hover {
+      background: #f0f7ff
+    }
+
+    .cart-area {
+      flex: 1;
+      background: #e9edf2
+    }
+
+    .summary-card {
+      height: 150px;
+      background: #fff;
+      border-radius: 8px;
+      padding: 18px 26px;
+      display: grid;
+      grid-template-columns: 1fr 430px;
+      gap: 20px;
+      align-items: start
+    }
+
+    .note-line {
+      color: #667085;
+      font-size: 14px
+    }
+
+    .totals {
+      font-size: 16px
+    }
+
+    .total-line {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 14px
+    }
+
+    .total-line strong {
+      font-weight: 800
+    }
+
+    .payable {
+      color: #006dff;
+      font-size: 22px
+    }
+
+    .cart-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden
+    }
+
+    .cart-table th {
+      height: 36px;
+      background: #e8f3ff;
+      text-align: left;
+      padding: 0 10px;
+      border-bottom: 1px solid #bcd9ff
+    }
+
+    .cart-table td {
+      height: 40px;
+      border-bottom: 1px solid #e5e9ee;
+      padding: 0 10px
+    }
+
+    .num {
+      text-align: right
+    }
+
+    .small {
+      width: 74px;
+      height: 28px;
+      border: 1px solid #cfd8e3;
+      border-radius: 5px;
+      text-align: right;
+      padding: 0 6px
+    }
+
+    .middle {
+      padding: 14px 24px
+    }
+
+    .mid-head {
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px
+    }
+
+    .customer-search {
+      position: relative;
+      margin-bottom: 16px
+    }
+
+    .customer-search input {
+      width: 100%;
+      height: 38px;
+      border: 0;
+      background: #f0f2f5;
+      border-radius: 5px;
+      padding: 0 42px 0 32px;
+      font-size: 16px
+    }
+
+    .customer-search i {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #667085
+    }
+
+    .customer-search button {
+      position: absolute;
+      right: 8px;
+      top: 5px;
+      border: 0;
+      background: transparent;
+      font-size: 24px;
+      cursor: pointer
+    }
+
+    .section-line {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 10px;
+      margin-bottom: 14px
+    }
+
+    .marker {
+      display: flex;
+      justify-content: center;
+      color: #0070f4;
+      font-size: 20px
+    }
+
+    .marker.green {
+      color: #00a651
+    }
+
+    .line-input {
+      height: 38px;
+      border: 0;
+      border-bottom: 1px solid #c2cad3;
+      padding: 0;
+      font-size: 16px;
+      outline: none
+    }
+
+    .two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px
+    }
+
+    .muted-red {
+      color: red;
+      font-size: 12px;
+      margin-top: -8px
+    }
+
+    .package {
+      border-top: 1px solid #edf0f3;
+      padding-top: 12px;
+      margin-top: 12px
+    }
+
+    .package-title {
+      font-size: 16px;
+      margin-bottom: 10px
+    }
+
+    .pkg-grid {
+      display: grid;
+      grid-template-columns: 70px 84px 1fr;
+      gap: 12px;
+      align-items: center
+    }
+
+    .pkg-input {
+      height: 30px;
+      border: 0;
+      border-bottom: 1px solid #c2cad3;
+      text-align: center
+    }
+
+    .cod {
+      margin-top: auto;
+      border-top: 1px solid #edf0f3;
+      padding-top: 14px
+    }
+
+    .toggle {
+      display: inline-block;
+      width: 42px;
+      height: 20px;
+      background: #9aa4b2;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 10px;
+      position: relative;
+      cursor: pointer;
+      transition: .2s
+    }
+
+    .toggle:before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 1px;
+      top: 1px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+      transition: .2s
+    }
+
+    .toggle.on {
+      background: #0070f4
+    }
+
+    .toggle.on:before {
+      transform: translateX(22px)
+    }
+
+    .right {
+      padding: 0
+    }
+
+    .tabs {
+      height: 38px;
+      display: grid;
+      grid-template-columns: 1fr;
+      border-bottom: 1px solid #d7dde5
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 700;
+      color: #0070f4;
+      border-bottom: 2px solid #0070f4
+    }
+
+    .right-body {
+      padding: 22px 20px
+    }
+
+    .delivery-row {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 18px
+    }
+
+    .delivery-row label {
+      font-size: 13px;
+      font-weight: 800;
+      color: #344054
+    }
+
+    .partner-picker {
+      position: relative
+    }
+
+    .partner-trigger {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid #cfd8e3;
+      border-radius: 7px;
+      background: #fff;
+      color: #344054;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 11px;
+      font-size: 14px;
+      cursor: pointer
+    }
+
+    .partner-trigger.empty {
+      color: #667085
+    }
+
+    .partner-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 230px;
+      overflow: auto;
+      background: #fff;
+      border: 1px solid #cfd8e3;
+      border-radius: 8px;
+      box-shadow: 0 12px 26px rgba(0, 0, 0, .16);
+      z-index: 80;
+      padding: 6px
+    }
+
+    .partner-picker.open .partner-menu {
+      display: block
+    }
+
+    .partner-option {
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      padding: 0 9px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #344054;
+      cursor: pointer
+    }
+
+    .partner-option:hover,
+    .partner-option.active {
+      background: #eef6ff;
+      color: #006dff;
+      font-weight: 800
+    }
+
+    .place-order {
+      margin-top: auto;
+      padding: 12px
+    }
+
+    .place-order button {
+      width: 100%;
+      height: 58px;
+      border: 0;
+      border-radius: 9px;
+      background: #0070f4;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 800;
+      cursor: pointer
+    }
+  </style>
+</head>
+
+<body>
+  <%- include('../partials/header') %>
+    <main class="order-create">
+      <section class="left">
+        <div class="top-search"><i class="fa-solid fa-magnifying-glass"></i><input id="productSearch"
+            placeholder="Tìm hàng hóa (F3)">
+          <div id="productResults" class="search-results"></div>
+        </div>
+        <div class="cart-area">
+          <table class="cart-table">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Mã hàng</th>
+                <th>Tên hàng</th>
+                <th class="num">SL</th>
+                <th class="num">Đơn giá</th>
+                <th class="num">Thành tiền</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="cartBody"></tbody>
+          </table>
+        </div>
+        <div class="summary-card">
+          <div class="note-line"><i class="fa-solid fa-pen"></i> Ghi chú hóa đơn</div>
+          <div class="totals">
+            <div class="total-line"><span>Tổng tiền hàng</span><span id="subtotal">0</span></div>
+            <div class="total-line"><span>Giảm giá</span><input id="discount" class="small" value="0"
+                oninput="renderCart()"></div>
+            <div class="total-line"><strong>Khách cần trả</strong><strong class="payable" id="grandTotal">0</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="middle">
+        <div class="mid-head"><strong id="storeName">Cửa hàng</strong><span>
+            <%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit',
+              minute:'2-digit' }) %>
+          </span></div>
+        <div class="customer-search"><i class="fa-solid fa-magnifying-glass"></i><input id="customerSearch"
+            placeholder="Tìm khách hàng (F4)"><button type="button">+</button>
+          <div id="customerResults" class="search-results" style="width:100%"></div>
+        </div>
+        <input type="hidden" id="customerId">
+        <div class="section-line">
+          <div class="marker"><i class="fa-solid fa-circle-dot"></i></div>
+          <div><select id="pickupStoreId" class="line-input" onchange="renderPickupStore()" style="width:100%">
+              <% stores.forEach(s=> { %><option value="<%= s._id %>">
+                  <%= s.ten_cua_hang %> - <%= s.sdt || 'Chưa có SĐT' %>
+                </option>
+                <% }) %>
+            </select>
+            <div class="muted-red" id="pickupInfo"></div>
+          </div>
+        </div>
+        <div class="section-line">
+          <div class="marker green"><i class="fa-solid fa-location-dot"></i></div>
+          <div>
+            <div class="two"><select id="recipientCustomerId" class="line-input"
+                onchange="selectRecipientCustomer(this.value)">
+                <option value="">Chọn khách hàng nhận</option>
+                <% customers.forEach(c=> {
+                  const defaultAddress = (c.dia_chi_list || []).find(a => a.mac_dinh) || (c.dia_chi_list || [])[0] || {};
+                  const optionPhone = c.sdt || c.sdt2 || '';
+                  const optionAddress = defaultAddress.dia_chi || c.dia_chi_nhan || '';
+                  const optionArea = defaultAddress.quan_huyen || defaultAddress.tinh_thanh || c.quan_huyen || c.tinh_thanh || '';
+                  const optionWard = defaultAddress.phuong_xa || c.phuong_xa || '';
+                %><option value="<%= c._id %>" data-name="<%= c.ten_khach_hang || '' %>" data-phone="<%= optionPhone %>" data-address="<%= optionAddress %>" data-area="<%= optionArea %>" data-ward="<%= optionWard %>">
+                    <%= c.ten_khach_hang %>
+                  </option>
+                  <% }) %>
+              </select><input id="recipientPhone" class="line-input" placeholder="Số điện thoại"></div><select
+              id="recipientAddressSelect" class="line-input" onchange="selectRecipientAddress()"
+              style="width:100%;margin-top:12px">
+              <option value="">Địa chỉ chi tiết (Số nhà, ngõ, đường)</option>
+            </select><input id="recipientAddress" class="line-input" style="width:100%;margin-top:12px"
+              placeholder="Địa chỉ nhận hàng"><input id="recipientArea" class="line-input"
+              style="width:100%;margin-top:12px" placeholder="Khu vực"><input id="recipientWard" class="line-input"
+              style="width:100%;margin-top:12px" placeholder="Phường/Xã">
+          </div>
+        </div>
+        <div class="cod"><strong>Thu hộ tiền (COD)</strong><span id="codToggle" class="toggle"
+            onclick="toggleCod()"></span><strong style="float:right" id="codTotal">0</strong>
+          <div style="margin-top:14px;color:#667085">Tiền thừa trả khách</div>
+        </div>
+      </section>
+      <section class="right">
+        <div class="tabs">
+          <div class="tab"><i class="fa-solid fa-user-gear"></i> Tự giao hàng</div>
+        </div>
+        <div class="right-body">
+          <div class="delivery-row">
+            <label>Đối tác giao hàng</label>
+            <input type="hidden" id="partnerId">
+            <div class="partner-picker" id="partnerPicker">
+              <button class="partner-trigger empty" type="button" onclick="togglePartnerMenu()">
+                <span id="partnerLabel">Chọn đối tác</span>
+                <i class="fa-solid fa-chevron-down"></i>
+              </button>
+              <div class="partner-menu">
+                <% partners.forEach(p=> { %>
+                  <div class="partner-option" data-partner-id="<%= p._id %>" onclick="selectPartner('<%= p._id %>', '<%= String(p.ten_doi_tac || '').replace(/'/g, '&#39;') %>')">
+                    <%= p.ten_doi_tac %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="place-order"><button onclick="saveOrder()" type="button">THANH TOÁN</button></div>
+      </section>
+    </main>
+    <script>
+      let cart = [];
+      let codEnabled = false;
+      const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang, ten_hang: p.ten_hang, gia_ban: p.gia_ban || 0, ton_kho: p.ton_kho || 0 }))) %>;
+      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ dia_chi: a.dia_chi || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
+      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi || '', dia_chi_gui_hang: s.dia_chi_gui_hang || '', tinh_thanh: s.tinh_thanh || '', quan_huyen: s.quan_huyen || '', phuong_xa: s.phuong_xa || '' }))) %>;
+      const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+      const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
+      const productSearch = document.getElementById('productSearch'), productResults = document.getElementById('productResults');
+      function renderProductSuggestions() { const q = productSearch.value.trim().toLowerCase(); const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 30); productResults.innerHTML = rows.map(p => `<div class="search-item" onclick="addProduct('${p._id}')"><span><b>${p.ma_hang || ''}</b> - ${p.ten_hang}</span><b>${fmt(p.gia_ban)}</b></div>`).join('') || '<div class="search-item"><span>Không có hàng hóa phù hợp</span></div>'; productResults.style.display = 'block'; }
+      productSearch.addEventListener('focus', renderProductSuggestions);
+      productSearch.addEventListener('input', renderProductSuggestions);
+      function addProduct(id) { const p = products.find(x => x._id === id); if (!p) return; const ex = cart.find(i => i.hang_hoa_id === id); if (ex) ex.so_luong++; else cart.push({ hang_hoa_id: id, ma_hang: p.ma_hang, ten_hang: p.ten_hang, so_luong: 1, don_gia_ban: p.gia_ban }); productSearch.value = ''; productResults.style.display = 'none'; renderCart(); }
+      function renderCart() { let subtotal = 0; cartBody.innerHTML = cart.map((i, idx) => { const line = i.so_luong * i.don_gia_ban; subtotal += line; return `<tr><td>${idx + 1}</td><td>${i.ma_hang}</td><td>${i.ten_hang}</td><td class="num"><input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)"></td><td class="num">${fmt(i.don_gia_ban)}</td><td class="num">${fmt(line)}</td><td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td></tr>` }).join(''); const total = Math.max(subtotal - num(discount.value), 0); document.getElementById('subtotal').textContent = fmt(subtotal); grandTotal.textContent = fmt(total); renderCod(); }
+      function toggleCod() { codEnabled = !codEnabled; renderCod(); }
+      function renderCod() { const total = num(grandTotal.textContent); codToggle.classList.toggle('on', codEnabled); codTotal.textContent = fmt(codEnabled ? total : 0); }
+      function updQty(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.so_luong = num(v); renderCart() } function removeProduct(id) { cart = cart.filter(i => i.hang_hoa_id !== id); renderCart() }
+      const customerSearch = document.getElementById('customerSearch'), customerResults = document.getElementById('customerResults');
+      function renderCustomerSuggestions() { const q = customerSearch.value.trim().toLowerCase(); const rows = (q ? customers.filter(c => c.ten_khach_hang.toLowerCase().includes(q) || c.sdt.includes(q) || c.ma_khach_hang.toLowerCase().includes(q)) : customers).slice(0, 30); customerResults.innerHTML = rows.map(c => `<div class="search-item" onclick="selectCustomer('${c._id}')"><span><b>${c.ma_khach_hang || ''}</b> - ${c.ten_khach_hang}</span><span>${c.sdt || ''}</span></div>`).join('') || '<div class="search-item"><span>Không có khách hàng phù hợp</span></div>'; customerResults.style.display = 'block'; }
+      customerSearch.addEventListener('focus', renderCustomerSuggestions);
+      customerSearch.addEventListener('input', renderCustomerSuggestions);
+      function addressText(a) { return [a.dia_chi, a.phuong_xa, a.quan_huyen, a.tinh_thanh].filter(Boolean).join(', ') }
+      function getCustomerAddress(customer) {
+        if (!customer) return {};
+        const addresses = customer.dia_chi_list || [];
+        return addresses.find(a => a.mac_dinh) || addresses[0] || {
+          dia_chi: customer.dia_chi_nhan || '',
+          tinh_thanh: customer.tinh_thanh || '',
+          quan_huyen: customer.quan_huyen || '',
+          phuong_xa: customer.phuong_xa || ''
+        };
+      }
+      function applyRecipientData(data = {}) {
+        const els = {
+          customerId: document.getElementById('customerId'),
+          recipientCustomerId: document.getElementById('recipientCustomerId'),
+          customerSearch: document.getElementById('customerSearch'),
+          recipientPhone: document.getElementById('recipientPhone'),
+          recipientAddressSelect: document.getElementById('recipientAddressSelect'),
+          recipientAddress: document.getElementById('recipientAddress'),
+          recipientArea: document.getElementById('recipientArea'),
+          recipientWard: document.getElementById('recipientWard')
+        };
+        els.customerId.value = data.id || '';
+        els.recipientCustomerId.value = data.id || '';
+        els.customerSearch.value = data.name || '';
+        els.recipientPhone.value = data.phone || '';
+        els.recipientAddress.value = data.address || '';
+        els.recipientArea.value = data.area || '';
+        els.recipientWard.value = data.ward || '';
+        els.recipientAddressSelect.innerHTML = '<option value="">Địa chỉ chi tiết (Số nhà, ngõ, đường)</option>';
+        if (data.address || data.area || data.ward) {
+          const opt = document.createElement('option');
+          opt.value = data.address || '';
+          opt.textContent = [data.address, data.ward, data.area].filter(Boolean).join(', ') || 'Địa chỉ khách hàng';
+          opt.dataset.area = data.area || '';
+          opt.dataset.ward = data.ward || '';
+          opt.selected = true;
+          els.recipientAddressSelect.appendChild(opt);
+        }
+      }
+      function fillRecipientFromCustomer(customer) {
+        if (!customer) return applyRecipientData();
+        const a = getCustomerAddress(customer);
+        applyRecipientData({
+          id: customer._id,
+          name: customer.ten_khach_hang || '',
+          phone: customer.sdt || customer.sdt2 || '',
+          address: a.dia_chi || customer.dia_chi_nhan || '',
+          area: a.quan_huyen || a.tinh_thanh || customer.quan_huyen || customer.tinh_thanh || '',
+          ward: a.phuong_xa || customer.phuong_xa || ''
+        });
+      }
+      function selectCustomer(id) { const c = customers.find(x => x._id === id); if (!c) return; fillRecipientFromCustomer(c); customerResults.style.display = 'none'; }
+      function selectRecipientCustomer(id) {
+        const select = document.getElementById('recipientCustomerId');
+        const opt = select.options[select.selectedIndex];
+        const c = customers.find(x => x._id === id);
+        const a = getCustomerAddress(c);
+        applyRecipientData({
+          id: id || '',
+          name: opt?.dataset?.name || c?.ten_khach_hang || '',
+          phone: opt?.dataset?.phone || c?.sdt || c?.sdt2 || '',
+          address: opt?.dataset?.address || a.dia_chi || c?.dia_chi_nhan || '',
+          area: opt?.dataset?.area || a.quan_huyen || a.tinh_thanh || c?.quan_huyen || c?.tinh_thanh || '',
+          ward: opt?.dataset?.ward || a.phuong_xa || c?.phuong_xa || ''
+        });
+      }
+      function selectRecipientAddress() {
+        const select = document.getElementById('recipientAddressSelect');
+        const opt = select.options[select.selectedIndex];
+        document.getElementById('recipientAddress').value = select.value;
+        document.getElementById('recipientArea').value = opt?.dataset?.area || '';
+        document.getElementById('recipientWard').value = opt?.dataset?.ward || '';
+      }
+      function renderPickupStore() { const s = stores.find(x => x._id === pickupStoreId.value); if (!s) return; storeName.textContent = s.ten_cua_hang; const addr = s.dia_chi_gui_hang || addressText(s) || 'Chưa có địa chỉ lấy hàng'; pickupInfo.textContent = `${s.sdt || 'Chưa có SĐT'} - ${addr}`; }
+      function togglePartnerMenu() { partnerPicker.classList.toggle('open'); }
+      function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); }
+      async function saveOrder() { if (!cart.length) return alert('Hóa đơn chưa có sản phẩm'); if (!partnerId.value) return alert('Vui lòng chọn đối tác giao hàng'); const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value); const noteInput = document.getElementById('deliveryNote'); const data = { khach_hang_id: customerId.value, cua_hang_id: pickupStoreId.value, items: cart, chiet_khau: num(discount.value), phi_van_chuyen: 0, ghi_chu: '', doi_tac_giao_hang_id: partnerId.value, ten_nguoi_nhan: recipientCustomer ? recipientCustomer.ten_khach_hang : '', sdt_nguoi_nhan: recipientPhone.value, dia_chi_nhan: [recipientAddress.value, recipientWard.value, recipientArea.value].filter(Boolean).join(', '), ghi_chu_giao_hang: noteInput ? noteInput.value : '', thu_ho_cod: codEnabled }; try { const res = await fetch('/don-hang/hoa-don/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!result.success) return alert(result.message || 'Không tạo được hóa đơn'); window.location.href = '/don-hang/hoa-don'; } catch (err) { alert('Lỗi khi tạo hóa đơn'); } }
+      document.addEventListener('DOMContentLoaded', () => { renderPickupStore(); renderCod(); });
+      document.addEventListener('click', e => { if (!partnerPicker.contains(e.target)) partnerPicker.classList.remove('open'); });
+    </script>
+</body>
+
+</html>

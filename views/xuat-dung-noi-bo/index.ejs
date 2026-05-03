@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .xnb-page{height:calc(100vh - 98px);background:#f3f6f9;display:grid;grid-template-columns:245px minmax(0,1fr);gap:14px;padding:14px 18px}
+    .xnb-sidebar{background:#fff;border-radius:4px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:auto}
+    .xnb-title{font-size:18px;font-weight:700;color:#111827;margin:0 0 16px}
+    .filter-block{margin-bottom:18px}.filter-title{font-size:13px;font-weight:700;color:#374151;margin-bottom:9px}
+    .check-filter{display:flex;align-items:center;gap:8px;margin:10px 0;color:#4b5563;font-size:13px;font-weight:600}
+    .check-filter input,.radio-filter input{width:15px;height:15px;accent-color:#1684f8}
+    .radio-filter{display:flex;align-items:center;gap:8px;margin:8px 0}
+    .radio-filter span{flex:1;height:32px;display:flex;align-items:center;justify-content:space-between;border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:0 10px;color:#374151;font-size:13px}
+    .filter-control{width:100%;height:34px;border:1px solid #dde3ea;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
+    .xnb-main{min-width:0;display:flex;flex-direction:column;gap:10px}
+    .xnb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .xnb-search{position:relative;max-width:520px;flex:1}
+    .xnb-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af}
+    .xnb-search input{width:100%;height:36px;border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:0 40px 0 36px;font-size:14px;outline:none}
+    .xnb-search button{position:absolute;right:5px;top:5px;width:26px;height:26px;border:none;background:#fff;color:#6b7280;border-radius:4px;cursor:pointer}
+    .toolbar-actions{display:flex;align-items:center;gap:8px}
+    .kv-btn{height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#374151;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .kv-btn.primary{border-color:#86bfff;color:#0070f4}.kv-btn:hover{background:#f8fbff;border-color:#8fc2ff;color:#0070f4}
+    .tool-icon{width:36px;height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;color:#667085;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .xnb-table-wrap{flex:1;min-height:0;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:auto}
+    .xnb-table{width:100%;min-width:1050px;border-collapse:collapse}
+    .xnb-table th{position:sticky;top:0;background:#eaf3ff;color:#374151;font-size:13px;font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid #d8e8fb}
+    .xnb-table td{height:46px;padding:0 12px;border-bottom:1px solid #edf0f3;color:#374151;font-size:13px}
+    .check-col,.star-col{width:36px;text-align:center}.row-check{width:16px;height:16px;accent-color:#0070f4}
+    .num{text-align:right;font-weight:600;color:#4b5563}.badge-status{display:inline-flex;align-items:center;height:24px;border-radius:5px;background:#eef2f7;color:#374151;padding:0 8px;font-size:12px;font-weight:700}
+    .empty-state{height:100%;min-height:460px;display:flex;align-items:center;justify-content:center;text-align:center;color:#374151}
+    .empty-box i{width:72px;height:72px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e9f5ff;color:#4d9fe8;font-size:34px;box-shadow:0 0 0 12px rgba(233,245,255,.55);margin-bottom:22px}
+    .empty-box strong{display:block;margin-bottom:8px;font-size:15px}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+
+  <form class="xnb-page" method="GET" action="/xuat-dung-noi-bo" id="filterForm">
+    <aside class="xnb-sidebar">
+      <h1 class="xnb-title">Xuất dùng nội bộ</h1>
+      <div class="filter-block">
+        <div class="filter-title">Trạng thái</div>
+        <label class="check-filter"><input type="checkbox" name="trang_thai" value="draft" <%= selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="submitFilters()"> Phiếu tạm</label>
+        <label class="check-filter"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitFilters()"> Hoàn thành</label>
+        <label class="check-filter"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="submitFilters()"> Đã hủy</label>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">Thời gian</div>
+        <label class="radio-filter"><input type="radio" checked><span>Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
+        <label class="radio-filter"><input type="radio"><span>Tùy chỉnh <i class="fa-regular fa-calendar"></i></span></label>
+      </div>
+      <div class="filter-block"><div class="filter-title">Người tạo</div><select class="filter-control" name="nguoi_tao_id" onchange="submitFilters()"><option value="">Chọn người tạo</option><% users.forEach(u=>{ %><option value="<%= u._id %>" <%= filters.nguoi_tao_id == u._id ? 'selected' : '' %>><%= u.ho_ten || u.email %></option><% }) %></select></div>
+      <div class="filter-block"><div class="filter-title">Người xuất dùng nội bộ</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người xuất"></div>
+      <div class="filter-block"><div class="filter-title">Loại xuất</div><select class="filter-control" name="loai_xuat" onchange="submitFilters()"><option value="">Chọn loại xuất</option><option value="Xuất dùng nội bộ" <%= filters.loai_xuat === 'Xuất dùng nội bộ' ? 'selected' : '' %>>Xuất dùng nội bộ</option><option value="Hỏng mất" <%= filters.loai_xuat === 'Hỏng mất' ? 'selected' : '' %>>Hỏng mất</option><option value="Khác" <%= filters.loai_xuat === 'Khác' ? 'selected' : '' %>>Khác</option></select></div>
+      <div class="filter-block"><div class="filter-title">Người nhận</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người nhận"></div>
+    </aside>
+
+    <main class="xnb-main">
+      <div class="xnb-toolbar">
+        <div class="xnb-search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input name="q" value="<%= filters.q || '' %>" placeholder="Theo mã xuất dùng nội bộ">
+          <button type="submit"><i class="fa-solid fa-sliders"></i></button>
+        </div>
+        <div class="toolbar-actions">
+          <a class="kv-btn primary" href="/xuat-dung-noi-bo/create"><i class="fa-solid fa-plus"></i> Xuất dùng nội bộ</a>
+          <a class="kv-btn" href="/xuat-dung-noi-bo/export.csv?<%= new URLSearchParams(filters).toString() %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
+          <button type="button" class="tool-icon" title="Danh sách"><i class="fa-solid fa-list"></i></button>
+          <button type="button" class="tool-icon" title="Thiết lập"><i class="fa-solid fa-gear"></i></button>
+          <button type="button" class="tool-icon" title="Trợ giúp"><i class="fa-regular fa-circle-question"></i></button>
+        </div>
+      </div>
+      <div class="xnb-table-wrap">
+        <table class="xnb-table">
+          <thead><tr><th class="check-col"><input class="row-check" type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã xuất dùng nội bộ</th><th>Loại xuất</th><th class="num">Tổng giá trị</th><th>Thời gian</th><th>Chi nhánh</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            <% if (tickets.length) { %>
+              <% tickets.forEach(t => { %>
+                <tr><td class="check-col"><input class="row-check" type="checkbox"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><strong><%= t.ma_xuat_noi_bo %></strong></td><td><%= t.loai_xuat || '' %></td><td class="num"><%= (t.tong_gia_tri || 0).toLocaleString('vi-VN') %></td><td><%= t.ngay_xuat ? t.ngay_xuat.toLocaleString('vi-VN') : '' %></td><td><%= t.cua_hang_id ? t.cua_hang_id.ten_cua_hang : '' %></td><td><%= t.ghi_chu || '' %></td><td><span class="badge-status"><%= statusMap[t.trang_thai] || t.trang_thai %></span></td></tr>
+              <% }) %>
+            <% } else { %>
+              <tr><td colspan="9"><div class="empty-state"><div class="empty-box"><i class="fa-solid fa-inbox"></i><strong>Không tìm thấy kết quả</strong><div>Không tìm thấy giao dịch nào phù hợp trong tháng này.<br>Nhấn vào đây để tiếp tục tìm kiếm.</div></div></div></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </form>
+  <script>
+    function submitFilters(){document.getElementById('filterForm').submit();}
+  </script>
+</body>
+</html>

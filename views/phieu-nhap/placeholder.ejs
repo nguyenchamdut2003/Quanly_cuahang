@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .placeholder-page{min-height:calc(100vh - 98px);background:#f3f6f9;padding:18px 12%}
+    .placeholder-card{background:#fff;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:26px}
+    .placeholder-title{font-size:20px;font-weight:700;color:#111827;margin:0 0 8px}
+    .placeholder-desc{font-size:14px;color:#667085;margin:0 0 20px}
+    .placeholder-actions{display:flex;gap:10px}
+    .placeholder-btn{height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#374151;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;text-decoration:none}
+    .placeholder-btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <main class="placeholder-page">
+    <section class="placeholder-card">
+      <h1 class="placeholder-title"><%= heading %></h1>
+      <p class="placeholder-desc"><%= description %></p>
+      <div class="placeholder-actions">
+        <a class="placeholder-btn primary" href="/phieu-nhap"><i class="fa-solid fa-arrow-left"></i> Nhập hàng</a>
+        <a class="placeholder-btn" href="/nha-cung-cap">Nhà cung cấp</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

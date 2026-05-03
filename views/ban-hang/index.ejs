@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <style>
+      body { overflow: hidden; background: #fff; }
+      .pos-container {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        height: calc(100vh - 100px);
+        background: #f0f2f5;
+      }
+      .pos-left {
+        padding: 15px;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid #ddd;
+      }
+      .pos-right {
+        padding: 15px;
+        background: #f9f9f9;
+        display: flex;
+        flex-direction: column;
+      }
+      .search-container {
+        position: relative;
+        margin-bottom: 15px;
+      }
+      .draft-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #0070f4;
+        padding: 8px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        min-height: 68px;
+      }
+      .draft-label {
+        color: #fff;
+        font-weight: 700;
+        white-space: nowrap;
+        margin-right: 4px;
+        flex: 0 0 auto;
+      }
+      .draft-tabs-scroll {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding: 2px 2px 8px;
+        scrollbar-color: rgba(255,255,255,.75) rgba(255,255,255,.2);
+        scrollbar-width: thin;
+      }
+      .draft-tabs-scroll::-webkit-scrollbar {
+        height: 8px;
+      }
+      .draft-tabs-scroll::-webkit-scrollbar-track {
+        background: rgba(255,255,255,.18);
+        border-radius: 999px;
+      }
+      .draft-tabs-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,.72);
+        border-radius: 999px;
+      }
+      .draft-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 0 0 auto;
+      }
+      .draft-action-btn {
+        height: 34px;
+        border: 1px solid rgba(255,255,255,.55);
+        background: rgba(255,255,255,.14);
+        color: #fff;
+        border-radius: 6px;
+        padding: 0 10px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .draft-action-btn:hover {
+        background: rgba(255,255,255,.24);
+      }
+      .draft-action-btn.danger {
+        border-color: rgba(255,255,255,.35);
+      }
+      .draft-tab {
+        border: 0;
+        background: rgba(255,255,255,.16);
+        color: #fff;
+        min-width: 142px;
+        height: 38px;
+        border-radius: 7px;
+        padding: 0 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        cursor: pointer;
+        white-space: nowrap;
+        flex: 0 0 auto;
+      }
+      .draft-tab.active {
+        background: #fff;
+        color: #111827;
+        font-weight: 700;
+      }
+      .draft-tab small {
+        display: block;
+        color: inherit;
+        opacity: .72;
+        font-weight: 400;
+      }
+      .draft-empty {
+        color: rgba(255,255,255,.8);
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        min-width: 190px;
+      }
+      .search-container input {
+        width: 100%;
+        padding: 12px 15px 12px 40px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+      }
+      .search-container i {
+        position: absolute;
+        left: 15px;
+        top: 15px;
+        color: #999;
+      }
+      .cart-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .cart-table th {
+        text-align: left;
+        background: #f8f9fa;
+        padding: 10px;
+      }
+      .cart-table td {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+      }
+      .input-pos {
+        width: 60px;
+        padding: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-align: right;
+      }
+      .customer-box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        margin-bottom: 15px;
+      }
+      .delivery-box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        margin-bottom: 15px;
+      }
+      .delivery-tab {
+        height: 34px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #0070f4;
+        font-weight: 700;
+        border-bottom: 2px solid #0070f4;
+        margin-bottom: 12px;
+      }
+      .delivery-row { margin-bottom: 12px; }
+      .delivery-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #333; }
+      .delivery-input {
+        width: 100%;
+        height: 34px;
+        border: 1px solid #d0d7de;
+        border-radius: 5px;
+        padding: 0 10px;
+        font-size: 14px;
+        background: #fff;
+      }
+      .store-info {
+        font-size: 12px;
+        color: #667085;
+        background: #f6f8fa;
+        border-radius: 5px;
+        padding: 8px;
+        line-height: 1.45;
+        margin-top: 7px;
+      }
+      .recipient-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .payment-box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+        flex-grow: 1;
+      }
+      .pay-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 15px;
+      }
+      .pay-total {
+        font-size: 24px;
+        font-weight: bold;
+        color: #0070f4;
+        border-top: 1px dashed #ddd;
+        padding-top: 15px;
+        margin-top: 15px;
+      }
+      .btn-pay {
+        width: 100%;
+        padding: 15px;
+        background: #0070f4;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 18px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 20px;
+      }
+      .search-results {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: #fff;
+        border: 1px solid #ddd;
+        z-index: 1000;
+        max-height: 300px;
+        overflow-y: auto;
+        display: none;
+      }
+      .search-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+      }
+      .search-item:hover { background: #e6f7ff; }
+    </style>
+  </head>
+  <body>
+    <%- include('../partials/header') %>
+
+    <div class="pos-container">
+      <div class="pos-left">
+        <div class="draft-strip">
+          <span class="draft-label"><i class="fa-regular fa-clock"></i> Đơn nháp</span>
+          <div class="draft-tabs-scroll">
+            <% if ((locals.draftOrders || []).length) { %>
+              <% draftOrders.forEach((order, index) => { %>
+                <button type="button" class="draft-tab <%= index === 0 ? 'active' : '' %>" onclick="loadDraftOrder('<%= order._id %>', this)">
+                  <span>
+                    <%= order.ma_don_hang %>
+                    <small><%= order.ten_khach_hang %></small>
+                  </span>
+                  <i class="fa-solid fa-chevron-right"></i>
+                </button>
+              <% }) %>
+            <% } else { %>
+              <span class="draft-empty">Chưa có đơn nháp</span>
+            <% } %>
+          </div>
+          <div class="draft-actions">
+            <button type="button" class="draft-action-btn" onclick="newDraftOrder()"><i class="fa-solid fa-plus"></i> Tạo nháp</button>
+            <button type="button" class="draft-action-btn" onclick="saveDraftOrder()"><i class="fa-solid fa-floppy-disk"></i> Lưu nháp</button>
+            <button type="button" class="draft-action-btn danger" onclick="deleteDraftOrder()"><i class="fa-solid fa-trash"></i> Xóa nháp</button>
+          </div>
+        </div>
+        <div class="search-container">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="posSearch" placeholder="Tìm hàng hóa (F3)">
+          <div id="posResults" class="search-results"></div>
+        </div>
+
+        <div style="flex-grow: 1; overflow-y: auto;">
+          <table class="cart-table">
+            <thead>
+              <tr>
+                <th width="40">STT</th>
+                <th>Tên hàng</th>
+                <th width="100" style="text-align: right;">Số lượng</th>
+                <th width="120" style="text-align: right;">Đơn giá</th>
+                <th width="120" style="text-align: right;">Thành tiền</th>
+                <th width="40"></th>
+              </tr>
+            </thead>
+            <tbody id="cartBody">
+              <!-- Cart items -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="pos-right">
+        <div class="customer-box">
+          <label><i class="fa-solid fa-user"></i> Khách hàng</label>
+          <select id="customerId" onchange="fillRecipientFromCustomer()" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ddd;">
+            <option value="">Chọn khách hàng</option>
+            <% customers.forEach(c => { %>
+              <option value="<%= c._id %>"><%= c.ten_khach_hang %></option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="delivery-box">
+          <div class="delivery-tab"><i class="fa-solid fa-truck-fast"></i> Tự giao hàng</div>
+          <div class="delivery-row">
+            <label>Đối tác giao hàng</label>
+            <select id="deliveryPartnerId" class="delivery-input">
+              <option value="">Chọn đối tác</option>
+              <% (locals.partners || []).forEach(p => { %>
+                <option value="<%= p._id %>"><%= p.ten_doi_tac %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="delivery-row">
+            <label>Nơi lấy hàng</label>
+            <select id="pickupStoreId" class="delivery-input" onchange="renderStoreInfo()">
+              <% stores.forEach(s => { %>
+                <option value="<%= s._id %>"><%= s.ten_cua_hang %> - <%= s.sdt || 'Chưa có SĐT' %></option>
+              <% }) %>
+            </select>
+            <div class="store-info" id="storeInfo"></div>
+          </div>
+          <div class="delivery-row">
+            <label>Người nhận</label>
+            <div class="recipient-grid">
+              <input id="recipientName" class="delivery-input" placeholder="Tên người nhận">
+              <input id="recipientPhone" class="delivery-input" placeholder="Số điện thoại">
+            </div>
+          </div>
+          <div class="delivery-row">
+            <label>Địa chỉ nhận</label>
+            <select id="recipientAddressSelect" class="delivery-input" onchange="selectRecipientAddress()" style="margin-bottom:8px">
+              <option value="">Chọn địa chỉ khách hàng</option>
+            </select>
+            <input id="recipientAddress" class="delivery-input" placeholder="Địa chỉ nhận hàng">
+          </div>
+          <div class="delivery-row">
+            <label>Ghi chú cho bưu tá</label>
+            <input id="deliveryNote" class="delivery-input" placeholder="Ghi chú giao hàng">
+          </div>
+        </div>
+
+        <div class="payment-box">
+          <div class="pay-item">
+            <span>Tổng tiền hàng:</span>
+            <span id="subtotal">0</span>
+          </div>
+          <div class="pay-item">
+            <span>Chiết khấu:</span>
+            <input type="number" id="discount" class="input-pos" value="0" style="width: 100px;" onchange="updateSummary()">
+          </div>
+          <div class="pay-item">
+            <span>Phí vận chuyển:</span>
+            <input type="number" id="shipFee" class="input-pos" value="0" style="width: 100px;" onchange="updateSummary()">
+          </div>
+          
+          <div class="pay-total">
+            <div class="pay-item">
+              <span>KHÁCH CẦN TRẢ:</span>
+              <span id="grandTotal">0</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px;">
+            <label>Ghi chú đơn hàng</label>
+            <textarea id="orderNote" style="width: 100%; margin-top: 5px; padding: 10px; border: 1px solid #ddd; height: 60px; border-radius: 4px;"></textarea>
+          </div>
+
+          <button class="btn-pay" onclick="checkout()">
+            <i class="fa-solid fa-cart-shopping"></i> THANH TOÁN (F9)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let cart = [];
+      const products = <%- JSON.stringify(products) %>;
+      const draftOrders = <%- JSON.stringify(locals.draftOrders || []) %>;
+      const customersData = <%- JSON.stringify(customers.map(c => ({
+        _id: String(c._id),
+        ten_khach_hang: c.ten_khach_hang || '',
+        sdt: c.sdt || '',
+        dia_chi_nhan: c.dia_chi_nhan || '',
+        dia_chi_list: (c.dia_chi_list || []).map(a => ({
+          dia_chi: a.dia_chi || '',
+          tinh_thanh: a.tinh_thanh || '',
+          quan_huyen: a.quan_huyen || '',
+          phuong_xa: a.phuong_xa || '',
+          mac_dinh: !!a.mac_dinh
+        }))
+      }))) %>;
+      const storesData = <%- JSON.stringify(stores.map(s => ({
+        _id: String(s._id),
+        ten_cua_hang: s.ten_cua_hang || '',
+        sdt: s.sdt || '',
+        email: s.email || '',
+        dia_chi: s.dia_chi || '',
+        dia_chi_gui_hang: s.dia_chi_gui_hang || '',
+        tinh_thanh: s.tinh_thanh || '',
+        quan_huyen: s.quan_huyen || '',
+        phuong_xa: s.phuong_xa || ''
+      }))) %>;
+
+      const searchInput = document.getElementById('posSearch');
+      const resultsDiv = document.getElementById('posResults');
+      let currentDraftId = '';
+
+      function formatAddress(parts) {
+        return [parts.dia_chi, parts.phuong_xa, parts.quan_huyen, parts.tinh_thanh].filter(Boolean).join(', ');
+      }
+
+      function renderStoreInfo() {
+        const id = document.getElementById('pickupStoreId').value;
+        const store = storesData.find(s => s._id === id);
+        const box = document.getElementById('storeInfo');
+        if (!store) {
+          box.textContent = 'Chưa chọn nơi lấy hàng';
+          return;
+        }
+        const address = store.dia_chi_gui_hang || formatAddress(store) || 'Chưa có địa chỉ';
+        box.innerHTML = `<strong>${store.ten_cua_hang}</strong><br>SĐT: ${store.sdt || 'Chưa có'}<br>Địa chỉ lấy hàng: ${address}`;
+      }
+
+      function loadDraftOrder(id, button) {
+        const draft = draftOrders.find(order => order._id === id);
+        if (!draft) return;
+        currentDraftId = id;
+        document.querySelectorAll('.draft-tab').forEach(tab => tab.classList.remove('active'));
+        if (button) button.classList.add('active');
+        document.getElementById('deliveryPartnerId').value = '';
+        document.getElementById('discount').value = 0;
+        document.getElementById('shipFee').value = 0;
+        document.getElementById('deliveryNote').value = '';
+        document.getElementById('recipientAddress').value = '';
+
+        cart = (draft.items || []).map(item => ({
+          hang_hoa_id: item.hang_hoa_id,
+          ten_hang: item.ten_hang || item.ma_hang || 'Hàng hóa',
+          so_luong: Number(item.so_luong || 0),
+          don_gia_ban: Number(item.don_gia_ban || 0)
+        })).filter(item => item.hang_hoa_id && item.so_luong > 0);
+
+        document.getElementById('customerId').value = draft.khach_hang_id || '';
+        fillRecipientFromCustomer();
+
+        if (draft.delivery) {
+          if (draft.delivery.doi_tac_giao_hang_id) {
+            document.getElementById('deliveryPartnerId').value = draft.delivery.doi_tac_giao_hang_id;
+          }
+          if (draft.delivery.cua_hang_id) {
+            document.getElementById('pickupStoreId').value = draft.delivery.cua_hang_id;
+            renderStoreInfo();
+          }
+          document.getElementById('recipientName').value = draft.delivery.ten_nguoi_nhan || document.getElementById('recipientName').value;
+          document.getElementById('recipientPhone').value = draft.delivery.sdt_nguoi_nhan || document.getElementById('recipientPhone').value;
+          document.getElementById('recipientAddress').value = draft.delivery.dia_chi_nhan || document.getElementById('recipientAddress').value;
+          document.getElementById('shipFee').value = Number(draft.delivery.phi_giao_hang || 0);
+          document.getElementById('deliveryNote').value = draft.delivery.ghi_chu || '';
+        }
+
+        document.getElementById('orderNote').value = draft.ghi_chu || '';
+        renderCart();
+      }
+
+      function newDraftOrder() {
+        currentDraftId = '';
+        cart = [];
+        document.querySelectorAll('.draft-tab').forEach(tab => tab.classList.remove('active'));
+        document.getElementById('customerId').value = '';
+        document.getElementById('deliveryPartnerId').value = '';
+        document.getElementById('recipientAddressSelect').innerHTML = '<option value="">Chọn địa chỉ khách hàng</option>';
+        document.getElementById('recipientName').value = '';
+        document.getElementById('recipientPhone').value = '';
+        document.getElementById('recipientAddress').value = '';
+        document.getElementById('deliveryNote').value = '';
+        document.getElementById('discount').value = 0;
+        document.getElementById('shipFee').value = 0;
+        document.getElementById('orderNote').value = '';
+        renderStoreInfo();
+        renderCart();
+      }
+
+      function fillRecipientFromCustomer() {
+        const id = document.getElementById('customerId').value;
+        const customer = customersData.find(c => c._id === id);
+        const addressSelect = document.getElementById('recipientAddressSelect');
+        addressSelect.innerHTML = '<option value="">Chọn địa chỉ khách hàng</option>';
+        if (!customer) {
+          document.getElementById('recipientName').value = '';
+          document.getElementById('recipientPhone').value = '';
+          document.getElementById('recipientAddress').value = '';
+          return;
+        }
+        document.getElementById('recipientName').value = customer.ten_khach_hang || '';
+        document.getElementById('recipientPhone').value = customer.sdt || '';
+        const addresses = customer.dia_chi_list && customer.dia_chi_list.length
+          ? customer.dia_chi_list
+          : (customer.dia_chi_nhan ? [{ dia_chi: customer.dia_chi_nhan, mac_dinh: true }] : []);
+        addresses.forEach((address, index) => {
+          const value = formatAddress(address) || address.dia_chi || '';
+          const opt = document.createElement('option');
+          opt.value = value;
+          opt.textContent = value || ('Địa chỉ ' + (index + 1));
+          if (address.mac_dinh) opt.selected = true;
+          addressSelect.appendChild(opt);
+        });
+        selectRecipientAddress();
+      }
+
+      function selectRecipientAddress() {
+        document.getElementById('recipientAddress').value = document.getElementById('recipientAddressSelect').value;
+      }
+
+      searchInput.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        if (!query) {
+          resultsDiv.style.display = 'none';
+          return;
+        }
+
+        const filtered = products.filter(p => 
+          p.ten_hang.toLowerCase().includes(query) || 
+          p.ma_hang.toLowerCase().includes(query)
+        );
+
+        resultsDiv.innerHTML = filtered.map(p => `
+          <div class="search-item" onclick="addToCart('${p._id}')">
+            <span>${p.ten_hang}</span>
+            <span style="font-weight: bold;">${p.gia_ban.toLocaleString()}</span>
+          </div>
+        `).join('');
+        resultsDiv.style.display = 'block';
+      });
+
+      function addToCart(id) {
+        const product = products.find(p => p._id === id);
+        if (!product) return;
+
+        const existing = cart.find(i => i.hang_hoa_id === id);
+        if (existing) {
+          existing.so_luong++;
+        } else {
+          cart.push({
+            hang_hoa_id: id,
+            ten_hang: product.ten_hang,
+            so_luong: 1,
+            don_gia_ban: product.gia_ban
+          });
+        }
+
+        renderCart();
+        searchInput.value = '';
+        resultsDiv.style.display = 'none';
+      }
+
+      function renderCart() {
+        const body = document.getElementById('cartBody');
+        let subtotal = 0;
+        
+        body.innerHTML = cart.map((item, index) => {
+          const total = item.so_luong * item.don_gia_ban;
+          subtotal += total;
+          return `
+            <tr>
+              <td>${index + 1}</td>
+              <td><strong>${item.ten_hang}</strong></td>
+              <td style="text-align: right;">
+                <input type="number" class="input-pos" value="${item.so_luong}" onchange="updateCartQty('${item.hang_hoa_id}', this.value)">
+              </td>
+              <td style="text-align: right;">${item.don_gia_ban.toLocaleString()}</td>
+              <td style="text-align: right; font-weight: bold;">${total.toLocaleString()}</td>
+              <td><i class="fa-solid fa-trash" style="color: #ccc; cursor: pointer;" onclick="removeFromCart('${item.hang_hoa_id}')"></i></td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('subtotal').innerText = subtotal.toLocaleString();
+        updateSummary();
+      }
+
+      function updateSummary() {
+        const subtotal = cart.reduce((sum, item) => sum + (item.so_luong * item.don_gia_ban), 0);
+        const discount = Number(document.getElementById('discount').value);
+        const shipFee = Number(document.getElementById('shipFee').value);
+        const total = subtotal - discount + shipFee;
+        
+        document.getElementById('grandTotal').innerText = total.toLocaleString();
+      }
+
+      function updateCartQty(id, val) {
+        const item = cart.find(i => i.hang_hoa_id === id);
+        if (item) item.so_luong = Number(val);
+        renderCart();
+      }
+
+      function removeFromCart(id) {
+        cart = cart.filter(i => i.hang_hoa_id !== id);
+        renderCart();
+      }
+
+      function collectOrderData() {
+        return {
+          khach_hang_id: document.getElementById('customerId').value,
+          cua_hang_id: document.getElementById('pickupStoreId').value,
+          items: cart,
+          chiet_khau: Number(document.getElementById('discount').value),
+          phi_van_chuyen: Number(document.getElementById('shipFee').value),
+          ghi_chu: document.getElementById('orderNote').value,
+          doi_tac_giao_hang_id: document.getElementById('deliveryPartnerId').value,
+          ten_nguoi_nhan: document.getElementById('recipientName').value,
+          sdt_nguoi_nhan: document.getElementById('recipientPhone').value,
+          dia_chi_nhan: document.getElementById('recipientAddress').value,
+          ghi_chu_giao_hang: document.getElementById('deliveryNote').value
+        };
+      }
+
+      async function saveDraftOrder() {
+        if (cart.length === 0) return alert("Đơn nháp chưa có sản phẩm");
+
+        const data = collectOrderData();
+        if (currentDraftId) data.draft_order_id = currentDraftId;
+
+        try {
+          const res = await fetch('/ban-hang/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          const result = await res.json();
+          if (result.success) {
+            alert(result.message);
+            location.reload();
+          } else {
+            alert(result.message || 'Không lưu được đơn nháp');
+          }
+        } catch (err) {
+          alert("Lỗi khi lưu đơn nháp");
+        }
+      }
+
+      async function deleteDraftOrder() {
+        if (!currentDraftId) return alert("Vui lòng chọn đơn nháp cần xóa");
+        if (!confirm("Xóa đơn nháp này?")) return;
+
+        try {
+          const res = await fetch('/ban-hang/draft/' + currentDraftId, { method: 'DELETE' });
+          const result = await res.json();
+          if (result.success) {
+            alert(result.message);
+            location.reload();
+          } else {
+            alert(result.message || 'Không xóa được đơn nháp');
+          }
+        } catch (err) {
+          alert("Lỗi khi xóa đơn nháp");
+        }
+      }
+
+      async function checkout() {
+        if (cart.length === 0) return alert("Đơn hàng trống");
+
+        const data = collectOrderData();
+        if (currentDraftId) data.draft_order_id = currentDraftId;
+
+        try {
+          const res = await fetch('/ban-hang/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+          const result = await res.json();
+          if (result.success) {
+            alert(result.message);
+            location.reload();
+          } else {
+            alert(result.message);
+          }
+        } catch (err) {
+          alert("Lỗi khi thanh toán");
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        renderStoreInfo();
+        fillRecipientFromCustomer();
+        if (draftOrders.length) {
+          loadDraftOrder(draftOrders[0]._id, document.querySelector('.draft-tab'));
+        }
+      });
+    </script>
+  </body>
+</html>

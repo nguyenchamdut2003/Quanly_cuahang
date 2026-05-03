@@ -1,0 +1,141 @@
+<%
+  const safeShipments = Array.isArray(locals.shipments) ? locals.shipments : [];
+  const safePartners = Array.isArray(locals.partners) ? locals.partners : [];
+  const safeFilters = locals.filters || {};
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const statusText = value => ({ draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy' }[value] || value || '');
+  const statusClass = value => ({ draft: 'draft', shipping: 'shipping', completed: 'completed', cancelled: 'cancelled' }[value] || 'draft');
+  const invoiceCode = item => item.hoa_don_id?.ma_hoa_don || item.don_hang_id?.ma_don_hang || '';
+  const customerCode = item => item.khach_hang_id?.ma_khach_hang || '';
+  const customerName = item => item.khach_hang_id?.ten_khach_hang || item.ten_nguoi_nhan || '';
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 12% 0}.sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}.title{font-size:20px;font-weight:700;margin:0 0 16px}.filter{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;margin-bottom:10px}.radio{display:flex;align-items:center;gap:9px;margin-top:9px}.radio input{accent-color:#0070f4}.pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#667085;padding:0 10px;font-size:13px}.seg{display:flex;gap:8px}.seg a{height:30px;border:1px solid #cfd8e3;border-radius:16px;padding:0 14px;display:flex;align-items:center;text-decoration:none;color:#111827;background:#fff;font-size:13px}.seg a.active{background:#0070f4;color:#fff;border-color:#0070f4}.main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;justify-content:space-between;gap:12px}.search{position:relative;flex:1;max-width:470px}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px}.search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff}.actions{display:flex;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1120px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;font-size:12px;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.check-col{width:36px;text-align:center}.num{text-align:right}.status{border:0;border-radius:4px;padding:4px 7px;font-size:12px;font-weight:700;outline:none;cursor:pointer}.status.draft{background:#eef2f7;color:#475467}.status.shipping{background:#dbeafe;color:#0058d4}.status.completed{background:#dcfce7;color:#15803d}.status.cancelled{background:#fee2e2;color:#b91c1c}.empty{height:560px;text-align:center;color:#111827}.empty-box{display:flex;height:100%;align-items:center;justify-content:center;flex-direction:column;gap:8px}.empty-icon{width:96px;height:96px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:34px}.muted{color:#667085}.link{color:#0070f4;text-decoration:none}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form class="page" method="GET" action="/don-hang/van-don">
+    <div class="shell">
+      <aside class="sidebar">
+        <h1 class="title">Vận đơn</h1>
+        <div class="filter">
+          <div class="filter-title">Trạng thái giao hàng</div>
+          <select name="trang_thai" class="control" onchange="this.form.submit()">
+            <option value="all">Chọn trạng thái</option>
+            <option value="draft" <%= safeFilters.trang_thai === 'draft' ? 'selected' : '' %>>Phiếu tạm</option>
+            <option value="shipping" <%= safeFilters.trang_thai === 'shipping' ? 'selected' : '' %>>Đang giao hàng</option>
+            <option value="completed" <%= safeFilters.trang_thai === 'completed' ? 'selected' : '' %>>Hoàn thành</option>
+            <option value="cancelled" <%= safeFilters.trang_thai === 'cancelled' ? 'selected' : '' %>>Đã hủy</option>
+          </select>
+        </div>
+        <div class="filter">
+          <div class="filter-title">Đối tác giao hàng</div>
+          <select name="doi_tac_giao_hang_id" class="control" onchange="this.form.submit()">
+            <option value="all">Chọn đối tác giao hàng</option>
+            <% safePartners.forEach(partner => { %>
+              <option value="<%= partner._id %>" <%= String(safeFilters.doi_tac_giao_hang_id || '') === String(partner._id) ? 'selected' : '' %>><%= partner.ten_doi_tac %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="filter">
+          <div class="filter-title">Thời gian tạo</div>
+          <input class="control" type="date" name="created_from" value="<%= safeFilters.created_from || '' %>" onchange="this.form.submit()">
+          <input class="control" type="date" name="created_to" value="<%= safeFilters.created_to || '' %>" onchange="this.form.submit()">
+        </div>
+        <div class="filter">
+          <div class="filter-title">Thời gian hoàn thành</div>
+          <label class="radio"><input type="radio" checked><span class="pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label>
+          <label class="radio"><input type="radio"><span class="pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label>
+        </div>
+        <div class="filter"><div class="filter-title">Khu vực giao hàng</div><input class="control" name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" placeholder="Chọn Tỉnh/TP - Quận/Huyện"></div>
+        <div class="filter"><div class="filter-title">Thu hộ tiền (COD)</div><div class="seg"><a class="<%= !safeFilters.cod ? 'active' : '' %>" href="/don-hang/van-don">Tất cả</a><a class="<%= safeFilters.cod === 'yes' ? 'active' : '' %>" href="/don-hang/van-don?cod=yes">Có</a><a class="<%= safeFilters.cod === 'no' ? 'active' : '' %>" href="/don-hang/van-don?cod=no">Không</a></div></div>
+      </aside>
+      <main class="main">
+        <div class="toolbar">
+          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã vận đơn"><button><i class="fa-solid fa-sliders"></i></button></div>
+          <div class="actions">
+            <a class="btn" href="/don-hang/van-don/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a>
+            <span class="icon"><i class="fa-solid fa-list"></i></span>
+            <span class="icon"><i class="fa-solid fa-gear"></i></span>
+            <span class="icon"><i class="fa-regular fa-circle-question"></i></span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th class="check-col"><input type="checkbox"></th><th>Mã vận đơn</th><th>Thời gian tạo</th><th>Mã hóa đơn</th><th>Mã KH</th><th>Khách hàng</th><th>Đối tác giao hàng</th><th>Trạng thái giao</th><th>Thời gian giao hàng</th><th class="num">Phí giao</th></tr>
+            </thead>
+            <tbody>
+              <% if (safeShipments.length) { %>
+                <% safeShipments.forEach(item => { %>
+                  <tr>
+                    <td class="check-col"><input type="checkbox"></td>
+                    <td><a href="#" class="link" onclick="showShipment('<%= item._id %>');return false"><%= item.ma_van_don %></a></td>
+                    <td><%= item.created_at ? new Date(item.created_at).toLocaleString('vi-VN') : '' %></td>
+                    <td><%= invoiceCode(item) %></td>
+                    <td><%= customerCode(item) %></td>
+                    <td><%= customerName(item) %></td>
+                    <td><%= item.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng' %></td>
+                    <td>
+                      <select class="status <%= statusClass(item.trang_thai) %>" onchange="updateStatus('<%= item._id %>', this)">
+                        <option value="draft" <%= item.trang_thai === 'draft' ? 'selected' : '' %>>Phiếu tạm</option>
+                        <option value="shipping" <%= item.trang_thai === 'shipping' ? 'selected' : '' %>>Đang giao hàng</option>
+                        <option value="completed" <%= item.trang_thai === 'completed' ? 'selected' : '' %>>Hoàn thành</option>
+                        <option value="cancelled" <%= item.trang_thai === 'cancelled' ? 'selected' : '' %>>Đã hủy</option>
+                      </select>
+                    </td>
+                    <td><%= item.trang_thai === 'completed' && item.updated_at ? new Date(item.updated_at).toLocaleString('vi-VN') : '' %></td>
+                    <td class="num"><%= fmt(item.phi_giao_hang) %></td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="10" class="empty"><div class="empty-box"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><strong>Không tìm thấy kết quả</strong><div>Không tìm thấy vận đơn nào phù hợp trong tháng này.<br>Nhấn vào <a href="/don-hang/hoa-don/create" class="link">đây</a> để tiếp tục tìm kiếm.</div></div></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </form>
+  <script>
+    const shipments = <%- JSON.stringify(safeShipments.map(item => ({
+      _id: String(item._id),
+      ma_van_don: item.ma_van_don,
+      ma_hoa_don: invoiceCode(item),
+      khach_hang: customerName(item),
+      doi_tac: item.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng',
+      nguoi_nhan: item.ten_nguoi_nhan || '',
+      sdt: item.sdt_nguoi_nhan || '',
+      dia_chi: item.dia_chi_nhan || '',
+      phi: item.phi_giao_hang || 0,
+      trang_thai: statusText(item.trang_thai)
+    }))) %>;
+    const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    function showShipment(id){
+      const item = shipments.find(s => s._id === id);
+      if(!item) return;
+      alert(`Vận đơn: ${item.ma_van_don}\nHóa đơn/Đơn hàng: ${item.ma_hoa_don}\nKhách hàng: ${item.khach_hang}\nĐối tác: ${item.doi_tac}\nNgười nhận: ${item.nguoi_nhan}\nSĐT: ${item.sdt}\nĐịa chỉ: ${item.dia_chi}\nPhí giao: ${fmt(item.phi)}\nTrạng thái: ${item.trang_thai}`);
+    }
+    async function updateStatus(id, select){
+      const value = select.value;
+      const previousClass = select.className;
+      select.disabled = true;
+      const res = await fetch(`/don-hang/van-don/${id}/status`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ trang_thai:value }) });
+      const result = await res.json();
+      select.disabled = false;
+      if(!result.success){
+        select.className = previousClass;
+        return alert(result.message || 'Không cập nhật được vận đơn');
+      }
+      select.className = `status ${value}`;
+    }
+  </script>
+</body>
+</html>
