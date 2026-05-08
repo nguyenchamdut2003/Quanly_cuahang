@@ -58,8 +58,8 @@ passport.use(new GoogleStrategy({
             email,
             ho_ten: profile.displayName || 'Người dùng',
             anh_dai_dien: profile.photos?.[0]?.value || '',
-            vai_tro: 'user',
-            trang_thai: 'inactive',
+            vai_tro: 'admin',
+            trang_thai: 'active',
             lan_dang_nhap_cuoi: new Date()
         });
 
