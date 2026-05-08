@@ -1,15 +1,21 @@
-<%
+﻿<%
   const safeOrders = Array.isArray(locals.orders) ? locals.orders : [];
   const safeFilters = locals.filters || {};
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : ['draft', 'shipping', 'completed']);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const statusText = status => ({
-    draft: 'Phiếu tạm',
-    shipping: 'Đang giao hàng',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy'
-  })[status] || 'Phiếu tạm';
+    draft: 'Phiáº¿u táº¡m',
+    shipping: 'Äang giao hÃ ng',
+    completed: 'HoÃ n thÃ nh',
+    cancelled: 'ÄÃ£ há»§y'
+  })[status] || 'Phiáº¿u táº¡m';
+  const deliveryStatusText = status => ({
+    chua_giao: 'Chưa giao',
+    giao_mot_phan: 'Giao một phần',
+    giao_thieu: 'Giao thiếu',
+    giao_du: 'Giao đủ'
+  })[status] || 'Chưa giao';
 %>
 <!DOCTYPE html>
 <html>
@@ -47,51 +53,51 @@
   <form id="filterForm" class="order-page" method="GET" action="/don-hang">
     <div class="order-shell">
       <aside class="sidebar">
-        <h1 class="title">Đặt hàng</h1>
+        <h1 class="title">Äáº·t hÃ ng</h1>
         <div class="filter-block">
-          <div class="filter-title">Thời gian</div>
-          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type !== 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
-          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label>
+          <div class="filter-title">Thá»i gian</div>
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type !== 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">ThÃ¡ng nÃ y <i class="fa-solid fa-chevron-right"></i></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">TÃ¹y chá»‰nh <i class="fa-regular fa-calendar-days"></i></span></label>
           <div class="date-range"><input type="date" name="date_from" value="<%= safeFilters.date_from || '' %>"><input type="date" name="date_to" value="<%= safeFilters.date_to || '' %>"></div>
         </div>
         <div class="filter-block">
-          <div class="filter-title">Trạng thái</div>
+          <div class="filter-title">Tráº¡ng thÃ¡i</div>
           <div class="tag-box">
-            <% [['draft','Phiếu tạm'],['shipping','Đang giao hàng'],['completed','Hoàn thành'],['cancelled','Đã hủy']].forEach(([value,label]) => { %>
+            <% [['draft','Phiáº¿u táº¡m'],['shipping','Äang giao hÃ ng'],['completed','HoÃ n thÃ nh'],['cancelled','ÄÃ£ há»§y']].forEach(([value,label]) => { %>
               <label class="tag" style="<%= selectedStatuses.includes(value) ? '' : 'background:#e8f3ff;color:#006dff' %>"><input class="status-check" type="checkbox" name="trang_thai" value="<%= value %>" <%= selectedStatuses.includes(value) ? 'checked' : '' %> onchange="this.form.submit()"> <%= label %> <i class="fa-solid fa-xmark"></i></label>
             <% }) %>
           </div>
         </div>
-        <div class="filter-block"><div class="filter-title">Đối tác giao hàng</div><select name="doi_tac" class="filter-control" onchange="this.form.submit()"><option value="">Chọn đối tác giao hàng</option><% (locals.partners || []).forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
-        <div class="filter-block"><div class="filter-title">Thời gian giao hàng</div><label class="radio-line"><input type="radio" name="delivery_time_type" value="all" <%= safeFilters.delivery_time_type !== 'custom' ? 'checked' : '' %>><span class="radio-pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label><label class="radio-line"><input type="radio" name="delivery_time_type" value="custom" <%= safeFilters.delivery_time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label><div class="date-range"><input type="date" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>"><input type="date" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>"></div></div>
-        <div class="filter-block"><div class="filter-title">Khu vực giao hàng</div><input name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" class="filter-control" placeholder="Chọn Tỉnh/TP - Quận/Huyện"></div>
-        <div class="filter-block"><div class="filter-title">Phương thức thanh toán</div><select name="phuong_thuc_tt" class="filter-control" onchange="this.form.submit()"><option value="">Chọn phương thức thanh toán...</option><option value="COD" <%= safeFilters.phuong_thuc_tt === 'COD' ? 'selected' : '' %>>COD</option></select></div>
-        <div class="filter-block"><div class="filter-title">Người tạo</div><input name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" list="userList" class="filter-control" placeholder="Chọn người tạo"></div>
-        <div class="filter-block"><div class="filter-title">Người nhận đặt</div><input name="nguoi_nhan" value="<%= safeFilters.nguoi_nhan || '' %>" class="filter-control" placeholder="Chọn người nhận đặt"></div>
+        <div class="filter-block"><div class="filter-title">Äá»‘i tÃ¡c giao hÃ ng</div><select name="doi_tac" class="filter-control" onchange="this.form.submit()"><option value="">Chá»n Ä‘á»‘i tÃ¡c giao hÃ ng</option><% (locals.partners || []).forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
+        <div class="filter-block"><div class="filter-title">Thá»i gian giao hÃ ng</div><label class="radio-line"><input type="radio" name="delivery_time_type" value="all" <%= safeFilters.delivery_time_type !== 'custom' ? 'checked' : '' %>><span class="radio-pill">ToÃ n thá»i gian <i class="fa-solid fa-chevron-right"></i></span></label><label class="radio-line"><input type="radio" name="delivery_time_type" value="custom" <%= safeFilters.delivery_time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">TÃ¹y chá»‰nh <i class="fa-regular fa-calendar-days"></i></span></label><div class="date-range"><input type="date" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>"><input type="date" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>"></div></div>
+        <div class="filter-block"><div class="filter-title">Khu vá»±c giao hÃ ng</div><input name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" class="filter-control" placeholder="Chá»n Tá»‰nh/TP - Quáº­n/Huyá»‡n"></div>
+        <div class="filter-block"><div class="filter-title">PhÆ°Æ¡ng thá»©c thanh toÃ¡n</div><select name="phuong_thuc_tt" class="filter-control" onchange="this.form.submit()"><option value="">Chá»n phÆ°Æ¡ng thá»©c thanh toÃ¡n...</option><option value="COD" <%= safeFilters.phuong_thuc_tt === 'COD' ? 'selected' : '' %>>COD</option></select></div>
+        <div class="filter-block"><div class="filter-title">NgÆ°á»i táº¡o</div><input name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" list="userList" class="filter-control" placeholder="Chá»n ngÆ°á»i táº¡o"></div>
+        <div class="filter-block"><div class="filter-title">NgÆ°á»i nháº­n Ä‘áº·t</div><input name="nguoi_nhan" value="<%= safeFilters.nguoi_nhan || '' %>" class="filter-control" placeholder="Chá»n ngÆ°á»i nháº­n Ä‘áº·t"></div>
         <datalist id="userList"><% safeUsers.forEach(u => { %><option value="<%= u.ho_ten || u.username %>"></option><% }) %></datalist>
-        <button type="submit" class="btn primary" style="width:100%;justify-content:center">Lọc</button>
+        <button type="submit" class="btn primary" style="width:100%;justify-content:center">Lá»c</button>
       </aside>
       <main class="main">
         <div class="toolbar">
-          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu đặt"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
+          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mÃ£ phiáº¿u Ä‘áº·t"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
-            <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Đặt hàng</a>
-            <button type="button" class="btn" onclick="alert('Chọn các đơn cần gộp trước khi dùng chức năng này.')"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
-            <a class="btn" href="/don-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Äáº·t hÃ ng</a>
+            <button type="button" class="btn" onclick="alert('Chá»n cÃ¡c Ä‘Æ¡n cáº§n gá»™p trÆ°á»›c khi dÃ¹ng chá»©c nÄƒng nÃ y.')"><i class="fa-regular fa-copy"></i> Gá»™p Ä‘Æ¡n</button>
+            <a class="btn" href="/don-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuáº¥t file <i class="fa-solid fa-chevron-down"></i></a>
             <span class="icon"><i class="fa-solid fa-list"></i></span><span class="icon"><i class="fa-solid fa-gear"></i></span><span class="icon"><i class="fa-regular fa-circle-question"></i></span>
           </div>
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th class="check-col"><input class="row-check" type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã đặt hàng</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Khách cần trả</th><th class="num">Khách đã trả</th><th>Trạng thái</th></tr></thead>
+            <thead><tr><th class="check-col"><input class="row-check" type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>MÃ£ Ä‘áº·t hÃ ng</th><th>Thá»i gian</th><th>MÃ£ KH</th><th>KhÃ¡ch hÃ ng</th><th class="num">KhÃ¡ch cáº§n tráº£</th><th class="num">KhÃ¡ch Ä‘Ã£ tráº£</th><th>Tráº¡ng thÃ¡i</th><th>Giao hàng</th></tr></thead>
             <tbody>
               <% if (safeOrders.length) { %>
                 <% safeOrders.forEach(o => { %>
-                  <tr class="order-row" data-order-row="<%= o._id %>" onclick="toggleOrderDetail('<%= o._id %>')"><td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%= o.ma_don_hang %></td><td><%= new Date(o.ngay_dat || o.created_at).toLocaleString('vi-VN') %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ma_khach_hang : '' %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td class="num"><%= fmt(o.tong_thanh_toan || o.tong_tien) %></td><td class="num">0</td><td><span class="status-badge <%= o.trang_thai %>"><%= statusText(o.trang_thai) %></span></td></tr>
-                  <tr class="detail-row" data-order-detail="<%= o._id %>"><td class="detail-cell" colspan="9"><div class="order-detail"><div class="loading-detail">Đang tải thông tin đơn...</div></div></td></tr>
+                  <tr class="order-row" data-order-row="<%= o._id %>" onclick="toggleOrderDetail('<%= o._id %>')"><td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%= o.ma_don_hang %></td><td><%= new Date(o.ngay_dat || o.created_at).toLocaleString('vi-VN') %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ma_khach_hang : '' %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ten_khach_hang : 'KhÃ¡ch láº»' %></td><td class="num"><%= fmt(o.tong_thanh_toan || o.tong_tien) %></td><td class="num"><%= fmt(o.khach_thanh_toan || 0) %></td><td><span class="status-badge <%= o.trang_thai %>"><%= statusText(o.trang_thai) %></span></td><td><span class="status-badge <%= o.trang_thai_giao_hang %>"><%= deliveryStatusText(o.trang_thai_giao_hang) %></span></td></tr>
+                  <tr class="detail-row" data-order-detail="<%= o._id %>"><td class="detail-cell" colspan="10"><div class="order-detail"><div class="loading-detail">Äang táº£i thÃ´ng tin Ä‘Æ¡n...</div></div></td></tr>
                 <% }) %>
               <% } else { %>
-                <tr><td colspan="9" class="empty"><div class="empty-wrap"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><h3>Không tìm thấy kết quả</h3><p>Không tìm thấy giao dịch nào phù hợp trong tháng này.<br>Nhấn vào <a href="/don-hang">đây</a> để tiếp tục tìm kiếm.</p></div></td></tr>
+                <tr><td colspan="10" class="empty"><div class="empty-wrap"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><h3>KhÃ´ng tÃ¬m tháº¥y káº¿t quáº£</h3><p>KhÃ´ng tÃ¬m tháº¥y giao dá»‹ch nÃ o phÃ¹ há»£p trong thÃ¡ng nÃ y.<br>Nháº¥n vÃ o <a href="/don-hang">Ä‘Ã¢y</a> Ä‘á»ƒ tiáº¿p tá»¥c tÃ¬m kiáº¿m.</p></div></td></tr>
               <% } %>
             </tbody>
           </table>
@@ -101,8 +107,11 @@
   </form>
   <script>
     const money = value => Number(value || 0).toLocaleString('vi-VN');
-    const statusLabels = { draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
+    const statusLabels = { draft: 'Phiáº¿u táº¡m', shipping: 'Äang giao hÃ ng', completed: 'HoÃ n thÃ nh', cancelled: 'ÄÃ£ há»§y' };
+    const deliveryStatusLabels = { chua_giao: 'Chưa giao', giao_mot_phan: 'Giao một phần', giao_thieu: 'Giao thiếu', giao_du: 'Giao đủ' };
+    const deliveryStatusText = status => deliveryStatusLabels[status] || 'Chưa giao';
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const orderDetailCache = {};
 
     async function toggleOrderDetail(id) {
       const row = document.querySelector('[data-order-row="' + id + '"]');
@@ -121,10 +130,11 @@
     async function loadOrderDetail(id, detailRow) {
       const res = await fetch('/don-hang/' + id + '/detail');
       const data = await res.json();
-      if (!data.success) return alert(data.message || 'Không tải được đơn hàng');
+      if (!data.success) return alert(data.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c Ä‘Æ¡n hÃ ng');
       const order = data.data.order;
       const shipment = data.data.shipment;
       const items = data.data.items || [];
+      orderDetailCache[id] = data.data;
       const totalGoods = items.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
       const discount = Math.max(totalGoods - Number(order.tong_thanh_toan || order.tong_tien || 0), 0);
       detailRow.querySelector('.order-detail').innerHTML = renderOrderDetail(order, shipment, items, totalGoods, discount);
@@ -138,73 +148,117 @@
       const address = shipment?.dia_chi_nhan || customer.dia_chi || '';
       const itemRows = items.map(item => {
         const product = item.hang_hoa_id || {};
+        const deliveryStatus = deliveryStatusLabels[item.trang_thai_giao] || deliveryStatusLabels.chua_giao;
         return `<tr>
           <td><a href="#" class="detail-link">${escapeHtml(product.ma_hang || '')}</a></td>
           <td>${escapeHtml(product.ten_hang || '')}</td>
-          <td class="num">${money(item.so_luong)}</td>
+          <td class="num">${money(item.so_luong_dat || item.so_luong || 0)}</td>
+          <td class="num">${money(item.so_luong_xac_nhan || 0)}</td>
+          <td class="num">${money(item.so_luong_da_giao || 0)}</td>
+          <td class="num">${money(item.so_luong_con_thieu || 0)}</td>
+          <td>${escapeHtml(deliveryStatus)}</td>
           <td class="num">${money(item.don_gia_ban)}</td>
           <td class="num">${money(item.chiet_khau)}</td>
           <td class="num">${money(item.don_gia_ban)}</td>
           <td class="num"><strong>${money(item.thanh_tien)}</strong></td>
         </tr>`;
-      }).join('') || '<tr><td colspan="7" class="loading-detail">Đơn chưa có hàng hóa</td></tr>';
+      }).join('') || '<tr><td colspan="11" class="loading-detail">ÄÆ¡n chÆ°a cÃ³ hÃ ng hÃ³a</td></tr>';
 
       return `
-        <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
+        <div class="detail-tabs"><button type="button" class="detail-tab">ThÃ´ng tin</button></div>
         <div class="detail-head">
           <div>
-            <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <span>${escapeHtml(order.ma_don_hang || '')}</span></div>
+            <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'KhÃ¡ch láº»')}</span> <span>${escapeHtml(order.ma_don_hang || '')}</span></div>
             <div class="detail-meta">
-              <div class="mini-field"><label>Người tạo</label><span>${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}</span></div>
-              <div class="mini-field"><label>Người nhận đặt</label><input class="mini-input" value="${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}"></div>
-              <div class="mini-field"><label>Ngày đặt</label><input class="mini-input" value="${escapeHtml(new Date(order.ngay_dat || order.created_at).toLocaleString('vi-VN'))}"></div>
-              <div class="mini-field"><label>Kênh bán</label><input class="mini-input" value="Bán trực tiếp"></div>
-              <div class="mini-field"><label>Bảng giá</label><input class="mini-input" value="Bảng giá chung"></div>
-              <div class="mini-field"><label>Trạng thái</label><select class="mini-select" onchange="updateOrderStatus('${order._id}',this.value)">${['draft','shipping','completed','cancelled'].map(status => `<option value="${status}" ${order.trang_thai === status ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}</select></div>
+              <div class="mini-field"><label>NgÆ°á»i táº¡o</label><span>${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}</span></div>
+              <div class="mini-field"><label>NgÆ°á»i nháº­n Ä‘áº·t</label><input class="mini-input" value="${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}"></div>
+              <div class="mini-field"><label>NgÃ y Ä‘áº·t</label><input class="mini-input" value="${escapeHtml(new Date(order.ngay_dat || order.created_at).toLocaleString('vi-VN'))}"></div>
+              <div class="mini-field"><label>KÃªnh bÃ¡n</label><input class="mini-input" value="BÃ¡n trá»±c tiáº¿p"></div>
+              <div class="mini-field"><label>Báº£ng giÃ¡</label><input class="mini-input" value="Báº£ng giÃ¡ chung"></div>
+              <div class="mini-field"><label>Tráº¡ng thÃ¡i</label><select class="mini-select" onchange="updateOrderStatus('${order._id}',this.value)">${['draft','shipping','completed','cancelled'].map(status => `<option value="${status}" ${order.trang_thai === status ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}</select></div>
             </div>
           </div>
-          <div>${escapeHtml(order.cua_hang_id?.ten_cua_hang || 'Chi nhánh trung tâm')}</div>
+          <div>${escapeHtml(order.cua_hang_id?.ten_cua_hang || 'Chi nhÃ¡nh trung tÃ¢m')}</div>
         </div>
         <div class="delivery-box">
-          <div class="delivery-title"><span><i class="fa-regular fa-hand-point-right"></i> Tự giao đến: <strong>${escapeHtml(address || 'Chưa có địa chỉ giao hàng')}</strong></span><i class="fa-solid fa-chevron-up"></i></div>
+          <div class="delivery-title"><span><i class="fa-regular fa-hand-point-right"></i> Tá»± giao Ä‘áº¿n: <strong>${escapeHtml(address || 'ChÆ°a cÃ³ Ä‘á»‹a chá»‰ giao hÃ ng')}</strong></span><i class="fa-solid fa-chevron-up"></i></div>
           <div class="delivery-grid">
-            <div class="mini-field"><label>Người nhận</label><input class="mini-input" value="${escapeHtml(receiver)}"></div>
-            <div class="mini-field"><label>Mã vận đơn</label><input class="mini-input" value="${escapeHtml(shipment?.ma_van_don || '')}"></div>
-            <div class="mini-field"><label>Người giao</label><input class="mini-input" value="${escapeHtml(shipment?.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng')}"></div>
-            <div class="mini-field"><label>Điện thoại</label><input class="mini-input" value="${escapeHtml(phone)}"></div>
-            <div class="mini-field"><label>Trọng lượng</label><input class="mini-input" value="500 g"></div>
-            <div class="mini-field"><label>Thu hộ tiền</label><input type="checkbox" checked></div>
-            <div class="mini-field"><label>Địa chỉ</label><input class="mini-input" value="${escapeHtml(address)}"></div>
-            <div class="mini-field"><label>Dịch vụ</label><input class="mini-input" value="Giao thường"></div>
-            <div class="mini-field"><label>Phí trả ĐTGH</label><input class="mini-input" value="${money(shipment?.phi_giao_hang || 0)}"></div>
+            <div class="mini-field"><label>NgÆ°á»i nháº­n</label><input class="mini-input" value="${escapeHtml(receiver)}"></div>
+            <div class="mini-field"><label>MÃ£ váº­n Ä‘Æ¡n</label><input class="mini-input" value="${escapeHtml(shipment?.ma_van_don || '')}"></div>
+            <div class="mini-field"><label>NgÆ°á»i giao</label><input class="mini-input" value="${escapeHtml(shipment?.doi_tac_giao_hang_id?.ten_doi_tac || 'Tá»± giao hÃ ng')}"></div>
+            <div class="mini-field"><label>Äiá»‡n thoáº¡i</label><input class="mini-input" value="${escapeHtml(phone)}"></div>
+            <div class="mini-field"><label>Trá»ng lÆ°á»£ng</label><input class="mini-input" value="500 g"></div>
+            <div class="mini-field"><label>Thu há»™ tiá»n</label><input type="checkbox" checked></div>
+            <div class="mini-field"><label>Äá»‹a chá»‰</label><input class="mini-input" value="${escapeHtml(address)}"></div>
+            <div class="mini-field"><label>Dá»‹ch vá»¥</label><input class="mini-input" value="Giao thÆ°á»ng"></div>
+            <div class="mini-field"><label>PhÃ­ tráº£ ÄTGH</label><input class="mini-input" value="${money(shipment?.phi_giao_hang || 0)}"></div>
           </div>
-          <textarea class="note" placeholder="Ghi chú giao...">${escapeHtml(shipment?.ghi_chu || '')}</textarea>
+          <textarea class="note" placeholder="Ghi chÃº giao...">${escapeHtml(shipment?.ghi_chu || '')}</textarea>
         </div>
-        <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <table class="items-table"><thead><tr><th>MÃ£ hÃ ng</th><th>TÃªn hÃ ng</th><th class="num">SL đặt</th><th class="num">SL xác nhận</th><th class="num">SL đã giao</th><th class="num">SL còn thiếu</th><th>Trạng thái giao</th><th class="num">ÄÆ¡n giÃ¡</th><th class="num">Giáº£m giÃ¡</th><th class="num">GiÃ¡ bÃ¡n</th><th class="num">ThÃ nh tiá»n</th></tr></thead><tbody>${itemRows}</tbody></table>
         <div class="detail-bottom">
-          <textarea class="note" placeholder="Ghi chú...">${escapeHtml(order.ghi_chu || '')}</textarea>
+          <textarea class="note" placeholder="Ghi chÃº...">${escapeHtml(order.ghi_chu || '')}</textarea>
           <div class="totals">
-            <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${money(totalGoods)}</strong></div>
-            <div class="total-line"><span>Giảm giá phiếu đặt</span><span>${money(discount)}</span></div>
-            <div class="total-line"><span>Tổng cộng</span><strong>${money(order.tong_thanh_toan || order.tong_tien)}</strong></div>
-            <div class="total-line"><span>Khách đã trả</span><span>0</span></div>
+            <div class="total-line"><span>Tá»•ng tiá»n hÃ ng (${items.length})</span><strong>${money(totalGoods)}</strong></div>
+            <div class="total-line"><span>Giáº£m giÃ¡ phiáº¿u Ä‘áº·t</span><span>${money(discount)}</span></div>
+            <div class="total-line"><span>Tá»•ng cá»™ng</span><strong>${money(order.tong_thanh_toan || order.tong_tien)}</strong></div>
+            <div class="total-line"><span>KhÃ¡ch Ä‘Ã£ tráº£</span><span>0</span></div>
           </div>
         </div>
         <div class="detail-actions">
-          <div class="detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
-          <div class="detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="updateOrderStatus('${order._id}','completed')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
+          <div class="detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Há»§y</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chÃ©p</button><a class="btn" href="/don-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuáº¥t file</a></div>
+          <div class="detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xá»­ lÃ½ Ä‘Æ¡n hÃ ng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button><button type="button" class="btn"><i class="fa-regular fa-floppy-disk"></i> LÆ°u</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Káº¿t thÃºc</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
         </div>`;
     }
 
-    async function updateOrderStatus(id, status) {
-      const res = await fetch('/don-hang/' + id + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trang_thai: status }) });
+    async function updateOrderStatus(id, status, forceCompleteShort = false) {
+      const res = await fetch('/don-hang/' + id + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trang_thai: status, force_complete_short: forceCompleteShort }) });
       const data = await res.json();
-      if (!data.success) return alert(data.message || 'Không cập nhật được trạng thái');
+      if (!data.success) return alert(data.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c tráº¡ng thÃ¡i');
+      location.reload();
+    }
+
+    async function finishOrder(id, deliveryStatus) {
+      if (deliveryStatus !== 'giao_du' && !confirm('Đơn chưa giao đủ. Xác nhận kết thúc thiếu?')) return;
+      await updateOrderStatus(id, 'completed', deliveryStatus !== 'giao_du');
+    }
+
+    async function confirmDelivery(id) {
+      const detail = orderDetailCache[id];
+      if (!detail) return alert('Vui lòng mở lại chi tiết đơn trước khi xác nhận giao.');
+      const order = detail.order || {};
+      const items = detail.items || [];
+      const khoId = order.kho_id?._id || order.kho_id;
+      if (!khoId) return alert('Đơn chưa có kho giao hàng.');
+      const deliveryItems = [];
+      for (const item of items) {
+        const missing = Number(item.so_luong_con_thieu || item.so_luong_dat || item.so_luong || 0);
+        if (missing <= 0) continue;
+        const product = item.hang_hoa_id || {};
+        const raw = prompt(`Số lượng giao cho ${product.ma_hang || product.ten_hang || 'hàng hóa'} (còn thiếu ${missing})`, String(missing));
+        if (raw === null) continue;
+        const quantity = Number(String(raw).replace(',', '.'));
+        if (!Number.isFinite(quantity) || quantity <= 0) continue;
+        deliveryItems.push({
+          ct_don_hang_id: item._id,
+          hang_hoa_id: product._id || item.hang_hoa_id,
+          lo_hang_id: item.lo_hang_id || '',
+          so_luong_giao: quantity
+        });
+      }
+      if (!deliveryItems.length) return alert('Chưa có số lượng giao.');
+      const res = await fetch('/don-hang/' + id + '/xac-nhan-giao', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kho_id: khoId, items: deliveryItems })
+      });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không xác nhận giao được.');
       location.reload();
     }
 
     async function deleteOrder(id) {
-      if (!confirm('Hủy đơn đặt hàng này?')) return;
+      if (!confirm('Há»§y Ä‘Æ¡n Ä‘áº·t hÃ ng nÃ y?')) return;
       await updateOrderStatus(id, 'cancelled');
     }
   </script>

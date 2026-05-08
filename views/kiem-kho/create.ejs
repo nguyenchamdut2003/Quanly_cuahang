@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
   <head>
     <title><%= title %></title>
@@ -113,10 +113,12 @@
               <th width="40">STT</th>
               <th width="120">Mã hàng</th>
               <th>Tên hàng</th>
+              <th width="80">ĐVT</th>
+              <th width="110">Mã lô</th>
+              <th width="120">Hạn sử dụng</th>
               <th width="100" style="text-align: right;">Hệ thống</th>
               <th width="100" style="text-align: right;">Thực tế</th>
               <th width="100" style="text-align: right;">Lệch</th>
-              <th width="40"></th>
             </tr>
           </thead>
           <tbody id="kkBody">
@@ -137,6 +139,13 @@
             <% stores.forEach(s => { %>
               <option value="<%= s._id %>"><%= s.ten_cua_hang %></option>
             <% }) %>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Kho kiểm</label>
+          <select id="khoId" class="form-control" style="width: 100%; padding: 8px; margin-top: 5px;" disabled>
+            <option value="">Vui lòng chọn cửa hàng trước</option>
           </select>
         </div>
 
@@ -164,47 +173,107 @@
 
     <script>
       let kkItems = [];
-      const products = <%- JSON.stringify(products) %>;
 
       const searchInput = document.getElementById('kkSearch');
       const resultsDiv = document.getElementById('kkResults');
+      const storeSelect = document.getElementById('storeId');
+      const khoSelect = document.getElementById('khoId');
 
-      searchInput.addEventListener('input', function() {
-        const query = this.value.toLowerCase();
+      function rowKey(item) {
+        return String(item.hang_hoa_id || '') + '::' + String(item.lo_hang_id || '');
+      }
+
+      function formatDate(value) {
+        if (!value) return '';
+        var date = new Date(value);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleDateString('vi-VN');
+      }
+
+      async function loadKhoByStore() {
+        const storeId = storeSelect.value;
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>';
+        khoSelect.disabled = true;
+        kkItems = [];
+        renderKK();
+
+        if (!storeId) return;
+
+        try {
+          const res = await fetch('/api/cua-hang/' + encodeURIComponent(storeId) + '/kho');
+          const result = await res.json();
+          const warehouses = result.success ? (result.data || []) : [];
+          khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho || k.ma_kho || ''}</option>`).join('');
+          khoSelect.disabled = false;
+        } catch (error) {
+          khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+        }
+      }
+
+      async function loadHangKiemKho() {
+        kkItems = [];
+        renderKK();
+
+        if (!khoSelect.value) return;
+
+        try {
+          const res = await fetch('/api/kho/' + encodeURIComponent(khoSelect.value) + '/hang-kiem-kho');
+          const result = await res.json();
+          if (!result.success) {
+            alert(result.message || 'Không tải được hàng kiểm kho.');
+            return;
+          }
+          kkItems = (result.data || []).map(row => ({
+            key: rowKey(row),
+            hang_hoa_id: row.hang_hoa_id,
+            lo_hang_id: row.lo_hang_id || null,
+            ma_hang: row.ma_hang || '',
+            ten_hang: row.ten_hang || '',
+            don_vi_tinh: row.don_vi_tinh || '',
+            ma_lo: row.ma_lo || '',
+            han_su_dung: row.han_su_dung || '',
+            ton_kho_he_thong: Number(row.ton_kho_he_thong || 0),
+            so_luong_thuc_te: Number(row.ton_kho_he_thong || 0),
+            nguyen_nhan_lech: ''
+          }));
+          renderKK();
+        } catch (error) {
+          alert('Không tải được hàng kiểm kho.');
+        }
+      }
+
+      storeSelect.addEventListener('change', loadKhoByStore);
+      khoSelect.addEventListener('change', loadHangKiemKho);
+      document.addEventListener('DOMContentLoaded', loadKhoByStore);
+
+      function renderSearchResults() {
+        const query = searchInput.value.trim().toLowerCase();
         if (!query) {
           resultsDiv.style.display = 'none';
           return;
         }
+        const filtered = kkItems.filter(item =>
+          String(item.ten_hang || '').toLowerCase().includes(query) ||
+          String(item.ma_hang || '').toLowerCase().includes(query) ||
+          String(item.ma_lo || '').toLowerCase().includes(query)
+        ).slice(0, 30);
 
-        const filtered = products.filter(p => 
-          p.ten_hang.toLowerCase().includes(query) || 
-          p.ma_hang.toLowerCase().includes(query)
-        );
-
-        resultsDiv.innerHTML = filtered.map(p => `
-          <div class="search-item" onclick="addKKItem('${p._id}')">
-            <span>${p.ten_hang} (${p.ma_hang})</span>
-            <span style="float: right; color: #999;">Tồn: ${p.ton_kho}</span>
+        resultsDiv.innerHTML = filtered.map(item => `
+          <div class="search-item" onclick="focusKKItem('${item.key}')">
+            <span>${item.ten_hang} (${item.ma_hang})${item.ma_lo ? ' - Lô ' + item.ma_lo : ''}</span>
+            <span style="float: right; color: #999;">Tồn: ${item.ton_kho_he_thong}</span>
           </div>
-        `).join('');
+        `).join('') || '<div class="search-item"><span>Không có hàng phù hợp</span></div>';
         resultsDiv.style.display = 'block';
-      });
+      }
 
-      function addKKItem(id) {
-        const product = products.find(p => p._id === id);
-        if (!product) return;
+      searchInput.addEventListener('focus', renderSearchResults);
+      searchInput.addEventListener('click', renderSearchResults);
+      searchInput.addEventListener('input', renderSearchResults);
 
-        if (kkItems.find(i => i.hang_hoa_id === id)) return alert("Hàng hóa này đã có trong danh sách");
-
-        kkItems.push({
-          hang_hoa_id: id,
-          ma_hang: product.ma_hang,
-          ten_hang: product.ten_hang,
-          ton_kho_he_thong: product.ton_kho,
-          so_luong_thuc_te: product.ton_kho
-        });
-
-        renderKK();
+      function focusKKItem(key) {
+        const row = document.querySelector('[data-row-key="' + key + '"]');
+        if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
         searchInput.value = '';
         resultsDiv.style.display = 'none';
       }
@@ -215,53 +284,59 @@
         let totalL = 0;
 
         body.innerHTML = kkItems.map((item, index) => {
-          const lech = item.so_luong_thuc_te - item.ton_kho_he_thong;
-          totalTT += item.so_luong_thuc_te;
+          const lech = Number(item.so_luong_thuc_te || 0) - Number(item.ton_kho_he_thong || 0);
+          totalTT += Number(item.so_luong_thuc_te || 0);
           totalL += lech;
 
           return `
-            <tr>
+            <tr data-row-key="${item.key}">
               <td>${index + 1}</td>
               <td>${item.ma_hang}</td>
               <td>${item.ten_hang}</td>
+              <td>${item.don_vi_tinh || ''}</td>
+              <td>${item.ma_lo || ''}</td>
+              <td>${formatDate(item.han_su_dung)}</td>
               <td style="text-align: right;">${item.ton_kho_he_thong}</td>
               <td style="text-align: right;">
-                <input type="number" class="input-thuc-te" value="${item.so_luong_thuc_te}" onchange="updateTT('${item.hang_hoa_id}', this.value)">
+                <input type="number" min="0" class="input-thuc-te" value="${item.so_luong_thuc_te}" onchange="updateTT('${item.key}', this.value)">
               </td>
               <td style="text-align: right;" class="${lech > 0 ? 'lech-positive' : (lech < 0 ? 'lech-negative' : '')}">
                 ${lech > 0 ? '+' + lech : lech}
               </td>
-              <td><i class="fa-solid fa-xmark" style="color: #ccc; cursor: pointer;" onclick="removeKK('${item.hang_hoa_id}')"></i></td>
             </tr>
           `;
-        }).join('');
+        }).join('') || '<tr><td colspan="9" style="text-align:center;color:#777;padding:40px;">Chọn kho để tải hàng hóa đang có tồn.</td></tr>';
 
         document.getElementById('totalThucTe').innerText = totalTT;
         document.getElementById('totalLech').innerText = totalL;
       }
 
-      function updateTT(id, val) {
-        const item = kkItems.find(i => i.hang_hoa_id === id);
-        if (item) item.so_luong_thuc_te = Number(val);
-        renderKK();
-      }
-
-      function removeKK(id) {
-        kkItems = kkItems.filter(i => i.hang_hoa_id !== id);
+      function updateTT(key, val) {
+        const item = kkItems.find(i => i.key === key);
+        const nextValue = Number(val);
+        if (item) item.so_luong_thuc_te = Number.isFinite(nextValue) && nextValue >= 0 ? nextValue : 0;
         renderKK();
       }
 
       async function saveKiemKho() {
-        if (kkItems.length === 0) return alert("Chưa có hàng hóa nào để kiểm");
+        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
+        if (kkItems.length === 0) return alert('Kho không có hàng hóa còn tồn để kiểm.');
 
         const data = {
           cua_hang_id: document.getElementById('storeId').value,
+          kho_id: document.getElementById('khoId').value,
           ghi_chu: document.getElementById('ghiChu').value,
-          items: kkItems
+          items: kkItems.map(item => ({
+            hang_hoa_id: item.hang_hoa_id,
+            lo_hang_id: item.lo_hang_id || null,
+            ton_kho_he_thong: item.ton_kho_he_thong,
+            so_luong_thuc_te: item.so_luong_thuc_te,
+            nguyen_nhan_lech: item.nguyen_nhan_lech || ''
+          }))
         };
 
         try {
-          const res = await fetch('/kiem-kho/add', {
+          const res = await fetch('/kiem-kho', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -271,10 +346,10 @@
             alert(result.message);
             window.location.href = '/kiem-kho';
           } else {
-            alert(result.message);
+            alert(result.message || 'Không thể lưu phiếu kiểm kho.');
           }
         } catch (err) {
-          alert("Lỗi khi lưu phiếu kiểm kho");
+          alert('Lỗi khi lưu phiếu kiểm kho');
         }
       }
     </script>

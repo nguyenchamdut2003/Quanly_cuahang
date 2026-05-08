@@ -1,454 +1,821 @@
-<%
-  const safeSuppliers = Array.isArray(locals.suppliers) ? locals.suppliers : [];
-  const safeGroups = Array.isArray(locals.groups) ? locals.groups : [];
-  const safeDetails = locals.supplierDetails || {};
-  const safeFilters = locals.filters || {};
-  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
-  const fmtDate = value => value ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
-%>
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="vi">
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    .supplier-page{height:calc(100vh - 98px);display:flex;flex-direction:column;background:#f3f6f9}
-    .supplier-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 12% 0}
-    .supplier-sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
-    .supplier-title{font-size:20px;font-weight:700;color:#111827;margin:0 0 16px}
-    .filter-block{margin-bottom:20px}
-    .filter-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-    .filter-title{font-size:13px;font-weight:700;color:#111827}
-    .filter-link{font-size:13px;color:#0070f4;text-decoration:none;cursor:pointer}
-    .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
-    .range-input{display:flex;height:30px;border:1px solid #cfd8e3;border-radius:6px;overflow:hidden;margin-top:7px;background:#fff}
-    .range-input span{width:46px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border-right:1px solid #d7dde5}
-    .range-input input{flex:1;border:0;padding:0 10px;outline:none;font-size:13px}
-    .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}
-    .radio-line input{accent-color:#0070f4}
-    .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
-    .pill-group{display:flex;gap:7px;flex-wrap:wrap}
-    .pill{height:30px;border:1px solid #cfd8e3;border-radius:999px;background:#fff;padding:0 12px;color:#111827;font-size:13px;cursor:pointer}
-    .pill.active{background:#0070f4;border-color:#0070f4;color:#fff;font-weight:700}
-    .supplier-main{min-width:0;display:flex;flex-direction:column;gap:10px}
-    .supplier-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .supplier-search{position:relative;flex:1;max-width:470px}
-    .supplier-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}
-    .supplier-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px;font-size:13px;outline:none}
-    .supplier-search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff;color:#374151;cursor:pointer}
-    .toolbar-actions{display:flex;align-items:center;gap:8px}
-    .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
-    .kv-btn.primary{border-color:#0070f4;color:#0070f4}
-    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
-    .supplier-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}
-    .supplier-table{width:100%;min-width:1080px;border-collapse:collapse}
-    .supplier-table th{height:36px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:700;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
-    .supplier-table td{height:42px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
-    .supplier-table .num{text-align:right}
-    .supplier-table tbody tr{cursor:pointer}
-    .supplier-table tbody tr:hover{background:#f7fbff}
-    .supplier-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}
-    .check-col{width:36px;text-align:center}
-    .row-check{width:15px;height:15px;accent-color:#0070f4}
-    .supplier-detail-row{display:none;cursor:default}
-    .supplier-detail-row.open{display:table-row}
-    .supplier-detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}
-    .supplier-detail{min-height:300px}
-    .detail-tabs{height:42px;display:flex;align-items:flex-end;gap:28px;border-bottom:1px solid #e5e9ee;padding:0 18px}
-    .detail-tab{height:42px;border:0;background:#fff;color:#111827;font-size:14px;cursor:pointer;padding:0 0 9px}
-    .detail-tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700}
-    .detail-panel{display:none;padding:16px 18px 18px}
-    .detail-panel.active{display:block}
-    .info-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}
-    .info-title{font-size:16px;font-weight:800}
-    .info-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
-    .muted{color:#7a8794}
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:20px}
-    .info-field{border-bottom:1px solid #e5e9ee;padding-bottom:9px}
-    .info-field label{display:block;font-size:12px;color:#111827;margin-bottom:8px}
-    .detail-link{color:#0070f4;text-decoration:none;font-weight:700}
-    .note-line{display:flex;align-items:center;gap:10px;margin-top:24px}
-    .detail-actions{height:54px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;padding:0 12px}
-    .detail-action-group{display:flex;align-items:center;gap:8px}
-    .mini-table{width:100%;border-collapse:collapse}
-    .mini-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 10px}
-    .mini-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 10px}
-    .status-chip{display:inline-flex;align-items:center;height:20px;border-radius:4px;background:#dcfce7;color:#008a2e;padding:0 6px;font-size:12px;font-weight:700}
-    .debt-filter{display:flex;justify-content:flex-end;margin:2px 0 16px}
-    .debt-filter select{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 34px 0 10px;font-size:13px}
-    .detail-empty{height:120px;text-align:center;color:#7a8794}
-    .supplier-empty{height:260px;text-align:center;color:#7a8794}
-    .supplier-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
-    .supplier-footer select{height:24px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 22px 0 8px;font-size:12px}
-    .supplier-modal-overlay{display:none;position:fixed;z-index:3000;inset:0;background:rgba(0,0,0,.52);align-items:flex-start;justify-content:center;padding-top:62px}
-    .supplier-modal-overlay.open{display:flex}
-    .supplier-modal{width:900px;max-width:94vw;max-height:88vh;background:#fff;border-radius:8px;box-shadow:0 18px 42px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
-    .supplier-modal-header{height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}
-    .supplier-modal-header h2{font-size:18px;margin:0;color:#111827}
-    .supplier-modal-header button{border:0;background:#fff;font-size:18px;color:#4b5563;cursor:pointer}
-    .supplier-form{display:flex;flex-direction:column;min-height:0}
-    .supplier-modal-body{padding:10px 22px 18px;overflow:auto}
-    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}
-    .field label{display:block;font-size:12px;color:#374151;margin-bottom:6px}
-    .input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:14px;outline:none}
-    .textarea{height:50px;padding-top:8px;resize:vertical}
-    .input:focus{border-color:#0070f4;box-shadow:0 0 0 2px rgba(0,112,244,.1)}
-    .modal-section{border:1px solid #e1e6ec;border-radius:7px;margin-top:12px;padding:14px 12px}
-    .section-title{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:700;color:#111827;margin-bottom:12px}
-    .supplier-modal-footer{height:64px;border-top:1px solid #edf0f3;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 22px}
-    .btn-cancel{height:38px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 18px;font-weight:700;cursor:pointer}
-    .btn-save{height:38px;border:0;background:#0070f4;color:#fff;border-radius:6px;padding:0 18px;font-weight:700;cursor:pointer}
-    @media(max-width:1100px){.supplier-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+    .detail-pane{display:none}
+    .detail-pane.is-active{display:block}
+    .store-table tr[data-href]{cursor:pointer}
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status-pill.is-active { background: #dcfce7; color: #166534; }
+    .status-pill.is-draft { background: #fef9c3; color: #854d0e; }
+    .status-pill.is-cancelled { background: #fee2e2; color: #991b1b; }
+    .table-code-link {
+      color: #0070f4;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .table-code-link:hover { text-decoration: underline; }
+    .history-type-icon { font-size: 14px; width: 16px; text-align: center; }
+    .history-amount { font-weight: 700; font-size: 14px; }
+    .history-amount.is-return { color: #ef4444; }
   </style>
 </head>
-<body>
-  <%- include('../partials/header') %>
-  <form id="supplierFilterForm" method="GET" action="/nha-cung-cap" class="supplier-page">
-    <div class="supplier-shell">
-      <aside class="supplier-sidebar">
-        <h1 class="supplier-title">Nhà cung cấp</h1>
-        <div class="filter-block">
-          <div class="filter-head"><span class="filter-title">Nhóm nhà cung cấp</span><a class="filter-link">Tạo mới</a></div>
-          <select class="filter-control" name="nhom_ncc" onchange="this.form.submit()"><option value="all">Tất cả các nhóm</option><% safeGroups.forEach(group => { %><option value="<%= group %>" <%= safeFilters.nhom_ncc === group ? 'selected' : '' %>><%= group %></option><% }) %></select>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title">Tổng mua</div>
-          <label style="font-size:12px;color:#667085;margin-top:10px;display:block">Giá trị</label>
-          <div class="range-input"><span>Từ</span><input name="tong_mua_from" value="<%= safeFilters.tong_mua_from || '' %>" placeholder="Nhập giá trị"></div>
-          <div class="range-input"><span>Tới</span><input name="tong_mua_to" value="<%= safeFilters.tong_mua_to || '' %>" placeholder="Nhập giá trị"></div>
-          <label style="font-size:12px;color:#667085;margin-top:14px;display:block">Thời gian</label>
-          <label class="radio-line"><input type="radio" checked><span class="radio-pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label>
-          <label class="radio-line"><input type="radio"><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title">Nợ hiện tại</div>
-          <div class="range-input"><span>Từ</span><input name="tong_no_from" value="<%= safeFilters.tong_no_from || '' %>" placeholder="Nhập giá trị"></div>
-          <div class="range-input"><span>Tới</span><input name="tong_no_to" value="<%= safeFilters.tong_no_to || '' %>" placeholder="Nhập giá trị"></div>
-        </div>
-        <div class="filter-block">
-          <div class="filter-title" style="margin-bottom:10px">Trạng thái</div>
-          <div class="pill-group">
-            <button type="button" class="pill <%= !safeFilters.trang_thai ? 'active' : '' %>" onclick="filterStatus('')">Tất cả</button>
-            <button type="button" class="pill <%= safeFilters.trang_thai === 'active' ? 'active' : '' %>" onclick="filterStatus('active')">Đang hoạt động</button>
-            <button type="button" class="pill <%= safeFilters.trang_thai === 'inactive' ? 'active' : '' %>" onclick="filterStatus('inactive')">Ngừng hoạt động</button>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+
+  <main class="admin-shell store-page">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+
+    <div class="store-toolbar">
+      <h1>Nhà cung cấp</h1>
+      <div class="store-search">
+        <span>⌕</span>
+        <input type="search" placeholder="Theo mã, tên nhà cung cấp">
+      </div>
+      <div class="page-actions">
+        <a class="btn btn-primary" href="/nha-cung-cap?mode=create">+ Tạo mới</a>
+        <button class="btn btn-danger" type="submit" form="bulkDeleteSuppliersForm" onclick="return confirm('Xóa các nhà cung cấp đã chọn?')">Xóa đã chọn</button>
+      </div>
+    </div>
+
+    <% if (formMode === 'create') { %>
+      <section class="store-form-panel">
+        <div class="store-form-heading">
+          <div>
+            <h2>Tạo nhà cung cấp</h2>
+            <p>Nhập thông tin nhà cung cấp mới.</p>
           </div>
+          <a class="link-button" href="/nha-cung-cap">Hủy</a>
         </div>
+        <form class="store-form-grid" method="post" action="/nha-cung-cap/add">
+          <label><span>Mã NCC</span><input name="ma_ncc" placeholder="Tự động nếu bỏ trống"></label>
+          <label><span>Tên nhà cung cấp *</span><input name="ten_ncc" required></label>
+          <label><span>Điện thoại</span><input name="sdt"></label>
+          <label><span>Email</span><input name="email" type="email"></label>
+          <label><span>Tên công ty</span><input name="ten_cong_ty"></label>
+          <label><span>Mã số thuế</span><input name="ma_so_thue"></label>
+          <label><span>Tổng nợ</span><input name="tong_no" type="number" min="0" value="0"></label>
+          <label><span>Tổng mua</span><input name="tong_mua" type="number" min="0" value="0"></label>
+          <label class="span-2"><span>Ghi chú</span><input name="ghi_chu"></label>
+          <label><span>Trạng thái</span>
+            <select name="trang_thai">
+              <option value="active" selected>Đang hoạt động</option>
+              <option value="inactive">Ngừng hoạt động</option>
+            </select>
+          </label>
+          <div class="store-form-actions">
+            <button class="btn btn-primary" type="submit">Tạo nhà cung cấp</button>
+            <a class="btn btn-light" href="/nha-cung-cap">Hủy</a>
+          </div>
+        </form>
+      </section>
+    <% } %>
+
+    <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
+    <div class="store-layout">
+      <aside class="store-filter-panel">
+        <form method="get" action="/nha-cung-cap" class="store-filter-form">
+          <section class="customer-filter-section">
+            <div class="customer-filter-title-row">
+              <h4>Nhóm nhà cung cấp</h4>
+              <button class="filter-link-btn" type="button" id="supplierGroupAddBtn">Tạo mới</button>
+            </div>
+            <% var selectedSupplierGroup = (supplierGroups || []).find(function(group) { return filter.groupId === String(group._id); }); %>
+            <div class="group-manage-wrapper" id="supplierGroupManageSidebar">
+              <div class="group-manage-header">
+                <button class="group-manage-trigger" type="button" id="supplierGroupFilterTrigger">
+                  <span id="supplierGroupFilterLabel"><%= selectedSupplierGroup ? selectedSupplierGroup.ten_nhom_ncc : 'Tất cả các nhóm' %></span>
+                  <span>▾</span>
+                </button>
+              </div>
+              <input type="hidden" name="groupId" id="supplierGroupFilterValue" value="<%= filter.groupId || 'all' %>">
+              <div class="group-manage-dropdown" id="supplierGroupFilterDropdown">
+                <div class="group-manage-item <%= (!filter.groupId || filter.groupId === 'all') ? 'is-active' : '' %>" data-id="" data-value="all" data-name="Tất cả các nhóm" data-desc="">
+                  <button class="group-manage-option" type="button">Tất cả các nhóm</button>
+                </div>
+                <% (supplierGroups || []).forEach(function(group) { %>
+                  <div class="group-manage-item <%= filter.groupId === String(group._id) ? 'is-active' : '' %>" data-id="<%= group._id %>" data-value="<%= group._id %>" data-name="<%= group.ten_nhom_ncc || '---' %>" data-desc="<%= group.mo_ta || '' %>">
+                    <button class="group-manage-option" type="button"><%= group.ten_nhom_ncc || '---' %></button>
+                    <div class="group-manage-actions">
+                      <button class="group-manage-action-edit" type="button">Sửa</button>
+                      <button class="group-manage-action-delete" type="button">Xóa</button>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+            <h4>Tổng mua</h4>
+            <div class="range-stack">
+              <div class="range-row"><span>Từ</span><input type="number" min="0" name="totalBuyFrom" value="<%= filter.totalBuyFrom || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Tới</span><input type="number" min="0" name="totalBuyTo" value="<%= filter.totalBuyTo || '' %>" placeholder="Nhập giá trị"></div>
+            </div>
+            <h4>Thời gian</h4>
+            <label class="filter-radio-row">
+              <input type="radio" name="created" value="all" <%= filter.created !== 'custom' ? 'checked' : '' %>>
+              <span>Toàn thời gian</span>
+            </label>
+            <label class="filter-radio-row">
+              <input type="radio" name="created" value="custom" <%= filter.created === 'custom' ? 'checked' : '' %>>
+              <span>Tùy chỉnh</span>
+            </label>
+            <div class="custom-date-range <%= filter.created === 'custom' ? 'is-visible' : '' %>" id="customDateRange">
+              <label><span>Từ ngày</span><input type="date" name="createdFrom" value="<%= filter.createdFrom || '' %>"></label>
+              <label><span>Đến ngày</span><input type="date" name="createdTo" value="<%= filter.createdTo || '' %>"></label>
+            </div>
+            <h4>Nợ hiện tại</h4>
+            <div class="range-stack">
+              <div class="range-row"><span>Từ</span><input type="number" min="0" name="currentDebtFrom" value="<%= filter.currentDebtFrom || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Tới</span><input type="number" min="0" name="currentDebtTo" value="<%= filter.currentDebtTo || '' %>" placeholder="Nhập giá trị"></div>
+            </div>
+            <h4>Trạng thái</h4>
+            <div class="pill-row">
+              <button class="pill-btn <%= filter.status === 'all' ? 'is-active' : '' %>" type="button" data-target-input="supplierStatusInput" data-value="all">Tất cả</button>
+              <button class="pill-btn <%= filter.status === 'active' ? 'is-active' : '' %>" type="button" data-target-input="supplierStatusInput" data-value="active">Đang hoạt động</button>
+              <button class="pill-btn <%= filter.status === 'inactive' ? 'is-active' : '' %>" type="button" data-target-input="supplierStatusInput" data-value="inactive">Ngừng hoạt động</button>
+            </div>
+            <input type="hidden" id="supplierStatusInput" name="status" value="<%= filter.status || 'all' %>">
+            <div class="customer-filter-actions">
+              <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
+              <a class="btn btn-light" href="/nha-cung-cap">Xóa lọc</a>
+            </div>
+          </section>
+        </form>
       </aside>
 
-      <main class="supplier-main">
-        <div class="supplier-toolbar">
-          <div class="supplier-search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã, tên, số điện thoại">
-            <button type="submit"><i class="fa-solid fa-sliders"></i></button>
-          </div>
-          <div class="toolbar-actions">
-            <button type="button" class="kv-btn primary" onclick="openSupplierModal()"><i class="fa-solid fa-plus"></i> Nhà cung cấp</button>
-            <button type="button" class="kv-btn" onclick="alert('Import CSV sẽ được bổ sung khi bạn chốt mẫu file.')"><i class="fa-solid fa-file-import"></i> Import file</button>
-            <a class="kv-btn" href="/nha-cung-cap/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a>
-            <button type="button" class="tool-icon"><i class="fa-solid fa-list"></i></button>
-            <button type="button" class="tool-icon"><i class="fa-solid fa-gear"></i></button>
-            <button type="button" class="tool-icon"><i class="fa-regular fa-circle-question"></i></button>
-          </div>
-        </div>
-
-        <div class="supplier-table-wrap">
-          <table class="supplier-table">
+      <section class="store-table-panel">
+        <div class="table-wrap">
+          <form id="bulkDeleteSuppliersForm" method="post" action="/nha-cung-cap/delete-selected">
+          <table class="admin-table store-table">
             <thead>
               <tr>
-                <th class="check-col"><input class="row-check" type="checkbox"></th>
-                <th>Mã nhà cung cấp</th>
-                <th>Tên nhà cung cấp</th>
-                <th>Điện thoại</th>
-                <th>Email</th>
-                <th class="num">Nợ cần trả hiện tại</th>
-                <th class="num">Tổng mua</th>
+                <th class="check-cell"><input id="selectAllSuppliers" type="checkbox" aria-label="Chọn tất cả"></th>
+                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng nợ</th><th>Tổng mua</th><th>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td></td><td></td><td></td><td></td><td></td>
-                <td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td>
-              </tr>
-              <% if (safeSuppliers.length) { %>
-                <% safeSuppliers.forEach(s => { const detail = safeDetails[String(s._id)] || { imports: [], returns: [], debts: [] }; %>
-                  <tr class="supplier-row" data-supplier-row="<%= s._id %>" onclick="toggleSupplierDetails('<%= s._id %>')">
-                    <td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td>
-                    <td><%= s.ma_ncc %></td>
-                    <td><%= s.ten_ncc %></td>
-                    <td><%= s.sdt || '' %></td>
-                    <td><%= s.email || '' %></td>
-                    <td class="num"><%= fmt(s.tong_no) %></td>
-                    <td class="num"><%= fmt(s.tong_mua) %></td>
-                  </tr>
-                  <tr class="supplier-detail-row" data-supplier-detail="<%= s._id %>">
-                    <td class="supplier-detail-cell" colspan="7">
-                      <div class="supplier-detail">
+              <% if (suppliers.length === 0) { %><tr><td colspan="8" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr><% } %>
+              <% suppliers.forEach(function(supplier) { %>
+                <% var isSelected = selectedSupplier && String(selectedSupplier._id) === String(supplier._id); %>
+                <% var rowHref = isSelected ? ('/nha-cung-cap' + (filterQueryString ? '?' + filterQueryString : '')) : ('/nha-cung-cap?' + filterQueryPrefix + 'supplier=' + supplier._id); %>
+                <tr class="<%= isSelected ? 'is-selected' : '' %>" data-href="<%= rowHref %>">
+                  <td class="check-cell" onclick="event.stopPropagation()"><input class="supplier-checkbox" type="checkbox" name="ids" value="<%= supplier._id %>" aria-label="Chọn nhà cung cấp"></td>
+                  <td><a class="table-code-link" href="<%= rowHref %>"><%= supplier.ma_ncc || '---' %></a></td>
+                  <td><strong><a class="table-code-link" href="<%= rowHref %>"><%= supplier.ten_ncc || '---' %></a></strong></td>
+                  <td><%= supplier.sdt || '---' %></td>
+                  <td><%= supplier.email || '---' %></td>
+                  <td><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></td>
+                  <td><%= Number(supplier.tong_mua || 0).toLocaleString('vi-VN') %></td>
+                  <td><span class="status-pill <%= supplier.trang_thai === 'active' ? 'is-active' : '' %>"><%= supplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></td>
+                </tr>
+                <% if (isSelected) { %>
+                  <tr class="store-detail-row">
+                    <td colspan="8">
+                      <div class="store-detail">
                         <div class="detail-tabs">
-                          <button type="button" class="detail-tab active" data-tab="info" onclick="showSupplierTab(event,'<%= s._id %>','info')">Thông tin</button>
-                          <button type="button" class="detail-tab" data-tab="history" onclick="showSupplierTab(event,'<%= s._id %>','history')">Lịch sử nhập/trả hàng</button>
-                          <button type="button" class="detail-tab" data-tab="debt" onclick="showSupplierTab(event,'<%= s._id %>','debt')">Nợ cần trả nhà cung cấp</button>
+                          <div class="detail-tab-list">
+                            <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin nhà cung cấp</button>
+                            <button class="detail-tab" type="button" data-detail-tab="address">Danh sách địa chỉ</button>
+                            <button class="detail-tab" type="button" data-detail-tab="history">Lịch sử nhập/trả hàng</button>
+                            <button class="detail-tab" type="button" data-detail-tab="debt">Nợ cần trả nhà cung cấp</button>
+                          </div>
+                          <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
                         </div>
-
-                        <div class="detail-panel active" data-panel="info">
-                          <div class="info-head">
+                        <div class="store-detail-body">
+                          <div class="detail-pane is-active" data-detail-pane="info">
+                          <div class="store-info-block">
+                            <div class="store-image-placeholder">NCC</div>
                             <div>
-                              <div><span class="info-title"><%= s.ten_ncc %></span> <span><%= s.ma_ncc %></span></div>
-                              <div class="info-meta">
-                                <span>Người tạo: <%= s.nguoi_tao_id?.ho_ten || user?.ho_ten || 'Admin' %></span>
-                                <span>|</span>
-                                <span>Ngày tạo: <%= s.created_at ? new Date(s.created_at).toLocaleDateString('vi-VN') : '' %></span>
-                                <span>|</span>
-                                <span>Nhóm nhà cung cấp: <span class="muted"><%= s.nhom_ncc || 'Chưa có' %></span></span>
+                              <h2><%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %></h2>
+                              <p><%= selectedSupplier.ma_ncc || '---' %></p>
+                              <div class="tag-row"><span class="tag">Nhà cung cấp</span><span class="tag tag-green"><%= selectedSupplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></div>
+                            </div>
+                          </div>
+                          <div class="store-fields">
+                            <div><span>Mã NCC</span><input name="ma_ncc" value="<%= selectedSupplier.ma_ncc || '' %>"></div>
+                            <div><span>Tên nhà cung cấp *</span><input name="ten_ncc" value="<%= selectedSupplier.ten_ncc || '' %>" required></div>
+                            <div><span>Điện thoại</span><input name="sdt" value="<%= selectedSupplier.sdt || '' %>"></div>
+                            <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
+                            <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>"></div>
+                            <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
+                            <div><span>Tổng nợ</span><input name="tong_no" type="number" min="0" value="<%= selectedSupplier.tong_no || 0 %>"></div>
+                            <div><span>Tổng mua</span><input name="tong_mua" type="number" min="0" value="<%= selectedSupplier.tong_mua || 0 %>"></div>
+                            <div><span>Trạng thái</span>
+                              <select name="trang_thai">
+                                <option value="active" <%= selectedSupplier.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+                                <option value="inactive" <%= selectedSupplier.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+                              </select>
+                            </div>
+                            <div><span>Thời gian tạo</span><strong><%= formatDate(selectedSupplier.created_at) %></strong></div>
+                            <div class="span-2"><span>Ghi chú</span><input name="ghi_chu" value="<%= selectedSupplier.ghi_chu || '' %>"></div>
+                          </div>
+                          <div class="warehouse-section">
+                            <div class="warehouse-heading">
+                              <h3>Thao tác</h3>
+                              <div class="detail-actions">
+                                <button class="btn btn-light" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/update" formmethod="post" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Lưu chỉnh sửa</button>
+                                <button class="btn btn-danger" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/delete" formmethod="post" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
                               </div>
                             </div>
-                            <div>Chi nhánh trung tâm</div>
                           </div>
-                          <div class="info-grid">
-                            <div class="info-field"><label>Điện thoại</label><span class="muted"><%= s.sdt || 'Chưa có' %></span></div>
-                            <div class="info-field"><label>Email</label><span class="muted"><%= s.email || 'Chưa có' %></span></div>
                           </div>
-                          <div class="info-field" style="margin-top:18px"><label>Địa chỉ</label><span class="muted"><%= s.dia_chi || 'Chưa có' %></span></div>
-                          <div style="margin-top:24px"><a class="detail-link" href="#" onclick="event.preventDefault()">Thêm thông tin xuất hóa đơn</a></div>
-                          <div class="note-line"><i class="fa-regular fa-pen-to-square"></i><span><%= s.ghi_chu || 'Chưa có ghi chú' %></span></div>
-                        </div>
-
-                        <div class="detail-panel" data-panel="history">
-                          <table class="mini-table">
-                            <thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th class="num">Tổng cộng</th><th>Trạng thái</th></tr></thead>
-                            <tbody>
-                              <% if (detail.imports.length || detail.returns.length) { %>
-                                <% detail.imports.forEach(item => { %>
-                                  <tr><td><a class="detail-link" href="/phieu-nhap"><%= item.ma_phieu_nhap %></a></td><td><%= fmtDate(item.ngay_nhap || item.created_at) %></td><td><%= item.nguoi_tao_id?.ho_ten || '' %></td><td class="num"><%= fmt(item.tong_tien) %></td><td><span class="status-chip"><%= item.trang_thai === 'draft' ? 'Phiếu tạm' : 'Đã nhập hàng' %></span></td></tr>
-                                <% }) %>
-                                <% detail.returns.forEach(item => { %>
-                                  <tr><td><a class="detail-link" href="/phieu-nhap/tra-hang-nhap"><%= item.ma_phieu_tra_nhap %></a></td><td><%= fmtDate(item.ngay_tra || item.created_at) %></td><td><%= item.nguoi_tao_id?.ho_ten || '' %></td><td class="num"><%= fmt(item.tong_tien_tra) %></td><td><span class="status-chip">Đã trả hàng</span></td></tr>
-                                <% }) %>
-                              <% } else { %>
-                                <tr><td colspan="5" class="detail-empty">Chưa có lịch sử nhập/trả hàng</td></tr>
-                              <% } %>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        <div class="detail-panel" data-panel="debt">
-                          <div class="debt-filter"><select><option>Tất cả giao dịch</option></select></div>
-                          <table class="mini-table">
-                            <thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Loại</th><th class="num">Giá trị</th><th class="num">Nợ cần trả nhà cung cấp</th></tr></thead>
-                            <tbody>
-                              <% if (detail.debts.length || detail.imports.length) { %>
-                                <% detail.debts.forEach(item => { const code = item.phieu_nhap_id?.ma_phieu_nhap || item.phieu_thu_chi_id?.ma_phieu || ''; %>
-                                  <tr><td><a class="detail-link" href="#"><%= code || 'Giao dịch' %></a></td><td><%= fmtDate(item.ngay || item.created_at) %></td><td><%= item.loai === 'chi' ? 'Thanh toán' : item.loai === 'thu' ? 'Điều chỉnh' : 'Nhập hàng' %></td><td class="num"><%= fmt(Math.abs(item.so_tien || 0)) %></td><td class="num"><%= fmt(item.so_tien) %></td></tr>
-                                <% }) %>
-                                <% if (!detail.debts.length) { detail.imports.forEach(item => { %>
-                                  <tr><td><a class="detail-link" href="/phieu-nhap"><%= item.ma_phieu_nhap %></a></td><td><%= fmtDate(item.ngay_nhap || item.created_at) %></td><td>Nhập hàng</td><td class="num"><%= fmt(item.tong_tien) %></td><td class="num"><%= fmt(item.tong_tien) %></td></tr>
-                                <% }) } %>
-                              <% } else { %>
-                                <tr><td colspan="5" class="detail-empty">Chưa có giao dịch công nợ</td></tr>
-                              <% } %>
-                            </tbody>
-                          </table>
-                        </div>
-
-                        <div class="detail-actions">
-                          <div class="detail-action-group">
-                            <button type="button" class="kv-btn" onclick="event.stopPropagation();deleteSupplierById('<%= s._id %>')"><i class="fa-regular fa-trash-can"></i> Xóa</button>
+                          <div class="detail-pane" data-detail-pane="address">
+                            <% var supplierAddressReturnQuery = filterQueryString ? (filterQueryString + '&supplier=' + selectedSupplier._id) : ('supplier=' + selectedSupplier._id); %>
+                            <div class="table-wrap">
+                              <table class="admin-table warehouse-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã địa chỉ</th>
+                                    <th>Tên người nhận</th>
+                                    <th>SĐT</th>
+                                    <th>Địa chỉ</th>
+                                    <th>Loại địa chỉ</th>
+                                    <th>Tạo lúc</th>
+                                    <th>Thao tác</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% var supplierAddressAddFormId = 'supplierAddressAdd_' + String(selectedSupplier._id); %>
+                                  <tr class="warehouse-edit-row warehouse-add-row">
+                                    <td>
+                                      <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
+                                      <input data-address-form="<%= supplierAddressAddFormId %>" name="ma_dia_chi" placeholder="Tự động" readonly style="background: transparent; border: none;">
+                                    </td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
+                                    <td>
+                                      <select data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
+                                        <% if ((addressTypes || []).length === 0) { %>
+                                          <option value="khac">Khác</option>
+                                        <% } %>
+                                        <% (addressTypes || []).forEach(function(type) { %>
+                                          <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
+                                        <% }) %>
+                                      </select>
+                                    </td>
+                                    <td>--</td>
+                                    <td class="warehouse-action-cell">
+                                      <div class="warehouse-action-buttons">
+                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                        <button
+                                          class="btn btn-primary btn-sm js-supplier-address-submit"
+                                          type="button"
+                                          data-form-id="<%= supplierAddressAddFormId %>"
+                                          data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
+                                          data-confirm="Bạn có muốn thêm địa chỉ mới không?"
+                                        >Thêm</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                    <td colspan="7">
+                                      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="so_nha" placeholder="Số nhà"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/Xã"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="quan_huyen" placeholder="Quận/Huyện"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
+                                        <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="ghi_chu" placeholder="Ghi chú"></div>
+                                        <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input data-address-form="<%= supplierAddressAddFormId %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
+                                    <tr><td colspan="7" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
+                                  <% } %>
+                                  <% (supplierAddresses || []).forEach(function(address) { %>
+                                    <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
+                                    <tr class="warehouse-edit-row">
+                                      <td>
+                                        <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
+                                        <input data-address-form="<%= supplierAddressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly style="background: transparent; border: none; cursor: default;">
+                                      </td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
+                                      <td>
+                                        <select data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
+                                          <% if ((addressTypes || []).length === 0) { %>
+                                            <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
+                                          <% } %>
+                                          <% (addressTypes || []).forEach(function(type) { %>
+                                            <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
+                                          <% }) %>
+                                        </select>
+                                      </td>
+                                      <td><%= formatDate(address.created_at) %></td>
+                                      <td class="warehouse-action-cell">
+                                        <div class="warehouse-action-buttons">
+                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                          <button
+                                            class="btn btn-light btn-sm js-supplier-address-submit"
+                                            type="button"
+                                            data-form-id="<%= supplierAddressFormId %>"
+                                            data-action="/nha-cung-cap/dia-chi/<%= address._id %>/update"
+                                            data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?"
+                                          >Lưu</button>
+                                          <button
+                                            class="btn btn-danger btn-sm js-supplier-address-delete"
+                                            type="button"
+                                            data-return-query="<%= supplierAddressReturnQuery %>"
+                                            data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
+                                          >Xóa</button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                      <td colspan="7">
+                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="quan_huyen" value="<%= address.quan_huyen || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
+                                          <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
+                                          <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input data-address-form="<%= supplierAddressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                          <div class="detail-action-group">
-                            <button type="button" class="kv-btn primary" onclick="event.stopPropagation();editSupplier('<%= s._id %>')"><i class="fa-solid fa-pen"></i> Chỉnh sửa</button>
-                            <button type="button" class="kv-btn" onclick="event.stopPropagation();toggleSupplierStatus('<%= s._id %>','<%= s.trang_thai === 'inactive' ? 'active' : 'inactive' %>')"><i class="fa-solid fa-lock"></i> <%= s.trang_thai === 'inactive' ? 'Hoạt động lại' : 'Ngừng hoạt động' %></button>
+                          <div class="detail-pane" data-detail-pane="history">
+                            <div class="table-wrap" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                              <table class="admin-table store-table" style="margin-bottom: 0;">
+                                <thead style="background: #f8fafc;">
+                                  <tr>
+                                    <th style="width: 180px;">Mã phiếu</th>
+                                    <th>Thời gian</th>
+                                    <th>Người tạo</th>
+                                    <th class="text-right">Tổng cộng</th>
+                                    <th style="width: 140px;">Trạng thái</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if ((supplierPurchaseHistory || []).length === 0) { %>
+                                    <tr><td colspan="5" class="empty-cell" style="padding: 40px;">Chưa có lịch sử nhập/trả hàng.</td></tr>
+                                  <% } %>
+                                  <% (supplierPurchaseHistory || []).forEach(function(row) { %>
+                                    <tr>
+                                      <td>
+                                        <a href="/nhap-hang" class="table-code-link">
+                                          <% if (row.loai === 'nhap') { %>
+                                            <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
+                                          <% } else { %>
+                                            <i class="fa-solid fa-arrow-rotate-left history-type-icon" title="Trả hàng" style="color:#ef4444"></i>
+                                          <% } %>
+                                          <%= row.ma_phieu || '--' %>
+                                        </a>
+                                      </td>
+                                      <td style="color: #475569;"><%= formatDate(row.thoi_gian) %></td>
+                                      <td>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                          <div style="width: 24px; height: 24px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #64748b;">
+                                            <%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %>
+                                          </div>
+                                          <%= row.nguoi_tao || '--' %>
+                                        </div>
+                                      </td>
+                                      <td class="text-right">
+                                        <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
+                                          <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %>
+                                        </span>
+                                      </td>
+                                      <td>
+                                        <% 
+                                          let statusClass = 'status-pill';
+                                          let statusLabelText = mapNhapHangStatus(row.trang_thai);
+                                          if (row.trang_thai === 'completed') statusClass += ' is-active';
+                                          else if (row.trang_thai === 'draft') statusClass += ' is-draft';
+                                          else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
+                                        %>
+                                        <span class="<%= statusClass %>"><%= statusLabelText %></span>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          <div class="detail-pane" data-detail-pane="debt">
+                            <div class="table-wrap">
+                              <table class="admin-table store-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã phiếu</th>
+                                    <th>Thời gian</th>
+                                    <th>Loại</th>
+                                    <th>Giá trị</th>
+                                    <th>Nợ cần trả nhà cung cấp</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if ((supplierDebtHistory || []).length === 0) { %>
+                                    <tr><td colspan="5" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
+                                  <% } %>
+                                  <% (supplierDebtHistory || []).forEach(function(row) { %>
+                                    <tr>
+                                      <td><%= row.ma_phieu || '--' %></td>
+                                      <td><%= formatDate(row.thoi_gian) %></td>
+                                      <td><%= mapCongNoLoai(row.loai) %></td>
+                                      <td><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
+                                      <td><%= Number(row.no_con_lai || 0).toLocaleString('vi-VN') %></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="detail-actions" style="margin-top:12px">
+                              <button class="btn btn-light" type="button">Điều chỉnh</button>
+                              <button class="btn btn-light" type="button">Thanh toán</button>
+                              <button class="btn btn-light" type="button">Chiết khấu thanh toán</button>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </td>
                   </tr>
-                <% }) %>
-              <% } else { %>
-                <tr><td colspan="7" class="supplier-empty">Chưa có nhà cung cấp</td></tr>
-              <% } %>
+                <% } %>
+              <% }) %>
             </tbody>
           </table>
+          </form>
         </div>
-        <div class="supplier-footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
-      </main>
+      </section>
     </div>
-  </form>
-
-  <div class="supplier-modal-overlay" id="supplierModal">
-    <div class="supplier-modal">
-      <div class="supplier-modal-header">
-        <h2 id="supplierModalTitle">Tạo nhà cung cấp</h2>
-        <button type="button" onclick="closeSupplierModal()"><i class="fa-solid fa-xmark"></i></button>
+  </main>
+  <div id="supplierGroupModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="supplierGroupModalTitle">Sửa nhóm nhà cung cấp</h3>
+        <button type="button" class="group-modal-close" id="supplierGroupModalClose">×</button>
       </div>
-      <form class="supplier-form" id="supplierForm">
-        <input type="hidden" name="_id">
-        <div class="supplier-modal-body">
-          <div class="form-grid">
-            <div class="field"><label>Tên nhà cung cấp</label><input class="input" name="ten_ncc" placeholder="Bắt buộc" required autofocus></div>
-            <div class="field"><label>Mã nhà cung cấp</label><input class="input" name="ma_ncc" placeholder="Tự động"></div>
-            <div class="field"><label>Điện thoại</label><input class="input" name="sdt"></div>
-            <div class="field"><label>Email</label><input class="input" name="email" placeholder="email@gmail.com"></div>
-          </div>
-          <section class="modal-section">
-            <div class="section-title">Địa chỉ <i class="fa-solid fa-chevron-up"></i></div>
-            <div class="field" style="margin-bottom:12px"><label>Địa chỉ</label><input class="input" name="dia_chi" placeholder="Nhập địa chỉ"></div>
-            <div class="form-grid">
-              <div class="field"><label>Khu vực</label><input class="input" name="tinh_thanh" placeholder="Chọn Tỉnh/Thành phố"></div>
-              <div class="field"><label>Phường/Xã</label><input class="input" name="phuong_xa" placeholder="Chọn Phường/Xã"></div>
-            </div>
-          </section>
-          <section class="modal-section">
-            <div class="section-title">Nhóm nhà cung cấp, ghi chú <i class="fa-solid fa-chevron-up"></i></div>
-            <div class="field" style="margin-bottom:12px"><label>Nhóm nhà cung cấp</label><input class="input" name="nhom_ncc" placeholder="Chọn nhóm nhà cung cấp"></div>
-            <div class="field"><label>Ghi chú</label><textarea class="input textarea" name="ghi_chu" placeholder="Nhập ghi chú"></textarea></div>
-          </section>
-          <section class="modal-section">
-            <div class="section-title">Thông tin xuất hóa đơn <i class="fa-solid fa-chevron-up"></i></div>
-            <div class="form-grid">
-              <div class="field"><label>Tên công ty</label><input class="input" name="ten_cong_ty" placeholder="Nhập tên công ty"></div>
-              <div class="field"><label>Mã số thuế</label><input class="input" name="ma_so_thue" placeholder="Nhập mã số thuế"></div>
-            </div>
-          </section>
-        </div>
-        <div class="supplier-modal-footer">
-          <button type="button" class="btn-cancel" id="deleteSupplierBtn" onclick="deleteSupplier()" style="margin-right:auto;color:#d92d20;display:none">Xóa</button>
-          <button type="button" class="btn-cancel" onclick="closeSupplierModal()">Bỏ qua</button>
-          <button type="button" class="btn-save" onclick="saveSupplier()">Lưu</button>
-        </div>
-      </form>
+      <div class="group-modal-body">
+        <label>
+          <span>Tên nhóm</span>
+          <input id="supplierGroupNameInput" type="text" placeholder="Nhập tên nhóm">
+        </label>
+        <label>
+          <span>Ghi chú</span>
+          <input id="supplierGroupDescInput" type="text" placeholder="Nhập ghi chú">
+        </label>
+      </div>
+      <div class="group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="supplierGroupModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="supplierGroupModalSubmit">Lưu</button>
+      </div>
     </div>
   </div>
-
+  <script id="supplierGroupsSeed" type="application/json"><%- JSON.stringify(supplierGroups || []) %></script>
   <script>
-    const suppliersData = <%- JSON.stringify(safeSuppliers.map(s => ({
-      _id: String(s._id),
-      ma_ncc: s.ma_ncc || '',
-      ten_ncc: s.ten_ncc || '',
-      sdt: s.sdt || '',
-      email: s.email || '',
-      dia_chi: s.dia_chi || '',
-      tinh_thanh: s.tinh_thanh || '',
-      phuong_xa: s.phuong_xa || '',
-      nhom_ncc: s.nhom_ncc || '',
-      ghi_chu: s.ghi_chu || '',
-      ten_cong_ty: s.ten_cong_ty || '',
-      ma_so_thue: s.ma_so_thue || '',
-      trang_thai: s.trang_thai || 'active'
-    }))) %>;
-
-    function filterStatus(status) {
-      const params = new URLSearchParams(new FormData(document.getElementById('supplierFilterForm')));
-      if (status) params.set('trang_thai', status); else params.delete('trang_thai');
-      window.location.href = '/nha-cung-cap?' + params.toString();
-    }
-
-    function openSupplierModal() {
-      document.getElementById('supplierForm').reset();
-      document.getElementById('supplierModalTitle').textContent = 'Tạo nhà cung cấp';
-      document.querySelector('[name="_id"]').value = '';
-      document.getElementById('deleteSupplierBtn').style.display = 'none';
-      document.getElementById('supplierModal').classList.add('open');
-    }
-
-    function setField(name, value) {
-      const el = document.querySelector('[name="' + name + '"]');
-      if (el) el.value = value || '';
-    }
-
-    function toggleSupplierDetails(id) {
-      document.querySelectorAll('.supplier-detail-row').forEach(row => {
-        row.classList.toggle('open', row.dataset.supplierDetail === id && !row.classList.contains('open'));
+    document.addEventListener('DOMContentLoaded', function () {
+      var selectAll = document.getElementById('selectAllSuppliers');
+      var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.supplier-checkbox'));
+      if (selectAll) {
+        selectAll.addEventListener('change', function () { checkboxes.forEach(function (checkbox) { checkbox.checked = selectAll.checked; }); });
+      }
+      checkboxes.forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+          if (!selectAll) return;
+          selectAll.checked = checkboxes.length > 0 && checkboxes.every(function (item) { return item.checked; });
+        });
       });
-      document.querySelectorAll('.supplier-row').forEach(row => {
-        row.classList.toggle('active', row.dataset.supplierRow === id && document.querySelector('[data-supplier-detail="' + id + '"]').classList.contains('open'));
+
+      var createdFilterRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="created"]'));
+      var customDateRange = document.getElementById('customDateRange');
+      function toggleCustomDateRange() {
+        if (!customDateRange) return;
+        var selectedCreated = createdFilterRadios.find(function(radio) { return radio.checked; });
+        customDateRange.classList.toggle('is-visible', selectedCreated && selectedCreated.value === 'custom');
+      }
+      createdFilterRadios.forEach(function(radio) {
+        radio.addEventListener('change', toggleCustomDateRange);
       });
-    }
+      toggleCustomDateRange();
 
-    function showSupplierTab(event, id, tab) {
-      event.stopPropagation();
-      const detail = document.querySelector('[data-supplier-detail="' + id + '"]');
-      if (!detail) return;
-      detail.querySelectorAll('.detail-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-      detail.querySelectorAll('.detail-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === tab));
-    }
+      var pillButtons = Array.prototype.slice.call(document.querySelectorAll('.pill-btn'));
+      pillButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var targetInputId = btn.getAttribute('data-target-input');
+          var value = btn.getAttribute('data-value');
+          var input = document.getElementById(targetInputId);
+          if (!input) return;
+          input.value = value;
+          var siblings = Array.prototype.slice.call(btn.parentElement.querySelectorAll('.pill-btn'));
+          siblings.forEach(function(item) { item.classList.remove('is-active'); });
+          btn.classList.add('is-active');
+        });
+      });
 
-    function editSupplier(id) {
-      const supplier = suppliersData.find(s => s._id === id);
-      if (!supplier) return;
-      document.getElementById('supplierForm').reset();
-      document.getElementById('supplierModalTitle').textContent = 'Chỉnh sửa nhà cung cấp';
-      Object.keys(supplier).forEach(key => setField(key, supplier[key]));
-      document.getElementById('deleteSupplierBtn').style.display = '';
-      document.getElementById('supplierModal').classList.add('open');
-    }
+      var supplierGroupFilterTrigger = document.getElementById('supplierGroupFilterTrigger');
+      var supplierGroupFilterLabel = document.getElementById('supplierGroupFilterLabel');
+      var supplierGroupFilterValue = document.getElementById('supplierGroupFilterValue');
+      var supplierGroupFilterDropdown = document.getElementById('supplierGroupFilterDropdown');
+      var supplierGroupAddBtn = document.getElementById('supplierGroupAddBtn');
+      var supplierGroupModalOverlay = document.getElementById('supplierGroupModalOverlay');
+      var supplierGroupModalTitle = document.getElementById('supplierGroupModalTitle');
+      var supplierGroupModalClose = document.getElementById('supplierGroupModalClose');
+      var supplierGroupModalCancel = document.getElementById('supplierGroupModalCancel');
+      var supplierGroupModalSubmit = document.getElementById('supplierGroupModalSubmit');
+      var supplierGroupNameInput = document.getElementById('supplierGroupNameInput');
+      var supplierGroupDescInput = document.getElementById('supplierGroupDescInput');
+      var supplierGroupModalMode = 'add';
+      var activeSupplierGroupItem = null;
 
-    function closeSupplierModal() {
-      document.getElementById('supplierModal').classList.remove('open');
-    }
+      function bindSupplierGroupItems() {
+        var groupItems = Array.prototype.slice.call(document.querySelectorAll('#supplierGroupFilterDropdown .group-manage-item'));
+        groupItems.forEach(function(item) {
+          var optionBtn = item.querySelector('.group-manage-option');
+          var editBtn = item.querySelector('.group-manage-action-edit');
+          var deleteBtn = item.querySelector('.group-manage-action-delete');
 
-    document.getElementById('supplierModal').addEventListener('click', function(e) {
-      if (e.target === this) closeSupplierModal();
+          if (optionBtn) {
+            optionBtn.addEventListener('click', function() {
+              groupItems.forEach(function(node) { node.classList.remove('is-active'); });
+              item.classList.add('is-active');
+              if (supplierGroupFilterValue) supplierGroupFilterValue.value = item.getAttribute('data-value') || 'all';
+              if (supplierGroupFilterLabel) supplierGroupFilterLabel.textContent = item.getAttribute('data-name') || 'Tất cả các nhóm';
+              if (supplierGroupFilterDropdown) supplierGroupFilterDropdown.classList.remove('is-open');
+            });
+          }
+
+          if (editBtn) {
+            editBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              activeSupplierGroupItem = item;
+              openSupplierGroupModal('edit');
+            });
+          }
+
+          if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              var groupId = item.getAttribute('data-id') || '';
+              if (!groupId) {
+                alert('Vui lòng chọn nhóm cần xóa.');
+                return;
+              }
+              if (!confirm('Bạn có chắc muốn xóa nhóm nhà cung cấp này không?')) return;
+              requestSupplierGroups('/nha-cung-cap/groups/' + groupId + '/delete', {}, '');
+            });
+          }
+        });
+      }
+
+      function renderSupplierGroupList(selectedValue) {
+        if (!supplierGroupFilterDropdown) return;
+        var groups = window.__supplierGroups || [];
+        var rows = [];
+        rows.push(
+          '<div class="group-manage-item ' + ((selectedValue === 'all' || !selectedValue) ? 'is-active' : '') + '" data-id="" data-value="all" data-name="Tất cả các nhóm" data-desc="">' +
+            '<button class="group-manage-option" type="button">Tất cả các nhóm</button>' +
+          '</div>'
+        );
+        groups.forEach(function(group) {
+          var id = String(group._id || '');
+          var isActive = id === String(selectedValue || '');
+          rows.push(
+            '<div class="group-manage-item ' + (isActive ? 'is-active' : '') + '" data-id="' + id + '" data-value="' + id + '" data-name="' + (group.ten_nhom_ncc || '').replace(/"/g, '&quot;') + '" data-desc="' + (group.mo_ta || '').replace(/"/g, '&quot;') + '">' +
+              '<button class="group-manage-option" type="button">' + (group.ten_nhom_ncc || '') + '</button>' +
+              '<div class="group-manage-actions">' +
+                '<button class="group-manage-action-edit" type="button">Sửa</button>' +
+                '<button class="group-manage-action-delete" type="button">Xóa</button>' +
+              '</div>' +
+            '</div>'
+          );
+        });
+        supplierGroupFilterDropdown.innerHTML = rows.join('');
+        bindSupplierGroupItems();
+      }
+
+      function refreshSupplierGroupWidget(selectedId) {
+        var selected = selectedId || (supplierGroupFilterValue ? supplierGroupFilterValue.value : 'all') || 'all';
+        renderSupplierGroupList(selected);
+        if (supplierGroupFilterDropdown && supplierGroupFilterLabel) {
+          var activeItem = supplierGroupFilterDropdown.querySelector('.group-manage-item.is-active');
+          supplierGroupFilterLabel.textContent = activeItem ? (activeItem.getAttribute('data-name') || 'Tất cả các nhóm') : 'Tất cả các nhóm';
+          if (supplierGroupFilterValue) supplierGroupFilterValue.value = activeItem ? (activeItem.getAttribute('data-value') || 'all') : 'all';
+        }
+      }
+
+      function requestSupplierGroups(url, payload, selectedId) {
+        var formBody = Object.keys(payload).map(function(key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function(response) {
+            return response.json().catch(function() {
+              return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+            });
+          })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert((data && data.message) || 'Không thể xử lý nhóm nhà cung cấp.');
+              return;
+            }
+            if (Array.isArray(data.supplierGroups)) {
+              window.__supplierGroups = data.supplierGroups;
+            } else if (data.data && data.data._id) {
+              window.__supplierGroups = (window.__supplierGroups || []).filter(function(group) {
+                return String(group._id) !== String(data.data._id);
+              });
+              window.__supplierGroups.push(data.data);
+            }
+            refreshSupplierGroupWidget(data.selectedId || (data.data && data.data._id) || selectedId || '');
+            closeSupplierGroupModal();
+          })
+          .catch(function(error) {
+            alert((error && error.message) || 'Có lỗi khi xử lý nhóm nhà cung cấp.');
+          });
+      }
+
+      function openSupplierGroupModal(mode) {
+        supplierGroupModalMode = mode;
+        if (!supplierGroupModalOverlay || !supplierGroupModalTitle) return;
+        if (mode === 'add') {
+          supplierGroupModalTitle.textContent = 'Thêm nhóm nhà cung cấp';
+          if (supplierGroupNameInput) supplierGroupNameInput.value = '';
+          if (supplierGroupDescInput) supplierGroupDescInput.value = '';
+        } else {
+          supplierGroupModalTitle.textContent = 'Sửa nhóm nhà cung cấp';
+          if (supplierGroupNameInput) supplierGroupNameInput.value = activeSupplierGroupItem ? (activeSupplierGroupItem.getAttribute('data-name') || '') : '';
+          if (supplierGroupDescInput) supplierGroupDescInput.value = activeSupplierGroupItem ? (activeSupplierGroupItem.getAttribute('data-desc') || '') : '';
+        }
+        supplierGroupModalOverlay.classList.add('is-open');
+      }
+
+      function closeSupplierGroupModal() {
+        if (!supplierGroupModalOverlay) return;
+        supplierGroupModalOverlay.classList.remove('is-open');
+      }
+
+      if (supplierGroupFilterTrigger && supplierGroupFilterDropdown) {
+        supplierGroupFilterTrigger.addEventListener('click', function() {
+          supplierGroupFilterDropdown.classList.toggle('is-open');
+        });
+      }
+      if (supplierGroupAddBtn) {
+        supplierGroupAddBtn.addEventListener('click', function() {
+          openSupplierGroupModal('add');
+        });
+      }
+      if (supplierGroupModalClose) supplierGroupModalClose.addEventListener('click', closeSupplierGroupModal);
+      if (supplierGroupModalCancel) supplierGroupModalCancel.addEventListener('click', closeSupplierGroupModal);
+
+      if (supplierGroupModalSubmit) {
+        supplierGroupModalSubmit.addEventListener('click', function() {
+          if (!supplierGroupNameInput || !supplierGroupNameInput.value.trim()) {
+            alert('Vui lòng nhập tên nhóm nhà cung cấp.');
+            return;
+          }
+          if (supplierGroupModalMode === 'add') {
+            requestSupplierGroups('/nha-cung-cap/groups/add', {
+              ten_nhom_ncc: supplierGroupNameInput.value.trim(),
+              mo_ta: supplierGroupDescInput ? supplierGroupDescInput.value.trim() : ''
+            }, '');
+            return;
+          }
+          var groupId = activeSupplierGroupItem ? (activeSupplierGroupItem.getAttribute('data-id') || '') : '';
+          if (!groupId) {
+            alert('Vui lòng chọn nhóm cần sửa.');
+            return;
+          }
+          requestSupplierGroups('/nha-cung-cap/groups/' + groupId + '/update', {
+            ten_nhom_ncc: supplierGroupNameInput.value.trim(),
+            mo_ta: supplierGroupDescInput ? supplierGroupDescInput.value.trim() : ''
+          }, groupId);
+        });
+      }
+
+      var supplierGroupsSeed = document.getElementById('supplierGroupsSeed');
+      window.__supplierGroups = supplierGroupsSeed ? JSON.parse(supplierGroupsSeed.textContent || '[]') : [];
+      refreshSupplierGroupWidget((supplierGroupFilterValue && supplierGroupFilterValue.value) || 'all');
+
+      var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.store-detail'));
+      detailBlocks.forEach(function (detailBlock) {
+        var tabButtons = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab[data-detail-tab]'));
+        var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-pane[data-detail-pane]'));
+        tabButtons.forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var target = btn.getAttribute('data-detail-tab');
+            tabButtons.forEach(function(node) { node.classList.remove('is-active'); });
+            panes.forEach(function(pane) { pane.classList.remove('is-active'); });
+            btn.classList.add('is-active');
+            var activePane = detailBlock.querySelector('.detail-pane[data-detail-pane="' + target + '"]');
+            if (activePane) activePane.classList.add('is-active');
+          });
+        });
+
+        var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
+        var detailBody = detailBlock.querySelector('.store-detail-body');
+        if (!collapseBtn || !detailBody) return;
+        collapseBtn.addEventListener('click', function () {
+          var isCollapsed = detailBlock.classList.toggle('is-collapsed');
+          collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
+          collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        });
+      });
+
+      function submitSupplierAddressForm(action, formId, confirmMessage) {
+        if (!action || !formId) return;
+        if (confirmMessage && !confirm(confirmMessage)) return;
+
+        var tempForm = document.createElement('form');
+        tempForm.method = 'post';
+        tempForm.action = action;
+        tempForm.style.display = 'none';
+
+        var fields = document.querySelectorAll('[data-address-form="' + formId + '"]');
+        fields.forEach(function(field) {
+          if (!field.name) return;
+          if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) return;
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = field.name;
+          input.value = field.value || '';
+          tempForm.appendChild(input);
+        });
+
+        document.body.appendChild(tempForm);
+        tempForm.submit();
+      }
+
+      document.querySelectorAll('.js-supplier-address-submit').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          submitSupplierAddressForm(
+            button.getAttribute('data-action'),
+            button.getAttribute('data-form-id'),
+            button.getAttribute('data-confirm')
+          );
+        });
+      });
+
+      document.querySelectorAll('.js-supplier-address-delete').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!confirm('Bạn có chắc muốn xóa địa chỉ này không?')) return;
+
+          var tempForm = document.createElement('form');
+          tempForm.method = 'post';
+          tempForm.action = button.getAttribute('data-action');
+          tempForm.style.display = 'none';
+
+          var returnQuery = document.createElement('input');
+          returnQuery.type = 'hidden';
+          returnQuery.name = 'returnQuery';
+          returnQuery.value = button.getAttribute('data-return-query') || '';
+          tempForm.appendChild(returnQuery);
+
+          document.body.appendChild(tempForm);
+          tempForm.submit();
+        });
+      });
+
+      var clickableRows = Array.prototype.slice.call(document.querySelectorAll('.store-table tr[data-href]'));
+      clickableRows.forEach(function(row) {
+        row.addEventListener('click', function(event) {
+          if (event.defaultPrevented) return;
+          if (event.target && event.target.closest('a,button,input,select,textarea,label,form')) return;
+          var href = row.getAttribute('data-href');
+          if (href) window.location.href = href;
+        });
+      });
+
+      document.addEventListener('click', function(event) {
+        if (!supplierGroupFilterDropdown || !supplierGroupFilterTrigger) return;
+        if (supplierGroupFilterDropdown.contains(event.target)) return;
+        if (supplierGroupFilterTrigger.contains(event.target)) return;
+        supplierGroupFilterDropdown.classList.remove('is-open');
+      });
     });
-
-    async function saveSupplier() {
-      const form = document.getElementById('supplierForm');
-      const fd = new FormData(form);
-      try {
-        const payload = Object.fromEntries(fd.entries());
-        const endpoint = payload._id ? ('/nha-cung-cap/' + payload._id + '/update') : '/nha-cung-cap/add';
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (!data.success) return alert(data.message || 'Không lưu được nhà cung cấp');
-        closeSupplierModal();
-        location.reload();
-      } catch (error) {
-        alert('Lỗi kết nối khi lưu nhà cung cấp');
-      }
-    }
-
-    async function deleteSupplier() {
-      const id = document.querySelector('[name="_id"]').value;
-      if (!id) return;
-      if (!confirm('Xóa nhà cung cấp này?')) return;
-      try {
-        const res = await fetch('/nha-cung-cap/' + id + '/delete', { method: 'POST' });
-        const data = await res.json();
-        if (!data.success) return alert(data.message || 'Không xóa được nhà cung cấp');
-        closeSupplierModal();
-        location.reload();
-      } catch (error) {
-        alert('Lỗi kết nối khi xóa nhà cung cấp');
-      }
-    }
-
-    async function deleteSupplierById(id) {
-      const currentId = document.querySelector('[name="_id"]').value;
-      document.querySelector('[name="_id"]').value = id;
-      await deleteSupplier();
-      document.querySelector('[name="_id"]').value = currentId;
-    }
-
-    async function toggleSupplierStatus(id, status) {
-      const supplier = suppliersData.find(s => s._id === id);
-      if (!supplier) return;
-      try {
-        const res = await fetch('/nha-cung-cap/' + id + '/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...supplier, trang_thai: status })
-        });
-        const data = await res.json();
-        if (!data.success) return alert(data.message || 'Không cập nhật được trạng thái nhà cung cấp');
-        location.reload();
-      } catch (error) {
-        alert('Lỗi kết nối khi cập nhật trạng thái nhà cung cấp');
-      }
-    }
   </script>
 </body>
 </html>

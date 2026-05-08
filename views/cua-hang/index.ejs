@@ -1,346 +1,509 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <title><%= title %></title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel='stylesheet' href='/stylesheets/style.css' />
-    <style>
-      .main-content {
-        padding: 20px;
-        max-width: 1200px;
-        margin: 0 auto;
-      }
-      .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-      }
-      .kv-table {
-        width: 100%;
-        border-collapse: collapse;
-        background: #fff;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-      .kv-table th {
-        background-color: #f8f9fa;
-        text-align: left;
-        padding: 12px 16px;
-        font-weight: 600;
-        border-bottom: 2px solid #dee2e6;
-        color: #495057;
-      }
-      .kv-table tr.main-row {
-        cursor: pointer;
-        border-bottom: 1px solid #eee;
-        transition: background 0.2s;
-      }
-      .kv-table tr.main-row:hover {
-        background-color: #e6f7ff;
-      }
-      .kv-table td {
-        padding: 12px 16px;
-        font-size: 14px;
-        color: #333;
-      }
-      .detail-row {
-        display: none;
-        background-color: #fafafa;
-      }
-      .detail-row.active {
-        display: table-row;
-      }
-      .detail-content {
-        padding: 20px;
-        border-left: 4px solid #0070f4;
-      }
-      .detail-tabs {
-        display: flex;
-        gap: 20px;
-        border-bottom: 1px solid #ddd;
-        margin-bottom: 20px;
-      }
-      .tab-item {
-        padding: 8px 0;
-        cursor: pointer;
-        color: #666;
-        font-weight: 500;
-        position: relative;
-      }
-      .tab-item.active {
-        color: #0070f4;
-      }
-      .tab-item.active::after {
-        content: "";
-        position: absolute;
-        bottom: -1px;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background-color: #0070f4;
-      }
-      .btn-add {
-        background-color: #0070f4;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      /* Modal Styles */
-      .modal {
-        display: none;
-        position: fixed;
-        z-index: 2000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0,0,0,0.5);
-      }
-      .modal-content {
-        background-color: #fff;
-        margin: 5% auto;
-        padding: 20px;
-        width: 600px;
-        border-radius: 8px;
-      }
-      .form-group {
-        margin-bottom: 15px;
-      }
-      .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: 500;
-      }
-      .form-group input, .form-group select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-      }
-    </style>
-  </head>
-  <body>
-    <%- include('../partials/header') %>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-    <div class="main-content">
-      <div class="page-header">
-        <h1>Quản lý cửa hàng</h1>
-        <button class="btn-add" onclick="openModal()">+ Thêm mới</button>
+  <main class="admin-shell store-page">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+
+    <div class="store-toolbar">
+      <h1>Cửa hàng</h1>
+      <div class="store-search">
+        <span>⌕</span>
+        <input type="search" placeholder="Theo mã, tên cửa hàng">
       </div>
-
-      <table class="kv-table">
-        <thead>
-          <tr>
-            <th>Mã cửa hàng</th>
-            <th>Tên cửa hàng</th>
-            <th>Điện thoại</th>
-            <th>Địa chỉ</th>
-            <th>Trạng thái</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% stores.forEach(store => { %>
-            <tr class="main-row" onclick="toggleDetail('<%= store._id %>')">
-              <td><strong><%= store.ma_cua_hang %></strong></td>
-              <td><%= store.ten_cua_hang %></td>
-              <td><%= store.sdt %></td>
-              <td><%= store.dia_chi_gui_hang %></td>
-              <td>
-                <span class="badge" style="background: <%= store.trang_thai === 'active' ? '#52c41a' : '#ff4d4f' %>; position: static;">
-                  <%= store.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
-                </span>
-              </td>
-            </tr>
-            <tr class="detail-row" id="detail-<%= store._id %>">
-              <td colspan="5">
-                <div class="detail-content">
-                  <div class="detail-tabs">
-                    <div class="tab-item active">Thông tin</div>
-                    <div class="tab-item">Lịch sử hoạt động</div>
-                  </div>
-                  
-                  <form onsubmit="handleEdit(event, '<%= store._id %>')">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                      <div class="form-group">
-                        <label>Tên cửa hàng</label>
-                        <input type="text" name="ten_cua_hang" value="<%= store.ten_cua_hang %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Điện thoại</label>
-                        <input type="text" name="sdt" value="<%= store.sdt %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Email</label>
-                        <input type="text" name="email" value="<%= store.email %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Địa chỉ (Số nhà, đường)</label>
-                        <input type="text" name="dia_chi_gui_hang" value="<%= store.dia_chi_gui_hang %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Tỉnh/Thành</label>
-                        <input type="text" name="tinh_thanh" value="<%= store.tinh_thanh %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Quận/Huyện</label>
-                        <input type="text" name="quan_huyen" value="<%= store.quan_huyen %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Phường/Xã</label>
-                        <input type="text" name="phuong_xa" value="<%= store.phuong_xa %>">
-                      </div>
-                      <div class="form-group">
-                        <label>Trạng thái</label>
-                        <select name="trang_thai">
-                          <option value="active" <%= store.trang_thai === 'active' ? 'selected' : '' %>>Đang hoạt động</option>
-                          <option value="inactive" <%= store.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div style="text-align: right; margin-top: 10px;">
-                      <button type="submit" class="btn-add">Cập nhật</button>
-                    </div>
-                  </form>
-                </div>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+      <div class="page-actions">
+        <a class="btn btn-primary" href="/cua-hang?mode=create">+ Tạo mới</a>
+        <button class="btn btn-danger" type="submit" form="bulkDeleteForm" onclick="return confirm('Xóa các cửa hàng đã chọn?')">Xóa đã chọn</button>
+        <button class="btn btn-light" type="button">Import file</button>
+        <button class="btn btn-light" type="button">Xuất file</button>
+      </div>
     </div>
 
-    <!-- Modal Thêm Mới -->
-    <div id="addModal" class="modal">
-      <div class="modal-content">
-        <h3>Thêm cửa hàng mới</h3>
-        <hr style="margin: 15px 0;">
-        <form onsubmit="handleAdd(event)">
-          <div class="form-group">
-            <label>Mã cửa hàng *</label>
-            <input type="text" name="ma_cua_hang" required placeholder="VD: CH001">
+    <% if (formMode === 'create' || formMode === 'edit') { %>
+      <section class="store-form-panel">
+        <div class="store-form-heading">
+          <div>
+            <h2><%= formMode === 'edit' ? 'Cập nhật cửa hàng' : 'Tạo cửa hàng' %></h2>
+            <p>Nhập thông tin cơ bản của cửa hàng.</p>
           </div>
-          <div class="form-group">
-            <label>Tên cửa hàng *</label>
-            <input type="text" name="ten_cua_hang" required>
-          </div>
-          <div class="form-group">
-            <label>Điện thoại</label>
-            <input type="text" name="sdt">
-          </div>
-          <div class="form-group">
-            <label>Địa chỉ (Số nhà, đường)</label>
-            <input type="text" name="dia_chi_gui_hang">
-          </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-            <div class="form-group">
-              <label>Tỉnh/Thành</label>
-              <input type="text" name="tinh_thanh">
-            </div>
-            <div class="form-group">
-              <label>Quận/Huyện</label>
-              <input type="text" name="quan_huyen">
-            </div>
-            <div class="form-group">
-              <label>Phường/Xã</label>
-              <input type="text" name="phuong_xa">
-            </div>
-          </div>
-          <div style="text-align: right; gap: 10px; display: flex; justify-content: flex-end;">
-            <button type="button" onclick="closeModal()" style="padding: 8px 16px; border: 1px solid #ddd; background: #fff; border-radius: 4px; cursor: pointer;">Hủy</button>
-            <button type="submit" class="btn-add">Lưu</button>
+          <a class="link-button" href="/cua-hang">Hủy</a>
+        </div>
+
+        <% var formStore = editingStore || {}; %>
+        <form class="store-form-grid" method="post" action="<%= formMode === 'edit' ? '/cua-hang/' + editingStore._id + '/update' : '/cua-hang/add' %>">
+          <label>
+            <span>Mã cửa hàng</span>
+            <input name="ma_cua_hang" value="<%= formStore.ma_cua_hang || '' %>" placeholder="Tự động nếu bỏ trống">
+          </label>
+          <label>
+            <span>Tên cửa hàng *</span>
+            <input name="ten_cua_hang" value="<%= formStore.ten_cua_hang || '' %>" required>
+          </label>
+          <label>
+            <span>Điện thoại</span>
+            <input name="sdt" value="<%= formStore.sdt || '' %>">
+          </label>
+          <label>
+            <span>Email</span>
+            <input name="email" value="<%= formStore.email || '' %>" type="email">
+          </label>
+          <label class="span-2">
+            <span>Địa chỉ</span>
+            <input name="dia_chi" value="<%= formStore.dia_chi || '' %>">
+          </label>
+          <label class="span-2">
+            <span>Địa chỉ gửi hàng</span>
+            <input name="dia_chi_gui_hang" value="<%= formStore.dia_chi_gui_hang || '' %>">
+          </label>
+          <label>
+            <span>Phường/xã</span>
+            <input name="phuong_xa" value="<%= formStore.phuong_xa || '' %>">
+          </label>
+          <label>
+            <span>Quận/huyện</span>
+            <input name="quan_huyen" value="<%= formStore.quan_huyen || '' %>">
+          </label>
+          <label>
+            <span>Tỉnh/thành</span>
+            <input name="tinh_thanh" value="<%= formStore.tinh_thanh || '' %>">
+          </label>
+          <label>
+            <span>Trạng thái</span>
+            <select name="trang_thai">
+              <option value="active" <%= formStore.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+              <option value="inactive" <%= formStore.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+            </select>
+          </label>
+          <div class="store-form-actions">
+            <button class="btn btn-primary" type="submit"><%= formMode === 'edit' ? 'Lưu thay đổi' : 'Tạo cửa hàng' %></button>
+            <a class="btn btn-light" href="/cua-hang">Hủy</a>
           </div>
         </form>
-      </div>
+      </section>
+    <% } %>
+
+    <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
+    <div class="store-layout">
+      <aside class="store-filter-panel">
+        <form method="get" action="/cua-hang" class="store-filter-form">
+          <div class="filter-heading">
+            <h3>Bộ lọc</h3>
+            <div class="filter-heading-actions">
+              <button class="btn btn-primary btn-sm" type="submit">Áp dụng</button>
+              <a class="filter-reset" href="/cua-hang">Xóa lọc</a>
+            </div>
+          </div>
+
+          <section class="filter-group">
+            <h4>Trạng thái</h4>
+            <select name="status">
+              <option value="all" <%= filter.status === 'all' ? 'selected' : '' %>>Tất cả</option>
+              <option value="active" <%= filter.status === 'active' ? 'selected' : '' %>>Đang hoạt động</option>
+              <option value="inactive" <%= filter.status === 'inactive' ? 'selected' : '' %>>Ngưng hoạt động</option>
+            </select>
+          </section>
+
+          <section class="filter-group">
+            <h4>Tỉnh/thành</h4>
+            <% var selectedCityLabel = filter.city && filter.city !== 'all' ? filter.city : 'Tất cả tỉnh/thành'; %>
+            <div class="group-manage-wrapper">
+              <div class="group-manage-header">
+                <button class="group-manage-trigger" type="button" id="storeCityFilterTrigger">
+                  <span id="storeCityFilterLabel"><%= selectedCityLabel %></span>
+                  <span>▾</span>
+                </button>
+              </div>
+              <input type="hidden" name="city" id="storeCityFilterValue" value="<%= filter.city || 'all' %>">
+              <div class="group-manage-dropdown" id="storeCityFilterDropdown">
+                <div class="group-manage-item <%= (!filter.city || filter.city === 'all') ? 'is-active' : '' %>" data-value="all" data-name="Tất cả tỉnh/thành">
+                  <button class="group-manage-option" type="button">Tất cả tỉnh/thành</button>
+                </div>
+                <% provinceOptions.forEach(function(city) { %>
+                  <div class="group-manage-item <%= filter.city === city ? 'is-active' : '' %>" data-value="<%= city %>" data-name="<%= city %>">
+                    <button class="group-manage-option" type="button"><%= city %></button>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          </section>
+
+          <section class="filter-group">
+            <h4>Số lượng kho</h4>
+            <select name="warehouse">
+              <option value="all" <%= filter.warehouse === 'all' ? 'selected' : '' %>>Tất cả</option>
+              <option value="none" <%= filter.warehouse === 'none' ? 'selected' : '' %>>Chưa có kho</option>
+              <option value="has" <%= filter.warehouse === 'has' ? 'selected' : '' %>>Có kho</option>
+              <option value="gte1" <%= filter.warehouse === 'gte1' ? 'selected' : '' %>>Từ 1 kho trở lên</option>
+              <option value="gte2" <%= filter.warehouse === 'gte2' ? 'selected' : '' %>>Từ 2 kho trở lên</option>
+            </select>
+          </section>
+
+          <section class="filter-group">
+            <h4>Thời gian tạo</h4>
+            <select name="created" id="createdFilterSelect">
+              <option value="all" <%= filter.created === 'all' ? 'selected' : '' %>>Toàn thời gian</option>
+              <option value="today" <%= filter.created === 'today' ? 'selected' : '' %>>Hôm nay</option>
+              <option value="7days" <%= filter.created === '7days' ? 'selected' : '' %>>7 ngày qua</option>
+              <option value="30days" <%= filter.created === '30days' ? 'selected' : '' %>>30 ngày qua</option>
+              <option value="custom" <%= filter.created === 'custom' ? 'selected' : '' %>>Tùy chỉnh</option>
+            </select>
+            <div class="custom-date-range <%= filter.created === 'custom' ? 'is-visible' : '' %>" id="customDateRange">
+              <label>
+                <span>Từ ngày</span>
+                <input type="date" name="createdFrom" value="<%= filter.createdFrom || '' %>">
+              </label>
+              <label>
+                <span>Đến ngày</span>
+                <input type="date" name="createdTo" value="<%= filter.createdTo || '' %>">
+              </label>
+            </div>
+          </section>
+
+        </form>
+      </aside>
+
+      <section class="store-table-panel">
+        <div class="table-wrap">
+          <form id="bulkDeleteForm" method="post" action="/cua-hang/delete-selected">
+          <table class="admin-table store-table">
+            <thead>
+              <tr>
+                <th class="check-cell"><input id="selectAllStores" type="checkbox" aria-label="Chọn tất cả"></th>
+                <th>Mã cửa hàng</th>
+                <th>Tên cửa hàng</th>
+                <th>Điện thoại</th>
+                <th>Email</th>
+                <th>Kho</th>
+                <th>Trạng thái</th>
+                <th>Thời gian tạo</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (stores.length === 0) { %>
+                <tr>
+                  <td colspan="8" class="empty-cell">Không có cửa hàng phù hợp với bộ lọc.</td>
+                </tr>
+              <% } %>
+              <% stores.forEach(function(store) { %>
+                <% var isSelected = selectedStore && String(selectedStore._id) === String(store._id); %>
+                <% var rowHref = isSelected ? ('/cua-hang' + (filterQueryString ? '?' + filterQueryString : '')) : ('/cua-hang?' + filterQueryPrefix + 'store=' + store._id); %>
+                <tr class="<%= isSelected ? 'is-selected' : '' %>" onclick="window.location.href='<%= rowHref %>'">
+                  <td class="check-cell" onclick="event.stopPropagation()"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
+                  <td><a class="table-code-link" href="<%= rowHref %>"><%= store.ma_cua_hang || '---' %></a></td>
+                  <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi || store.dia_chi_gui_hang || 'Chưa có địa chỉ' %></div></td>
+                  <td><%= store.sdt || '---' %></td>
+                  <td><%= store.email || '---' %></td>
+                  <td><%= warehouseCountMap[String(store._id)] || 0 %></td>
+                  <td>
+                    <span class="status-pill <%= store.trang_thai === 'active' ? 'is-active' : '' %>">
+                      <%= store.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
+                    </span>
+                  </td>
+                  <td><%= formatDate(store.created_at) %></td>
+                </tr>
+
+                <% if (isSelected) { %>
+                  <tr class="store-detail-row">
+                    <td colspan="8">
+                      <div class="store-detail">
+                        <div class="detail-tabs">
+                          <div class="detail-tab-list">
+                            <button class="detail-tab is-active" type="button" data-tab-target="store-info">Thông tin</button>
+                            <button class="detail-tab" type="button" data-tab-target="store-warehouses">Danh sách kho</button>
+                            <button class="detail-tab" type="button" data-tab-target="store-notes">Ghi chú</button>
+                          </div>
+                          <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
+                        </div>
+
+                        <div class="store-detail-body">
+                          <div class="store-detail-pane is-active" data-tab-pane="store-info">
+                          <div class="store-info-block">
+                            <div class="store-image-placeholder">CH</div>
+                            <div>
+                              <h2><%= selectedStore.ten_cua_hang || 'Cửa hàng' %></h2>
+                              <p><%= selectedStore.ma_cua_hang || '---' %> - <%= selectedStore.tinh_thanh || 'Chưa có tỉnh thành' %></p>
+                              <div class="tag-row">
+                                <span class="tag">Cửa hàng</span>
+                                <span class="tag tag-green"><%= selectedStore.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="store-fields">
+                            <div>
+                              <span>Mã cửa hàng</span>
+                              <input name="ma_cua_hang" value="<%= selectedStore.ma_cua_hang || '' %>">
+                            </div>
+                            <div>
+                              <span>Tên cửa hàng *</span>
+                              <input name="ten_cua_hang" value="<%= selectedStore.ten_cua_hang || '' %>" required>
+                            </div>
+                            <div>
+                              <span>Điện thoại</span>
+                              <input name="sdt" value="<%= selectedStore.sdt || '' %>">
+                            </div>
+                            <div>
+                              <span>Email</span>
+                              <input name="email" type="email" value="<%= selectedStore.email || '' %>">
+                            </div>
+                            <div>
+                              <span>Địa chỉ</span>
+                              <input name="dia_chi" value="<%= selectedStore.dia_chi || '' %>">
+                            </div>
+                            <div>
+                              <span>Địa chỉ gửi hàng</span>
+                              <input name="dia_chi_gui_hang" value="<%= selectedStore.dia_chi_gui_hang || '' %>">
+                            </div>
+                            <div>
+                              <span>Phường/xã</span>
+                              <input name="phuong_xa" value="<%= selectedStore.phuong_xa || '' %>">
+                            </div>
+                            <div>
+                              <span>Quận/huyện</span>
+                              <input name="quan_huyen" value="<%= selectedStore.quan_huyen || '' %>">
+                            </div>
+                            <div>
+                              <span>Tỉnh/thành</span>
+                              <input name="tinh_thanh" value="<%= selectedStore.tinh_thanh || '' %>">
+                            </div>
+                            <div>
+                              <span>Trạng thái</span>
+                              <select name="trang_thai">
+                                <option value="active" <%= selectedStore.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+                                <option value="inactive" <%= selectedStore.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+                              </select>
+                            </div>
+                            <div>
+                              <span>Kho trực thuộc</span>
+                              <strong><%= warehouses.length %></strong>
+                            </div>
+                          </div>
+                          </div>
+
+                          <div class="store-detail-pane" data-tab-pane="store-warehouses">
+                          <div class="warehouse-section">
+                            <div class="warehouse-heading">
+                              <h3>Danh sách kho</h3>
+                              <div class="detail-actions">
+                                <button
+                                  class="btn btn-light"
+                                  type="submit"
+                                  formaction="/cua-hang/<%= selectedStore._id %>/update"
+                                  formmethod="post"
+                                  onclick="return confirm('Bạn có muốn lưu thay đổi cửa hàng này không?')"
+                                >💾 Lưu chỉnh sửa</button>
+                                <button
+                                  class="btn btn-danger"
+                                  type="submit"
+                                  formaction="/cua-hang/<%= selectedStore._id %>/delete"
+                                  formmethod="post"
+                                  onclick="return confirm('Bạn có chắc muốn xóa cửa hàng này và các kho trực thuộc không?')"
+                                >🗑️ Xóa</button>
+                                <button class="btn btn-light" type="button">➕ Thêm kho</button>
+
+                              </div>
+                            </div>
+
+                            <table class="admin-table warehouse-table">
+                              <thead>
+                                <tr>
+                                  <th>Mã kho</th>
+                                  <th>Tên kho</th>
+                                  <th>Địa chỉ</th>
+                                  <th>Trạng thái</th>
+                                  <th>Thời gian tạo</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <% if (warehouses.length === 0) { %>
+                                  <tr>
+                                    <td colspan="5" class="empty-cell">Chưa có kho cho cửa hàng này.</td>
+                                  </tr>
+                                <% } %>
+                                <tr class="warehouse-edit-row warehouse-add-row">
+                                  <td><input form="warehouseAddForm" name="ma_kho" value="" placeholder="Mã kho (tự động)"></td>
+                                  <td><input form="warehouseAddForm" name="ten_kho" value="" placeholder="Tên kho mới"></td>
+                                  <td><input form="warehouseAddForm" name="dia_chi" value="" placeholder="Địa chỉ kho"></td>
+                                  <td>
+                                    <select form="warehouseAddForm" name="trang_thai">
+                                      <option value="active" selected>Đang hoạt động</option>
+                                      <option value="inactive">Ngừng hoạt động</option>
+                                    </select>
+                                  </td>
+                                  <td class="warehouse-action-cell">
+                                    <button
+                                      form="warehouseAddForm"
+                                      class="btn btn-primary btn-sm"
+                                      type="submit"
+                                      onclick="return confirm('Bạn có muốn thêm kho mới không?')"
+                                    >✨ Thêm</button>
+
+                                  </td>
+                                </tr>
+                                <% warehouses.forEach(function(warehouse) { %>
+                                  <% var warehouseFormId = 'warehouseForm_' + String(warehouse._id); %>
+                                  <tr class="warehouse-edit-row">
+                                    <td><input form="<%= warehouseFormId %>" name="ma_kho" value="<%= warehouse.ma_kho || '' %>"></td>
+                                    <td><input form="<%= warehouseFormId %>" name="ten_kho" value="<%= warehouse.ten_kho || '' %>" required></td>
+                                    <td><input form="<%= warehouseFormId %>" name="dia_chi" value="<%= warehouse.dia_chi || '' %>"></td>
+                                    <td>
+                                      <select form="<%= warehouseFormId %>" name="trang_thai">
+                                        <option value="active" <%= warehouse.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+                                        <option value="inactive" <%= warehouse.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+                                      </select>
+                                    </td>
+                                    <td class="warehouse-action-cell">
+                                      <div class="warehouse-action-meta"><%= formatDate(warehouse.created_at) %></div>
+                                      <div class="warehouse-action-buttons">
+                                        <button
+                                          form="<%= warehouseFormId %>"
+                                          class="btn btn-light btn-sm"
+                                          type="submit"
+                                          onclick="return confirm('Bạn có muốn lưu chỉnh sửa kho này không?')"
+                                        >💾 Lưu</button>
+                                        <button
+                                          form="warehouseDeleteForm_<%= warehouse._id %>"
+                                          class="btn btn-danger btn-sm"
+                                          type="submit"
+                                          onclick="return confirm('Bạn có chắc muốn xóa kho này không?')"
+                                        >🗑️ Xóa</button>
+
+                                      </div>
+                                    </td>
+                                  </tr>
+                                <% }) %>
+                              </tbody>
+                            </table>
+                          </div>
+                          </div>
+
+                          <div class="store-detail-pane" data-tab-pane="store-notes">
+                            <div class="warehouse-section">
+                              <h3>Ghi chú</h3>
+                              <p class="muted-line">Chưa có ghi chú cho cửa hàng này.</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% } %>
+              <% }) %>
+            </tbody>
+          </table>
+          </form>
+          <% if (selectedStore) { %>
+            <form id="warehouseAddForm" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/add"></form>
+            <% warehouses.forEach(function(warehouse) { %>
+              <form id="warehouseForm_<%= warehouse._id %>" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/<%= warehouse._id %>/update"></form>
+              <form id="warehouseDeleteForm_<%= warehouse._id %>" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/<%= warehouse._id %>/delete"></form>
+            <% }) %>
+          <% } %>
+        </div>
+      </section>
     </div>
+  </main>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var selectAll = document.getElementById('selectAllStores');
+      var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.store-checkbox'));
 
-    <script>
-      function toggleDetail(id) {
-        const row = document.getElementById('detail-' + id);
-        const isActive = row.classList.contains('active');
-        
-        // Đóng tất cả các row khác trước
-        document.querySelectorAll('.detail-row').forEach(r => r.classList.remove('active'));
-        
-        if (!isActive) {
-          row.classList.add('active');
-        }
-      }
-
-      function openModal() {
-        document.getElementById('addModal').style.display = 'block';
-      }
-
-      function closeModal() {
-        document.getElementById('addModal').style.display = 'none';
-      }
-
-      async function handleAdd(e) {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-
-        try {
-          const res = await fetch('/cua-hang/add', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+      if (selectAll) {
+        selectAll.addEventListener('change', function () {
+          checkboxes.forEach(function (checkbox) {
+            checkbox.checked = selectAll.checked;
           });
-          const result = await res.json();
-          if (result.success) {
-            alert(result.message);
-            location.reload();
-          } else {
-            alert(result.message);
-          }
-        } catch (err) {
-          alert("Lỗi kết nối server");
-        }
+        });
       }
 
-      async function handleEdit(e, id) {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-
-        try {
-          const res = await fetch('/cua-hang/edit/' + id, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+      checkboxes.forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+          if (!selectAll) return;
+          selectAll.checked = checkboxes.length > 0 && checkboxes.every(function (item) {
+            return item.checked;
           });
-          const result = await res.json();
-          if (result.success) {
-            alert(result.message);
-            location.reload();
-          } else {
-            alert(result.message);
-          }
-        } catch (err) {
-          alert("Lỗi kết nối server");
-        }
-      }
-
-      // Đóng modal khi click ra ngoài
-      window.onclick = function(event) {
-        const modal = document.getElementById('addModal');
-        if (event.target == modal) {
-          closeModal();
-        }
-      }
-
-      document.addEventListener('DOMContentLoaded', function() {
-        const openId = new URLSearchParams(window.location.search).get('open');
-        if (!openId) return;
-
-        const row = document.getElementById('detail-' + openId);
-        if (row) {
-          row.classList.add('active');
-          row.scrollIntoView({ block: 'center' });
-        }
+        });
       });
-    </script>
-  </body>
+
+      var createdFilterSelect = document.getElementById('createdFilterSelect');
+      var customDateRange = document.getElementById('customDateRange');
+      var storeCityFilterTrigger = document.getElementById('storeCityFilterTrigger');
+      var storeCityFilterLabel = document.getElementById('storeCityFilterLabel');
+      var storeCityFilterValue = document.getElementById('storeCityFilterValue');
+      var storeCityFilterDropdown = document.getElementById('storeCityFilterDropdown');
+
+      function toggleCustomDateRange() {
+        if (!customDateRange) return;
+        var isCustom = createdFilterSelect && createdFilterSelect.value === 'custom';
+        customDateRange.classList.toggle('is-visible', isCustom);
+      }
+
+      if (createdFilterSelect) createdFilterSelect.addEventListener('change', toggleCustomDateRange);
+
+      toggleCustomDateRange();
+
+      if (storeCityFilterTrigger && storeCityFilterDropdown) {
+        storeCityFilterTrigger.addEventListener('click', function () {
+          storeCityFilterDropdown.classList.toggle('is-open');
+        });
+
+        Array.prototype.slice.call(storeCityFilterDropdown.querySelectorAll('.group-manage-item')).forEach(function (item) {
+          var optionBtn = item.querySelector('.group-manage-option');
+          if (!optionBtn) return;
+          optionBtn.addEventListener('click', function () {
+            Array.prototype.slice.call(storeCityFilterDropdown.querySelectorAll('.group-manage-item')).forEach(function (node) {
+              node.classList.remove('is-active');
+            });
+            item.classList.add('is-active');
+            if (storeCityFilterValue) storeCityFilterValue.value = item.getAttribute('data-value') || 'all';
+            if (storeCityFilterLabel) storeCityFilterLabel.textContent = item.getAttribute('data-name') || 'Tất cả tỉnh/thành';
+            storeCityFilterDropdown.classList.remove('is-open');
+          });
+        });
+      }
+
+      var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.store-detail'));
+      detailBlocks.forEach(function (detailBlock) {
+        var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
+        var detailBody = detailBlock.querySelector('.store-detail-body');
+        var tabs = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab'));
+        var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.store-detail-pane'));
+        if (!collapseBtn || !detailBody) return;
+
+        tabs.forEach(function(tab) {
+          tab.addEventListener('click', function(event) {
+            event.stopPropagation();
+            var target = tab.getAttribute('data-tab-target');
+            tabs.forEach(function(node) {
+              node.classList.toggle('is-active', node === tab);
+            });
+            panes.forEach(function(pane) {
+              pane.classList.toggle('is-active', pane.getAttribute('data-tab-pane') === target);
+            });
+          });
+        });
+
+        collapseBtn.addEventListener('click', function () {
+          var isCollapsed = detailBlock.classList.toggle('is-collapsed');
+          collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
+          collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        });
+      });
+
+      document.addEventListener('click', function (event) {
+        if (!storeCityFilterDropdown || !storeCityFilterTrigger) return;
+        if (storeCityFilterDropdown.contains(event.target)) return;
+        if (storeCityFilterTrigger.contains(event.target)) return;
+        storeCityFilterDropdown.classList.remove('is-open');
+      });
+    });
+  </script>
+</body>
 </html>

@@ -1,268 +1,922 @@
-<%
-  const safeProducts = Array.isArray(locals.products) ? locals.products : [];
-  const safeCategories = Array.isArray(locals.categories) ? locals.categories : [];
-  const safeFilters = locals.filters || {};
-  const pageInfo = locals.pagination || { page: 1, limit: 15, total: 0, totalPages: 1 };
-  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
-  const fromRow = pageInfo.total ? ((pageInfo.page - 1) * pageInfo.limit) + 1 : 0;
-  const toRow = Math.min(pageInfo.page * pageInfo.limit, pageInfo.total || 0);
-  const pageUrl = nextPage => {
-    const params = Object.assign({}, safeFilters, { page: nextPage, limit: pageInfo.limit });
-    const query = Object.keys(params)
-      .filter(key => params[key] !== undefined && params[key] !== null && params[key] !== '')
-      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
-      .join('&');
-    return '/hang-hoa/thiet-lap-gia' + (query ? '?' + query : '');
-  };
-%>
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="vi">
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
-  <style>
-    .price-page{height:calc(100vh - 98px);background:#f1f3f5;display:flex;flex-direction:column;overflow:hidden}
-    .price-topbar{height:58px;background:#fff;border-bottom:1px solid #dce3ea;display:flex;align-items:center;justify-content:space-between;padding:0 16px 0 210px;gap:12px}
-    .price-search{position:relative;max-width:760px;flex:1}
-    .price-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}
-    .price-search input{width:100%;height:34px;border:1px solid #cfd8e3;border-radius:5px;padding:0 36px;font-size:13px;outline:none}
-    .price-search input:focus,.price-filter-control:focus,.price-input:focus{border-color:#2d9cff;box-shadow:0 0 0 2px rgba(45,156,255,.12)}
-    .price-actions{display:flex;align-items:center;gap:8px}
-    .price-btn{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:5px;padding:0 12px;font-size:13px;font-weight:600;color:#374151;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
-    .price-btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}
-    .price-btn:hover{border-color:#7fbfff;color:#0070f4;background:#f8fbff}
-    .price-btn.primary:hover{background:#0064dc;color:#fff}
-    .price-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:10px;padding:0 18px 0 210px}
-    .price-sidebar{background:#fff;padding:14px 12px;overflow:auto}
-    .price-filter{margin-bottom:18px}
-    .price-filter-title{font-size:13px;font-weight:700;color:#111827;margin-bottom:10px}
-    .price-filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
-    .price-filter-stack{display:flex;flex-direction:column;gap:8px}
-    .price-main{min-width:0;display:flex;flex-direction:column}
-    .price-table-wrap{flex:1;min-height:0;background:#fff;overflow:auto}
-    .price-table{width:100%;min-width:1040px;border-collapse:collapse}
-    .price-table th{height:42px;background:#fff;color:#111827;font-size:13px;font-weight:700;text-align:left;border-bottom:1px solid #e2e8f0;padding:0 10px;white-space:nowrap}
-    .price-table td{height:41px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;vertical-align:middle}
-    .price-table tbody tr:hover{background:#f7fbff}
-    .price-table .num{text-align:right}
-    .price-code{width:136px;color:#005cb8}
-    .price-name{min-width:360px}
-    .price-small-col{width:100px}
-    .price-edit-col{width:132px}
-    .price-input{width:112px;height:23px;border:1px solid #cfd8e3;border-radius:7px;text-align:right;padding:0 6px;font-size:13px;outline:none}
-    .price-input.changed{border-color:#0070f4;background:#f2f8ff}
-    .price-empty{height:260px;text-align:center;color:#7a8794}
-    .price-footer{height:30px;background:#f1f3f5;display:flex;align-items:center;gap:10px;font-size:12px;color:#111827}
-    .price-footer select{height:24px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 22px 0 8px;font-size:12px}
-    .pager{display:flex;align-items:center;gap:8px;margin-left:18px}
-    .pager a,.pager span{min-width:28px;height:22px;border-radius:7px;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
-    .pager .current{border:1px solid #cfd8e3;background:#fff}
-    .pager .disabled{color:#c4ccd5}
-    .price-status{margin-left:auto;color:#4b5563}
-    @media(max-width:1100px){
-      .price-topbar,.price-shell{padding-left:12px}
-      .price-shell{grid-template-columns:220px minmax(0,1fr)}
-    }
-    @media(max-width:780px){
-      .price-page{height:auto;min-height:calc(100vh - 98px);overflow:visible}
-      .price-topbar{height:auto;align-items:stretch;flex-direction:column;padding:10px}
-      .price-shell{grid-template-columns:1fr;padding:10px}
-      .price-sidebar{order:1}
-      .price-main{order:2;min-height:520px}
-      .price-actions{flex-wrap:wrap}
-    }
-  </style>
 </head>
-<body>
-  <%- include('../partials/header') %>
+<body class="admin-body price-setup-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-  <form id="priceFilterForm" method="GET" action="/hang-hoa/thiet-lap-gia" class="price-page">
-    <div class="price-topbar">
-      <div class="price-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Tìm kiếm theo mã, tên hàng">
-      </div>
-      <div class="price-actions">
-        <button type="submit" class="price-btn"><i class="fa-solid fa-filter"></i> Lọc</button>
-        <button type="button" class="price-btn primary" onclick="savePrices()"><i class="fa-solid fa-floppy-disk"></i> Lưu giá</button>
-      </div>
-    </div>
+  <main class="admin-shell customer-page price-setup-main">
+    <%- include('../partials/flash-message', { flash: flash }) %>
 
-    <div class="price-shell">
-      <aside class="price-sidebar">
-        <div class="price-filter">
-          <div class="price-filter-title">Nhóm hàng</div>
-          <select class="price-filter-control" name="nhom_hang_id" onchange="submitPriceFilters()">
-            <option value="">Chọn nhóm hàng</option>
-            <% safeCategories.forEach(c => { %>
-              <option value="<%= c._id %>" <%= safeFilters.nhom_hang_id == c._id ? 'selected' : '' %>><%= c.ten_nhom_hang %></option>
-            <% }) %>
-          </select>
-        </div>
+    <form class="price-setup-shell" method="get" action="/hang-hoa/thiet-lap-gia" id="priceSetupFilterForm">
+      <input type="hidden" name="page" id="priceSetupPage" value="<%= filter.page %>">
 
-        <div class="price-filter">
-          <div class="price-filter-title">Tồn kho</div>
-          <select class="price-filter-control" name="ton_kho" onchange="submitPriceFilters()">
-            <option value="" <%= !safeFilters.ton_kho ? 'selected' : '' %>>Tất cả</option>
-            <option value="con" <%= safeFilters.ton_kho === 'con' ? 'selected' : '' %>>Còn hàng</option>
-            <option value="het" <%= safeFilters.ton_kho === 'het' ? 'selected' : '' %>>Hết hàng</option>
-          </select>
-        </div>
-
-        <div class="price-filter">
-          <div class="price-filter-title">Giá bán</div>
-          <div class="price-filter-stack">
-            <select class="price-filter-control" name="gia_ban_dk" onchange="togglePriceValue()">
-              <option value="">Chọn điều kiện</option>
-              <option value="eq" <%= safeFilters.gia_ban_dk === 'eq' ? 'selected' : '' %>>Bằng</option>
-              <option value="gt" <%= safeFilters.gia_ban_dk === 'gt' ? 'selected' : '' %>>Lớn hơn</option>
-              <option value="gte" <%= safeFilters.gia_ban_dk === 'gte' ? 'selected' : '' %>>Lớn hơn hoặc bằng</option>
-              <option value="lt" <%= safeFilters.gia_ban_dk === 'lt' ? 'selected' : '' %>>Nhỏ hơn</option>
-              <option value="lte" <%= safeFilters.gia_ban_dk === 'lte' ? 'selected' : '' %>>Nhỏ hơn hoặc bằng</option>
-            </select>
-            <input class="price-filter-control" name="gia_ban_value" value="<%= safeFilters.gia_ban_value || '' %>" placeholder="Chọn giá so sánh">
+      <aside class="customer-filter price-setup-filter">
+        <section class="customer-filter-section price-setup-bg-filter">
+          <div class="customer-filter-title-row">
+            <h4>Bảng giá</h4>
+            <button type="button" class="filter-link-btn js-open-bang-gia-modal">Tạo mới</button>
           </div>
-        </div>
+          <div class="price-setup-bg-picker-wrap">
+            <button type="button" class="group-manage-trigger price-setup-bg-trigger" id="priceSetupBangGiaTrigger" aria-expanded="false" aria-haspopup="listbox">
+              <span id="priceSetupBangGiaTriggerLabel">Chọn bảng giá</span>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div class="price-setup-bg-popover" id="priceSetupBangGiaPopover" role="dialog" aria-label="Chọn bảng giá">
+              <div class="price-setup-bg-popover-head">
+                <span class="price-setup-bg-popover-title">Bảng giá</span>
+                <button type="button" class="filter-link-btn js-open-bang-gia-modal">Tạo mới</button>
+              </div>
+              <label class="price-setup-bg-popover-search">
+                <span aria-hidden="true">⌕</span>
+                <input type="search" id="priceSetupBangGiaSearch" placeholder="Tìm kiếm" autocomplete="off">
+              </label>
+              <div class="price-setup-bg-popover-list" id="priceSetupBangGiaCheckboxList">
+                <% var _bgSel = (filter.bangGiaIds || []).map(function(x) { return String(x); }); %>
+                <% (bangGiaList || []).forEach(function(bg) { %>
+                  <label class="price-setup-bg-item" data-name="<%= String(bg.ten_bang_gia || '').toLowerCase().replace(/"/g, '') %>">
+                    <input type="checkbox" value="<%= bg._id %>" <%= _bgSel.indexOf(String(bg._id)) >= 0 ? 'checked' : '' %>>
+                    <span><%= bg.ten_bang_gia || '—' %></span>
+                  </label>
+                <% }) %>
+              </div>
+              <div class="price-setup-bg-popover-foot">
+                <button type="button" class="filter-link-btn" id="priceSetupBangGiaSelectAll">Chọn tất cả</button>
+                <button type="button" class="btn btn-primary btn-sm" id="priceSetupBangGiaApply">Áp dụng</button>
+              </div>
+            </div>
+          </div>
+          <div class="price-setup-tag-row" id="priceSetupBangGiaTags">
+            <% (selectedBangGiaOrdered || []).forEach(function(bg) { %>
+              <span class="price-setup-tag">
+                <%= bg.ten_bang_gia || '—' %>
+                <button type="button" class="price-setup-tag-remove js-remove-bang-gia-tag" data-bang-gia-id="<%= bg._id %>" aria-label="Gỡ <%= bg.ten_bang_gia || '' %>">×</button>
+              </span>
+            <% }) %>
+          </div>
+          <% (filter.bangGiaIds || []).forEach(function(bid) { %>
+            <input type="hidden" name="bangGia" value="<%= bid %>" class="js-bang-gia-hidden">
+          <% }) %>
+        </section>
+
+        <section class="customer-filter-section">
+          <div class="customer-filter-title-row">
+            <h4>Nhóm hàng</h4>
+            <button class="filter-link-btn" type="button" id="priceSetupGroupAddBtn">Tạo mới</button>
+          </div>
+          <% var selectedPriceSetupGroup = (groups || []).find(function(g) { return String(filter.groupId) === String(g._id); }); %>
+          <div class="group-manage-wrapper" id="priceSetupGroupManage">
+            <div class="group-manage-header">
+              <button class="group-manage-trigger" type="button" id="priceSetupGroupFilterTrigger">
+                <span id="priceSetupGroupFilterLabel"><%= selectedPriceSetupGroup ? selectedPriceSetupGroup.ten_nhom_hang : 'Chọn nhóm hàng' %></span>
+                <span>▾</span>
+              </button>
+            </div>
+            <input type="hidden" name="groupId" id="priceSetupGroupFilterValue" value="<%= filter.groupId === 'all' || !filter.groupId ? 'all' : filter.groupId %>">
+            <div class="group-manage-dropdown" id="priceSetupGroupFilterDropdown">
+              <div class="group-manage-item <%= (filter.groupId === 'all' || !filter.groupId) ? 'is-active' : '' %>" data-id="" data-value="all" data-name="Chọn nhóm hàng" data-desc="">
+                <button class="group-manage-option" type="button">Chọn nhóm hàng</button>
+              </div>
+              <% (groups || []).forEach(function(group) { %>
+                <div class="group-manage-item <%= String(filter.groupId) === String(group._id) ? 'is-active' : '' %>" data-id="<%= group._id %>" data-value="<%= group._id %>" data-name="<%= group.ten_nhom_hang || '---' %>" data-desc="<%= group.mo_ta || '' %>">
+                  <button class="group-manage-option" type="button"><%= group.ten_nhom_hang || '---' %></button>
+                  <div class="group-manage-actions">
+                    <button class="group-manage-action-edit" type="button">Sửa</button>
+                    <button class="group-manage-action-delete" type="button">Xóa</button>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+        </section>
+
+        <section class="customer-filter-section">
+          <h4>Tồn kho</h4>
+          <select name="stock" onchange="document.getElementById('priceSetupPage').value='1'; this.form.submit();">
+            <option value="all" <%= filter.stock === 'all' ? 'selected' : '' %>>Tất cả</option>
+            <option value="co_ton" <%= filter.stock === 'co_ton' ? 'selected' : '' %>>Còn hàng</option>
+            <option value="het_hang" <%= filter.stock === 'het_hang' ? 'selected' : '' %>>Hết hàng</option>
+          </select>
+        </section>
+
+        <section class="customer-filter-section">
+          <h4>Giá bán</h4>
+          <select class="price-setup-select-placeholder" aria-label="Điều kiện giá">
+            <option>Chọn điều kiện</option>
+            <option>Bằng</option>
+            <option>Lớn hơn</option>
+            <option>Nhỏ hơn</option>
+          </select>
+          <select class="price-setup-select-placeholder" aria-label="Giá so sánh">
+            <option>Chọn giá so sánh</option>
+            <option>Giá vốn</option>
+            <option>Giá nhập cuối</option>
+          </select>
+        </section>
+
+        <section class="customer-filter-section">
+          <h4>Lọc nhanh</h4>
+          <div class="customer-filter-actions">
+            <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
+            <a class="btn btn-light" href="/hang-hoa/thiet-lap-gia">Xóa lọc</a>
+          </div>
+        </section>
       </aside>
 
-      <main class="price-main">
-        <div class="price-table-wrap">
-          <table class="price-table">
+      <div class="price-setup-workspace">
+        <header class="price-setup-page-head">
+          <h1 class="price-setup-title"><%= pageTitle %></h1>
+          <div class="price-setup-head-search">
+            <label class="customer-search price-setup-search-wide">
+              <span aria-hidden="true">⌕</span>
+              <input type="search" name="keyword" placeholder="Theo mã, tên hàng" value="<%= filter.keyword %>" autocomplete="off">
+              <span class="price-setup-barcode" title="Quét mã" aria-hidden="true">▥</span>
+            </label>
+          </div>
+          <div class="price-setup-head-actions">
+            <button type="button" class="btn btn-outline-kv js-open-bang-gia-modal">+ Bảng giá</button>
+            <button type="button" class="btn btn-light price-setup-btn-icon">
+              <span aria-hidden="true">↑</span> Import
+            </button>
+            <button type="button" class="btn btn-light price-setup-btn-icon">
+              <span aria-hidden="true">↓</span> Xuất file
+            </button>
+            <div class="price-setup-icon-group">
+              <button type="button" class="price-setup-icon-btn" title="Chế độ xem" aria-label="Chế độ xem">☰</button>
+              <button type="button" class="price-setup-icon-btn" title="Thiết lập" aria-label="Thiết lập">⚙</button>
+              <button type="button" class="price-setup-icon-btn" title="Trợ giúp" aria-label="Trợ giúp">?</button>
+            </div>
+          </div>
+        </header>
+
+        <% var _dynCols = (selectedBangGiaOrdered || []).length; %>
+        <% var _tableColspan = 5 + _dynCols; %>
+        <div class="customer-table-wrap price-setup-table-card">
+          <table class="admin-table customer-table price-setup-table">
             <thead>
               <tr>
-                <th class="price-code">Mã hàng</th>
-                <th class="price-name">Tên hàng</th>
-                <th class="num price-small-col">Tồn kho</th>
-                <th class="num price-small-col">Giá vốn</th>
-                <th class="num price-edit-col">Giá bán</th>
+                <th class="price-setup-col-icon" scope="col">
+                  <button type="button" class="price-setup-row-icon" disabled aria-hidden="true">🗑</button>
+                </th>
+                <th scope="col">Mã hàng</th>
+                <th scope="col">Tên hàng</th>
+                <th class="text-right" scope="col">Giá vốn</th>
+                <th class="text-right" scope="col">Giá nhập cuối</th>
+                <% (selectedBangGiaOrdered || []).forEach(function(bg) { %>
+                  <th class="text-right price-setup-col-retail" scope="col" title="<%= bg.ten_bang_gia || '' %>"><%= bg.ten_bang_gia || '—' %></th>
+                <% }) %>
+              </tr>
+              <tr class="price-setup-filter-row">
+                <th class="price-setup-col-icon"></th>
+                <th>
+                  <input class="price-setup-th-input" type="text" name="filterMa" placeholder="Tìm mã hàng" value="<%= filter.filterMa %>">
+                </th>
+                <th>
+                  <input class="price-setup-th-input" type="text" name="filterTen" placeholder="Tìm tên hàng" value="<%= filter.filterTen %>">
+                </th>
+                <th colspan="<%= 2 + _dynCols %>" class="price-setup-filter-row-spacer"></th>
               </tr>
             </thead>
             <tbody>
-              <% if (safeProducts.length) { %>
-                <% safeProducts.forEach(p => { %>
-                  <tr>
-                    <td class="price-code"><%= p.ma_hang %></td>
-                    <td class="price-name"><%= p.ten_hang %></td>
-                    <td class="num"><%= fmt(p.ton_kho) %></td>
-                    <td class="num"><%= fmt(p.gia_von) %></td>
-                    <td class="num">
-                      <input class="price-input" data-id="<%= p._id %>" data-original="<%= p.gia_ban || 0 %>" value="<%= fmt(p.gia_ban) %>" oninput="markChanged(this)" onfocus="unformatPrice(this)" onblur="formatPriceInput(this)">
-                    </td>
-                  </tr>
-                <% }) %>
-              <% } else { %>
-                <tr><td colspan="5" class="price-empty">Không tìm thấy hàng hóa phù hợp</td></tr>
+              <% if (!products || products.length === 0) { %>
+                <tr>
+                  <td colspan="<%= _tableColspan %>" class="empty-cell">Chưa có dữ liệu hàng hóa phù hợp bộ lọc.</td>
+                </tr>
               <% } %>
+              <% (products || []).forEach(function(item) {
+                   var giaVon = Number(item.gia_von || 0);
+                   var giaNhap = Number(item.gia_nhap_cuoi || 0);
+                   var giaNhapDisplay = giaNhap > 0 ? giaNhap.toLocaleString('vi-VN') : '—';
+                   var ctByBang = item.ctBangGiaByBangId || {};
+              %>
+                <tr data-product-id="<%= item._id %>">
+                  <td class="price-setup-col-icon">
+                    <button type="button" class="price-setup-row-icon" disabled title="Xóa">🗑</button>
+                  </td>
+                  <td><%= item.ma_hang || '—' %></td>
+                  <td><%= item.ten_hang || '—' %></td>
+                  <td class="text-right"><%= giaVon.toLocaleString('vi-VN') %></td>
+                  <td class="text-right"><%= giaNhapDisplay %></td>
+                  <% (selectedBangGiaOrdered || []).forEach(function(bg) {
+                       var bid = String(bg._id);
+                       var cell = ctByBang[bid] || {};
+                       var giaCell = Number(cell.gia_ban || 0);
+                  %>
+                    <td class="text-right price-setup-col-retail">
+                      <input
+                        class="price-setup-price-input js-ct-bang-gia-price"
+                        type="number"
+                        min="0"
+                        step="1000"
+                        data-product-id="<%= item._id %>"
+                        data-bang-gia-id="<%= bg._id %>"
+                        value="<%= giaCell %>"
+                        aria-label="Giá <%= bg.ten_bang_gia || '' %> — <%= item.ma_hang || '' %>"
+                      >
+                    </td>
+                  <% }) %>
+                </tr>
+              <% }) %>
             </tbody>
           </table>
         </div>
 
-        <div class="price-footer">
-          <span>Hiển thị</span>
-          <select name="limit" onchange="submitPriceFilters()">
-            <% [10, 15, 20, 50].forEach(size => { %>
-              <option value="<%= size %>" <%= pageInfo.limit === size ? 'selected' : '' %>><%= size %> dòng</option>
-            <% }) %>
-          </select>
-          <div class="pager">
-            <a class="<%= pageInfo.page <= 1 ? 'disabled' : '' %>" href="<%= pageUrl(1) %>"><i class="fa-solid fa-backward-step"></i></a>
-            <a class="<%= pageInfo.page <= 1 ? 'disabled' : '' %>" href="<%= pageUrl(Math.max(pageInfo.page - 1, 1)) %>"><i class="fa-solid fa-chevron-left"></i></a>
-            <span class="current"><%= pageInfo.page %></span>
-            <a class="<%= pageInfo.page >= pageInfo.totalPages ? 'disabled' : '' %>" href="<%= pageUrl(Math.min(pageInfo.page + 1, pageInfo.totalPages)) %>"><i class="fa-solid fa-chevron-right"></i></a>
-            <a class="<%= pageInfo.page >= pageInfo.totalPages ? 'disabled' : '' %>" href="<%= pageUrl(pageInfo.totalPages) %>"><i class="fa-solid fa-forward-step"></i></a>
+        <footer class="price-setup-footer">
+          <div class="price-setup-page-size">
+            <span>Hiển thị</span>
+            <select name="limit" class="price-setup-limit-select" onchange="document.getElementById('priceSetupPage').value='1'; document.getElementById('priceSetupFilterForm').submit();">
+              <% [15, 25, 50, 100].forEach(function(n) { %>
+                <option value="<%= n %>" <%= pagination.limit === n ? 'selected' : '' %>><%= n %> dòng</option>
+              <% }) %>
+            </select>
           </div>
-          <strong><%= fromRow %> - <%= toRow %> trong <%= pageInfo.total %> hàng hóa</strong>
-          <span class="price-status" id="priceStatus"></span>
-        </div>
-      </main>
+          <nav class="price-setup-pagination" aria-label="Phân trang">
+            <% if (pagination.page > 1) { %>
+              <a class="price-setup-page-link" href="/hang-hoa/thiet-lap-gia?<%= qs({ page: 1 }) %>">Đầu</a>
+              <a class="price-setup-page-link" href="/hang-hoa/thiet-lap-gia?<%= qs({ page: pagination.page - 1 }) %>">Trước</a>
+            <% } else { %>
+              <span class="price-setup-page-link is-disabled">Đầu</span>
+              <span class="price-setup-page-link is-disabled">Trước</span>
+            <% } %>
+            <span class="price-setup-page-current">
+              <input type="number" min="1" max="<%= pagination.totalPages %>" value="<%= pagination.page %>" class="price-setup-page-input" readonly aria-label="Trang hiện tại">
+              / <%= pagination.totalPages %>
+            </span>
+            <% if (pagination.page < pagination.totalPages) { %>
+              <a class="price-setup-page-link" href="/hang-hoa/thiet-lap-gia?<%= qs({ page: pagination.page + 1 }) %>">Sau</a>
+              <a class="price-setup-page-link" href="/hang-hoa/thiet-lap-gia?<%= qs({ page: pagination.totalPages }) %>">Cuối</a>
+            <% } else { %>
+              <span class="price-setup-page-link is-disabled">Sau</span>
+              <span class="price-setup-page-link is-disabled">Cuối</span>
+            <% } %>
+          </nav>
+          <div class="price-setup-count">
+            <%= pagination.from %> - <%= pagination.to %> trong <%= pagination.total %> hàng hóa
+          </div>
+        </footer>
+      </div>
+    </form>
+  </main>
+
+  <div id="priceSetupGroupModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="priceSetupGroupModalTitle">Sửa nhóm hàng</h3>
+        <button type="button" class="group-modal-close" id="priceSetupGroupModalClose">×</button>
+      </div>
+      <div class="group-modal-body">
+        <label>
+          <span>Tên nhóm</span>
+          <input id="priceSetupGroupNameInput" type="text" placeholder="Nhập tên nhóm">
+        </label>
+        <label>
+          <span>Ghi chú</span>
+          <input id="priceSetupGroupDescInput" type="text" placeholder="Nhập ghi chú">
+        </label>
+      </div>
+      <div class="group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="priceSetupGroupModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="priceSetupGroupModalSubmit">Lưu</button>
+      </div>
     </div>
-  </form>
+  </div>
+
+  <script id="priceSetupGroupsSeed" type="application/json"><%- JSON.stringify(groups || []) %></script>
+
+  <div class="bang-gia-modal-overlay" id="bangGiaModalOverlay" aria-hidden="true">
+    <div class="bang-gia-modal" role="dialog" aria-modal="true" aria-labelledby="bangGiaModalTitle">
+      <div class="bang-gia-modal-header">
+        <h2 id="bangGiaModalTitle" class="bang-gia-modal-title">Tạo bảng giá</h2>
+        <button type="button" class="bang-gia-modal-close" id="bangGiaModalClose" aria-label="Đóng">×</button>
+      </div>
+
+      <div class="bang-gia-modal-tabs">
+        <button type="button" class="bang-gia-tab is-active" data-tab="thong-tin">Thông tin</button>
+      </div>
+
+      <form id="bangGiaCreateForm" class="bang-gia-modal-form">
+        <div class="bang-gia-tab-panel is-active" data-panel="thong-tin">
+          <div class="bang-gia-field">
+            <label class="bang-gia-label">Tên bảng giá <span class="bang-gia-required">*</span></label>
+            <input class="bang-gia-input" type="text" name="ten_bang_gia" placeholder="Nhập tên bảng giá" required autocomplete="off">
+          </div>
+
+          <details class="bang-gia-details" open>
+            <summary class="bang-gia-details-summary">
+              <span class="bang-gia-details-chevron" aria-hidden="true">▲</span>
+              Hiệu lực
+            </summary>
+            <div class="bang-gia-details-body">
+              <div class="bang-gia-field">
+                <label class="bang-gia-label-sub">Hiệu lực</label>
+                <div class="bang-gia-datetime-row">
+                  <input class="bang-gia-input bang-gia-datetime" type="datetime-local" name="ngay_bat_dau" value="<%= typeof defaultNgayBatDau !== 'undefined' ? defaultNgayBatDau : '' %>">
+                  <span class="bang-gia-datetime-sep">đến</span>
+                  <input class="bang-gia-input bang-gia-datetime" type="datetime-local" name="ngay_ket_thuc" value="<%= typeof defaultNgayKetThuc !== 'undefined' ? defaultNgayKetThuc : '' %>">
+                </div>
+              </div>
+              <div class="bang-gia-field">
+                <label class="bang-gia-label-sub">Trạng thái</label>
+                <div class="bang-gia-radio-row">
+                  <label class="bang-gia-radio">
+                    <input type="radio" name="trang_thai" value="active" checked>
+                    <span>Áp dụng</span>
+                  </label>
+                  <label class="bang-gia-radio">
+                    <input type="radio" name="trang_thai" value="draft">
+                    <span>Chưa áp dụng</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <details class="bang-gia-details" open>
+            <summary class="bang-gia-details-summary">
+              <span class="bang-gia-details-chevron" aria-hidden="true">▲</span>
+              Công thức giá
+            </summary>
+            <div class="bang-gia-details-body">
+              <p class="bang-gia-hint">Tạo công thức dựa trên giá vốn, giá nhập hoặc giá bán ở các bảng giá khác</p>
+              <div class="bang-gia-formula-row">
+                <span class="bang-gia-formula-label">Giá mới =</span>
+                <select class="bang-gia-select bang-gia-formula-select" name="nguon_co_so" id="bangGiaNguonCoSo">
+                  <option value="">Chọn bảng giá</option>
+                  <optgroup label="Theo giá hàng">
+                    <option value="gia_von">Giá vốn</option>
+                    <option value="gia_nhap_cuoi">Giá nhập cuối</option>
+                  </optgroup>
+                  <% if ((bangGiaList || []).length > 0) { %>
+                    <optgroup label="Bảng giá khác">
+                      <% bangGiaList.forEach(function(bg) { %>
+                        <option value="bang:<%= bg._id %>"><%= bg.ten_bang_gia %></option>
+                      <% }) %>
+                    </optgroup>
+                  <% } %>
+                </select>
+                <div class="bang-gia-step-btns">
+                  <button type="button" class="bang-gia-step-btn is-active" data-phep="cong" title="Cộng">+</button>
+                  <button type="button" class="bang-gia-step-btn" data-phep="tru" title="Trừ">−</button>
+                </div>
+                <input type="hidden" name="phep_tinh" id="bangGiaPhepTinh" value="cong">
+                <input class="bang-gia-input bang-gia-formula-num" type="number" name="gia_tri_dieu_chinh" id="bangGiaGiaTri" min="0" step="1" value="0">
+                <div class="bang-gia-unit-toggle" role="group" aria-label="Đơn vị điều chỉnh">
+                  <button type="button" class="bang-gia-unit-btn is-active" data-kieu="vnd">VNĐ</button>
+                  <button type="button" class="bang-gia-unit-btn" data-kieu="phan_tram">%</button>
+                </div>
+                <input type="hidden" name="kieu_dieu_chinh" id="bangGiaKieuDieuChinh" value="vnd">
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <div class="bang-gia-tab-panel" data-panel="pham-vi" hidden>
+          <p class="bang-gia-scope-placeholder">Chọn cửa hàng, kênh bán và nhóm khách áp dụng bảng giá. Tính năng đang được hoàn thiện.</p>
+        </div>
+
+        <div class="bang-gia-modal-footer">
+          <button type="button" class="btn btn-light bang-gia-btn-skip" id="bangGiaModalCancel">Bỏ qua</button>
+          <button type="submit" class="btn btn-primary bang-gia-btn-save">Lưu</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="price-setup-trial-banner" role="status">
+    <span class="price-setup-trial-icon" aria-hidden="true">⚠</span>
+    <span>Tài khoản dùng thử sẽ hết hạn sau 3 ngày. Bạn có thể tham khảo các gói dịch vụ tại đây.</span>
+  </div>
 
   <script>
-    const priceForm = document.getElementById('priceFilterForm');
-
-    function buildPageUrl(page) {
-      const params = new URLSearchParams(new FormData(priceForm));
-      params.set('page', page);
-      return '/hang-hoa/thiet-lap-gia?' + params.toString();
-    }
-
-    document.querySelectorAll('.pager a').forEach(link => {
-      const icon = link.querySelector('i');
-      if (!icon || link.classList.contains('disabled')) {
-        link.addEventListener('click', e => e.preventDefault());
-        return;
-      }
-      const isFirst = icon.classList.contains('fa-backward-step');
-      const isPrev = icon.classList.contains('fa-chevron-left');
-      const isNext = icon.classList.contains('fa-chevron-right');
-      const page = isFirst ? 1 : isPrev ? <%= Math.max(pageInfo.page - 1, 1) %> : isNext ? <%= Math.min(pageInfo.page + 1, pageInfo.totalPages) %> : <%= pageInfo.totalPages %>;
-      link.href = buildPageUrl(page);
-    });
-
-    function submitPriceFilters() {
-      const pageInput = document.createElement('input');
-      pageInput.type = 'hidden';
-      pageInput.name = 'page';
-      pageInput.value = '1';
-      priceForm.appendChild(pageInput);
-      priceForm.submit();
-    }
-
-    function numberValue(value) {
-      const parsed = Number(String(value || '').replace(/\./g, '').replace(/,/g, '').trim());
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-
-    function unformatPrice(input) {
-      input.value = String(numberValue(input.value));
-      input.select();
-    }
-
-    function formatPriceInput(input) {
-      input.value = numberValue(input.value).toLocaleString('vi-VN');
-      markChanged(input);
-    }
-
-    function markChanged(input) {
-      const changed = numberValue(input.value) !== Number(input.dataset.original || 0);
-      input.classList.toggle('changed', changed);
-      document.getElementById('priceStatus').textContent = document.querySelectorAll('.price-input.changed').length ? 'Có thay đổi chưa lưu' : '';
-    }
-
-    async function savePrices() {
-      const changedInputs = Array.from(document.querySelectorAll('.price-input.changed'));
-      if (!changedInputs.length) {
-        document.getElementById('priceStatus').textContent = 'Không có thay đổi';
-        return;
-      }
-
-      const prices = changedInputs.map(input => ({
-        id: input.dataset.id,
-        gia_ban: numberValue(input.value)
-      }));
-
-      try {
-        const res = await fetch('/hang-hoa/thiet-lap-gia/update', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prices })
+    (function () {
+      var form = document.getElementById('priceSetupFilterForm');
+      if (form) {
+        form.addEventListener('submit', function (e) {
+          var sub = e.submitter;
+          if (sub && sub.getAttribute('data-pagination') === '1') return;
+          var pageEl = document.getElementById('priceSetupPage');
+          if (pageEl) pageEl.value = '1';
         });
-        const data = await res.json();
-        if (!data.success) {
-          alert(data.message || 'Không cập nhật được giá');
+      }
+
+      document.querySelectorAll('.js-ct-bang-gia-price').forEach(function (input) {
+        input.addEventListener('change', function () {
+          var pid = input.getAttribute('data-product-id');
+          var bid = input.getAttribute('data-bang-gia-id');
+          if (!pid || !bid) return;
+          var v = parseInt(input.value, 10);
+          if (!Number.isFinite(v) || v < 0) v = 0;
+          input.disabled = true;
+          fetch('/hang-hoa/thiet-lap-gia/ct-bang-gia', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ hang_hoa_id: pid, bang_gia_id: bid, gia_ban: v })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              input.disabled = false;
+              if (data && data.success) {
+                input.classList.add('is-saved');
+                setTimeout(function () { input.classList.remove('is-saved'); }, 1200);
+              }
+            })
+            .catch(function () {
+              input.disabled = false;
+            });
+        });
+      });
+
+      var priceSetupBangGiaTrigger = document.getElementById('priceSetupBangGiaTrigger');
+      var priceSetupBangGiaPopover = document.getElementById('priceSetupBangGiaPopover');
+      var priceSetupBangGiaSearch = document.getElementById('priceSetupBangGiaSearch');
+      var priceSetupBangGiaApply = document.getElementById('priceSetupBangGiaApply');
+      var priceSetupBangGiaSelectAll = document.getElementById('priceSetupBangGiaSelectAll');
+
+      function priceSetupToggleBangGiaPopover(open) {
+        if (!priceSetupBangGiaPopover || !priceSetupBangGiaTrigger) return;
+        var isOpen = open !== undefined ? open : !priceSetupBangGiaPopover.classList.contains('is-open');
+        priceSetupBangGiaPopover.classList.toggle('is-open', isOpen);
+        priceSetupBangGiaTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      }
+
+      if (priceSetupBangGiaTrigger && priceSetupBangGiaPopover) {
+        priceSetupBangGiaTrigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          priceSetupToggleBangGiaPopover();
+        });
+      }
+
+      if (priceSetupBangGiaSearch) {
+        priceSetupBangGiaSearch.addEventListener('input', function () {
+          var q = String(priceSetupBangGiaSearch.value || '').trim().toLowerCase();
+          document.querySelectorAll('#priceSetupBangGiaCheckboxList .price-setup-bg-item').forEach(function (row) {
+            var name = row.getAttribute('data-name') || '';
+            row.style.display = !q || name.indexOf(q) >= 0 ? '' : 'none';
+          });
+        });
+      }
+
+      function priceSetupSyncBangGiaHiddenFromPopover() {
+        var form = document.getElementById('priceSetupFilterForm');
+        if (!form) return;
+        form.querySelectorAll('.js-bang-gia-hidden').forEach(function (h) { h.remove(); });
+        document.querySelectorAll('#priceSetupBangGiaCheckboxList input[type="checkbox"]:checked').forEach(function (cb) {
+          var inp = document.createElement('input');
+          inp.type = 'hidden';
+          inp.name = 'bangGia';
+          inp.value = cb.value;
+          inp.className = 'js-bang-gia-hidden';
+          form.appendChild(inp);
+        });
+      }
+
+      if (priceSetupBangGiaApply) {
+        priceSetupBangGiaApply.addEventListener('click', function () {
+          priceSetupSyncBangGiaHiddenFromPopover();
+          var pageEl = document.getElementById('priceSetupPage');
+          if (pageEl) pageEl.value = '1';
+          priceSetupToggleBangGiaPopover(false);
+          document.getElementById('priceSetupFilterForm').submit();
+        });
+      }
+
+      if (priceSetupBangGiaSelectAll) {
+        priceSetupBangGiaSelectAll.addEventListener('click', function () {
+          document.querySelectorAll('#priceSetupBangGiaCheckboxList .price-setup-bg-item').forEach(function (row) {
+            if (row.style.display === 'none') return;
+            var cb = row.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = true;
+          });
+        });
+      }
+
+      document.querySelectorAll('.js-remove-bang-gia-tag').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var rid = btn.getAttribute('data-bang-gia-id');
+          if (!rid) return;
+          var form = document.getElementById('priceSetupFilterForm');
+          if (!form) return;
+          var fd = new FormData(form);
+          var params = new URLSearchParams();
+          fd.forEach(function (val, key) {
+            if (key === 'bangGia' && String(val) === String(rid)) return;
+            params.append(key, val);
+          });
+          params.set('page', '1');
+          window.location.href = '/hang-hoa/thiet-lap-gia?' + params.toString();
+        });
+      });
+
+      var bangGiaOverlay = document.getElementById('bangGiaModalOverlay');
+      var bangGiaForm = document.getElementById('bangGiaCreateForm');
+      var bangGiaCloseBtn = document.getElementById('bangGiaModalClose');
+      var bangGiaCancelBtn = document.getElementById('bangGiaModalCancel');
+
+      function openBangGiaModal() {
+        if (!bangGiaOverlay) return;
+        bangGiaOverlay.classList.add('is-open');
+        bangGiaOverlay.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeBangGiaModal() {
+        if (!bangGiaOverlay) return;
+        bangGiaOverlay.classList.remove('is-open');
+        bangGiaOverlay.setAttribute('aria-hidden', 'true');
+      }
+
+      document.querySelectorAll('.js-open-bang-gia-modal').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          openBangGiaModal();
+        });
+      });
+
+      if (bangGiaCloseBtn) bangGiaCloseBtn.addEventListener('click', closeBangGiaModal);
+      if (bangGiaCancelBtn) bangGiaCancelBtn.addEventListener('click', closeBangGiaModal);
+
+      if (bangGiaOverlay) {
+        bangGiaOverlay.addEventListener('click', function (e) {
+          if (e.target === bangGiaOverlay) closeBangGiaModal();
+        });
+      }
+
+      var priceSetupGroupModalOverlay = document.getElementById('priceSetupGroupModalOverlay');
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        if (bangGiaOverlay && bangGiaOverlay.classList.contains('is-open')) {
+          closeBangGiaModal();
           return;
         }
-        changedInputs.forEach(input => {
-          input.dataset.original = String(numberValue(input.value));
-          input.classList.remove('changed');
+        if (priceSetupGroupModalOverlay && priceSetupGroupModalOverlay.classList.contains('is-open')) {
+          priceSetupGroupModalOverlay.classList.remove('is-open');
+        }
+      });
+
+      document.querySelectorAll('.bang-gia-tab').forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          var name = tab.getAttribute('data-tab');
+          document.querySelectorAll('.bang-gia-tab').forEach(function (t) { t.classList.remove('is-active'); });
+          tab.classList.add('is-active');
+          document.querySelectorAll('.bang-gia-tab-panel').forEach(function (panel) {
+            var isMatch = panel.getAttribute('data-panel') === name;
+            panel.classList.toggle('is-active', isMatch);
+            panel.hidden = !isMatch;
+          });
         });
-        document.getElementById('priceStatus').textContent = data.message || 'Đã lưu giá';
-      } catch (error) {
-        alert('Lỗi kết nối khi lưu giá');
+      });
+
+      document.querySelectorAll('.bang-gia-step-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var phep = btn.getAttribute('data-phep');
+          document.querySelectorAll('.bang-gia-step-btn').forEach(function (b) { b.classList.remove('is-active'); });
+          btn.classList.add('is-active');
+          var hidden = document.getElementById('bangGiaPhepTinh');
+          if (hidden && phep) hidden.value = phep;
+        });
+      });
+
+      document.querySelectorAll('.bang-gia-unit-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var kieu = btn.getAttribute('data-kieu');
+          var wrap = btn.closest('.bang-gia-unit-toggle');
+          if (wrap) {
+            wrap.querySelectorAll('.bang-gia-unit-btn').forEach(function (b) { b.classList.remove('is-active'); });
+          }
+          btn.classList.add('is-active');
+          var hidden = document.getElementById('bangGiaKieuDieuChinh');
+          if (hidden && kieu) hidden.value = kieu;
+        });
+      });
+
+      function syncCashierCanhBao() {
+        var strict = document.querySelector('input[name="cashier_mode"][value="strict"]');
+        var flex = document.querySelector('input[name="cashier_mode"][value="flexible"]');
+        var cb = document.getElementById('bangGiaCanhBao');
+        if (!cb) return;
+        var isStrict = strict && strict.checked;
+        cb.disabled = !!isStrict;
+        if (isStrict) cb.checked = false;
       }
-    }
+
+      document.querySelectorAll('input[name="cashier_mode"]').forEach(function (r) {
+        r.addEventListener('change', syncCashierCanhBao);
+      });
+      syncCashierCanhBao();
+
+      if (bangGiaForm) {
+        bangGiaForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var tenInput = bangGiaForm.querySelector('[name="ten_bang_gia"]');
+          var ten = tenInput ? String(tenInput.value || '').trim() : '';
+          if (!ten) {
+            if (tenInput) tenInput.focus();
+            return;
+          }
+
+          var nguonEl = document.getElementById('bangGiaNguonCoSo');
+          var nguonVal = nguonEl && nguonEl.value ? nguonEl.value : 'gia_von';
+
+          var trangRadio = bangGiaForm.querySelector('input[name="trang_thai"]:checked');
+          var cashierRadio = bangGiaForm.querySelector('input[name="cashier_mode"]:checked');
+          var canhBaoEl = document.getElementById('bangGiaCanhBao');
+
+          var payload = {
+            ten_bang_gia: ten,
+            ngay_bat_dau: (bangGiaForm.querySelector('[name="ngay_bat_dau"]') || {}).value || '',
+            ngay_ket_thuc: (bangGiaForm.querySelector('[name="ngay_ket_thuc"]') || {}).value || '',
+            trang_thai: trangRadio ? trangRadio.value : 'active',
+            nguon_co_so: nguonVal,
+            phep_tinh: (document.getElementById('bangGiaPhepTinh') || {}).value || 'cong',
+            kieu_dieu_chinh: (document.getElementById('bangGiaKieuDieuChinh') || {}).value || 'vnd',
+            gia_tri_dieu_chinh: (document.getElementById('bangGiaGiaTri') || {}).value || '0',
+            cashier_mode: cashierRadio ? cashierRadio.value : 'flexible'
+          };
+
+          if (payload.cashier_mode === 'flexible' && canhBaoEl && canhBaoEl.checked) {
+            payload.canh_bao_hang_ngoai = '1';
+          }
+
+          var saveBtn = bangGiaForm.querySelector('.bang-gia-btn-save');
+          if (saveBtn) saveBtn.disabled = true;
+
+          fetch('/hang-hoa/bang-gia/add', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          })
+            .then(function (r) {
+              return r.text().then(function (text) {
+                var data = null;
+                try {
+                  data = text ? JSON.parse(text) : null;
+                } catch (err) {
+                  data = null;
+                }
+                return { ok: r.ok, data: data };
+              });
+            })
+            .then(function (res) {
+              if (saveBtn) saveBtn.disabled = false;
+              if (res.ok && res.data && res.data.success) {
+                closeBangGiaModal();
+                window.location.href = '/hang-hoa/thiet-lap-gia?success=created_bang_gia';
+              } else {
+                var msg = (res.data && res.data.message) ? res.data.message : 'Không lưu được bảng giá.';
+                window.alert(msg);
+              }
+            })
+            .catch(function () {
+              if (saveBtn) saveBtn.disabled = false;
+              window.alert('Lỗi kết nối. Vui lòng thử lại.');
+            });
+        });
+      }
+
+      var priceSetupGroupFilterTrigger = document.getElementById('priceSetupGroupFilterTrigger');
+      var priceSetupGroupFilterLabel = document.getElementById('priceSetupGroupFilterLabel');
+      var priceSetupGroupFilterValue = document.getElementById('priceSetupGroupFilterValue');
+      var priceSetupGroupFilterDropdown = document.getElementById('priceSetupGroupFilterDropdown');
+      var priceSetupGroupAddBtn = document.getElementById('priceSetupGroupAddBtn');
+      var priceSetupGroupModalTitle = document.getElementById('priceSetupGroupModalTitle');
+      var priceSetupGroupModalClose = document.getElementById('priceSetupGroupModalClose');
+      var priceSetupGroupModalCancel = document.getElementById('priceSetupGroupModalCancel');
+      var priceSetupGroupModalSubmit = document.getElementById('priceSetupGroupModalSubmit');
+      var priceSetupGroupNameInput = document.getElementById('priceSetupGroupNameInput');
+      var priceSetupGroupDescInput = document.getElementById('priceSetupGroupDescInput');
+      var priceSetupGroupModalMode = 'add';
+      var priceSetupActiveGroupItem = null;
+
+      function priceSetupBindGroupItems() {
+        var groupItems = Array.prototype.slice.call(document.querySelectorAll('#priceSetupGroupFilterDropdown .group-manage-item'));
+        groupItems.forEach(function (item) {
+          var optionBtn = item.querySelector('.group-manage-option');
+          var editBtn = item.querySelector('.group-manage-action-edit');
+          var deleteBtn = item.querySelector('.group-manage-action-delete');
+
+          if (optionBtn) {
+            optionBtn.addEventListener('click', function () {
+              groupItems.forEach(function (node) { node.classList.remove('is-active'); });
+              item.classList.add('is-active');
+              if (priceSetupGroupFilterValue) {
+                priceSetupGroupFilterValue.value = item.getAttribute('data-value') || 'all';
+              }
+              if (priceSetupGroupFilterLabel) {
+                priceSetupGroupFilterLabel.textContent = item.getAttribute('data-name') || 'Chọn nhóm hàng';
+              }
+              if (priceSetupGroupFilterDropdown) {
+                priceSetupGroupFilterDropdown.classList.remove('is-open');
+              }
+            });
+          }
+
+          if (editBtn) {
+            editBtn.addEventListener('click', function (event) {
+              event.stopPropagation();
+              priceSetupActiveGroupItem = item;
+              priceSetupOpenGroupModal('edit');
+            });
+          }
+
+          if (deleteBtn) {
+            deleteBtn.addEventListener('click', function (event) {
+              event.stopPropagation();
+              var groupId = item.getAttribute('data-id') || '';
+              if (!groupId) {
+                window.alert('Vui lòng chọn nhóm cần xóa.');
+                return;
+              }
+              if (!window.confirm('Bạn có chắc muốn xóa nhóm hàng này không?')) return;
+              priceSetupRequestGroups('/hang-hoa/groups/' + groupId + '/delete', {}, '');
+            });
+          }
+        });
+      }
+
+      function priceSetupRenderGroupList(selectedValue) {
+        if (!priceSetupGroupFilterDropdown) return;
+        var list = window.__priceSetupGroups || [];
+        var rows = [];
+        rows.push(
+          '<div class="group-manage-item ' + ((selectedValue === 'all' || !selectedValue) ? 'is-active' : '') + '" data-id="" data-value="all" data-name="Chọn nhóm hàng" data-desc="">' +
+            '<button class="group-manage-option" type="button">Chọn nhóm hàng</button>' +
+          '</div>'
+        );
+        list.forEach(function (group) {
+          var id = String(group._id || '');
+          var isActive = id === String(selectedValue || '');
+          rows.push(
+            '<div class="group-manage-item ' + (isActive ? 'is-active' : '') + '" data-id="' + id + '" data-value="' + id + '" data-name="' + (group.ten_nhom_hang || '').replace(/"/g, '&quot;') + '" data-desc="' + (group.mo_ta || '').replace(/"/g, '&quot;') + '">' +
+              '<button class="group-manage-option" type="button">' + (group.ten_nhom_hang || '') + '</button>' +
+              '<div class="group-manage-actions">' +
+                '<button class="group-manage-action-edit" type="button">Sửa</button>' +
+                '<button class="group-manage-action-delete" type="button">Xóa</button>' +
+              '</div>' +
+            '</div>'
+          );
+        });
+        priceSetupGroupFilterDropdown.innerHTML = rows.join('');
+        priceSetupBindGroupItems();
+      }
+
+      function priceSetupRefreshGroupWidget(selectedId) {
+        var selected = selectedId || (priceSetupGroupFilterValue ? priceSetupGroupFilterValue.value : 'all') || 'all';
+        priceSetupRenderGroupList(selected);
+        if (priceSetupGroupFilterDropdown && priceSetupGroupFilterLabel) {
+          var activeItem = priceSetupGroupFilterDropdown.querySelector('.group-manage-item.is-active');
+          priceSetupGroupFilterLabel.textContent = activeItem
+            ? (activeItem.getAttribute('data-name') || 'Chọn nhóm hàng')
+            : 'Chọn nhóm hàng';
+          if (priceSetupGroupFilterValue) {
+            priceSetupGroupFilterValue.value = activeItem
+              ? (activeItem.getAttribute('data-value') || 'all')
+              : 'all';
+          }
+        }
+      }
+
+      function priceSetupRequestGroups(url, payload, selectedId) {
+        var formBody = Object.keys(payload).map(function (key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function (response) { return response.json(); })
+          .then(function (data) {
+            if (!data || !data.success) {
+              window.alert('Không thể xử lý nhóm hàng.');
+              return;
+            }
+            window.__priceSetupGroups = Array.isArray(data.groups) ? data.groups : [];
+            priceSetupRefreshGroupWidget(data.selectedId || selectedId || '');
+            if (priceSetupGroupModalOverlay) {
+              priceSetupGroupModalOverlay.classList.remove('is-open');
+            }
+          })
+          .catch(function () {
+            window.alert('Có lỗi khi xử lý nhóm hàng.');
+          });
+      }
+
+      function priceSetupOpenGroupModal(mode) {
+        priceSetupGroupModalMode = mode;
+        if (!priceSetupGroupModalOverlay || !priceSetupGroupModalTitle) return;
+        if (mode === 'add') {
+          priceSetupGroupModalTitle.textContent = 'Thêm nhóm hàng';
+          if (priceSetupGroupNameInput) priceSetupGroupNameInput.value = '';
+          if (priceSetupGroupDescInput) priceSetupGroupDescInput.value = '';
+        } else {
+          priceSetupGroupModalTitle.textContent = 'Sửa nhóm hàng';
+          if (priceSetupGroupNameInput) {
+            priceSetupGroupNameInput.value = priceSetupActiveGroupItem
+              ? (priceSetupActiveGroupItem.getAttribute('data-name') || '')
+              : '';
+          }
+          if (priceSetupGroupDescInput) {
+            priceSetupGroupDescInput.value = priceSetupActiveGroupItem
+              ? (priceSetupActiveGroupItem.getAttribute('data-desc') || '')
+              : '';
+          }
+        }
+        priceSetupGroupModalOverlay.classList.add('is-open');
+      }
+
+      if (priceSetupGroupFilterTrigger && priceSetupGroupFilterDropdown) {
+        priceSetupGroupFilterTrigger.addEventListener('click', function () {
+          priceSetupGroupFilterDropdown.classList.toggle('is-open');
+        });
+      }
+
+      if (priceSetupGroupAddBtn) {
+        priceSetupGroupAddBtn.addEventListener('click', function () {
+          priceSetupOpenGroupModal('add');
+        });
+      }
+
+      if (priceSetupGroupModalClose) {
+        priceSetupGroupModalClose.addEventListener('click', function () {
+          if (priceSetupGroupModalOverlay) priceSetupGroupModalOverlay.classList.remove('is-open');
+        });
+      }
+      if (priceSetupGroupModalCancel) {
+        priceSetupGroupModalCancel.addEventListener('click', function () {
+          if (priceSetupGroupModalOverlay) priceSetupGroupModalOverlay.classList.remove('is-open');
+        });
+      }
+
+      if (priceSetupGroupModalSubmit) {
+        priceSetupGroupModalSubmit.addEventListener('click', function () {
+          if (!priceSetupGroupNameInput || !priceSetupGroupNameInput.value.trim()) {
+            window.alert('Vui lòng nhập tên nhóm hàng.');
+            return;
+          }
+          if (priceSetupGroupModalMode === 'add') {
+            priceSetupRequestGroups('/hang-hoa/groups/add', {
+              ten_nhom_hang: priceSetupGroupNameInput.value.trim(),
+              mo_ta: priceSetupGroupDescInput ? priceSetupGroupDescInput.value.trim() : ''
+            }, '');
+            return;
+          }
+          var groupId = priceSetupActiveGroupItem
+            ? (priceSetupActiveGroupItem.getAttribute('data-id') || '')
+            : '';
+          if (!groupId) {
+            window.alert('Vui lòng chọn nhóm cần sửa.');
+            return;
+          }
+          priceSetupRequestGroups('/hang-hoa/groups/' + groupId + '/update', {
+            ten_nhom_hang: priceSetupGroupNameInput.value.trim(),
+            mo_ta: priceSetupGroupDescInput ? priceSetupGroupDescInput.value.trim() : ''
+          }, groupId);
+        });
+      }
+
+      var priceSetupGroupsSeed = document.getElementById('priceSetupGroupsSeed');
+      window.__priceSetupGroups = priceSetupGroupsSeed
+        ? JSON.parse(priceSetupGroupsSeed.textContent || '[]')
+        : [];
+      priceSetupRefreshGroupWidget((priceSetupGroupFilterValue && priceSetupGroupFilterValue.value) || 'all');
+
+      document.addEventListener('click', function (event) {
+        if (priceSetupBangGiaPopover && priceSetupBangGiaTrigger) {
+          if (
+            !priceSetupBangGiaPopover.contains(event.target) &&
+            !priceSetupBangGiaTrigger.contains(event.target)
+          ) {
+            priceSetupBangGiaPopover.classList.remove('is-open');
+            priceSetupBangGiaTrigger.setAttribute('aria-expanded', 'false');
+          }
+        }
+        if (priceSetupGroupFilterDropdown && priceSetupGroupFilterTrigger) {
+          if (
+            !priceSetupGroupFilterDropdown.contains(event.target) &&
+            !priceSetupGroupFilterTrigger.contains(event.target)
+          ) {
+            priceSetupGroupFilterDropdown.classList.remove('is-open');
+          }
+        }
+      });
+    })();
   </script>
 </body>
 </html>

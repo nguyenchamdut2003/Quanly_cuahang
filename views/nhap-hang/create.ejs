@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .purchase-page{height:calc(100vh - 98px);background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1fr) 398px;gap:10px;padding:10px 11% 0}
+    .purchase-left{min-width:0;display:flex;flex-direction:column;background:#fff;border:1px solid #d7dde5}
+    .purchase-top{height:43px;display:flex;align-items:center;gap:12px;padding:0 0 0 4px;background:#f3f6f9;border-bottom:1px solid #d7dde5}
+    .back-link{width:26px;height:32px;display:flex;align-items:center;justify-content:center;color:#111827;text-decoration:none;font-size:18px}
+    .purchase-title{font-size:20px;font-weight:700;color:#111827;margin-right:4px}
+    .product-search{position:relative;flex:1;max-width:470px}
+    .product-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#667085}
+    .product-search input{width:100%;height:32px;border:1px solid #0070f4;border-radius:7px;padding:0 76px 0 36px;font-size:13px;outline:none}
+    .search-actions{position:absolute;right:6px;top:5px;display:flex;gap:12px;color:#111827}
+    .search-results{display:none;position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 8px 22px rgba(0,0,0,.14);z-index:10;max-height:300px;overflow:auto}
+    .search-item{height:42px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;cursor:pointer}
+    .search-item:hover{background:#f0f7ff}
+    .table-wrap{flex:1;min-height:0;overflow:auto;background:#fff}
+    .items-table{width:100%;min-width:920px;border-collapse:collapse}
+    .items-table th{height:36px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:13px;font-weight:700;padding:0 10px;text-align:left}
+    .items-table td{height:42px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
+    .items-table .lot-row td{height:auto;padding:6px 10px;background:#fbfdff}
+    .lot-line{display:flex;align-items:center;gap:10px;font-size:12px;color:#344054}
+    .lot-line .lot-link{color:#0070f4;cursor:pointer;text-decoration:none;font-weight:600}
+    .items-table .num{text-align:right}
+    .input-small{width:92px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 7px}
+    .empty-import{height:calc(100vh - 260px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#111827}
+    .empty-import h3{font-size:18px;margin:0 0 22px}
+    .empty-import p{font-size:13px;margin:0 0 32px}
+    .empty-import a{color:#0070f4;text-decoration:none}
+    .file-btn{height:52px;border:0;background:#0070f4;color:#fff;border-radius:3px;padding:0 24px;font-size:18px;font-weight:700;display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+    .purchase-right{background:#fff;border-radius:6px;display:flex;flex-direction:column;padding:18px 12px 10px}
+    .right-tools{height:28px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .icon-group{display:flex;gap:6px}
+    .icon-btn{width:30px;height:28px;border:1px solid #cfd8e3;background:#fff;border-radius:5px;display:flex;align-items:center;justify-content:center;color:#111827}
+    .right-row{display:flex;gap:12px;margin-bottom:14px}
+    .select-like,.date-input,.side-input{height:30px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;padding:0 10px;font-size:13px;outline:none}
+    .select-like{flex:1}
+    .date-input{width:138px}
+    .supplier-search{position:relative;margin-bottom:14px}
+    .supplier-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 36px 0 10px;font-size:13px;outline:none}
+    .supplier-search i{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:18px}
+    .supplier-results{display:none;position:absolute;top:35px;left:0;right:0;background:#fff;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 8px 22px rgba(0,0,0,.14);z-index:10;max-height:260px;overflow:auto}
+    .supplier-products{margin-bottom:10px;border:1px solid #e1e7ef;border-radius:8px;padding:8px;background:#fafcff}
+    .supplier-products-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .supplier-products-head strong{font-size:12px}
+    .btn-add-mini{height:26px;border:0;background:#0070f4;color:#fff;border-radius:6px;padding:0 8px;font-size:12px;cursor:pointer}
+    .supplier-products-search{width:100%;height:30px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:12px;margin-bottom:8px}
+    .supplier-products-list{max-height:210px;overflow:auto}
+    .supplier-products-empty{font-size:12px;color:#667085;padding:8px 4px}
+    .supplier-product-row{display:grid;grid-template-columns:1fr 64px 50px 54px;gap:6px;align-items:center;padding:6px 4px;border-bottom:1px dashed #e5e9ee}
+    .supplier-product-main{min-width:0}
+    .supplier-product-main b{display:block;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .supplier-product-main span{display:block;font-size:11px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .supplier-product-price{font-size:12px;text-align:right}
+    .btn-row{height:24px;border-radius:6px;border:1px solid #cfd8e3;background:#fff;font-size:11px;cursor:pointer}
+    .btn-row.primary{background:#0070f4;color:#fff;border-color:#0070f4}
+    .quick-modal{position:fixed;inset:0;background:rgba(15,23,42,.3);display:none;align-items:center;justify-content:center;z-index:999}
+    .quick-modal.open{display:flex}
+    .quick-modal-card{width:520px;max-width:calc(100vw - 20px);background:#fff;border-radius:10px;padding:14px}
+    .quick-modal-title{font-size:16px;font-weight:700;margin-bottom:10px}
+    .quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .quick-grid .full{grid-column:1/-1}
+    .quick-input{height:34px;border:1px solid #cfd8e3;border-radius:7px;padding:0 10px;font-size:13px;width:100%}
+    .quick-check{display:flex;align-items:center;gap:8px;font-size:13px}
+    .quick-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+    .lot-modal{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;align-items:center;justify-content:center;z-index:1000}
+    .lot-modal.open{display:flex}
+    .lot-modal-card{width:520px;max-width:calc(100vw - 20px);background:#fff;border-radius:10px;padding:14px}
+    .lot-modal-title{font-size:16px;font-weight:700;margin-bottom:10px}
+    .lot-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .lot-grid .full{grid-column:1/-1}
+    .lot-input{height:34px;border:1px solid #cfd8e3;border-radius:7px;padding:0 10px;font-size:13px;width:100%}
+    .lot-note{height:68px;border:1px solid #cfd8e3;border-radius:7px;padding:8px 10px;font-size:13px;resize:none;width:100%}
+    .lot-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
+    .summary-line{display:grid;grid-template-columns:1fr 172px;align-items:center;min-height:40px;font-size:13px;color:#111827}
+    .summary-line strong{font-weight:700}
+    .summary-line .num{text-align:right}
+    .discount-input{height:30px;border:1px solid #cfd8e3;border-radius:7px;text-align:right;padding:0 10px;font-size:13px}
+    .paid-combo{display:flex;gap:6px;justify-content:flex-end}
+    .btn-pay-all{height:30px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:7px;padding:0 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+    .discount-combo{display:flex;gap:6px;justify-content:flex-end}
+    .discount-type{height:30px;border:1px solid #cfd8e3;border-radius:7px;padding:0 6px;font-size:12px;background:#fff}
+    .line-discount-wrap{display:flex;gap:4px;justify-content:flex-end}
+    .line-discount-wrap .input-small{width:68px}
+    .payable{color:#006dff!important;font-weight:700}
+    .note{height:60px;border:1px solid #cfd8e3;border-radius:7px;padding:10px;resize:none;font-size:13px;margin-top:20px}
+    .right-spacer{flex:1}
+    .bottom-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .btn-draft,.btn-complete{height:45px;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer}
+    .btn-draft{border:1px solid #0070f4;background:#fff;color:#0070f4}
+    .btn-complete{border:0;background:#0070f4;color:#fff}
+    @media(max-width:1150px){.purchase-page{padding:10px;grid-template-columns:minmax(0,1fr) 360px}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <%- include('../partials/flash-message', { flash: flash }) %>
+  <form method="post" action="/nhap-hang/create" id="nhapHangCreateForm">
+    <input type="hidden" name="items_json" id="nhapHangItemsJson" value="[]">
+    <input type="hidden" name="submitMode" id="nhapHangSubmitMode" value="draft">
+    <input type="hidden" name="nha_cung_cap_id" id="supplierId">
+    <input type="hidden" name="tong_tien_hang" id="tongTienHangInput" value="0">
+    <input type="hidden" name="can_tra_ncc" id="canTraNccInput" value="0">
+    <input type="hidden" name="con_no_ncc" id="conNoNccInput" value="0">
+    <main class="purchase-page">
+      <section class="purchase-left">
+        <div class="purchase-top">
+          <a href="/nhap-hang" class="back-link"><i class="fa-solid fa-arrow-left"></i></a>
+          <div class="purchase-title">Nhập hàng</div>
+          <div class="product-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="productSearch" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)" autocomplete="off">
+            <div class="search-actions"><i class="fa-solid fa-table-cells"></i><i class="fa-solid fa-plus"></i></div>
+            <div id="searchResults" class="search-results"></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th style="width:60px;text-align:center">STT</th>
+                <th style="width:110px">Mã hàng</th>
+                <th>Tên hàng</th>
+                <th style="width:80px">ĐVT</th>
+                <th class="num" style="width:120px">Số lượng</th>
+                <th class="num" style="width:130px">Đơn giá nhập</th>
+                <th class="num" style="width:150px">Giảm giá</th>
+                <th class="num" style="width:140px">Thành tiền</th>
+                <th style="width:42px"></th>
+              </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+          </table>
+          <div id="emptyImport" class="empty-import">
+            <h3>Thêm sản phẩm từ file excel</h3>
+            <p>(Tải về file mẫu: <a href="#">Excel file</a>)</p>
+            <button class="file-btn" type="button"><i class="fa-regular fa-copy"></i> Chọn file dữ liệu</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="purchase-right">
+        <div class="right-tools">
+          <div class="icon-group">
+            <button class="icon-btn" type="button"><i class="fa-solid fa-scroll"></i></button>
+            <button class="icon-btn" type="button"><i class="fa-solid fa-print"></i></button>
+            <button class="icon-btn" type="button"><i class="fa-solid fa-eye"></i></button>
+            <button class="icon-btn" type="button"><i class="fa-solid fa-exclamation"></i></button>
+          </div>
+        </div>
+        <div class="right-row">
+          <input class="select-like" value="<%= user && user.ho_ten ? user.ho_ten : 'Người dùng' %>" readonly>
+          <input id="importDate" class="date-input" name="ngay_nhap_hien_thi" value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>" readonly>
+        </div>
+        <div class="right-row">
+          <select name="kho_id" id="khoId" class="select-like" required>
+            <option value="">Chọn kho nhập</option>
+            <% (warehouses || []).forEach(function(w) { %>
+              <option value="<%= w._id %>"><%= w.ten_kho || w.ma_kho || '---' %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="supplier-search">
+          <input id="supplierSearch" placeholder="Tìm nhà cung cấp" autocomplete="off">
+          <i class="fa-solid fa-plus"></i>
+          <div id="supplierResults" class="supplier-results"></div>
+        </div>
+        <section class="supplier-products">
+          <div class="supplier-products-head">
+            <strong>Hàng hóa của nhà cung cấp</strong>
+            <button type="button" class="btn-add-mini" id="quickAddProductBtn">+ Thêm hàng hóa</button>
+          </div>
+          <input id="supplierProductKeyword" class="supplier-products-search" placeholder="Tìm hàng hóa của nhà cung cấp" autocomplete="off">
+          <div id="supplierProductsList" class="supplier-products-list">
+            <div class="supplier-products-empty">Chọn nhà cung cấp để hiển thị hàng hóa.</div>
+          </div>
+        </section>
+        <div class="summary-line"><span>Mã phiếu nhập</span><input class="side-input" placeholder="Mã phiếu tự động" readonly></div>
+        <div class="summary-line"><span>Mã đặt hàng nhập</span><span></span></div>
+        <div class="summary-line"><span>Trạng thái</span><span>Phiếu tạm</span></div>
+        <div class="summary-line"><span>Tổng tiền hàng <i class="fa-regular fa-circle-question"></i></span><span class="num" id="goodsTotal">0</span></div>
+        <div class="summary-line">
+          <span>Giảm giá</span>
+          <div class="discount-combo">
+            <input id="discount" class="discount-input" name="giam_gia" value="0" oninput="renderItems()">
+            <select id="discountType" class="discount-type" name="kieu_giam_gia" onchange="renderItems()">
+              <option value="vnd">VND</option>
+              <option value="percent">%</option>
+            </select>
+          </div>
+        </div>
+        <div class="summary-line"><strong>Cần trả nhà cung cấp</strong><span class="num payable" id="payableTotal">0</span></div>
+        <div class="summary-line"><span>Phương thức thanh toán</span>
+          <select id="paymentMethod" class="side-input" name="phuong_thuc_thanh_toan">
+            <option value="cong_no" selected>Công nợ</option>
+            <option value="tien_mat">Tiền mặt</option>
+            <option value="chuyen_khoan">Chuyển khoản</option>
+          </select>
+        </div>
+        <div class="summary-line">
+          <span>Tiền trả nhà cung cấp</span>
+          <div class="paid-combo">
+            <input id="paidToSupplier" class="discount-input" name="da_tra_ncc" value="0" oninput="renderItems()">
+            <button type="button" class="btn-pay-all" id="payAllBtn">Tất cả</button>
+          </div>
+        </div>
+        <div class="summary-line"><strong>Nợ nhà cung cấp</strong><span class="num payable" id="debtToSupplier">0</span></div>
+        <textarea id="note" class="note" name="ghi_chu" placeholder="Ghi chú"></textarea>
+        <div class="right-spacer"></div>
+        <div class="bottom-actions">
+          <button class="btn-draft" type="button" id="saveDraftBtn">Lưu tạm</button>
+          <button class="btn-complete" type="button" id="completeBtn">Hoàn thành</button>
+        </div>
+      </aside>
+    </main>
+  </form>
+
+  <script id="nhapHangProductsSeed" type="application/json"><%- JSON.stringify(products || []) %></script>
+  <script id="nhapHangSuppliersSeed" type="application/json"><%- JSON.stringify(suppliers || []) %></script>
+  <script id="nhapHangGroupsSeed" type="application/json"><%- JSON.stringify(groups || []) %></script>
+  <script id="nhapHangUnitsSeed" type="application/json"><%- JSON.stringify(units || []) %></script>
+  <div class="quick-modal" id="quickProductModal">
+    <div class="quick-modal-card">
+      <div class="quick-modal-title" id="quickModalTitle">Thêm hàng hóa nhanh</div>
+      <div class="quick-grid">
+        <input id="qpMaHang" class="quick-input" placeholder="Mã hàng (để trống để tự động)">
+        <input id="qpTenHang" class="quick-input" placeholder="Tên hàng *">
+        <select id="qpDonViTinh" class="quick-input"></select>
+        <select id="qpNhomHang" class="quick-input"></select>
+        <input id="qpGiaVon" class="quick-input" placeholder="Giá vốn" value="0">
+        <input id="qpGiaNhapCuoi" class="quick-input" placeholder="Giá nhập cuối" value="0">
+        <select id="qpLoaiGia" class="quick-input">
+          <option value="thi_truong">Giá thị trường</option>
+          <option value="co_dinh">Giá cố định</option>
+        </select>
+        <input id="qpGiaCoDinh" class="quick-input" placeholder="Giá cố định" value="0">
+        <label class="quick-check"><input type="checkbox" id="qpQuanLyLo"> Quản lý theo lô</label>
+        <select id="qpTrangThai" class="quick-input">
+          <option value="active">Đang kinh doanh</option>
+          <option value="inactive">Ngưng kinh doanh</option>
+        </select>
+      </div>
+      <div class="quick-actions">
+        <button type="button" class="btn-row" id="quickModalCancel">Đóng</button>
+        <button type="button" class="btn-row primary" id="quickModalSave">Lưu</button>
+      </div>
+    </div>
+  </div>
+  <div class="lot-modal" id="lotModal">
+    <div class="lot-modal-card">
+      <div class="lot-modal-title">Thông tin lô hàng</div>
+      <div class="lot-grid">
+        <input id="lotMaLo" class="lot-input" placeholder="Mã lô (để trống tự động)">
+        <input id="lotTenLo" class="lot-input" placeholder="Tên lô">
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày nhập</div>
+          <input id="lotNgayNhap" type="date" class="lot-input">
+        </label>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày thu hoạch</div>
+          <input id="lotNgayThuHoach" type="date" class="lot-input">
+        </label>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Hạn sử dụng</div>
+          <input id="lotHanSuDung" type="date" class="lot-input">
+        </label>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Số lượng lô</div>
+          <input id="lotSoLuong" class="lot-input" value="1">
+        </label>
+        <textarea id="lotGhiChu" class="lot-note full" placeholder="Ghi chú lô"></textarea>
+      </div>
+      <div class="lot-actions">
+        <button type="button" class="btn-row" id="lotCancelBtn">Đóng</button>
+        <button type="button" class="btn-row primary" id="lotSaveBtn">Lưu lô</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    let selectedItems = [];
+    const seedProducts = JSON.parse(document.getElementById('nhapHangProductsSeed').textContent || '[]').map(p => ({
+      _id: String(p._id),
+      ma_hang: p.ma_hang || '',
+      ten_hang: p.ten_hang || '',
+      don_vi_tinh: p.don_vi_tinh || 'cái',
+      gia_nhap_cuoi: Number(p.gia_nhap_cuoi || 0),
+      gia_von: Number(p.gia_von || 0),
+      nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id) : '',
+      quan_ly_theo_lo: Boolean(p.quan_ly_theo_lo)
+    }));
+    let products = seedProducts.slice();
+    const suppliers = JSON.parse(document.getElementById('nhapHangSuppliersSeed').textContent || '[]').map(s => ({
+      _id: String(s._id),
+      ma_ncc: s.ma_ncc || '',
+      ten_ncc: s.ten_ncc || '',
+      sdt: s.sdt || ''
+    }));
+    const groups = JSON.parse(document.getElementById('nhapHangGroupsSeed').textContent || '[]').map(g => ({
+      _id: String(g._id),
+      ten_nhom: g.ten_nhom || ''
+    }));
+    const units = JSON.parse(document.getElementById('nhapHangUnitsSeed').textContent || '[]').map(u => ({
+      _id: String(u._id),
+      ten_don_vi: u.ten_don_vi || ''
+    }));
+    let supplierProducts = [];
+    let quickEditId = '';
+    let lotEditItemId = '';
+    let isPayAllMode = false;
+    const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const numeric = v => Math.max(0, Number(String(v || '').replace(/\./g,'').replace(/,/g,'').trim()) || 0);
+    const productSearch = document.getElementById('productSearch');
+    const searchResults = document.getElementById('searchResults');
+    const productSearchActions = document.querySelector('.product-search .search-actions');
+    const supplierSearch = document.getElementById('supplierSearch');
+    const supplierResults = document.getElementById('supplierResults');
+    const supplierIdInput = document.getElementById('supplierId');
+    const supplierProductKeyword = document.getElementById('supplierProductKeyword');
+    const supplierProductsList = document.getElementById('supplierProductsList');
+    const quickProductModal = document.getElementById('quickProductModal');
+    const itemsJsonInput = document.getElementById('nhapHangItemsJson');
+    const submitModeInput = document.getElementById('nhapHangSubmitMode');
+    const paymentMethodInput = document.getElementById('paymentMethod');
+    const paidToSupplierInput = document.getElementById('paidToSupplier');
+    const payAllBtn = document.getElementById('payAllBtn');
+    const discountTypeInput = document.getElementById('discountType');
+    const tongTienHangInput = document.getElementById('tongTienHangInput');
+    const canTraNccInput = document.getElementById('canTraNccInput');
+    const conNoNccInput = document.getElementById('conNoNccInput');
+    const lotModal = document.getElementById('lotModal');
+
+    function escapeHtml(text) {
+      return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function renderProductResults(list) {
+      if (!list || !list.length) {
+        searchResults.innerHTML = '<div class="search-item"><span>Không có hàng hóa</span><span></span></div>';
+        searchResults.style.display = 'block';
+        return;
+      }
+      searchResults.innerHTML = list
+        .map(p => `<div class="search-item" onclick="addItem('${p._id}')"><span>${escapeHtml(p.ten_hang)} (${escapeHtml(p.ma_hang)})</span><span>${fmt(p.gia_nhap_cuoi || p.gia_von || 0)}</span></div>`)
+        .join('');
+      searchResults.style.display = 'block';
+    }
+
+    function renderSupplierResults(list) {
+      if (!list || !list.length) {
+        supplierResults.innerHTML = '<div class="search-item"><span>Không có nhà cung cấp</span><span></span></div>';
+        supplierResults.style.display = 'block';
+        return;
+      }
+      supplierResults.innerHTML = list
+        .map(s => `<div class="search-item" onclick="selectSupplier('${s._id}')"><span>${escapeHtml(s.ten_ncc)}</span><span>${escapeHtml(s.ma_ncc)}</span></div>`)
+        .join('');
+      supplierResults.style.display = 'block';
+    }
+
+    function getSupplierSuggest(keyword, limit) {
+      const q = String(keyword || '').trim().toLowerCase();
+      return suppliers
+        .filter(s => {
+          if (!q) return true;
+          return String(s.ma_ncc || '').toLowerCase().includes(q)
+            || String(s.ten_ncc || '').toLowerCase().includes(q)
+            || String(s.sdt || '').includes(q);
+        })
+        .slice(0, limit || 20);
+    }
+
+    function openSupplierSuggest(showAll) {
+      const keyword = showAll ? '' : supplierSearch.value;
+      renderSupplierResults(getSupplierSuggest(keyword, 20));
+    }
+
+    function clampDiscountValue(value, type) {
+      let n = numeric(value);
+      if (type === 'percent' && n > 100) n = 100;
+      return n;
+    }
+
+    function calcLineTotal(item) {
+      const qty = numeric(item.so_luong);
+      const price = numeric(item.don_gia_nhap);
+      const base = qty * price;
+      const type = item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd';
+      const discount = clampDiscountValue(item.giam_gia || 0, type);
+      const discountAmount = type === 'percent' ? (base * discount / 100) : discount;
+      return Math.max(base - discountAmount, 0);
+    }
+
+    function toISODate(value) {
+      const d = value ? new Date(value) : null;
+      if (!d || Number.isNaN(d.getTime())) return '';
+      return d.toISOString().slice(0, 10);
+    }
+
+    function formatDateVi(value) {
+      if (!value) return '---';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '---';
+      return d.toLocaleDateString('vi-VN');
+    }
+
+    function renderSupplierProducts(list) {
+      if (!list || !list.length) {
+        supplierProductsList.innerHTML = '<div class="supplier-products-empty">Không có hàng hóa phù hợp.</div>';
+        return;
+      }
+      supplierProductsList.innerHTML = list.map(p => {
+        const price = Number(p.gia_nhap_cuoi || p.gia_von || 0);
+        const statusBtn = String(p.trang_thai || 'active') === 'active'
+          ? `<button type="button" class="btn-row" onclick="setInactiveProduct('${p._id}')">Ngưng</button>`
+          : `<button type="button" class="btn-row" disabled>Ngưng</button>`;
+        return `<div class="supplier-product-row">
+          <div class="supplier-product-main">
+            <b>${escapeHtml(p.ma_hang || '')} - ${escapeHtml(p.ten_hang || '')}</b>
+            <span>${escapeHtml(p?.don_vi_tinh_id?.ten_don_vi || '---')}</span>
+          </div>
+          <div class="supplier-product-price">${fmt(price)}</div>
+          <button type="button" class="btn-row primary" onclick="pickSupplierProduct('${p._id}')">Chọn</button>
+          <div style="display:flex;gap:4px">
+            <button type="button" class="btn-row" onclick="openQuickEditModal('${p._id}')">Sửa</button>
+            ${statusBtn}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function fetchSupplierProducts(keyword) {
+      const supplierId = String(supplierIdInput.value || '').trim();
+      if (!supplierId) {
+        supplierProducts = [];
+        renderSupplierProducts([]);
+        return [];
+      }
+      const params = new URLSearchParams();
+      if (keyword) params.set('keyword', String(keyword || '').trim());
+      const url = `/api/nha-cung-cap/${supplierId}/hang-hoa` + (params.toString() ? `?${params.toString()}` : '');
+      try {
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const json = await response.json();
+        supplierProducts = json && json.success && Array.isArray(json.items) ? json.items : [];
+        renderSupplierProducts(supplierProducts);
+        return supplierProducts;
+      } catch (e) {
+        supplierProducts = [];
+        renderSupplierProducts([]);
+        return [];
+      }
+    }
+
+    function getLocalProductSuggest(limit) {
+      const q = (productSearch && productSearch.value ? productSearch.value : '').trim().toLowerCase();
+      const base = products && products.length ? products : seedProducts;
+      const matched = base.filter(p => {
+        if (!q) return true;
+        return String(p.ma_hang || '').toLowerCase().includes(q) || String(p.ten_hang || '').toLowerCase().includes(q);
+      });
+      return matched.slice(0, limit || 12);
+    }
+
+    async function fetchProductsForSuggest(keyword) {
+      const q = String(keyword || '').trim();
+      const supplierId = (supplierIdInput && supplierIdInput.value ? supplierIdInput.value : '').trim();
+      const params = new URLSearchParams();
+      if (q) params.set('keyword', q);
+      if (supplierId) params.set('nha_cung_cap_id', supplierId);
+      const url = '/api/hang-hoa' + (params.toString() ? `?${params.toString()}` : '');
+
+      try {
+        const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const json = await response.json();
+        if (!json || !json.success || !Array.isArray(json.items)) return [];
+        const mapped = json.items.map(p => ({
+          _id: String(p._id),
+          ma_hang: p.ma_hang || '',
+          ten_hang: p.ten_hang || '',
+          don_vi_tinh: p.don_vi_tinh || 'cái',
+          gia_nhap_cuoi: Number(p.gia_nhap_cuoi || 0),
+          gia_von: Number(p.gia_von || 0),
+          nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id) : '',
+          quan_ly_theo_lo: Boolean(p.quan_ly_theo_lo)
+        }));
+        products = mapped;
+        return mapped;
+      } catch (e) {
+        return [];
+      }
+    }
+
+    async function openProductSuggest(limit) {
+      const max = limit || 12;
+      renderProductResults(getLocalProductSuggest(max));
+      const list = await fetchProductsForSuggest(productSearch.value.trim());
+      renderProductResults((list && list.length ? list : getLocalProductSuggest(max)).slice(0, max));
+    }
+
+    productSearch.addEventListener('input', async function() {
+      const q = this.value.trim();
+      const list = await fetchProductsForSuggest(q);
+      renderProductResults(list.slice(0, 20));
+    });
+
+    productSearch.addEventListener('focus', async function() {
+      await openProductSuggest(12);
+    });
+
+    productSearch.addEventListener('click', async function() {
+      await openProductSuggest(12);
+    });
+
+    if (productSearchActions) {
+      productSearchActions.addEventListener('click', async function(e) {
+        e.preventDefault();
+        await openProductSuggest(12);
+        productSearch.focus();
+      });
+    }
+
+    supplierSearch.addEventListener('input', function() {
+      openSupplierSuggest(false);
+    });
+
+    supplierSearch.addEventListener('focus', function() {
+      openSupplierSuggest(!supplierIdInput.value);
+    });
+
+    supplierSearch.parentElement.addEventListener('click', function(e) {
+      if (e.target === supplierResults || supplierResults.contains(e.target)) return;
+      supplierSearch.focus();
+      openSupplierSuggest(true);
+    });
+
+    function selectSupplier(id) {
+      const supplier = suppliers.find(s => s._id === id);
+      if (!supplier) return;
+      supplierIdInput.value = supplier._id;
+      supplierSearch.value = supplier.ten_ncc;
+      supplierResults.style.display = 'none';
+      fetchProductsForSuggest(productSearch.value.trim()).then(list => renderProductResults(list.slice(0, 12)));
+      fetchSupplierProducts('');
+    }
+
+    function addItem(id) {
+      const product = products.find(p => p._id === id) || supplierProducts.find(p => String(p._id) === String(id));
+      if (!product) return;
+      const existing = selectedItems.find(item => item.hang_hoa_id === id);
+      if (existing) {
+        existing.so_luong += 1;
+      } else {
+        selectedItems.push({
+          hang_hoa_id: id,
+          ma_hang: product.ma_hang,
+          ten_hang: product.ten_hang,
+          don_vi_tinh: product.don_vi_tinh || (product.don_vi_tinh_id && product.don_vi_tinh_id.ten_don_vi) || '---',
+          so_luong: 1,
+          don_gia_nhap: numeric(product.gia_nhap_cuoi || product.gia_von || 0),
+          giam_gia: 0,
+          kieu_giam_gia_dong: 'vnd',
+          quan_ly_theo_lo: Boolean(product.quan_ly_theo_lo),
+          lo_info: null
+        });
+      }
+      productSearch.value = '';
+      searchResults.style.display = 'none';
+      renderItems();
+    }
+
+    function pickSupplierProduct(id) {
+      addItem(id);
+    }
+
+    function openQuickModal(type, product) {
+      quickEditId = type === 'edit' && product ? String(product._id) : '';
+      document.getElementById('quickModalTitle').textContent = type === 'edit' ? 'Sửa hàng hóa nhanh' : 'Thêm hàng hóa nhanh';
+      document.getElementById('qpMaHang').value = type === 'edit' ? (product.ma_hang || '') : '';
+      document.getElementById('qpTenHang').value = type === 'edit' ? (product.ten_hang || '') : '';
+      document.getElementById('qpDonViTinh').value = type === 'edit' ? String(product?.don_vi_tinh_id?._id || product?.don_vi_tinh_id || '') : '';
+      document.getElementById('qpNhomHang').value = type === 'edit' ? String(product?.nhom_hang_id?._id || product?.nhom_hang_id || '') : '';
+      document.getElementById('qpGiaVon').value = type === 'edit' ? String(Number(product.gia_von || 0)) : '0';
+      document.getElementById('qpGiaNhapCuoi').value = type === 'edit' ? String(Number(product.gia_nhap_cuoi || 0)) : '0';
+      document.getElementById('qpLoaiGia').value = type === 'edit' ? String(product.loai_gia || 'thi_truong') : 'thi_truong';
+      document.getElementById('qpGiaCoDinh').value = type === 'edit' ? String(Number(product.gia_co_dinh || 0)) : '0';
+      document.getElementById('qpQuanLyLo').checked = Boolean(type === 'edit' ? product.quan_ly_theo_lo : false);
+      document.getElementById('qpTrangThai').value = type === 'edit' ? String(product.trang_thai || 'active') : 'active';
+      quickProductModal.classList.add('open');
+    }
+
+    function openQuickAddModal() {
+      if (!supplierIdInput.value) {
+        alert('Vui lòng chọn nhà cung cấp trước');
+        return;
+      }
+      openQuickModal('create', null);
+    }
+
+    function openQuickEditModal(id) {
+      const product = supplierProducts.find(p => String(p._id) === String(id));
+      if (!product) return;
+      openQuickModal('edit', product);
+    }
+
+    async function saveQuickProduct() {
+      const payload = {
+        ma_hang: document.getElementById('qpMaHang').value.trim(),
+        ten_hang: document.getElementById('qpTenHang').value.trim(),
+        don_vi_tinh_id: document.getElementById('qpDonViTinh').value,
+        nhom_hang_id: document.getElementById('qpNhomHang').value,
+        gia_von: numeric(document.getElementById('qpGiaVon').value),
+        gia_nhap_cuoi: numeric(document.getElementById('qpGiaNhapCuoi').value),
+        loai_gia: document.getElementById('qpLoaiGia').value,
+        gia_co_dinh: numeric(document.getElementById('qpGiaCoDinh').value),
+        quan_ly_theo_lo: document.getElementById('qpQuanLyLo').checked,
+        trang_thai: document.getElementById('qpTrangThai').value,
+        nha_cung_cap_id: supplierIdInput.value
+      };
+      if (!payload.ten_hang) {
+        alert('Tên hàng là bắt buộc');
+        return;
+      }
+      const isEdit = Boolean(quickEditId);
+      const url = isEdit ? `/api/hang-hoa/${quickEditId}/quick-update` : '/api/hang-hoa/quick-create';
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json || !json.success) {
+        alert(json && json.message ? json.message : 'Không thể lưu hàng hóa');
+        return;
+      }
+      quickProductModal.classList.remove('open');
+      await fetchSupplierProducts(supplierProductKeyword.value.trim());
+      if (!isEdit && json.item && json.item._id) {
+        pickSupplierProduct(String(json.item._id));
+      }
+    }
+
+    async function setInactiveProduct(id) {
+      if (!confirm('Ngưng kinh doanh hàng hóa này?')) return;
+      const res = await fetch(`/api/hang-hoa/${id}/inactive`, {
+        method: 'POST',
+        headers: { 'Accept': 'application/json' }
+      });
+      const json = await res.json();
+      if (!json || !json.success) {
+        alert((json && json.message) || 'Không thể ngưng hàng hóa');
+        return;
+      }
+      await fetchSupplierProducts(supplierProductKeyword.value.trim());
+    }
+
+    function renderItems() {
+      const body = document.getElementById('itemsBody');
+      let goodsTotal = 0;
+      body.innerHTML = selectedItems.map((item, index) => {
+        const lineTotal = calcLineTotal(item);
+        goodsTotal += lineTotal;
+        const lineDiscountType = item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd';
+        const lineDiscountValue = clampDiscountValue(item.giam_gia || 0, lineDiscountType);
+        return `<tr>
+          <td style="text-align:center">${index + 1}</td>
+          <td>${item.ma_hang}</td>
+          <td>${item.ten_hang}</td>
+          <td>${item.don_vi_tinh || '---'}</td>
+          <td class="num"><input class="input-small" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}', this.value)"></td>
+          <td class="num"><input class="input-small" value="${fmt(item.don_gia_nhap)}" onchange="updatePrice('${item.hang_hoa_id}', this.value)"></td>
+          <td class="num">
+            <div class="line-discount-wrap">
+              <input class="input-small" value="${fmt(lineDiscountValue)}" onchange="updateLineDiscount('${item.hang_hoa_id}', this.value)">
+              <select class="discount-type" onchange="updateLineDiscountType('${item.hang_hoa_id}', this.value)">
+                <option value="vnd" ${lineDiscountType === 'vnd' ? 'selected' : ''}>VND</option>
+                <option value="percent" ${lineDiscountType === 'percent' ? 'selected' : ''}>%</option>
+              </select>
+            </div>
+          </td>
+          <td class="num">${fmt(lineTotal)}</td>
+          <td><i class="fa-solid fa-trash" style="color:#ef4444;cursor:pointer" onclick="removeItem('${item.hang_hoa_id}')"></i></td>
+        </tr>` + (item.quan_ly_theo_lo ? `<tr class="lot-row">
+          <td></td>
+          <td colspan="8">
+            <div class="lot-line">
+              <span>Nhập lô, hạn sử dụng</span>
+              <a class="lot-link" onclick="openLotModal('${item.hang_hoa_id}')">Chọn lô</a>
+              <span>${item.lo_info ? `Lô: ${escapeHtml(item.lo_info.ten_lo || item.lo_info.ma_lo || '---')} - HSD: ${escapeHtml(formatDateVi(item.lo_info.han_su_dung))} - SL: ${fmt(item.lo_info.so_luong_lo || 0)}` : 'Chưa chọn lô'}</span>
+            </div>
+          </td>
+        </tr>` : '');
+      }).join('');
+      const discountInput = document.getElementById('discount');
+      const discountType = discountTypeInput && discountTypeInput.value === 'percent' ? 'percent' : 'vnd';
+      const discount = clampDiscountValue(discountInput.value, discountType);
+      const discountAmount = discountType === 'percent' ? (goodsTotal * discount / 100) : discount;
+      const canTra = Math.max(goodsTotal - discountAmount, 0);
+
+      let method = paymentMethodInput ? paymentMethodInput.value : 'cong_no';
+      let daTra = numeric(paidToSupplierInput ? paidToSupplierInput.value : 0);
+      if (method === 'cong_no') {
+        daTra = 0;
+        if (isPayAllMode) {
+          if (paymentMethodInput) paymentMethodInput.value = 'tien_mat';
+          method = 'tien_mat';
+          daTra = canTra;
+        }
+      } else if (isPayAllMode) {
+        daTra = canTra;
+      }
+      if (daTra > canTra) daTra = canTra;
+      const conNo = Math.max(canTra - daTra, 0);
+
+      document.getElementById('goodsTotal').textContent = fmt(goodsTotal);
+      document.getElementById('payableTotal').textContent = fmt(canTra);
+      document.getElementById('debtToSupplier').textContent = fmt(conNo);
+      if (tongTienHangInput) tongTienHangInput.value = String(Math.floor(goodsTotal));
+      if (canTraNccInput) canTraNccInput.value = String(Math.floor(canTra));
+      if (conNoNccInput) conNoNccInput.value = String(Math.floor(conNo));
+      if (discountInput) discountInput.value = fmt(discount);
+      if (discountTypeInput) discountTypeInput.value = discountType;
+      if (paidToSupplierInput) {
+        paidToSupplierInput.disabled = method === 'cong_no';
+        paidToSupplierInput.value = fmt(daTra);
+      }
+      if (payAllBtn) {
+        payAllBtn.textContent = 'Tất cả';
+        payAllBtn.title = 'Trả đủ';
+      }
+      document.getElementById('emptyImport').style.display = selectedItems.length ? 'none' : 'flex';
+      itemsJsonInput.value = JSON.stringify(selectedItems.map(item => ({
+        hang_hoa_id: item.hang_hoa_id,
+        so_luong: numeric(item.so_luong),
+        don_gia: numeric(item.don_gia_nhap),
+        giam_gia_dong: clampDiscountValue(item.giam_gia, item.kieu_giam_gia_dong),
+        kieu_giam_gia_dong: item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd',
+        lo_info: item.lo_info ? {
+          ma_lo: String(item.lo_info.ma_lo || '').trim(),
+          ten_lo: String(item.lo_info.ten_lo || '').trim(),
+          ngay_nhap: String(item.lo_info.ngay_nhap || '').trim(),
+          ngay_thu_hoach: String(item.lo_info.ngay_thu_hoach || '').trim(),
+          han_su_dung: String(item.lo_info.han_su_dung || '').trim(),
+          so_luong_lo: numeric(item.lo_info.so_luong_lo || 0),
+          ghi_chu: String(item.lo_info.ghi_chu || '').trim()
+        } : null
+      })));
+    }
+
+    function updateQty(id, val) {
+      const item = selectedItems.find(i => i.hang_hoa_id === id);
+      if (item) item.so_luong = Math.max(1, Math.floor(numeric(val)));
+      if (item && item.quan_ly_theo_lo && item.lo_info) {
+        item.lo_info.so_luong_lo = Math.min(numeric(item.lo_info.so_luong_lo || 0), item.so_luong);
+      }
+      renderItems();
+    }
+    function updatePrice(id, val) {
+      const item = selectedItems.find(i => i.hang_hoa_id === id);
+      if (item) item.don_gia_nhap = Math.floor(numeric(val));
+      renderItems();
+    }
+    function updateLineDiscount(id, val) {
+      const item = selectedItems.find(i => i.hang_hoa_id === id);
+      if (item) item.giam_gia = Math.floor(clampDiscountValue(val, item.kieu_giam_gia_dong));
+      renderItems();
+    }
+    function updateLineDiscountType(id, val) {
+      const item = selectedItems.find(i => i.hang_hoa_id === id);
+      if (item) item.kieu_giam_gia_dong = val === 'percent' ? 'percent' : 'vnd';
+      renderItems();
+    }
+    function removeItem(id) {
+      selectedItems = selectedItems.filter(i => i.hang_hoa_id !== id);
+      renderItems();
+    }
+
+    function openLotModal(itemId) {
+      const item = selectedItems.find(i => i.hang_hoa_id === itemId);
+      if (!item || !item.quan_ly_theo_lo) return;
+      lotEditItemId = itemId;
+      const today = toISODate(new Date());
+      const currentNgayNhap = toISODate(document.getElementById('importDate') ? new Date() : new Date());
+      const soLuongMacDinh = Math.max(1, numeric(item.so_luong || 1));
+      const lo = item.lo_info || {};
+      document.getElementById('lotMaLo').value = lo.ma_lo || '';
+      document.getElementById('lotTenLo').value = lo.ten_lo || `Lô ${formatDateVi(currentNgayNhap || today)}`;
+      document.getElementById('lotNgayNhap').value = lo.ngay_nhap || currentNgayNhap || today;
+      document.getElementById('lotNgayThuHoach').value = lo.ngay_thu_hoach || '';
+      document.getElementById('lotHanSuDung').value = lo.han_su_dung || '';
+      document.getElementById('lotSoLuong').value = String(Math.min(numeric(lo.so_luong_lo || soLuongMacDinh), soLuongMacDinh));
+      document.getElementById('lotGhiChu').value = lo.ghi_chu || '';
+      lotModal.classList.add('open');
+    }
+
+    function saveLotInfo() {
+      const item = selectedItems.find(i => i.hang_hoa_id === lotEditItemId);
+      if (!item) return;
+      const soLuongDong = Math.max(1, numeric(item.so_luong || 1));
+      const soLuongLo = Math.max(0, numeric(document.getElementById('lotSoLuong').value));
+      if (soLuongLo > soLuongDong) {
+        alert('Số lượng lô không được lớn hơn số lượng dòng hàng');
+        return;
+      }
+      item.lo_info = {
+        ma_lo: document.getElementById('lotMaLo').value.trim(),
+        ten_lo: document.getElementById('lotTenLo').value.trim(),
+        ngay_nhap: document.getElementById('lotNgayNhap').value,
+        ngay_thu_hoach: document.getElementById('lotNgayThuHoach').value,
+        han_su_dung: document.getElementById('lotHanSuDung').value,
+        so_luong_lo: soLuongLo,
+        ghi_chu: document.getElementById('lotGhiChu').value.trim()
+      };
+      lotModal.classList.remove('open');
+      renderItems();
+    }
+
+    document.getElementById('saveDraftBtn').addEventListener('click', function() {
+      submitModeInput.value = 'draft';
+      document.getElementById('nhapHangCreateForm').submit();
+    });
+    document.getElementById('completeBtn').addEventListener('click', function() {
+      const invalidLotItem = selectedItems.find(item => {
+        if (!item.quan_ly_theo_lo) return false;
+        if (!item.lo_info) return true;
+        const soLuongLo = numeric(item.lo_info.so_luong_lo || 0);
+        return soLuongLo <= 0 || soLuongLo > numeric(item.so_luong || 0);
+      });
+      if (invalidLotItem) {
+        alert('Hàng quản lý theo lô cần có thông tin lô hợp lệ trước khi Hoàn thành.');
+        return;
+      }
+      submitModeInput.value = 'completed';
+      document.getElementById('nhapHangCreateForm').submit();
+    });
+
+    if (paidToSupplierInput) {
+      paidToSupplierInput.addEventListener('input', function() {
+        isPayAllMode = false;
+      });
+    }
+    if (paymentMethodInput) {
+      paymentMethodInput.addEventListener('change', function() {
+        if (this.value === 'cong_no') isPayAllMode = false;
+        renderItems();
+      });
+    }
+    if (payAllBtn) {
+      payAllBtn.addEventListener('click', function() {
+        const canTra = numeric(document.getElementById('payableTotal').textContent || 0);
+        if (paymentMethodInput && paymentMethodInput.value === 'cong_no') {
+          paymentMethodInput.value = 'tien_mat';
+        }
+        isPayAllMode = true;
+        if (paidToSupplierInput) paidToSupplierInput.value = fmt(canTra);
+        renderItems();
+      });
+    }
+
+    supplierProductKeyword.addEventListener('input', function() {
+      fetchSupplierProducts(this.value.trim());
+    });
+
+    document.getElementById('quickAddProductBtn').addEventListener('click', openQuickAddModal);
+    document.getElementById('quickModalCancel').addEventListener('click', function() {
+      quickProductModal.classList.remove('open');
+    });
+    document.getElementById('quickModalSave').addEventListener('click', saveQuickProduct);
+    document.getElementById('lotCancelBtn').addEventListener('click', function() {
+      lotModal.classList.remove('open');
+    });
+    document.getElementById('lotSaveBtn').addEventListener('click', saveLotInfo);
+
+    const unitSelect = document.getElementById('qpDonViTinh');
+    const groupSelect = document.getElementById('qpNhomHang');
+    unitSelect.innerHTML = `<option value="">Đơn vị tính</option>` + units.map(u => `<option value="${u._id}">${escapeHtml(u.ten_don_vi)}</option>`).join('');
+    groupSelect.innerHTML = `<option value="">Nhóm hàng</option>` + groups.map(g => `<option value="${g._id}">${escapeHtml(g.ten_nhom)}</option>`).join('');
+
+    document.addEventListener('click', e => {
+      if (!productSearch.parentElement.contains(e.target)) searchResults.style.display = 'none';
+      if (!supplierSearch.parentElement.contains(e.target)) supplierResults.style.display = 'none';
+      if (quickProductModal.classList.contains('open') && e.target === quickProductModal) quickProductModal.classList.remove('open');
+      if (lotModal.classList.contains('open') && e.target === lotModal) lotModal.classList.remove('open');
+    });
+
+    // paymentMethodInput change handled above to support pay-all mode.
+    if (discountTypeInput) {
+      discountTypeInput.addEventListener('change', renderItems);
+    }
+
+    renderItems();
+    window.pickSupplierProduct = pickSupplierProduct;
+    window.openQuickEditModal = openQuickEditModal;
+    window.setInactiveProduct = setInactiveProduct;
+    window.addItem = addItem;
+    window.updateLineDiscountType = updateLineDiscountType;
+    window.openLotModal = openLotModal;
+  </script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+<%
+  const safeTickets = Array.isArray(locals.importSlips) ? locals.importSlips : [];
+  const safeFilters = locals.filter || {};
+  const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const statusBadge = status => status === 'draft' ? 'draft' : '';
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .po-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
+    .po-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 0}
+    .po-sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
+    .po-title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
+    .filter-block{margin-bottom:22px}
+    .filter-title{font-size:13px;font-weight:800;color:#111827;margin-bottom:10px}
+    .check-line{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:#111827}
+    .check-line input{width:14px;height:14px;accent-color:#0070f4}
+    .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}
+    .radio-line input{accent-color:#0070f4}
+    .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
+    .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none}
+    .po-main{min-width:0;display:flex;flex-direction:column;gap:10px}
+    .po-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .po-search{position:relative;flex:1;max-width:470px}
+    .po-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 12px;font-size:13px;outline:none}
+    .toolbar-actions{display:flex;align-items:center;gap:8px}
+    .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .kv-btn.primary{border-color:#0070f4;color:#0070f4}
+    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:hidden}
+    .po-table{width:100%;table-layout:fixed;border-collapse:collapse}
+    .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
+    .po-table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
+    .po-table tbody tr:hover{background:#f7fbff}
+    .po-table .num{text-align:right}
+    .check-col,.star-col{width:36px;text-align:center}
+    .row-check{width:15px;height:15px;accent-color:#0070f4}
+    .star-col{color:#8b95a1}
+    .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}
+    .status-badge.draft{background:#fff4d6;color:#9a6700}
+    .po-empty{height:260px;text-align:center;color:#7a8794}
+    .col-code{width:130px}
+    .col-time{width:160px}
+    .col-ncc-code{width:95px}
+    .col-payable{width:120px}
+    .col-status{width:120px}
+    .cell-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .expand-row{cursor:pointer}
+    .po-detail-row td{padding:0;background:#fff}
+    .po-detail{border-top:1px solid #dbe4ee;background:#fff}
+    .po-detail-tabs{display:flex;gap:18px;padding:10px 12px 0;border-bottom:1px solid #e6edf5}
+    .po-detail-tab{border:0;background:none;padding:8px 0;font-size:13px;font-weight:700;color:#667085;cursor:pointer;border-bottom:2px solid transparent}
+    .po-detail-tab.is-active{color:#0070f4;border-color:#0070f4}
+    .po-detail-pane{display:none;padding:12px}
+    .po-detail-pane.is-active{display:block}
+    .detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+    .detail-title{font-size:18px;font-weight:800}
+    .detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+    .detail-grid .item{font-size:12px;color:#475467}
+    .detail-grid .item b{display:block;color:#111827;font-size:13px;margin-top:2px}
+    .detail-body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px}
+    .mini-table{width:100%;border-collapse:collapse}
+    .mini-table th,.mini-table td{border:1px solid #e4eaf2;padding:6px 8px;font-size:12px}
+    .mini-table th{background:#f4f8fc;text-align:left}
+    .lot-note{font-size:11px;color:#667085}
+    .summary-card{border:1px solid #e4eaf2;border-radius:6px;padding:10px}
+    .summary-line{display:flex;justify-content:space-between;font-size:12px;margin:6px 0}
+    .summary-line b{font-size:13px}
+    .detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+    .po-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+
+  <form id="poFilterForm" method="GET" action="/nhap-hang" class="po-page">
+    <div class="po-shell">
+      <aside class="po-sidebar">
+        <h1 class="po-title">Nhập hàng</h1>
+        <div class="filter-block">
+          <div class="filter-title">Trạng thái</div>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã nhập hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Thời gian</div>
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <span>›</span></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
+          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
+          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Người tạo</div>
+          <input class="filter-control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo">
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Nhà cung cấp</div>
+          <input class="filter-control" name="nha_cung_cap" value="<%= safeFilters.nha_cung_cap || '' %>" placeholder="Chọn nhà cung cấp">
+        </div>
+      </aside>
+
+      <main class="po-main">
+        <div class="po-toolbar">
+          <div class="po-search">
+            <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu nhập">
+          </div>
+          <div class="toolbar-actions">
+            <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
+            <button class="kv-btn" type="button">Xuất file ▾</button>
+            <button type="button" class="tool-icon">☰</button>
+            <button type="button" class="tool-icon">⚙</button>
+            <button type="button" class="tool-icon">?</button>
+          </div>
+        </div>
+
+        <div class="po-table-wrap">
+          <table class="po-table">
+            <thead>
+              <tr>
+                <th class="check-col"><input class="row-check" type="checkbox"></th>
+                <th class="star-col">☆</th>
+                <th class="col-code">Mã nhập hàng</th>
+                <th class="col-time">Thời gian</th>
+                <th class="col-ncc-code">Mã NCC</th>
+                <th>Nhà cung cấp</th>
+                <th class="num col-payable">Cần trả NCC</th>
+                <th class="col-status">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (safeTickets.length) { %>
+                <% safeTickets.forEach(function(t) { %>
+                  <tr class="expand-row" data-expand-id="<%= t._id %>">
+                    <td class="check-col"><input class="row-check" type="checkbox"></td>
+                    <td class="star-col">☆</td>
+                    <td class="cell-ellipsis"><%= t.ma_phieu_nhap || '' %></td>
+                    <td class="cell-ellipsis"><%= formatDate(t.ngay_nhap || t.created_at) %></td>
+                    <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ma_ncc || '--') : '--' %></td>
+                    <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
+                    <td class="num"><%= fmt((t.con_no_ncc ?? 0)) %></td>
+                    <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
+                  </tr>
+                  <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
+                    <td colspan="8">
+                      <div class="po-detail">
+                        <div class="po-detail-tabs">
+                          <button class="po-detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
+                          <button class="po-detail-tab" type="button" data-tab-target="payment">Lịch sử thanh toán</button>
+                        </div>
+                        <div class="po-detail-pane is-active" data-tab-pane="info">
+                          <div class="detail-head">
+                            <div>
+                              <div class="detail-title"><%= t.ma_phieu_nhap || '--' %></div>
+                              <span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span>
+                            </div>
+                            <div><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></div>
+                          </div>
+                          <div class="detail-grid">
+                            <div class="item">Người tạo<b><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || t.nguoi_tao_id.email || '--') : '--' %></b></div>
+                            <div class="item">Người nhập<b><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || '--') : '--' %></b></div>
+                            <div class="item">Ngày nhập<b><%= formatDate(t.ngay_nhap || t.created_at) %></b></div>
+                            <div class="item">Kho nhập<b><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></b></div>
+                            <div class="item">Tên NCC<b><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></b></div>
+                            <div class="item">Mã NCC<b><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ma_ncc || '--') : '--' %></b></div>
+                            <div class="item" style="grid-column: span 2;">Ghi chú<b><%= t.ghi_chu || '--' %></b></div>
+                          </div>
+                          <div class="detail-body">
+                            <div>
+                              <table class="mini-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã hàng</th><th>Tên hàng</th><th>Số lượng</th><th>Đơn giá nhập</th><th>Giảm giá</th><th>Giá nhập</th><th>Thành tiền</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if (!(t.detail_rows || []).length) { %>
+                                    <tr><td colspan="7">Không có chi tiết hàng.</td></tr>
+                                  <% } %>
+                                  <% (t.detail_rows || []).forEach(function(r) { %>
+                                    <tr>
+                                      <td><%= r.hang_hoa_id ? (r.hang_hoa_id.ma_hang || '--') : '--' %></td>
+                                      <td><%= r.hang_hoa_id ? (r.hang_hoa_id.ten_hang || '--') : '--' %></td>
+                                      <td><%= fmt(r.so_luong || 0) %></td>
+                                      <td><%= fmt(r.don_gia_nhap || 0) %></td>
+                                      <td><%= (r.kieu_giam_gia_dong === 'percent' ? ((r.giam_gia_dong || 0) + '%') : fmt(r.giam_gia_dong || 0)) %></td>
+                                      <td><%= fmt(r.don_gia_nhap || 0) %></td>
+                                      <td><%= fmt(r.thanh_tien || 0) %></td>
+                                    </tr>
+                                    <% if (r.lo_hang_id) { %>
+                                      <tr><td colspan="7" class="lot-note">Lô: <%= r.lo_hang_id.ten_lo || r.lo_hang_id.ma_lo || '--' %> - HSD: <%= formatDate(r.lo_hang_id.han_su_dung) %> - SL: <%= fmt(r.lo_hang_id.so_luong_ban_dau || r.lo_hang_id.so_luong_con_lai || 0) %></td></tr>
+                                    <% } %>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="summary-card">
+                              <div class="summary-line"><span>Số lượng mặt hàng</span><b><%= fmt(t?.detail_summary?.tong_mat_hang || 0) %></b></div>
+                              <div class="summary-line"><span>Tổng tiền hàng</span><b><%= fmt(t.tong_tien_hang || 0) %></b></div>
+                              <div class="summary-line"><span>Giảm giá</span><b><%= (t.kieu_giam_gia === 'percent' ? ((t.giam_gia || 0) + '%') : fmt(t.giam_gia || 0)) %></b></div>
+                              <div class="summary-line"><span>Tổng cộng / Cần trả NCC</span><b><%= fmt(t.can_tra_ncc || t.tong_tien || 0) %></b></div>
+                              <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmt(t.da_tra_ncc || 0) %></b></div>
+                              <div class="summary-line"><span>Nợ NCC</span><b><%= fmt(t.con_no_ncc || 0) %></b></div>
+                            </div>
+                          </div>
+                          <div class="detail-actions">
+                            <button type="button" class="kv-btn">Hủy</button>
+                            <button type="button" class="kv-btn">Sao chép</button>
+                            <button type="button" class="kv-btn">Xuất file</button>
+                            <button type="button" class="kv-btn">Mở phiếu</button>
+                            <button type="button" class="kv-btn">Lưu</button>
+                            <button type="button" class="kv-btn">Trả hàng nhập</button>
+                            <button type="button" class="kv-btn">In tem mã</button>
+                          </div>
+                        </div>
+                        <div class="po-detail-pane" data-tab-pane="payment">
+                          <table class="mini-table">
+                            <thead>
+                              <tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th>Phương thức</th><th>Trạng thái</th><th>Tiền chi</th></tr>
+                            </thead>
+                            <tbody>
+                              <% if (!(t.payment_rows || []).length) { %>
+                                <tr><td colspan="6">Chưa có lịch sử thanh toán.</td></tr>
+                              <% } %>
+                              <% (t.payment_rows || []).forEach(function(p) { %>
+                                <tr>
+                                  <td><%= p.ma_phieu || '--' %></td>
+                                  <td><%= formatDate(p.thoi_gian) %></td>
+                                  <td><%= p.nguoi_tao || '--' %></td>
+                                  <td><%= p.phuong_thuc || '--' %></td>
+                                  <td><%= p.trang_thai || '--' %></td>
+                                  <td><%= fmt(p.tien_chi || 0) %></td>
+                                </tr>
+                              <% }) %>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="8" class="po-empty">Chưa có phiếu nhập hàng</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="po-footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+      </main>
+    </div>
+  </form>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var rows = Array.prototype.slice.call(document.querySelectorAll('.expand-row'));
+      rows.forEach(function(row) {
+        row.addEventListener('click', function(e) {
+          if (e.target && e.target.closest('input[type="checkbox"]')) return;
+          var id = row.getAttribute('data-expand-id');
+          var detail = document.getElementById('detail-' + id);
+          if (!detail) return;
+          detail.style.display = detail.style.display === 'none' ? 'table-row' : 'none';
+        });
+      });
+      var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.po-detail'));
+      detailBlocks.forEach(function(block) {
+        var tabs = Array.prototype.slice.call(block.querySelectorAll('.po-detail-tab'));
+        var panes = Array.prototype.slice.call(block.querySelectorAll('.po-detail-pane'));
+        tabs.forEach(function(tab) {
+          tab.addEventListener('click', function(ev) {
+            ev.stopPropagation();
+            var target = tab.getAttribute('data-tab-target');
+            tabs.forEach(function(t) { t.classList.remove('is-active'); });
+            panes.forEach(function(p) { p.classList.remove('is-active'); });
+            tab.classList.add('is-active');
+            var pane = block.querySelector('.po-detail-pane[data-tab-pane="' + target + '"]');
+            if (pane) pane.classList.add('is-active');
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,214 +1,1346 @@
-<%
-  const safeCustomers = Array.isArray(locals.customers) ? locals.customers : [];
-  const safeGroups = Array.isArray(locals.groups) ? locals.groups : [];
-  const safeDetails = locals.detailMap || {};
-  const safeFilters = locals.filters || {};
-  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
-  const fmtDate = value => value ? new Date(value).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
-%>
-<!DOCTYPE html>
-<html>
+﻿<!doctype html>
+<html lang="vi">
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
-  <style>
-    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 12% 0}.sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}.title{font-size:20px;font-weight:700;margin:0 0 16px}.filter{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;margin-bottom:10px}.radio{display:flex;align-items:center;gap:9px;margin-top:9px}.radio input{accent-color:#0070f4}.pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#667085;padding:0 10px;font-size:13px}.seg{display:flex;gap:8px;flex-wrap:wrap}.seg button,.seg a{height:30px;border:1px solid #cfd8e3;border-radius:16px;padding:0 14px;display:flex;align-items:center;text-decoration:none;color:#111827;background:#fff;font-size:13px;cursor:pointer}.seg .active{background:#0070f4;color:#fff;border-color:#0070f4}.main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;justify-content:space-between;gap:12px}.search{position:relative;flex:1;max-width:470px}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px}.search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff}.actions{display:flex;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.btn.primary{border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1040px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;font-size:12px;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.table tbody tr{cursor:pointer}.customer-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}.check-col{width:36px;text-align:center}.num{text-align:right}.row-link{color:#006dff;text-decoration:none;font-weight:700}.footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}.footer select{height:24px;border:1px solid #cfd8e3;border-radius:6px}.detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.customer-detail{padding:0 18px 14px;min-height:300px}.detail-tabs{height:42px;display:flex;align-items:flex-end;gap:26px;border-bottom:1px solid #e5e9ee}.detail-tab{height:42px;border:0;background:#fff;color:#111827;padding:0 0 9px;font-size:14px;cursor:pointer}.detail-tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700}.detail-panel{display:none;padding-top:16px}.detail-panel.active{display:block}.info-head{display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:18px;margin-bottom:20px}.profile-avatar{width:92px;height:92px;border-radius:50%;background:#e8f3ff;color:#65a6f5;display:flex;align-items:center;justify-content:center;font-size:54px}.info-title{font-size:16px;font-weight:800}.info-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}.info-field{border-bottom:1px solid #e5e9ee;padding-bottom:8px}.info-field label{display:block;font-size:12px;margin-bottom:8px}.muted{color:#7a8794}.mini-table{width:100%;border-collapse:collapse}.mini-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 10px}.mini-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 10px}.detail-empty{height:140px;text-align:center;color:#667085}.detail-actions{height:44px;border-top:1px solid #e5e9ee;display:flex;justify-content:space-between;align-items:center;margin-top:18px}.detail-action-group{display:flex;gap:8px}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:20px;z-index:1000}.modal-backdrop.open{display:flex}.modal{width:900px;max-width:calc(100vw - 80px);max-height:calc(100vh - 40px);background:#fff;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden}.modal-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 22px}.modal-head h2{margin:0;font-size:20px}.modal-close{border:0;background:#fff;font-size:24px;color:#475467;cursor:pointer}.modal-body{padding:16px 22px 76px;overflow:auto;display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:20px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 22px}.field label{display:block;font-size:12px;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:14px}.field textarea{height:50px;padding-top:8px;resize:none}.full{grid-column:1 / -1}.panel{border:1px solid #e1e6ec;border-radius:6px;padding:12px;margin-top:16px}.panel-title{font-weight:800;margin-bottom:12px;display:flex;justify-content:space-between}.avatar{width:170px;height:170px;border-radius:50%;background:#f1f3f6;border:1px dashed #cfd8e3;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:#667085;text-align:center;margin-top:18px}.avatar button{height:34px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;font-weight:700}.modal-foot{position:absolute}.fixed-foot{height:62px;border-top:1px solid #e5e9ee;background:#fff;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 22px}.save{height:38px;border:0;border-radius:7px;background:#0070f4;color:#fff;font-weight:800;padding:0 18px}.cancel{height:38px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;padding:0 18px;font-weight:700}.group-inline{display:flex;justify-content:space-between;align-items:center}.group-inline a{color:#0070f4;text-decoration:none;font-size:12px}.empty{text-align:center;color:#667085;height:300px}
-  </style>
 </head>
-<body>
-  <%- include('../partials/header') %>
-  <form class="page" method="GET" action="/khach-hang">
-    <div class="shell">
-      <aside class="sidebar">
-        <h1 class="title">Khách hàng</h1>
-        <div class="filter">
-          <div class="filter-title group-inline"><span>Nhóm khách hàng</span><a href="#" onclick="openGroupModal();return false">Tạo mới</a></div>
-          <select class="control" name="nhom_khach_hang_id" onchange="this.form.submit()">
-            <option value="all">Tất cả các nhóm</option>
-            <% safeGroups.forEach(group => { %>
-              <option value="<%= group._id %>" <%= String(safeFilters.nhom_khach_hang_id || '') === String(group._id) ? 'selected' : '' %>><%= group.ten_nhom %></option>
-            <% }) %>
-          </select>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+
+  <main class="admin-shell customer-page">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+
+    <div id="addCustomerModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'create' ? '1' : '0' %>">
+      <div class="modal-content customer-create-modal">
+        <div class="modal-header">
+          <h3 id="addCustomerModalTitle">Tạo khách hàng</h3>
+          <button type="button" class="modal-close" id="addCustomerModalClose">×</button>
         </div>
-        <div class="filter"><div class="filter-title">Ngày tạo</div><input class="control" type="date" name="created_from" value="<%= safeFilters.created_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="created_to" value="<%= safeFilters.created_to || '' %>" onchange="this.form.submit()"></div>
-        <div class="filter"><div class="filter-title">Người tạo</div><input class="control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo"></div>
-        <div class="filter"><div class="filter-title">Loại khách hàng</div><div class="seg"><button type="button" class="<%= !safeFilters.loai_khach_hang || safeFilters.loai_khach_hang === 'all' ? 'active' : '' %>" onclick="setCustomerFilter('loai_khach_hang','')">Tất cả</button><button type="button" class="<%= safeFilters.loai_khach_hang === 'ca_nhan' ? 'active' : '' %>" onclick="setCustomerFilter('loai_khach_hang','ca_nhan')">Cá nhân</button><button type="button" class="<%= safeFilters.loai_khach_hang === 'cong_ty' ? 'active' : '' %>" onclick="setCustomerFilter('loai_khach_hang','cong_ty')">Công ty</button></div></div>
-        <div class="filter"><div class="filter-title">Giới tính</div><div class="seg"><button type="button" class="<%= !safeFilters.gioi_tinh || safeFilters.gioi_tinh === 'all' ? 'active' : '' %>" onclick="setCustomerFilter('gioi_tinh','')">Tất cả</button><button type="button" class="<%= safeFilters.gioi_tinh === 'nam' ? 'active' : '' %>" onclick="setCustomerFilter('gioi_tinh','nam')">Nam</button><button type="button" class="<%= safeFilters.gioi_tinh === 'nu' ? 'active' : '' %>" onclick="setCustomerFilter('gioi_tinh','nu')">Nữ</button></div></div>
-        <div class="filter"><div class="filter-title">Sinh nhật</div><input class="control" type="date" name="birthday_from" value="<%= safeFilters.birthday_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="birthday_to" value="<%= safeFilters.birthday_to || '' %>" onchange="this.form.submit()"></div>
-        <div class="filter"><div class="filter-title">Ngày giao dịch cuối</div><input class="control" type="date" name="last_tx_from" value="<%= safeFilters.last_tx_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="last_tx_to" value="<%= safeFilters.last_tx_to || '' %>" onchange="this.form.submit()"></div>
-        <div class="filter"><div class="filter-title">Tổng bán</div><input class="control" name="tong_ban_from" value="<%= safeFilters.tong_ban_from || '' %>" placeholder="Từ"><input class="control" name="tong_ban_to" value="<%= safeFilters.tong_ban_to || '' %>" placeholder="Tới"></div>
-        <div class="filter"><div class="filter-title">Nợ hiện tại</div><input class="control" name="tong_no_from" value="<%= safeFilters.tong_no_from || '' %>" placeholder="Từ"><input class="control" name="tong_no_to" value="<%= safeFilters.tong_no_to || '' %>" placeholder="Tới"></div>
-        <div class="filter"><div class="filter-title">Khu vực giao hàng</div><input class="control" name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" placeholder="Chọn Tỉnh/TP - Quận/Huyện"></div>
-      </aside>
-      <main class="main">
-        <div class="toolbar">
-          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã, tên, số điện thoại"><button><i class="fa-solid fa-sliders"></i></button></div>
-          <div class="actions">
-            <button type="button" class="btn primary" onclick="openCustomerModal()"><i class="fa-solid fa-plus"></i> Khách hàng</button>
-            <button type="button" class="btn" onclick="document.getElementById('importFile').click()"><i class="fa-solid fa-file-import"></i> Import file</button>
-            <input id="importFile" type="file" accept=".csv" hidden onchange="importCustomers(this)">
-            <span class="icon"><i class="fa-solid fa-ellipsis"></i></span>
-            <span class="icon"><i class="fa-solid fa-list"></i></span>
-            <span class="icon"><i class="fa-solid fa-gear"></i></span>
-            <span class="icon"><i class="fa-regular fa-circle-question"></i></span>
+      
+        <form class="modal-body" method="post" action="/khach-hang/add" id="customerCreateForm">
+          <div class="customer-form-grid">
+      
+            <!-- THONG TIN CHUNG -->
+            <div class="form-row-full collapsible-section is-active">
+              <div class="collapsible-header">
+                <strong>Thông tin khách hàng</strong>
+                <span class="chevron">▲</span>
+              </div>
+      
+              <div class="collapsible-content customer-form-main">
+                <div class="customer-form-field">
+                  <label>Loại khách hàng</label>
+                  <div class="radio-inline">
+                    <label>
+                      <input type="radio" name="loai_khach_hang" value="ca_nhan" checked>
+                      Cá nhân
+                    </label>
+                    <label>
+                      <input type="radio" name="loai_khach_hang" value="cong_ty">
+                      Công ty
+                    </label>
+                  </div>
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Mã khách hàng</label>
+                  <input name="ma_khach_hang" placeholder="Tu dong">
+                </div>
+      
+                <div class="customer-form-field form-row-full">
+                  <label>Tên khách hàng *</label>
+                  <input name="ten_khach_hang" placeholder="Nhap ten khach hang" required>
+                </div>
+      
+                <div class="customer-form-field company-field" style="display:none;">
+                  <label>Tên công ty</label>
+                  <input name="ten_cong_ty" placeholder="Nhap ten cong ty">
+                </div>
+      
+                <div class="customer-form-field company-field" style="display:none;">
+                  <label>Mã số thuế</label>
+                  <input name="ma_so_thue" placeholder="Nhap ma so thue">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Số điện thoại</label>
+                  <input name="sdt" placeholder="Nhap so dien thoai">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Email</label>
+                  <input type="email" name="email" placeholder="email@gmail.com">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Facebook</label>
+                  <input name="facebook" placeholder="facebook.com/username">
+                </div>
+      
+                <div class="customer-form-field individual-field">
+                  <label>Ngày sinh</label>
+                  <input type="date" name="ngay_sinh">
+                </div>
+      
+                <div class="customer-form-field individual-field">
+                  <label>Giới tính</label>
+                  <select name="gioi_tinh">
+                    <option value="">Chọn giới tính</option>
+                    <option value="nam">Nam</option>
+                    <option value="nu">Nữ</option>
+                    <option value="khac">Khác</option>
+                  </select>
+                </div>
+      
+                <div class="customer-form-field individual-field">
+                  <label>CCCD/CMND</label>
+                  <input name="cccd" placeholder="Nhap CCCD/CMND">
+                </div>
+      
+                <div class="customer-form-field individual-field">
+                  <label>Số hộ chiếu</label>
+                  <input name="so_ho_chieu" placeholder="Nhap so ho chieu">
+                </div>
+              </div>
+            </div>
+      
+      
+            <!-- DIA CHI -->
+            <div class="form-row-full collapsible-section is-active">
+              <div class="collapsible-header">
+                <strong>Địa chỉ khách hàng</strong>
+                <span class="chevron">▲</span>
+              </div>
+      
+              <div class="collapsible-content customer-form-main">
+                <div class="customer-form-field">
+                  <label>Mã địa chỉ</label>
+                  <input name="ma_dia_chi" placeholder="Tu dong">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Loại địa chỉ</label>
+                  <% var initialAddressType = (addressTypes && addressTypes[0]) ? addressTypes[0] : null; %>
+                  <div class="address-type-wrapper">
+                    <div class="address-type-header">
+                      <button class="address-type-trigger" type="button" id="addressTypeTrigger">
+                        <span id="addressTypeSelectedLabel"><%= initialAddressType ? initialAddressType.ten_loai : 'Chọn loại địa chỉ' %></span>
+                        <span>▾</span>
+                      </button>
+                      <button class="btn btn-primary btn-sm" type="button" id="addressTypeAddBtn">Thêm</button>
+                    </div>
+                    <input type="hidden" name="loai_dia_chi" id="addressTypeValue" value="<%= initialAddressType ? initialAddressType.ma_loai : '' %>">
+                    <div class="address-type-dropdown" id="addressTypeDropdown">
+                      <% (addressTypes || []).forEach(function(type) { %>
+                        <div
+                          class="address-type-item <%= initialAddressType && String(initialAddressType._id) === String(type._id) ? 'is-active' : '' %>"
+                          data-id="<%= type._id %>"
+                          data-value="<%= type.ma_loai %>"
+                          data-name="<%= type.ten_loai %>"
+                        >
+                          <button class="address-type-option" type="button"><%= type.ten_loai %></button>
+                          <div class="address-type-actions">
+                            <button class="address-type-action-edit" type="button">Sửa</button>
+                            <button class="address-type-action-delete" type="button">Xóa</button>
+                          </div>
+                        </div>
+                      <% }) %>
+                    </div>
+                  </div>
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Tên người nhận</label>
+                  <input name="ten_nguoi_nhan" placeholder="Nhap ten nguoi nhan">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>SĐT người nhận</label>
+                  <input name="sdt_nguoi_nhan" placeholder="Nhap SDT nguoi nhan">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Số nhà</label>
+                  <input name="so_nha" placeholder="Nhap so nha, duong">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Tỉnh/Thành</label>
+                  <input name="tinh_thanh" placeholder="Chon Tinh/Thanh pho">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Quận/Huyện</label>
+                  <input name="quan_huyen" placeholder="Chon Quan/Huyen">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Phường/Xã</label>
+                  <input name="phuong_xa" placeholder="Chon Phuong/Xa">
+                </div>
+      
+                <div class="customer-form-field form-row-full">
+                  <label>Địa chỉ đầy đủ</label>
+                  <input name="dia_chi_day_du" placeholder="Nhap dia chi day du">
+                </div>
+      
+                <div class="customer-form-field form-row-full">
+                  <label>
+                    <input type="checkbox" name="mac_dinh" value="true" checked>
+                    Đặt làm địa chỉ mặc định
+                  </label>
+                </div>
+      
+                <div class="customer-form-field form-row-full">
+                  <label>Ghi chú địa chỉ</label>
+                  <textarea name="ghi_chu_dia_chi" placeholder="Vi du: dia chi cong ty, noi nhan hang, nha rieng..."></textarea>
+                </div>
+              </div>
+            </div>
+      
+            <div class="form-row-full collapsible-section is-active">
+              <div class="collapsible-header">
+                <strong>Nhóm khách hàng, ghi chú</strong>
+                <span class="chevron">▲</span>
+              </div>
+      
+              <div class="collapsible-content customer-form-main">
+                <div class="customer-form-field form-row-full">
+                  <label>Nhóm khách hàng</label>
+                  <div class="group-manage-wrapper" id="groupManageModal">
+                    <div class="group-manage-header">
+                      <button class="group-manage-trigger" type="button" id="groupModalTrigger">
+                        <span id="groupModalSelectedLabel">Không chọn nhóm</span>
+                        <span>▾</span>
+                      </button>
+                      <button class="btn btn-primary btn-sm" type="button" id="groupModalAddBtn">Thêm</button>
+                    </div>
+                    <input type="hidden" name="nhom_khach_hang_id" id="groupModalValue" value="">
+                    <div class="group-manage-dropdown" id="groupModalDropdown">
+                      <div class="group-manage-item is-active" data-id="" data-value="" data-name="Không chọn nhóm" data-desc="">
+                        <button class="group-manage-option" type="button">Không chọn nhóm</button>
+                      </div>
+                      <% customerGroups.forEach(function(group) { %>
+                        <div class="group-manage-item" data-id="<%= group._id %>" data-value="<%= group._id %>" data-name="<%= group.ten_nhom %>" data-desc="<%= group.mo_ta || '' %>">
+                          <button class="group-manage-option" type="button"><%= group.ten_nhom %></button>
+                          <div class="group-manage-actions">
+                            <button class="group-manage-action-edit" type="button">Sửa</button>
+                            <button class="group-manage-action-delete" type="button">Xóa</button>
+                          </div>
+                        </div>
+                      <% }) %>
+                    </div>
+                  </div>
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Ngân hàng</label>
+                  <input name="ngan_hang" placeholder="Nhap ten ngan hang">
+                </div>
+      
+                <div class="customer-form-field">
+                  <label>Số tài khoản ngân hàng</label>
+                  <input name="stk_ngan_hang" placeholder="Nhap so tai khoan">
+                </div>
+      
+                <div class="customer-form-field form-row-full">
+                  <label>Ghi chú</label>
+                  <textarea name="ghi_chu" placeholder="Nhap ghi chu"></textarea>
+                </div>
+              </div>
+            </div>
+      
           </div>
+        </form>
+      
+        <div class="modal-footer">
+          <button class="btn btn-light" type="button" id="addCustomerModalCancel">Bỏ qua</button>
+          <button class="btn btn-primary" type="submit" form="customerCreateForm">Lưu</button>
         </div>
-        <div class="table-wrap">
-          <table class="table">
-            <thead><tr><th class="check-col"><input type="checkbox"></th><th>Mã khách hàng</th><th>Tên khách hàng</th><th>Điện thoại</th><th class="num">Nợ hiện tại</th><th class="num">Tổng bán</th><th class="num">Tổng bán trừ trả hàng</th></tr></thead>
-            <tbody>
-              <tr><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td></tr>
-              <% if (safeCustomers.length) { %>
-                <% safeCustomers.forEach(customer => { const detail = safeDetails[String(customer._id)] || { addresses: [], debts: [], invoices: [] }; %>
-                  <tr class="customer-row" data-customer-row="<%= customer._id %>" onclick="toggleCustomerDetail('<%= customer._id %>')">
-                    <td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td>
-                    <td><a href="#" class="row-link" onclick="event.preventDefault();event.stopPropagation();toggleCustomerDetail('<%= customer._id %>')"><%= customer.ma_khach_hang %></a></td>
-                    <td><%= customer.ten_khach_hang %></td>
-                    <td><%= customer.sdt || '' %></td>
-                    <td class="num"><%= fmt(customer.tong_no) %></td>
-                    <td class="num"><%= fmt(customer.tong_ban) %></td>
-                    <td class="num"><%= fmt(customer.tong_ban_tru_tra) %></td>
+      </div>
+      
+      <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+          const radios = document.querySelectorAll('input[name="loai_khach_hang"]');
+          const companyFields = document.querySelectorAll('.company-field');
+          const individualFields = document.querySelectorAll('.individual-field');
+      
+          function toggleCustomerType() {
+            const selected = document.querySelector('input[name="loai_khach_hang"]:checked')?.value;
+      
+            companyFields.forEach(el => {
+              el.style.display = selected === 'cong_ty' ? '' : 'none';
+            });
+      
+            individualFields.forEach(el => {
+              el.style.display = selected === 'ca_nhan' ? '' : 'none';
+            });
+          }
+      
+          radios.forEach(radio => {
+            radio.addEventListener('change', toggleCustomerType);
+          });
+      
+          toggleCustomerType();
+        });
+      </script>
+    </div>
+
+    <div class="customer-shell">
+      <aside class="customer-filter">
+        <h2>Khách hàng</h2>
+        <form method="get" action="/khach-hang" id="customerFilterForm">
+          <section class="customer-filter-section">
+            <div class="customer-filter-title-row">
+              <h4>Nhóm khách hàng</h4>
+              <button class="filter-link-btn" type="button" id="groupAddBtn">Tạo mới</button>
+            </div>
+            <% var selectedSidebarGroup = customerGroups.find(function(group) { return filter.groupId === String(group._id); }); %>
+            <div class="group-manage-wrapper" id="groupManageSidebar">
+              <div class="group-manage-header">
+                <button class="group-manage-trigger" type="button" id="groupFilterTrigger">
+                  <span id="groupFilterSelectedLabel"><%= selectedSidebarGroup ? selectedSidebarGroup.ten_nhom : 'Tất cả các nhóm' %></span>
+                  <span>▾</span>
+                </button>
+              </div>
+              <input type="hidden" name="groupId" id="groupFilterValue" value="<%= filter.groupId || 'all' %>">
+              <div class="group-manage-dropdown" id="groupFilterDropdown">
+                <div class="group-manage-item <%= (!filter.groupId || filter.groupId === 'all') ? 'is-active' : '' %>" data-id="" data-value="all" data-name="Tất cả các nhóm" data-desc="">
+                  <button class="group-manage-option" type="button">Tất cả các nhóm</button>
+                </div>
+                <% customerGroups.forEach(function(group) { %>
+                  <div class="group-manage-item <%= filter.groupId === String(group._id) ? 'is-active' : '' %>" data-id="<%= group._id %>" data-value="<%= group._id %>" data-name="<%= group.ten_nhom %>" data-desc="<%= group.mo_ta || '' %>">
+                    <button class="group-manage-option" type="button"><%= group.ten_nhom %></button>
+                    <div class="group-manage-actions">
+                      <button class="group-manage-action-edit" type="button">Sửa</button>
+                      <button class="group-manage-action-delete" type="button">Xóa</button>
+                    </div>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+            <h4>Ngày tạo</h4>
+            <select name="created" id="createdFilterSelect">
+              <option value="all" <%= filter.created === 'all' ? 'selected' : '' %>>Toàn thời gian</option>
+              <option value="today" <%= filter.created === 'today' ? 'selected' : '' %>>Hôm nay</option>
+              <option value="7days" <%= filter.created === '7days' ? 'selected' : '' %>>7 ngày qua</option>
+              <option value="30days" <%= filter.created === '30days' ? 'selected' : '' %>>30 ngày qua</option>
+              <option value="custom" <%= filter.created === 'custom' ? 'selected' : '' %>>Tùy chỉnh</option>
+            </select>
+            <div class="custom-date-range <%= filter.created === 'custom' ? 'is-visible' : '' %>" id="customDateRange">
+              <input type="date" name="createdFrom" value="<%= filter.createdFrom || '' %>">
+              <input type="date" name="createdTo" value="<%= filter.createdTo || '' %>">
+            </div>
+            <h4>Người tạo</h4>
+            <input type="text" name="creatorKeyword" value="<%= filter.creatorKeyword || '' %>" placeholder="Chon nguoi tao">
+            <h4>Loại khách hàng</h4>
+            <div class="pill-row">
+              <button class="pill-btn <%= filter.customerType === 'all' ? 'is-active' : '' %>" type="button" data-target-input="customerTypeInput" data-value="all">Tất cả</button>
+              <button class="pill-btn <%= filter.customerType === 'ca_nhan' ? 'is-active' : '' %>" type="button" data-target-input="customerTypeInput" data-value="ca_nhan">Cá nhân</button>
+              <button class="pill-btn <%= filter.customerType === 'cong_ty' ? 'is-active' : '' %>" type="button" data-target-input="customerTypeInput" data-value="cong_ty">Công ty</button>
+            </div>
+            <input type="hidden" id="customerTypeInput" name="customerType" value="<%= filter.customerType || 'all' %>">
+            <h4>Giới tính</h4>
+            <div class="pill-row">
+              <button class="pill-btn <%= filter.gender === 'all' ? 'is-active' : '' %>" type="button" data-target-input="genderInput" data-value="all">Tất cả</button>
+              <button class="pill-btn <%= filter.gender === 'nam' ? 'is-active' : '' %>" type="button" data-target-input="genderInput" data-value="nam">Nam</button>
+              <button class="pill-btn <%= filter.gender === 'nu' ? 'is-active' : '' %>" type="button" data-target-input="genderInput" data-value="nu">Nữ</button>
+            </div>
+            <input type="hidden" id="genderInput" name="gender" value="<%= filter.gender || 'all' %>">
+            <h4>Tổng bán</h4>
+            <div class="range-stack">
+              <div class="range-row"><span>Từ</span><input type="number" min="0" name="totalSalesFrom" value="<%= filter.totalSalesFrom || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Tới</span><input type="number" min="0" name="totalSalesTo" value="<%= filter.totalSalesTo || '' %>" placeholder="Nhập giá trị"></div>
+            </div>
+            <h4>Nợ hiện tại</h4>
+            <div class="range-stack">
+              <div class="range-row"><span>Từ</span><input type="number" min="0" name="currentDebtFrom" value="<%= filter.currentDebtFrom || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Tới</span><input type="number" min="0" name="currentDebtTo" value="<%= filter.currentDebtTo || '' %>" placeholder="Nhập giá trị"></div>
+            </div>
+            <h4>Khu vực giao hàng</h4>
+            <input type="text" name="shippingArea" value="<%= filter.shippingArea || '' %>" placeholder="Chọn Tỉnh/TP - Quận/Huyện">
+            <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
+            <a class="btn btn-light" href="/khach-hang">Xóa lọc</a>
+          </section>
+        </form>
+      </aside>
+
+      <section class="customer-content">
+        <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
+        <div class="customer-toolbar">
+          <div class="customer-search">
+            <span>⌕</span>
+            <input type="search" name="keyword" form="customerFilterForm" value="<%= filter.keyword || '' %>" placeholder="Theo ma, ten, so dien thoai">
+          </div>
+          <div class="customer-toolbar-actions">
+            <button class="btn btn-primary" type="button" id="openAddCustomerModal">+ Khách hàng</button>
+            <button class="btn btn-light" type="button">Import file</button>
+            <button class="btn btn-light" type="button">Xuất file</button>
+          </div>
+
+
+        </div>
+
+        <div class="customer-table-wrap">
+          <form id="bulkDeleteCustomersForm" method="post" action="/khach-hang/delete-selected">
+            <table class="admin-table customer-table">
+              <thead>
+                <tr>
+                  <th class="check-cell"><input id="selectAllCustomers" type="checkbox" aria-label="Chọn tất cả"></th>
+                  <th>Mã khách hàng</th>
+                  <th>Tên khách hàng</th>
+                  <th>Điện thoại</th>
+                  <th>Nợ hiện tại</th>
+                  <th>Tổng bán</th>
+                  <th>Tổng bán trừ trả hàng</th>
+                  <th class="text-right">Thao tác</th>
+
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="customer-summary-row" style="background-color: #f1f5f9;">
+                  <td class="check-cell"></td>
+                  <td colspan="3" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
+                  <td><strong><%= Number(summaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td><strong><%= Number(summaryTotals.totalSales || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td><strong><%= Number(summaryTotals.totalSales || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td></td>
+                </tr>
+                <% if (customers.length === 0) { %>
+                  <tr>
+                    <td colspan="8" class="empty-cell">Không có khách hàng phù hợp với bộ lọc.</td>
                   </tr>
-                  <tr class="detail-row" data-customer-detail="<%= customer._id %>">
-                    <td class="detail-cell" colspan="7">
-                      <div class="customer-detail">
-                        <div class="detail-tabs">
-                          <button type="button" class="detail-tab active" data-tab="info" onclick="showCustomerTab(event,'<%= customer._id %>','info')">Thông tin</button>
-                          <button type="button" class="detail-tab" data-tab="address" onclick="showCustomerTab(event,'<%= customer._id %>','address')">Địa chỉ nhận hàng</button>
-                          <button type="button" class="detail-tab" data-tab="debt" onclick="showCustomerTab(event,'<%= customer._id %>','debt')">Nợ cần thu từ khách</button>
-                        </div>
-                        <div class="detail-panel active" data-panel="info">
-                          <div class="info-head">
-                            <div class="profile-avatar"><i class="fa-solid fa-user"></i></div>
-                            <div>
-                              <div><span class="info-title"><%= customer.ten_khach_hang %></span> <span><%= customer.ma_khach_hang %></span></div>
-                              <div class="info-meta"><span>Người tạo: <%= customer.nguoi_tao_id?.ho_ten || user?.ho_ten || 'Admin' %></span><span>|</span><span>Ngày tạo: <%= customer.created_at ? new Date(customer.created_at).toLocaleDateString('vi-VN') : '' %></span><span>|</span><span>Nhóm khách: <span class="muted"><%= customer.nhom_khach_hang_id?.ten_nhom || 'Chưa có' %></span></span></div>
-                            </div>
-                            <div>Chi nhánh trung tâm</div>
-                          </div>
-                          <div class="info-grid">
-                            <div class="info-field"><label>Điện thoại</label><span class="muted"><%= customer.sdt || 'Chưa có' %></span></div>
-                            <div class="info-field"><label>Sinh nhật</label><span class="muted"><%= customer.ngay_sinh ? new Date(customer.ngay_sinh).toLocaleDateString('vi-VN') : 'Chưa có' %></span></div>
-                            <div class="info-field"><label>Giới tính</label><span class="muted"><%= customer.gioi_tinh || 'Chưa có' %></span></div>
-                            <div class="info-field"><label>Email</label><span class="muted"><%= customer.email || 'Chưa có' %></span></div>
-                            <div class="info-field"><label>Facebook</label><span class="muted"><%= customer.facebook || 'Chưa có' %></span></div>
-                            <div></div>
-                            <div class="info-field" style="grid-column:1/-1"><label>Địa chỉ</label><span class="muted"><%= customer.dia_chi_nhan || 'Chưa có' %></span></div>
-                          </div>
-                          <div style="margin-top:18px"><a class="row-link" href="#" onclick="event.preventDefault()">Thêm thông tin xuất hóa đơn</a></div>
-                          <div style="margin-top:20px"><i class="fa-regular fa-pen-to-square"></i> <%= customer.ghi_chu || 'Chưa có ghi chú' %></div>
-                          <div class="detail-actions"><div><button type="button" class="btn" onclick="event.stopPropagation();deleteCustomerInline('<%= customer._id %>')"><i class="fa-regular fa-trash-can"></i> Xóa</button></div><div class="detail-action-group"><button type="button" class="btn solid" onclick="event.stopPropagation();editCustomer('<%= customer._id %>')"><i class="fa-solid fa-pen"></i> Chỉnh sửa</button><button type="button" class="btn" onclick="event.stopPropagation();deleteCustomerInline('<%= customer._id %>')"><i class="fa-solid fa-lock"></i> Ngừng hoạt động</button></div></div>
-                        </div>
-                        <div class="detail-panel" data-panel="address">
-                          <table class="mini-table"><thead><tr><th>Tên địa chỉ</th><th>Tên người nhận</th><th>Số điện thoại</th><th>Địa chỉ nhận</th><th>Ngày tạo</th></tr></thead><tbody>
-                            <% if (detail.addresses.length) { %>
-                              <% detail.addresses.forEach(address => { %><tr><td><%= address.mac_dinh ? 'Mặc định' : 'Địa chỉ nhận hàng' %></td><td><%= customer.ten_khach_hang %></td><td><%= customer.sdt || '' %></td><td><%= [address.dia_chi,address.phuong_xa,address.quan_huyen,address.tinh_thanh].filter(Boolean).join(', ') %></td><td></td></tr><% }) %>
-                            <% } else { %><tr><td colspan="5" class="detail-empty">Không tìm thấy kết quả nào phù hợp</td></tr><% } %>
-                          </tbody></table><div class="detail-actions"><span></span><button type="button" class="btn solid"><i class="fa-solid fa-plus"></i> Địa chỉ mới</button></div>
-                        </div>
-                        <div class="detail-panel" data-panel="debt">
-                          <div style="display:flex;justify-content:flex-end;margin-bottom:12px"><select class="control" style="width:180px"><option>Tất cả giao dịch</option></select></div>
-                          <table class="mini-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Loại</th><th class="num">Giá trị</th><th class="num">Dư nợ khách hàng</th></tr></thead><tbody>
-                            <% if (detail.debts.length || detail.invoices.length) { %>
-                              <% detail.debts.forEach(item => { const code = item.hoa_don_id?.ma_hoa_don || item.phieu_thu_chi_id?.ma_phieu || ''; %><tr><td><a class="row-link" href="#"><%= code || 'Giao dịch' %></a></td><td><%= fmtDate(item.ngay || item.created_at) %></td><td><%= item.loai === 'thu' ? 'Thanh toán' : 'Bán hàng' %></td><td class="num"><%= fmt(Math.abs(item.so_tien || 0)) %></td><td class="num"><%= fmt(item.so_tien) %></td></tr><% }) %>
-                              <% if (!detail.debts.length) { detail.invoices.forEach(item => { %><tr><td><a class="row-link" href="/don-hang/hoa-don"><%= item.ma_hoa_don %></a></td><td><%= fmtDate(item.ngay_ban || item.created_at) %></td><td>Bán hàng</td><td class="num"><%= fmt(item.thanh_toan || item.tong_tien) %></td><td class="num"><%= fmt(item.thanh_toan || item.tong_tien) %></td></tr><% }) } %>
-                            <% } else { %><tr><td colspan="5" class="detail-empty">Không tìm thấy kết quả nào phù hợp</td></tr><% } %>
-                          </tbody></table><div class="detail-actions"><div class="detail-action-group"><a class="btn" href="/khach-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file công nợ</a><a class="btn" href="/khach-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div><div class="detail-action-group"><button type="button" class="btn solid">Thanh toán</button><button type="button" class="btn">Điều chỉnh</button><button type="button" class="btn">Chiết khấu thanh toán</button><button type="button" class="btn">Tạo QR</button></div></div>
-                        </div>
+
+                <% } %>
+                <% customers.forEach(function(customer) { %>
+                  <% var isSelected = selectedCustomer && String(selectedCustomer._id) === String(customer._id); %>
+                  <% var rowHref = isSelected ? ('/khach-hang' + (filterQueryString ? '?' + filterQueryString : '')) : ('/khach-hang?' + filterQueryPrefix + 'customer=' + customer._id); %>
+                  <tr class="<%= isSelected ? 'is-selected' : '' %>" onclick="window.location.href='<%= rowHref %>'">
+                    <td class="check-cell" onclick="event.stopPropagation()"><input class="customer-checkbox" type="checkbox" name="ids" value="<%= customer._id %>" aria-label="Chọn khách hàng"></td>
+                    <td><a class="table-code-link" href="<%= rowHref %>"><%= customer.ma_khach_hang || '---' %></a></td>
+                    <td><strong><%= customer.ten_khach_hang || '---' %></strong></td>
+                    <td><%= customer.sdt || '---' %></td>
+                    <td><%= Number(customer.tong_no || 0).toLocaleString('vi-VN') %></td>
+                    <td><%= Number(customer.tong_ban || 0).toLocaleString('vi-VN') %></td>
+                    <td><%= Number(customer.tong_ban || 0).toLocaleString('vi-VN') %></td>
+                    <td class="text-right">
+                      <div class="warehouse-action-buttons" onclick="event.stopPropagation()">
+                        <button 
+                          class="btn btn-light btn-sm btn-edit-customer" 
+                          type="button" 
+                          data-customer='<%= JSON.stringify(customer) %>'
+                        >Sửa</button>
+                        <button
+
+                          class="btn btn-danger btn-sm"
+                          type="submit"
+                          form="deleteCustomerForm_<%= customer._id %>"
+                          onclick="return confirm('Bạn có chắc muốn xóa khách hàng này không?')"
+                        >Xóa</button>
                       </div>
                     </td>
+
                   </tr>
+                  <% if (isSelected) { %>
+                    <tr class="customer-detail-row">
+                      <td colspan="8">
+                        <div class="customer-detail" data-customer-detail>
+                          <div class="detail-tabs">
+                            <div class="detail-tab-list">
+                              <button class="detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
+                              <button class="detail-tab" type="button" data-tab-target="address">Danh sách địa chỉ</button>
+                            </div>
+                            <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
+                          </div>
+                          <div class="customer-detail-body">
+                            <div class="customer-detail-pane is-active" data-tab-pane="info">
+                              <div class="store-fields customer-detail-fields">
+                                <div>
+                                  <span>Mã khách hàng</span>
+                                  <strong><%= selectedCustomer.ma_khach_hang || '---' %></strong>
+                                </div>
+                                <div>
+                                  <span>Nhóm khách hàng</span>
+                                  <strong><%= selectedCustomer.nhom_khach_hang_ten || '---' %></strong>
+                                </div>
+                                <div>
+                                  <span>Loại khách hàng</span>
+                                  <strong><%= selectedCustomer.loai_khach_hang === 'cong_ty' ? 'Công ty' : 'Cá nhân' %></strong>
+                                </div>
+                                <div>
+                                  <span>Người tạo</span>
+                                  <strong><%= selectedCustomer.nguoi_tao_ten || '---' %></strong>
+                                </div>
+                                <div>
+                                  <span>Giới tính</span>
+                                  <strong><%= selectedCustomer.gioi_tinh === 'nam' ? 'Nam' : (selectedCustomer.gioi_tinh === 'nu' ? 'Nữ' : '---') %></strong>
+                                </div>
+                                <div>
+                                  <span>Khu vực giao hàng</span>
+                                  <strong><%= selectedCustomer.khu_vuc_giao_hang || '---' %></strong>
+                                </div>
+                                <div>
+                                  <span>Tổng bán</span>
+                                  <strong><%= Number(selectedCustomer.tong_ban || 0).toLocaleString('vi-VN') %></strong>
+                                </div>
+                                <div>
+                                  <span>Nợ hiện tại</span>
+                                  <strong><%= Number(selectedCustomer.tong_no || 0).toLocaleString('vi-VN') %></strong>
+                                </div>
+                                <div>
+                                  <span>Email</span>
+                                  <strong><%= selectedCustomer.email || '---' %></strong>
+                                </div>
+                                <div>
+                                  <span>Điện thoại</span>
+                                  <strong><%= selectedCustomer.sdt || '---' %></strong>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="address">
+                              <% var returnQuery = filterQueryString ? (filterQueryString + '&customer=' + selectedCustomer._id) : ('customer=' + selectedCustomer._id); %>
+                              <table class="admin-table warehouse-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã địa chỉ</th>
+                                    <th>Tên người nhận</th>
+                                    <th>SĐT</th>
+                                    <th>Địa chỉ</th>
+                                    <th>Loại địa chỉ</th>
+                                    <th>Tạo lúc</th>
+                                    <th>Thao tác</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr class="warehouse-edit-row warehouse-add-row">
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ma_dia_chi" placeholder="Tự động" readonly style="background: transparent; border: none;"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                                    <td>
+                                      <input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ">
+                                    </td>
+                                    <td>
+                                      <select form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
+                                        <% (addressTypes || []).forEach(function(type) { %>
+                                          <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
+                                        <% }) %>
+                                      </select>
+                                    </td>
+                                    <td>--</td>
+                                    <td class="warehouse-action-cell">
+                                      <div class="warehouse-action-buttons">
+                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                        <button
+                                          form="addressAddForm_<%= selectedCustomer._id %>"
+                                          class="btn btn-primary btn-sm js-address-add"
+                                          data-form-id="addressAddForm_<%= selectedCustomer._id %>"
+                                          data-action="/khach-hang/<%= selectedCustomer._id %>/addresses/add"
+                                          type="submit"
+                                        >Thêm</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                    <td colspan="7">
+                                      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="so_nha" placeholder="Số nhà"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" placeholder="Phường/Xã"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" placeholder="Quận/Huyện"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
+                                        <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
+                                        <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <% if (!customerAddresses || customerAddresses.length === 0) { %>
+                                    <tr>
+                                      <td colspan="7" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
+                                    </tr>
+                                  <% } %>
+                                  <% (customerAddresses || []).forEach(function(address) { %>
+                                    <% var addressFormId = 'addressForm_' + String(address._id); %>
+                                    <tr class="warehouse-edit-row">
+                                      <td><input form="<%= addressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly style="background: transparent; border: none; cursor: default;"></td>
+                                      <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
+                                      <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                                      <td>
+                                        <input form="<%= addressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>">
+                                      </td>
+                                      <td>
+                                        <select form="<%= addressFormId %>" name="loai_dia_chi">
+                                          <% (addressTypes || []).forEach(function(type) { %>
+                                            <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
+                                          <% }) %>
+                                        </select>
+                                      </td>
+                                      <td><%= formatDate(address.created_at) %></td>
+                                      <td class="warehouse-action-cell">
+                                        <div class="warehouse-action-buttons">
+                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                          <button
+                                            form="<%= addressFormId %>"
+                                            class="btn btn-light btn-sm"
+                                            type="submit"
+                                            onclick="return confirm('Bạn có muốn lưu chỉnh sửa địa chỉ này không?')"
+                                          >Lưu</button>
+                                          <button
+                                            form="addressDeleteForm_<%= address._id %>"
+                                            class="btn btn-danger btn-sm"
+                                            type="submit"
+                                            onclick="return confirm('Bạn có chắc muốn xóa địa chỉ này không?')"
+                                          >Xóa</button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                      <td colspan="7">
+                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" form="<%= addressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" form="<%= addressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" form="<%= addressFormId %>" name="quan_huyen" value="<%= address.quan_huyen || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" form="<%= addressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
+                                          <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
+                                          <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                              <form id="addressAddForm_<%= selectedCustomer._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/add">
+                                <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+                              </form>
+                              <% (customerAddresses || []).forEach(function(address) { %>
+                                <form id="addressForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/update">
+                                  <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+                                </form>
+                                <form id="addressDeleteForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/delete">
+                                  <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+                                </form>
+                              <% }) %>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  <% } %>
                 <% }) %>
-              <% } else { %>
-                <tr><td colspan="7" class="empty">Chưa có khách hàng</td></tr>
-              <% } %>
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </form>
+          <% customers.forEach(function(customer) { %>
+            <form id="deleteCustomerForm_<%= customer._id %>" method="post" action="/khach-hang/<%= customer._id %>/delete"></form>
+          <% }) %>
         </div>
-        <div class="footer">Hiển thị <select><option>15 dòng</option></select></div>
-      </main>
+      </section>
     </div>
-  </form>
-
-  <div id="customerModal" class="modal-backdrop">
-    <form class="modal" onsubmit="saveCustomer(event)">
-      <div class="modal-head"><h2 id="modalTitle">Tạo khách hàng</h2><button type="button" class="modal-close" onclick="closeCustomerModal()">&times;</button></div>
-      <div class="modal-body">
-        <div>
-          <input type="hidden" name="_id" id="customerId">
-          <div class="form-grid">
-            <div class="field"><label>Tên khách hàng</label><input name="ten_khach_hang" id="tenKhachHang" placeholder="Bắt buộc" required autofocus></div>
-            <div class="field"><label>Mã khách hàng</label><input name="ma_khach_hang" id="maKhachHang" placeholder="Tự động"></div>
-            <div class="field"><label>Điện thoại 1</label><input name="sdt" id="sdt"></div>
-            <div class="field"><label>Điện thoại 2</label><input name="sdt2" id="sdt2"></div>
-            <div class="field"><label>Email</label><input name="email" id="email" placeholder="email@gmail.com"></div>
-            <div class="field"><label>Facebook</label><input name="facebook" id="facebook" placeholder="facebook.com/username"></div>
-            <div class="field"><label>Sinh nhật</label><input type="date" name="ngay_sinh" id="ngaySinh"></div>
-            <div class="field"><label>Giới tính</label><select name="gioi_tinh" id="gioiTinh"><option value="">Chọn giới tính</option><option value="nam">Nam</option><option value="nu">Nữ</option><option value="khac">Khác</option></select></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">Địa chỉ <i class="fa-solid fa-chevron-up"></i></div>
-            <div class="form-grid">
-              <div class="field full"><label>Địa chỉ</label><input name="dia_chi_nhan" id="diaChi" placeholder="Nhập địa chỉ"></div>
-              <div class="field"><label>Khu vực</label><input name="tinh_thanh" id="tinhThanh" placeholder="Chọn Tỉnh/Thành phố"></div>
-              <div class="field"><label>Phường/Xã</label><input name="phuong_xa" id="phuongXa" placeholder="Chọn Phường/Xã"></div>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">Nhóm khách hàng, ghi chú <i class="fa-solid fa-chevron-up"></i></div>
-            <div class="field"><label>Nhóm khách hàng</label><select name="nhom_khach_hang_id" id="nhomKhachHang"><option value="">Chọn nhóm khách hàng</option><% safeGroups.forEach(group => { %><option value="<%= group._id %>"><%= group.ten_nhom %></option><% }) %></select></div>
-            <div class="field" style="margin-top:12px"><label>Ghi chú</label><textarea name="ghi_chu" id="ghiChu" placeholder="Nhập ghi chú"></textarea></div>
-          </div>
-          <div class="panel">
-            <div class="panel-title">Thông tin xuất hóa đơn <i class="fa-solid fa-chevron-up"></i></div>
-            <div class="field" style="margin-bottom:12px"><label>Loại khách hàng</label><label style="display:inline-flex;gap:8px;align-items:center;margin-right:18px"><input type="radio" name="loai_khach_hang" value="ca_nhan" checked> Cá nhân</label><label style="display:inline-flex;gap:8px;align-items:center"><input type="radio" name="loai_khach_hang" value="cong_ty"> Tổ chức/ Hộ kinh doanh</label></div>
-            <div class="form-grid">
-              <div class="field"><label>Tên người mua</label><input name="ten_nguoi_mua" id="tenNguoiMua" placeholder="Nhập tên người mua"></div>
-              <div class="field"><label>Mã số thuế</label><input name="ma_so_thue" id="maSoThue" placeholder="Nhập mã số thuế"></div>
-              <div class="field full"><label>Tên công ty</label><input name="ten_cong_ty" id="tenCongTy" placeholder="Nhập tên công ty"></div>
-            </div>
-          </div>
-        </div>
-        <aside><div class="avatar"><button type="button">Thêm ảnh</button><span>Ảnh không được vượt quá<br>2MB</span></div></aside>
+  </main>
+  <div id="groupModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="groupModalTitle">Sửa nhóm khách hàng</h3>
+        <button type="button" class="group-modal-close" id="groupModalClose">×</button>
       </div>
-      <div class="fixed-foot"><button class="cancel" type="button" onclick="closeCustomerModal()">Bỏ qua</button><button class="save" type="submit">Lưu</button></div>
-    </form>
-  </div>
-
-  <div id="groupModal" class="modal-backdrop">
-    <form class="modal" style="width:420px" onsubmit="saveGroup(event)">
-      <div class="modal-head"><h2>Tạo nhóm khách hàng</h2><button type="button" class="modal-close" onclick="closeGroupModal()">&times;</button></div>
-      <div style="padding:16px 22px 24px">
-        <div class="field"><label>Tên nhóm</label><input name="ten_nhom" required placeholder="Nhập tên nhóm"></div>
-        <div class="field" style="margin-top:12px"><label>Mô tả</label><textarea name="mo_ta" placeholder="Nhập mô tả"></textarea></div>
+      <div class="group-modal-body">
+        <label>
+          <span>Tên nhóm</span>
+          <input id="groupNameInput" type="text" placeholder="Nhap ten nhom">
+        </label>
+        <label>
+          <span>Ghi chú</span>
+          <input id="groupDescInput" type="text" placeholder="Nhap ghi chu">
+        </label>
       </div>
-      <div class="fixed-foot"><button class="cancel" type="button" onclick="closeGroupModal()">Bỏ qua</button><button class="save" type="submit">Lưu</button></div>
-    </form>
+      <div class="group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="groupModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="groupModalSubmit">Lưu</button>
+      </div>
+    </div>
   </div>
-
+  <div id="addressTypeModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="addressTypeModalTitle">Thêm loại địa chỉ</h3>
+        <button type="button" class="group-modal-close" id="addressTypeModalClose">×</button>
+      </div>
+      <div class="group-modal-body">
+        <label>
+          <span>Tên loại địa chỉ</span>
+          <input id="addressTypeNameInput" type="text" placeholder="Nhap ten loai dia chi">
+        </label>
+        <label>
+          <span>Mã loại (không bắt buộc)</span>
+          <input id="addressTypeCodeInput" type="text" placeholder="VD: nha_rieng">
+        </label>
+      </div>
+      <div class="group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="addressTypeModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="addressTypeModalSubmit">Lưu</button>
+      </div>
+    </div>
+  </div>
+  <script id="customerGroupsSeed" type="application/json"><%- JSON.stringify(customerGroups || []) %></script>
   <script>
-    const customers = <%- JSON.stringify(safeCustomers.map(c => ({
-      _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '',
-      sdt: c.sdt || '', sdt2: c.sdt2 || '', email: c.email || '', facebook: c.facebook || '',
-      ngay_sinh: c.ngay_sinh ? new Date(c.ngay_sinh).toISOString().slice(0,10) : '',
-      gioi_tinh: c.gioi_tinh || '', loai_khach_hang: c.loai_khach_hang || 'ca_nhan',
-      dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', phuong_xa: c.phuong_xa || '',
-      nhom_khach_hang_id: c.nhom_khach_hang_id ? String(c.nhom_khach_hang_id._id || c.nhom_khach_hang_id) : '',
-      ghi_chu: c.ghi_chu || '', ten_nguoi_mua: c.ten_nguoi_mua || '', ten_cong_ty: c.ten_cong_ty || '', ma_so_thue: c.ma_so_thue || ''
-    }))) %>;
-    function setCustomerFilter(key,value){const form=document.querySelector('form.page');let input=form.querySelector('[name="'+key+'"]');if(!input){input=document.createElement('input');input.type='hidden';input.name=key;form.appendChild(input)}input.value=value;form.submit()}
-    function openCustomerModal(){modalTitle.textContent='Tạo khách hàng';document.querySelector('#customerModal form').reset();customerId.value='';maKhachHang.disabled=false;customerModal.classList.add('open');setTimeout(()=>tenKhachHang.focus(),50)}
-    function closeCustomerModal(){customerModal.classList.remove('open')}
-    function toggleCustomerDetail(id){const row=document.querySelector('[data-customer-row="'+id+'"]');const detail=document.querySelector('[data-customer-detail="'+id+'"]');if(!detail)return;const open=!detail.classList.contains('open');document.querySelectorAll('.detail-row').forEach(x=>x.classList.remove('open'));document.querySelectorAll('.customer-row').forEach(x=>x.classList.remove('active'));if(!open)return;detail.classList.add('open');row?.classList.add('active')}
-    function showCustomerTab(event,id,tab){event.stopPropagation();const detail=document.querySelector('[data-customer-detail="'+id+'"]');if(!detail)return;detail.querySelectorAll('.detail-tab').forEach(btn=>btn.classList.toggle('active',btn.dataset.tab===tab));detail.querySelectorAll('.detail-panel').forEach(panel=>panel.classList.toggle('active',panel.dataset.panel===tab))}
-    async function deleteCustomerInline(id){if(!confirm('Ngừng hoạt động khách hàng này?'))return;const res=await fetch('/khach-hang/'+id,{method:'DELETE'});const result=await res.json();if(!result.success)return alert(result.message||'Không cập nhật được khách hàng');location.reload()}
-    function editCustomer(id){const c=customers.find(x=>x._id===id);if(!c)return;openCustomerModal();modalTitle.textContent='Cập nhật khách hàng';customerId.value=c._id;maKhachHang.value=c.ma_khach_hang;maKhachHang.disabled=true;tenKhachHang.value=c.ten_khach_hang;sdt.value=c.sdt;sdt2.value=c.sdt2;email.value=c.email;facebook.value=c.facebook;ngaySinh.value=c.ngay_sinh;gioiTinh.value=c.gioi_tinh;diaChi.value=c.dia_chi_nhan;tinhThanh.value=c.tinh_thanh;phuongXa.value=c.phuong_xa;nhomKhachHang.value=c.nhom_khach_hang_id;ghiChu.value=c.ghi_chu;tenNguoiMua.value=c.ten_nguoi_mua;tenCongTy.value=c.ten_cong_ty;maSoThue.value=c.ma_so_thue;document.querySelectorAll('input[name=loai_khach_hang]').forEach(r=>r.checked=r.value===c.loai_khach_hang)}
-    async function saveCustomer(e){e.preventDefault();const form=e.target;const data=Object.fromEntries(new FormData(form).entries());if(maKhachHang.disabled)delete data.ma_khach_hang;const id=data._id;delete data._id;const res=await fetch(id?`/khach-hang/${id}`:'/khach-hang/add',{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await res.json();if(!result.success)return alert(result.message||'Không lưu được khách hàng');location.reload()}
-    function openGroupModal(){groupModal.classList.add('open')}
-    function closeGroupModal(){groupModal.classList.remove('open')}
-    async function saveGroup(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());const res=await fetch('/khach-hang/groups/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await res.json();if(!result.success)return alert(result.message||'Không tạo được nhóm');location.reload()}
-    async function importCustomers(input){if(!input.files.length)return;const data=new FormData();data.append('file',input.files[0]);const res=await fetch('/khach-hang/import',{method:'POST',body:data});const result=await res.json();if(!result.success)return alert(result.message||'Không import được khách hàng');alert(result.message);location.reload()}
+    document.addEventListener('DOMContentLoaded', function () {
+      var selectAll = document.getElementById('selectAllCustomers');
+      var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.customer-checkbox'));
+
+      if (selectAll) {
+        selectAll.addEventListener('change', function () {
+          checkboxes.forEach(function (checkbox) {
+            checkbox.checked = selectAll.checked;
+          });
+        });
+      }
+
+      checkboxes.forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
+          if (!selectAll) return;
+          selectAll.checked = checkboxes.length > 0 && checkboxes.every(function (item) {
+            return item.checked;
+          });
+        });
+      });
+
+      var createdFilterSelect = document.getElementById('createdFilterSelect');
+      var customDateRange = document.getElementById('customDateRange');
+      function toggleCustomDateRange() {
+        if (!customDateRange) return;
+        customDateRange.classList.toggle('is-visible', createdFilterSelect && createdFilterSelect.value === 'custom');
+      }
+      if (createdFilterSelect) createdFilterSelect.addEventListener('change', toggleCustomDateRange);
+      toggleCustomDateRange();
+
+      var groupFilterTrigger = document.getElementById('groupFilterTrigger');
+      var groupFilterSelectedLabel = document.getElementById('groupFilterSelectedLabel');
+      var groupFilterValue = document.getElementById('groupFilterValue');
+      var groupFilterDropdown = document.getElementById('groupFilterDropdown');
+      var groupModalTrigger = document.getElementById('groupModalTrigger');
+      var groupModalSelectedLabel = document.getElementById('groupModalSelectedLabel');
+      var groupModalValue = document.getElementById('groupModalValue');
+      var groupModalDropdown = document.getElementById('groupModalDropdown');
+      var groupNameInput = document.getElementById('groupNameInput');
+      var groupDescInput = document.getElementById('groupDescInput');
+      var groupAddBtn = document.getElementById('groupAddBtn');
+      var groupModalAddBtn = document.getElementById('groupModalAddBtn');
+      var groupModalOverlay = document.getElementById('groupModalOverlay');
+      var groupModalTitle = document.getElementById('groupModalTitle');
+      var groupModalSubmit = document.getElementById('groupModalSubmit');
+      var groupModalClose = document.getElementById('groupModalClose');
+      var groupModalCancel = document.getElementById('groupModalCancel');
+      var modalMode = 'add';
+      var activeGroupItem = null;
+      var openAddCustomerModalBtn = document.getElementById('openAddCustomerModal');
+      var addCustomerModalOverlay = document.getElementById('addCustomerModalOverlay');
+      var addCustomerModalClose = document.getElementById('addCustomerModalClose');
+      var addCustomerModalCancel = document.getElementById('addCustomerModalCancel');
+      var addressTypeTrigger = document.getElementById('addressTypeTrigger');
+      var addressTypeSelectedLabel = document.getElementById('addressTypeSelectedLabel');
+      var addressTypeValue = document.getElementById('addressTypeValue');
+      var addressTypeDropdown = document.getElementById('addressTypeDropdown');
+      var addressTypeAddBtn = document.getElementById('addressTypeAddBtn');
+      var addressTypeModalOverlay = document.getElementById('addressTypeModalOverlay');
+      var addressTypeModalTitle = document.getElementById('addressTypeModalTitle');
+      var addressTypeModalClose = document.getElementById('addressTypeModalClose');
+      var addressTypeModalCancel = document.getElementById('addressTypeModalCancel');
+      var addressTypeModalSubmit = document.getElementById('addressTypeModalSubmit');
+      var addressTypeNameInput = document.getElementById('addressTypeNameInput');
+      var addressTypeCodeInput = document.getElementById('addressTypeCodeInput');
+      var addressTypeModalMode = 'add';
+      var activeAddressTypeItem = null;
+
+      function submitDynamicForm(action, payload) {
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = action;
+        Object.keys(payload).forEach(function(key) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = payload[key];
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+      }
+
+      function bindGroupItems() {
+        var groupItems = Array.prototype.slice.call(document.querySelectorAll('.group-manage-item'));
+        groupItems.forEach(function(item) {
+          var optionBtn = item.querySelector('.group-manage-option');
+          var editBtn = item.querySelector('.group-manage-action-edit');
+          var deleteBtn = item.querySelector('.group-manage-action-delete');
+
+          if (optionBtn) {
+            optionBtn.addEventListener('click', function() {
+              var container = item.closest('.group-manage-wrapper');
+              if (!container) return;
+              Array.prototype.slice.call(container.querySelectorAll('.group-manage-item')).forEach(function(node) {
+                node.classList.remove('is-active');
+              });
+              item.classList.add('is-active');
+              var valueInput = container.querySelector('input[type="hidden"]');
+              if (valueInput) valueInput.value = item.getAttribute('data-value') || '';
+              var labelNode = container.querySelector('.group-manage-trigger span');
+              if (labelNode) labelNode.textContent = item.getAttribute('data-name') || '';
+              var dropdownNode = container.querySelector('.group-manage-dropdown');
+              if (dropdownNode) dropdownNode.classList.remove('is-open');
+            });
+          }
+
+          if (editBtn) {
+            editBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              activeGroupItem = item;
+              openGroupModal('edit');
+            });
+          }
+
+          if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              var groupId = item.getAttribute('data-id') || '';
+              if (!groupId) {
+                alert('Vui lòng chọn nhóm cần xóa.');
+                return;
+              }
+              if (!confirm('Bạn có chắc muốn xóa nhóm khách hàng này không?')) return;
+              requestCustomerGroups('/khach-hang/groups/' + groupId + '/delete', {}, '');
+            });
+          }
+        });
+      }
+
+      function renderGroupList(dropdownNode, selectedValue, includeRootOption) {
+        if (!dropdownNode) return;
+        var groups = window.__customerGroups || [];
+        var rows = [];
+
+        if (includeRootOption) {
+          rows.push(
+            '<div class="group-manage-item ' + ((selectedValue === 'all' || !selectedValue) ? 'is-active' : '') + '" data-id="" data-value="all" data-name="Tất cả các nhóm" data-desc="">' +
+              '<button class="group-manage-option" type="button">Tất cả các nhóm</button>' +
+            '</div>'
+          );
+        } else {
+          rows.push(
+            '<div class="group-manage-item ' + (!selectedValue ? 'is-active' : '') + '" data-id="" data-value="" data-name="Không chọn nhóm" data-desc="">' +
+              '<button class="group-manage-option" type="button">Không chọn nhóm</button>' +
+            '</div>'
+          );
+        }
+
+        groups.forEach(function(group) {
+          var value = String(group._id || '');
+          var isActive = value === String(selectedValue || '');
+          rows.push(
+            '<div class="group-manage-item ' + (isActive ? 'is-active' : '') + '" data-id="' + value + '" data-value="' + value + '" data-name="' + (group.ten_nhom || '').replace(/"/g, '&quot;') + '" data-desc="' + (group.mo_ta || '').replace(/"/g, '&quot;') + '">' +
+              '<button class="group-manage-option" type="button">' + (group.ten_nhom || '') + '</button>' +
+              '<div class="group-manage-actions">' +
+                '<button class="group-manage-action-edit" type="button">Sửa</button>' +
+                '<button class="group-manage-action-delete" type="button">Xóa</button>' +
+              '</div>' +
+            '</div>'
+          );
+        });
+
+        dropdownNode.innerHTML = rows.join('');
+      }
+
+      function refreshGroupWidgets(sidebarSelectedOverride, modalSelectedOverride) {
+        if (Array.isArray(window.__customerGroups) === false) return;
+        var sidebarSelected = typeof sidebarSelectedOverride === 'undefined'
+          ? ((groupFilterValue ? groupFilterValue.value : 'all') || 'all')
+          : sidebarSelectedOverride;
+        var modalSelected = typeof modalSelectedOverride === 'undefined'
+          ? ((groupModalValue ? groupModalValue.value : '') || '')
+          : modalSelectedOverride;
+
+        renderGroupList(groupFilterDropdown, sidebarSelected, true);
+        renderGroupList(groupModalDropdown, modalSelected, false);
+
+        if (groupFilterSelectedLabel && groupFilterDropdown) {
+          var activeSidebar = groupFilterDropdown.querySelector('.group-manage-item.is-active');
+          groupFilterSelectedLabel.textContent = activeSidebar ? (activeSidebar.getAttribute('data-name') || 'Tất cả các nhóm') : 'Tất cả các nhóm';
+          if (groupFilterValue) groupFilterValue.value = activeSidebar ? (activeSidebar.getAttribute('data-value') || 'all') : 'all';
+        }
+        if (groupModalSelectedLabel && groupModalDropdown) {
+          var activeModal = groupModalDropdown.querySelector('.group-manage-item.is-active');
+          groupModalSelectedLabel.textContent = activeModal ? (activeModal.getAttribute('data-name') || 'Không chọn nhóm') : 'Không chọn nhóm';
+          if (groupModalValue) groupModalValue.value = activeModal ? (activeModal.getAttribute('data-value') || '') : '';
+        }
+
+        bindGroupItems();
+      }
+
+      function requestCustomerGroups(url, payload, selectedId) {
+        var formBody = Object.keys(payload).map(function(key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert('Không thể xử lý nhóm khách hàng.');
+              return;
+            }
+            var currentSidebarValue = groupFilterValue ? groupFilterValue.value : 'all';
+            var currentModalValue = groupModalValue ? groupModalValue.value : '';
+            window.__customerGroups = Array.isArray(data.customerGroups) ? data.customerGroups : [];
+            refreshGroupWidgets(currentSidebarValue, data.selectedId || selectedId || currentModalValue || '');
+            closeGroupModal();
+          })
+          .catch(function() {
+            alert('Có lỗi khi xử lý nhóm khách hàng.');
+          });
+      }
+
+      if (groupFilterTrigger && groupFilterDropdown) {
+        groupFilterTrigger.addEventListener('click', function() {
+          groupFilterDropdown.classList.toggle('is-open');
+        });
+      }
+      if (groupModalTrigger && groupModalDropdown) {
+        groupModalTrigger.addEventListener('click', function() {
+          groupModalDropdown.classList.toggle('is-open');
+        });
+      }
+
+      function openGroupModal(mode) {
+        modalMode = mode;
+        if (!groupModalOverlay || !groupModalTitle) return;
+        if (mode === 'add') {
+          groupModalTitle.textContent = 'Thêm nhóm khách hàng';
+          if (groupNameInput) groupNameInput.value = '';
+          if (groupDescInput) groupDescInput.value = '';
+        } else {
+          groupModalTitle.textContent = 'Sửa nhóm khách hàng';
+          if (groupNameInput) groupNameInput.value = activeGroupItem ? (activeGroupItem.getAttribute('data-name') || '') : '';
+          if (groupDescInput) groupDescInput.value = activeGroupItem ? (activeGroupItem.getAttribute('data-desc') || '') : '';
+        }
+        groupModalOverlay.classList.add('is-open');
+      }
+
+      function closeGroupModal() {
+        if (!groupModalOverlay) return;
+        groupModalOverlay.classList.remove('is-open');
+      }
+
+      if (groupAddBtn) {
+        groupAddBtn.addEventListener('click', function() {
+          openGroupModal('add');
+        });
+      }
+      if (groupModalAddBtn) {
+        groupModalAddBtn.addEventListener('click', function() {
+          openGroupModal('add');
+        });
+      }
+
+      if (groupModalSubmit) {
+        groupModalSubmit.addEventListener('click', function() {
+          if (!groupNameInput || !groupNameInput.value.trim()) {
+            alert('Vui lòng nhập tên nhóm khách hàng.');
+            return;
+          }
+          if (modalMode === 'add') {
+            requestCustomerGroups('/khach-hang/groups/add', {
+              ten_nhom: groupNameInput.value.trim(),
+              mo_ta: groupDescInput ? groupDescInput.value.trim() : ''
+            }, '');
+            return;
+          }
+          var groupId = activeGroupItem ? (activeGroupItem.getAttribute('data-id') || '') : '';
+          if (!groupId) {
+            alert('Vui lòng chọn nhóm cần sửa.');
+            return;
+          }
+          requestCustomerGroups('/khach-hang/groups/' + groupId + '/update', {
+            ten_nhom: groupNameInput.value.trim(),
+            mo_ta: groupDescInput ? groupDescInput.value.trim() : ''
+          }, groupId);
+        });
+      }
+
+      if (groupModalClose) groupModalClose.addEventListener('click', closeGroupModal);
+      if (groupModalCancel) groupModalCancel.addEventListener('click', closeGroupModal);
+
+      var customerGroupsSeed = document.getElementById('customerGroupsSeed');
+      window.__customerGroups = customerGroupsSeed ? JSON.parse(customerGroupsSeed.textContent || '[]') : [];
+      refreshGroupWidgets();
+
+      function openAddressTypeModal(mode) {
+        addressTypeModalMode = mode;
+        if (!addressTypeModalOverlay || !addressTypeModalTitle) return;
+        if (mode === 'add') {
+          addressTypeModalTitle.textContent = 'Thêm loại địa chỉ';
+          if (addressTypeNameInput) addressTypeNameInput.value = '';
+          if (addressTypeCodeInput) addressTypeCodeInput.value = '';
+          if (addressTypeCodeInput) addressTypeCodeInput.removeAttribute('disabled');
+        } else {
+          addressTypeModalTitle.textContent = 'Sửa loại địa chỉ';
+          if (addressTypeNameInput) addressTypeNameInput.value = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-name') || '') : '';
+          if (addressTypeCodeInput) addressTypeCodeInput.value = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-value') || '') : '';
+          if (addressTypeCodeInput) addressTypeCodeInput.setAttribute('disabled', 'disabled');
+        }
+        addressTypeModalOverlay.classList.add('is-open');
+      }
+
+      function closeAddressTypeModal() {
+        if (!addressTypeModalOverlay) return;
+        addressTypeModalOverlay.classList.remove('is-open');
+      }
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+
+      function bindAddressTypeItems() {
+        var addressTypeItems = Array.prototype.slice.call(document.querySelectorAll('.address-type-item'));
+        addressTypeItems.forEach(function(item) {
+          var optionBtn = item.querySelector('.address-type-option');
+          var editBtn = item.querySelector('.address-type-action-edit');
+          var deleteBtn = item.querySelector('.address-type-action-delete');
+
+          if (optionBtn) {
+            optionBtn.addEventListener('click', function() {
+              addressTypeItems.forEach(function(node) { node.classList.remove('is-active'); });
+              item.classList.add('is-active');
+              if (addressTypeSelectedLabel) addressTypeSelectedLabel.textContent = item.getAttribute('data-name') || '';
+              if (addressTypeValue) addressTypeValue.value = item.getAttribute('data-value') || '';
+              if (addressTypeDropdown) addressTypeDropdown.classList.remove('is-open');
+            });
+          }
+
+          if (editBtn) {
+            editBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              activeAddressTypeItem = item;
+              openAddressTypeModal('edit');
+            });
+          }
+
+          if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              var typeId = item.getAttribute('data-id') || '';
+              if (!typeId) {
+                alert('Vui lòng chọn loại địa chỉ cần xóa.');
+                return;
+              }
+              if (!confirm('Bạn có chắc muốn xóa loại địa chỉ này không?')) return;
+              requestAddressType('/khach-hang/address-types/' + typeId + '/delete', {});
+            });
+          }
+        });
+      }
+
+      function renderAddressTypeList(addressTypes, selectedId) {
+        if (!addressTypeDropdown || !addressTypeValue || !addressTypeSelectedLabel) return;
+        var selectedType = null;
+        if (selectedId) {
+          selectedType = addressTypes.find(function(item) { return String(item._id) === String(selectedId); }) || null;
+        }
+        if (!selectedType && addressTypes.length > 0) {
+          selectedType = addressTypes[0];
+        }
+
+        addressTypeDropdown.innerHTML = addressTypes.map(function(type) {
+          var isActive = selectedType && String(selectedType._id) === String(type._id);
+          return (
+            '<div class="address-type-item ' + (isActive ? 'is-active' : '') + '" data-id="' + escapeHtml(type._id) + '" data-value="' + escapeHtml(type.ma_loai) + '" data-name="' + escapeHtml(type.ten_loai) + '">' +
+              '<button class="address-type-option" type="button">' + escapeHtml(type.ten_loai) + '</button>' +
+              '<div class="address-type-actions">' +
+                '<button class="address-type-action-edit" type="button">Sửa</button>' +
+                '<button class="address-type-action-delete" type="button">Xóa</button>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+
+        if (selectedType) {
+          addressTypeValue.value = selectedType.ma_loai || '';
+          addressTypeSelectedLabel.textContent = selectedType.ten_loai || 'Chọn loại địa chỉ';
+        } else {
+          addressTypeValue.value = '';
+          addressTypeSelectedLabel.textContent = 'Chọn loại địa chỉ';
+        }
+
+        activeAddressTypeItem = null;
+        bindAddressTypeItems();
+      }
+
+      function requestAddressType(url, payload, callback) {
+        var formBody = Object.keys(payload).map(function(key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert('Không thể xử lý loại địa chỉ.');
+              return;
+            }
+            renderAddressTypeList(Array.isArray(data.addressTypes) ? data.addressTypes : [], data.selectedId || '');
+            if (typeof callback === 'function') callback();
+          })
+          .catch(function() {
+            alert('Có lỗi khi xử lý loại địa chỉ.');
+          });
+      }
+
+      if (addressTypeAddBtn) {
+        addressTypeAddBtn.addEventListener('click', function() {
+          openAddressTypeModal('add');
+        });
+      }
+
+      if (addressTypeTrigger && addressTypeDropdown) {
+        addressTypeTrigger.addEventListener('click', function() {
+          addressTypeDropdown.classList.toggle('is-open');
+        });
+      }
+
+      bindAddressTypeItems();
+
+      if (addressTypeModalSubmit) {
+        addressTypeModalSubmit.addEventListener('click', function() {
+          if (!addressTypeNameInput || !addressTypeNameInput.value.trim()) {
+            alert('Vui lòng nhập tên loại địa chỉ.');
+            return;
+          }
+          if (addressTypeModalMode === 'add') {
+            requestAddressType('/khach-hang/address-types/add', {
+              ten_loai: addressTypeNameInput.value.trim(),
+              ma_loai: addressTypeCodeInput && addressTypeCodeInput.value ? addressTypeCodeInput.value.trim() : ''
+            }, function() {
+              closeAddressTypeModal();
+            });
+            return;
+          }
+
+          var typeId = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-id') || '') : '';
+          if (!typeId) {
+            alert('Vui lòng chọn loại địa chỉ cần sửa.');
+            return;
+          }
+
+          requestAddressType('/khach-hang/address-types/' + typeId + '/update', {
+            ten_loai: addressTypeNameInput.value.trim()
+          }, function() {
+            closeAddressTypeModal();
+          });
+        });
+      }
+
+      if (addressTypeModalClose) addressTypeModalClose.addEventListener('click', closeAddressTypeModal);
+      if (addressTypeModalCancel) addressTypeModalCancel.addEventListener('click', closeAddressTypeModal);
+      document.addEventListener('click', function(event) {
+        if (addressTypeDropdown && addressTypeTrigger) {
+          if (!addressTypeDropdown.contains(event.target) && !addressTypeTrigger.contains(event.target)) {
+            addressTypeDropdown.classList.remove('is-open');
+          }
+        }
+        if (groupFilterDropdown && groupFilterTrigger) {
+          if (!groupFilterDropdown.contains(event.target) && !groupFilterTrigger.contains(event.target)) {
+            groupFilterDropdown.classList.remove('is-open');
+          }
+        }
+        if (groupModalDropdown && groupModalTrigger) {
+          if (!groupModalDropdown.contains(event.target) && !groupModalTrigger.contains(event.target)) {
+            groupModalDropdown.classList.remove('is-open');
+          }
+        }
+      });
+
+      function openAddCustomerModal() {
+        if (!addCustomerModalOverlay) return;
+        addCustomerModalOverlay.classList.add('is-visible');
+      }
+
+      function closeAddCustomerModal() {
+        if (!addCustomerModalOverlay) return;
+        addCustomerModalOverlay.classList.remove('is-visible');
+      }
+
+      if (openAddCustomerModalBtn) openAddCustomerModalBtn.addEventListener('click', openAddCustomerModal);
+      if (addCustomerModalClose) addCustomerModalClose.addEventListener('click', closeAddCustomerModal);
+      if (addCustomerModalCancel) addCustomerModalCancel.addEventListener('click', closeAddCustomerModal);
+      if (addCustomerModalOverlay && addCustomerModalOverlay.getAttribute('data-auto-open') === '1') {
+        openAddCustomerModal();
+      }
+
+      // Collapsible Sections Logic
+      var collapsibleHeaders = Array.prototype.slice.call(document.querySelectorAll('.collapsible-header'));
+      collapsibleHeaders.forEach(function(header) {
+        header.addEventListener('click', function() {
+          var section = header.parentElement;
+          section.classList.toggle('is-active');
+        });
+      });
+
+      var customerDetailBlocks = Array.prototype.slice.call(document.querySelectorAll('[data-customer-detail]'));
+      customerDetailBlocks.forEach(function(detailBlock) {
+        var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
+        var tabs = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab'));
+        var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.customer-detail-pane'));
+
+        tabs.forEach(function(tab) {
+          tab.addEventListener('click', function(event) {
+            event.stopPropagation();
+            var target = tab.getAttribute('data-tab-target');
+            tabs.forEach(function(node) {
+              node.classList.toggle('is-active', node === tab);
+            });
+            panes.forEach(function(pane) {
+              pane.classList.toggle('is-active', pane.getAttribute('data-tab-pane') === target);
+            });
+          });
+        });
+
+        if (collapseBtn) {
+          collapseBtn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            var isCollapsed = detailBlock.classList.toggle('is-collapsed');
+            collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
+            collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          });
+        }
+      });
+
+      var customerCreateForm = document.getElementById('customerCreateForm');
+      var editCustomerBtns = document.querySelectorAll('.btn-edit-customer');
+      
+      editCustomerBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var customerData = JSON.parse(this.getAttribute('data-customer') || '{}');
+          if (!customerCreateForm) return;
+
+          customerCreateForm.action = '/khach-hang/' + customerData._id + '/update';
+          var title = document.getElementById('addCustomerModalTitle');
+          if (title) title.textContent = 'Cập nhật khách hàng';
+
+          var fields = ['ten_khach_hang', 'ma_khach_hang', 'sdt', 'sdt2', 'ngay_sinh', 'gioi_tinh', 'email', 'facebook', 'khu_vuc_giao_hang', 'nhom_khach_hang_id', 'ghi_chu', 'loai_khach_hang', 'ma_so_thue', 'ten_cong_ty', 'stk_ngan_hang', 'ngan_hang', 'trang_thai', 'ten_nguoi_nhan', 'sdt_nguoi_nhan', 'so_nha', 'tinh_thanh', 'quan_huyen', 'phuong_xa', 'dia_chi_day_du', 'ghi_chu_dia_chi'];
+          
+          fields.forEach(function(field) {
+            var input = customerCreateForm.querySelector('[name="' + field + '"]');
+            if (input) {
+              if (input.type === 'radio') {
+                var radio = customerCreateForm.querySelector('input[name="' + field + '"][value="' + customerData[field] + '"]');
+                if (radio) radio.checked = true;
+              } else if (input.type === 'date' && customerData[field]) {
+                input.value = new Date(customerData[field]).toISOString().split('T')[0];
+              } else {
+                input.value = customerData[field] || '';
+              }
+            }
+          });
+
+          var selectedType = customerData.loai_khach_hang || 'ca_nhan';
+          var typeRadios = customerCreateForm.querySelectorAll('input[name="loai_khach_hang"]');
+          typeRadios.forEach(function(r) { if (r.value === selectedType) r.checked = true; });
+          
+          if (typeof toggleCustomerType === 'function') toggleCustomerType();
+          openAddCustomerModal();
+        });
+      });
+
+      if (openAddCustomerModalBtn) {
+        openAddCustomerModalBtn.addEventListener('click', function() {
+          if (customerCreateForm) {
+            customerCreateForm.reset();
+            customerCreateForm.action = '/khach-hang/add';
+            var title = document.getElementById('addCustomerModalTitle');
+            if (title) title.textContent = 'Thêm khách hàng';
+            if (typeof toggleCustomerType === 'function') toggleCustomerType();
+          }
+        });
+      }
+
+      var pillButtons = Array.prototype.slice.call(document.querySelectorAll('.pill-btn'));
+      pillButtons.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var targetInputId = btn.getAttribute('data-target-input');
+          var value = btn.getAttribute('data-value');
+          var input = document.getElementById(targetInputId);
+          if (!input) return;
+          input.value = value;
+          var siblings = Array.prototype.slice.call(btn.parentElement.querySelectorAll('.pill-btn'));
+          siblings.forEach(function(item) { item.classList.remove('is-active'); });
+          btn.classList.add('is-active');
+        });
+      });
+
+      document.querySelectorAll('.js-address-add').forEach(function(btn) {
+        btn.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!confirm('Bạn có muốn thêm địa chỉ mới không?')) return;
+
+          var formId = btn.getAttribute('data-form-id');
+          var action = btn.getAttribute('data-action');
+          var tempForm = document.createElement('form');
+          tempForm.method = 'post';
+          tempForm.action = action;
+          tempForm.style.display = 'none';
+
+          document.querySelectorAll('[form="' + formId + '"]').forEach(function(field) {
+            if (!field.name || field.disabled) return;
+            if ((field.type === 'checkbox' || field.type === 'radio') && !field.checked) return;
+
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = field.name;
+            hidden.value = field.value;
+            tempForm.appendChild(hidden);
+          });
+
+          document.body.appendChild(tempForm);
+          tempForm.submit();
+        });
+      });
+
+      var customerTypeRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="loai_khach_hang"]'));
+      var customerTypePanes = Array.prototype.slice.call(document.querySelectorAll('.customer-type-pane'));
+      function toggleCustomerTypePane() {
+        var selected = customerTypeRadios.find(function(item) { return item.checked; });
+        var selectedType = selected ? selected.value : 'ca_nhan';
+        customerTypePanes.forEach(function(pane) {
+          pane.classList.toggle('is-active', pane.getAttribute('data-customer-type-pane') === selectedType);
+        });
+      }
+      customerTypeRadios.forEach(function(radio) {
+        radio.addEventListener('change', toggleCustomerTypePane);
+      });
+      toggleCustomerTypePane();
+    });
   </script>
+
 </body>
 </html>

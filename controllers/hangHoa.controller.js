@@ -1,487 +1,1121 @@
-const fs = require('fs');
-const path = require('path');
-const multer = require('multer');
-const {
-    HangHoa,
-    NhomHang,
-    ThuongHieu,
-    DonViTinh,
-    NhaCungCap,
-    CuaHang,
-    ViTri
-} = require('../models/kiot.model');
+﻿var mongoose = require('mongoose');
+var { HangHoa, NhomHang, DonViTinh, NhaCungCap, TonKho, Kho, BangGia, CTBangGia, CuaHang, LoHang, TonKhoLo, LichSuKho } = require('../models/kiot.model');
 
-const uploadDir = path.join(__dirname, '../public/uploads/hang-hoa');
-fs.mkdirSync(uploadDir, { recursive: true });
+function formatDate(value) {
+    if (!value) return '---';
+    return new Date(value).toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname);
-        cb(null, Date.now() + '-' + Math.round(Math.random() * 1e9) + ext);
+function normalizeFilterQuery(query) {
+    query = query || {};
+    return {
+        groupId: String(query.groupId || 'all').trim() || 'all',
+        supplierId: String(query.supplierId || 'all').trim() || 'all',
+        stockFrom: String(query.stockFrom || '').trim(),
+        stockTo: String(query.stockTo || '').trim(),
+        created: ['all', 'custom'].indexOf(query.created) >= 0 ? query.created : 'all',
+        createdFrom: String(query.createdFrom || '').trim(),
+        createdTo: String(query.createdTo || '').trim(),
+        salesLink: ['all', 'yes', 'no'].indexOf(query.salesLink) >= 0 ? query.salesLink : 'all',
+        status: query.status === 'inactive' ? 'inactive' : 'all',
+        keyword: String(query.keyword || '').trim()
+    };
+}
+
+function normalizeBangGiaIdsFromQuery(query) {
+    var raw = query && query.bangGia;
+    if (raw == null || raw === '') return [];
+    if (!Array.isArray(raw)) raw = [raw];
+    var seen = {};
+    var out = [];
+    raw.forEach(function(x) {
+        var id = String(x || '').trim();
+        if (!id || seen[id]) return;
+        if (!mongoose.Types.ObjectId.isValid(id)) return;
+        seen[id] = true;
+        out.push(id);
+    });
+    return out;
+}
+
+function normalizePriceSetupQuery(query) {
+    query = query || {};
+    var page = parseInt(query.page, 10);
+    var limit = parseInt(query.limit, 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+    if (!Number.isFinite(limit) || limit < 1) limit = 15;
+    if (limit > 100) limit = 100;
+    var stock = String(query.stock || 'all').trim();
+    if (['all', 'co_ton', 'het_hang'].indexOf(stock) < 0) stock = 'all';
+    return {
+        keyword: String(query.keyword || '').trim(),
+        groupId: String(query.groupId || 'all').trim() || 'all',
+        stock: stock,
+        filterMa: String(query.filterMa || '').trim(),
+        filterTen: String(query.filterTen || '').trim(),
+        bangGiaIds: normalizeBangGiaIdsFromQuery(query),
+        page: page,
+        limit: limit
+    };
+}
+
+function buildPriceSetupQueryString(filter) {
+    var params = [];
+    if (filter.keyword) params.push('keyword=' + encodeURIComponent(filter.keyword));
+    if (filter.groupId !== 'all') params.push('groupId=' + encodeURIComponent(filter.groupId));
+    if (filter.stock !== 'all') params.push('stock=' + encodeURIComponent(filter.stock));
+    if (filter.filterMa) params.push('filterMa=' + encodeURIComponent(filter.filterMa));
+    if (filter.filterTen) params.push('filterTen=' + encodeURIComponent(filter.filterTen));
+    (filter.bangGiaIds || []).forEach(function(id) {
+        params.push('bangGia=' + encodeURIComponent(id));
+    });
+    if (filter.page > 1) params.push('page=' + encodeURIComponent(filter.page));
+    if (filter.limit !== 15) params.push('limit=' + encodeURIComponent(filter.limit));
+    return params.join('&');
+}
+
+function buildFilterQueryString(filter) {
+    var params = [];
+    if (filter.groupId !== 'all') params.push('groupId=' + encodeURIComponent(filter.groupId));
+    if (filter.supplierId !== 'all') params.push('supplierId=' + encodeURIComponent(filter.supplierId));
+    if (filter.stockFrom) params.push('stockFrom=' + encodeURIComponent(filter.stockFrom));
+    if (filter.stockTo) params.push('stockTo=' + encodeURIComponent(filter.stockTo));
+    if (filter.created !== 'all') params.push('created=' + encodeURIComponent(filter.created));
+    if (filter.created === 'custom' && filter.createdFrom) params.push('createdFrom=' + encodeURIComponent(filter.createdFrom));
+    if (filter.created === 'custom' && filter.createdTo) params.push('createdTo=' + encodeURIComponent(filter.createdTo));
+    if (filter.salesLink !== 'all') params.push('salesLink=' + encodeURIComponent(filter.salesLink));
+    if (filter.status !== 'all') params.push('status=' + encodeURIComponent(filter.status));
+    if (filter.keyword) params.push('keyword=' + encodeURIComponent(filter.keyword));
+    return params.join('&');
+}
+
+function normalizeProductPayload(body) {
+    body = body || {};
+    var giaVonRaw = Number(body.gia_von || 0);
+    var giaCoDinhRaw = Number(body.gia_co_dinh || 0);
+    var tonBanDauRaw = Number(body.ton_ban_dau || 0);
+    var dinhMucRaw = Number(body.dinh_muc_toi_thieu || 0);
+    return {
+        ma_hang: String(body.ma_hang || '').trim(),
+        ten_hang: String(body.ten_hang || '').trim(),
+        mo_ta: String(body.mo_ta || '').trim(),
+        nhom_hang_id: String(body.nhom_hang_id || '').trim() || null,
+        don_vi_tinh_id: String(body.don_vi_tinh_id || '').trim() || null,
+        nha_cung_cap_id: String(body.nha_cung_cap_id || '').trim() || null,
+        gia_von: Number.isFinite(giaVonRaw) && giaVonRaw > 0 ? giaVonRaw : 0,
+        loai_gia: body.loai_gia === 'co_dinh' ? 'co_dinh' : 'thi_truong',
+        gia_co_dinh: Number.isFinite(giaCoDinhRaw) && giaCoDinhRaw > 0 ? giaCoDinhRaw : 0,
+        ton_ban_dau: Number.isFinite(tonBanDauRaw) && tonBanDauRaw > 0 ? tonBanDauRaw : 0,
+        dinh_muc_toi_thieu: Number.isFinite(dinhMucRaw) && dinhMucRaw > 0 ? dinhMucRaw : 0,
+        ban_truc_tiep: body.ban_truc_tiep === 'false' ? false : true,
+        quan_ly_theo_lo: body.quan_ly_theo_lo === 'true' || body.quan_ly_theo_lo === 'on',
+        trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
+    };
+}
+
+async function makeProductCode() {
+    var lastProduct = await HangHoa.findOne({ ma_hang: /^NSTP\d+$/ }).sort({ ma_hang: -1 }).lean();
+    var nextNumber = 1;
+    if (lastProduct && lastProduct.ma_hang) {
+        nextNumber = Number(String(lastProduct.ma_hang).replace(/\D/g, '')) + 1;
     }
-});
+    return 'NSTP' + String(nextNumber).padStart(5, '0');
+}
 
-exports.uploadProductImages = multer({
-    storage,
-    limits: { fileSize: 2 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (file?.mimetype?.startsWith('image/')) return cb(null, true);
-        cb(new Error('Chỉ chấp nhận file ảnh!'), false);
+async function makeLotCode(prefix) {
+    var safePrefix = String(prefix || 'LO').replace(/[^A-Z0-9_]/gi, '').toUpperCase() || 'LO';
+    var exists = await LoHang.findOne({ ma_lo: safePrefix }).select('_id').lean();
+    if (!exists) return safePrefix;
+
+    var lots = await LoHang.find({ ma_lo: new RegExp('^' + safePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '_\\d+$') }).select('ma_lo').lean();
+    var maxNumber = 0;
+    lots.forEach(function(lot) {
+        var num = Number(String(lot.ma_lo || '').split('_').pop());
+        if (Number.isFinite(num) && num > maxNumber) maxNumber = num;
+    });
+    return safePrefix + '_' + String(maxNumber + 1).padStart(3, '0');
+}
+
+async function getDefaultWarehouseForProduct(product, req) {
+    var storeId = await resolveStoreId(req);
+    var query = {};
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
+    var warehouse = await Kho.findOne(query).sort({ created_at: 1, ma_kho: 1 }).lean();
+    return warehouse || null;
+}
+
+async function createDefaultLotFromInventory(product, inventoryRows, req, options) {
+    options = options || {};
+    var createdLots = [];
+    if (!product || !product._id || !product.quan_ly_theo_lo) return createdLots;
+
+    for (var i = 0; i < (inventoryRows || []).length; i++) {
+        var row = inventoryRows[i];
+        var quantity = Number(row.so_luong || 0);
+        if (quantity <= 0) continue;
+
+        var existingLotQty = await TonKhoLo.aggregate([
+            { $match: { kho_id: row.kho_id, hang_hoa_id: product._id } },
+            { $group: { _id: null, total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+        ]);
+        var missingQty = quantity - Number(existingLotQty?.[0]?.total || 0);
+        if (missingQty <= 0) continue;
+
+        var maLo = await makeLotCode(options.ma_lo || ('LO_AUTO_' + String(product.ma_hang || product._id)));
+        var warehouse = await Kho.findById(row.kho_id).lean();
+        var storeId = row.cua_hang_id || product.cua_hang_id || warehouse?.cua_hang_id || (req.user && req.user.cua_hang_id) || undefined;
+        var lot = await LoHang.create({
+            cua_hang_id: storeId,
+            kho_id: row.kho_id,
+            hang_hoa_id: product._id,
+            nha_cung_cap_id: product.nha_cung_cap_id || undefined,
+            ma_lo: maLo,
+            ten_lo: options.ten_lo || 'Lô mặc định ' + (product.ma_hang || product.ten_hang || ''),
+            ngay_nhap: new Date(),
+            han_su_dung: options.han_su_dung || undefined,
+            so_luong_ban_dau: missingQty,
+            so_luong_con_lai: missingQty,
+            don_gia_nhap: Number(product.gia_nhap_cuoi || product.gia_von || 0),
+            gia_von: Number(product.gia_von || 0),
+            trang_thai: 'active',
+            ghi_chu: options.ghi_chu || 'Tạo tự động từ tồn hiện tại'
+        });
+
+        await TonKhoLo.findOneAndUpdate(
+            { kho_id: row.kho_id, hang_hoa_id: product._id, lo_hang_id: lot._id },
+            {
+                $setOnInsert: {
+                    cua_hang_id: storeId,
+                    kho_id: row.kho_id,
+                    hang_hoa_id: product._id,
+                    lo_hang_id: lot._id
+                },
+                $set: { gia_von: Number(product.gia_von || 0) },
+                $inc: { so_luong: missingQty }
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        createdLots.push(lot);
     }
-}).array('anh_san_pham', 4);
+    return createdLots;
+}
 
-exports.importProductFile = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 }
-}).single('file');
+function makeRangeFilter(minRaw, maxRaw) {
+    var hasMinValue = String(minRaw || '').trim() !== '';
+    var hasMaxValue = String(maxRaw || '').trim() !== '';
+    if (!hasMinValue && !hasMaxValue) return null;
 
-function parseCsv(text) {
-    const rows = [];
-    let row = [];
-    let cell = '';
-    let inQuotes = false;
+    var min = Number(minRaw);
+    var max = Number(maxRaw);
+    var hasMin = hasMinValue && Number.isFinite(min);
+    var hasMax = hasMaxValue && Number.isFinite(max);
+    if (!hasMin && !hasMax) return null;
 
-    for (let i = 0; i < text.length; i++) {
-        const ch = text[i];
-        const next = text[i + 1];
+    var range = {};
+    if (hasMin) range.$gte = min < 0 ? 0 : min;
+    if (hasMax) range.$lte = max < 0 ? 0 : max;
+    return range;
+}
 
-        if (ch === '"' && inQuotes && next === '"') {
-            cell += '"';
-            i++;
-        } else if (ch === '"') {
-            inQuotes = !inQuotes;
-        } else if (ch === ',' && !inQuotes) {
-            row.push(cell);
-            cell = '';
-        } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
-            if (ch === '\r' && next === '\n') i++;
-            row.push(cell);
-            if (row.some(v => v.trim())) rows.push(row);
-            row = [];
-            cell = '';
-        } else {
-            cell += ch;
+function normalizeIdParam(value) {
+    return String(value || '').trim();
+}
+
+function toDatetimeLocalValue(d) {
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    return (
+        d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        'T' + pad(d.getHours()) + ':' + pad(d.getMinutes())
+    );
+}
+
+async function makeBangGiaCode() {
+    var last = await BangGia.findOne({ ma_bang_gia: /^BG\d+$/ }).sort({ ma_bang_gia: -1 }).lean();
+    var nextNumber = 1;
+    if (last && last.ma_bang_gia) {
+        nextNumber = Number(String(last.ma_bang_gia).replace(/\D/g, '')) + 1;
+    }
+    return 'BG' + String(nextNumber).padStart(4, '0');
+}
+
+function shouldRespondJson(req) {
+    var accept = String(req?.headers?.accept || '').toLowerCase();
+    var requestedWith = String(req?.headers?.['x-requested-with'] || '').toLowerCase();
+    return requestedWith === 'xmlhttprequest' || accept.indexOf('application/json') >= 0;
+}
+
+async function loadProductGroups() {
+    return await NhomHang.find({}).sort({ ten_nhom_hang: 1 }).lean();
+}
+
+async function makeProductGroupCode() {
+    var groups = await NhomHang.find({ ma_nhom_hang: /^NH\d+$/ }).select('ma_nhom_hang').lean();
+    var maxNumber = 0;
+    for (var group of groups) {
+        var number = Number(String(group.ma_nhom_hang || '').replace(/\D/g, ''));
+        if (Number.isFinite(number) && number > maxNumber) maxNumber = number;
+    }
+    return 'NH' + String(maxNumber + 1).padStart(4, '0');
+}
+
+async function loadUnitOptions() {
+    return await DonViTinh.find({}).sort({ ten_don_vi: 1 }).lean();
+}
+
+async function makeUnitCode() {
+    var units = await DonViTinh.find({ ma_don_vi: /^DVT\d+$/ }).select('ma_don_vi').lean();
+    var maxNumber = 0;
+    for (var unit of units) {
+        var number = Number(String(unit.ma_don_vi || '').replace(/\D/g, ''));
+        if (Number.isFinite(number) && number > maxNumber) maxNumber = number;
+    }
+    return 'DVT' + String(maxNumber + 1).padStart(4, '0');
+}
+
+async function resolveStoreId(req) {
+    var sessionStoreId = req && req.session ? String(req.session.cua_hang_id || '').trim() : '';
+    if (sessionStoreId && mongoose.Types.ObjectId.isValid(sessionStoreId)) return sessionStoreId;
+    var userStoreId = req && req.user ? String(req.user.cua_hang_id || '').trim() : '';
+    if (userStoreId && mongoose.Types.ObjectId.isValid(userStoreId)) return userStoreId;
+    if (!CuaHang) return '';
+    var activeStore = await CuaHang.findOne({ trang_thai: 'active' }).sort({ created_at: 1 }).lean();
+    return activeStore ? String(activeStore._id) : '';
+}
+
+function respondUnitError(req, res, statusCode, message) {
+    if (shouldRespondJson(req)) {
+        return res.status(statusCode || 400).json({ success: false, message: message || 'Không thể xử lý đơn vị tính.' });
+    }
+    return res.redirect('/hang-hoa?error=unit_error');
+}
+
+function respondProductGroupError(req, res, statusCode, message) {
+    if (shouldRespondJson(req)) {
+        return res.status(statusCode || 400).json({ success: false, message: message || 'Không thể xử lý nhóm hàng.' });
+    }
+    return res.redirect('/hang-hoa?error=group_error');
+}
+
+function getDateRange(filter) {
+    var start = null;
+    var end = null;
+    if (filter.created === 'custom') {
+        if (filter.createdFrom) {
+            var parsedFrom = new Date(filter.createdFrom + 'T00:00:00');
+            if (!isNaN(parsedFrom.getTime())) start = parsedFrom;
+        }
+        if (filter.createdTo) {
+            var parsedTo = new Date(filter.createdTo + 'T23:59:59.999');
+            if (!isNaN(parsedTo.getTime())) end = parsedTo;
         }
     }
-
-    row.push(cell);
-    if (row.some(v => v.trim())) rows.push(row);
-    return rows;
+    return { start: start, end: end };
 }
 
-function numberFromCsv(value) {
-    if (!value) return 0;
-    const normalized = String(value).replace(/\./g, '').replace(/,/g, '').trim();
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : 0;
-}
+async function seedProductsIfEmpty() {
+    var count = await HangHoa.countDocuments();
+    if (count > 0) return;
 
-function parseNumber(value, fallback = 0) {
-    if (value === undefined || value === null) return fallback;
-    const parsed = Number(String(value).replace(/\./g, '').replace(/,/g, '').trim());
-    return Number.isFinite(parsed) ? parsed : fallback;
-}
+    var groups = await NhomHang.find({}).sort({ created_at: 1 }).lean();
+    if (groups.length === 0) {
+        groups = await NhomHang.insertMany([
+            { ma_nhom_hang: 'NH001', ten_nhom_hang: 'Hải sản tươi sống', trang_thai: 'active' },
+            { ma_nhom_hang: 'NH002', ten_nhom_hang: 'Thực phẩm đông lạnh', trang_thai: 'active' }
+        ]);
+    }
 
-function nullableId(value) {
-    return value && String(value).trim() !== '' ? value : null;
-}
+    var units = await DonViTinh.find({}).sort({ created_at: 1 }).lean();
+    if (units.length === 0) {
+        await DonViTinh.insertMany([
+            { ma_don_vi: 'DVT001', ten_don_vi: 'Cái', trang_thai: 'active' },
+            { ma_don_vi: 'DVT002', ten_don_vi: 'Kg', trang_thai: 'active' },
+            { ma_don_vi: 'DVT003', ten_don_vi: 'Hộp', trang_thai: 'active' }
+        ]);
+    }
 
-async function getProductFormData() {
-    const [categories, brands, units, suppliers, stores, locations] = await Promise.all([
-        NhomHang.find().sort({ ten_nhom_hang: 1 }),
-        ThuongHieu.find().sort({ ten_thuong_hieu: 1 }),
-        DonViTinh.find().sort({ ten_don_vi: 1 }),
-        NhaCungCap.find().sort({ ten_ncc: 1 }),
-        CuaHang.find().sort({ ten_cua_hang: 1 }),
-        ViTri.find().sort({ ten_vi_tri: 1 })
+    var suppliers = await NhaCungCap.find({}).sort({ created_at: 1 }).lean();
+    var supplierA = suppliers[0] || null;
+    var supplierB = suppliers[1] || supplierA;
+
+    var products = await HangHoa.insertMany([
+        { ma_hang: 'NSTP00030', ten_hang: 'Sầu riêng lạnh Vibraood 300g', nhom_hang_id: groups[0]?._id, nha_cung_cap_id: supplierA?._id, gia_co_dinh: 200000, gia_von: 100000, gia_nhap_cuoi: 95000, ban_truc_tiep: true, trang_thai: 'active' },
+        { ma_hang: 'NSTP00029', ten_hang: 'Gà ta đông lạnh', nhom_hang_id: groups[1]?._id, nha_cung_cap_id: supplierB?._id, gia_co_dinh: 90000, gia_von: 65000, gia_nhap_cuoi: 62000, ban_truc_tiep: true, trang_thai: 'active' },
+        { ma_hang: 'NSTP00028', ten_hang: 'Bò bít tết Mỹ AACE FOODS 500g', nhom_hang_id: groups[1]?._id, nha_cung_cap_id: supplierA?._id, gia_co_dinh: 150000, gia_von: 120000, gia_nhap_cuoi: 118000, ban_truc_tiep: false, trang_thai: 'active' },
+        { ma_hang: 'NSTP00027', ten_hang: 'Chả ram tôm đất Định Chí đặc biệt', nhom_hang_id: groups[0]?._id, nha_cung_cap_id: supplierB?._id, gia_co_dinh: 120000, gia_von: 90000, gia_nhap_cuoi: 88000, ban_truc_tiep: true, trang_thai: 'active' }
     ]);
 
-    return { categories, brands, units, suppliers, stores, locations };
+    var firstWarehouse = await Kho.findOne({}).lean();
+    if (!firstWarehouse) return;
+
+    await TonKho.insertMany(products.map(function(item, index) {
+        return {
+            kho_id: firstWarehouse._id,
+            hang_hoa_id: item._id,
+            so_luong: [14, 0, 0, 0][index] || 0
+        };
+    }));
 }
 
-exports.index = async (req, res, next) => {
+exports.index = async function(req, res, next) {
     try {
-        const { q, nhom_hang_id, ton_kho, nha_cung_cap_id, vi_tri_id, loai_hang, ban_truc_tiep } = req.query || {};
-        const filter = {};
+        var requestQuery = req?.query || {};
+        var filter = normalizeFilterQuery(requestQuery);
+        var dateRange = getDateRange(filter);
+        var productQuery = {};
 
-        if (q && q.trim() !== '') {
-            const keyword = q.trim();
-            filter.$or = [
-                { ma_hang: { $regex: keyword, $options: 'i' } },
-                { ten_hang: { $regex: keyword, $options: 'i' } }
+        if (filter.groupId !== 'all') productQuery.nhom_hang_id = filter.groupId;
+        if (filter.supplierId !== 'all') productQuery.nha_cung_cap_id = filter.supplierId;
+        if (filter.salesLink === 'yes') productQuery.ban_truc_tiep = true;
+        if (filter.salesLink === 'no') productQuery.ban_truc_tiep = false;
+        if (filter.status !== 'all') productQuery.trang_thai = filter.status;
+        if (filter.keyword) {
+            productQuery.$or = [
+                { ma_hang: { $regex: filter.keyword, $options: 'i' } },
+                { ten_hang: { $regex: filter.keyword, $options: 'i' } }
             ];
         }
-        if (nhom_hang_id) filter.nhom_hang_id = nhom_hang_id;
-        if (nha_cung_cap_id) filter.nha_cung_cap_id = nha_cung_cap_id;
-        if (vi_tri_id) filter.vi_tri_id = vi_tri_id;
-        if (['hang_hoa', 'dich_vu', 'combo'].includes(loai_hang)) filter.loai_hang = loai_hang;
-        if (ban_truc_tiep === 'true') filter.ban_truc_tiep = true;
-        if (ban_truc_tiep === 'false') filter.ban_truc_tiep = false;
-        if (ton_kho === 'con') filter.ton_kho = { $gt: 0 };
-        if (ton_kho === 'het') filter.ton_kho = { $lte: 0 };
-        if (ton_kho === 'duoi_dinh_muc') {
-            filter.$expr = { $lte: ['$ton_kho', '$dinh_muc_ton_thap'] };
+        if (dateRange.start || dateRange.end) {
+            productQuery.created_at = {};
+            if (dateRange.start) productQuery.created_at.$gte = dateRange.start;
+            if (dateRange.end) productQuery.created_at.$lte = dateRange.end;
         }
 
-        const [products, formData] = await Promise.all([
-            HangHoa.find(filter)
-                .populate('nhom_hang_id')
-                .populate('thuong_hieu_id')
-                .populate('nha_cung_cap_id')
-                .populate('don_vi_tinh_id')
-                .populate('vi_tri_id')
-                .sort({ created_at: -1 }),
-            getProductFormData()
-        ]);
+        var products = await HangHoa.find(productQuery).sort({ created_at: -1, ma_hang: 1 }).lean();
+        var productIds = products.map(function(item) { return item._id; });
+
+        var inventoryRows = productIds.length > 0
+            ? await TonKho.aggregate([
+                { $match: { hang_hoa_id: { $in: productIds } } },
+                { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+            ])
+            : [];
+        var inventoryMap = inventoryRows.reduce(function(map, row) {
+            map[String(row._id)] = Number(row.total || 0);
+            return map;
+        }, {});
+
+        var stockRange = makeRangeFilter(filter.stockFrom, filter.stockTo);
+        if (stockRange) {
+            products = products.filter(function(item) {
+                var qty = Number(inventoryMap[String(item._id)] || 0);
+                if (Object.prototype.hasOwnProperty.call(stockRange, '$gte') && qty < stockRange.$gte) return false;
+                if (Object.prototype.hasOwnProperty.call(stockRange, '$lte') && qty > stockRange.$lte) return false;
+                return true;
+            });
+        }
+
+        var groups = await loadProductGroups();
+        var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
+        var units = await loadUnitOptions();
+        var warehouses = await Kho.find({}).sort({ ten_kho: 1, ma_kho: 1 }).lean();
+        var groupMap = groups.reduce(function(map, group) {
+            map[String(group._id)] = group.ten_nhom_hang || '---';
+            return map;
+        }, {});
+        var supplierMap = suppliers.reduce(function(map, supplier) {
+            map[String(supplier._id)] = supplier.ten_ncc || '---';
+            return map;
+        }, {});
+        var unitMap = units.reduce(function(map, unit) {
+            map[String(unit._id)] = unit.ten_don_vi || '---';
+            return map;
+        }, {});
+        var warehouseMap = warehouses.reduce(function(map, warehouse) {
+            map[String(warehouse._id)] = warehouse.ten_kho || warehouse.ma_kho || '---';
+            return map;
+        }, {});
+
+        products = products.map(function(item) {
+            item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
+            item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
+            item.nha_cung_cap_ten = supplierMap[String(item.nha_cung_cap_id || '')] || '---';
+            item.don_vi_tinh_ten = unitMap[String(item.don_vi_tinh_id || '')] || '---';
+            item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
+            return item;
+        });
+        var selectedProductId = Object.prototype.hasOwnProperty.call(requestQuery, 'product')
+            ? String(requestQuery.product || '')
+            : '';
+        var selectedProduct = selectedProductId
+            ? products.find(function(item) { return String(item._id) === selectedProductId; }) || null
+            : null;
+        var selectedProductInventory = selectedProduct
+            ? await TonKho.find({ hang_hoa_id: selectedProduct._id }).sort({ updated_at: -1 }).lean()
+            : [];
+        selectedProductInventory = selectedProductInventory.map(function(row) {
+            row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+            return row;
+        });
+        var selectedProductHistories = selectedProduct
+            ? await LichSuKho.find({ hang_hoa_id: selectedProduct._id })
+                .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+                .sort({ ngay: -1, created_at: -1 })
+                .lean()
+            : [];
+        selectedProductHistories = selectedProductHistories.map(function(row) {
+            row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+            return row;
+        });
+        var selectedProductLots = selectedProduct && selectedProduct.quan_ly_theo_lo
+            ? await TonKhoLo.find({ hang_hoa_id: selectedProduct._id })
+                .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung ngay_nhap so_luong_ban_dau so_luong_con_lai trang_thai' })
+                .sort({ updated_at: -1, created_at: -1 })
+                .lean()
+            : [];
+        selectedProductLots = selectedProductLots.map(function(row) {
+            row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+            return row;
+        });
+        var filterQueryString = buildFilterQueryString(filter);
 
         res.render('hang-hoa/index', {
-            title: 'Quản lý Hàng hóa',
-            products,
-            ...formData,
-            filters: req.query || {}
+            title: 'Hàng hóa',
+            pageTitle: 'Hàng hóa',
+            activeMenu: 'hang-hoa',
+            user: req.user,
+            flash: requestQuery,
+            products: products,
+            groups: groups,
+            units: units,
+            suppliers: suppliers,
+            warehouses: warehouses,
+            selectedProduct: selectedProduct,
+            selectedProductInventory: selectedProductInventory,
+            selectedProductHistories: selectedProductHistories,
+            selectedProductLots: selectedProductLots,
+            filter: filter,
+            formatDate: formatDate,
+            filterQueryString: filterQueryString,
+            formMode: requestQuery.mode === 'create' ? 'create' : ''
         });
     } catch (error) {
         next(error);
     }
 };
 
-exports.priceSetup = async (req, res, next) => {
+exports.add = async function(req, res, next) {
     try {
-        const { q, nhom_hang_id, ton_kho, gia_ban_dk, gia_ban_value, page, limit } = req.query || {};
-        const filter = {};
-
-        if (q && q.trim() !== '') {
-            const keyword = q.trim();
-            filter.$or = [
-                { ma_hang: { $regex: keyword, $options: 'i' } },
-                { ten_hang: { $regex: keyword, $options: 'i' } }
-            ];
+        var payload = normalizeProductPayload(req?.body);
+        if (!payload.ten_hang) {
+            return res.redirect('/hang-hoa?mode=create&error=missing_name');
         }
-        if (nhom_hang_id) filter.nhom_hang_id = nhom_hang_id;
-        if (ton_kho === 'con') filter.ton_kho = { $gt: 0 };
-        if (ton_kho === 'het') filter.ton_kho = { $lte: 0 };
+        if (!payload.ma_hang) {
+            payload.ma_hang = await makeProductCode();
+        }
+        if (!payload.nhom_hang_id) delete payload.nhom_hang_id;
+        if (!payload.don_vi_tinh_id) delete payload.don_vi_tinh_id;
+        if (!payload.nha_cung_cap_id) delete payload.nha_cung_cap_id;
 
-        const priceValue = parseNumber(gia_ban_value, null);
-        if (priceValue !== null && gia_ban_dk) {
-            const ops = {
-                eq: priceValue,
-                gt: { $gt: priceValue },
-                gte: { $gte: priceValue },
-                lt: { $lt: priceValue },
-                lte: { $lte: priceValue }
-            };
-            if (ops[gia_ban_dk] !== undefined) filter.gia_ban = ops[gia_ban_dk];
+        var initialQty = Number(payload.ton_ban_dau || 0);
+        var created = await HangHoa.create(payload);
+        if (initialQty > 0) {
+            var warehouse = await getDefaultWarehouseForProduct(created, req);
+            if (warehouse) {
+                var inventory = await TonKho.findOneAndUpdate(
+                    { kho_id: warehouse._id, hang_hoa_id: created._id },
+                    {
+                        $setOnInsert: {
+                            cua_hang_id: warehouse.cua_hang_id,
+                            chi_nhanh_id: warehouse.chi_nhanh_id,
+                            kho_id: warehouse._id,
+                            hang_hoa_id: created._id
+                        },
+                        $inc: { so_luong: initialQty }
+                    },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                ).lean();
+
+                var lotOptions = {
+                    ma_lo: String(req?.body?.initial_lot_ma || '').trim() || undefined,
+                    ten_lo: String(req?.body?.initial_lot_ten || '').trim() || undefined,
+                    han_su_dung: req?.body?.initial_lot_han_su_dung ? new Date(req.body.initial_lot_han_su_dung) : undefined,
+                    ghi_chu: 'Tạo từ tồn ban đầu'
+                };
+                var createdLots = [];
+                if (created.quan_ly_theo_lo) {
+                    createdLots = await createDefaultLotFromInventory(created, [inventory], req, lotOptions);
+                }
+
+                if (LichSuKho) {
+                    await LichSuKho.create({
+                        cua_hang_id: warehouse.cua_hang_id,
+                        chi_nhanh_id: warehouse.chi_nhanh_id,
+                        kho_id: warehouse._id,
+                        hang_hoa_id: created._id,
+                        lo_hang_id: createdLots[0]?._id || undefined,
+                        nguoi_tao_id: req.user && req.user._id ? req.user._id : undefined,
+                        loai_phieu: 'dieu_chinh',
+                        ma_phieu: 'TON_DAU_' + (created.ma_hang || created._id),
+                        so_luong_thay_doi: initialQty,
+                        ton_kho_sau: Number(inventory.so_luong || 0),
+                        gia_tri_thay_doi: initialQty * Number(created.gia_von || 0),
+                        ghi_chu: 'Tồn ban đầu'
+                    });
+                }
+            }
+        }
+        res.redirect('/hang-hoa?success=created');
+    } catch (error) {
+        if (error && error.code === 11000) {
+            return res.redirect('/hang-hoa?mode=create&error=duplicate_code');
+        }
+        next(error);
+    }
+};
+
+exports.update = async function(req, res, next) {
+    try {
+        var productId = normalizeIdParam(req?.params?.id);
+        if (!productId) return res.redirect('/hang-hoa?error=invalid_product');
+
+        var payload = normalizeProductPayload(req?.body);
+        if (!payload.ten_hang) {
+            return res.redirect('/hang-hoa?mode=create&error=missing_name');
         }
 
-        const perPage = Math.min(Math.max(parseInt(limit, 10) || 15, 10), 50);
-        const currentPage = Math.max(parseInt(page, 10) || 1, 1);
-        const skip = (currentPage - 1) * perPage;
+        if (!payload.ma_hang) delete payload.ma_hang;
+        if (!payload.nhom_hang_id) delete payload.nhom_hang_id;
+        if (!payload.don_vi_tinh_id) delete payload.don_vi_tinh_id;
+        if (!payload.nha_cung_cap_id) delete payload.nha_cung_cap_id;
 
-        const [products, total, categories] = await Promise.all([
-            HangHoa.find(filter)
-                .populate('nhom_hang_id')
-                .sort({ created_at: -1 })
-                .skip(skip)
-                .limit(perPage),
-            HangHoa.countDocuments(filter),
-            NhomHang.find().sort({ ten_nhom_hang: 1 })
-        ]);
+        var oldProduct = await HangHoa.findById(productId).lean();
+        var updatedProduct = await HangHoa.findByIdAndUpdate(productId, payload, { runValidators: true, new: true });
+        if (oldProduct && !oldProduct.quan_ly_theo_lo && updatedProduct && updatedProduct.quan_ly_theo_lo) {
+            var inventoryRows = await TonKho.find({ hang_hoa_id: updatedProduct._id, so_luong: { $gt: 0 } }).lean();
+            await createDefaultLotFromInventory(updatedProduct, inventoryRows, req, {
+                ma_lo: String(req?.body?.initial_lot_ma || '').trim() || undefined,
+                ten_lo: String(req?.body?.initial_lot_ten || '').trim() || undefined,
+                han_su_dung: req?.body?.initial_lot_han_su_dung ? new Date(req.body.initial_lot_han_su_dung) : undefined
+            });
+        }
+        res.redirect('/hang-hoa?success=updated');
+    } catch (error) {
+        if (error && error.code === 11000) {
+            return res.redirect('/hang-hoa?mode=create&error=duplicate_code');
+        }
+        next(error);
+    }
+};
+
+exports.remove = async function(req, res, next) {
+    try {
+        var productId = normalizeIdParam(req?.params?.id);
+        if (!productId) return res.redirect('/hang-hoa?error=invalid_product');
+
+        await TonKho.deleteMany({ hang_hoa_id: productId });
+        await HangHoa.findByIdAndDelete(productId);
+        res.redirect('/hang-hoa?success=deleted');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.removeSelected = async function(req, res, next) {
+    try {
+        var ids = req?.body?.ids || [];
+        if (!Array.isArray(ids)) ids = [ids];
+        ids = ids.map(function(item) { return String(item || '').trim(); }).filter(Boolean);
+        if (ids.length === 0) return res.redirect('/hang-hoa?error=no_selection');
+
+        await TonKho.deleteMany({ hang_hoa_id: { $in: ids } });
+        await HangHoa.deleteMany({ _id: { $in: ids } });
+        res.redirect('/hang-hoa?success=deleted');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.addGroup = async function(req, res, next) {
+    try {
+        var tenNhom = String(req?.body?.ten_nhom_hang || '').trim();
+        var moTa = String(req?.body?.mo_ta || '').trim();
+        var maNhom = String(req?.body?.ma_nhom_hang || '').trim().toUpperCase();
+        if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lòng nhập tên nhóm hàng.');
+        if (!maNhom) maNhom = await makeProductGroupCode();
+
+        var doc = {
+            ma_nhom_hang: maNhom,
+            ten_nhom_hang: tenNhom,
+            mo_ta: moTa,
+            trang_thai: 'active'
+        };
+        var storeId = await resolveStoreId(req);
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) doc.cua_hang_id = storeId;
+
+        var created = await NhomHang.create(doc);
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã thêm nhóm hàng.',
+                data: created,
+                selectedId: String(created._id),
+                groups: await loadProductGroups()
+            });
+        }
+
+        res.redirect('/hang-hoa?success=created');
+    } catch (error) {
+        if (error && error.code === 11000) {
+            return respondProductGroupError(req, res, 409, 'Mã nhóm hàng đã tồn tại.');
+        }
+        if (error && error.name === 'ValidationError') {
+            return respondProductGroupError(req, res, 400, error.message || 'Dữ liệu nhóm hàng không hợp lệ.');
+        }
+        next(error);
+    }
+};
+
+exports.updateGroup = async function(req, res, next) {
+    try {
+        var groupId = normalizeIdParam(req?.params?.groupId);
+        if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
+            return respondProductGroupError(req, res, 400, 'Nhóm hàng không hợp lệ.');
+        }
+
+        var tenNhom = String(req?.body?.ten_nhom_hang || '').trim();
+        var moTa = String(req?.body?.mo_ta || '').trim();
+        if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lòng nhập tên nhóm hàng.');
+
+        var updated = await NhomHang.findByIdAndUpdate(
+            groupId,
+            { ten_nhom_hang: tenNhom, mo_ta: moTa },
+            { runValidators: true, new: true }
+        );
+        if (!updated) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã cập nhật nhóm hàng.',
+                data: updated,
+                selectedId: groupId,
+                groups: await loadProductGroups()
+            });
+        }
+
+        res.redirect('/hang-hoa?success=updated');
+    } catch (error) {
+        if (error && error.name === 'ValidationError') {
+            return respondProductGroupError(req, res, 400, error.message || 'Dữ liệu nhóm hàng không hợp lệ.');
+        }
+        next(error);
+    }
+};
+
+exports.removeGroup = async function(req, res, next) {
+    try {
+        var groupId = normalizeIdParam(req?.params?.groupId);
+        if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
+            return respondProductGroupError(req, res, 400, 'Nhóm hàng không hợp lệ.');
+        }
+
+        await HangHoa.updateMany(
+            { nhom_hang_id: groupId },
+            { $unset: { nhom_hang_id: 1 } }
+        );
+        var deleted = await NhomHang.findByIdAndDelete(groupId);
+        if (!deleted) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã xóa nhóm hàng.',
+                groups: await loadProductGroups()
+            });
+        }
+
+        res.redirect('/hang-hoa?success=deleted');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.addUnit = async function(req, res, next) {
+    try {
+        var tenDonVi = String(req?.body?.ten_don_vi || '').trim();
+        var maDonVi = String(req?.body?.ma_don_vi || '').trim().toUpperCase();
+        if (!tenDonVi) return respondUnitError(req, res, 400, 'Vui lòng nhập tên đơn vị tính.');
+        if (!maDonVi) maDonVi = await makeUnitCode();
+
+        var doc = {
+            ma_don_vi: maDonVi,
+            ten_don_vi: tenDonVi,
+            trang_thai: 'active'
+        };
+        var storeId = await resolveStoreId(req);
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) doc.cua_hang_id = storeId;
+
+        var created = await DonViTinh.create(doc);
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã thêm đơn vị tính.',
+                data: created,
+                selectedId: String(created._id),
+                units: await loadUnitOptions()
+            });
+        }
+        res.redirect('/hang-hoa?success=created');
+    } catch (error) {
+        if (error && error.code === 11000) {
+            return respondUnitError(req, res, 409, 'Mã đơn vị tính đã tồn tại.');
+        }
+        if (error && error.name === 'ValidationError') {
+            return respondUnitError(req, res, 400, error.message || 'Dữ liệu đơn vị tính không hợp lệ.');
+        }
+        next(error);
+    }
+};
+
+exports.updateUnit = async function(req, res, next) {
+    try {
+        var unitId = normalizeIdParam(req?.params?.unitId);
+        if (!unitId || !mongoose.Types.ObjectId.isValid(unitId)) {
+            return respondUnitError(req, res, 400, 'Đơn vị tính không hợp lệ.');
+        }
+
+        var tenDonVi = String(req?.body?.ten_don_vi || '').trim();
+        if (!tenDonVi) return respondUnitError(req, res, 400, 'Vui lòng nhập tên đơn vị tính.');
+
+        var updated = await DonViTinh.findByIdAndUpdate(
+            unitId,
+            { ten_don_vi: tenDonVi },
+            { runValidators: true, new: true }
+        );
+        if (!updated) return respondUnitError(req, res, 404, 'Không tìm thấy đơn vị tính.');
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã cập nhật đơn vị tính.',
+                data: updated,
+                selectedId: unitId,
+                units: await loadUnitOptions()
+            });
+        }
+        res.redirect('/hang-hoa?success=updated');
+    } catch (error) {
+        if (error && error.name === 'ValidationError') {
+            return respondUnitError(req, res, 400, error.message || 'Dữ liệu đơn vị tính không hợp lệ.');
+        }
+        next(error);
+    }
+};
+
+exports.removeUnit = async function(req, res, next) {
+    try {
+        var unitId = normalizeIdParam(req?.params?.unitId);
+        if (!unitId || !mongoose.Types.ObjectId.isValid(unitId)) {
+            return respondUnitError(req, res, 400, 'Đơn vị tính không hợp lệ.');
+        }
+
+        await HangHoa.updateMany(
+            { don_vi_tinh_id: unitId },
+            { $unset: { don_vi_tinh_id: 1 } }
+        );
+        var deleted = await DonViTinh.findByIdAndDelete(unitId);
+        if (!deleted) return respondUnitError(req, res, 404, 'Không tìm thấy đơn vị tính.');
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã xóa đơn vị tính.',
+                units: await loadUnitOptions()
+            });
+        }
+        res.redirect('/hang-hoa?success=deleted');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.priceSetup = async function(req, res, next) {
+    try {
+        var requestQuery = req?.query || {};
+        var filter = normalizePriceSetupQuery(requestQuery);
+
+        var conditions = [];
+        if (filter.groupId !== 'all') conditions.push({ nhom_hang_id: filter.groupId });
+        if (filter.keyword) {
+            conditions.push({
+                $or: [
+                    { ma_hang: { $regex: filter.keyword, $options: 'i' } },
+                    { ten_hang: { $regex: filter.keyword, $options: 'i' } }
+                ]
+            });
+        }
+        if (filter.filterMa) conditions.push({ ma_hang: { $regex: filter.filterMa, $options: 'i' } });
+        if (filter.filterTen) conditions.push({ ten_hang: { $regex: filter.filterTen, $options: 'i' } });
+        var productQuery = conditions.length === 0 ? {} : conditions.length === 1 ? conditions[0] : { $and: conditions };
+
+        var allProducts = await HangHoa.find(productQuery)
+            .sort({ created_at: -1, ma_hang: 1 })
+            .lean();
+        var productIds = allProducts.map(function(item) { return item._id; });
+
+        var inventoryRows = productIds.length > 0
+            ? await TonKho.aggregate([
+                { $match: { hang_hoa_id: { $in: productIds } } },
+                { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+            ])
+            : [];
+        var inventoryMap = inventoryRows.reduce(function(map, row) {
+            map[String(row._id)] = Number(row.total || 0);
+            return map;
+        }, {});
+
+        var products = allProducts.filter(function(item) {
+            var qty = Number(inventoryMap[String(item._id)] || 0);
+            if (filter.stock === 'co_ton') return qty > 0;
+            if (filter.stock === 'het_hang') return qty <= 0;
+            return true;
+        });
+
+        var total = products.length;
+        var totalPages = Math.max(1, Math.ceil(total / filter.limit));
+        if (filter.page > totalPages) filter.page = totalPages;
+        var start = (filter.page - 1) * filter.limit;
+        var pageItems = products.slice(start, start + filter.limit);
+
+        var groups = await loadProductGroups();
+        var groupMap = groups.reduce(function(map, group) {
+            map[String(group._id)] = group.ten_nhom_hang || '';
+            return map;
+        }, {});
+
+        pageItems = pageItems.map(function(item) {
+            item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
+            item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
+            return item;
+        });
+
+        var bangGiaList = await BangGia.find({}).sort({ ten_bang_gia: 1 }).lean();
+        var selectedBangGiaOrdered = filter.bangGiaIds.map(function(id) {
+            return bangGiaList.find(function(b) { return String(b._id) === id; });
+        }).filter(Boolean);
+
+        var ctMapByProduct = {};
+        if (selectedBangGiaOrdered.length > 0 && pageItems.length > 0) {
+            var pageIds = pageItems.map(function(p) { return p._id; });
+            var bangIds = selectedBangGiaOrdered.map(function(b) { return b._id; });
+            var ctRows = await CTBangGia.find({
+                bang_gia_id: { $in: bangIds },
+                hang_hoa_id: { $in: pageIds }
+            }).lean();
+            ctRows.forEach(function(row) {
+                var hid = String(row.hang_hoa_id);
+                var bid = String(row.bang_gia_id);
+                if (!ctMapByProduct[hid]) ctMapByProduct[hid] = {};
+                ctMapByProduct[hid][bid] = {
+                    gia_ban: Number(row.gia_ban || 0),
+                    _id: row._id
+                };
+            });
+        }
+
+        pageItems = pageItems.map(function(item) {
+            item.ctBangGiaByBangId = ctMapByProduct[String(item._id)] || {};
+            return item;
+        });
+
+        var qs = function(overrides) {
+            var merged = Object.assign({}, filter, overrides || {});
+            if (merged.page < 1) merged.page = 1;
+            return buildPriceSetupQueryString(merged);
+        };
+
+        var now = new Date();
+        var defaultEnd = new Date(now);
+        defaultEnd.setFullYear(defaultEnd.getFullYear() + 1);
+
+        var pageTitleText = selectedBangGiaOrdered.length > 0
+            ? String(selectedBangGiaOrdered.length) + ' bảng giá'
+            : 'Thiết lập giá';
 
         res.render('hang-hoa/thiet-lap-gia', {
             title: 'Thiết lập giá',
-            products,
-            categories,
-            filters: req.query || {},
+            pageTitle: pageTitleText,
+            activeMenu: 'hang-hoa',
+            user: req.user,
+            flash: requestQuery,
+            products: pageItems,
+            groups: groups,
+            bangGiaList: bangGiaList,
+            selectedBangGiaOrdered: selectedBangGiaOrdered,
+            defaultNgayBatDau: toDatetimeLocalValue(now),
+            defaultNgayKetThuc: toDatetimeLocalValue(defaultEnd),
+            filter: filter,
             pagination: {
-                page: currentPage,
-                limit: perPage,
-                total,
-                totalPages: Math.max(Math.ceil(total / perPage), 1)
+                total: total,
+                page: filter.page,
+                limit: filter.limit,
+                totalPages: totalPages,
+                from: total === 0 ? 0 : start + 1,
+                to: Math.min(start + filter.limit, total)
+            },
+            qs: qs
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateRetailPrice = async function(req, res, next) {
+    try {
+        var productId = normalizeIdParam(req?.params?.id);
+        if (!productId) {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Mã hàng không hợp lệ.' });
+            return res.redirect('/hang-hoa/thiet-lap-gia?error=invalid_product');
+        }
+
+        var giaRaw = Number(req?.body?.gia_co_dinh);
+        var gia = Number.isFinite(giaRaw) && giaRaw >= 0 ? Math.floor(giaRaw) : 0;
+
+        await HangHoa.findByIdAndUpdate(
+            productId,
+            {
+                gia_co_dinh: gia > 0 ? gia : 0,
+                loai_gia: gia > 0 ? 'co_dinh' : 'thi_truong'
+            },
+            { runValidators: true }
+        );
+
+        if (shouldRespondJson(req)) {
+            return res.json({ success: true, gia_co_dinh: gia });
+        }
+        res.redirect('/hang-hoa/thiet-lap-gia?success=updated');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateCTBangGiaPrice = async function(req, res, next) {
+    try {
+        var bangGiaId = normalizeIdParam(req?.body?.bang_gia_id);
+        var hangHoaId = normalizeIdParam(req?.body?.hang_hoa_id);
+        if (
+            !bangGiaId ||
+            !hangHoaId ||
+            !mongoose.Types.ObjectId.isValid(bangGiaId) ||
+            !mongoose.Types.ObjectId.isValid(hangHoaId)
+        ) {
+            if (shouldRespondJson(req)) {
+                return res.status(400).json({ success: false, message: 'Thiếu hoặc sai mã bảng giá / hàng hóa.' });
             }
-        });
+            return res.redirect('/hang-hoa/thiet-lap-gia?error=invalid_ct');
+        }
+
+        var giaRaw = Number(req?.body?.gia_ban);
+        var giaBan = Number.isFinite(giaRaw) && giaRaw >= 0 ? Math.floor(giaRaw) : 0;
+
+        await CTBangGia.findOneAndUpdate(
+            { bang_gia_id: bangGiaId, hang_hoa_id: hangHoaId },
+            { $set: { bang_gia_id: bangGiaId, hang_hoa_id: hangHoaId, gia_ban: giaBan, gia_goc: 0 } },
+            { upsert: true, new: true, runValidators: true }
+        );
+
+        if (shouldRespondJson(req)) {
+            return res.json({ success: true, gia_ban: giaBan });
+        }
+        res.redirect('/hang-hoa/thiet-lap-gia');
     } catch (error) {
         next(error);
     }
 };
 
-exports.updatePrices = async (req, res, next) => {
+exports.addBangGia = async function(req, res, next) {
     try {
-        const prices = Array.isArray(req.body?.prices) ? req.body.prices : [];
-        if (!prices.length) {
-            return res.status(400).json({ success: false, message: 'Chưa có giá cần cập nhật' });
+        var body = req.body || {};
+        var ten = String(body.ten_bang_gia || '').trim();
+        if (!ten) {
+            if (shouldRespondJson(req)) {
+                return res.status(400).json({ success: false, message: 'Vui lòng nhập tên bảng giá.' });
+            }
+            return res.redirect('/hang-hoa/thiet-lap-gia?error=missing_bang_gia_name');
         }
 
-        const ops = prices
-            .filter(item => item && item.id)
-            .map(item => ({
-                updateOne: {
-                    filter: { _id: item.id },
-                    update: { $set: { gia_ban: parseNumber(item.gia_ban) } }
-                }
-            }));
+        var trangThai = body.trang_thai === 'draft' ? 'draft' : 'active';
 
-        if (!ops.length) {
-            return res.status(400).json({ success: false, message: 'Dữ liệu cập nhật không hợp lệ' });
+        var ngayBatDau = null;
+        var ngayKetThuc = null;
+        if (body.ngay_bat_dau) {
+            var d1 = new Date(String(body.ngay_bat_dau));
+            if (!isNaN(d1.getTime())) ngayBatDau = d1;
+        }
+        if (body.ngay_ket_thuc) {
+            var d2 = new Date(String(body.ngay_ket_thuc));
+            if (!isNaN(d2.getTime())) ngayKetThuc = d2;
         }
 
-        const result = await HangHoa.bulkWrite(ops);
-        res.json({
-            success: true,
-            message: `Đã cập nhật ${result.modifiedCount || result.matchedCount || 0} hàng hóa`,
-            updated: result.modifiedCount || result.matchedCount || 0
-        });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.add = async (req, res, next) => {
-    try {
-        const {
-            ma_hang, ten_hang, loai_hang, mo_ta, nhom_hang_id, thuong_hieu_id, don_vi_tinh_id, don_vi_tinh, vi_tri_id,
-            gia_von, gia_ban, dinh_muc_ton_thap, dinh_muc_ton_cao,
-            trong_luong, don_vi_trong_luong, quan_ly_theo_lo, ban_truc_tiep
-        } = req.body || {};
-
-        if (!ten_hang || ten_hang.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Tên hàng là bắt buộc' });
+        var nguonCoSo = String(body.nguon_co_so || 'gia_von').trim();
+        var nguonGia = 'gia_von';
+        var bangGiaGocId = null;
+        if (nguonCoSo.indexOf('bang:') === 0) {
+            var gid = nguonCoSo.slice(5).trim();
+            if (gid && mongoose.Types.ObjectId.isValid(gid)) {
+                nguonGia = 'bang_gia_khac';
+                bangGiaGocId = gid;
+            }
+        } else if (['gia_von', 'gia_nhap_cuoi'].indexOf(nguonCoSo) >= 0) {
+            nguonGia = nguonCoSo;
         }
 
-        const productType = ['hang_hoa', 'dich_vu', 'combo'].includes(loai_hang) ? loai_hang : 'hang_hoa';
-        const prefixMap = { hang_hoa: 'HH', dich_vu: 'DV', combo: 'CB' };
-        const count = await HangHoa.countDocuments({ loai_hang: productType });
-        const generatedCode = prefixMap[productType] + String(count + 1).padStart(4, '0');
-        const anh_san_pham = (req.files || []).map(f => '/uploads/hang-hoa/' + f.filename);
+        var phepTinh = body.phep_tinh === 'tru' ? 'tru' : 'cong';
+        var kieu = body.kieu_dieu_chinh === 'phan_tram' ? 'phan_tram' : 'vnd';
+        var giaTriRaw = Number(body.gia_tri_dieu_chinh);
+        var giaTri = Number.isFinite(giaTriRaw) && giaTriRaw >= 0 ? giaTriRaw : 0;
 
-        const item = await HangHoa.create({
-            ma_hang: ma_hang && ma_hang.trim() !== '' ? ma_hang.trim() : generatedCode,
-            ten_hang: ten_hang.trim(),
-            loai_hang: productType,
-            mo_ta: mo_ta || '',
-            nhom_hang_id: nullableId(nhom_hang_id),
-            thuong_hieu_id: nullableId(thuong_hieu_id),
-            don_vi_tinh_id: nullableId(don_vi_tinh_id),
-            don_vi_tinh: don_vi_tinh && don_vi_tinh.trim() !== '' ? don_vi_tinh.trim() : 'cái',
-            vi_tri_id: nullableId(vi_tri_id),
-            gia_von: parseNumber(gia_von),
-            gia_ban: parseNumber(gia_ban),
-            ton_kho: productType === 'dich_vu' ? 0 : 0,
-            dinh_muc_ton_thap: parseNumber(dinh_muc_ton_thap),
-            dinh_muc_ton_cao: parseNumber(dinh_muc_ton_cao, 999999999),
-            trong_luong: parseNumber(trong_luong),
-            don_vi_trong_luong: don_vi_trong_luong || 'g',
-            quan_ly_theo_lo: quan_ly_theo_lo === 'true' || quan_ly_theo_lo === true,
-            ban_truc_tiep: ban_truc_tiep !== 'false' && ban_truc_tiep !== false,
-            anh_san_pham,
-            trang_thai: 'active'
-        });
+        var cashierFlexible = body.cashier_mode !== 'strict';
+        var canhBao = cashierFlexible && (
+            body.canh_bao_hang_ngoai === '1' ||
+            body.canh_bao_hang_ngoai === true ||
+            body.canh_bao_hang_ngoai === 'true'
+        );
 
-        res.json({ success: true, message: 'Thêm hàng hóa thành công', data: item });
-    } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({ success: false, message: 'Mã hàng đã tồn tại' });
-        }
-        next(error);
-    }
-};
-
-exports.update = async (req, res, next) => {
-    try {
-        const productId = req.params?.id;
-        if (!productId) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
-
-        const {
-            ma_hang, ten_hang, loai_hang, mo_ta, nhom_hang_id, thuong_hieu_id, don_vi_tinh_id, don_vi_tinh, vi_tri_id,
-            gia_von, gia_ban, dinh_muc_ton_thap, dinh_muc_ton_cao,
-            trong_luong, don_vi_trong_luong, quan_ly_theo_lo, ban_truc_tiep
-        } = req.body || {};
-
-        if (!ten_hang || ten_hang.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Tên hàng là bắt buộc' });
-        }
-
-        const item = await HangHoa.findById(productId);
-        if (!item) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
-        }
-
-        if (ma_hang && ma_hang.trim() !== '') item.ma_hang = ma_hang.trim();
-        item.ten_hang = ten_hang.trim();
-        if (['hang_hoa', 'dich_vu', 'combo'].includes(loai_hang)) item.loai_hang = loai_hang;
-        item.mo_ta = mo_ta || '';
-        item.nhom_hang_id = nullableId(nhom_hang_id);
-        item.thuong_hieu_id = nullableId(thuong_hieu_id);
-        item.don_vi_tinh_id = nullableId(don_vi_tinh_id);
-        item.don_vi_tinh = don_vi_tinh && don_vi_tinh.trim() !== '' ? don_vi_tinh.trim() : 'cái';
-        item.vi_tri_id = nullableId(vi_tri_id);
-        item.gia_von = parseNumber(gia_von);
-        item.gia_ban = parseNumber(gia_ban);
-        item.dinh_muc_ton_thap = parseNumber(dinh_muc_ton_thap);
-        item.dinh_muc_ton_cao = parseNumber(dinh_muc_ton_cao, 999999999);
-        item.trong_luong = parseNumber(trong_luong);
-        item.don_vi_trong_luong = don_vi_trong_luong || 'g';
-        item.quan_ly_theo_lo = quan_ly_theo_lo === 'true' || quan_ly_theo_lo === true;
-        item.ban_truc_tiep = ban_truc_tiep !== 'false' && ban_truc_tiep !== false;
-
-        const newImages = (req.files || []).map(f => '/uploads/hang-hoa/' + f.filename);
-        if (newImages.length > 0) item.anh_san_pham = newImages;
-
-        await item.save();
-        res.json({ success: true, message: 'Cập nhật hàng hóa thành công', data: item });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.remove = async (req, res, next) => {
-    try {
-        const productId = req.params?.id;
-        if (!productId) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
-
-        const item = await HangHoa.findByIdAndDelete(productId);
-        if (!item) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
-        }
-        res.json({ success: true, message: 'Đã xóa hàng hóa' });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.importCsv = async (req, res, next) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn file CSV' });
-        }
-
-        const text = req.file.buffer.toString('utf8').replace(/^\uFEFF/, '');
-        const rows = parseCsv(text);
-        if (!Array.isArray(rows) || rows.length < 2) {
-            return res.status(400).json({ success: false, message: 'File không có dữ liệu để import' });
-        }
-
-        const headers = rows[0].map(h => h.trim().toLowerCase());
-        const indexOf = (...names) => headers.findIndex(h => names.includes(h));
-        const idx = {
-            ma_hang: indexOf('ma_hang', 'mã hàng', 'ma hang'),
-            ten_hang: indexOf('ten_hang', 'tên hàng', 'ten hang'),
-            nhom_hang: indexOf('nhom_hang', 'nhóm hàng', 'nhom hang'),
-            gia_ban: indexOf('gia_ban', 'giá bán', 'gia ban'),
-            gia_von: indexOf('gia_von', 'giá vốn', 'gia von'),
-            ton_kho: indexOf('ton_kho', 'tồn kho', 'ton kho')
+        var doc = {
+            ma_bang_gia: await makeBangGiaCode(),
+            ten_bang_gia: ten,
+            ngay_bat_dau: ngayBatDau,
+            ngay_ket_thuc: ngayKetThuc,
+            trang_thai: trangThai,
+            nguon_gia: nguonGia,
+            phep_tinh: phepTinh,
+            kieu_dieu_chinh: kieu,
+            gia_tri_dieu_chinh: giaTri,
+            cho_phep_hang_ngoai_bang_gia: cashierFlexible,
+            canh_bao_hang_ngoai_bang_gia: canhBao
         };
 
-        if (idx.ten_hang < 0) {
-            return res.status(400).json({ success: false, message: 'File cần có cột ten_hang hoặc Tên hàng' });
+        if (nguonGia === 'bang_gia_khac' && bangGiaGocId) {
+            doc.bang_gia_goc_id = bangGiaGocId;
         }
 
-        let created = 0;
-        let skipped = 0;
-        let autoCodeCount = await HangHoa.countDocuments();
+        if (req.user && req.user.cua_hang_id) {
+            doc.cua_hang_id = req.user.cua_hang_id;
+        }
+        if (req.user && req.user._id) {
+            doc.nguoi_tao_id = req.user._id;
+        }
 
-        for (const row of rows.slice(1)) {
-            const tenHang = (row[idx.ten_hang] || '').trim();
-            if (!tenHang) {
-                skipped++;
-                continue;
-            }
+        var created = await BangGia.create(doc);
 
-            let maHang = idx.ma_hang >= 0 ? (row[idx.ma_hang] || '').trim() : '';
-            if (!maHang) {
-                autoCodeCount++;
-                maHang = 'HH' + String(autoCodeCount).padStart(4, '0');
-            }
-
-            const exists = await HangHoa.exists({ ma_hang: maHang });
-            if (exists) {
-                skipped++;
-                continue;
-            }
-
-            let nhomHangId = null;
-            const tenNhom = idx.nhom_hang >= 0 ? (row[idx.nhom_hang] || '').trim() : '';
-            if (tenNhom) {
-                const nhom = await NhomHang.findOneAndUpdate(
-                    { ten_nhom_hang: tenNhom },
-                    { $setOnInsert: { ten_nhom_hang: tenNhom } },
-                    { new: true, upsert: true }
-                );
-                nhomHangId = nhom._id;
-            }
-
-            await HangHoa.create({
-                ma_hang: maHang,
-                ten_hang: tenHang,
-                nhom_hang_id: nhomHangId,
-                gia_ban: idx.gia_ban >= 0 ? numberFromCsv(row[idx.gia_ban]) : 0,
-                gia_von: idx.gia_von >= 0 ? numberFromCsv(row[idx.gia_von]) : 0,
-                ton_kho: idx.ton_kho >= 0 ? numberFromCsv(row[idx.ton_kho]) : 0,
-                trang_thai: 'active'
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã tạo bảng giá.',
+                id: String(created._id),
+                ma_bang_gia: created.ma_bang_gia
             });
-            created++;
         }
-
-        res.json({ success: true, message: `Đã import ${created} hàng hóa, bỏ qua ${skipped} dòng`, created, skipped });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.addCategory = async (req, res, next) => {
-    try {
-        const { ten_nhom_hang, nhom_cha_id } = req.body || {};
-        if (!ten_nhom_hang || ten_nhom_hang.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Thiếu tên nhóm hàng' });
-        }
-        const exists = await NhomHang.findOne({ ten_nhom_hang: ten_nhom_hang.trim() });
-        if (exists) {
-            return res.status(400).json({ success: false, message: 'Nhóm hàng đã tồn tại' });
-        }
-        const nhom = await NhomHang.create({
-            ten_nhom_hang: ten_nhom_hang.trim(),
-            nhom_cha_id: nullableId(nhom_cha_id)
-        });
-        res.json({ success: true, data: nhom });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.addBrand = async (req, res, next) => {
-    try {
-        const { ten_thuong_hieu } = req.body || {};
-        if (!ten_thuong_hieu || ten_thuong_hieu.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Thiếu tên thương hiệu' });
-        }
-        const brand = await ThuongHieu.create({ ten_thuong_hieu: ten_thuong_hieu.trim() });
-        res.json({ success: true, data: brand });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.addUnit = async (req, res, next) => {
-    try {
-        const { ten_don_vi } = req.body || {};
-        if (!ten_don_vi || ten_don_vi.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Thiếu tên đơn vị tính' });
-        }
-        const unit = await DonViTinh.create({ ten_don_vi: ten_don_vi.trim() });
-        res.json({ success: true, data: unit });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.addLocation = async (req, res, next) => {
-    try {
-        const { ten_vi_tri } = req.body || {};
-        if (!ten_vi_tri || ten_vi_tri.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Thiếu tên vị trí' });
-        }
-        const location = await ViTri.create({ ten_vi_tri: ten_vi_tri.trim() });
-        res.json({ success: true, data: location });
+        res.redirect('/hang-hoa/thiet-lap-gia?success=created_bang_gia');
     } catch (error) {
         next(error);
     }

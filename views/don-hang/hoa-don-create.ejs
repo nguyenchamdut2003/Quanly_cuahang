@@ -464,6 +464,11 @@
             <div class="total-line"><strong>Khách cần trả</strong><strong class="payable" id="grandTotal">0</strong>
             </div>
           </div>
+          <div class="delivery-row" style="margin-top:16px">
+            <label>PhÃ­ giao hÃ ng</label>
+            <input id="shippingFee" class="delivery-input" value="0" inputmode="numeric" oninput="handleManualShippingFee()">
+            <div class="delivery-help" id="shippingFeeHelp">CÃ³ thá»ƒ nháº­p tay náº¿u chÆ°a cÃ³ báº£ng giÃ¡.</div>
+          </div>
         </div>
       </section>
       <section class="middle">
@@ -478,13 +483,16 @@
         <input type="hidden" id="customerId">
         <div class="section-line">
           <div class="marker"><i class="fa-solid fa-circle-dot"></i></div>
-          <div><select id="pickupStoreId" class="line-input" onchange="renderPickupStore()" style="width:100%">
+          <div><select id="pickupStoreId" class="line-input" onchange="handlePickupStoreChange()" style="width:100%">
               <% stores.forEach(s=> { %><option value="<%= s._id %>">
                   <%= s.ten_cua_hang %> - <%= s.sdt || 'Chưa có SĐT' %>
                 </option>
                 <% }) %>
             </select>
             <div class="muted-red" id="pickupInfo"></div>
+            <select id="khoId" class="line-input" style="width:100%;margin-top:12px" disabled>
+              <option value="">Vui lòng chọn cửa hàng trước</option>
+            </select>
           </div>
         </div>
         <div class="section-line">
@@ -496,10 +504,11 @@
                 <% customers.forEach(c=> {
                   const defaultAddress = (c.dia_chi_list || []).find(a => a.mac_dinh) || (c.dia_chi_list || [])[0] || {};
                   const optionPhone = c.sdt || c.sdt2 || '';
-                  const optionAddress = defaultAddress.dia_chi || c.dia_chi_nhan || '';
+                  const optionAddress = defaultAddress.dia_chi || defaultAddress.dia_chi_day_du || c.dia_chi_nhan || '';
+                  const optionAddressId = defaultAddress._id || '';
                   const optionArea = defaultAddress.quan_huyen || defaultAddress.tinh_thanh || c.quan_huyen || c.tinh_thanh || '';
                   const optionWard = defaultAddress.phuong_xa || c.phuong_xa || '';
-                %><option value="<%= c._id %>" data-name="<%= c.ten_khach_hang || '' %>" data-phone="<%= optionPhone %>" data-address="<%= optionAddress %>" data-area="<%= optionArea %>" data-ward="<%= optionWard %>">
+                %><option value="<%= c._id %>" data-name="<%= c.ten_khach_hang || '' %>" data-phone="<%= optionPhone %>" data-address="<%= optionAddress %>" data-address-id="<%= optionAddressId %>" data-area="<%= optionArea %>" data-ward="<%= optionWard %>">
                     <%= c.ten_khach_hang %>
                   </option>
                   <% }) %>
@@ -547,8 +556,9 @@
     <script>
       let cart = [];
       let codEnabled = false;
+      let shippingFeeManuallyEdited = false;
       const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang, ten_hang: p.ten_hang, gia_ban: p.gia_ban || 0, ton_kho: p.ton_kho || 0 }))) %>;
-      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ dia_chi: a.dia_chi || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
+      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi: a.dia_chi || a.dia_chi_day_du || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
       const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi || '', dia_chi_gui_hang: s.dia_chi_gui_hang || '', tinh_thanh: s.tinh_thanh || '', quan_huyen: s.quan_huyen || '', phuong_xa: s.phuong_xa || '' }))) %>;
       const fmt = n => Number(n || 0).toLocaleString('vi-VN');
       const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
@@ -557,7 +567,7 @@
       productSearch.addEventListener('focus', renderProductSuggestions);
       productSearch.addEventListener('input', renderProductSuggestions);
       function addProduct(id) { const p = products.find(x => x._id === id); if (!p) return; const ex = cart.find(i => i.hang_hoa_id === id); if (ex) ex.so_luong++; else cart.push({ hang_hoa_id: id, ma_hang: p.ma_hang, ten_hang: p.ten_hang, so_luong: 1, don_gia_ban: p.gia_ban }); productSearch.value = ''; productResults.style.display = 'none'; renderCart(); }
-      function renderCart() { let subtotal = 0; cartBody.innerHTML = cart.map((i, idx) => { const line = i.so_luong * i.don_gia_ban; subtotal += line; return `<tr><td>${idx + 1}</td><td>${i.ma_hang}</td><td>${i.ten_hang}</td><td class="num"><input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)"></td><td class="num">${fmt(i.don_gia_ban)}</td><td class="num">${fmt(line)}</td><td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td></tr>` }).join(''); const total = Math.max(subtotal - num(discount.value), 0); document.getElementById('subtotal').textContent = fmt(subtotal); grandTotal.textContent = fmt(total); renderCod(); }
+      function renderCart() { let subtotal = 0; cartBody.innerHTML = cart.map((i, idx) => { const line = i.so_luong * i.don_gia_ban; subtotal += line; return `<tr><td>${idx + 1}</td><td>${i.ma_hang}</td><td>${i.ten_hang}</td><td class="num"><input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)"></td><td class="num">${fmt(i.don_gia_ban)}</td><td class="num">${fmt(line)}</td><td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td></tr>` }).join(''); const total = Math.max(subtotal - num(discount.value) + num(shippingFee.value), 0); document.getElementById('subtotal').textContent = fmt(subtotal); grandTotal.textContent = fmt(total); renderCod(); }
       function toggleCod() { codEnabled = !codEnabled; renderCod(); }
       function renderCod() { const total = num(grandTotal.textContent); codToggle.classList.toggle('on', codEnabled); codTotal.textContent = fmt(codEnabled ? total : 0); }
       function updQty(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.so_luong = num(v); renderCart() } function removeProduct(id) { cart = cart.filter(i => i.hang_hoa_id !== id); renderCart() }
@@ -599,11 +609,13 @@
           const opt = document.createElement('option');
           opt.value = data.address || '';
           opt.textContent = [data.address, data.ward, data.area].filter(Boolean).join(', ') || 'Địa chỉ khách hàng';
+          opt.dataset.addressId = data.addressId || '';
           opt.dataset.area = data.area || '';
           opt.dataset.ward = data.ward || '';
           opt.selected = true;
           els.recipientAddressSelect.appendChild(opt);
         }
+        calculateShippingFee();
       }
       function fillRecipientFromCustomer(customer) {
         if (!customer) return applyRecipientData();
@@ -613,6 +625,7 @@
           name: customer.ten_khach_hang || '',
           phone: customer.sdt || customer.sdt2 || '',
           address: a.dia_chi || customer.dia_chi_nhan || '',
+          addressId: a._id || '',
           area: a.quan_huyen || a.tinh_thanh || customer.quan_huyen || customer.tinh_thanh || '',
           ward: a.phuong_xa || customer.phuong_xa || ''
         });
@@ -628,6 +641,7 @@
           name: opt?.dataset?.name || c?.ten_khach_hang || '',
           phone: opt?.dataset?.phone || c?.sdt || c?.sdt2 || '',
           address: opt?.dataset?.address || a.dia_chi || c?.dia_chi_nhan || '',
+          addressId: opt?.dataset?.addressId || a._id || '',
           area: opt?.dataset?.area || a.quan_huyen || a.tinh_thanh || c?.quan_huyen || c?.tinh_thanh || '',
           ward: opt?.dataset?.ward || a.phuong_xa || c?.phuong_xa || ''
         });
@@ -638,12 +652,64 @@
         document.getElementById('recipientAddress').value = select.value;
         document.getElementById('recipientArea').value = opt?.dataset?.area || '';
         document.getElementById('recipientWard').value = opt?.dataset?.ward || '';
+        calculateShippingFee();
+      }
+      function getRecipientAddressId() {
+        const select = document.getElementById('recipientAddressSelect');
+        const opt = select.options[select.selectedIndex];
+        return opt?.dataset?.addressId || '';
+      }
+      function getShippingEndPoint() {
+        return [recipientAddress.value, recipientWard.value, recipientArea.value].filter(Boolean).join(', ');
+      }
+      function handleManualShippingFee() {
+        shippingFeeManuallyEdited = true;
+        renderCart();
+      }
+      async function calculateShippingFee() {
+        if (!partnerId.value || !pickupStoreId.value || !customerId.value || !getRecipientAddressId()) return;
+        try {
+          const res = await fetch('/api/giao-hang/tinh-phi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cua_hang_id: pickupStoreId.value,
+              khach_hang_id: customerId.value,
+              dia_chi_khach_hang_id: getRecipientAddressId(),
+              doi_tac_giao_hang_id: partnerId.value,
+              diem_den: getShippingEndPoint()
+            })
+          });
+          const result = await res.json();
+          if (!result.success) throw new Error(result.message || 'KhÃ´ng tÃ­nh Ä‘Æ°á»£c phÃ­ giao hÃ ng');
+          if (!shippingFeeManuallyEdited) shippingFee.value = fmt(result.phi_giao_hang || 0);
+          shippingFeeHelp.textContent = result.loai_tinh_phi ? 'Tá»± tÃ­nh phÃ­. CÃ³ thá»ƒ sá»­a tay.' : 'ChÆ°a cÃ³ báº£ng giÃ¡ phÃ¹ há»£p, cÃ³ thá»ƒ nháº­p tay.';
+          renderCart();
+        } catch (error) {
+          shippingFeeHelp.textContent = error.message || 'KhÃ´ng tÃ­nh Ä‘Æ°á»£c phÃ­ giao hÃ ng, cÃ³ thá»ƒ nháº­p tay.';
+        }
       }
       function renderPickupStore() { const s = stores.find(x => x._id === pickupStoreId.value); if (!s) return; storeName.textContent = s.ten_cua_hang; const addr = s.dia_chi_gui_hang || addressText(s) || 'Chưa có địa chỉ lấy hàng'; pickupInfo.textContent = `${s.sdt || 'Chưa có SĐT'} - ${addr}`; }
+      async function loadKhoByStore() {
+        const khoSelect = document.getElementById('khoId');
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>';
+        khoSelect.disabled = true;
+        if (!pickupStoreId.value) return;
+        try {
+          const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(pickupStoreId.value));
+          const result = await res.json();
+          const warehouses = result.success ? (result.data || []) : [];
+          khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
+          khoSelect.disabled = false;
+        } catch (error) {
+          khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+        }
+      }
+      function handlePickupStoreChange() { renderPickupStore(); loadKhoByStore(); }
       function togglePartnerMenu() { partnerPicker.classList.toggle('open'); }
-      function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); }
-      async function saveOrder() { if (!cart.length) return alert('Hóa đơn chưa có sản phẩm'); if (!partnerId.value) return alert('Vui lòng chọn đối tác giao hàng'); const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value); const noteInput = document.getElementById('deliveryNote'); const data = { khach_hang_id: customerId.value, cua_hang_id: pickupStoreId.value, items: cart, chiet_khau: num(discount.value), phi_van_chuyen: 0, ghi_chu: '', doi_tac_giao_hang_id: partnerId.value, ten_nguoi_nhan: recipientCustomer ? recipientCustomer.ten_khach_hang : '', sdt_nguoi_nhan: recipientPhone.value, dia_chi_nhan: [recipientAddress.value, recipientWard.value, recipientArea.value].filter(Boolean).join(', '), ghi_chu_giao_hang: noteInput ? noteInput.value : '', thu_ho_cod: codEnabled }; try { const res = await fetch('/don-hang/hoa-don/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!result.success) return alert(result.message || 'Không tạo được hóa đơn'); window.location.href = '/don-hang/hoa-don'; } catch (err) { alert('Lỗi khi tạo hóa đơn'); } }
-      document.addEventListener('DOMContentLoaded', () => { renderPickupStore(); renderCod(); });
+      function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); shippingFeeManuallyEdited = false; calculateShippingFee(); }
+      async function saveOrder() { if (!cart.length) return alert('Hóa đơn chưa có sản phẩm'); if (!partnerId.value) return alert('Vui lòng chọn đối tác giao hàng'); if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.'); const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value); const noteInput = document.getElementById('deliveryNote'); const data = { khach_hang_id: customerId.value, cua_hang_id: pickupStoreId.value, kho_id: document.getElementById('khoId').value, items: cart, chiet_khau: num(discount.value), phi_van_chuyen: num(shippingFee.value), ghi_chu: '', doi_tac_giao_hang_id: partnerId.value, dia_chi_khach_hang_id: getRecipientAddressId(), ten_nguoi_nhan: recipientCustomer ? recipientCustomer.ten_khach_hang : '', sdt_nguoi_nhan: recipientPhone.value, dia_chi_nhan: [recipientAddress.value, recipientWard.value, recipientArea.value].filter(Boolean).join(', '), ghi_chu_giao_hang: noteInput ? noteInput.value : '', thu_ho_cod: codEnabled }; try { const res = await fetch('/don-hang/hoa-don/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!result.success) return alert(result.message || 'Không tạo được hóa đơn'); window.location.href = '/don-hang/hoa-don'; } catch (err) { alert('Lỗi khi tạo hóa đơn'); } }
+      document.addEventListener('DOMContentLoaded', () => { renderPickupStore(); loadKhoByStore(); renderCod(); });
       document.addEventListener('click', e => { if (!partnerPicker.contains(e.target)) partnerPicker.classList.remove('open'); });
     </script>
 </body>

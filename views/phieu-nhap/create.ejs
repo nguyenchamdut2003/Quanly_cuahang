@@ -108,6 +108,11 @@
         </select>
         <input id="importDate" class="date-input" value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>">
       </div>
+      <div class="right-row">
+        <select id="khoId" class="select-like" disabled>
+          <option value="">Vui lòng chọn cửa hàng trước</option>
+        </select>
+      </div>
       <div class="supplier-search">
         <input id="supplierSearch" placeholder="Tìm nhà cung cấp">
         <i class="fa-solid fa-plus"></i>
@@ -135,6 +140,28 @@
     const suppliers = <%- JSON.stringify(suppliers.map(s => ({ _id:String(s._id), ma_ncc:s.ma_ncc, ten_ncc:s.ten_ncc, sdt:s.sdt || '' }))) %>;
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
     const numeric = v => Number(String(v || '').replace(/\./g,'').replace(/,/g,'').trim()) || 0;
+    const storeSelect = document.getElementById('storeId');
+    const khoSelect = document.getElementById('khoId');
+
+    async function loadKhoByStore() {
+      const storeId = storeSelect.value;
+      khoSelect.innerHTML = '<option value="">Chọn kho</option>';
+      khoSelect.disabled = true;
+      if (!storeId) return;
+
+      try {
+        const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
+        const result = await res.json();
+        const warehouses = result.success ? (result.data || []) : [];
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
+        khoSelect.disabled = false;
+      } catch (error) {
+        khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+      }
+    }
+
+    storeSelect.addEventListener('change', loadKhoByStore);
+    document.addEventListener('DOMContentLoaded', loadKhoByStore);
 
     const productSearch = document.getElementById('productSearch');
     const searchResults = document.getElementById('searchResults');
@@ -208,9 +235,11 @@
       const supplierId = document.getElementById('supplierId').value;
       if (!supplierId) return alert('Vui lòng chọn nhà cung cấp');
       if (!selectedItems.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
+      if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
       const data = {
         nha_cung_cap_id: supplierId,
         cua_hang_id: document.getElementById('storeId').value,
+        kho_id: document.getElementById('khoId').value,
         ma_phieu_nhap: document.getElementById('receiptCode').value,
         ngay_nhap: new Date().toISOString(),
         ghi_chu: document.getElementById('note').value,

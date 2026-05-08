@@ -3,47 +3,279 @@
   <head>
     <title><%= title %></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel='stylesheet' href='/stylesheets/style.css' />
+    <link rel="stylesheet" href="/stylesheets/style.css">
+    <style>
+      body{background:#f2f4f7}
+      .kk-page{height:calc(100vh - 98px);display:grid;grid-template-columns:242px minmax(0,1fr);gap:10px;padding:8px 6px 0}
+      .kk-sidebar{background:#fff;border-radius:8px;padding:14px 12px;overflow:auto}
+      .kk-main{min-width:0;display:flex;flex-direction:column}
+      .kk-top{height:40px;display:grid;grid-template-columns:240px minmax(260px,470px) 1fr auto;align-items:center;gap:8px}
+      .kk-title{font-size:20px;font-weight:800;color:#050505}
+      .kk-search{height:30px;border:1px solid #c7d0dc;border-radius:7px;background:#fff;display:flex;align-items:center;padding:0 10px;gap:8px}
+      .kk-search input{border:0;outline:0;flex:1;font-size:14px}
+      .kk-search button{border:0;background:transparent;color:#344054;cursor:pointer}
+      .kk-actions{display:flex;align-items:center;gap:8px}
+      .kk-btn{height:30px;border:1px solid #c7d0dc;background:#fff;border-radius:7px;color:#1f2937;padding:0 11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+      .kk-btn.primary{border-color:#006dff;color:#006dff}
+      .kk-icon{width:30px;height:30px;border:1px solid #c7d0dc;border-radius:7px;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#344054}
+      .filter-title{font-size:14px;font-weight:800;margin:0 0 10px;color:#050505}
+      .filter-block{margin-bottom:20px}
+      .radio-row,.check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px;color:#111827}
+      .radio-row input,.check-row input{width:15px;height:15px;accent-color:#0070f4}
+      .filter-line{height:30px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 9px;color:#111827}
+      .filter-line input,.filter-line select{border:0;outline:0;width:100%;height:28px;background:transparent;color:#667085}
+      .date-range{display:none;margin:8px 0 0 23px;gap:6px}
+      .date-range.show{display:grid}
+      .kk-table-wrap{background:#fff;flex:1;overflow:auto}
+      .kk-table{width:100%;min-width:1180px;border-collapse:collapse;font-size:13px}
+      .kk-table th{height:37px;background:#e8f3ff;border-bottom:1px solid #a8cdfc;text-align:left;color:#050505;font-weight:800;padding:0 10px;white-space:nowrap}
+      .kk-table td{height:42px;border-bottom:1px solid #e5e7eb;padding:0 10px;vertical-align:top}
+      .kk-table .num{text-align:right}
+      .select-col{width:26px;text-align:center}
+      .row-check{width:14px;height:14px;accent-color:#0070f4}
+      .ticket-row{cursor:pointer}
+      .ticket-row.active{outline:2px solid #006dff;outline-offset:-2px}
+      .star{color:#8391a7;font-size:16px}
+      .note-cell{max-width:120px;white-space:normal;line-height:20px;padding-top:8px!important}
+      .detail-row{display:none}
+      .detail-row.open{display:table-row}
+      .detail-cell{padding:0!important;border:2px solid #006dff!important;border-top:0!important;background:#fff}
+      .detail-panel{padding:12px 22px 16px}
+      .detail-tab{display:inline-flex;height:28px;align-items:center;border-bottom:2px solid #006dff;color:#006dff;font-weight:700;margin-bottom:14px}
+      .detail-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin:0 0 14px}
+      .status-pill{font-size:13px;color:#047857;background:#dcfce7;border-radius:4px;padding:3px 7px;font-weight:700}
+      .detail-meta{display:flex;gap:12px;align-items:center;font-size:14px;margin:8px 0;color:#111827}
+      .meta-sep{height:14px;width:1px;background:#d1d5db}
+      .detail-table{width:100%;border-collapse:collapse;margin-top:38px;font-size:13px}
+      .detail-table th{height:34px;background:#f0f1f3;border-bottom:1px solid #cfd5dd;text-align:left;padding:0 10px}
+      .detail-table td{height:39px;border-bottom:0;padding:0 10px}
+      .detail-table .num{text-align:right}
+      .filter-input{height:30px;border:1px solid #cbd5e1;border-radius:6px;padding:0 10px;color:#667085;width:100%;max-width:200px}
+      .product-code{color:#006dff;text-decoration:none}
+      .detail-bottom{display:grid;grid-template-columns:minmax(360px,1fr) 330px;gap:28px;margin-top:14px;align-items:start}
+      .detail-note{height:92px;border:1px solid #cbd5e1;border-radius:7px;padding:10px 12px;color:#667085}
+      .detail-total{display:grid;grid-template-columns:1fr 90px;gap:12px;font-size:14px;line-height:30px}
+      .detail-actions{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;margin-top:16px;padding-top:16px}
+      .detail-action-left,.detail-action-right{display:flex;gap:26px;align-items:center}
+      .detail-link-btn{border:0;background:transparent;color:#111827;font-weight:700;display:inline-flex;gap:7px;align-items:center;cursor:pointer}
+      .small-outline{height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:0 12px;display:inline-flex;align-items:center;gap:7px;font-weight:700}
+      .kk-footer{height:34px;display:flex;align-items:center;gap:6px;font-size:13px;color:#344054}
+      .page-size{height:24px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:0 25px 0 8px}
+      .empty-row{height:140px!important;text-align:center;color:#667085}
+    </style>
   </head>
   <body>
     <%- include('../partials/header') %>
+    <%
+      const safeFilters = locals.filters || {};
+      const selectedStatuses = safeFilters.trang_thai || [];
+      const fmtNumber = n => Number(n || 0).toLocaleString('vi-VN');
+      const fmtDateTime = d => d ? new Date(d).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+    %>
+    <form id="kkFilterForm" class="kk-page" method="GET" action="/kiem-kho">
+      <aside class="kk-sidebar">
+        <div class="filter-block">
+          <div class="filter-title">Ngày tạo</div>
+          <label class="radio-row">
+            <input type="radio" name="date_mode" value="this_month" <%= safeFilters.date_mode !== 'custom' ? 'checked' : '' %> onchange="toggleDateRange();this.form.submit()">
+            <span class="filter-line" style="flex:1">Tháng này <i class="fa-solid fa-chevron-right"></i></span>
+          </label>
+          <label class="radio-row">
+            <input type="radio" name="date_mode" value="custom" <%= safeFilters.date_mode === 'custom' ? 'checked' : '' %> onchange="toggleDateRange()">
+            <span class="filter-line" style="flex:1">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span>
+          </label>
+          <div id="dateRange" class="date-range <%= safeFilters.date_mode === 'custom' ? 'show' : '' %>">
+            <div class="filter-line"><input type="date" name="from_date" value="<%= safeFilters.from_date || '' %>"></div>
+            <div class="filter-line"><input type="date" name="to_date" value="<%= safeFilters.to_date || '' %>"></div>
+          </div>
+        </div>
 
-    <div style="padding: 20px; max-width: 1200px; margin: 0 auto;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h1>Danh sách phiếu kiểm kho</h1>
-        <a href="/kiem-kho/create" class="btn-ban-hang" style="background: #0070f4; color: #fff; text-decoration: none;">+ Kiểm kho</a>
-      </div>
+        <div class="filter-block">
+          <div class="filter-title">Trạng thái</div>
+          <label class="check-row"><input type="checkbox" name="trang_thai" value="pending" <%= selectedStatuses.includes('pending') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
+          <label class="check-row"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã cân bằng kho</label>
+          <label class="check-row"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+        </div>
 
-      <table class="kv-table">
-        <thead>
-          <tr>
-            <th>Mã phiếu</th>
-            <th>Ngày kiểm</th>
-            <th>Cửa hàng</th>
-            <th>Người tạo</th>
-            <th style="text-align: right;">SL Thực tế</th>
-            <th style="text-align: right;">SL Lệch</th>
-            <th>Trạng thái</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% tickets.forEach(t => { %>
-            <tr class="main-row">
-              <td><strong><%= t.ma_kiem_kho %></strong></td>
-              <td><%= new Date(t.ngay_kiem).toLocaleDateString('vi-VN') %></td>
-              <td><%= t.cua_hang_id ? t.cua_hang_id.ten_cua_hang : 'N/A' %></td>
-              <td><%= t.nguoi_tao_id ? t.nguoi_tao_id.ho_ten : 'N/A' %></td>
-              <td style="text-align: right;"><%= t.tong_so_luong_thuc_te || 0 %></td>
-              <td style="text-align: right; color: <%= (t.tong_so_luong_lech || 0) !== 0 ? '#ff4d4f' : '#52c41a' %>">
-                <%= (t.tong_so_luong_lech || 0) > 0 ? '+' + (t.tong_so_luong_lech || 0) : (t.tong_so_luong_lech || 0) %>
-              </td>
-              <td>
-                <span class="badge" style="background: #52c41a; position: static;">Hoàn thành</span>
-              </td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
+        <div class="filter-block">
+          <div class="filter-title">Người tạo</div>
+          <div class="filter-line">
+            <select name="nguoi_tao_id" onchange="this.form.submit()">
+              <option value="">Chọn người tạo</option>
+              <% (users || []).forEach(u => { %>
+                <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao_id || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.username || u.email %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+      </aside>
+
+      <main class="kk-main">
+        <div class="kk-top">
+          <div class="kk-title">Phiếu kiểm kho</div>
+          <div class="kk-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu kiểm">
+            <button type="submit"><i class="fa-solid fa-sliders"></i></button>
+          </div>
+          <div></div>
+          <div class="kk-actions">
+            <a class="kk-btn primary" href="/kiem-kho/create"><i class="fa-solid fa-plus"></i> Kiểm kho</a>
+            <a class="kk-btn" href="/kiem-kho/export.csv?<%= new URLSearchParams(safeFilters).toString() %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
+            <span class="kk-icon"><i class="fa-solid fa-list"></i></span>
+            <span class="kk-icon"><i class="fa-solid fa-gear"></i></span>
+            <span class="kk-icon"><i class="fa-regular fa-circle-question"></i></span>
+          </div>
+        </div>
+
+        <div class="kk-table-wrap">
+          <table class="kk-table">
+            <thead>
+              <tr>
+                <th class="select-col"><input class="row-check" type="checkbox"></th>
+                <th style="width:36px"><i class="fa-regular fa-star star"></i></th>
+                <th>Mã kiểm kho</th>
+                <th>Thời gian</th>
+                <th>Ngày cân bằng</th>
+                <th class="num">SL thực tế</th>
+                <th class="num">Tổng thực tế</th>
+                <th class="num">Tổng chênh lệch</th>
+                <th class="num">SL lệch tăng</th>
+                <th class="num">SL lệch giảm</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!tickets.length) { %>
+                <tr><td class="empty-row" colspan="11">Không tìm thấy phiếu kiểm kho phù hợp</td></tr>
+              <% } %>
+              <% tickets.forEach((t, index) => {
+                const summary = t.summary || {};
+                const detailItems = summary.items || [];
+                const statusCompleted = t.trang_thai === 'completed';
+                const creatorName = t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || t.nguoi_tao_id.username || t.nguoi_tao_id.email || '') : '';
+                const statusText = statusCompleted ? 'Đã cân bằng kho' : (t.trang_thai === 'cancelled' ? 'Đã hủy' : 'Phiếu tạm');
+              %>
+                <tr class="ticket-row <%= index === 0 ? 'active' : '' %>" data-detail-id="detail-<%= t._id %>" onclick="toggleTicketDetail('<%= t._id %>')">
+                  <td class="select-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td>
+                  <td><i class="fa-regular fa-star star"></i></td>
+                  <td><%= t.ma_kiem_kho || '' %></td>
+                  <td><%= fmtDateTime(t.ngay_kiem || t.created_at) %></td>
+                  <td><%= statusCompleted ? fmtDateTime(t.updated_at || t.ngay_kiem || t.created_at) : '' %></td>
+                  <td class="num"><%= fmtNumber(t.tong_so_luong_thuc_te || summary.actual) %></td>
+                  <td class="num"><%= fmtNumber(t.tong_gia_tri_thuc_te || 0) %></td>
+                  <td class="num"><%= fmtNumber(t.tong_so_luong_lech || 0) %></td>
+                  <td class="num"><%= fmtNumber(summary.positive || 0) %></td>
+                  <td class="num"><%= fmtNumber(summary.negative || 0) %></td>
+                  <td class="note-cell"><%= t.ghi_chu || '' %></td>
+                </tr>
+                <tr id="detail-<%= t._id %>" class="detail-row <%= index === 0 ? 'open' : '' %>">
+                  <td class="detail-cell" colspan="11">
+                    <div class="detail-panel">
+                      <div class="detail-tab">Thông tin</div>
+                      <div class="detail-title">
+                        <span><%= t.ma_kiem_kho || '' %></span>
+                        <span class="status-pill"><%= statusText %></span>
+                      </div>
+                      <div class="detail-meta">
+                        <span>Người tạo: <strong><%= creatorName || 'N/A' %></strong></span>
+                        <span class="meta-sep"></span>
+                        <span>Ngày tạo: <%= fmtDateTime(t.ngay_kiem || t.created_at) %></span>
+                      </div>
+                      <div class="detail-meta">
+                        <span>Người cân bằng: <strong><%= statusCompleted ? (creatorName || 'N/A') : '' %></strong></span>
+                        <span class="meta-sep"></span>
+                        <span>Ngày cân bằng: <%= statusCompleted ? fmtDateTime(t.updated_at || t.ngay_kiem || t.created_at) : '' %></span>
+                      </div>
+
+                      <table class="detail-table">
+                        <thead>
+                          <tr>
+                            <th style="width:200px">Mã hàng</th>
+                            <th>Tên hàng</th>
+                            <th class="num" style="width:120px">Tồn kho</th>
+                            <th class="num" style="width:120px">Thực tế</th>
+                            <th class="num" style="width:120px">SL lệch</th>
+                            <th class="num" style="width:140px">Giá trị lệch</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td><input class="filter-input" placeholder="Tìm mã hàng"></td>
+                            <td><input class="filter-input" placeholder="Tìm tên hàng"></td>
+                            <td></td><td></td><td></td><td></td>
+                          </tr>
+                          <% detailItems.forEach(item => {
+                            const product = item.hang_hoa_id || {};
+                          %>
+                            <tr>
+                              <td><a class="product-code" href="/hang-hoa"><%= product.ma_hang || '' %></a></td>
+                              <td><%= product.ten_hang || '' %></td>
+                              <td class="num"><%= fmtNumber(item.ton_kho_he_thong || 0) %></td>
+                              <td class="num"><%= fmtNumber(item.so_luong_thuc_te || 0) %></td>
+                              <td class="num"><%= fmtNumber(item.so_luong_lech || 0) %></td>
+                              <td class="num"><%= fmtNumber(item.gia_tri_lech || 0) %></td>
+                            </tr>
+                          <% }) %>
+                        </tbody>
+                      </table>
+
+                      <div class="detail-bottom">
+                        <div class="detail-note"><%= t.ghi_chu || 'Ghi chú...' %></div>
+                        <div class="detail-total">
+                          <span>Tổng thực tế (<%= fmtNumber(t.tong_so_luong_thuc_te || summary.actual) %>):</span><strong class="num"><%= fmtNumber(t.tong_gia_tri_thuc_te || 0) %></strong>
+                          <span>Tổng lệch tăng (<%= fmtNumber(summary.positive || 0) %>):</span><strong class="num"><%= fmtNumber(0) %></strong>
+                          <span>Tổng lệch giảm (<%= fmtNumber(summary.negative || 0) %>):</span><strong class="num"><%= fmtNumber(0) %></strong>
+                          <span>Tổng chênh lệch (<%= fmtNumber(t.tong_so_luong_lech || 0) %>):</span><strong class="num"><%= fmtNumber(t.tong_gia_tri_lech || summary.value || 0) %></strong>
+                        </div>
+                      </div>
+
+                      <div class="detail-actions">
+                        <div class="detail-action-left">
+                          <button class="detail-link-btn" type="button"><i class="fa-regular fa-trash-can"></i> Hủy</button>
+                          <button class="detail-link-btn" type="button"><i class="fa-regular fa-copy"></i> Sao chép</button>
+                          <button class="detail-link-btn" type="button"><i class="fa-solid fa-file-export"></i> Xuất file</button>
+                        </div>
+                        <div class="detail-action-right">
+                          <button class="small-outline" type="button"><i class="fa-regular fa-floppy-disk"></i> Lưu</button>
+                          <button class="small-outline" type="button"><i class="fa-solid fa-print"></i> In</button>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="kk-footer">
+          <span>Hiển thị</span>
+          <select class="page-size" name="page_size" onchange="this.form.submit()">
+            <% ['15','30','50','100'].forEach(size => { %>
+              <option value="<%= size %>" <%= String(safeFilters.page_size || '15') === size ? 'selected' : '' %>><%= size %> dòng</option>
+            <% }) %>
+          </select>
+        </div>
+      </main>
+    </form>
+    <script>
+      function toggleDateRange() {
+        const custom = document.querySelector('input[name="date_mode"][value="custom"]').checked;
+        document.getElementById('dateRange').classList.toggle('show', custom);
+      }
+      function toggleTicketDetail(id) {
+        const detail = document.getElementById('detail-' + id);
+        const row = document.querySelector(`[data-detail-id="detail-${id}"]`);
+        if (!detail || !row) return;
+        const willOpen = !detail.classList.contains('open');
+        document.querySelectorAll('.detail-row.open').forEach(item => item.classList.remove('open'));
+        document.querySelectorAll('.ticket-row.active').forEach(item => item.classList.remove('active'));
+        if (willOpen) {
+          detail.classList.add('open');
+          row.classList.add('active');
+        }
+      }
+    </script>
   </body>
 </html>

@@ -311,7 +311,7 @@
       <div class="pos-right">
         <div class="customer-box">
           <label><i class="fa-solid fa-user"></i> Khách hàng</label>
-          <select id="customerId" onchange="fillRecipientFromCustomer()" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ddd;">
+          <select id="customerId" onchange="shippingFeeManuallyEdited = false; fillRecipientFromCustomer()" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ddd;">
             <option value="">Chọn khách hàng</option>
             <% customers.forEach(c => { %>
               <option value="<%= c._id %>"><%= c.ten_khach_hang %></option>
@@ -323,7 +323,7 @@
           <div class="delivery-tab"><i class="fa-solid fa-truck-fast"></i> Tự giao hàng</div>
           <div class="delivery-row">
             <label>Đối tác giao hàng</label>
-            <select id="deliveryPartnerId" class="delivery-input">
+            <select id="deliveryPartnerId" class="delivery-input" onchange="shippingFeeManuallyEdited = false; calculateShippingFee()">
               <option value="">Chọn đối tác</option>
               <% (locals.partners || []).forEach(p => { %>
                 <option value="<%= p._id %>"><%= p.ten_doi_tac %></option>
@@ -332,12 +332,18 @@
           </div>
           <div class="delivery-row">
             <label>Nơi lấy hàng</label>
-            <select id="pickupStoreId" class="delivery-input" onchange="renderStoreInfo()">
+            <select id="pickupStoreId" class="delivery-input" onchange="handleStoreChange()">
               <% stores.forEach(s => { %>
                 <option value="<%= s._id %>"><%= s.ten_cua_hang %> - <%= s.sdt || 'Chưa có SĐT' %></option>
               <% }) %>
             </select>
             <div class="store-info" id="storeInfo"></div>
+          </div>
+          <div class="delivery-row">
+            <label>Kho</label>
+            <select id="khoId" class="delivery-input" disabled>
+              <option value="">Vui lòng chọn cửa hàng trước</option>
+            </select>
           </div>
           <div class="delivery-row">
             <label>Người nhận</label>
@@ -370,7 +376,7 @@
           </div>
           <div class="pay-item">
             <span>Phí vận chuyển:</span>
-            <input type="number" id="shipFee" class="input-pos" value="0" style="width: 100px;" onchange="updateSummary()">
+            <input type="number" id="shipFee" class="input-pos" value="0" style="width: 100px;" oninput="shippingFeeManuallyEdited = true; updateSummary()">
           </div>
           
           <div class="pay-total">
@@ -394,6 +400,7 @@
 
     <script>
       let cart = [];
+      let shippingFeeManuallyEdited = false;
       const products = <%- JSON.stringify(products) %>;
       const draftOrders = <%- JSON.stringify(locals.draftOrders || []) %>;
       const customersData = <%- JSON.stringify(customers.map(c => ({
@@ -402,7 +409,8 @@
         sdt: c.sdt || '',
         dia_chi_nhan: c.dia_chi_nhan || '',
         dia_chi_list: (c.dia_chi_list || []).map(a => ({
-          dia_chi: a.dia_chi || '',
+          _id: String(a._id || ''),
+          dia_chi: a.dia_chi || a.dia_chi_day_du || '',
           tinh_thanh: a.tinh_thanh || '',
           quan_huyen: a.quan_huyen || '',
           phuong_xa: a.phuong_xa || '',
@@ -441,7 +449,32 @@
         box.innerHTML = `<strong>${store.ten_cua_hang}</strong><br>SĐT: ${store.sdt || 'Chưa có'}<br>Địa chỉ lấy hàng: ${address}`;
       }
 
-      function loadDraftOrder(id, button) {
+      async function loadKhoByStore(selectedKhoId = '') {
+        const storeId = document.getElementById('pickupStoreId').value;
+        const khoSelect = document.getElementById('khoId');
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>';
+        khoSelect.disabled = true;
+        if (!storeId) return;
+
+        try {
+          const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
+          const result = await res.json();
+          const warehouses = result.success ? (result.data || []) : [];
+          khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
+          khoSelect.disabled = false;
+          if (selectedKhoId) khoSelect.value = selectedKhoId;
+        } catch (error) {
+          khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+        }
+      }
+
+      function handleStoreChange() {
+        renderStoreInfo();
+        loadKhoByStore();
+        calculateShippingFee();
+      }
+
+      async function loadDraftOrder(id, button) {
         const draft = draftOrders.find(order => order._id === id);
         if (!draft) return;
         currentDraftId = id;
@@ -470,6 +503,7 @@
           if (draft.delivery.cua_hang_id) {
             document.getElementById('pickupStoreId').value = draft.delivery.cua_hang_id;
             renderStoreInfo();
+            await loadKhoByStore(draft.kho_id || '');
           }
           document.getElementById('recipientName').value = draft.delivery.ten_nguoi_nhan || document.getElementById('recipientName').value;
           document.getElementById('recipientPhone').value = draft.delivery.sdt_nguoi_nhan || document.getElementById('recipientPhone').value;
@@ -496,7 +530,7 @@
         document.getElementById('discount').value = 0;
         document.getElementById('shipFee').value = 0;
         document.getElementById('orderNote').value = '';
-        renderStoreInfo();
+        handleStoreChange();
         renderCart();
       }
 
@@ -521,6 +555,7 @@
           const opt = document.createElement('option');
           opt.value = value;
           opt.textContent = value || ('Địa chỉ ' + (index + 1));
+          opt.dataset.addressId = address._id || '';
           if (address.mac_dinh) opt.selected = true;
           addressSelect.appendChild(opt);
         });
@@ -529,6 +564,46 @@
 
       function selectRecipientAddress() {
         document.getElementById('recipientAddress').value = document.getElementById('recipientAddressSelect').value;
+        calculateShippingFee();
+      }
+
+      function selectedCustomerAddressId() {
+        const select = document.getElementById('recipientAddressSelect');
+        const opt = select.options[select.selectedIndex];
+        return opt?.dataset?.addressId || '';
+      }
+
+      function storeAddress() {
+        const store = storesData.find(s => s._id === document.getElementById('pickupStoreId').value);
+        return store ? (store.dia_chi_gui_hang || formatAddress(store) || store.ten_cua_hang || '') : '';
+      }
+
+      async function calculateShippingFee() {
+        if (shippingFeeManuallyEdited) return;
+        const customerId = document.getElementById('customerId').value;
+        const addressId = selectedCustomerAddressId();
+        const partnerId = document.getElementById('deliveryPartnerId').value;
+        const storeId = document.getElementById('pickupStoreId').value;
+        if (!customerId || !addressId || !partnerId || !storeId) return;
+        try {
+          const res = await fetch('/api/giao-hang/tinh-phi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              cua_hang_id: storeId,
+              khach_hang_id: customerId,
+              dia_chi_khach_hang_id: addressId,
+              doi_tac_giao_hang_id: partnerId,
+              diem_di: storeAddress(),
+              diem_den: document.getElementById('recipientAddress').value
+            })
+          });
+          const result = await res.json();
+          if (result.success) {
+            document.getElementById('shipFee').value = Number(result.phi_giao_hang || 0);
+            updateSummary();
+          }
+        } catch (_) {}
       }
 
       searchInput.addEventListener('input', function() {
@@ -622,11 +697,13 @@
         return {
           khach_hang_id: document.getElementById('customerId').value,
           cua_hang_id: document.getElementById('pickupStoreId').value,
+          kho_id: document.getElementById('khoId').value,
           items: cart,
           chiet_khau: Number(document.getElementById('discount').value),
           phi_van_chuyen: Number(document.getElementById('shipFee').value),
           ghi_chu: document.getElementById('orderNote').value,
           doi_tac_giao_hang_id: document.getElementById('deliveryPartnerId').value,
+          dia_chi_khach_hang_id: selectedCustomerAddressId(),
           ten_nguoi_nhan: document.getElementById('recipientName').value,
           sdt_nguoi_nhan: document.getElementById('recipientPhone').value,
           dia_chi_nhan: document.getElementById('recipientAddress').value,
@@ -636,6 +713,7 @@
 
       async function saveDraftOrder() {
         if (cart.length === 0) return alert("Đơn nháp chưa có sản phẩm");
+        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
 
         const data = collectOrderData();
         if (currentDraftId) data.draft_order_id = currentDraftId;
@@ -678,6 +756,7 @@
 
       async function checkout() {
         if (cart.length === 0) return alert("Đơn hàng trống");
+        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
 
         const data = collectOrderData();
         if (currentDraftId) data.draft_order_id = currentDraftId;
@@ -702,6 +781,7 @@
 
       document.addEventListener('DOMContentLoaded', function() {
         renderStoreInfo();
+        loadKhoByStore();
         fillRecipientFromCustomer();
         if (draftOrders.length) {
           loadDraftOrder(draftOrders[0]._id, document.querySelector('.draft-tab'));

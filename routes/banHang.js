@@ -5,6 +5,7 @@ const {
     DonHang, CTDonHang, HangHoa, KhachHang, DiaChiKhachHang,
     CuaHang, DoiTacGiaoHang, VanDon
 } = require('../models/kiot.model');
+const { luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
 
 router.use(isAuthenticated);
 
@@ -60,6 +61,7 @@ router.get('/', async (req, res, next) => {
                 ma_don_hang: order.ma_don_hang,
                 ngay_tao: order.ngay_tao || order.created_at,
                 khach_hang_id: order.khach_hang_id ? String(order.khach_hang_id._id) : '',
+                kho_id: order.kho_id ? String(order.kho_id) : '',
                 ten_khach_hang: order.khach_hang_id?.ten_khach_hang || 'Khách lẻ',
                 tong_tien_hang: order.tong_tien_hang || 0,
                 tong_thanh_toan: order.tong_thanh_toan || order.tong_tien || 0,
@@ -99,13 +101,16 @@ router.get('/', async (req, res, next) => {
 router.post('/add', async (req, res, next) => {
     try {
         const {
-            khach_hang_id, cua_hang_id, items, chiet_khau, phi_van_chuyen, ghi_chu,
-            doi_tac_giao_hang_id, ten_nguoi_nhan, sdt_nguoi_nhan, dia_chi_nhan, ghi_chu_giao_hang,
+            khach_hang_id, cua_hang_id, kho_id, items, chiet_khau, phi_van_chuyen, ghi_chu,
+            doi_tac_giao_hang_id, dia_chi_khach_hang_id, ten_nguoi_nhan, sdt_nguoi_nhan, dia_chi_nhan, ghi_chu_giao_hang,
             draft_order_id
         } = req.body;
 
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ success: false, message: 'Đơn hàng chưa có sản phẩm' });
+        }
+        if (!kho_id) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
         }
 
         let tong_tien_hang = 0;
@@ -114,6 +119,14 @@ router.post('/add', async (req, res, next) => {
         });
 
         const tong_thanh_toan = tong_tien_hang - Number(chiet_khau || 0) + Number(phi_van_chuyen || 0);
+        await luuPhiVanChuyenKhachHang({
+            cua_hang_id,
+            khach_hang_id,
+            dia_chi_khach_hang_id,
+            doi_tac_giao_hang_id,
+            phi_van_chuyen,
+            ghi_chu: ghi_chu_giao_hang
+        });
         let donHang;
 
         if (draft_order_id && /^[0-9a-fA-F]{24}$/.test(draft_order_id)) {
@@ -125,6 +138,7 @@ router.post('/add', async (req, res, next) => {
             donHang.set({
                 khach_hang_id: khach_hang_id || null,
                 cua_hang_id: cua_hang_id || null,
+                kho_id,
                 tong_tien: tong_thanh_toan,
                 tong_tien_hang,
                 tong_thanh_toan,
@@ -138,6 +152,7 @@ router.post('/add', async (req, res, next) => {
                 ma_don_hang,
                 khach_hang_id: khach_hang_id || null,
                 cua_hang_id: cua_hang_id || null,
+                kho_id,
                 nguoi_tao_id: req.user._id,
                 ngay_dat: new Date(),
                 ngay_tao: new Date(),
@@ -215,6 +230,14 @@ async function upsertDraftShipment(orderId, data) {
     }
 
     const shipment = await VanDon.findOne({ don_hang_id: orderId });
+    await luuPhiVanChuyenKhachHang({
+        cua_hang_id,
+        khach_hang_id,
+        dia_chi_khach_hang_id: data.dia_chi_khach_hang_id,
+        doi_tac_giao_hang_id,
+        phi_van_chuyen,
+        ghi_chu: ghi_chu_giao_hang
+    });
     const shipmentData = {
         doi_tac_giao_hang_id: doi_tac_giao_hang_id || null,
         cua_hang_id: cua_hang_id || null,
@@ -244,12 +267,15 @@ async function upsertDraftShipment(orderId, data) {
 router.post('/draft', async (req, res, next) => {
     try {
         const {
-            draft_order_id, khach_hang_id, cua_hang_id, items,
+            draft_order_id, khach_hang_id, cua_hang_id, kho_id, items,
             chiet_khau, phi_van_chuyen, ghi_chu
         } = req.body;
 
         if (!Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ success: false, message: 'Đơn nháp chưa có sản phẩm' });
+        }
+        if (!kho_id) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
         }
 
         let tong_tien_hang = 0;
@@ -269,6 +295,7 @@ router.post('/draft', async (req, res, next) => {
             donHang.set({
                 khach_hang_id: khach_hang_id || null,
                 cua_hang_id: cua_hang_id || null,
+                kho_id,
                 tong_tien: tong_thanh_toan,
                 tong_tien_hang,
                 tong_thanh_toan,
@@ -281,6 +308,7 @@ router.post('/draft', async (req, res, next) => {
                 ma_don_hang: 'DH' + Date.now(),
                 khach_hang_id: khach_hang_id || null,
                 cua_hang_id: cua_hang_id || null,
+                kho_id,
                 nguoi_tao_id: req.user._id,
                 ngay_dat: new Date(),
                 ngay_tao: new Date(),

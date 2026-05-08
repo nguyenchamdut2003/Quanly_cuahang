@@ -14,7 +14,9 @@ var profileRouter = require('./routes/profile');
 var cuaHangRouter = require('./routes/cuaHang');
 var hangHoaRouter = require('./routes/hangHoa');
 var nhaCungCapRouter = require('./routes/nhaCungCap');
-var phieuNhapRouter = require('./routes/phieuNhap');
+var { isAuthenticated } = require('./middlewares/auth.middleware');
+var nhapHangRouter = require('./routes/nhapHang');
+var nhapHangController = require('./controllers/nhapHang.controller');
 var kiemKhoRouter = require('./routes/kiemKho');
 var banHangRouter = require('./routes/banHang');
 var donHangRouter = require('./routes/donHang');
@@ -22,6 +24,8 @@ var soQuyRouter = require('./routes/soQuy');
 var baoCaoRouter = require('./routes/baoCao');
 var khachHangRouter = require('./routes/khachHang');
 var xuatDungNoiBoRouter = require('./routes/xuatDungNoiBo');
+var xuatHuyRouter = require('./routes/xuatHuy');
+var apiKhoRouter = require('./routes/apiKho');
 
 var app = express();
 
@@ -76,14 +80,26 @@ app.use('/profile', profileRouter);
 app.use('/cua-hang', cuaHangRouter);
 app.use('/hang-hoa', hangHoaRouter);
 app.use('/nha-cung-cap', nhaCungCapRouter);
-app.use('/phieu-nhap', phieuNhapRouter);
+app.use('/nhap-hang', nhapHangRouter);
 app.use('/kiem-kho', kiemKhoRouter);
 app.use('/ban-hang', banHangRouter);
+app.use('/api', apiKhoRouter);
+
+// APIs for nhapHang feature
+app.get('/api/hang-hoa', isAuthenticated, nhapHangController.apiHangHoa);
+app.get('/api/nha-cung-cap/:id/hang-hoa', isAuthenticated, nhapHangController.apiSupplierProducts);
+app.post('/api/hang-hoa/quick-create', isAuthenticated, nhapHangController.quickCreateProduct);
+app.post('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
+app.put('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
+app.post('/api/hang-hoa/:id/inactive', isAuthenticated, nhapHangController.inactiveProduct);
+
+app.use('/api/don-hang', donHangRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);
 app.use('/bao-cao', baoCaoRouter);
 app.use('/khach-hang', khachHangRouter);
 app.use('/xuat-dung-noi-bo', xuatDungNoiBoRouter);
+app.use('/xuat-huy', xuatHuyRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

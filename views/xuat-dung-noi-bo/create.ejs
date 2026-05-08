@@ -64,6 +64,7 @@
         <div class="field"><label>Loại xuất</label><select class="input" id="loaiXuat"><option>Xuất dùng nội bộ</option><option>Hỏng mất</option><option>Khác</option></select></div>
         <div class="field"><label>Người nhận</label><select class="input" id="nguoiNhan"><option value="">Chọn người nhận</option><% users.forEach(u=>{ %><option value="<%= u.ho_ten || u.email %>"><%= u.ho_ten || u.email %></option><% }) %></select></div>
         <div class="field"><label>Chi nhánh</label><select class="input" id="storeId"><option value="">Chọn chi nhánh</option><% stores.forEach(s=>{ %><option value="<%= s._id %>"><%= s.ten_cua_hang %></option><% }) %></select></div>
+        <div class="field"><label>Kho</label><select class="input" id="khoId" disabled><option value="">Vui lòng chọn cửa hàng trước</option></select></div>
         <div class="total"><span>Tổng giá trị <i class="fa-regular fa-circle-question"></i></span><strong id="totalValue">0</strong></div>
         <div class="field"><textarea class="input textarea" id="ghiChu" placeholder="Ghi chú"></textarea></div>
       </div>
@@ -75,6 +76,28 @@
     let items = [];
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
+    const storeSelect = document.getElementById('storeId');
+    const khoSelect = document.getElementById('khoId');
+
+    async function loadKhoByStore(){
+      const storeId = storeSelect.value;
+      khoSelect.innerHTML = '<option value="">Chọn kho</option>';
+      khoSelect.disabled = true;
+      if(!storeId) return;
+      try{
+        const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
+        const result = await res.json();
+        const warehouses = result.success ? (result.data || []) : [];
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
+        khoSelect.disabled = false;
+      }catch(e){
+        khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+      }
+    }
+
+    storeSelect.addEventListener('change', loadKhoByStore);
+    document.addEventListener('DOMContentLoaded', loadKhoByStore);
+
     searchInput.addEventListener('input', function(){
       const q = this.value.trim().toLowerCase();
       if(!q){results.style.display='none';return;}
@@ -124,7 +147,8 @@
     }
     async function saveXnb(status){
       if(!items.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
-      const data = {trang_thai:status,loai_xuat:document.getElementById('loaiXuat').value,nguoi_nhan:document.getElementById('nguoiNhan').value,cua_hang_id:document.getElementById('storeId').value,ghi_chu:document.getElementById('ghiChu').value,items};
+      if(!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
+      const data = {trang_thai:status,loai_xuat:document.getElementById('loaiXuat').value,nguoi_nhan:document.getElementById('nguoiNhan').value,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items};
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         const result = await res.json();

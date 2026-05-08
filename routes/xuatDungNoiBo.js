@@ -6,16 +6,31 @@ const {
     CTXuatNoiBo,
     HangHoa,
     CuaHang,
-    NguoiDung
+    NguoiDung,
+    Kho
 } = require('../models/kiot.model');
+const { truTonKho } = require('../services/kho.service');
 
 router.use(isAuthenticated);
 
 const STATUS_MAP = {
-    draft: 'Phiếu tạm',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy'
+    draft: 'Phieu tam',
+    completed: 'Hoan thanh',
+    cancelled: 'Da huy'
 };
+
+function parseItems(rawItems) {
+    if (Array.isArray(rawItems)) return rawItems;
+    if (typeof rawItems === 'string' && rawItems.trim() !== '') {
+        try {
+            const parsed = JSON.parse(rawItems);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+            return [];
+        }
+    }
+    return [];
+}
 
 function buildFilter(query) {
     const filter = {};
@@ -38,12 +53,13 @@ router.get('/', async (req, res, next) => {
         const { filter, statuses } = buildFilter(req.query);
         const tickets = await PhieuXuatNoiBo.find(filter)
             .populate('cua_hang_id')
+            .populate('kho_id')
             .populate('nguoi_tao_id')
             .sort({ created_at: -1 });
         const users = await NguoiDung.find().sort({ ho_ten: 1 });
 
         res.render('xuat-dung-noi-bo/index', {
-            title: 'Xuất dùng nội bộ',
+            title: 'Xuat dung noi bo',
             tickets,
             users,
             filters: req.query,
@@ -57,14 +73,18 @@ router.get('/', async (req, res, next) => {
 
 router.get('/create', async (req, res, next) => {
     try {
-        const products = await HangHoa.find().sort({ ten_hang: 1 });
-        const stores = await CuaHang.find().sort({ ten_cua_hang: 1 });
-        const users = await NguoiDung.find().sort({ ho_ten: 1 });
+        const [products, stores, users, warehouses] = await Promise.all([
+            HangHoa.find().sort({ ten_hang: 1 }),
+            CuaHang.find().sort({ ten_cua_hang: 1 }),
+            NguoiDung.find().sort({ ho_ten: 1 }),
+            Kho.find({ trang_thai: 'active' }).sort({ ten_kho: 1 })
+        ]);
         res.render('xuat-dung-noi-bo/create', {
-            title: 'Xuất dùng nội bộ',
+            title: 'Xuat dung noi bo',
             products,
             stores,
-            users
+            users,
+            warehouses
         });
     } catch (error) {
         next(error);
@@ -73,13 +93,34 @@ router.get('/create', async (req, res, next) => {
 
 router.post('/add', async (req, res, next) => {
     try {
-        const { cua_hang_id, loai_xuat, nguoi_nhan, ghi_chu, trang_thai, items } = req.body;
-        if (!items || !Array.isArray(items) || !items.length) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 hàng hóa' });
+        const {
+            cua_hang_id,
+            kho_id,
+            loai_xuat,
+            loai_nguoi_nhan,
+            nguoi_nhan,
+            ghi_chu,
+            trang_thai,
+            cong_don_vao_the
+        } = req.body || {};
+        const items = parseItems(req.body?.items);
+
+        if (!kho_id) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
         }
 
-        const finalStatus = trang_thai === 'completed' ? 'completed' : 'draft';
+        const kho = await Kho.findById(kho_id);
+        if (!kho) {
+            return res.status(400).json({ success: false, message: 'Kho xuat khong hop le' });
+        }
+
+        if (!items.length) {
+            return res.status(400).json({ success: false, message: 'Vui long chon it nhat 1 hang hoa' });
+        }
+
+        const finalStatus = trang_thai === 'completed' ? 'completed' : (trang_thai === 'cancelled' ? 'cancelled' : 'draft');
         let tongGiaTri = 0;
+        let tongSoLuong = 0;
         const normalizedItems = [];
 
         for (const item of items) {
@@ -88,31 +129,30 @@ router.post('/add', async (req, res, next) => {
 
             const soLuong = Number(item.so_luong) || 0;
             if (soLuong <= 0) continue;
-            if (finalStatus === 'completed' && product.ton_kho < soLuong) {
-                return res.status(400).json({
-                    success: false,
-                    message: `${product.ten_hang} không đủ tồn kho để xuất`
-                });
-            }
 
-            const giaVon = Number(product.gia_von) || 0;
+            const giaVon = Number(item.gia_von ?? product.gia_von) || 0;
             const thanhTien = soLuong * giaVon;
+            tongSoLuong += soLuong;
             tongGiaTri += thanhTien;
-            normalizedItems.push({ product, soLuong, giaVon, thanhTien });
+            normalizedItems.push({ product, loHangId: item.lo_hang_id || null, soLuong, giaVon, thanhTien });
         }
 
         if (!normalizedItems.length) {
-            return res.status(400).json({ success: false, message: 'Số lượng xuất không hợp lệ' });
+            return res.status(400).json({ success: false, message: 'So luong xuat khong hop le' });
         }
 
         const ma_xuat_noi_bo = 'XNB' + Date.now();
         const phieu = await PhieuXuatNoiBo.create({
             ma_xuat_noi_bo,
-            loai_xuat: loai_xuat || 'Xuất dùng nội bộ',
-            cua_hang_id: cua_hang_id || null,
-            nguoi_tao_id: req.user._id,
+            loai_xuat: loai_xuat || 'xuat_dung_noi_bo',
+            cua_hang_id: cua_hang_id || kho.cua_hang_id,
+            kho_id: kho._id,
+            nguoi_tao_id: req.user?._id,
             nguoi_nhan: nguoi_nhan || '',
+            loai_nguoi_nhan: ['nhan_vien', 'khach_hang', 'nha_cung_cap', 'khac'].includes(loai_nguoi_nhan) ? loai_nguoi_nhan : 'khac',
+            tong_so_luong: tongSoLuong,
             tong_gia_tri: tongGiaTri,
+            cong_don_vao_the: cong_don_vao_the === true || cong_don_vao_the === 'true',
             trang_thai: finalStatus,
             ghi_chu: ghi_chu || ''
         });
@@ -121,17 +161,37 @@ router.post('/add', async (req, res, next) => {
             await CTXuatNoiBo.create({
                 phieu_xuat_id: phieu._id,
                 hang_hoa_id: item.product._id,
+                lo_hang_id: item.loHangId,
                 so_luong: item.soLuong,
                 gia_von: item.giaVon,
                 thanh_tien: item.thanhTien
             });
 
             if (finalStatus === 'completed') {
+                try {
+                    await truTonKho({
+                        kho_id: kho._id,
+                        hang_hoa_id: item.product._id,
+                        lo_hang_id: item.loHangId,
+                        so_luong: item.soLuong,
+                        nguoi_tao_id: req.user?._id,
+                        loai_phieu: 'xuat_noi_bo',
+                        ma_phieu: ma_xuat_noi_bo,
+                        ghi_chu: ghi_chu || 'Xuat dung noi bo'
+                    });
+                } catch (_) {
+                    return res.status(400).json({ success: false, message: 'Khong du ton kho de xuat' });
+                }
+
                 await HangHoa.findByIdAndUpdate(item.product._id, { $inc: { ton_kho: -item.soLuong } });
             }
         }
 
-        res.json({ success: true, message: finalStatus === 'completed' ? 'Đã hoàn thành phiếu xuất' : 'Đã lưu phiếu tạm', ma_xuat_noi_bo });
+        return res.json({
+            success: true,
+            message: finalStatus === 'completed' ? 'Da hoan thanh phieu xuat' : 'Da luu phieu',
+            ma_xuat_noi_bo
+        });
     } catch (error) {
         next(error);
     }
@@ -142,18 +202,18 @@ router.get('/export.csv', async (req, res, next) => {
         const { filter } = buildFilter(req.query);
         const tickets = await PhieuXuatNoiBo.find(filter)
             .populate('cua_hang_id')
+            .populate('kho_id')
             .sort({ created_at: -1 });
 
-        const rows = [['Mã xuất dùng nội bộ', 'Loại xuất', 'Tổng giá trị', 'Thời gian', 'Chi nhánh', 'Ghi chú', 'Trạng thái']];
+        const rows = [['ma_xuat_noi_bo', 'loai_xuat', 'tong_so_luong', 'tong_gia_tri', 'kho', 'trang_thai']];
         tickets.forEach(t => {
             rows.push([
                 t.ma_xuat_noi_bo,
                 t.loai_xuat || '',
+                t.tong_so_luong || 0,
                 t.tong_gia_tri || 0,
-                t.ngay_xuat ? t.ngay_xuat.toLocaleString('vi-VN') : '',
-                t.cua_hang_id ? t.cua_hang_id.ten_cua_hang : '',
-                t.ghi_chu || '',
-                STATUS_MAP[t.trang_thai] || t.trang_thai
+                t.kho_id ? t.kho_id.ten_kho : '',
+                t.trang_thai || ''
             ]);
         });
 

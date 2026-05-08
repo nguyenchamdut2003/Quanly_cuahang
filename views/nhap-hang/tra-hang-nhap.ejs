@@ -1,0 +1,428 @@
+<%
+  const safeReturns = Array.isArray(locals.returns) ? locals.returns : [];
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .page {
+      height: calc(100vh - 58px);
+      background: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+    }
+    .shell {
+      flex: 1;
+      padding: 20px 10%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .bar h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1e293b;
+      margin: 0;
+    }
+    .table-wrap {
+      flex: 1;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }
+    .table-code-link {
+      color: #0070f4;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .table-code-link:hover { text-decoration: underline; }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #dcfce7;
+      color: #166534;
+    }
+    .empty-state {
+      height: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      gap: 12px;
+    }
+    .empty-state i { font-size: 48px; opacity: 0.3; }
+    
+    /* Modal Modernization */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 3000;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .modal.open { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    
+    .box {
+      width: 900px;
+      max-width: 96vw;
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      max-height: 90vh;
+    }
+    .head {
+      padding: 18px 24px;
+      border-bottom: 1px solid #f1f5f9;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .head h2 { font-size: 18px; font-weight: 700; margin: 0; color: #1e293b; }
+    .close-btn {
+      border: 0; background: transparent; font-size: 20px; color: #64748b; cursor: pointer; transition: color 0.2s;
+    }
+    .close-btn:hover { color: #1e293b; }
+    .body { padding: 24px; overflow-y: auto; flex: 1; }
+    .foot {
+      padding: 16px 24px;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      background: #f8fafc;
+    }
+    
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    .input-control {
+      width: 100%;
+      height: 38px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 0 12px;
+      font-size: 14px;
+      transition: all 0.2s;
+      outline: none;
+    }
+    .input-control:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    
+    .item-selector {
+      margin-top: 24px;
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 8px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .items-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    .items-table th { background: #f1f5f9; padding: 12px; text-align: left; font-size: 12px; font-weight: 700; color: #475569; }
+    .items-table td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 14px; vertical-align: middle; }
+    .qty-input { width: 80px; height: 32px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: right; padding: 0 8px; }
+    
+    .btn {
+      height: 38px; padding: 0 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 8px; transition: all 0.2s; border: 1px solid #cbd5e1; background: #fff; color: #334155;
+    }
+    .btn:hover { background: #f1f5f9; border-color: #94a3b8; }
+    .btn-primary { background: #0070f4; color: #fff; border-color: #0070f4; }
+    .btn-primary:hover { background: #005bd3; border-color: #005bd3; }
+    .btn-danger { color: #dc2626; border-color: #fecaca; }
+    .btn-danger:hover { background: #fef2f2; }
+    
+    .total-bar {
+      margin-top: 20px; padding: 16px; background: #f0f7ff; border-radius: 8px; text-align: right; font-size: 16px; color: #1e40af;
+    }
+    .total-bar strong { font-size: 20px; margin-left: 8px; }
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  
+  <main class="page">
+    <div class="shell">
+      <div class="bar">
+        <h1>Trả hàng nhập</h1>
+        <button class="btn btn-primary" onclick="openModal()">
+          <i class="fa-solid fa-plus"></i> Tạo phiếu trả hàng
+        </button>
+      </div>
+      
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th style="padding-left: 20px;">Mã phiếu trả</th>
+              <th>Thời gian</th>
+              <th>Nhà cung cấp</th>
+              <th>Phiếu nhập</th>
+              <th class="text-right" style="padding-right: 20px;">Tổng tiền trả</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (safeReturns.length) { %>
+              <% safeReturns.forEach(r => { %>
+                <tr>
+                  <td style="padding-left: 20px;">
+                    <a href="#" class="table-code-link"><%= r.ma_phieu_tra_nhap %></a>
+                  </td>
+                  <td style="color: #475569;">
+                    <i class="fa-regular fa-clock" style="margin-right: 4px; opacity: 0.6;"></i>
+                    <%= new Date(r.ngay_tra).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' }) %>
+                  </td>
+                  <td><strong><%= r.nha_cung_cap_id ? r.nha_cung_cap_id.ten_ncc : '---' %></strong></td>
+                  <td>
+                    <% if (r.phieu_nhap_id) { %>
+                      <span style="font-size: 12px; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">
+                        <%= r.phieu_nhap_id.ma_phieu_nhap %>
+                      </span>
+                    <% } else { %> --- <% } %>
+                  </td>
+                  <td class="text-right" style="padding-right: 20px;">
+                    <span style="font-weight: 700; color: #dc2626;"><%= fmt(r.tong_tien_tra) %></span>
+                  </td>
+                  <td><span class="status-badge">Hoàn thành</span></td>
+                </tr>
+              <% }) %>
+            <% } else { %>
+              <tr>
+                <td colspan="6">
+                  <div class="empty-state">
+                    <i class="fa-solid fa-box-open"></i>
+                    <p>Chưa có phiếu trả hàng nhập nào được tạo.</p>
+                  </div>
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+  
+  <!-- Modal for Creating Return -->
+  <div class="modal" id="returnModal">
+    <div class="box">
+      <div class="head">
+        <h2>Tạo phiếu trả hàng nhập</h2>
+        <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="body">
+        <div class="form-grid">
+          <div class="field">
+            <label>Nhà cung cấp</label>
+            <select id="nccId" class="input-control">
+              <option value="">Chọn nhà cung cấp</option>
+              <% (suppliers || []).forEach(s => { %>
+                <option value="<%= s._id %>"><%= s.ten_ncc %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label>Phiếu nhập (tùy chọn)</label>
+            <select id="pnId" class="input-control">
+              <option value="">Không chọn</option>
+              <% (receipts || []).forEach(r => { %>
+                <option value="<%= r._id %>"><%= r.ma_phieu_nhap %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="field">
+            <label>Lý do trả hàng</label>
+            <input id="lyDo" class="input-control" placeholder="Ví dụ: Hàng lỗi, sai mẫu mã...">
+          </div>
+          <div class="field">
+            <label>Ghi chú</label>
+            <input id="ghiChu" class="input-control" placeholder="Thông tin thêm nếu có">
+          </div>
+        </div>
+        
+        <div class="item-selector">
+          <div style="flex: 1;">
+            <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Chọn hàng hóa trả lại</label>
+            <select id="productId" class="input-control">
+              <option value="">Tìm theo mã hoặc tên hàng...</option>
+              <% (products || []).forEach(p => { %>
+                <option value="<%= p._id %>" data-code="<%= p.ma_hang %>" data-name="<%= p.ten_hang %>" data-price="<%= p.gia_von || 0 %>">
+                  <%= p.ma_hang %> - <%= p.ten_hang %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="addItem()" type="button">
+            <i class="fa-solid fa-plus"></i> Thêm hàng
+          </button>
+        </div>
+        
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width: 120px;">Mã hàng</th>
+              <th>Tên hàng</th>
+              <th class="text-right" style="width: 100px;">Số lượng</th>
+              <th class="text-right" style="width: 140px;">Đơn giá</th>
+              <th class="text-right" style="width: 140px;">Thành tiền</th>
+              <th style="width: 50px;"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            <!-- Items will be injected here -->
+          </tbody>
+        </table>
+        
+        <div class="total-bar">
+          Tổng giá trị trả hàng: <strong id="totalReturn">0</strong>
+        </div>
+      </div>
+      <div class="foot">
+        <button class="btn" onclick="closeModal()">Bỏ qua</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveReturn()">
+          <i class="fa-solid fa-check"></i> Hoàn thành trả hàng
+        </button>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    let items = [];
+    const _fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    
+    function openModal(){ document.getElementById('returnModal').classList.add('open'); }
+    function closeModal(){ 
+      if(items.length > 0 && !confirm('Dữ liệu đang nhập sẽ bị mất. Bạn có chắc muốn thoát?')) return;
+      document.getElementById('returnModal').classList.remove('open'); 
+    }
+    
+    function addItem() {
+      const productId = document.getElementById('productId');
+      const sel = productId.options[productId.selectedIndex]; 
+      if(!productId.value) return; 
+      
+      const ex = items.find(i => i.hang_hoa_id === productId.value); 
+      if(ex) {
+        ex.so_luong++; 
+      } else {
+        items.push({
+          hang_hoa_id: productId.value,
+          ma_hang: sel.dataset.code,
+          ten_hang: sel.dataset.name,
+          so_luong: 1,
+          don_gia: Number(sel.dataset.price)||0
+        });
+      }
+      render();
+    }
+    
+    function render() {
+      let total = 0; 
+      const body = document.getElementById('itemsBody');
+      if (items.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">Chưa có hàng hóa nào trong danh sách trả.</td></tr>';
+        document.getElementById('totalReturn').textContent = '0';
+        return;
+      }
+      
+      body.innerHTML = items.map(i => {
+        const line = i.so_luong * i.don_gia; 
+        total += line; 
+        return `<tr>
+          <td><code style="background:#f1f5f9;padding:2px 4px;border-radius:4px;font-weight:700;">${i.ma_hang}</code></td>
+          <td><strong>${i.ten_hang}</strong></td>
+          <td class="text-right">
+            <input type="number" class="qty-input" value="${i.so_luong}" min="1" onchange="updQty('${i.hang_hoa_id}',this.value)">
+          </td>
+          <td class="text-right">
+            <input type="number" class="qty-input" style="width:120px" value="${i.don_gia}" onchange="updPrice('${i.hang_hoa_id}',this.value)">
+          </td>
+          <td class="text-right" style="font-weight:700;">${_fmt(line)}</td>
+          <td style="text-align:center">
+            <button class="btn btn-danger btn-sm" onclick="removeItem('${i.hang_hoa_id}')" style="padding:0;width:32px;justify-content:center;">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </td>
+        </tr>`;
+      }).join(''); 
+      document.getElementById('totalReturn').textContent = _fmt(total);
+    }
+    
+    function updQty(id,v) { const i = items.find(x => x.hang_hoa_id === id); if(i) i.so_luong = Number(v) || 0; render(); } 
+    function updPrice(id,v) { const i = items.find(x => x.hang_hoa_id === id); if(i) i.don_gia = Number(v) || 0; render(); } 
+    function removeItem(id) { items = items.filter(i => i.hang_hoa_id !== id); render(); }
+    
+    async function saveReturn() {
+      if (!items.length) {
+        alert('Vui lòng thêm ít nhất một mặt hàng để trả.');
+        return;
+      }
+      if (!document.getElementById('nccId').value) {
+        alert('Vui lòng chọn nhà cung cấp.');
+        return;
+      }
+      
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+      
+      const payload = {
+        nha_cung_cap_id: document.getElementById('nccId').value,
+        phieu_nhap_id: document.getElementById('pnId').value,
+        ly_do: document.getElementById('lyDo').value,
+        ghi_chu: document.getElementById('ghiChu').value,
+        items: items
+      };
+      
+      try {
+        const res = await fetch('/nhap-hang/tra-hang-nhap/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }); 
+        const data = await res.json(); 
+        if(!data.success) {
+          alert(data.message || 'Không thể lưu phiếu trả hàng.');
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+          return;
+        }
+        location.reload();
+      } catch (err) {
+        alert('Lỗi kết nối máy chủ.');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
+    }
+    
+    // Initialize empty state
+    render();
+  </script>
+</body>
+</html>
