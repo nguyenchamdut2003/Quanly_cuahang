@@ -1041,7 +1041,7 @@ router.get('/tra-hang/invoices/search', async (req, res, next) => {
                 tong_tien: i.tong_tien || 0,
                 thanh_toan: i.thanh_toan || 0,
                 nguoi_ban: i.nguoi_ban_id?.ho_ten || i.nguoi_ban_id?.username || 'Admin',
-                khach_hang: i.khach_hang_id?.ten_khach_hang || 'KhÃ¡ch láº»',
+                khach_hang: i.khach_hang_id?.ten_khach_hang || 'Khách lẻ',
                 khach_hang_id: i.khach_hang_id ? String(i.khach_hang_id._id) : ''
             })),
             pagination: {
