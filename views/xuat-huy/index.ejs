@@ -1,0 +1,101 @@
+<%
+  const safeTickets = Array.isArray(locals.tickets) ? locals.tickets : [];
+  const safeWarehouses = Array.isArray(locals.warehouses) ? locals.warehouses : [];
+  const safeUsers = Array.isArray(locals.users) ? locals.users : [];
+  const safeFilters = locals.filters || {};
+  const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
+    .shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 0}
+    .sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
+    .title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
+    .filter-block{margin-bottom:22px}.filter-title{font-size:13px;font-weight:800;margin-bottom:10px}
+    .check-line{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px}.check-line input,.radio-line input{accent-color:#0070f4}
+    .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}.radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}
+    .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 10px;font-size:13px;outline:none;margin-top:6px}
+    .main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .search{flex:1;max-width:470px}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 12px;font-size:13px;outline:none}
+    .actions{display:flex;align-items:center;gap:8px}.kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.kv-btn.primary{border-color:#0070f4;color:#0070f4}.tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
+    .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}table{width:100%;table-layout:fixed;border-collapse:collapse}
+    th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
+    td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}tbody tr:hover{background:#f7fbff}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}
+    .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.qty-col{width:110px}.status-col{width:115px}.ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}.status-badge.draft{background:#fff4d6;color:#9a6700}.status-badge.cancelled{background:#eef2f7;color:#667085}
+    .empty{height:420px;text-align:center}.empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085}.empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}.empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
+    .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}@media(max-width:1100px){.shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <form method="GET" action="/xuat-huy" class="page">
+    <div class="shell">
+      <aside class="sidebar">
+        <h1 class="title">Xuất hủy</h1>
+        <div class="filter-block">
+          <div class="filter-title">Trạng thái</div>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy phiếu</label>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Thời gian</div>
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <span>›</span></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
+          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
+          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Kho</div>
+          <select class="filter-control" name="kho_id" onchange="this.form.submit()">
+            <option value="">Chọn kho</option>
+            <% safeWarehouses.forEach(function(k) { %>
+              <option value="<%= k._id %>" <%= String(safeFilters.kho_id || '') === String(k._id) ? 'selected' : '' %>><%= k.ten_kho || k.ma_kho %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Người tạo</div>
+          <select class="filter-control" name="nguoi_tao" onchange="this.form.submit()">
+            <option value="">Chọn người tạo</option>
+            <% safeUsers.forEach(function(u) { %><option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option><% }) %>
+          </select>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="toolbar">
+          <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã xuất hủy"></div>
+          <div class="actions">
+            <a class="kv-btn primary" href="/xuat-huy/create">+ Xuất hủy</a>
+            <button class="kv-btn" type="button">Xuất file ▾</button><span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col">☆</th><th class="code-col">Mã xuất hủy</th><th class="time-col">Thời gian</th><th>Kho</th><th class="num qty-col">Tổng số lượng</th><th class="num money-col">Tổng giá trị</th><th>Lý do hủy</th><th class="status-col">Trạng thái</th></tr></thead>
+            <tbody>
+              <% if (safeTickets.length) { %>
+                <% safeTickets.forEach(function(t) { %>
+                  <tr><td class="check-col"><input type="checkbox"></td><td class="star-col">☆</td><td class="ellipsis"><%= t.ma_xuat_huy || '' %></td><td><%= formatDate(t.ngay_xuat || t.created_at) %></td><td class="ellipsis"><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></td><td class="num"><%= fmt(t.tong_so_luong || 0) %></td><td class="num"><%= fmt(t.tong_gia_tri || 0) %></td><td class="ellipsis"><%= t.ly_do_huy || '--' %></td><td><span class="status-badge <%= badgeClass(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td></tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="9" class="empty"><div class="empty-box"><div class="empty-icon">▤</div><div class="empty-title">Không tìm thấy kết quả</div><div>Không tìm thấy giao dịch nào phù hợp trong tháng này.</div></div></td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+      </main>
+    </div>
+  </form>
+</body>
+</html>

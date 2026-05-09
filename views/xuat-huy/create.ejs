@@ -1,0 +1,140 @@
+<%
+  const creatorName = user ? (user.ho_ten || user.email || 'Người dùng') : 'Người dùng';
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    body.admin-body{background:#f3f6f9}.create-page{height:calc(100vh - 98px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}.left{min-width:0;display:flex;flex-direction:column}.topline{height:52px;display:flex;align-items:center;gap:12px;position:relative}.back{width:28px;text-align:center;font-size:24px;color:#111827;text-decoration:none;line-height:1}.title{font-size:20px;font-weight:800;color:#111827;white-space:nowrap}.search{width:620px;height:32px;border:1px solid #0070f4;border-radius:6px;padding:0 12px;font-size:13px;outline:none;background:#fff}.grid-wrap{flex:1;min-height:0;background:#fff;border:1px solid #cfd8e3;overflow:auto}table{width:100%;table-layout:fixed;border-collapse:collapse}th{height:34px;background:#eef0f3;border-bottom:1px solid #cfd8e3;color:#111827;font-size:12px;font-weight:800;padding:0 8px;text-align:left}td{height:40px;border-bottom:1px solid #edf1f5;padding:0 8px;font-size:13px}.num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.lot{width:130px}.stock{width:135px}.qty{width:105px}.money{width:122px}.cell-input{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 7px;text-align:right;font-size:13px}.empty{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#111827}.empty small{color:#0070f4;margin-top:12px}
+    .right{background:#fff;border-left:1px solid #dbe4ee;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}.mini-tools{display:flex;justify-content:flex-start;gap:6px}.tool{width:29px;height:29px;border:1px solid #cfd8e3;background:#fff;border-radius:5px}.field{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;font-size:13px}.field label{font-weight:600}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px;font-size:13px;background:#fff;outline:none}.readonly-box{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#f8fafc;padding:0 9px;display:flex;align-items:center;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.readonly{height:31px;display:flex;align-items:center;justify-content:flex-end}.readonly.blue{color:#0070f4;font-weight:800}.note{height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:none}.footer-actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{height:56px;border:1px solid #0070f4;background:#0070f4;color:#fff;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer}.btn.primary{background:#08a83e;border-color:#08a83e}.error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
+    @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="create-page">
+    <section class="left">
+      <div class="topline"><a class="back" href="/xuat-huy">‹</a><div class="title">Xuất hủy</div><input id="itemSearch" class="search" placeholder="Tìm trong hàng của phiếu nhập" autocomplete="off" disabled></div>
+      <div class="grid-wrap">
+        <table>
+          <thead><tr><th class="stt center">STT</th><th class="code">Mã hàng</th><th>Tên hàng</th><th class="unit">ĐVT</th><th class="lot">Lô hàng</th><th class="stock num">SL đã nhập</th><th class="stock num">Tồn có thể hủy</th><th class="qty num">SL hủy</th><th class="money num">Giá vốn</th><th class="money num">Thành tiền</th></tr></thead>
+          <tbody id="itemsBody"><tr><td colspan="10"><div class="empty"><b>Chọn phiếu nhập gốc còn hàng để xuất hủy</b><small>Hệ thống sẽ tự lấy kho và các dòng còn tồn</small></div></td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <aside class="right">
+      <div class="mini-tools"><button class="tool">⌘</button><button class="tool">⎙</button><button class="tool">!</button></div>
+      <div id="errorBox" class="error"></div>
+      <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
+      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayXuat" type="datetime-local" value="<%= todayValue %>"></div>
+      <div class="field"><label>Phiếu nhập gốc</label><select id="phieuNhapId" class="control"><option value="">Đang tải phiếu nhập...</option></select></div>
+      <div class="field"><label>Kho hủy</label><input type="hidden" id="khoId"><div id="khoText" class="readonly-box">Tự động theo phiếu nhập</div></div>
+      <div class="field"><label>Mã xuất hủy</label><input id="maPhieu" class="control" value="<%= nextCode %>" placeholder="Mã phiếu tự động"></div>
+      <div class="field"><label>Trạng thái</label><div>Phiếu tạm</div></div>
+      <div class="field"><label>Lý do hủy</label><input id="lyDoHuy" class="control" placeholder="Bắt buộc"></div>
+      <div class="field"><label>Tổng số lượng</label><div class="readonly blue" id="tongSoLuong">0</div></div>
+      <div class="field"><label>Tổng giá trị</label><div class="readonly blue" id="tongGiaTri">0</div></div>
+      <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
+      <div class="footer-actions"><button class="btn" type="button" onclick="submitTicket('draft')">Lưu tạm</button><button class="btn primary" type="button" onclick="submitTicket('completed')">Hoàn thành</button></div>
+    </aside>
+  </main>
+  <script>
+    let items = [];
+    let allItems = [];
+    const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const money = raw => Math.max(0, Math.floor(Number(String(raw || '').replace(/\./g, '').replace(/,/g, '')) || 0));
+    const body = document.getElementById('itemsBody');
+    const search = document.getElementById('itemSearch');
+    function showError(msg){ const box=document.getElementById('errorBox'); box.textContent=msg; box.style.display='block'; }
+    function clearError(){ document.getElementById('errorBox').style.display='none'; }
+    function resetAll(){ items=[]; allItems=[]; document.getElementById('khoId').value=''; document.getElementById('khoText').textContent='Tự động theo phiếu nhập'; search.value=''; search.disabled=true; renderItems(); renderTotals(); }
+    function formatDateOnly(value){ if(!value) return ''; return new Date(value).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+    async function loadPurchases(){
+      const select = document.getElementById('phieuNhapId');
+      select.disabled = true;
+      select.innerHTML = '<option value="">Đang tải phiếu nhập...</option>';
+      try {
+        const res = await fetch('/api/phieu-nhap/con-hang-xuat-huy');
+        const data = await res.json();
+        if(!data.success){ select.innerHTML='<option value="">Không tải được phiếu nhập</option>'; return showError(data.message || 'Không tải được phiếu nhập'); }
+        const rows = data.items || [];
+        if(!rows.length){ select.innerHTML='<option value="">Không có phiếu nhập còn hàng</option>'; return; }
+        select.innerHTML = '<option value="">Chọn phiếu nhập gốc</option>' + rows.map(row => {
+          const kho = row.kho || {};
+          const supplier = row.nha_cung_cap || {};
+          const label = [row.ma_phieu_nhap, formatDateOnly(row.ngay_nhap), supplier.ten_ncc || supplier.ma_ncc || '', kho.ten_kho || kho.ma_kho || ''].filter(Boolean).join(' - ');
+          return `<option value="${row._id}" data-kho="${row.kho_id}" data-kho-name="${kho.ten_kho || kho.ma_kho || ''}">${label}</option>`;
+        }).join('');
+        select.disabled = false;
+      } catch(error) {
+        select.innerHTML='<option value="">Không tải được phiếu nhập</option>';
+        showError('Lỗi kết nối khi tải phiếu nhập');
+      }
+    }
+    async function loadPurchaseDetail(id){
+      resetAll();
+      if(!id) return;
+      clearError();
+      const res = await fetch('/api/phieu-nhap/' + id + '/chi-tiet-xuat-huy');
+      const data = await res.json();
+      if(!data.success) return showError(data.message || 'Không tải được chi tiết phiếu nhập');
+      const ticket = data.data && data.data.phieu_nhap || {};
+      document.getElementById('khoId').value = ticket.kho_id || '';
+      const kho = ticket.kho || {};
+      document.getElementById('khoText').textContent = kho.ten_kho || kho.ma_kho || 'Kho nhập';
+      allItems = (data.data.items || []).map(row => Object.assign({}, row, { so_luong: '', gia_von: Number(row.gia_von || 0) }));
+      items = allItems.slice();
+      search.disabled = false;
+      renderItems();
+    }
+    function renderItems(){
+      if(!items.length){ body.innerHTML='<tr><td colspan="10"><div class="empty"><b>Chọn phiếu nhập gốc còn hàng để xuất hủy</b><small>Hệ thống sẽ tự lấy kho và các dòng còn tồn</small></div></td></tr>'; return; }
+      body.innerHTML = items.map((it, idx) => {
+        const realIndex = allItems.indexOf(it);
+        const line = Number(it.so_luong || 0) * Number(it.gia_von || 0);
+        return `<tr><td class="center">${idx+1}</td><td>${it.ma_hang}</td><td>${it.ten_hang}</td><td>${it.don_vi_tinh || ''}</td><td>${it.ma_lo || ''}</td><td class="num">${fmt(it.so_luong_nhap || 0)}</td><td class="num">${fmt(it.ton_hien_tai || 0)}</td><td><input class="cell-input" type="number" min="0" max="${it.ton_hien_tai}" value="${it.so_luong || ''}" onchange="updateItem(${realIndex},'so_luong',this.value)"></td><td><input class="cell-input" inputmode="numeric" value="${it.gia_von}" onchange="updateItem(${realIndex},'gia_von',this.value)"></td><td class="num"><b>${fmt(line)}</b></td></tr>`;
+      }).join('');
+      renderTotals();
+    }
+    function updateItem(idx, field, value){
+      if(!allItems[idx]) return;
+      if(field === 'so_luong') allItems[idx][field] = Math.min(money(value), Number(allItems[idx].ton_hien_tai || 0));
+      else if(field === 'gia_von') allItems[idx][field] = money(value);
+      filterItems();
+    }
+    function filterItems(){
+      const key = search.value.trim().toLowerCase();
+      items = key ? allItems.filter(x => (x.ma_hang + ' ' + x.ten_hang + ' ' + (x.ma_lo || '')).toLowerCase().includes(key)) : allItems.slice();
+      renderItems();
+    }
+    function renderTotals(){
+      const totals = allItems.reduce((sum,it)=>{ sum.qty += Number(it.so_luong||0); sum.value += Number(it.so_luong||0)*Number(it.gia_von||0); return sum; }, {qty:0,value:0});
+      document.getElementById('tongSoLuong').textContent = fmt(totals.qty);
+      document.getElementById('tongGiaTri').textContent = fmt(totals.value);
+    }
+    async function submitTicket(mode){
+      clearError();
+      const purchaseId = document.getElementById('phieuNhapId').value;
+      const khoId = document.getElementById('khoId').value;
+      const reason = document.getElementById('lyDoHuy').value.trim();
+      const sendItems = allItems.filter(x => Number(x.so_luong || 0) > 0);
+      if(!purchaseId) return showError('Vui lòng chọn phiếu nhập gốc');
+      if(!khoId) return showError('Phiếu nhập chưa có kho hợp lệ');
+      if(!reason) return showError('Vui lòng nhập lý do hủy');
+      if(!sendItems.length) return showError('Vui lòng nhập số lượng hủy cho ít nhất một hàng hóa');
+      const payload = { submitMode: mode, phieu_nhap_id: purchaseId, kho_id: khoId, ma_xuat_huy: document.getElementById('maPhieu').value, ngay_xuat: document.getElementById('ngayXuat').value, ly_do_huy: reason, ghi_chu: document.getElementById('ghiChu').value, items_json: JSON.stringify(sendItems.map(x => ({ hang_hoa_id:x.hang_hoa_id, lo_hang_id:x.lo_hang_id, so_luong:x.so_luong, gia_von:x.gia_von }))) };
+      const res = await fetch('/xuat-huy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const data = await res.json();
+      if(!data.success) return showError(data.message || 'Không thể lưu phiếu xuất hủy');
+      location.href = data.redirect || '/xuat-huy';
+    }
+    document.getElementById('phieuNhapId').addEventListener('change', function(){ loadPurchaseDetail(this.value); });
+    search.addEventListener('input', filterItems);
+    loadPurchases();
+  </script>
+</body>
+</html>
