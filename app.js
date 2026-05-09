@@ -17,6 +17,7 @@ var nhaCungCapRouter = require('./routes/nhaCungCap');
 var { isAuthenticated } = require('./middlewares/auth.middleware');
 var nhapHangRouter = require('./routes/nhapHang');
 var nhapHangController = require('./controllers/nhapHang.controller');
+var traHangNhapController = require('./controllers/traHangNhap.controller');
 var kiemKhoRouter = require('./routes/kiemKho');
 var banHangRouter = require('./routes/banHang');
 var donHangRouter = require('./routes/donHang');
@@ -26,6 +27,7 @@ var khachHangRouter = require('./routes/khachHang');
 var xuatDungNoiBoRouter = require('./routes/xuatDungNoiBo');
 var xuatHuyRouter = require('./routes/xuatHuy');
 var apiKhoRouter = require('./routes/apiKho');
+var traHangNhapRouter = require('./routes/traHangNhap');
 
 var app = express();
 
@@ -81,18 +83,22 @@ app.use('/cua-hang', cuaHangRouter);
 app.use('/hang-hoa', hangHoaRouter);
 app.use('/nha-cung-cap', nhaCungCapRouter);
 app.use('/nhap-hang', nhapHangRouter);
+app.use('/tra-hang-nhap', traHangNhapRouter);
 app.use('/kiem-kho', kiemKhoRouter);
 app.use('/ban-hang', banHangRouter);
-app.use('/api', apiKhoRouter);
 
 // APIs for nhapHang feature
 app.get('/api/hang-hoa', isAuthenticated, nhapHangController.apiHangHoa);
 app.get('/api/nha-cung-cap/:id/hang-hoa', isAuthenticated, nhapHangController.apiSupplierProducts);
+app.get('/api/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);
+app.get('/api/kho/:khoId/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);
+app.get('/api/phieu-nhap/:id/chi-tiet-tra-hang', isAuthenticated, traHangNhapController.apiPurchaseReturnDetail);
 app.post('/api/hang-hoa/quick-create', isAuthenticated, nhapHangController.quickCreateProduct);
 app.post('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
 app.put('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
 app.post('/api/hang-hoa/:id/inactive', isAuthenticated, nhapHangController.inactiveProduct);
 
+app.use('/api', apiKhoRouter);
 app.use('/api/don-hang', donHangRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);

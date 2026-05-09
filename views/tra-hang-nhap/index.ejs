@@ -1,0 +1,280 @@
+<%
+  const safeReturns = Array.isArray(locals.returns) ? locals.returns : [];
+  const safeUsers = Array.isArray(locals.users) ? locals.users : [];
+  const safeFilters = locals.filters || {};
+  const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .return-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
+    .return-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 0}
+    .sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
+    .title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
+    .filter-block{margin-bottom:22px}
+    .filter-title{font-size:13px;font-weight:800;color:#111827;margin-bottom:10px}
+    .check-line{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:#111827}
+    .check-line input,.radio-line input{accent-color:#0070f4}
+    .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}
+    .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
+    .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none;margin-top:6px}
+    .main{min-width:0;display:flex;flex-direction:column;gap:10px}
+    .toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .search{flex:1;max-width:470px}
+    .search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 12px;font-size:13px;outline:none}
+    .actions{display:flex;align-items:center;gap:8px}
+    .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .kv-btn.primary{border-color:#0070f4;color:#0070f4}
+    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center}
+    .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}
+    table{width:100%;table-layout:fixed;border-collapse:collapse}
+    th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
+    td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
+    tbody tr:hover{background:#f7fbff}
+    .num{text-align:right}
+    .check-col,.star-col{width:36px;text-align:center}
+    .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.status-col{width:115px}
+    .ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}
+    .status-badge.draft{background:#fff4d6;color:#9a6700}
+    .status-badge.cancelled{background:#eef2f7;color:#667085}
+    .return-row{cursor:pointer}
+    .return-row.is-open{outline:2px solid #0070f4;outline-offset:-2px;background:#eef6ff}
+    .detail-row td{height:auto;padding:0;background:#fff;border-bottom:2px solid #0070f4}
+    .detail-card{border:2px solid #0070f4;border-top:0;padding:12px 18px 14px;background:#fff}
+    .detail-tabs{height:30px;display:flex;align-items:center;border-bottom:1px solid #dbe4ee;margin:-2px -18px 12px;padding:0 18px}
+    .detail-tab{font-size:13px;font-weight:800;color:#0070f4}
+    .detail-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:12px}
+    .detail-code{font-size:18px;font-weight:800;color:#111827;display:flex;align-items:center;gap:10px}
+    .detail-status{height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 8px;display:inline-flex;align-items:center;font-size:12px;font-weight:800}
+    .detail-branch{font-size:12px;color:#111827;margin-top:2px}
+    .detail-info{display:grid;grid-template-columns:280px 280px 1fr;gap:18px;margin-bottom:12px}
+    .info-line{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;gap:8px;font-size:12px;margin:8px 0;color:#111827}
+    .info-line input,.info-line select{height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 8px;font-size:12px;background:#fff}
+    .mini-table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:8px}
+    .mini-table th{height:31px;background:#f0f2f4;border-bottom:1px solid #cfd8e3;font-size:12px}
+    .mini-table td{height:36px;border-bottom:0;font-size:12px}
+    .mini-table input{height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 8px;font-size:12px;width:100%;background:#fff}
+    .detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:26px;margin-top:28px}
+    .detail-note{height:96px;border:1px solid #cfd8e3;border-radius:6px;padding:10px;font-size:12px;color:#667085}
+    .summary-line{display:flex;justify-content:space-between;font-size:12px;margin:9px 0;color:#111827}
+    .detail-actions{display:flex;justify-content:space-between;align-items:center;margin-top:20px}
+    .detail-actions-left,.detail-actions-right{display:flex;gap:18px;align-items:center}
+    .detail-btn{border:0;background:#fff;color:#111827;font-size:12px;cursor:pointer}
+    .detail-btn.box{height:30px;border:1px solid #cfd8e3;border-radius:5px;padding:0 10px}
+    .empty{height:420px;text-align:center;color:#111827}
+    .empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085}
+    .empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}
+    .empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
+    .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    @media(max-width:1100px){.return-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <form method="GET" action="/tra-hang-nhap" class="return-page">
+    <div class="return-shell">
+      <aside class="sidebar">
+        <h1 class="title">Trả hàng nhập</h1>
+        <div class="filter-block">
+          <div class="filter-title">Trạng thái</div>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã trả hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Thời gian</div>
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <span>›</span></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
+          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
+          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Người tạo</div>
+          <select class="filter-control" name="nguoi_tao" onchange="this.form.submit()">
+            <option value="">Chọn người tạo</option>
+            <% safeUsers.forEach(function(u) { %>
+              <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Người trả</div>
+          <select class="filter-control" name="nguoi_tra" onchange="this.form.submit()">
+            <option value="">Chọn người trả</option>
+            <% safeUsers.forEach(function(u) { %>
+              <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tra || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option>
+            <% }) %>
+          </select>
+        </div>
+      </aside>
+      <main class="main">
+        <div class="toolbar">
+          <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"></div>
+          <div class="actions">
+            <a class="kv-btn primary" href="/tra-hang-nhap/create">+ Trả hàng nhập</a>
+            <a class="kv-btn" href="/tra-hang-nhap/export.csv?<%= new URLSearchParams(safeFilters).toString() %>">Xuất file ▾</a>
+            <span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="check-col"><input type="checkbox"></th>
+                <th class="star-col">☆</th>
+                <th class="code-col">Mã trả hàng nhập</th>
+                <th class="time-col">Thời gian</th>
+                <th>Nhà cung cấp</th>
+                <th class="num money-col">Tổng tiền hàng</th>
+                <th class="num money-col">Giảm giá</th>
+                <th class="num money-col">NCC cần trả</th>
+                <th class="num money-col">NCC đã trả</th>
+                <th class="status-col">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (safeReturns.length) { %>
+                <% safeReturns.forEach(function(r) { %>
+                  <tr class="return-row" data-detail-id="<%= r._id %>">
+                    <td class="check-col"><input type="checkbox"></td>
+                    <td class="star-col">☆</td>
+                    <td class="ellipsis"><%= r.ma_phieu_tra_nhap || '' %></td>
+                    <td class="ellipsis"><%= formatDate(r.ngay_tra || r.created_at) %></td>
+                    <td class="ellipsis"><%= r.nha_cung_cap_id ? (r.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
+                    <td class="num"><%= fmt(r.tong_tien_hang || r.tong_tien_tra || 0) %></td>
+                    <td class="num"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmt(r.giam_gia || 0) %></td>
+                    <td class="num"><%= fmt(r.ncc_can_tra || r.tong_tien_tra || 0) %></td>
+                    <td class="num"><%= fmt(r.ncc_da_tra || 0) %></td>
+                    <td><span class="status-badge <%= badgeClass(r.trang_thai) %>"><%= statusLabel(r.trang_thai) %></span></td>
+                  </tr>
+                  <tr class="detail-row" id="detail-<%= r._id %>" style="display:none">
+                    <td colspan="10">
+                      <div class="detail-card">
+                        <div class="detail-tabs"><span class="detail-tab">Thông tin</span></div>
+                        <div class="detail-head">
+                          <div>
+                            <div class="detail-code"><%= r.ma_phieu_tra_nhap || '--' %> <span class="detail-status"><%= statusLabel(r.trang_thai) %></span></div>
+                            <% if (r.phieu_nhap_id) { %>
+                              <div class="detail-branch">Phiếu nhập gốc: <%= r.phieu_nhap_id.ma_phieu_nhap || '--' %></div>
+                            <% } %>
+                          </div>
+                          <div class="detail-branch"><%= r.kho_id ? (r.kho_id.ten_kho || r.kho_id.ma_kho || 'Chi nhánh trung tâm') : 'Chi nhánh trung tâm' %></div>
+                        </div>
+                        <div class="detail-info">
+                          <div>
+                            <div class="info-line"><span>Người tạo:</span><b><%= r.nguoi_tao_id ? (r.nguoi_tao_id.ho_ten || r.nguoi_tao_id.email || '--') : '--' %></b></div>
+                            <div class="info-line"><span>Tên NCC:</span><input readonly value="<%= r.nha_cung_cap_id ? ((r.nha_cung_cap_id.ma_ncc || '') + (r.nha_cung_cap_id.ma_ncc ? ' - ' : '') + (r.nha_cung_cap_id.ten_ncc || '')) : '' %>" placeholder="Tìm nhà cung cấp"></div>
+                          </div>
+                          <div>
+                            <div class="info-line"><span>Người trả:</span><select disabled><option><%= r.nguoi_tra_id ? (r.nguoi_tra_id.ho_ten || r.nguoi_tra_id.email || '--') : '--' %></option></select></div>
+                          </div>
+                          <div>
+                            <div class="info-line"><span>Ngày trả:</span><input readonly value="<%= formatDate(r.ngay_tra || r.created_at) %>"></div>
+                          </div>
+                        </div>
+                        <table class="mini-table">
+                          <thead>
+                            <tr>
+                              <th style="width:120px">Mã hàng</th>
+                              <th>Tên hàng</th>
+                              <th class="num" style="width:105px">Số lượng</th>
+                              <th class="num" style="width:130px">Giá nhập</th>
+                              <th class="num" style="width:130px">Giá trả lại</th>
+                              <th class="num" style="width:130px">Giảm giá trả lại</th>
+                              <th class="num" style="width:130px">Thành tiền</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <% if (!(r.detail_rows || []).length) { %>
+                              <tr><td colspan="7">Chưa có chi tiết hàng trả.</td></tr>
+                            <% } %>
+                            <% (r.detail_rows || []).forEach(function(item) { %>
+                              <tr>
+                                <td style="color:#0070f4"><%= item.hang_hoa_id ? (item.hang_hoa_id.ma_hang || '--') : '--' %></td>
+                                <td>
+                                  <%= item.hang_hoa_id ? (item.hang_hoa_id.ten_hang || '--') : '--' %>
+                                  <% if (item.lo_hang_id) { %>
+                                    <div style="font-size:11px;color:#667085">Lô: <%= item.lo_hang_id.ma_lo || item.lo_hang_id.ten_lo || '--' %></div>
+                                  <% } %>
+                                </td>
+                                <td class="num"><%= fmt(item.so_luong || 0) %></td>
+                                <td class="num"><%= fmt(item.gia_nhap || item.don_gia || 0) %></td>
+                                <td class="num"><%= fmt(item.gia_tra_lai || item.don_gia || 0) %></td>
+                                <td class="num">0</td>
+                                <td class="num"><%= fmt(item.thanh_tien || 0) %></td>
+                              </tr>
+                            <% }) %>
+                          </tbody>
+                        </table>
+                        <div class="detail-bottom">
+                          <div class="detail-note"><%= r.ghi_chu || 'Ghi chú...' %></div>
+                          <div>
+                            <div class="summary-line"><span>Số lượng mặt hàng</span><b><%= fmt(r.detail_summary ? r.detail_summary.tong_mat_hang : 0) %></b></div>
+                            <div class="summary-line"><span>Tổng tiền hàng (<%= fmt(r.detail_summary ? r.detail_summary.tong_so_luong : 0) %>)</span><b><%= fmt(r.tong_tien_hang || r.tong_tien_tra || 0) %></b></div>
+                            <div class="summary-line"><span>Giảm giá</span><b><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmt(r.giam_gia || 0) %></b></div>
+                            <div class="summary-line"><span>NCC cần trả</span><b><%= fmt(r.ncc_can_tra || r.tong_tien_tra || 0) %></b></div>
+                            <div class="summary-line"><span>NCC đã trả</span><b><%= fmt(r.ncc_da_tra || 0) %></b></div>
+                          </div>
+                        </div>
+                        <div class="detail-actions">
+                          <div class="detail-actions-left">
+                            <button class="detail-btn" type="button">Hủy</button>
+                            <button class="detail-btn" type="button">Sao chép</button>
+                            <button class="detail-btn" type="button">Xuất file</button>
+                          </div>
+                          <div class="detail-actions-right">
+                            <button class="detail-btn box" type="button">Lưu</button>
+                            <button class="detail-btn box" type="button">In</button>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              <% } else { %>
+                <tr>
+                  <td colspan="10" class="empty">
+                    <div class="empty-box">
+                      <div class="empty-icon">▤</div>
+                      <div class="empty-title">Không tìm thấy kết quả</div>
+                      <div>Không tìm thấy giao dịch nào phù hợp trong tháng này.</div>
+                    </div>
+                  </td>
+                </tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+      </main>
+    </div>
+  </form>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.return-row').forEach(function(row) {
+        row.addEventListener('click', function(e) {
+          if (e.target && e.target.closest('input,button,a,select')) return;
+          var id = row.getAttribute('data-detail-id');
+          var detail = document.getElementById('detail-' + id);
+          if (!detail) return;
+          var isOpen = detail.style.display !== 'none';
+          document.querySelectorAll('.detail-row').forEach(function(x) { x.style.display = 'none'; });
+          document.querySelectorAll('.return-row').forEach(function(x) { x.classList.remove('is-open'); });
+          if (!isOpen) {
+            detail.style.display = 'table-row';
+            row.classList.add('is-open');
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

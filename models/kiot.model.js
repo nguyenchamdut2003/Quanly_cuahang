@@ -608,14 +608,22 @@ CtPhieuNhapSchema.index(
 );
 const PhieuTraHangNhapSchema = new Schema({
   cua_hang_id: { type: ObjectId, ref: 'CuaHang', required: true },
+  kho_id: { type: ObjectId, ref: 'Kho' },
   ma_phieu_tra_nhap: { type: String, unique: true, sparse: true },
   ngay_tra: { type: Date, default: Date.now },
   nha_cung_cap_id: { type: ObjectId, ref: 'NhaCungCap' },
   phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
+  tong_tien_hang: { type: Number, default: 0 },
+  giam_gia: { type: Number, default: 0 },
+  kieu_giam_gia: { type: String, enum: ['vnd', 'percent'], default: 'vnd' },
+  ncc_can_tra: { type: Number, default: 0 },
+  ncc_da_tra: { type: Number, default: 0 },
+  tinh_vao_cong_no: { type: Boolean, default: true },
   tong_tien_tra: { type: Number, default: 0 },
   trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'completed' },
   ly_do: { type: String },
   ghi_chu: { type: String },
+  nguoi_tra_id: { type: ObjectId, ref: 'NguoiDung' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' }
 }, {
   collection: 'phieu_tra_hang_nhap',
@@ -623,9 +631,16 @@ const PhieuTraHangNhapSchema = new Schema({
 });
 const CtPhieuTraHangNhapSchema = new Schema({
   phieu_tra_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap', required: true },
+  phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
+  ct_phieu_nhap_id: { type: ObjectId, ref: 'CTPhieuNhap' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa', required: true },
+  lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  don_vi_tinh_id: { type: ObjectId, ref: 'DonViTinh' },
   so_luong: { type: Number, default: 0 },
   don_gia: { type: Number, default: 0 },
+  gia_nhap: { type: Number, default: 0 },
+  gia_tra_lai: { type: Number, default: 0 },
+  ghi_chu: { type: String },
   thanh_tien: { type: Number, default: 0 }
 }, {
   collection: 'ct_phieu_tra_hang_nhap',
@@ -667,7 +682,7 @@ const LichSuKhoSchema = new Schema({
 
   loai_phieu: {
     type: String,
-    enum: ['nhap_hang', 'kiem_kho', 'ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
+    enum: ['nhap_hang', 'tra_hang_nhap', 'kiem_kho', 'ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
     required: true
   },
 
@@ -721,6 +736,11 @@ const CongNoNhaCungCapSchema = new Schema({
   phieu_nhap_id: {
     type: ObjectId,
     ref: 'PhieuNhap'
+  },
+
+  phieu_tra_nhap_id: {
+    type: ObjectId,
+    ref: 'PhieuTraHangNhap'
   },
 
   phieu_thu_chi_id: {

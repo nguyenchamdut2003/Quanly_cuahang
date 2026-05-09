@@ -1,0 +1,16 @@
+const express = require('express');
+const router = express.Router();
+const { isAuthenticated } = require('../middlewares/auth.middleware');
+const controller = require('../controllers/traHangNhap.controller');
+
+router.use(isAuthenticated);
+
+router.get('/', controller.index);
+router.get('/export.csv', controller.exportCsv);
+router.get('/create', controller.createPage);
+router.post('/', controller.createSubmit);
+router.get('/:id', controller.detail);
+router.post('/:id/complete', controller.complete);
+router.post('/:id/cancel', controller.cancel);
+
+module.exports = router;

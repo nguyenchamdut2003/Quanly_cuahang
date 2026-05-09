@@ -1,0 +1,427 @@
+<%
+  const safeWarehouses = Array.isArray(locals.warehouses) ? locals.warehouses : [];
+  const safeSuppliers = Array.isArray(locals.suppliers) ? locals.suppliers : [];
+  const safeReceipts = Array.isArray(locals.receipts) ? locals.receipts : [];
+  const creatorName = user ? (user.ho_ten || user.email || 'Người dùng') : 'Người dùng';
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    body.admin-body{background:#f3f6f9}
+    .create-page{height:calc(100vh - 98px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}
+    .left{min-width:0;display:flex;flex-direction:column}
+    .topline{height:52px;display:flex;align-items:center;gap:12px;position:relative}
+    .back{width:28px;text-align:center;font-size:24px;color:#111827;text-decoration:none;line-height:1}
+    .title{font-size:20px;font-weight:800;color:#111827;white-space:nowrap}
+    .search{width:620px;height:32px;border:1px solid #0070f4;border-radius:6px;padding:0 12px;font-size:13px;outline:none;background:#fff}
+    .product-pop{position:absolute;top:44px;left:178px;width:620px;max-height:310px;overflow:auto;background:#fff;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 12px 28px rgba(15,23,42,.16);z-index:30;display:none}
+    .product-row{display:grid;grid-template-columns:90px minmax(0,1fr) 90px 70px;gap:8px;padding:9px 10px;border-bottom:1px solid #eef2f7;cursor:pointer;font-size:13px}
+    .product-row:hover{background:#f0f7ff}
+    .grid-wrap{flex:1;min-height:0;background:#fff;border:1px solid #cfd8e3;overflow:auto}
+    table{width:100%;table-layout:fixed;border-collapse:collapse}
+    th{height:34px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:12px;font-weight:800;padding:0 8px;text-align:left}
+    td{height:40px;border-bottom:1px solid #edf1f5;padding:0 8px;font-size:13px;color:#111827}
+    .num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.lot{width:118px}.smallqty{width:118px}.qty{width:105px}.money{width:122px}.remove{width:42px}
+    .cell-input{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 7px;text-align:right;font-size:13px}
+    .lot-select{display:block;width:260px;max-width:100%;height:25px;margin-top:5px;border:1px solid #cfd8e3;border-radius:5px;font-size:12px;color:#475467}
+    .empty{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#111827}
+    .empty small{color:#0070f4;margin-top:12px}
+    .right{background:#fff;border-left:1px solid #dbe4ee;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}
+    .mini-tools{display:flex;justify-content:flex-start;gap:6px}
+    .tool{width:29px;height:29px;border:1px solid #cfd8e3;background:#fff;border-radius:5px}
+    .field{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:10px;font-size:13px;color:#111827}
+    .field label{font-weight:600}
+    .control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px;font-size:13px;background:#fff;outline:none}
+    .supplier-link{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#f8fafc;padding:0 9px;display:flex;align-items:center;color:#0070f4;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .supplier-link.is-empty{color:#667085;font-weight:400;pointer-events:none}
+    .readonly{height:31px;display:flex;align-items:center;justify-content:flex-end;color:#111827}
+    .readonly.blue{color:#0070f4;font-weight:800}
+    .note{height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:none}
+    .switch-line{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+    .switch-line input{accent-color:#0070f4}
+    .footer-actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn{height:38px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer}
+    .btn.primary{background:#0070f4;color:#fff}
+    .danger{color:#dc2626;border:0;background:transparent;cursor:pointer}
+    .error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
+    @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}.product-pop{left:120px;width:420px}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="create-page">
+    <section class="left">
+      <div class="topline">
+        <a class="back" href="/tra-hang-nhap">‹</a>
+        <div class="title">Trả hàng nhập</div>
+        <input id="productSearch" class="search" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)" autocomplete="off">
+        <div id="productPop" class="product-pop"></div>
+      </div>
+      <div class="grid-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="stt center">STT</th>
+              <th class="code">Mã hàng</th>
+              <th>Tên hàng</th>
+              <th class="unit">ĐVT</th>
+              <th class="lot">Lô hàng</th>
+              <th class="smallqty num">SL đã nhập</th>
+              <th class="smallqty num">Còn có thể trả</th>
+              <th class="qty num">Số lượng trả</th>
+              <th class="money num">Giá nhập</th>
+              <th class="money num">Giá trả lại</th>
+              <th class="money num">Thành tiền</th>
+              <th class="remove"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody">
+            <tr><td colspan="11"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <aside class="right">
+      <div class="mini-tools"><button class="tool">⌘</button><button class="tool">⎙</button><button class="tool">!</button></div>
+      <div id="errorBox" class="error"></div>
+      <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
+      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayTra" type="datetime-local" value="<%= todayValue %>"></div>
+      <div class="field">
+        <label>Kho trả</label>
+        <select id="khoId" class="control">
+          <option value="">Chọn kho trả</option>
+          <% safeWarehouses.forEach(function(k, idx) { %>
+            <option value="<%= k._id %>"><%= k.ten_kho || k.ma_kho %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label>Phiếu nhập gốc</label>
+        <select id="phieuNhapId" class="control" disabled>
+          <option value="">Chọn kho trước</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Nhà cung cấp</label>
+        <input type="hidden" id="nccId" name="nha_cung_cap_id" value="">
+        <a id="nccLink" class="supplier-link is-empty" href="#" tabindex="-1">Tự động theo phiếu nhập</a>
+      </div>
+      <div class="field"><label>Mã trả hàng nhập</label><input id="maPhieu" class="control" value="<%= nextCode %>" placeholder="Mã phiếu tự động"></div>
+      <div class="field"><label>Trạng thái</label><div>Phiếu tạm</div></div>
+      <div class="field"><label>Tổng tiền hàng</label><div class="readonly" id="tongTienHang">0</div></div>
+      <div class="field"><label>Giảm giá</label><input id="giamGia" class="control" inputmode="numeric" value="0"></div>
+      <div class="field">
+        <label>Kiểu giảm giá</label>
+        <select id="kieuGiamGia" class="control"><option value="vnd">VND</option><option value="percent">%</option></select>
+      </div>
+      <div class="field"><label>Nhà cung cấp cần trả</label><div class="readonly blue" id="nccCanTra">0</div></div>
+      <div class="field"><label>Tiền nhà cung cấp trả</label><input id="nccDaTra" class="control" inputmode="numeric" value="0"></div>
+      <label class="switch-line"><span>Tính vào công nợ</span><input id="tinhCongNo" type="checkbox" checked></label>
+      <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
+      <div class="footer-actions">
+        <button class="btn" type="button" onclick="submitReturn('draft')">Lưu tạm</button>
+        <button class="btn primary" type="button" onclick="submitReturn('completed')">Hoàn thành</button>
+      </div>
+    </aside>
+  </main>
+  <script>
+    const products = <%- productsJson || '[]' %>;
+    let items = [];
+    let selectedPurchaseSupplierId = '';
+    let currentKhoId = '';
+    let loadingPurchases = false;
+    const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const money = raw => Math.max(0, Math.floor(Number(String(raw || '').replace(/\./g, '').replace(/,/g, '')) || 0));
+
+    const search = document.getElementById('productSearch');
+    const pop = document.getElementById('productPop');
+    const body = document.getElementById('itemsBody');
+
+    function currentKho(){ return document.getElementById('khoId').value; }
+    function showError(msg){ const box=document.getElementById('errorBox'); box.textContent=msg; box.style.display='block'; }
+    function clearError(){ document.getElementById('errorBox').style.display='none'; }
+    function setSupplierLink(supplier) {
+      const hidden = document.getElementById('nccId');
+      const link = document.getElementById('nccLink');
+      if (!supplier || !supplier._id) {
+        hidden.value = '';
+        link.textContent = 'Tự động theo phiếu nhập';
+        link.href = '#';
+        link.tabIndex = -1;
+        link.classList.add('is-empty');
+        return;
+      }
+      hidden.value = supplier._id;
+      link.textContent = [supplier.ma_ncc, supplier.ten_ncc].filter(Boolean).join(' - ');
+      link.href = '/nha-cung-cap?supplier=' + encodeURIComponent(supplier._id);
+      link.tabIndex = 0;
+      link.classList.remove('is-empty');
+    }
+    function resetReturnState() {
+      items = [];
+      selectedPurchaseSupplierId = '';
+      setSupplierLink(null);
+      document.getElementById('phieuNhapId').value = '';
+      document.getElementById('giamGia').value = 0;
+      document.getElementById('nccDaTra').value = 0;
+      renderItems();
+      renderTotals();
+    }
+    function setPurchasePlaceholder(text, disabled) {
+      const select = document.getElementById('phieuNhapId');
+      select.innerHTML = `<option value="">${text}</option>`;
+      select.disabled = Boolean(disabled);
+    }
+    function formatDateOnly(value) {
+      if (!value) return '';
+      return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+    async function loadPurchasesByWarehouse(khoId) {
+      const select = document.getElementById('phieuNhapId');
+      if (!khoId) {
+        setPurchasePlaceholder('Chọn kho trước', true);
+        return;
+      }
+      loadingPurchases = true;
+      setPurchasePlaceholder('Đang tải phiếu nhập...', true);
+      try {
+        const res = await fetch('/api/phieu-nhap?kho_id=' + encodeURIComponent(khoId));
+        const data = await res.json();
+        if (!data.success) {
+          setPurchasePlaceholder('Không tải được phiếu nhập', true);
+          showError(data.message || 'Không thể tải phiếu nhập theo kho');
+          return;
+        }
+        const rows = data.items || [];
+        if (!rows.length) {
+          setPurchasePlaceholder('Không có phiếu nhập hoàn thành trong kho này', true);
+          return;
+        }
+        select.innerHTML = '<option value="">Chọn phiếu nhập gốc</option>' + rows.map(row => {
+          const supplier = row.nha_cung_cap || {};
+          const supplierName = supplier.ten_ncc || supplier.ma_ncc || '';
+          const label = [row.ma_phieu_nhap || '', formatDateOnly(row.ngay_nhap), supplierName].filter(Boolean).join(' - ');
+          return `<option value="${row._id}" data-ncc="${row.nha_cung_cap_id || ''}" data-kho="${row.kho_id || ''}">${label}</option>`;
+        }).join('');
+        select.disabled = false;
+      } catch (error) {
+        setPurchasePlaceholder('Không tải được phiếu nhập', true);
+        showError('Lỗi kết nối khi tải phiếu nhập theo kho');
+      } finally {
+        loadingPurchases = false;
+      }
+    }
+
+    function productStock(p){
+      const byKho = p.ton_kho_by_kho || {};
+      return Number(byKho[currentKho()] || 0);
+    }
+
+    function renderSearch() {
+      const key = search.value.trim().toLowerCase();
+      if (!key) { pop.style.display = 'none'; return; }
+      const rows = products.filter(p => (p.ma_hang + ' ' + p.ten_hang).toLowerCase().includes(key)).slice(0, 30);
+      pop.innerHTML = rows.length ? rows.map(p => `
+        <div class="product-row" onclick="addProduct('${p._id}')">
+          <b>${p.ma_hang || ''}</b><span>${p.ten_hang || ''}</span><span class="num">${fmt(p.gia_nhap || 0)}</span><span class="num">Tồn ${fmt(productStock(p))}</span>
+        </div>`).join('') : '<div class="product-row">Không tìm thấy hàng hóa</div>';
+      pop.style.display = 'block';
+    }
+
+    function addProduct(id) {
+      if (document.getElementById('phieuNhapId').value) {
+        showError('Đã chọn phiếu nhập gốc, không thêm hàng ngoài phiếu nhập này');
+        return;
+      }
+      const p = products.find(x => x._id === id);
+      if (!p) return;
+      const existed = items.find(x => x.hang_hoa_id === id && !x.lo_hang_id);
+      if (existed) existed.so_luong += 1;
+      else items.push({
+        hang_hoa_id: p._id,
+        ma_hang: p.ma_hang,
+        ten_hang: p.ten_hang,
+        don_vi_tinh: p.don_vi_tinh || '',
+        quan_ly_theo_lo: !!p.quan_ly_theo_lo,
+        lo_hang_id: '',
+        ma_lo: '',
+        so_luong_nhap: 0,
+        tong_so_luong_da_tra: 0,
+        so_luong_con_co_the_tra: productStock(p),
+        ton_kho_hien_tai: productStock(p),
+        so_luong_toi_da_tra: productStock(p),
+        so_luong: 1,
+        gia_nhap: Number(p.gia_nhap || 0),
+        gia_tra_lai: Number(p.gia_nhap || 0)
+      });
+      search.value = '';
+      pop.style.display = 'none';
+      renderItems();
+    }
+
+    function lotOptions(item) {
+      const p = products.find(x => x._id === item.hang_hoa_id);
+      if (!p || !p.quan_ly_theo_lo) return '<option value="">Không quản lý lô</option>';
+      const lots = (p.lots || []).filter(l => !l.kho_id || l.kho_id === currentKho());
+      return '<option value="">Tự chọn FEFO</option>' + lots.map(l => `<option value="${l._id}" ${item.lo_hang_id === l._id ? 'selected' : ''}>${l.ma_lo || l.ten_lo} - SL ${fmt(l.so_luong)}</option>`).join('');
+    }
+
+    function renderItems() {
+      if (!items.length) {
+        body.innerHTML = '<tr><td colspan="11"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>';
+        renderTotals();
+        return;
+      }
+      body.innerHTML = items.map((it, idx) => {
+        const line = Number(it.so_luong || 0) * Number(it.gia_tra_lai || 0);
+        return `<tr>
+          <td class="center">${idx + 1}</td>
+          <td>${it.ma_hang || ''}</td>
+          <td>${it.ten_hang || ''}${it.quan_ly_theo_lo && !it.ct_phieu_nhap_id ? `<select class="lot-select" onchange="updateItem(${idx}, 'lo_hang_id', this.value)">${lotOptions(it)}</select>` : ''}</td>
+          <td>${it.don_vi_tinh || ''}</td>
+          <td>${it.ma_lo || ''}</td>
+          <td class="num">${fmt(it.so_luong_nhap || 0)}</td>
+          <td class="num" title="Tồn hiện tại: ${fmt(it.ton_kho_hien_tai || 0)}">${fmt(it.so_luong_con_co_the_tra || 0)}</td>
+          <td><input class="cell-input" type="number" min="0" max="${it.so_luong_toi_da_tra != null ? it.so_luong_toi_da_tra : ''}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
+          <td><input class="cell-input" inputmode="numeric" value="${it.gia_nhap}" onchange="updateItem(${idx}, 'gia_nhap', this.value)" ${it.ct_phieu_nhap_id ? 'readonly' : ''}></td>
+          <td><input class="cell-input" inputmode="numeric" value="${it.gia_tra_lai}" onchange="updateItem(${idx}, 'gia_tra_lai', this.value)"></td>
+          <td class="num"><b>${fmt(line)}</b></td>
+          <td class="center"><button type="button" class="danger" onclick="removeItem(${idx})">×</button></td>
+        </tr>`;
+      }).join('');
+      renderTotals();
+    }
+
+    function updateItem(idx, field, value) {
+      if (!items[idx]) return;
+      if (field === 'so_luong') {
+        const maxQty = Number(items[idx].so_luong_toi_da_tra != null ? items[idx].so_luong_toi_da_tra : items[idx].so_luong_con_co_the_tra || 0);
+        items[idx][field] = Math.min(money(value), Math.max(0, maxQty));
+      } else if (['gia_nhap', 'gia_tra_lai'].includes(field)) items[idx][field] = money(value);
+      else items[idx][field] = value;
+      renderItems();
+    }
+    function removeItem(idx) { items.splice(idx, 1); renderItems(); }
+
+    function renderTotals() {
+      const total = items.reduce((sum, it) => sum + Number(it.so_luong || 0) * Number(it.gia_tra_lai || 0), 0);
+      const type = document.getElementById('kieuGiamGia').value;
+      const discount = money(document.getElementById('giamGia').value);
+      const discountMoney = type === 'percent' ? Math.floor(total * Math.min(100, discount) / 100) : Math.min(discount, total);
+      const canPay = Math.max(0, total - discountMoney);
+      document.getElementById('tongTienHang').textContent = fmt(total);
+      document.getElementById('nccCanTra').textContent = fmt(canPay);
+    }
+
+    async function submitReturn(mode) {
+      clearError();
+      const sendItems = items.filter(it => Number(it.so_luong || 0) > 0);
+      if (!sendItems.length) return showError('Vui lòng nhập số lượng trả cho ít nhất một hàng hóa');
+      if (!document.getElementById('khoId').value) return showError('Vui lòng chọn kho trả hàng');
+      const purchaseId = document.getElementById('phieuNhapId').value;
+      if (!purchaseId) return showError('Vui lòng chọn phiếu nhập gốc');
+      if (purchaseId && selectedPurchaseSupplierId && document.getElementById('nccId').value !== selectedPurchaseSupplierId) {
+        return showError('Không cho chọn nhà cung cấp khác với phiếu nhập gốc');
+      }
+      const payload = {
+        submitMode: mode,
+        kho_id: document.getElementById('khoId').value,
+        nha_cung_cap_id: document.getElementById('nccId').value,
+        phieu_nhap_id: document.getElementById('phieuNhapId').value,
+        ma_phieu_tra_nhap: document.getElementById('maPhieu').value,
+        ngay_tra: document.getElementById('ngayTra').value,
+        giam_gia: document.getElementById('giamGia').value,
+        kieu_giam_gia: document.getElementById('kieuGiamGia').value,
+        ncc_da_tra: document.getElementById('nccDaTra').value,
+        tinh_vao_cong_no: document.getElementById('tinhCongNo').checked,
+        ghi_chu: document.getElementById('ghiChu').value,
+        items_json: JSON.stringify(sendItems.map(it => ({
+          ct_phieu_nhap_id: it.ct_phieu_nhap_id,
+          phieu_nhap_id: purchaseId || it.phieu_nhap_id,
+          hang_hoa_id: it.hang_hoa_id,
+          lo_hang_id: it.lo_hang_id,
+          so_luong: it.so_luong,
+          gia_nhap: it.gia_nhap,
+          gia_tra_lai: it.gia_tra_lai
+        })))
+      };
+      const res = await fetch('/tra-hang-nhap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) return showError(data.message || 'Không thể lưu phiếu trả hàng nhập');
+      location.href = data.redirect || '/tra-hang-nhap';
+    }
+
+    search.addEventListener('input', renderSearch);
+    document.addEventListener('click', e => { if (!e.target.closest('.product-pop') && e.target !== search) pop.style.display = 'none'; });
+    document.getElementById('khoId').addEventListener('focus', function() {
+      currentKhoId = this.value;
+    });
+    document.getElementById('khoId').addEventListener('change', async function() {
+      const nextKhoId = this.value;
+      if ((items.length || document.getElementById('phieuNhapId').value) && currentKhoId && nextKhoId !== currentKhoId) {
+        if (!confirm('Đổi kho sẽ xóa danh sách hàng trả hiện tại. Tiếp tục?')) {
+          this.value = currentKhoId;
+          return;
+        }
+      }
+      currentKhoId = nextKhoId;
+      clearError();
+      resetReturnState();
+      await loadPurchasesByWarehouse(nextKhoId);
+    });
+    document.getElementById('giamGia').addEventListener('input', renderTotals);
+    document.getElementById('kieuGiamGia').addEventListener('change', renderTotals);
+    document.getElementById('phieuNhapId').addEventListener('change', async function() {
+      clearError();
+      const purchaseId = this.value;
+      if (!document.getElementById('khoId').value) {
+        this.value = '';
+        return showError('Vui lòng chọn kho trả trước');
+      }
+      items = [];
+      selectedPurchaseSupplierId = '';
+      setSupplierLink(null);
+      document.getElementById('giamGia').value = 0;
+      document.getElementById('nccDaTra').value = 0;
+      renderItems();
+      if (!purchaseId) {
+        search.disabled = false;
+        return;
+      }
+      search.disabled = true;
+      try {
+        const res = await fetch('/api/phieu-nhap/' + purchaseId + '/chi-tiet-tra-hang?kho_id=' + encodeURIComponent(document.getElementById('khoId').value));
+        const data = await res.json();
+        if (!data.success) return showError(data.message || 'Không thể tải chi tiết phiếu nhập');
+        const payload = data.data || {};
+        const ticket = payload.phieu_nhap || {};
+        const supplier = payload.nha_cung_cap || ticket.nha_cung_cap || null;
+        selectedPurchaseSupplierId = supplier && supplier._id ? supplier._id : (ticket.nha_cung_cap_id || '');
+        setSupplierLink(supplier || (selectedPurchaseSupplierId ? { _id: selectedPurchaseSupplierId } : null));
+        if (ticket.kho_id && ticket.kho_id !== document.getElementById('khoId').value) {
+          return showError('Phiếu nhập không thuộc kho trả đã chọn');
+        }
+        items = (payload.items || payload.chi_tiet || []).map(row => Object.assign({}, row, {
+          so_luong: '',
+          gia_nhap: Number(row.gia_nhap || 0),
+          gia_tra_lai: Number(row.gia_tra_lai || row.gia_nhap || 0),
+          thanh_tien: 0
+        }));
+        renderItems();
+      } catch (error) {
+        showError('Lỗi kết nối khi tải chi tiết phiếu nhập');
+      }
+    });
+    setPurchasePlaceholder('Chọn kho trước', true);
+  </script>
+</body>
+</html>
