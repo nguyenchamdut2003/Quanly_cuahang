@@ -7,6 +7,7 @@ const {
     Kho, LoHang, CongNoNhaCungCap
 } = require('../models/kiot.model');
 const { congTonKho } = require('../services/kho.service');
+const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
 
 router.use(isAuthenticated);
 
@@ -426,17 +427,36 @@ router.post('/add', async (req, res, next) => {
 
         if (phieu.trang_thai === 'completed' && nha_cung_cap_id) {
             await NhaCungCap.findByIdAndUpdate(nha_cung_cap_id, {
-                $inc: { tong_mua: tong_tien, tong_no: con_no_ncc }
+                $inc: { tong_mua: tong_tien, tong_no: tong_tien }
             });
 
-            if (con_no_ncc > 0) {
+            if (tong_tien > 0) {
                 await CongNoNhaCungCap.create({
+                    cua_hang_id: phieu.cua_hang_id,
                     nha_cung_cap_id,
                     phieu_nhap_id: phieu._id,
-                    so_tien: con_no_ncc,
+                    so_tien: tong_tien,
                     loai: 'tang_no',
                     ghi_chu: `Cong no phieu nhap ${ma_phieu_nhap}`,
                     ngay: new Date()
+                });
+            }
+
+            if (da_tra_ncc > 0) {
+                const cashBook = await ensureDefaultSoQuy(phieu.cua_hang_id);
+                await taoPhieuThuChi({
+                    loai_phieu: 'chi',
+                    loai_thu_chi: 'Chi tra nha cung cap',
+                    gia_tri: da_tra_ncc,
+                    so_quy_id: cashBook._id,
+                    cua_hang_id: phieu.cua_hang_id,
+                    nguoi_tao_id: req.user?._id,
+                    nha_cung_cap_id,
+                    phieu_nhap_id: phieu._id,
+                    ma_chung_tu_goc: ma_phieu_nhap,
+                    nhom_doi_tuong: 'nha_cung_cap',
+                    phuong_thuc_thanh_toan: ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(phuong_thuc_thanh_toan) ? phuong_thuc_thanh_toan : 'tien_mat',
+                    hach_toan: true
                 });
             }
         }

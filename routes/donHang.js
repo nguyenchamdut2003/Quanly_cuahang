@@ -17,6 +17,7 @@ const {
     VanDon,
     PhieuThuChi,
     CongNoKhachHang,
+    SoQuy,
     Kho,
     BangGia,
     CTBangGia,
@@ -25,6 +26,7 @@ const {
 } = require('../models/kiot.model');
 const { truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
+const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
 
 router.use(isAuthenticated);
 
@@ -157,6 +159,27 @@ function dateRange(query = {}, fromKey, toKey, fallbackThisMonth) {
     if (from && !Number.isNaN(from.getTime())) range.$gte = from;
     if (to && !Number.isNaN(to.getTime())) range.$lte = to;
     return Object.keys(range).length ? range : null;
+}
+
+function normalizeInvoiceStatus(value) {
+    const status = String(value || '').trim();
+    if (['processing', 'completed', 'failed', 'cancelled'].includes(status)) return status;
+    if (status === 'draft' || status === 'shipping') return 'processing';
+    if (status === 'done' || status === 'paid') return 'completed';
+    return 'processing';
+}
+
+function normalizePaymentMethodValue(value) {
+    const method = String(value || '').trim();
+    if (['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(method)) return method;
+    if (/chuyển|chuyen|bank/i.test(method)) return 'chuyen_khoan';
+    if (/ví|vi/i.test(method)) return 'vi_dien_tu';
+    if (/cod/i.test(method)) return 'khac';
+    return 'tien_mat';
+}
+
+function isEnabled(value) {
+    return value === true || value === 'true' || value === 'on' || value === '1';
 }
 
 function applyIdIntersection(filter, field, ids) {
@@ -361,23 +384,30 @@ async function buildInvoiceFilter(query = {}) {
 
     const saleRange = dateRange(query, 'date_from', 'date_to', query.time_type === 'this_month');
     if (saleRange) filter.ngay_ban = saleRange;
-    if (query.phuong_thuc_tt && query.phuong_thuc_tt.trim() !== '') filter.phuong_thuc_tt = query.phuong_thuc_tt.trim();
+    if (query.phuong_thuc_tt && query.phuong_thuc_tt.trim() !== '') filter.phuong_thuc_tt = { $regex: query.phuong_thuc_tt.trim(), $options: 'i' };
 
-    const sellerIds = await userIdFilter(query.nguoi_ban || query.nguoi_tao || '');
+    const sellerIds = await userIdFilter(query.nguoi_ban || '');
     if (sellerIds) filter.nguoi_ban_id = { $in: sellerIds };
+    const creatorIds = await userIdFilter(query.nguoi_tao || '');
+    if (creatorIds && !filter.nguoi_ban_id) filter.nguoi_ban_id = { $in: creatorIds };
 
     const shipmentFilter = {};
     if (query.doi_tac && query.doi_tac !== 'all') shipmentFilter.doi_tac_giao_hang_id = query.doi_tac;
     if (query.trang_thai_giao_hang && query.trang_thai_giao_hang !== 'all') shipmentFilter.trang_thai = query.trang_thai_giao_hang;
     if (query.khu_vuc && query.khu_vuc.trim() !== '') shipmentFilter.dia_chi_nhan = { $regex: query.khu_vuc.trim(), $options: 'i' };
-    const deliveryRange = dateRange(query, 'delivery_from', 'delivery_to', false);
+    const deliveryRange = dateRange(query, 'delivery_from', 'delivery_to', query.delivery_time_type === 'this_month');
     if (deliveryRange) shipmentFilter.created_at = deliveryRange;
 
     const invoiceTypes = cleanArray(query.loai_hoa_don);
     const needsShipmentLookup = Object.keys(shipmentFilter).length || invoiceTypes.length;
     if (needsShipmentLookup) {
-        const shipments = await VanDon.find(shipmentFilter).select('hoa_don_id');
+        const shipments = await VanDon.find(shipmentFilter).select('hoa_don_id don_hang_id');
         const shipmentInvoiceIds = shipments.map(item => item.hoa_don_id).filter(Boolean);
+        const shipmentOrderIds = shipments.map(item => item.don_hang_id).filter(Boolean);
+        if (shipmentOrderIds.length) {
+            const invoicesByOrder = await HoaDonBanHang.find({ don_hang_id: { $in: shipmentOrderIds } }).select('_id');
+            shipmentInvoiceIds.push(...invoicesByOrder.map(item => item._id));
+        }
         if (invoiceTypes.includes('giao_hang') && !invoiceTypes.includes('khong_giao_hang')) {
             applyIdIntersection(filter, '_id', shipmentInvoiceIds);
         } else if (invoiceTypes.includes('khong_giao_hang') && !invoiceTypes.includes('giao_hang')) {
@@ -389,6 +419,60 @@ async function buildInvoiceFilter(query = {}) {
     }
 
     return filter;
+}
+
+async function decorateInvoices(invoices) {
+    const invoiceIds = invoices.map(item => item._id);
+    const orderIds = invoices.map(item => item.don_hang_id?._id || item.don_hang_id).filter(Boolean);
+    const [shipments, receipts, returns, debts] = await Promise.all([
+        VanDon.find({
+            $or: [
+                { hoa_don_id: { $in: invoiceIds } },
+                { don_hang_id: { $in: orderIds } }
+            ]
+        }).populate('doi_tac_giao_hang_id').lean(),
+        PhieuThuChi.find({ hoa_don_id: { $in: invoiceIds }, loai_phieu: 'thu', trang_thai: { $ne: 'cancelled' } }).lean(),
+        PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' } }).lean(),
+        CongNoKhachHang.find({ hoa_don_id: { $in: invoiceIds } }).lean()
+    ]);
+
+    const shipmentByInvoice = {};
+    shipments.forEach(row => {
+        if (row.hoa_don_id) shipmentByInvoice[String(row.hoa_don_id)] = row;
+    });
+    shipments.forEach(row => {
+        if (!row.don_hang_id) return;
+        const invoice = invoices.find(item => String(item.don_hang_id?._id || item.don_hang_id || '') === String(row.don_hang_id));
+        if (invoice && !shipmentByInvoice[String(invoice._id)]) shipmentByInvoice[String(invoice._id)] = row;
+    });
+
+    const paidByInvoice = receipts.reduce((map, row) => {
+        const key = String(row.hoa_don_id || '');
+        map[key] = (map[key] || 0) + Number(row.gia_tri || 0);
+        return map;
+    }, {});
+    const returnByInvoice = returns.reduce((map, row) => {
+        const key = String(row.hoa_don_id || '');
+        if (!map[key]) map[key] = row;
+        return map;
+    }, {});
+    const debtByInvoice = debts.reduce((map, row) => {
+        const key = String(row.hoa_don_id || '');
+        map[key] = (map[key] || 0) + Number(row.so_tien || 0);
+        return map;
+    }, {});
+
+    return invoices.map(invoice => {
+        const object = invoice.toObject ? invoice.toObject() : invoice;
+        const id = String(object._id);
+        object.van_don = shipmentByInvoice[id] || null;
+        object.phieu_tra_hang = returnByInvoice[id] || null;
+        object.khach_da_tra = paidByInvoice[id] || 0;
+        object.con_no = Math.max(0, Number(object.thanh_toan || 0) - object.khach_da_tra);
+        object.cong_no_phat_sinh = debtByInvoice[id] || 0;
+        object.trang_thai_chuan = normalizeInvoiceStatus(object.trang_thai);
+        return object;
+    });
 }
 
 async function buildReturnFilter(query = {}) {
@@ -684,7 +768,7 @@ router.post('/add', async (req, res, next) => {
         }
 
         const shipmentCount = await VanDon.countDocuments();
-        await VanDon.create({
+        const shipment = await VanDon.create({
             ma_van_don: 'VD' + String(shipmentCount + 1).padStart(6, '0'),
             don_hang_id: order._id,
             doi_tac_giao_hang_id: doi_tac_giao_hang_id || null,
@@ -703,6 +787,26 @@ router.post('/add', async (req, res, next) => {
             trang_thai: 'draft'
         });
 
+        if (!codEnabled && khachThanhToan > 0) {
+            const cashBook = await ensureDefaultSoQuy(order.cua_hang_id);
+            await taoPhieuThuChi({
+                loai_phieu: 'thu',
+                loai_thu_chi: 'Thu tien don hang',
+                gia_tri: khachThanhToan,
+                so_quy_id: cashBook._id,
+                cua_hang_id: order.cua_hang_id,
+                nguoi_tao_id: req.user?._id,
+                khach_hang_id,
+                don_hang_id: order._id,
+                van_don_id: shipment._id,
+                ma_chung_tu_goc: ma_don_hang,
+                doi_tuong: order.khach_hang_id ? undefined : ten_nguoi_nhan,
+                nhom_doi_tuong: 'khach_hang',
+                phuong_thuc_thanh_toan: 'tien_mat',
+                hach_toan: false
+            });
+        }
+
         res.json({ success: true, message: 'Đã tạo đơn đặt hàng', ma_don_hang });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message || 'Không tạo được đơn hàng' });
@@ -712,16 +816,19 @@ router.post('/add', async (req, res, next) => {
 router.get('/hoa-don', async (req, res, next) => {
     try {
         const filter = await buildInvoiceFilter(req.query);
-        const invoices = await HoaDonBanHang.find(filter)
+        const rawInvoices = await HoaDonBanHang.find(filter)
             .populate('khach_hang_id')
             .populate('don_hang_id')
+            .populate('kho_id')
             .populate('nguoi_ban_id')
             .sort({ created_at: -1 });
-        const [partners, users] = await Promise.all([
+        const [invoices, partners, users, priceBooks] = await Promise.all([
+            decorateInvoices(rawInvoices),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
-            NguoiDung.find().sort({ ho_ten: 1, username: 1 })
+            NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
+            BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 })
         ]);
-        res.render('don-hang/hoa-don', { title: 'Hóa đơn', invoices, partners, users, filters: req.query || {} });
+        res.render('don-hang/hoa-don', { title: 'Hóa đơn', invoices, partners, users, priceBooks, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -729,10 +836,14 @@ router.get('/hoa-don', async (req, res, next) => {
 
 router.get('/hoa-don/export.csv', async (req, res, next) => {
     try {
-        const invoices = await HoaDonBanHang.find(await buildInvoiceFilter(req.query)).populate('khach_hang_id').sort({ created_at: -1 });
+        const rawInvoices = await HoaDonBanHang.find(await buildInvoiceFilter(req.query))
+            .populate('khach_hang_id')
+            .populate('don_hang_id')
+            .sort({ created_at: -1 });
+        const invoices = await decorateInvoices(rawInvoices);
         const escape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
         const rows = [
-            ['ma_hoa_don', 'thoi_gian', 'ma_khach_hang', 'khach_hang', 'tong_tien_hang', 'giam_gia', 'khach_da_tra'],
+            ['ma_hoa_don', 'thoi_gian', 'ma_khach_hang', 'khach_hang', 'tong_tien_hang', 'giam_gia', 'khach_da_tra', 'trang_thai'],
             ...invoices.map(i => [
                 i.ma_hoa_don,
                 i.ngay_ban ? i.ngay_ban.toISOString() : '',
@@ -740,7 +851,8 @@ router.get('/hoa-don/export.csv', async (req, res, next) => {
                 i.khach_hang_id?.ten_khach_hang || '',
                 i.tong_tien || 0,
                 i.giam_gia || 0,
-                i.thanh_toan || 0
+                i.khach_da_tra || 0,
+                i.trang_thai_chuan || i.trang_thai || ''
             ])
         ];
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -765,35 +877,148 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
         const invoice = await HoaDonBanHang.findById(req.params.id)
             .populate('khach_hang_id')
             .populate('cua_hang_id')
+            .populate('kho_id')
+            .populate('don_hang_id')
             .populate('nguoi_ban_id');
         if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
 
         const [items, shipment, debtHistory, receipts] = await Promise.all([
             CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id'),
-            VanDon.findOne({ hoa_don_id: invoice._id }).populate('doi_tac_giao_hang_id').populate('cua_hang_id'),
+            VanDon.findOne({
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id._id || invoice.don_hang_id }] : [])
+                ]
+            }).populate('doi_tac_giao_hang_id').populate('cua_hang_id'),
             CongNoKhachHang.find({ hoa_don_id: invoice._id })
                 .populate('phieu_thu_chi_id')
                 .sort({ ngay: -1, created_at: -1 }),
-            PhieuThuChi.find({ khach_hang_id: invoice.khach_hang_id, ngay_lap: { $gte: invoice.ngay_ban || invoice.created_at || new Date(0) } })
+            PhieuThuChi.find({ hoa_don_id: invoice._id, trang_thai: { $ne: 'cancelled' } })
                 .populate('nguoi_tao_id')
                 .sort({ ngay_lap: -1, created_at: -1 })
                 .limit(20)
         ]);
 
-        res.json({ success: true, data: { invoice, items, shipment, debtHistory, receipts } });
+        const paid = receipts
+            .filter(row => row.loai_phieu === 'thu')
+            .reduce((sum, row) => sum + Number(row.gia_tri || 0), 0);
+        const payable = Number(invoice.thanh_toan || 0);
+
+        res.json({ success: true, data: { invoice, items, shipment, debtHistory, receipts, paid, debt: Math.max(0, payable - paid) } });
     } catch (error) {
         next(error);
     }
 });
 
-router.post('/hoa-don/add', async (req, res, next) => {
+router.get('/hoa-don/:id', async (req, res, next) => {
+    try {
+        const invoice = await HoaDonBanHang.findById(req.params.id)
+            .populate('khach_hang_id')
+            .populate('don_hang_id')
+            .populate('kho_id')
+            .populate('nguoi_ban_id');
+        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        const [decorated] = await decorateInvoices([invoice]);
+        const items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id');
+        res.json({ success: true, data: { invoice: decorated, items } });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/hoa-don/:id/cancel', async (req, res, next) => {
+    try {
+        const invoice = await HoaDonBanHang.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
+            return res.json({ success: true, message: 'Hóa đơn đã hủy' });
+        }
+
+        const [items, receipts, debts, shipment] = await Promise.all([
+            CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).lean(),
+            PhieuThuChi.find({ hoa_don_id: invoice._id, trang_thai: { $ne: 'cancelled' } }),
+            CongNoKhachHang.find({ hoa_don_id: invoice._id }).lean(),
+            VanDon.findOne({
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                ]
+            })
+        ]);
+
+        for (const item of items) {
+            const quantity = Number(item.so_luong || 0);
+            if (quantity <= 0) continue;
+            await HangHoa.findByIdAndUpdate(item.hang_hoa_id, { $inc: { ton_kho: quantity } });
+            if (invoice.kho_id) {
+                await TonKho.findOneAndUpdate(
+                    { kho_id: invoice.kho_id, hang_hoa_id: item.hang_hoa_id },
+                    {
+                        $setOnInsert: { cua_hang_id: invoice.cua_hang_id || undefined },
+                        $inc: { so_luong: quantity }
+                    },
+                    { upsert: true, new: true }
+                );
+            }
+        }
+
+        for (const receipt of receipts) {
+            const amount = Number(receipt.gia_tri || 0);
+            if (receipt.so_quy_id && amount > 0) {
+                await SoQuy.findByIdAndUpdate(receipt.so_quy_id, {
+                    $inc: { so_du: receipt.loai_phieu === 'thu' ? -amount : amount }
+                });
+            }
+            receipt.trang_thai = 'cancelled';
+            await receipt.save();
+        }
+
+        const debtIncrease = debts
+            .filter(row => row.loai === 'tang_no')
+            .reduce((sum, row) => sum + Math.abs(Number(row.so_tien || 0)), 0);
+        if (invoice.khach_hang_id && debtIncrease > 0) {
+            const customer = await KhachHang.findById(invoice.khach_hang_id).select('tong_no').lean();
+            if (customer && typeof customer.tong_no === 'number') {
+                await KhachHang.updateOne({ _id: invoice.khach_hang_id }, { $inc: { tong_no: -debtIncrease } });
+            }
+            await CongNoKhachHang.create({
+                khach_hang_id: invoice.khach_hang_id,
+                don_hang_id: invoice.don_hang_id || undefined,
+                hoa_don_id: invoice._id,
+                so_tien: debtIncrease,
+                loai: 'giam_no',
+                ghi_chu: `Đảo công nợ hủy hóa đơn ${invoice.ma_hoa_don}`,
+                ngay: new Date()
+            });
+        }
+
+        if (shipment) {
+            shipment.trang_thai = 'cancelled';
+            if (shipment.trang_thai_cod !== 'da_thu') shipment.trang_thai_cod = 'khong_cod';
+            await shipment.save();
+        }
+
+        invoice.trang_thai = 'cancelled';
+        await invoice.save();
+        res.json({ success: true, message: 'Đã hủy hóa đơn' });
+    } catch (error) {
+        next(error);
+    }
+});
+
+async function createInvoice(req, res, next) {
     try {
         const {
+            don_hang_id,
             khach_hang_id,
             cua_hang_id,
             items,
             chiet_khau,
+            kieu_giam_gia,
             phi_van_chuyen,
+            khach_thanh_toan,
+            phuong_thuc_thanh_toan,
+            giao_hang,
             ghi_chu,
             kho_id,
             doi_tac_giao_hang_id,
@@ -805,91 +1030,217 @@ router.post('/hoa-don/add', async (req, res, next) => {
             thu_ho_cod
         } = req.body || {};
 
-        if (!Array.isArray(items) || !items.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có sản phẩm' });
-        }
-        if (!doi_tac_giao_hang_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn đối tác giao hàng' });
-        }
-        if (!kho_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
+        let sourceOrder = null;
+        let invoiceItems = parseItems(items);
+        if (don_hang_id && /^[0-9a-fA-F]{24}$/.test(String(don_hang_id))) {
+            sourceOrder = await DonHang.findById(don_hang_id).lean();
+            if (!sourceOrder) return res.status(400).json({ success: false, message: 'Đơn hàng gốc không hợp lệ' });
+            const orderDetails = await CTDonHang.find({ don_hang_id }).lean();
+            invoiceItems = orderDetails.map(row => ({
+                hang_hoa_id: row.hang_hoa_id,
+                lo_hang_id: row.lo_hang_id,
+                so_luong: row.so_luong_dat || row.so_luong || 0,
+                don_gia_ban: row.don_gia_ban || 0,
+                chiet_khau: row.chiet_khau || 0,
+                kieu_chiet_khau: row.kieu_chiet_khau || 'vnd'
+            }));
         }
 
+        if (!Array.isArray(invoiceItems) || !invoiceItems.length) {
+            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có sản phẩm' });
+        }
+
+        const finalKhoId = kho_id || sourceOrder?.kho_id;
+        if (!finalKhoId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
+        }
+        const kho = await Kho.findById(finalKhoId).lean();
+        if (!kho) return res.status(400).json({ success: false, message: 'Kho không hợp lệ.' });
+
         let tong_tien_hang = 0;
-        items.forEach(item => {
-            tong_tien_hang += Number(item.so_luong) * Number(item.don_gia_ban);
-        });
-        const discount = Number(chiet_khau || 0);
+        const normalizedItems = [];
+        for (const item of invoiceItems) {
+            const productId = String(item.hang_hoa_id || '').trim();
+            const quantity = Number(item.so_luong_dat ?? item.so_luong ?? 0);
+            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'Dòng hàng không hợp lệ' });
+            const unitPrice = Number(item.don_gia_ban ?? item.don_gia ?? 0);
+            const lineBase = quantity * unitPrice;
+            const lineDiscount = normalizeDiscount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
+            const lineTotal = Math.max(lineBase - lineDiscount, 0);
+            tong_tien_hang += lineTotal;
+            normalizedItems.push({
+                hang_hoa_id: productId,
+                lo_hang_id: item.lo_hang_id || null,
+                so_luong: quantity,
+                don_gia: unitPrice,
+                chiet_khau: lineDiscount,
+                thanh_tien: lineTotal
+            });
+        }
+
+        const discount = normalizeDiscount(chiet_khau ?? sourceOrder?.giam_gia, kieu_giam_gia || sourceOrder?.kieu_giam_gia, tong_tien_hang);
+        const finalCustomerId = khach_hang_id || sourceOrder?.khach_hang_id || null;
+        const finalStoreId = cua_hang_id || sourceOrder?.cua_hang_id || kho.cua_hang_id || null;
+        const shouldShip = isEnabled(giao_hang) || Boolean(doi_tac_giao_hang_id) || isEnabled(thu_ho_cod) || Boolean(sourceOrder?.cod_enabled);
         let shippingFee = Number(phi_van_chuyen);
-        if (!Number.isFinite(shippingFee) || shippingFee < 0) {
+        if (shouldShip && (!Number.isFinite(shippingFee) || shippingFee < 0)) {
             const calculatedShippingFee = await tinhPhiGiaoHang({
-                cua_hang_id: cua_hang_id || null,
-                khach_hang_id,
+                cua_hang_id: finalStoreId,
+                khach_hang_id: finalCustomerId,
                 dia_chi_khach_hang_id,
                 doi_tac_giao_hang_id,
                 diem_den: dia_chi_nhan
             });
             shippingFee = Number(calculatedShippingFee.phi_giao_hang || 0);
         }
-        await luuPhiVanChuyenKhachHang({
-            cua_hang_id: cua_hang_id || null,
-            khach_hang_id,
-            dia_chi_khach_hang_id,
-            doi_tac_giao_hang_id,
-            phi_van_chuyen: shippingFee,
-            ghi_chu: ghi_chu_giao_hang
-        });
-        const thanh_toan = Math.max(tong_tien_hang - discount + shippingFee, 0);
+        if (!Number.isFinite(shippingFee) || shippingFee < 0) shippingFee = 0;
+        if (shouldShip && doi_tac_giao_hang_id) {
+            await luuPhiVanChuyenKhachHang({
+                cua_hang_id: finalStoreId,
+                khach_hang_id: finalCustomerId,
+                dia_chi_khach_hang_id,
+                doi_tac_giao_hang_id,
+                phi_van_chuyen: shippingFee,
+                ghi_chu: ghi_chu_giao_hang
+            });
+        }
+        const payable = Math.max(tong_tien_hang - discount + (shouldShip ? shippingFee : 0), 0);
+        const paid = Math.min(Math.max(Number(khach_thanh_toan ?? req.body?.khach_da_tra ?? (isEnabled(thu_ho_cod) ? 0 : payable)) || 0, 0), payable);
+        const debt = Math.max(payable - paid, 0);
         const count = await HoaDonBanHang.countDocuments();
-        const ma_hoa_don = 'HD' + String(count + 1).padStart(6, '0');
+        const ma_hoa_don = String(req.body?.ma_hoa_don || '').trim() || 'HD' + String(count + 1).padStart(6, '0');
 
         const invoice = await HoaDonBanHang.create({
             ma_hoa_don,
             ngay_ban: new Date(),
             tong_tien: tong_tien_hang,
             giam_gia: discount,
-            thanh_toan,
-            phuong_thuc_tt: thu_ho_cod === false ? 'Tiền mặt' : 'COD',
-            trang_thai: 'processing',
+            thanh_toan: payable,
+            phuong_thuc_tt: isEnabled(thu_ho_cod) ? 'COD' : (phuong_thuc_thanh_toan || 'Tiền mặt'),
+            trang_thai: normalizeInvoiceStatus(req.body?.trang_thai || (debt > 0 ? 'processing' : 'completed')),
             ghi_chu,
-            cua_hang_id: cua_hang_id || null,
-            kho_id,
-            khach_hang_id: khach_hang_id || null,
+            cua_hang_id: finalStoreId,
+            kho_id: finalKhoId,
+            don_hang_id: sourceOrder?._id || null,
+            khach_hang_id: finalCustomerId,
             nguoi_ban_id: req.user?._id
         });
 
-        for (const item of items) {
+        for (const item of normalizedItems) {
             await CTHoaDonBanHang.create({
                 hoa_don_id: invoice._id,
                 hang_hoa_id: item.hang_hoa_id,
                 so_luong: Number(item.so_luong),
-                don_gia: Number(item.don_gia_ban),
+                don_gia: Number(item.don_gia),
                 chiet_khau: Number(item.chiet_khau || 0),
-                thanh_tien: Number(item.so_luong) * Number(item.don_gia_ban) - Number(item.chiet_khau || 0)
+                thanh_tien: Number(item.thanh_tien || 0)
             });
             await HangHoa.findByIdAndUpdate(item.hang_hoa_id, { $inc: { ton_kho: -Number(item.so_luong) } });
         }
 
-        const shipmentCount = await VanDon.countDocuments();
-        await VanDon.create({
-            ma_van_don: 'VD' + String(shipmentCount + 1).padStart(6, '0'),
-            hoa_don_id: invoice._id,
-            doi_tac_giao_hang_id,
-            cua_hang_id: cua_hang_id || null,
-            khach_hang_id: khach_hang_id || null,
-            ten_nguoi_nhan,
-            sdt_nguoi_nhan,
-            dia_chi_nhan,
-            phi_giao_hang: shippingFee,
-            ghi_chu: ghi_chu_giao_hang,
-            trang_thai: 'shipping'
-        });
+        let shipment = null;
+        if (shouldShip) {
+            shipment = sourceOrder
+                ? await VanDon.findOneAndUpdate(
+                    { don_hang_id: sourceOrder._id },
+                    {
+                        $set: {
+                            hoa_don_id: invoice._id,
+                            doi_tac_giao_hang_id: doi_tac_giao_hang_id || undefined,
+                            cua_hang_id: finalStoreId,
+                            khach_hang_id: finalCustomerId,
+                            ten_nguoi_nhan,
+                            sdt_nguoi_nhan,
+                            dia_chi_nhan,
+                            phi_giao_hang: shippingFee,
+                            cod_enabled: isEnabled(thu_ho_cod),
+                            cod_amount: isEnabled(thu_ho_cod) ? payable : 0,
+                            trang_thai_cod: isEnabled(thu_ho_cod) ? 'chua_thu' : 'khong_cod',
+                            ghi_chu: ghi_chu_giao_hang,
+                            trang_thai: 'shipping'
+                        }
+                    },
+                    { new: true }
+                )
+                : null;
+            if (!shipment) {
+                const shipmentCount = await VanDon.countDocuments();
+                shipment = await VanDon.create({
+                    ma_van_don: 'VD' + String(shipmentCount + 1).padStart(6, '0'),
+                    don_hang_id: sourceOrder?._id || null,
+                    hoa_don_id: invoice._id,
+                    doi_tac_giao_hang_id: doi_tac_giao_hang_id || null,
+                    cua_hang_id: finalStoreId,
+                    khach_hang_id: finalCustomerId,
+                    ten_nguoi_nhan,
+                    sdt_nguoi_nhan,
+                    dia_chi_nhan,
+                    phi_giao_hang: shippingFee,
+                    cod_enabled: isEnabled(thu_ho_cod),
+                    cod_amount: isEnabled(thu_ho_cod) ? payable : 0,
+                    trang_thai_cod: isEnabled(thu_ho_cod) ? 'chua_thu' : 'khong_cod',
+                    ghi_chu: ghi_chu_giao_hang,
+                    trang_thai: 'shipping'
+                });
+            }
+        }
 
-        res.json({ success: true, message: 'Đã tạo hóa đơn', ma_hoa_don });
+        if (sourceOrder) {
+            await DonHang.updateOne(
+                { _id: sourceOrder._id },
+                {
+                    $set: {
+                        khach_thanh_toan: paid,
+                        trang_thai: normalizeInvoiceStatus(invoice.trang_thai) === 'completed' ? 'completed' : sourceOrder.trang_thai
+                    }
+                }
+            );
+        }
+
+        if (debt > 0 && finalCustomerId) {
+            await CongNoKhachHang.create({
+                khach_hang_id: finalCustomerId,
+                don_hang_id: sourceOrder?._id || undefined,
+                hoa_don_id: invoice._id,
+                so_tien: debt,
+                loai: 'tang_no',
+                ghi_chu: `Công nợ hóa đơn ${ma_hoa_don}`,
+                ngay: invoice.ngay_ban
+            });
+            const customer = await KhachHang.findById(finalCustomerId).select('tong_no').lean();
+            if (customer && typeof customer.tong_no === 'number') {
+                await KhachHang.updateOne({ _id: finalCustomerId }, { $inc: { tong_no: debt } });
+            }
+        }
+
+        if (!isEnabled(thu_ho_cod) && paid > 0) {
+            const cashBook = await ensureDefaultSoQuy(invoice.cua_hang_id);
+            await taoPhieuThuChi({
+                loai_phieu: 'thu',
+                loai_thu_chi: 'Thu tien hoa don',
+                gia_tri: paid,
+                so_quy_id: cashBook._id,
+                cua_hang_id: invoice.cua_hang_id,
+                nguoi_tao_id: req.user?._id,
+                khach_hang_id: finalCustomerId,
+                don_hang_id: sourceOrder?._id || undefined,
+                hoa_don_id: invoice._id,
+                van_don_id: shipment?._id,
+                ma_chung_tu_goc: ma_hoa_don,
+                nhom_doi_tuong: 'khach_hang',
+                phuong_thuc_thanh_toan: normalizePaymentMethodValue(phuong_thuc_thanh_toan),
+                hach_toan: false
+            });
+        }
+
+        res.json({ success: true, message: 'Đã tạo hóa đơn', ma_hoa_don, id: invoice._id });
     } catch (error) {
         next(error);
     }
-});
+}
+
+router.post('/hoa-don', createInvoice);
+router.post('/hoa-don/add', createInvoice);
 
 router.get('/tra-hang', async (req, res, next) => {
     try {
@@ -1263,6 +1614,72 @@ router.post('/van-don/:id/status', async (req, res, next) => {
     }
 });
 
+router.post('/van-don/:id/thu-cod', async (req, res, next) => {
+    try {
+        const shipment = await VanDon.findById(req.params.id)
+            .populate('khach_hang_id')
+            .populate('hoa_don_id')
+            .populate('don_hang_id');
+        if (!shipment) return res.status(404).json({ success: false, message: 'Không tìm thấy vận đơn' });
+        const amount = Number(req.body?.gia_tri || shipment.cod_amount || shipment.hoa_don_id?.thanh_toan || shipment.don_hang_id?.tong_thanh_toan || 0);
+        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền COD không hợp lệ' });
+        const exists = await PhieuThuChi.findOne({ van_don_id: shipment._id, loai_phieu: 'thu', loai_thu_chi: 'Thu COD' });
+        if (exists) return res.json({ success: true, message: 'Vận đơn đã có phiếu thu COD', data: exists });
+        const cashBook = await ensureDefaultSoQuy(shipment.cua_hang_id);
+        const receipt = await taoPhieuThuChi({
+            loai_phieu: 'thu',
+            loai_thu_chi: 'Thu COD',
+            gia_tri: amount,
+            so_quy_id: cashBook._id,
+            cua_hang_id: shipment.cua_hang_id,
+            nguoi_tao_id: req.user?._id,
+            khach_hang_id: shipment.khach_hang_id?._id || shipment.khach_hang_id,
+            don_hang_id: shipment.don_hang_id?._id || shipment.don_hang_id,
+            hoa_don_id: shipment.hoa_don_id?._id || shipment.hoa_don_id,
+            van_don_id: shipment._id,
+            ma_chung_tu_goc: shipment.ma_van_don,
+            doi_tuong: shipment.khach_hang_id?.ten_khach_hang || shipment.ten_nguoi_nhan || 'COD',
+            nhom_doi_tuong: 'khach_hang',
+            phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
+            hach_toan: req.body?.hach_toan === true || req.body?.hach_toan === 'true'
+        });
+        shipment.trang_thai_cod = 'da_thu';
+        await shipment.save();
+        res.json({ success: true, message: 'Đã tạo phiếu thu COD', data: receipt });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message || 'Không thu được COD' });
+    }
+});
+
+router.post('/van-don/:id/chi-phi-van-chuyen', async (req, res, next) => {
+    try {
+        const shipment = await VanDon.findById(req.params.id).populate('doi_tac_giao_hang_id');
+        if (!shipment) return res.status(404).json({ success: false, message: 'Không tìm thấy vận đơn' });
+        const amount = Number(req.body?.gia_tri || shipment.phi_giao_hang || 0);
+        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'Phí vận chuyển không hợp lệ' });
+        const cashBook = await ensureDefaultSoQuy(shipment.cua_hang_id);
+        const receipt = await taoPhieuThuChi({
+            loai_phieu: 'chi',
+            loai_thu_chi: 'Chi phi van chuyen',
+            gia_tri: amount,
+            so_quy_id: cashBook._id,
+            cua_hang_id: shipment.cua_hang_id,
+            nguoi_tao_id: req.user?._id,
+            don_hang_id: shipment.don_hang_id,
+            hoa_don_id: shipment.hoa_don_id,
+            van_don_id: shipment._id,
+            ma_chung_tu_goc: shipment.ma_van_don,
+            doi_tuong: shipment.doi_tac_giao_hang_id?.ten_doi_tac || 'Đối tác giao hàng',
+            nhom_doi_tuong: 'doi_tac_giao_hang',
+            phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
+            hach_toan: false
+        });
+        res.json({ success: true, message: 'Đã tạo phiếu chi phí vận chuyển', data: receipt });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu chi vận chuyển' });
+    }
+});
+
 router.get('/van-don', async (req, res, next) => {
     try {
         const filter = {};
@@ -1408,6 +1825,8 @@ async function confirmOrderDelivery(req, res, next) {
             order.ngay_giao_thuc_te = new Date();
             if (!order.trang_thai || order.trang_thai === 'draft' || order.trang_thai === 'da_xac_nhan') {
                 order.trang_thai = allDelivered ? 'completed' : 'shipping';
+            } else if (order.trang_thai === 'shipping' && allDelivered) {
+                order.trang_thai = 'completed';
             }
         }
         await order.save();

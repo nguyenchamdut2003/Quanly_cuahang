@@ -1,18 +1,31 @@
 <%
   const safeInvoices = Array.isArray(locals.invoices) ? locals.invoices : [];
+  const safePartners = Array.isArray(locals.partners) ? locals.partners : [];
+  const safeUsers = Array.isArray(locals.users) ? locals.users : [];
+  const safePriceBooks = Array.isArray(locals.priceBooks) ? locals.priceBooks : [];
   const safeFilters = locals.filters || {};
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const selectedTypes = Array.isArray(safeFilters.loai_hoa_don) ? safeFilters.loai_hoa_don : (safeFilters.loai_hoa_don ? [safeFilters.loai_hoa_don] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const statusText = value => ({ processing: 'Đang xử lý', completed: 'Hoàn thành', failed: 'Không giao được', cancelled: 'Đã hủy' }[value] || value || 'Đang xử lý');
+  const shipStatusText = value => ({ draft: 'Phiếu tạm', shipping: 'Đang giao', completed: 'Hoàn thành', cancelled: 'Đã hủy' }[value] || value || '');
+  const invoiceStatus = item => item.trang_thai_chuan || ({ draft: 'processing', shipping: 'processing', done: 'completed', paid: 'completed' }[item.trang_thai] || item.trang_thai || 'processing');
+  const totalRow = safeInvoices.reduce((sum, item) => {
+    sum.goods += Number(item.tong_tien || 0);
+    sum.discount += Number(item.giam_gia || 0);
+    sum.paid += Number(item.khach_da_tra || 0);
+    return sum;
+  }, { goods: 0, discount: 0, paid: 0 });
 %>
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px clamp(12px,5vw,80px) 0}.sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}.title{font-size:20px;font-weight:700;margin:0 0 16px}.filter{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;margin-bottom:10px}.check{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px}.check input,.radio input{accent-color:#0070f4}.radio{display:flex;align-items:center;gap:9px;margin-top:9px}.pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#8b95a1;padding:0 10px;font-size:13px}.main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;justify-content:space-between;gap:12px}.search{position:relative;flex:1;max-width:470px}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px}.search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff}.actions{display:flex;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.btn.primary{border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1080px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;font-size:12px;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.table tbody tr{cursor:pointer}.invoice-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}.empty{height:560px;text-align:center;color:#667085}.detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.invoice-detail{padding:0 18px 14px;min-height:220px}.detail-tabs{height:40px;display:flex;align-items:flex-end;gap:26px;border-bottom:1px solid #e5e9ee}.detail-tab{height:40px;border:0;background:#fff;color:#111827;padding:0 0 8px;font-size:14px;cursor:pointer}.detail-tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700}.detail-panel{display:none}.detail-panel.active{display:block}.detail-head{display:flex;justify-content:space-between;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.done{background:#dff7e9;color:#008a3d;border-radius:4px;padding:2px 7px;font-size:12px}.detail-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 22px;margin-top:12px}.mini-field label{display:block;font-size:12px;margin-bottom:5px}.mini-input,.mini-select{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 9px;font-size:12px}.items-table{width:100%;border-collapse:collapse;margin-top:12px}.items-table th{height:32px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 8px}.items-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-link{color:#006dff;text-decoration:none;font-weight:700}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;margin-top:14px}.note{width:100%;height:70px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:12px}.total-line{display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px}.loading-detail{height:160px;display:flex;align-items:center;justify-content:center;color:#667085}.history-empty{height:150px;text-align:center;color:#111827}.empty-icon{width:72px;height:72px;border-radius:50%;background:#eef6ff;color:#0070f4;display:flex;align-items:center;justify-content:center;margin:18px auto 12px;font-size:30px}
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#111827;overflow:hidden}.page{height:calc(100vh - 98px);display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:206px minmax(0,1fr);gap:8px;padding:8px 8px 0}.sidebar{background:#fff;border-radius:4px;padding:10px 8px;overflow:auto}.title{font-size:18px;font-weight:800;margin:0 0 12px}.filter{margin-bottom:18px}.filter-title{font-size:12px;font-weight:800;margin-bottom:8px}.check,.radio{display:flex;align-items:center;gap:7px;margin:8px 0;font-size:12px}.check input,.radio input{accent-color:#0070f4}.pill{height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;flex:1}.control{width:100%;height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;color:#667085;padding:0 8px;font-size:12px;margin-bottom:6px}.small-link{float:right;color:#0070f4;text-decoration:none;font-size:11px;font-weight:700}.main{min-width:0;display:flex;flex-direction:column;gap:8px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.search{position:relative;width:390px;max-width:100%}.search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#6b7280}.search input{width:100%;height:30px;border:1px solid #c8d1dc;border-radius:5px;padding:0 34px 0 30px;font-size:13px}.search button{position:absolute;right:4px;top:4px;width:22px;height:22px;border:0;background:#fff;color:#475467}.actions{display:flex;align-items:center;gap:7px}.btn{height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;padding:0 10px;color:#111827;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;text-decoration:none;cursor:pointer}.btn.primary{background:#fff;border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.btn:disabled,.dropdown-item.disabled{opacity:.48;cursor:not-allowed}.icon{width:30px;height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;display:inline-flex;align-items:center;justify-content:center}.dropdown{position:relative}.dropdown-menu{display:none;position:absolute;top:34px;right:0;width:190px;background:#fff;border:1px solid #d7dde5;border-radius:5px;box-shadow:0 12px 28px rgba(15,23,42,.18);z-index:20;padding:6px 0}.dropdown.open .dropdown-menu{display:block}.dropdown-item{height:34px;padding:0 12px;display:flex;align-items:center;color:#111827;text-decoration:none;font-size:13px}.dropdown-item:hover{background:#f2f7ff}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:5px;overflow:auto}.table{width:100%;min-width:1140px;border-collapse:collapse}.table th{height:32px;background:#e8f3ff;border-bottom:1px solid #b7d8ff;text-align:left;padding:0 8px;font-size:11px}.table td{height:39px;border-bottom:1px solid #e5e9ee;padding:0 8px;font-size:12px}.table tbody tr.invoice-row{cursor:pointer}.table tbody tr.invoice-row:hover td{background:#f8fbff}.invoice-row.active td{background:#f0f8ff;border-top:2px solid #0070f4}.check-col,.star-col{width:30px;text-align:center}.num{text-align:right}.link{color:#006dff;text-decoration:none;font-weight:700}.status{display:inline-flex;align-items:center;height:22px;border-radius:4px;padding:0 7px;font-weight:700;font-size:11px}.status.processing{background:#e8f3ff;color:#0058d4}.status.completed{background:#dcfce7;color:#15803d}.status.failed{background:#fff1d6;color:#b45309}.status.cancelled{background:#fee2e2;color:#b91c1c}.empty{height:560px;text-align:center;color:#667085}.detail-row{display:none}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.invoice-detail{padding:0 16px 14px;min-height:230px}.tabs{height:40px;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid #e5e9ee}.tab{height:40px;border:0;background:#fff;padding:0 0 8px;cursor:pointer}.tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:800}.panel{display:none}.panel.active{display:block}.detail-head{display:flex;justify-content:space-between;gap:20px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px 20px;margin-top:12px}.mini-field label{display:block;color:#667085;font-size:11px;margin-bottom:4px}.mini-field span{font-size:12px}.items-table{width:100%;border-collapse:collapse;margin-top:10px}.items-table th{height:30px;background:#f3f4f6;border-bottom:1px solid #d4d9e0;font-size:11px;text-align:left;padding:0 8px}.items-table td{height:36px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;margin-top:12px}.note{height:74px;border:1px solid #cfd8e3;border-radius:5px;padding:8px;color:#667085}.total-line{display:flex;justify-content:space-between;margin-bottom:8px;font-size:12px}.total-line strong{font-size:13px}.ship-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-top:12px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px}.pager{height:32px;display:flex;align-items:center;gap:8px;font-size:12px}.pager select{height:26px;border:1px solid #c8d1dc;border-radius:5px;background:#fff}
   </style>
 </head>
 <body>
@@ -21,30 +34,67 @@
     <div class="shell">
       <aside class="sidebar">
         <h1 class="title">Hóa đơn</h1>
-        <div class="filter"><div class="filter-title">Thời gian</div><label class="radio"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label><input class="control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()"></div>
+        <div class="filter">
+          <div class="filter-title">Thời gian</div>
+          <label class="radio"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
+          <label class="radio"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %>><span class="pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label>
+          <input class="control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
+          <input class="control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+        </div>
         <div class="filter"><div class="filter-title">Loại hóa đơn</div><label class="check"><input name="loai_hoa_don" value="khong_giao_hang" type="checkbox" <%= !selectedTypes.length || selectedTypes.includes('khong_giao_hang') ? 'checked' : '' %> onchange="this.form.submit()"> Không giao hàng</label><label class="check"><input name="loai_hoa_don" value="giao_hang" type="checkbox" <%= !selectedTypes.length || selectedTypes.includes('giao_hang') ? 'checked' : '' %> onchange="this.form.submit()"> Giao hàng</label></div>
         <div class="filter"><div class="filter-title">Trạng thái hóa đơn</div><label class="check"><input name="trang_thai" value="processing" type="checkbox" <%= !selectedStatuses.length || selectedStatuses.includes('processing') ? 'checked' : '' %> onchange="this.form.submit()"> Đang xử lý</label><label class="check"><input name="trang_thai" value="completed" type="checkbox" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Hoàn thành</label><label class="check"><input name="trang_thai" value="failed" type="checkbox" <%= selectedStatuses.includes('failed') ? 'checked' : '' %> onchange="this.form.submit()"> Không giao được</label><label class="check"><input name="trang_thai" value="cancelled" type="checkbox" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label></div>
-        <div class="filter"><div class="filter-title">Trạng thái giao hàng</div><select class="control" name="trang_thai_giao_hang" onchange="this.form.submit()"><option value="">Chọn trạng thái</option><option value="draft" <%= safeFilters.trang_thai_giao_hang === 'draft' ? 'selected' : '' %>>Phiếu tạm</option><option value="shipping" <%= safeFilters.trang_thai_giao_hang === 'shipping' ? 'selected' : '' %>>Đang giao</option><option value="completed" <%= safeFilters.trang_thai_giao_hang === 'completed' ? 'selected' : '' %>>Hoàn thành</option><option value="cancelled" <%= safeFilters.trang_thai_giao_hang === 'cancelled' ? 'selected' : '' %>>Đã hủy</option></select></div>
-        <div class="filter"><div class="filter-title">Đối tác giao hàng</div><select class="control" name="doi_tac" onchange="this.form.submit()"><option value="">Chọn đối tác giao hàng</option><% (locals.partners || []).forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
-        <div class="filter"><div class="filter-title">Thời gian giao hàng</div><input class="control" type="date" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>" onchange="this.form.submit()"></div>
+        <div class="filter"><div class="filter-title">Trạng thái giao hàng</div><select class="control" name="trang_thai_giao_hang" onchange="this.form.submit()"><option value="all">Chọn trạng thái</option><option value="draft" <%= safeFilters.trang_thai_giao_hang === 'draft' ? 'selected' : '' %>>Phiếu tạm</option><option value="shipping" <%= safeFilters.trang_thai_giao_hang === 'shipping' ? 'selected' : '' %>>Đang giao</option><option value="completed" <%= safeFilters.trang_thai_giao_hang === 'completed' ? 'selected' : '' %>>Hoàn thành</option><option value="cancelled" <%= safeFilters.trang_thai_giao_hang === 'cancelled' ? 'selected' : '' %>>Đã hủy</option></select></div>
+        <div class="filter"><div class="filter-title">Đối tác giao hàng</div><select class="control" name="doi_tac" onchange="this.form.submit()"><option value="all">Chọn đối tác giao hàng</option><% safePartners.forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
+        <div class="filter"><div class="filter-title">Thời gian giao hàng</div><label class="radio"><input type="radio" name="delivery_time_type" value="all" <%= safeFilters.delivery_time_type !== 'custom' ? 'checked' : '' %>><span class="pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label><label class="radio"><input type="radio" name="delivery_time_type" value="custom" <%= safeFilters.delivery_time_type === 'custom' ? 'checked' : '' %>><span class="pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label><input class="control" type="date" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>" onchange="this.form.submit()"></div>
         <div class="filter"><div class="filter-title">Khu vực giao hàng</div><input class="control" name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" placeholder="Chọn Tỉnh/TP - Quận/Huyện"></div>
-        <div class="filter"><div class="filter-title">Phương thức thanh toán</div><input class="control" name="phuong_thuc_tt" value="<%= safeFilters.phuong_thuc_tt || '' %>" placeholder="COD, Tiền mặt..."></div>
-        <div class="filter"><div class="filter-title">Người bán</div><input class="control" name="nguoi_ban" value="<%= safeFilters.nguoi_ban || '' %>" placeholder="Chọn người bán"></div>
+        <div class="filter"><div class="filter-title">Phương thức thanh toán</div><select class="control" name="phuong_thuc_tt" onchange="this.form.submit()"><option value="">Chọn phương thức thanh toán...</option><option value="Tiền mặt" <%= safeFilters.phuong_thuc_tt === 'Tiền mặt' ? 'selected' : '' %>>Tiền mặt</option><option value="COD" <%= safeFilters.phuong_thuc_tt === 'COD' ? 'selected' : '' %>>COD</option><option value="chuyen_khoan" <%= safeFilters.phuong_thuc_tt === 'chuyen_khoan' ? 'selected' : '' %>>Chuyển khoản</option></select></div>
+        <div class="filter"><div class="filter-title">Người tạo</div><input class="control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" list="userList" placeholder="Chọn người tạo"></div>
+        <div class="filter"><div class="filter-title">Người bán</div><input class="control" name="nguoi_ban" value="<%= safeFilters.nguoi_ban || '' %>" list="userList" placeholder="Chọn người bán"></div>
+        <div class="filter"><div class="filter-title">Bảng giá</div><select class="control" name="bang_gia"><option value="">Chọn bảng giá</option><% safePriceBooks.forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.bang_gia || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_bang_gia %></option><% }) %></select></div>
+        <div class="filter"><div class="filter-title">Kênh bán <a href="#" class="small-link">Tạo mới</a></div><select class="control" name="kenh_ban"><option value="">Chọn kênh bán</option><option value="ban_truc_tiep" <%= safeFilters.kenh_ban === 'ban_truc_tiep' ? 'selected' : '' %>>Bán trực tiếp</option><option value="online" <%= safeFilters.kenh_ban === 'online' ? 'selected' : '' %>>Online</option></select></div>
+        <datalist id="userList"><% safeUsers.forEach(u => { %><option value="<%= u.ho_ten || u.username || u.email %>"></option><% }) %></datalist>
       </aside>
       <main class="main">
-        <div class="toolbar"><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã hóa đơn"><button><i class="fa-solid fa-sliders"></i></button></div><div class="actions"><a href="/don-hang/hoa-don/create" class="btn primary"><i class="fa-solid fa-plus"></i> Tạo mới</a><button type="button" class="btn"><i class="fa-solid fa-file-import"></i> Import file</button><a href="/don-hang/hoa-don/export.csv" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a><span class="icon"><i class="fa-solid fa-ellipsis"></i></span><span class="icon"><i class="fa-solid fa-list"></i></span><span class="icon"><i class="fa-solid fa-gear"></i></span><span class="icon"><i class="fa-regular fa-circle-question"></i></span></div></div>
-        <div class="table-wrap"><table class="table"><thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Tổng tiền hàng</th><th class="num">Giảm giá</th><th class="num">Khách đã trả</th></tr></thead><tbody>
-          <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td></tr>
-          <% if (safeInvoices.length) { %>
-            <% safeInvoices.forEach(i => { %><tr class="invoice-row" data-invoice-row="<%= i._id %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%= i.ma_hoa_don %></td><td><%= new Date(i.ngay_ban).toLocaleString('vi-VN') %></td><td></td><td><%= i.khach_hang_id ? i.khach_hang_id.ma_khach_hang : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : '' %></td><td class="num"><%= fmt(i.tong_tien) %></td><td class="num"><%= fmt(i.giam_gia) %></td><td class="num"><%= fmt(i.thanh_toan) %></td></tr><tr class="detail-row" data-invoice-detail="<%= i._id %>"><td class="detail-cell" colspan="10"><div class="invoice-detail"><div class="loading-detail">Đang tải thông tin hóa đơn...</div></div></td></tr><% }) %>
-          <% } else { %><tr><td colspan="10" class="empty">Chưa có hóa đơn</td></tr><% } %>
-        </tbody></table></div>
+        <div class="toolbar">
+          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã hóa đơn"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
+          <div class="actions">
+            <div class="dropdown" id="createDropdown"><button class="btn primary" type="button" onclick="toggleCreateMenu(event)"><i class="fa-solid fa-plus"></i> Tạo mới <i class="fa-solid fa-chevron-down"></i></button><div class="dropdown-menu"><span class="dropdown-item disabled">Vận đơn KShip</span><a class="dropdown-item" href="/don-hang/hoa-don/create">Hóa đơn</a></div></div>
+            <button type="button" class="btn"><i class="fa-solid fa-file-import"></i> Import file</button>
+            <a href="/don-hang/hoa-don/export.csv" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <span class="icon"><i class="fa-solid fa-ellipsis"></i></span><span class="icon"><i class="fa-solid fa-list"></i></span><span class="icon"><i class="fa-solid fa-gear"></i></span><span class="icon"><i class="fa-regular fa-circle-question"></i></span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Tổng tiền hàng</th><th class="num">Giảm giá</th><th class="num">Khách đã trả</th><th>Trạng thái</th></tr></thead>
+            <tbody>
+              <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong><%= fmt(totalRow.goods) %></strong></td><td class="num"><strong><%= fmt(totalRow.discount) %></strong></td><td class="num"><strong><%= fmt(totalRow.paid) %></strong></td><td></td></tr>
+              <% if (safeInvoices.length) { %>
+                <% safeInvoices.forEach(i => { const st = invoiceStatus(i); %>
+                  <tr class="invoice-row" data-invoice-row="<%= i._id %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><a class="link" href="#" onclick="toggleInvoiceDetail('<%= i._id %>');return false"><%= i.ma_hoa_don %></a></td><td><%= i.ngay_ban ? new Date(i.ngay_ban).toLocaleString('vi-VN') : '' %></td><td><%= i.phieu_tra_hang?.ma_phieu_tra || '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ma_khach_hang : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td class="num"><%= fmt(i.tong_tien) %></td><td class="num"><%= fmt(i.giam_gia) %></td><td class="num"><%= fmt(i.khach_da_tra) %></td><td><span class="status <%= st %>"><%= statusText(st) %></span></td></tr>
+                  <tr class="detail-row" data-invoice-detail="<%= i._id %>"><td class="detail-cell" colspan="11"><div class="invoice-detail"><div class="loading-detail">Đang tải thông tin hóa đơn...</div></div></td></tr>
+                <% }) %>
+              <% } else { %>
+                <tr><td colspan="11" class="empty">Chưa có hóa đơn</td></tr>
+              <% } %>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager"><span>Hiển thị</span><select><option>15 dòng</option><option>30 dòng</option><option>50 dòng</option></select></div>
       </main>
     </div>
   </form>
   <script>
     const money = value => Number(value || 0).toLocaleString('vi-VN');
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const invoiceStatusText = value => ({ processing:'Đang xử lý', completed:'Hoàn thành', failed:'Không giao được', cancelled:'Đã hủy' }[value] || value || '');
+    const shipmentStatusText = value => ({ draft:'Phiếu tạm', shipping:'Đang giao', completed:'Hoàn thành', cancelled:'Đã hủy' }[value] || value || '');
+
+    function toggleCreateMenu(event) {
+      event.stopPropagation();
+      document.getElementById('createDropdown').classList.toggle('open');
+    }
+    document.addEventListener('click', () => document.getElementById('createDropdown')?.classList.remove('open'));
 
     async function toggleInvoiceDetail(id) {
       const row = document.querySelector('[data-invoice-row="' + id + '"]');
@@ -67,68 +117,89 @@
     function showInvoiceTab(event, id, tab) {
       event.stopPropagation();
       const detail = document.querySelector('[data-invoice-detail="' + id + '"]');
-      detail.querySelectorAll('.detail-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-      detail.querySelectorAll('.detail-panel').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === tab));
+      detail.querySelectorAll('.tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+      detail.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.dataset.panel === tab));
     }
 
     function renderInvoiceDetail(data) {
-      const invoice = data.invoice;
+      const invoice = data.invoice || {};
       const customer = invoice.khach_hang_id || {};
+      const shipment = data.shipment || {};
       const items = data.items || [];
       const histories = [...(data.debtHistory || []), ...(data.receipts || [])];
+      const paid = Number(data.paid || 0);
+      const payable = Number(invoice.thanh_toan || 0);
+      const debt = Number(data.debt || Math.max(payable - paid, 0));
+      const status = ({draft:'processing',shipping:'processing',done:'completed',paid:'completed'}[invoice.trang_thai] || invoice.trang_thai || 'processing');
       const itemRows = items.map(item => {
         const product = item.hang_hoa_id || {};
-        const price = Number(item.don_gia || 0);
-        return `<tr><td><a href="#" class="detail-link">${escapeHtml(product.ma_hang || '')}</a></td><td>${escapeHtml(product.ten_hang || '')}</td><td class="num">${money(item.so_luong)}</td><td class="num">${money(price)}</td><td class="num">${money(item.chiet_khau)}</td><td class="num">${money(price)}</td><td class="num"><strong>${money(item.thanh_tien)}</strong></td></tr>`;
-      }).join('') || '<tr><td colspan="7" class="loading-detail">Hóa đơn chưa có hàng hóa</td></tr>';
+        return `<tr><td><a href="#" class="link">${escapeHtml(product.ma_hang || '')}</a></td><td>${escapeHtml(product.ten_hang || '')}</td><td class="num">${money(item.so_luong)}</td><td class="num">${money(item.don_gia)}</td><td class="num">${money(item.chiet_khau)}</td><td class="num"><strong>${money(item.thanh_tien)}</strong></td></tr>`;
+      }).join('') || '<tr><td colspan="6" class="loading-detail">Hóa đơn chưa có hàng hóa</td></tr>';
       const historyRows = histories.map(item => {
         const receipt = item.phieu_thu_chi_id || item;
-        const code = receipt.ma_phieu || 'Giao dịch';
+        const code = receipt.ma_phieu || 'Công nợ';
         const date = new Date(item.ngay || receipt.ngay_lap || receipt.created_at || invoice.ngay_ban).toLocaleString('vi-VN');
         const amount = Math.abs(Number(item.so_tien || receipt.gia_tri || 0));
-        const type = receipt.loai_phieu === 'chi' ? 'Chi' : 'Thu';
-        return `<tr><td><a href="#" class="detail-link">${escapeHtml(code)}</a></td><td>${escapeHtml(date)}</td><td>${escapeHtml(receipt.nguoi_tao_id?.ho_ten || '')}</td><td class="num">${money(amount)}</td><td>${escapeHtml(receipt.loai_thu_chi || receipt.phuong_thuc_tt || 'Tiền mặt')}</td><td><span class="done">${type}</span></td><td class="num">${money(amount)}</td></tr>`;
-      }).join('');
-      const historyBody = historyRows || '<tr><td colspan="7" class="history-empty"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><strong>Không tìm thấy lịch sử thanh toán nào phù hợp</strong></td></tr>';
-      const paid = Number(invoice.thanh_toan || 0);
+        const type = receipt.loai_phieu ? (receipt.loai_phieu === 'chi' ? 'Chi' : 'Thu') : (item.loai || '');
+        return `<tr><td><a href="#" class="link">${escapeHtml(code)}</a></td><td>${escapeHtml(date)}</td><td>${escapeHtml(receipt.nguoi_tao_id?.ho_ten || '')}</td><td class="num">${money(amount)}</td><td>${escapeHtml(receipt.loai_thu_chi || receipt.phuong_thuc_tt || receipt.phuong_thuc_thanh_toan || '')}</td><td><span class="status completed">${escapeHtml(type)}</span></td><td class="num">${money(amount)}</td></tr>`;
+      }).join('') || '<tr><td colspan="7" class="loading-detail">Chưa có lịch sử thanh toán hoặc công nợ</td></tr>';
+      const shipmentPanel = shipment._id ? `
+        <div class="panel" data-panel="shipping">
+          <div class="ship-grid">
+            <div class="mini-field"><label>Đối tác giao hàng</label><span>${escapeHtml(shipment.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng')}</span></div>
+            <div class="mini-field"><label>Phí giao hàng</label><span>${money(shipment.phi_giao_hang)}</span></div>
+            <div class="mini-field"><label>Trạng thái giao hàng</label><span>${escapeHtml(shipmentStatusText(shipment.trang_thai))}</span></div>
+            <div class="mini-field"><label>Ngày giao</label><span>${shipment.updated_at ? escapeHtml(new Date(shipment.updated_at).toLocaleString('vi-VN')) : ''}</span></div>
+          </div>
+        </div>` : '<div class="panel" data-panel="shipping"><div class="loading-detail">Hóa đơn không có vận đơn</div></div>';
 
       return `
-        <div class="detail-tabs">
-          <button type="button" class="detail-tab active" data-tab="info" onclick="showInvoiceTab(event,'${invoice._id}','info')">Thông tin</button>
-          <button type="button" class="detail-tab" data-tab="payment" onclick="showInvoiceTab(event,'${invoice._id}','payment')">Lịch sử thanh toán</button>
+        <div class="tabs">
+          <button type="button" class="tab active" data-tab="info" onclick="showInvoiceTab(event,'${invoice._id}','info')">Thông tin</button>
+          <button type="button" class="tab" data-tab="payment" onclick="showInvoiceTab(event,'${invoice._id}','payment')">Thanh toán</button>
+          <button type="button" class="tab" data-tab="shipping" onclick="showInvoiceTab(event,'${invoice._id}','shipping')">Giao hàng</button>
         </div>
-        <div class="detail-panel active" data-panel="info">
+        <div class="panel active" data-panel="info">
           <div class="detail-head">
             <div>
-              <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <a href="#" class="detail-link"><i class="fa-regular fa-pen-to-square"></i></a> <span>${escapeHtml(invoice.ma_hoa_don || '')}</span> <span class="done">Hoàn thành</span></div>
+              <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <span>${escapeHtml(invoice.ma_hoa_don || '')}</span> <span class="status ${escapeHtml(status)}">${escapeHtml(invoiceStatusText(status))}</span></div>
               <div class="detail-meta">
                 <div class="mini-field"><label>Người tạo</label><span>${escapeHtml(invoice.nguoi_ban_id?.ho_ten || invoice.nguoi_ban_id?.username || '')}</span></div>
-                <div class="mini-field"><label>Người bán</label><input class="mini-input" value="${escapeHtml(invoice.nguoi_ban_id?.ho_ten || invoice.nguoi_ban_id?.username || '')}"></div>
-                <div class="mini-field"><label>Ngày bán</label><input class="mini-input" value="${escapeHtml(new Date(invoice.ngay_ban || invoice.created_at).toLocaleString('vi-VN'))}"></div>
-                <div class="mini-field"><label>Kênh bán</label><input class="mini-input" value="Bán trực tiếp"></div>
-                <div class="mini-field"><label>Bảng giá</label><input class="mini-input" value="Bảng giá chung"></div>
+                <div class="mini-field"><label>Người bán</label><span>${escapeHtml(invoice.nguoi_ban_id?.ho_ten || invoice.nguoi_ban_id?.username || '')}</span></div>
+                <div class="mini-field"><label>Ngày bán</label><span>${escapeHtml(new Date(invoice.ngay_ban || invoice.created_at).toLocaleString('vi-VN'))}</span></div>
+                <div class="mini-field"><label>Kho</label><span>${escapeHtml(invoice.kho_id?.ten_kho || invoice.kho_id?.ma_kho || '')}</span></div>
+                <div class="mini-field"><label>Đơn hàng</label><span>${escapeHtml(invoice.don_hang_id?.ma_don_hang || '')}</span></div>
+                <div class="mini-field"><label>Kênh bán</label><span>Bán trực tiếp</span></div>
               </div>
             </div>
             <div>${escapeHtml(invoice.cua_hang_id?.ten_cua_hang || 'Chi nhánh trung tâm')}</div>
           </div>
-          <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+          <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
           <div class="detail-bottom">
-            <textarea class="note" placeholder="Ghi chú...">${escapeHtml(invoice.ghi_chu || '')}</textarea>
+            <div class="note">${escapeHtml(invoice.ghi_chu || 'Ghi chú')}</div>
             <div>
               <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${money(invoice.tong_tien)}</strong></div>
               <div class="total-line"><span>Giảm giá hóa đơn</span><span>${money(invoice.giam_gia)}</span></div>
-              <div class="total-line"><span>Khách cần trả</span><strong>${money(invoice.thanh_toan)}</strong></div>
+              <div class="total-line"><span>Khách cần trả</span><strong>${money(payable)}</strong></div>
               <div class="total-line"><span>Khách đã trả</span><strong>${money(paid)}</strong></div>
+              <div class="total-line"><span>Còn nợ</span><strong>${money(debt)}</strong></div>
             </div>
           </div>
           <div class="detail-actions">
-            <div class="detail-action-group"><button type="button" class="btn"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/hoa-don/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
-            <div class="detail-action-group"><button type="button" class="btn solid"><i class="fa-solid fa-pen"></i> Chỉnh sửa</button><button type="button" class="btn"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><a class="btn" href="/don-hang/tra-hang/create"><i class="fa-solid fa-right-left"></i> Trả hàng</a><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
+            <div class="detail-action-group"><button type="button" class="btn" onclick="cancelInvoice('${invoice._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/hoa-don/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+            <div class="detail-action-group"><a class="btn" href="/don-hang/tra-hang/create"><i class="fa-solid fa-right-left"></i> Trả hàng</a><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
           </div>
         </div>
-        <div class="detail-panel" data-panel="payment">
-          <table class="items-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th class="num">Giá trị phiếu</th><th>Phương thức</th><th>Trạng thái</th><th class="num">Tiền thu/chi</th></tr></thead><tbody>${historyBody}</tbody></table>
-        </div>`;
+        <div class="panel" data-panel="payment"><table class="items-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th class="num">Giá trị</th><th>Phương thức</th><th>Loại</th><th class="num">Tiền thu/chi</th></tr></thead><tbody>${historyRows}</tbody></table></div>
+        ${shipmentPanel}`;
+    }
+
+    async function cancelInvoice(id) {
+      if (!confirm('Hủy hóa đơn này? Hệ thống sẽ hoàn kho, hủy phiếu thu, đảo công nợ và hủy vận đơn liên quan.')) return;
+      const res = await fetch('/don-hang/hoa-don/' + id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không hủy được hóa đơn');
+      location.reload();
     }
   </script>
 </body>

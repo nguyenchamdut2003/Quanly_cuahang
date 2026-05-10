@@ -16,6 +16,7 @@ const {
   CongNoNhaCungCap
 } = require('../models/kiot.model');
 const { truTonKho } = require('../services/kho.service');
+const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
 
 function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || '').trim());
@@ -420,6 +421,33 @@ async function applySupplierDebt(returnDoc) {
   }
 }
 
+async function createSupplierRefundReceipt(returnDoc, userId) {
+  if (!returnDoc.nha_cung_cap_id) return;
+  const amount = Number(returnDoc.ncc_da_tra || 0);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const existed = await mongoose.models.PhieuThuChi.findOne({
+    phieu_tra_hang_nhap_id: returnDoc._id,
+    loai_phieu: 'thu'
+  }).lean();
+  if (existed) return;
+  const cashBook = await ensureDefaultSoQuy(returnDoc.cua_hang_id);
+  await taoPhieuThuChi({
+    loai_phieu: 'thu',
+    loai_thu_chi: 'NCC hoan tien tra hang nhap',
+    gia_tri: amount,
+    so_quy_id: cashBook._id,
+    cua_hang_id: returnDoc.cua_hang_id,
+    nguoi_tao_id: userId,
+    nha_cung_cap_id: returnDoc.nha_cung_cap_id,
+    phieu_nhap_id: returnDoc.phieu_nhap_id || undefined,
+    phieu_tra_hang_nhap_id: returnDoc._id,
+    ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
+    nhom_doi_tuong: 'nha_cung_cap',
+    phuong_thuc_thanh_toan: 'tien_mat',
+    hach_toan: returnDoc.tinh_vao_cong_no
+  });
+}
+
 exports.index = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
@@ -713,6 +741,7 @@ exports.createSubmit = async function(req, res, next) {
     if (submitMode === 'completed') {
       await completeInventory(returnDoc, detailRows, req.user?._id);
       await applySupplierDebt(returnDoc);
+      await createSupplierRefundReceipt(returnDoc, req.user?._id);
     }
 
     return res.json({ success: true, redirect: '/tra-hang-nhap', id: returnDoc._id, ma_phieu_tra_nhap: maPhieu });
@@ -770,6 +799,7 @@ exports.complete = async function(req, res) {
     returnDoc.nguoi_tra_id = req.user?._id || returnDoc.nguoi_tra_id;
     await returnDoc.save();
     await applySupplierDebt(returnDoc);
+    await createSupplierRefundReceipt(returnDoc, req.user?._id);
     return res.json({ success: true, message: 'Đã hoàn thành phiếu trả hàng nhập' });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể hoàn thành phiếu' });

@@ -1,5 +1,6 @@
 var mongoose = require('mongoose');
 var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh } = require('../models/kiot.model');
+var { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
 
 function normalizeNhapHangFilter(query) {
   query = query || {};
@@ -941,12 +942,12 @@ exports.createSubmit = async function(req, res, next) {
       }
 
       if (supplierId) {
-        if (conNoNcc > 0) {
+        if (canTraNcc > 0) {
           await CongNoNhaCungCap.create({
             cua_hang_id: storeId,
             nha_cung_cap_id: supplierId,
             phieu_nhap_id: phieu._id,
-            so_tien: conNoNcc,
+            so_tien: canTraNcc,
             loai: 'tang_no',
             ghi_chu: 'Công nợ phát sinh từ phiếu nhập ' + maPhieu,
             ngay: ngayNhap
@@ -959,7 +960,7 @@ exports.createSubmit = async function(req, res, next) {
         if (supplierDoc) {
           var supplierInc = {};
           if (typeof supplierDoc.tong_mua === 'number') supplierInc.tong_mua = canTraNcc;
-          if (conNoNcc > 0 && typeof supplierDoc.tong_no === 'number') supplierInc.tong_no = conNoNcc;
+          if (canTraNcc > 0 && typeof supplierDoc.tong_no === 'number') supplierInc.tong_no = canTraNcc;
           if (Object.keys(supplierInc).length > 0) {
             await NhaCungCap.updateOne(
               { _id: supplierId },
@@ -967,6 +968,24 @@ exports.createSubmit = async function(req, res, next) {
             );
           }
         }
+      }
+
+      if (supplierId && daTra > 0) {
+        var cashBook = await ensureDefaultSoQuy(storeId);
+        await taoPhieuThuChi({
+          loai_phieu: 'chi',
+          loai_thu_chi: 'Chi tra nha cung cap',
+          gia_tri: daTra,
+          so_quy_id: cashBook._id,
+          cua_hang_id: storeId,
+          nguoi_tao_id: req.user && req.user._id ? req.user._id : undefined,
+          nha_cung_cap_id: supplierId,
+          phieu_nhap_id: phieu._id,
+          ma_chung_tu_goc: maPhieu,
+          nhom_doi_tuong: 'nha_cung_cap',
+          phuong_thuc_thanh_toan: ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].indexOf(phuongThuc) >= 0 ? phuongThuc : 'tien_mat',
+          hach_toan: true
+        });
       }
     }
 

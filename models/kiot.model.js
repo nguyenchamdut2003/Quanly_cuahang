@@ -1093,6 +1093,7 @@ const SoQuySchema = new Schema({
   ten_so_quy: { type: String },
   loai: { type: String },
   so_du: { type: Number, default: 0 },
+  cho_phep_am: { type: Boolean, default: true },
   trang_thai: { type: String, default: 'active' },
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' }
@@ -1114,7 +1115,23 @@ const PhieuThuChiSchema = new Schema({
   so_quy_id: { type: ObjectId, ref: 'SoQuy' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
-  nha_cung_cap_id: { type: ObjectId, ref: 'NhaCungCap' }
+  nha_cung_cap_id: { type: ObjectId, ref: 'NhaCungCap' },
+  don_hang_id: { type: ObjectId, ref: 'DonHang' },
+  hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
+  phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
+  phieu_tra_hang_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap' },
+  van_don_id: { type: ObjectId, ref: 'VanDon' },
+  ma_chung_tu_goc: { type: String },
+  nhom_doi_tuong: {
+    type: String,
+    enum: ['khach_hang', 'nha_cung_cap', 'doi_tac_giao_hang', 'nhan_vien', 'khac'],
+    default: 'khac'
+  },
+  phuong_thuc_thanh_toan: {
+    type: String,
+    enum: ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'],
+    default: 'tien_mat'
+  }
 }, { collection: "phieu_thu_chi", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 // CONG_NO_KHACH_HANG
