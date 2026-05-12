@@ -1,0 +1,76 @@
+<%
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const d = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
+  const supplier = ticket.nha_cung_cap_id || {};
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title><%= title %></title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;background:#f3f4f6;color:#111}
+    .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:16mm;box-sizing:border-box}
+    h1{text-align:center;font-size:19px;text-transform:uppercase;margin:18px 0 8px}
+    h2{font-size:14px;margin:14px 0 6px}
+    p,.info{font-size:13px;line-height:1.55}
+    table{width:100%;border-collapse:collapse;margin-top:10px}
+    th,td{border:1px solid #333;padding:6px;font-size:12px}
+    th{background:#f1f5f9}
+    .num{text-align:right}
+    .sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px;text-align:center;font-size:13px}
+    .sign b{display:block;margin-bottom:60px;text-transform:uppercase}
+    .print-actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}
+    .print-actions button{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer}
+    @media print{body{background:#fff}.page{margin:0;width:auto;min-height:auto}.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+  <div class="print-actions no-print">
+    <button type="button" onclick="window.print()">In</button>
+    <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf'">Tải PDF</button>
+  </div>
+  <main class="page">
+    <h1>Hợp đồng mua bán nguyên tắc</h1>
+    <p style="text-align:center">Căn cứ phiếu nhập hàng số <strong><%= ticket.ma_phieu_nhap || '' %></strong> ngày <%= d(ticket.ngay_nhap) %></p>
+    <h2>Bên mua</h2>
+    <div class="info">
+      Tên đơn vị: <strong><%= store ? (store.ten_cua_hang || '') : '' %></strong><br>
+      Địa chỉ: <%= store ? (store.dia_chi || '') : '' %><br>
+      Điện thoại: <%= store ? (store.sdt || '') : '' %>
+    </div>
+    <h2>Bên bán</h2>
+    <div class="info">
+      Nhà cung cấp: <strong><%= supplier.ten_ncc || '' %></strong><br>
+      Công ty: <%= supplier.ten_cong_ty || '' %><br>
+      Mã số thuế: <%= supplier.ma_so_thue || '' %><br>
+      Điện thoại: <%= supplier.sdt || '' %> - Email: <%= supplier.email || '' %>
+    </div>
+    <h2>Danh sách hàng hóa</h2>
+    <table>
+      <thead><tr><th>STT</th><th>Tên hàng</th><th>Lô</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
+      <tbody>
+        <% items.forEach(function(row, index){ %>
+          <tr>
+            <td class="num"><%= index + 1 %></td>
+            <td><%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %></td>
+            <td><%= row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '' %></td>
+            <td class="num"><%= fmt(row.so_luong) %></td>
+            <td class="num"><%= fmt(row.don_gia_nhap) %></td>
+            <td class="num"><%= fmt(row.thanh_tien) %></td>
+          </tr>
+        <% }) %>
+        <tr><th colspan="5">Tổng tiền</th><th class="num"><%= fmt(ticket.tong_tien) %></th></tr>
+      </tbody>
+    </table>
+    <h2>Điều khoản thanh toán</h2>
+    <p>Bên mua cần trả nhà cung cấp <strong><%= fmt(ticket.can_tra_ncc) %> VND</strong>, đã trả <strong><%= fmt(ticket.da_tra_ncc) %> VND</strong>, còn nợ <strong><%= fmt(ticket.con_no_ncc) %> VND</strong>. Phương thức thanh toán: <%= ticket.phuong_thuc_thanh_toan || 'cong_no' %>.</p>
+    <h2>Giao nhận</h2>
+    <p>Hàng hóa được giao và nhập tại kho <strong><%= ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '' %></strong>. Hai bên xác nhận số lượng, chất lượng hàng hóa theo danh sách trên tại thời điểm giao nhận.</p>
+    <section class="sign">
+      <div><b>Đại diện bên mua</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Đại diện bên bán</b>(Ký, ghi rõ họ tên)</div>
+    </section>
+  </main>
+</body>
+</html>

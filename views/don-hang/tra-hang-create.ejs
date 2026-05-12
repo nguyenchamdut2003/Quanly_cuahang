@@ -14,7 +14,7 @@
     _id: String(p._id),
     ma_hang: p.ma_hang || '',
     ten_hang: p.ten_hang || '',
-    gia_ban: p.gia_ban || 0,
+    gia_ban: p.gia_ban || p.gia_co_dinh || 0,
     ton_kho: p.ton_kho || 0
   }));
 %>
@@ -57,10 +57,14 @@
       <div class="link-line">Tr&#7843; h&#224;ng / <a id="invoiceLink" href="#">Ch&#432;a ch&#7885;n h&#243;a &#273;&#417;n</a></div>
       <div class="sum-line"><span>T&#7893;ng gi&#225; g&#7889;c h&#224;ng mua</span><span id="originTotal">0</span><span class="num">0</span></div>
       <div class="sum-line"><span>T&#7893;ng ti&#7873;n h&#224;ng tr&#7843;</span><span id="returnTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>T&#7893;ng ti&#7873;n h&#224;ng &#273;&#7893;i</span><span id="exchangeTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>Ch&#234;nh l&#7879;ch</span><span></span><strong id="differenceTotal" class="num">0</strong></div>
       <div class="sum-line"><span>Gi&#7843;m gi&#225;</span><span></span><input id="discount" value="0" oninput="renderTotals()"></div>
       <div class="sum-line"><span>Ph&#237; tr&#7843; h&#224;ng</span><span></span><input id="returnFee" value="0" oninput="renderTotals()"></div>
-      <div class="sum-line"><strong>C&#7847;n tr&#7843; kh&#225;ch</strong><span></span><strong id="payable" class="payable num">0</strong></div>
-      <button class="submit" type="button" onclick="submitReturn()">TR&#7842; H&#192;NG</button>
+      <div class="sum-line"><strong id="payableLabel">C&#7847;n tr&#7843; kh&#225;ch</strong><span></span><strong id="payable" class="payable num">0</strong></div>
+      <div class="sum-line" id="customerPaidExtraRow" style="display:none"><span>Kh&#225;ch thanh to&#225;n th&#234;m</span><span></span><input id="customerPaidExtra" value="0" oninput="customerPaidExtraTouched=true"></div>
+      <div id="returnStatus" style="min-height:24px;margin-top:auto;color:#667085;font-size:14px"></div>
+      <button id="submitReturnBtn" class="submit" type="button" onclick="submitReturn()">TR&#7842; H&#192;NG</button>
     </section>
   </main>
   <div id="invoiceModal" class="modal-backdrop">
@@ -103,6 +107,7 @@
     let selectedInvoice = null;
     let returnItems = [];
     let swapItems = [];
+    let customerPaidExtraTouched = false;
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
     const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
 
@@ -180,6 +185,7 @@
         ten_hang: item.hang_hoa_id?.ten_hang || '',
         so_luong_goc: Number(item.so_luong || 0),
         so_luong: 0,
+        lo_hang_id: item.lo_hang_id?._id || item.lo_hang_id || '',
         don_gia: Number(item.don_gia || 0),
         thanh_tien_goc: Number(item.thanh_tien || 0)
       }));
@@ -283,6 +289,7 @@
       const rows = swapItems;
       const swapItemsEl = document.getElementById('swapItems');
       swapItemsEl.innerHTML = rows.length ? rows.map(item => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeSwapItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '';
+      renderTotals();
     }
     function setQty(id, value){
       const item = returnItems.find(i => String(i.hang_hoa_id) === String(id));
@@ -313,33 +320,75 @@
     function renderTotals(){
       const origin = returnItems.reduce((sum, item) => sum + item.thanh_tien_goc, 0);
       const total = returnItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
-      const payableValue = Math.max(total - num(discount.value) - num(returnFee.value), 0);
+      const exchange = swapItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
+      const difference = exchange - total;
+      const payableValue = Math.abs(difference);
       originTotal.textContent = fmt(origin);
       returnTotal.textContent = fmt(total);
+      exchangeTotal.textContent = fmt(exchange);
+      differenceTotal.textContent = fmt(difference);
+      payableLabel.textContent = difference > 0 ? 'Khách cần trả thêm' : 'Cần trả khách';
       payable.textContent = fmt(payableValue);
+      customerPaidExtraRow.style.display = difference > 0 ? 'grid' : 'none';
+      if (difference > 0 && !customerPaidExtraTouched) customerPaidExtra.value = fmt(payableValue);
+      if (difference <= 0) {
+        customerPaidExtra.value = '0';
+        customerPaidExtraTouched = false;
+      }
     }
     async function submitReturn(){
+      const button = document.getElementById('submitReturnBtn');
+      const status = document.getElementById('returnStatus');
+      if (button.disabled) return;
       if(!selectedInvoice){
         openInvoiceModal();
         return;
       }
-      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ hang_hoa_id: i.hang_hoa_id, so_luong: i.so_luong, don_gia: i.don_gia }));
+      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ hang_hoa_id: i.hang_hoa_id, lo_hang_id: i.lo_hang_id || '', so_luong: i.so_luong, don_gia: i.don_gia }));
       if(!items.length) return alert('Vui long nhap so luong hang tra');
-      const exchangeItems = swapItems.filter(i => i.so_luong > 0);
+      const exchangeItems = swapItems.filter(i => i.so_luong > 0).map(i => ({
+        hang_hoa_id: i.hang_hoa_id,
+        so_luong: i.so_luong,
+        don_gia: i.don_gia,
+        thanh_tien: i.so_luong * i.don_gia
+      }));
       const selectedCustomerId = selectedInvoice?.khach_hang_id?._id || selectedInvoice?.khach_hang_id || null;
       if(exchangeItems.length && !selectedCustomerId) return alert('Vui long chon khach hang truoc khi dat don doi');
       const payload = {
         hoa_don_id: selectedInvoice?._id || null,
         khach_hang_id: selectedCustomerId,
+        kho_id: selectedInvoice?.kho_id?._id || selectedInvoice?.kho_id || null,
         items,
+        exchangeItems,
+        khach_thanh_toan_them: num(customerPaidExtra.value),
         giam_gia: num(discount.value),
         phi_tra_hang: num(returnFee.value),
         ghi_chu: ''
       };
-      const res = await fetch('/don-hang/tra-hang/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-      const result = await res.json();
-      if(!result.success) return alert(result.message || 'Khong tao duoc phieu tra hang');
-      window.location.href = '/don-hang/tra-hang';
+      button.disabled = true;
+      button.textContent = 'ĐANG XỬ LÝ...';
+      status.style.color = '#006dff';
+      status.textContent = 'Đang gửi yêu cầu tạo phiếu trả hàng...';
+      try {
+        const res = await fetch('/don-hang/tra-hang/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+        const text = await res.text();
+        let result = {};
+        try {
+          result = text ? JSON.parse(text) : {};
+        } catch (_) {
+          throw new Error(text || 'Backend trả về phản hồi không hợp lệ');
+        }
+        if(!res.ok || !result.success) throw new Error(result.message || 'Không tạo được phiếu trả hàng');
+        status.style.color = '#008a3d';
+        status.textContent = result.message || 'Đã tạo phiếu trả hàng';
+        setTimeout(() => { window.location.href = '/don-hang/tra-hang'; }, 500);
+      } catch (error) {
+        status.style.color = '#d92d20';
+        status.textContent = error.message || 'Lỗi khi tạo phiếu trả hàng';
+        alert(status.textContent);
+        button.disabled = false;
+        button.textContent = 'TRẢ HÀNG';
+      }
     }
     document.addEventListener('DOMContentLoaded', () => {
       loadInvoices(1);

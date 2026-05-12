@@ -682,7 +682,7 @@ const LichSuKhoSchema = new Schema({
 
   loai_phieu: {
     type: String,
-    enum: ['nhap_hang', 'tra_hang_nhap', 'kiem_kho', 'ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
+    enum: ['nhap_hang', 'tra_hang_nhap', 'tra_hang', 'kiem_kho', 'ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
     required: true
   },
 
@@ -995,11 +995,16 @@ const HoaDonBanHangSchema = new Schema({
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
   nguoi_ban_id: { type: ObjectId, ref: 'NguoiDung' }
 }, { collection: "hoa_don_ban_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+HoaDonBanHangSchema.index(
+  { don_hang_id: 1 },
+  { unique: true, sparse: true }
+);
 
 // CT_HOA_DON_BAN_HANG
 const CTHoaDonBanHangSchema = new Schema({
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
+  lo_hang_id: { type: ObjectId, ref: 'LoHang' },
   so_luong: { type: Number },
   don_gia: { type: Number },
   chiet_khau: { type: Number },
@@ -1041,6 +1046,11 @@ const PhieuTraHangSchema = new Schema({
   ma_phieu_tra: { type: String, unique: true },
   ngay_tra: { type: Date, default: Date.now },
   tong_tien_tra: { type: Number },
+  tong_tien_hang_tra: { type: Number, default: 0 },
+  tong_tien_hang_doi: { type: Number, default: 0 },
+  chenh_lech: { type: Number, default: 0 },
+  khach_can_tra_them: { type: Number, default: 0 },
+  can_tra_khach: { type: Number, default: 0 },
   ly_do: { type: String },
   trang_thai: { type: String },
   ghi_chu: { type: String },
@@ -1056,6 +1066,8 @@ const PhieuTraHangSchema = new Schema({
 const CTPhieuTraHangSchema = new Schema({
   phieu_tra_hang_id: { type: ObjectId, ref: 'PhieuTraHang' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
+  lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  loai_dong: { type: String, enum: ['hang_tra', 'hang_doi'], default: 'hang_tra' },
   so_luong: { type: Number },
   don_gia: { type: Number },
   thanh_tien: { type: Number }
@@ -1259,6 +1271,10 @@ PhiVanChuyenKhachHangSchema.index(
   },
   { unique: true }
 );
+const CounterSchema = new Schema({
+  _id: { type: String },
+  seq: { type: Number, default: 0 }
+}, { collection: "counters" });
 // Register models
 const CuaHang = mongoose.models.CuaHang || mongoose.model("CuaHang", CuaHangSchema);
 const Kho = mongoose.models.Kho || mongoose.model("Kho", KhoSchema);
@@ -1307,6 +1323,7 @@ const CTXuatHuy = mongoose.models.CTXuatHuy || mongoose.model("CTXuatHuy", CTXua
 const PhanBoHang = mongoose.models.PhanBoHang || mongoose.model("PhanBoHang", PhanBoHangSchema);
 const CTPhanBoHang = mongoose.models.CTPhanBoHang || mongoose.model("CTPhanBoHang", CTPhanBoHangSchema);
 const PhiVanChuyenKhachHang = mongoose.models.PhiVanChuyenKhachHang || mongoose.model("PhiVanChuyenKhachHang", PhiVanChuyenKhachHangSchema);
+const Counter = mongoose.models.Counter || mongoose.model("Counter", CounterSchema);
 module.exports = {
   CuaHang, Kho, NguoiDung,
   NhomKhachHang, KhachHang, DiaChiKhachHang, LoaiDiaChiKhachHang, 
@@ -1322,5 +1339,6 @@ module.exports = {
   CongNoKhachHang, CongNoNhaCungCap, LichSuKho,
   PhieuXuatNoiBo, CTXuatNoiBo, PhieuXuatHuy, CTXuatHuy,
   PhanBoHang, CTPhanBoHang,
-  PhiVanChuyenKhachHang
+  PhiVanChuyenKhachHang,
+  Counter
 };

@@ -5,6 +5,16 @@
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
+  const exportParams = new URLSearchParams();
+  Object.keys(safeFilters).forEach(function(key) {
+    const value = safeFilters[key];
+    if (Array.isArray(value)) {
+      value.forEach(function(item) { exportParams.append(key, item); });
+    } else if (value !== undefined && value !== null && value !== '') {
+      exportParams.append(key, value);
+    }
+  });
+  const exportQuery = exportParams.toString();
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -120,7 +130,7 @@
           <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"></div>
           <div class="actions">
             <a class="kv-btn primary" href="/tra-hang-nhap/create">+ Trả hàng nhập</a>
-            <a class="kv-btn" href="/tra-hang-nhap/export.csv?<%= new URLSearchParams(safeFilters).toString() %>">Xuất file ▾</a>
+            <a class="kv-btn" href="/tra-hang-nhap/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
             <span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
           </div>
         </div>
@@ -228,7 +238,7 @@
                           <div class="detail-actions-left">
                             <button class="detail-btn" type="button">Hủy</button>
                             <button class="detail-btn" type="button">Sao chép</button>
-                            <button class="detail-btn" type="button">Xuất file</button>
+                            <a class="detail-btn" href="/tra-hang-nhap/<%= r._id %>/export.xlsx">Xuất file</a>
                           </div>
                           <div class="detail-actions-right">
                             <button class="detail-btn box" type="button">Lưu</button>

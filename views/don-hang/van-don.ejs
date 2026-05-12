@@ -2,6 +2,16 @@
   const safeShipments = Array.isArray(locals.shipments) ? locals.shipments : [];
   const safePartners = Array.isArray(locals.partners) ? locals.partners : [];
   const safeFilters = locals.filters || {};
+  const exportParams = new URLSearchParams();
+  Object.keys(safeFilters).forEach(key => {
+    const value = safeFilters[key];
+    if (Array.isArray(value)) {
+      value.forEach(item => exportParams.append(key, item));
+    } else if (value !== undefined && value !== null && value !== '') {
+      exportParams.append(key, value);
+    }
+  });
+  const exportQuery = exportParams.toString();
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const statusText = value => ({ draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy' }[value] || value || '');
   const statusClass = value => ({ draft: 'draft', shipping: 'shipping', completed: 'completed', cancelled: 'cancelled' }[value] || 'draft');
@@ -61,7 +71,7 @@
         <div class="toolbar">
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã vận đơn"><button><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
-            <a class="btn" href="/don-hang/van-don/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a>
+            <a class="btn" href="/don-hang/van-don/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file</a>
             <span class="icon"><i class="fa-solid fa-list"></i></span>
             <span class="icon"><i class="fa-solid fa-gear"></i></span>
             <span class="icon"><i class="fa-regular fa-circle-question"></i></span>

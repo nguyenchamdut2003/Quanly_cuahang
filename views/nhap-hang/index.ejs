@@ -74,6 +74,15 @@
     .summary-line b{font-size:13px}
     .detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
     .po-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .po-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000}
+    .po-modal.open{display:flex}
+    .po-modal-card{width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}
+    .po-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .po-modal-head h3{margin:0;font-size:18px}
+    .po-modal-close{border:0;background:#fff;font-size:24px;cursor:pointer}
+    .po-modal textarea{width:100%;min-height:90px;border:1px solid #cfd8e3;border-radius:6px;padding:8px}
+    .label-options{display:flex;gap:12px;margin:10px 0}.label-options select{height:32px;border:1px solid #cfd8e3;border-radius:6px}
+    @media print{body>*:not(#labelPrintArea){display:none!important}#labelPrintArea{display:block!important}.label-sheet{display:grid;grid-template-columns:repeat(3,64mm);gap:3mm}.label-item{border:1px solid #111;padding:3mm;height:28mm;font-size:11px;break-inside:avoid}.label-code{font-weight:800;font-size:13px}.label-bar{font-family:monospace;letter-spacing:2px;margin-top:3px}}
     @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
   </style>
 </head>
@@ -211,13 +220,16 @@
                             </div>
                           </div>
                           <div class="detail-actions">
-                            <button type="button" class="kv-btn">Hủy</button>
-                            <button type="button" class="kv-btn">Sao chép</button>
-                            <button type="button" class="kv-btn">Xuất file</button>
-                            <button type="button" class="kv-btn">Mở phiếu</button>
-                            <button type="button" class="kv-btn">Lưu</button>
-                            <button type="button" class="kv-btn">Trả hàng nhập</button>
-                            <button type="button" class="kv-btn">In tem mã</button>
+                            <button type="button" class="kv-btn" onclick="cancelPurchase('<%= t._id %>')" <%= t.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
+                            <button type="button" class="kv-btn" onclick="copyPurchase('<%= t._id %>')">Sao chép</button>
+                            <a class="kv-btn" href="/nhap-hang/<%= t._id %>/export.xlsx">Xuất file</a>
+                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/in" target="_blank">In phiếu</a>
+                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/bang-ke-02-tndn" target="_blank">02/TNDN</a>
+                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/hd-mua-ban-nguyen-tac" target="_blank">HĐ nguyên tắc</a>
+                            <button type="button" class="kv-btn" onclick="openPurchase('<%= t._id %>')">Mở phiếu</button>
+                            <button type="button" class="kv-btn" onclick="openPurchase('<%= t._id %>')">Lưu</button>
+                            <button type="button" class="kv-btn" onclick="returnPurchase('<%= t._id %>')">Trả hàng nhập</button>
+                            <button type="button" class="kv-btn" onclick="openLabelModal('<%= t._id %>')">In tem mã</button>
                           </div>
                         </div>
                         <div class="po-detail-pane" data-tab-pane="payment">
@@ -256,7 +268,148 @@
       </main>
     </div>
   </form>
+  <div id="purchaseModal" class="po-modal">
+    <div class="po-modal-card">
+      <div class="po-modal-head">
+        <h3 id="purchaseModalTitle">Phiếu nhập</h3>
+        <button class="po-modal-close" type="button" onclick="closePurchaseModal()">×</button>
+      </div>
+      <div id="purchaseModalBody"></div>
+      <div class="detail-actions">
+        <button class="kv-btn primary" type="button" onclick="savePurchaseNote()">Lưu</button>
+        <button class="kv-btn" type="button" onclick="closePurchaseModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+  <div id="labelModal" class="po-modal">
+    <div class="po-modal-card">
+      <div class="po-modal-head">
+        <h3>In tem mã</h3>
+        <button class="po-modal-close" type="button" onclick="closeLabelModal()">×</button>
+      </div>
+      <div class="label-options">
+        <label>Mẫu giấy
+          <select id="labelPaper">
+            <option value="3col">A4 - 3 cột</option>
+            <option value="2col">A4 - 2 cột</option>
+          </select>
+        </label>
+      </div>
+      <div id="labelItems"></div>
+      <div class="detail-actions">
+        <button class="kv-btn primary" type="button" onclick="printLabels()">In / Preview</button>
+        <button class="kv-btn" type="button" onclick="closeLabelModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
+  <div id="labelPrintArea" style="display:none"></div>
+  <script id="purchaseData" type="application/json"><%- JSON.stringify(safeTickets || []).replace(/</g, '\\u003c') %></script>
   <script>
+    const purchases = JSON.parse(document.getElementById('purchaseData')?.textContent || '[]');
+    let currentPurchaseId = '';
+    function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
+    function findPurchase(id){ return purchases.find(item => String(item._id) === String(id)); }
+    async function postJson(url, body){
+      const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body || {}) });
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (_) { throw new Error(text || 'Backend trả về phản hồi không hợp lệ'); }
+      if (!res.ok || !data.success) throw new Error(data.message || 'Thao tác thất bại');
+      return data;
+    }
+    async function cancelPurchase(id){
+      if (!confirm('Hủy phiếu nhập này? Nếu phiếu đã cộng kho, hệ thống sẽ rollback tồn kho.')) return;
+      try {
+        const data = await postJson('/nhap-hang/' + id + '/cancel');
+        alert(data.message || 'Đã hủy phiếu nhập');
+        location.reload();
+      } catch (error) {
+        alert(error.message || 'Không hủy được phiếu nhập');
+      }
+    }
+    async function copyPurchase(id){
+      if (!confirm('Sao chép phiếu nhập này thành phiếu tạm mới?')) return;
+      try {
+        const data = await postJson('/nhap-hang/' + id + '/copy');
+        alert((data.message || 'Đã sao chép') + (data.ma_phieu_nhap ? ': ' + data.ma_phieu_nhap : ''));
+        location.reload();
+      } catch (error) {
+        alert(error.message || 'Không sao chép được phiếu nhập');
+      }
+    }
+    async function openPurchase(id){
+      currentPurchaseId = id;
+      const modal = document.getElementById('purchaseModal');
+      const title = document.getElementById('purchaseModalTitle');
+      const body = document.getElementById('purchaseModalBody');
+      body.innerHTML = 'Đang tải phiếu nhập...';
+      modal.classList.add('open');
+      try {
+        const res = await fetch('/nhap-hang/' + id + '/detail');
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Không tải được phiếu nhập');
+        const ticket = data.data.ticket;
+        const readonly = ticket.trang_thai === 'completed' || ticket.trang_thai === 'cancelled';
+        title.textContent = `${ticket.ma_phieu_nhap || 'Phiếu nhập'} - ${readonly ? 'chỉ sửa ghi chú' : 'phiếu tạm'}`;
+        body.innerHTML = `
+          <div class="detail-grid">
+            <div class="item">Nhà cung cấp<b>${ticket.nha_cung_cap_id?.ten_ncc || '--'}</b></div>
+            <div class="item">Kho<b>${ticket.kho_id?.ten_kho || ticket.kho_id?.ma_kho || '--'}</b></div>
+            <div class="item">Trạng thái<b>${ticket.trang_thai || '--'}</b></div>
+            <div class="item">Cần trả NCC<b>${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}</b></div>
+          </div>
+          <label>Ghi chú</label>
+          <textarea id="purchaseNote">${ticket.ghi_chu || ''}</textarea>
+          <p class="lot-note">${readonly ? 'Phiếu đã hoàn thành/hủy: chỉ lưu ghi chú để tránh lệch tồn kho và công nợ.' : 'Phiếu tạm: thay đổi hàng hóa nên thực hiện ở màn tạo/sửa chuyên dụng.'}</p>
+        `;
+      } catch (error) {
+        body.innerHTML = `<span style="color:#d92d20">${error.message}</span>`;
+      }
+    }
+    function closePurchaseModal(){ document.getElementById('purchaseModal').classList.remove('open'); }
+    async function savePurchaseNote(){
+      if (!currentPurchaseId) return;
+      try {
+        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', { ghi_chu: document.getElementById('purchaseNote')?.value || '' });
+        alert(data.message || 'Đã lưu');
+        location.reload();
+      } catch (error) {
+        alert(error.message || 'Không lưu được phiếu nhập');
+      }
+    }
+    function returnPurchase(id){
+      const p = findPurchase(id);
+      if (p && p.trang_thai !== 'completed') return alert('Chỉ trả hàng nhập từ phiếu đã nhập hàng.');
+      location.href = '/tra-hang-nhap/create?phieu_nhap_id=' + encodeURIComponent(id);
+    }
+    function openLabelModal(id){
+      currentPurchaseId = id;
+      const p = findPurchase(id);
+      if (!p) return alert('Không tìm thấy phiếu nhập');
+      const rows = p.detail_rows || [];
+      labelItems.innerHTML = rows.length ? `
+        <table class="mini-table"><thead><tr><th>Hàng hóa</th><th>Số lượng nhập</th><th>Số tem</th></tr></thead><tbody>
+        ${rows.map(row => `<tr><td>${row.hang_hoa_id?.ma_hang || ''} - ${row.hang_hoa_id?.ten_hang || ''}</td><td>${money(row.so_luong || 0)}</td><td><input data-label-product="${row._id}" type="number" min="0" value="${Number(row.so_luong || 0)}" style="width:90px"></td></tr>`).join('')}
+        </tbody></table>` : 'Phiếu chưa có hàng hóa';
+      document.getElementById('labelModal').classList.add('open');
+    }
+    function closeLabelModal(){ document.getElementById('labelModal').classList.remove('open'); }
+    function printLabels(){
+      const p = findPurchase(currentPurchaseId);
+      if (!p) return;
+      const qtyByRow = {};
+      document.querySelectorAll('[data-label-product]').forEach(input => { qtyByRow[input.dataset.labelProduct] = Math.max(0, Number(input.value || 0)); });
+      const labels = [];
+      (p.detail_rows || []).forEach(row => {
+        const qty = qtyByRow[String(row._id)] || 0;
+        for (let i = 0; i < qty; i++) {
+          labels.push(`<div class="label-item"><div class="label-code">${row.hang_hoa_id?.ma_hang || ''}</div><div>${row.hang_hoa_id?.ten_hang || ''}</div><div>Giá nhập: ${money(row.don_gia_nhap || 0)}</div><div class="label-bar">|||| ${row.hang_hoa_id?.ma_hang || ''} ||||</div></div>`);
+        }
+      });
+      if (!labels.length) return alert('Chưa chọn số lượng tem');
+      labelPrintArea.innerHTML = `<div class="label-sheet">${labels.join('')}</div>`;
+      window.print();
+    }
     document.addEventListener('DOMContentLoaded', function() {
       var rows = Array.prototype.slice.call(document.querySelectorAll('.expand-row'));
       rows.forEach(function(row) {

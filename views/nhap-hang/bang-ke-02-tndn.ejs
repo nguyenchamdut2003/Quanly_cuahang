@@ -1,0 +1,210 @@
+<%
+  const phieuNhap = ticket || {};
+  const cuaHang = store || phieuNhap.cua_hang_id || {};
+  const nhaCungCap = phieuNhap.nha_cung_cap_id || {};
+  const diaChiNcc = supplierAddress || {};
+  const ngayNhap = phieuNhap.ngay_nhap ? new Date(phieuNhap.ngay_nhap) : new Date();
+  const dot = '................................................................';
+
+  const fmtMoney = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtDate = value => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('vi-VN');
+  };
+  const fill = value => value ? value : dot;
+  const sellerName = nhaCungCap.ten_ncc || nhaCungCap.ten_cong_ty || '';
+  const sellerAddress = diaChiNcc.dia_chi_day_du || diaChiNcc.so_nha || nhaCungCap.dia_chi || '';
+
+  function readThreeDigits(num, full) {
+    const digits = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
+    const hundred = Math.floor(num / 100);
+    const ten = Math.floor((num % 100) / 10);
+    const unit = num % 10;
+    let result = [];
+    if (full || hundred > 0) {
+      result.push(digits[hundred] + ' trăm');
+      if (ten === 0 && unit > 0) result.push('lẻ');
+    }
+    if (ten > 1) {
+      result.push(digits[ten] + ' mươi');
+      if (unit === 1) result.push('mốt');
+      else if (unit === 5) result.push('lăm');
+      else if (unit > 0) result.push(digits[unit]);
+    } else if (ten === 1) {
+      result.push('mười');
+      if (unit === 5) result.push('lăm');
+      else if (unit > 0) result.push(digits[unit]);
+    } else if (unit > 0) {
+      result.push(digits[unit]);
+    }
+    return result.join(' ');
+  }
+
+  function readMoney(value) {
+    let amount = Math.floor(Number(value || 0));
+    if (!Number.isFinite(amount) || amount <= 0) return 'Không đồng';
+    const units = ['', 'nghìn', 'triệu', 'tỷ', 'nghìn tỷ', 'triệu tỷ'];
+    let parts = [];
+    let groups = [];
+    while (amount > 0) {
+      groups.push(amount % 1000);
+      amount = Math.floor(amount / 1000);
+    }
+    for (let i = groups.length - 1; i >= 0; i--) {
+      if (groups[i] === 0) continue;
+      const text = readThreeDigits(groups[i], i < groups.length - 1);
+      parts.push(text + (units[i] ? ' ' + units[i] : ''));
+    }
+    const sentence = parts.join(' ').replace(/\s+/g, ' ').trim();
+    return sentence.charAt(0).toUpperCase() + sentence.slice(1) + ' đồng';
+  }
+
+  let totalAmount = 0;
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title><%= title || 'Bảng kê 02/TNDN' %></title>
+  <style>
+    @page{size:A4;margin:16mm 14mm}
+    *{box-sizing:border-box}
+    body{margin:0;background:#e5e7eb;color:#000;font-family:"Times New Roman",Times,serif;font-size:13px}
+    .print-actions{position:fixed;top:14px;right:18px;display:flex;gap:8px}
+    .print-actions button{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer}
+    .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:14mm 16mm}
+    .form-code{width:78mm;margin-left:auto;text-align:center;font-style:italic;line-height:1.18;margin-bottom:10px}
+    .form-code strong{font-style:normal}
+    .title{text-align:center;font-weight:bold;line-height:1.1;margin-top:6px}
+    .title h1{font-size:15px;margin:0;text-transform:uppercase}
+    .date-line{font-style:normal;font-weight:normal;margin-top:2px}
+    .company-info{width:128mm;margin:12px 0 12px 15mm;line-height:1.55}
+    .company-info div{white-space:nowrap}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{border:1px solid #000;padding:3px 3px;vertical-align:middle}
+    th{text-align:center;font-weight:bold}
+    td{height:22px}
+    .center{text-align:center}
+    .right{text-align:right}
+    .small{font-size:12px;line-height:1.1}
+    .col-date{width:12%}
+    .col-seller-name{width:10%}
+    .col-seller-address{width:10%}
+    .col-cccd{width:10%}
+    .col-phone{width:10%}
+    .col-item{width:13%}
+    .col-qty{width:10%}
+    .col-price{width:9%}
+    .col-total{width:11%}
+    .col-note{width:5%}
+    .column-numbers td{height:16px;text-align:center;padding:1px 2px}
+    .total-line{margin:2px 0 12px 0;line-height:1.35}
+    .signatures{display:grid;grid-template-columns:1fr 1fr;gap:22mm;margin-top:4px;text-align:center}
+    .signature-box{min-height:35mm}
+    .signature-date{font-style:italic;margin-bottom:24px}
+    .signature-title{font-weight:bold}
+    .signature-note{font-style:italic;margin-top:4px}
+    .notes{margin-top:12px;font-size:12.5px;font-style:italic;line-height:1.25}
+    .notes strong{font-style:italic}
+    @media print{
+      body{background:#fff}
+      .no-print{display:none!important}
+      .page{width:auto;min-height:auto;margin:0;padding:0}
+    }
+  </style>
+</head>
+<body>
+  <div class="print-actions no-print">
+    <button type="button" onclick="window.print()">In</button>
+    <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf'">Tải PDF</button>
+  </div>
+  <main class="page">
+    <div class="form-code">
+      <strong>Mẫu số: 02/TNDN</strong><br>
+      (Ban hành kèm theo Thông tư số 20/2026/TT-BTC của Bộ trưởng Bộ Tài chính)
+    </div>
+
+    <section class="title">
+      <h1>BẢNG KÊ THU MUA HÀNG HÓA, DỊCH VỤ</h1>
+      <h1>KHÔNG CÓ HÓA ĐƠN</h1>
+      <div class="date-line">(Ngày <%= ngayNhap.getDate() %> tháng <%= ngayNhap.getMonth() + 1 %> năm <%= ngayNhap.getFullYear() %>)</div>
+    </section>
+
+    <section class="company-info">
+      <div>- Tên doanh nghiệp: <%= fill(cuaHang.ten_cua_hang) %></div>
+      <div>- Mã số thuế: <%= fill(cuaHang.ma_so_thue) %></div>
+      <div>- Địa chỉ: <%= fill(cuaHang.dia_chi) %></div>
+      <div>- Số điện thoại: <%= fill(cuaHang.sdt || cuaHang.email) %></div>
+      <div>- Địa chỉ nơi tổ chức thu mua: <%= fill(cuaHang.dia_chi_gui_hang) %></div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th class="col-date" rowspan="2">Ngày tháng năm mua hàng</th>
+          <th colspan="4">Người bán</th>
+          <th colspan="4">Hàng hóa, dịch vụ mua vào</th>
+          <th class="col-note" rowspan="2">Ghi chú</th>
+        </tr>
+        <tr>
+          <th class="col-seller-name small">Tên người bán</th>
+          <th class="col-seller-address small">Địa chỉ</th>
+          <th class="col-cccd small">Số căn cước</th>
+          <th class="col-phone small">Số điện thoại nếu có</th>
+          <th class="col-item small">Tên hàng hóa, dịch vụ</th>
+          <th class="col-qty small">Số lượng, trọng lượng</th>
+          <th class="col-price small">Đơn giá</th>
+          <th class="col-total small">Tổng giá thanh toán</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="column-numbers">
+          <td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td>
+        </tr>
+        <% (items || []).forEach(function(row) { totalAmount += Number(row.thanh_tien || 0); %>
+          <tr>
+            <td class="center"><%= fmtDate(phieuNhap.ngay_nhap) %></td>
+            <td><%= sellerName %></td>
+            <td><%= sellerAddress %></td>
+            <td></td>
+            <td><%= nhaCungCap.sdt || '' %></td>
+            <td><%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %></td>
+            <td class="right"><%= fmtMoney(row.so_luong) %></td>
+            <td class="right"><%= fmtMoney(row.don_gia_nhap) %></td>
+            <td class="right"><%= fmtMoney(row.thanh_tien) %></td>
+            <td><%= row.ghi_chu || '' %></td>
+          </tr>
+        <% }) %>
+        <% if (!(items || []).length) { %>
+          <tr><td colspan="10" class="center">Không có dữ liệu</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+
+    <div class="total-line">
+      - Tổng giá trị hàng hóa, dịch vụ mua vào: <strong><%= fmtMoney(totalAmount) %></strong><br>
+      chữ: <%= readMoney(totalAmount) %>.
+    </div>
+
+    <section class="signatures">
+      <div class="signature-box">
+        <div class="signature-title">Người lập bảng kê</div>
+        <div class="signature-note">(Ký, ghi rõ họ tên)</div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-date">Ngày .... tháng .... năm ....</div>
+        <div class="signature-title">Người đại diện hoặc người được ủy quyền của doanh nghiệp</div>
+        <div class="signature-note">(Ký tên, đóng dấu)</div>
+      </div>
+    </section>
+
+    <section class="notes">
+      <strong>Ghi chú:</strong><br>
+      - Căn cứ vào số thực tế các hàng hóa, dịch vụ mà doanh nghiệp mua của người bán không có hóa đơn, lập bảng kê khai theo thứ tự thời gian mua, doanh nghiệp ghi đầy đủ các chỉ tiêu trên bảng kê, tổng hợp bảng kê hàng tháng.<br>
+      - Đối với doanh nghiệp có tổ chức các trạm thu mua ở nhiều nơi thì từng trạm thu mua phải lập từng bảng kê riêng. Doanh nghiệp lập bảng kê tổng hợp chung của các trạm.
+    </section>
+  </main>
+</body>
+</html>

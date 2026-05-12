@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const {
   CuaHang,
   Kho,
@@ -14,6 +15,32 @@ const {
   CTXuatHuy
 } = require('../models/kiot.model');
 const { truTonKho, congTonKho } = require('../services/kho.service');
+
+const EXPORT_STATUS_MAP = {
+  draft: 'Phiếu tạm',
+  completed: 'Đã hủy hàng',
+  cancelled: 'Đã hủy phiếu'
+};
+
+const XUAT_HUY_EXPORT_COLUMNS = [
+  { header: 'Mã xuất hủy', key: 'ma_xuat_huy' },
+  { header: 'Thời gian', key: 'thoi_gian' },
+  { header: 'Kho xuất', key: 'kho_xuat' },
+  { header: 'Người tạo', key: 'nguoi_tao' },
+  { header: 'Lý do hủy', key: 'ly_do_huy' },
+  { header: 'Tổng số lượng', key: 'tong_so_luong', style: { numFmt: '#,##0.##' } },
+  { header: 'Tổng giá trị', key: 'tong_gia_tri', style: { numFmt: '#,##0' } },
+  { header: 'Ghi chú', key: 'ghi_chu' },
+  { header: 'Trạng thái', key: 'trang_thai' },
+  { header: 'Mã hàng', key: 'ma_hang' },
+  { header: 'Tên hàng', key: 'ten_hang' },
+  { header: 'Thương hiệu', key: 'thuong_hieu' },
+  { header: 'Đơn vị tính', key: 'don_vi_tinh' },
+  { header: 'Lô hàng', key: 'lo_hang' },
+  { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
+  { header: 'Giá vốn', key: 'gia_von', style: { numFmt: '#,##0' } },
+  { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } }
+];
 
 function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || '').trim());
@@ -53,6 +80,136 @@ function formatDate(value) {
   return new Date(value).toLocaleString('vi-VN', {
     day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
+}
+
+function formatExportDate(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+function getCreatorName(user) {
+  return user ? (user.ho_ten || user.username || user.email || '') : '';
+}
+
+function getLotName(lot) {
+  return lot ? (lot.ma_lo || lot.ten_lo || '') : '';
+}
+
+function buildExportRow(ticket, detail) {
+  const product = detail && detail.hang_hoa_id ? detail.hang_hoa_id : {};
+  return {
+    ma_xuat_huy: ticket.ma_xuat_huy || '',
+    thoi_gian: formatExportDate(ticket.ngay_xuat || ticket.created_at),
+    kho_xuat: ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '',
+    nguoi_tao: getCreatorName(ticket.nguoi_tao_id),
+    ly_do_huy: ticket.ly_do_huy || '',
+    tong_so_luong: Number(ticket.tong_so_luong || 0),
+    tong_gia_tri: Number(ticket.tong_gia_tri || 0),
+    ghi_chu: ticket.ghi_chu || '',
+    trang_thai: EXPORT_STATUS_MAP[ticket.trang_thai] || ticket.trang_thai || '',
+    ma_hang: product.ma_hang || '',
+    ten_hang: product.ten_hang || '',
+    thuong_hieu: product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '',
+    don_vi_tinh: product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi : '',
+    lo_hang: getLotName(detail && detail.lo_hang_id),
+    so_luong: detail ? Number(detail.so_luong || 0) : 0,
+    gia_von: detail ? Number(detail.gia_von || 0) : 0,
+    thanh_tien: detail ? Number(detail.thanh_tien || 0) : 0
+  };
+}
+
+function applyWorksheetFormat(worksheet) {
+  const headerRow = worksheet.getRow(1);
+  headerRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: 'FF111827' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3FF' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+      bottom: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+      left: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+      right: { style: 'thin', color: { argb: 'FFD8E8FB' } }
+    };
+  });
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: XUAT_HUY_EXPORT_COLUMNS.length }
+  };
+  worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    row.eachCell(cell => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+      };
+      cell.alignment = { vertical: 'middle' };
+    });
+  });
+  worksheet.columns.forEach(column => {
+    let maxLength = String(column.header || '').length;
+    column.eachCell({ includeEmpty: true }, cell => {
+      const value = cell.value == null ? '' : String(cell.value);
+      maxLength = Math.max(maxLength, value.length);
+    });
+    column.width = Math.min(Math.max(maxLength + 2, 12), 36);
+  });
+}
+
+async function loadExportTickets(filter) {
+  const tickets = await PhieuXuatHuy.find(filter)
+    .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+    .populate({ path: 'nguoi_tao_id', select: 'ho_ten username email' })
+    .sort({ ngay_xuat: -1, created_at: -1 });
+  const ticketIds = tickets.map(ticket => ticket._id);
+  const details = ticketIds.length
+    ? await CTXuatHuy.find({ phieu_xuat_huy_id: { $in: ticketIds } })
+      .populate({
+        path: 'hang_hoa_id',
+        populate: [
+          { path: 'thuong_hieu_id' },
+          { path: 'don_vi_tinh_id' }
+        ]
+      })
+      .populate('lo_hang_id')
+    : [];
+  const detailMap = details.reduce((map, detail) => {
+    const key = String(detail.phieu_xuat_huy_id);
+    if (!map[key]) map[key] = [];
+    map[key].push(detail);
+    return map;
+  }, {});
+  return { tickets, detailMap };
+}
+
+async function sendXuatHuyWorkbook(res, filename, tickets, detailMap) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Xuất hủy');
+  worksheet.columns = XUAT_HUY_EXPORT_COLUMNS;
+
+  tickets.forEach(ticket => {
+    const details = detailMap[String(ticket._id)] || [];
+    if (!details.length) {
+      worksheet.addRow(buildExportRow(ticket, null));
+      return;
+    }
+    details.forEach(detail => worksheet.addRow(buildExportRow(ticket, detail)));
+  });
+
+  applyWorksheetFormat(worksheet);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+  await workbook.xlsx.write(res);
+  res.end();
 }
 
 function statusLabel(value) {
@@ -249,6 +406,38 @@ exports.index = async function(req, res, next) {
       formatDate,
       statusLabel
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportExcel = async function(req, res, next) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const query = await buildFilter(req, storeId);
+    const { tickets, detailMap } = await loadExportTickets(query);
+    await sendXuatHuyWorkbook(res, 'xuat-huy.xlsx', tickets, detailMap);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportOneExcel = async function(req, res, next) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const query = { _id: req.params.id };
+    if (isObjectId(storeId)) query.cua_hang_id = storeId;
+    if (!isObjectId(req.params.id)) return res.status(404).send('Không tìm thấy phiếu xuất hủy');
+
+    const { tickets, detailMap } = await loadExportTickets(query);
+    if (!tickets.length) return res.status(404).send('Không tìm thấy phiếu xuất hủy');
+
+    await sendXuatHuyWorkbook(
+      res,
+      'xuat-huy-' + (tickets[0].ma_xuat_huy || 'unknown') + '.xlsx',
+      tickets,
+      detailMap
+    );
   } catch (error) {
     next(error);
   }

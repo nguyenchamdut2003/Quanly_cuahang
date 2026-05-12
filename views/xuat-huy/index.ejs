@@ -6,6 +6,16 @@
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
+  const exportParams = new URLSearchParams();
+  Object.keys(safeFilters).forEach(function(key) {
+    const value = safeFilters[key];
+    if (Array.isArray(value)) {
+      value.forEach(function(item) { exportParams.append(key, item); });
+    } else if (value !== undefined && value !== null && value !== '') {
+      exportParams.append(key, value);
+    }
+  });
+  const exportQuery = exportParams.toString();
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -76,7 +86,7 @@
           <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã xuất hủy"></div>
           <div class="actions">
             <a class="kv-btn primary" href="/xuat-huy/create">+ Xuất hủy</a>
-            <button class="kv-btn" type="button">Xuất file ▾</button><span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
+            <a class="kv-btn" href="/xuat-huy/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a><span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
           </div>
         </div>
         <div class="table-wrap">

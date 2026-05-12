@@ -131,6 +131,9 @@
   </main>
   <script>
     const products = <%- productsJson || '[]' %>;
+    const preselectedPurchaseId = '<%= selectedPurchaseId || "" %>';
+    const preselectedPurchaseKhoId = '<%= selectedPurchaseKhoId || "" %>';
+    const preselectedPurchaseSupplierId = '<%= selectedPurchaseSupplierId || "" %>';
     let items = [];
     let selectedPurchaseSupplierId = '';
     let currentKhoId = '';
@@ -421,7 +424,19 @@
         showError('Lỗi kết nối khi tải chi tiết phiếu nhập');
       }
     });
+    async function initPreselectedPurchase() {
+      if (!preselectedPurchaseId || !preselectedPurchaseKhoId) return;
+      const khoSelect = document.getElementById('khoId');
+      khoSelect.value = preselectedPurchaseKhoId;
+      currentKhoId = preselectedPurchaseKhoId;
+      await loadPurchasesByWarehouse(preselectedPurchaseKhoId);
+      const purchaseSelect = document.getElementById('phieuNhapId');
+      purchaseSelect.value = preselectedPurchaseId;
+      selectedPurchaseSupplierId = preselectedPurchaseSupplierId;
+      purchaseSelect.dispatchEvent(new Event('change'));
+    }
     setPurchasePlaceholder('Chọn kho trước', true);
+    initPreselectedPurchase();
   </script>
 </body>
 </html>

@@ -8,6 +8,14 @@
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <%
+    var history = locals.customerHistory || {};
+    var historyOrders = Array.isArray(history.orders) ? history.orders : [];
+    var historyInvoices = Array.isArray(history.invoices) ? history.invoices : [];
+    var historyReturns = Array.isArray(history.returns) ? history.returns : [];
+    var historyDebts = Array.isArray(history.debts) ? history.debts : [];
+    var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+  %>
 
   <main class="admin-shell customer-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
@@ -452,6 +460,10 @@
                             <div class="detail-tab-list">
                               <button class="detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
                               <button class="detail-tab" type="button" data-tab-target="address">Danh sách địa chỉ</button>
+                              <button class="detail-tab" type="button" data-tab-target="orders">Đơn hàng</button>
+                              <button class="detail-tab" type="button" data-tab-target="invoices">Hóa đơn</button>
+                              <button class="detail-tab" type="button" data-tab-target="returns">Trả hàng</button>
+                              <button class="detail-tab" type="button" data-tab-target="debts">Công nợ</button>
                             </div>
                             <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
                           </div>
@@ -621,6 +633,94 @@
                                   <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
                                 </form>
                               <% }) %>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="orders">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Mã đơn hàng</th><th>Ngày đặt</th><th>Tổng tiền hàng</th><th>Khách cần trả</th><th>Khách đã trả</th><th>Trạng thái đơn</th><th>Giao hàng</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyOrders.length) { %>
+                                    <tr><td colspan="8" class="empty-cell">Chưa có đơn hàng</td></tr>
+                                  <% } %>
+                                  <% historyOrders.forEach(function(order) { %>
+                                    <tr>
+                                      <td><%= order.ma_don_hang || '---' %></td>
+                                      <td><%= formatDate(order.ngay_dat || order.created_at) %></td>
+                                      <td><%= money(order.tong_tien_hang || order.tong_tien || 0) %></td>
+                                      <td><%= money(order.tong_thanh_toan || order.tong_tien || 0) %></td>
+                                      <td><%= money(order.khach_thanh_toan || order.khach_da_tra || 0) %></td>
+                                      <td><%= order.trang_thai || '---' %></td>
+                                      <td><%= order.trang_thai_giao_hang || '---' %></td>
+                                      <td><a class="btn btn-light btn-sm" href="/don-hang?order=<%= order._id %>">Xem</a></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="invoices">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Mã hóa đơn</th><th>Ngày bán</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Đơn hàng</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyInvoices.length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có hóa đơn</td></tr>
+                                  <% } %>
+                                  <% historyInvoices.forEach(function(invoice) { %>
+                                    <tr>
+                                      <td><%= invoice.ma_hoa_don || '---' %></td>
+                                      <td><%= formatDate(invoice.ngay_ban || invoice.created_at) %></td>
+                                      <td><%= money(invoice.tong_tien || 0) %></td>
+                                      <td><%= money(invoice.thanh_toan || 0) %></td>
+                                      <td><%= invoice.trang_thai || '---' %></td>
+                                      <td><%= invoice.don_hang_id?.ma_don_hang || '---' %></td>
+                                      <td>
+                                        <a class="btn btn-light btn-sm" href="/don-hang/hoa-don">Xem</a>
+                                        <a class="btn btn-light btn-sm" href="/don-hang/tra-hang/create?invoice_id=<%= invoice._id %>">Trả hàng</a>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="returns">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Mã phiếu trả</th><th>Ngày trả</th><th>Hóa đơn gốc</th><th>Tổng tiền trả</th><th>Trạng thái</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyReturns.length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có phiếu trả hàng</td></tr>
+                                  <% } %>
+                                  <% historyReturns.forEach(function(ret) { %>
+                                    <tr>
+                                      <td><%= ret.ma_phieu_tra || '---' %></td>
+                                      <td><%= formatDate(ret.ngay_tra || ret.created_at) %></td>
+                                      <td><%= ret.hoa_don_id?.ma_hoa_don || '---' %></td>
+                                      <td><%= money(ret.can_tra_khach || ret.tong_tien_tra || 0) %></td>
+                                      <td><%= ret.trang_thai || '---' %></td>
+                                      <td><%= ret.ghi_chu || '---' %></td>
+                                      <td><a class="btn btn-light btn-sm" href="/don-hang/tra-hang?customer=<%= selectedCustomer._id %>">Xem</a></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="debts">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Ngày</th><th>Loại</th><th>Số tiền</th><th>Hóa đơn</th><th>Đơn hàng</th><th>Phiếu thu chi</th><th>Ghi chú</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyDebts.length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có công nợ</td></tr>
+                                  <% } %>
+                                  <% historyDebts.forEach(function(debt) { %>
+                                    <tr>
+                                      <td><%= formatDate(debt.ngay || debt.created_at) %></td>
+                                      <td><%= debt.loai || '---' %></td>
+                                      <td><%= money(debt.so_tien || 0) %></td>
+                                      <td><%= debt.hoa_don_id?.ma_hoa_don || '---' %></td>
+                                      <td><%= debt.don_hang_id?.ma_don_hang || '---' %></td>
+                                      <td><%= debt.phieu_thu_chi_id?.ma_phieu || debt.phieu_thu_chi_id?.ma_phieu_thu_chi || '---' %></td>
+                                      <td><%= debt.ghi_chu || '---' %></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
                             </div>
                           </div>
                         </div>

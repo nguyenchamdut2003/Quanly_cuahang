@@ -1,6 +1,28 @@
 ﻿var mongoose = require('mongoose');
+var ExcelJS = require('exceljs');
 var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang } = require('../models/kiot.model');
 var DiaChiNhaCungCap = DiaChiNcc || DiaChiDoiTuong;
+
+var SUPPLIER_EXPORT_COLUMNS = [
+    { header: 'Mã NCC', key: 'ma_ncc' },
+    { header: 'Tên nhà cung cấp', key: 'ten_ncc' },
+    { header: 'Người liên hệ', key: 'nguoi_lien_he' },
+    { header: 'Điện thoại', key: 'dien_thoai' },
+    { header: 'Email', key: 'email' },
+    { header: 'Địa chỉ', key: 'dia_chi' },
+    { header: 'Tỉnh/TP', key: 'tinh_tp' },
+    { header: 'Quận/Huyện', key: 'quan_huyen' },
+    { header: 'Phường/Xã', key: 'phuong_xa' },
+    { header: 'Mã số thuế', key: 'ma_so_thue' },
+    { header: 'Nhóm nhà cung cấp', key: 'nhom_nha_cung_cap' },
+    { header: 'Tổng mua', key: 'tong_mua', style: { numFmt: '#,##0' } },
+    { header: 'Đã trả NCC', key: 'da_tra_ncc', style: { numFmt: '#,##0' } },
+    { header: 'Nợ NCC', key: 'no_ncc', style: { numFmt: '#,##0' } },
+    { header: 'Trạng thái', key: 'trang_thai' },
+    { header: 'Ngày tạo', key: 'ngay_tao' },
+    { header: 'Người tạo', key: 'nguoi_tao' },
+    { header: 'Ghi chú', key: 'ghi_chu' }
+];
 
 function formatDate(value) {
     if (!value) return '---';
@@ -184,6 +206,111 @@ function makeRangeFilter(minRaw, maxRaw) {
     return range;
 }
 
+function buildSupplierQueryFromFilter(filter) {
+    var dateRange = getDateRange(filter);
+    var supplierQuery = {};
+
+    if (filter.groupId !== 'all') supplierQuery.nhom_nha_cung_cap_id = filter.groupId;
+    if (filter.status !== 'all') supplierQuery.trang_thai = filter.status;
+    var totalBuyRange = makeRangeFilter(filter.totalBuyFrom, filter.totalBuyTo);
+    if (totalBuyRange) supplierQuery.tong_mua = totalBuyRange;
+    var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
+    if (currentDebtRange) supplierQuery.tong_no = currentDebtRange;
+    if (dateRange.start || dateRange.end) {
+        supplierQuery.created_at = {};
+        if (dateRange.start) supplierQuery.created_at.$gte = dateRange.start;
+        if (dateRange.end) supplierQuery.created_at.$lte = dateRange.end;
+    }
+
+    return supplierQuery;
+}
+
+function formatExportDate(value) {
+    if (!value) return '';
+    return new Date(value).toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+    });
+}
+
+function getUserName(user) {
+    return user ? (user.ho_ten || user.username || user.email || '') : '';
+}
+
+function getSupplierStatusLabel(value) {
+    return value === 'inactive' ? 'Ngừng hoạt động' : 'Đang hoạt động';
+}
+
+function buildSupplierExportRow(supplier, address) {
+    var debt = Number(supplier.tong_no || 0);
+    var totalBuy = Number(supplier.tong_mua || 0);
+    var paid = Math.max(0, totalBuy - debt);
+    return {
+        ma_ncc: supplier.ma_ncc || '',
+        ten_ncc: supplier.ten_ncc || '',
+        nguoi_lien_he: address ? (address.ten_nguoi_nhan || '') : '',
+        dien_thoai: supplier.sdt || (address ? address.sdt_nguoi_nhan || '' : ''),
+        email: supplier.email || '',
+        dia_chi: address ? (address.dia_chi_day_du || address.so_nha || '') : '',
+        tinh_tp: address ? (address.tinh_thanh || '') : '',
+        quan_huyen: address ? (address.quan_huyen || '') : '',
+        phuong_xa: address ? (address.phuong_xa || '') : '',
+        ma_so_thue: supplier.ma_so_thue || '',
+        nhom_nha_cung_cap: supplier.nhom_nha_cung_cap_id ? (supplier.nhom_nha_cung_cap_id.ten_nhom_ncc || '') : '',
+        tong_mua: totalBuy,
+        da_tra_ncc: paid,
+        no_ncc: debt,
+        trang_thai: getSupplierStatusLabel(supplier.trang_thai),
+        ngay_tao: formatExportDate(supplier.created_at),
+        nguoi_tao: getUserName(supplier.nguoi_tao_id),
+        ghi_chu: supplier.ghi_chu || ''
+    };
+}
+
+function applySupplierWorksheetFormat(worksheet) {
+    var headerRow = worksheet.getRow(1);
+    headerRow.eachCell(function(cell) {
+        cell.font = { bold: true, color: { argb: 'FF111827' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3FF' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+            left: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+            right: { style: 'thin', color: { argb: 'FFD8E8FB' } }
+        };
+    });
+    worksheet.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: 1, column: worksheet.columns.length }
+    };
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+    worksheet.eachRow(function(row, rowNumber) {
+        if (rowNumber === 1) return;
+        row.eachCell(function(cell) {
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+            };
+            cell.alignment = { vertical: 'middle' };
+        });
+    });
+    worksheet.columns.forEach(function(column) {
+        var maxLength = String(column.header || '').length;
+        column.eachCell({ includeEmpty: true }, function(cell) {
+            var value = cell.value == null ? '' : String(cell.value);
+            maxLength = Math.max(maxLength, value.length);
+        });
+        column.width = Math.min(Math.max(maxLength + 2, 12), 36);
+    });
+}
+
 async function makeSupplierCode() {
     var lastSupplier = await NhaCungCap.findOne({ ma_ncc: /^NCC\d+$/ }).sort({ ma_ncc: -1 }).lean();
     var nextNumber = 1;
@@ -252,20 +379,7 @@ exports.index = async function(req, res, next) {
 
         var requestQuery = req?.query || {};
         var filter = normalizeFilterQuery(requestQuery);
-        var dateRange = getDateRange(filter);
-        var supplierQuery = {};
-
-        if (filter.groupId !== 'all') supplierQuery.nhom_nha_cung_cap_id = filter.groupId;
-        if (filter.status !== 'all') supplierQuery.trang_thai = filter.status;
-        var totalBuyRange = makeRangeFilter(filter.totalBuyFrom, filter.totalBuyTo);
-        if (totalBuyRange) supplierQuery.tong_mua = totalBuyRange;
-        var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
-        if (currentDebtRange) supplierQuery.tong_no = currentDebtRange;
-        if (dateRange.start || dateRange.end) {
-            supplierQuery.created_at = {};
-            if (dateRange.start) supplierQuery.created_at.$gte = dateRange.start;
-            if (dateRange.end) supplierQuery.created_at.$lte = dateRange.end;
-        }
+        var supplierQuery = buildSupplierQueryFromFilter(filter);
 
         var supplierGroups = await loadSupplierGroups();
         var addressTypes = await loadAddressTypes();
@@ -365,6 +479,43 @@ exports.index = async function(req, res, next) {
             mapNhapHangStatus: mapNhapHangStatus,
             mapCongNoLoai: mapCongNoLoai
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.exportExcel = async function(req, res, next) {
+    try {
+        var filter = normalizeFilterQuery(req?.query || {});
+        var supplierQuery = buildSupplierQueryFromFilter(filter);
+        var suppliers = await NhaCungCap.find(supplierQuery)
+            .populate({ path: 'nhom_nha_cung_cap_id', select: 'ten_nhom_ncc ma_nhom_ncc' })
+            .populate({ path: 'nguoi_tao_id', select: 'ho_ten username email' })
+            .sort({ created_at: 1, ma_ncc: 1 });
+        var supplierIds = suppliers.map(function(supplier) { return supplier._id; });
+        var addresses = supplierIds.length
+            ? await DiaChiNhaCungCap.find({ nha_cung_cap_id: { $in: supplierIds } })
+                .sort({ mac_dinh: -1, created_at: -1 })
+                .lean()
+            : [];
+        var addressMap = addresses.reduce(function(map, address) {
+            var key = String(address.nha_cung_cap_id);
+            if (!map[key]) map[key] = address;
+            return map;
+        }, {});
+
+        var workbook = new ExcelJS.Workbook();
+        var worksheet = workbook.addWorksheet('Nhà cung cấp');
+        worksheet.columns = SUPPLIER_EXPORT_COLUMNS;
+        suppliers.forEach(function(supplier) {
+            worksheet.addRow(buildSupplierExportRow(supplier, addressMap[String(supplier._id)]));
+        });
+        applySupplierWorksheetFormat(worksheet);
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="nha-cung-cap.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
     } catch (error) {
         next(error);
     }

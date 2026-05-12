@@ -6,6 +6,7 @@ var nhaCungCapController = require('../controllers/nhaCungCap.controller');
 router.use(isAuthenticated);
 
 router.get('/', nhaCungCapController.index);
+router.get('/export.xlsx', nhaCungCapController.exportExcel);
 router.post('/add', nhaCungCapController.add);
 router.post('/:id/update', nhaCungCapController.update);
 router.post('/:id/delete', nhaCungCapController.remove);

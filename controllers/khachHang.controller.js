@@ -1,4 +1,13 @@
-var { KhachHang, NhomKhachHang, DiaChiKhachHang, LoaiDiaChiKhachHang } = require('../models/kiot.model');
+var {
+    KhachHang,
+    NhomKhachHang,
+    DiaChiKhachHang,
+    LoaiDiaChiKhachHang,
+    DonHang,
+    HoaDonBanHang,
+    PhieuTraHang,
+    CongNoKhachHang
+} = require('../models/kiot.model');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -310,6 +319,42 @@ async function loadCustomerGroups() {
     return await NhomKhachHang.find().sort({ ten_nhom: 1 }).lean();
 }
 
+async function loadCustomerHistory(customerId) {
+    if (!customerId) {
+        return { orders: [], invoices: [], returns: [], debts: [] };
+    }
+
+    var query = { khach_hang_id: customerId };
+    var orders = await DonHang.find(query)
+        .sort({ ngay_dat: -1, created_at: -1 })
+        .limit(50)
+        .lean();
+    var invoices = await HoaDonBanHang.find(query)
+        .populate('don_hang_id')
+        .sort({ ngay_ban: -1, created_at: -1 })
+        .limit(50)
+        .lean();
+    var returns = await PhieuTraHang.find(query)
+        .populate('hoa_don_id')
+        .sort({ ngay_tra: -1, created_at: -1 })
+        .limit(50)
+        .lean();
+    var debts = await CongNoKhachHang.find(query)
+        .populate('hoa_don_id')
+        .populate('don_hang_id')
+        .populate('phieu_thu_chi_id')
+        .sort({ ngay: -1, created_at: -1 })
+        .limit(80)
+        .lean();
+
+    return {
+        orders: orders,
+        invoices: invoices,
+        returns: returns,
+        debts: debts
+    };
+}
+
 function makeRangeFilter(minRaw, maxRaw) {
     var hasMinValue = String(minRaw || '').trim() !== '';
     var hasMaxValue = String(maxRaw || '').trim() !== '';
@@ -401,6 +446,9 @@ exports.index = async function(req, res, next) {
         var customerAddresses = selectedCustomer
             ? await DiaChiKhachHang.find({ khach_hang_id: selectedCustomer._id }).sort({ created_at: -1 }).lean()
             : [];
+        var customerHistory = selectedCustomer
+            ? await loadCustomerHistory(selectedCustomer._id)
+            : { orders: [], invoices: [], returns: [], debts: [] };
 
         res.render('khach-hang/index', {
             title: 'Khach hang',
@@ -411,6 +459,7 @@ exports.index = async function(req, res, next) {
             customers: customers,
             selectedCustomer: selectedCustomer,
             customerAddresses: customerAddresses,
+            customerHistory: customerHistory,
             customerGroups: customerGroups,
             addressTypes: addressTypes,
             summaryTotals: summaryTotals,

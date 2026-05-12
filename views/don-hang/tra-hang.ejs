@@ -3,8 +3,23 @@
   const safeFilters = locals.filters || {};
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const selectedTypes = Array.isArray(safeFilters.loai_tra_hang) ? safeFilters.loai_tra_hang : (safeFilters.loai_tra_hang ? [safeFilters.loai_tra_hang] : []);
+  const exportParams = new URLSearchParams();
+  Object.keys(safeFilters).forEach(key => {
+    const value = safeFilters[key];
+    if (Array.isArray(value)) {
+      value.forEach(item => exportParams.append(key, item));
+    } else if (value !== undefined && value !== null && value !== '') {
+      exportParams.append(key, value);
+    }
+  });
+  const exportQuery = exportParams.toString();
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const userName = user => user?.ho_ten || user?.username || user?.ten_dang_nhap || '';
+  const returnType = item => Number(item?.tong_tien_hang_doi || 0) > 0 ? 'Đổi hàng' : 'Trả hàng';
+  const returnGoodsTotal = item => Number(item?.tong_tien_hang_tra ?? item?.tong_tien_tra ?? 0);
+  const exchangeGoodsTotal = item => Number(item?.tong_tien_hang_doi || 0);
+  const customerPayMore = item => Math.max(Number(item?.khach_can_tra_them || 0), Number(item?.chenh_lech || 0), 0);
+  const customerRefund = item => Math.max(Number(item?.can_tra_khach || 0), -Number(item?.chenh_lech || 0), 0);
 %>
 <!DOCTYPE html>
 <html>
@@ -16,6 +31,7 @@
     .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px clamp(12px,5vw,80px) 0}.sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}.title{font-size:20px;font-weight:700;margin:0 0 16px}.filter{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;margin-bottom:10px}.check{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px}.check input,.radio input{accent-color:#0070f4}.radio{display:flex;align-items:center;gap:9px;margin-top:9px}.pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#8b95a1;padding:0 10px;font-size:13px}.main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;justify-content:space-between;gap:12px}.search{position:relative;flex:1;max-width:470px}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#7a8794}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px}.search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff}.actions{display:flex;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.btn.primary{border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1160px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;font-size:12px;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px}.table tbody tr{cursor:pointer}.return-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}.empty{height:560px;text-align:center;color:#111827}.empty-box{display:flex;height:100%;align-items:center;justify-content:center;flex-direction:column;gap:8px}.empty-icon{width:96px;height:96px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:34px}.empty-note{color:#111827}.empty-sub{color:#111827}.status{display:inline-flex;align-items:center;padding:3px 8px;border-radius:4px;background:#dcfce7;color:#15803d;font-weight:700;font-size:12px}.status.cancel{background:#fee2e2;color:#b91c1c}.detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.return-detail{padding:0 18px 14px;min-height:280px}.detail-tabs{height:40px;display:flex;align-items:flex-end;border-bottom:1px solid #e5e9ee}.detail-tab{height:40px;border:0;background:#fff;color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700;padding:0 0 8px;font-size:14px}.detail-head{display:flex;justify-content:space-between;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 22px;margin-top:12px}.mini-field label{display:block;font-size:12px;margin-bottom:5px}.mini-input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 9px;font-size:12px}.detail-link{color:#006dff;text-decoration:none;font-weight:700}.items-table{width:100%;border-collapse:collapse;margin-top:12px}.items-table th{height:32px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 8px}.items-table td{height:40px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;margin-top:14px}.note{width:100%;height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:12px}.total-line{display:flex;justify-content:space-between;margin-bottom:10px;font-size:12px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px}.loading-detail{height:160px;display:flex;align-items:center;justify-content:center;color:#667085}
     .page{overflow:hidden}.shell{padding:14px 16px 0!important;width:100%;overflow:hidden}.main{overflow:hidden}.toolbar{min-width:0}.actions{flex:0 0 auto}.table-wrap{max-width:100%;overflow:auto}.table{min-width:1080px}.return-detail{padding:0 16px 12px;overflow:hidden}.detail-head,.detail-bottom,.detail-actions{min-width:0}.detail-head>div:first-child{min-width:0}.detail-meta{grid-template-columns:repeat(3,minmax(0,216px));max-width:720px}.items-table{table-layout:fixed}.items-table th,.items-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-bottom{grid-template-columns:minmax(0,1fr) minmax(220px,280px)}.detail-actions{gap:12px}.detail-action-group{min-width:0;flex-wrap:wrap}
     .invoice-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:30px;z-index:1000}.invoice-modal-backdrop.open{display:flex}.invoice-modal{width:1435px;max-width:calc(100vw - 64px);min-height:625px;background:#fff;border-radius:14px;box-shadow:0 22px 48px rgba(0,0,0,.35);padding:28px 36px 32px;position:relative}.invoice-modal h2{margin:0 0 28px;font-size:20px}.invoice-close{position:absolute;right:28px;top:24px;border:0;background:transparent;color:#7a8794;font-size:28px;cursor:pointer}.invoice-modal-grid{display:grid;grid-template-columns:268px minmax(0,1fr);gap:42px}.invoice-filter-card{background:#fff;border-radius:6px;box-shadow:0 10px 26px rgba(15,23,42,.14);padding:14px 20px 20px;margin-bottom:32px}.invoice-filter-card h3{margin:0 0 18px;font-size:16px}.invoice-filter-input{width:100%;height:44px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none;color:#111827}.invoice-filter-input::placeholder{color:#7a8794}.invoice-pick-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-pick-table table{width:100%;border-collapse:collapse;table-layout:fixed}.invoice-pick-table th{height:53px;background:#338cf2;color:#fff;text-align:left;padding:0 14px;font-size:16px}.invoice-pick-table td{height:56px;border-bottom:1px solid #dde3ea;padding:0 14px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.invoice-pick-table a{color:#006dff;text-decoration:none}.invoice-choose{height:34px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.invoice-pager{height:74px;display:flex;align-items:center;justify-content:flex-end;gap:18px}.invoice-page-btn{min-width:42px;height:42px;border-radius:8px;border:0;background:#fff;color:#111827;font-size:16px;cursor:pointer}.invoice-page-btn.active{background:#0070f4;color:#fff;font-weight:800}.invoice-page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick-return{position:absolute;right:36px;bottom:32px;height:49px;border:0;border-radius:8px;background:#0070f4;color:#fff;font-size:17px;font-weight:800;padding:0 30px;cursor:pointer}
+    .type-badge{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:4px;background:#e8f3ff;color:#075cad;font-size:12px;font-weight:800}.type-badge.exchange{background:#fff7ed;color:#c2410c}.detail-section-title{margin:14px 0 6px;font-size:13px;font-weight:800;color:#111827}.items-table.return-table th{background:#eefdf3}.items-table.exchange-table th{background:#fff7ed}.muted-empty{height:38px;color:#667085;text-align:center}.settlement-line{font-size:14px;font-weight:900}.settlement-refund{color:#006dff}.settlement-collect{color:#c2410c}.settlement-none{color:#15803d}.return-detail>.items-table:not(.return-table):not(.exchange-table){display:none}.legacy-summary{display:none}
   </style>
 </head>
 <body>
@@ -51,7 +67,7 @@
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"><button><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
             <button type="button" class="btn primary" onclick="openInvoiceModal()"><i class="fa-solid fa-plus"></i> Trả hàng</button>
-            <a href="/don-hang/tra-hang/export.csv" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <a href="/don-hang/tra-hang/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
             <span class="icon"><i class="fa-solid fa-list"></i></span>
             <span class="icon"><i class="fa-solid fa-gear"></i></span>
             <span class="icon"><i class="fa-regular fa-circle-question"></i></span>
@@ -59,22 +75,22 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã trả hàng</th><th>Người bán</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Tổng tiền hàng</th><th class="num">Cần trả khách</th><th class="num">Đã trả khách</th><th>Trạng thái</th></tr></thead>
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th>Lo&#7841;i</th><th>Mã trả hàng</th><th>Người bán</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">H&#224;ng tr&#7843;</th><th class="num">H&#224;ng &#273;&#7893;i</th><th class="num">C&#7847;n thu/tr&#7843;</th><th>Trạng thái</th></tr></thead>
             <tbody>
               <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td></td></tr>
               <% if (safeReturns.length) { %>
                 <% safeReturns.forEach(item => { %>
                   <tr class="return-row" data-return-row="<%= item._id %>" onclick="toggleReturnDetail('<%= item._id %>')">
                     <td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td>
-                    <td class="star-col"><i class="fa-regular fa-star"></i></td>
+                    <td><span class="type-badge <%= exchangeGoodsTotal(item) > 0 ? 'exchange' : '' %>"><%= returnType(item) %></span></td>
                     <td><%= item.ma_phieu_tra %></td>
                     <td><%= userName(item.nguoi_tao_id) %></td>
                     <td><%= item.ngay_tra ? new Date(item.ngay_tra).toLocaleString('vi-VN') : '' %></td>
                     <td><%= item.khach_hang_id?.ma_khach_hang || '' %></td>
                     <td><%= item.khach_hang_id?.ten_khach_hang || '' %></td>
-                    <td class="num"><%= fmt(item.tong_tien_tra) %></td>
-                    <td class="num"><%= fmt(item.tong_tien_tra) %></td>
-                    <td class="num"><%= fmt(item.tong_tien_tra) %></td>
+                    <td class="num"><%= fmt(returnGoodsTotal(item)) %></td>
+                    <td class="num"><%= fmt(exchangeGoodsTotal(item)) %></td>
+                    <td class="num"><%= customerPayMore(item) > 0 ? '+' + fmt(customerPayMore(item)) : (customerRefund(item) > 0 ? '-' + fmt(customerRefund(item)) : '0') %></td>
                     <td><span class="status <%= item.trang_thai === 'cancelled' ? 'cancel' : '' %>"><%= item.trang_thai === 'cancelled' ? 'Đã hủy' : 'Đã trả' %></span></td>
                   </tr>
                   <tr class="detail-row" data-return-detail="<%= item._id %>"><td class="detail-cell" colspan="11"><div class="return-detail"><div class="loading-detail">Đang tải thông tin phiếu trả...</div></div></td></tr>
@@ -223,13 +239,27 @@
       const invoice = data.invoice || slip.hoa_don_id || {};
       const customer = slip.khach_hang_id || {};
       const items = data.items || [];
-      const total = items.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
-      const fee = Math.max(total - Number(slip.tong_tien_tra || 0), 0);
-      const itemRows = items.map(item => {
+      const returnItems = items.filter(item => (item.loai_dong || 'hang_tra') !== 'hang_doi');
+      const exchangeItems = items.filter(item => item.loai_dong === 'hang_doi');
+      const returnTotal = Number(slip.tong_tien_hang_tra ?? returnItems.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0));
+      const exchangeTotal = Number(slip.tong_tien_hang_doi ?? exchangeItems.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0));
+      const difference = Number(slip.chenh_lech ?? (exchangeTotal - returnTotal));
+      const needCollect = Math.max(Number(slip.khach_can_tra_them || 0), difference, 0);
+      const needRefund = Math.max(Number(slip.can_tra_khach || 0), -difference, 0);
+      const fee = Math.max(returnTotal - exchangeTotal - needRefund, 0);
+      const discount = Math.max(exchangeTotal - returnTotal - needCollect, 0);
+      const rowHtml = (rows, emptyText) => rows.map(item => {
         const product = item.hang_hoa_id || {};
         const price = Number(item.don_gia || 0);
-        return `<tr><td><a href="#" class="detail-link">${escapeHtml(product.ma_hang || '')}</a></td><td>${escapeHtml(product.ten_hang || '')}</td><td class="num">${money(item.so_luong)}</td><td class="num">${money(price)}</td><td class="num">0</td><td class="num">${money(price)}</td><td class="num"><strong>${money(item.thanh_tien)}</strong></td></tr>`;
-      }).join('') || '<tr><td colspan="7" class="loading-detail">Phiếu trả chưa có hàng hóa</td></tr>';
+        return `<tr><td><a href="#" class="detail-link">${escapeHtml(product.ma_hang || '')}</a></td><td>${escapeHtml(product.ten_hang || '')}</td><td class="num">${money(item.so_luong)}</td><td class="num">${money(price)}</td><td class="num"><strong>${money(item.thanh_tien)}</strong></td></tr>`;
+      }).join('') || `<tr><td colspan="5" class="muted-empty">${emptyText}</td></tr>`;
+      const returnRows = rowHtml(returnItems, 'Không có hàng khách trả');
+      const exchangeRows = rowHtml(exchangeItems, 'Không có hàng khách đổi/lấy mới');
+      const settlementLabel = needCollect > 0 ? 'Khách cần trả thêm' : (needRefund > 0 ? 'Cần trả khách' : 'Không cần thu/chi thêm');
+      const settlementValue = needCollect > 0 ? needCollect : needRefund;
+      const settlementClass = needCollect > 0 ? 'settlement-collect' : (needRefund > 0 ? 'settlement-refund' : 'settlement-none');
+      const itemRows = '';
+      const total = returnTotal;
 
       return `
         <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
@@ -248,18 +278,23 @@
           <div>${escapeHtml(invoice.cua_hang_id?.ten_cua_hang || 'Chi nhánh trung tâm')}</div>
         </div>
         <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Giá trả hàng</th><th class="num">Giảm giá</th><th class="num">Giá nhập lại</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <div class="detail-section-title">Hàng khách trả</div>
+        <table class="items-table return-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Giá trả hàng</th><th class="num">Thành tiền trả</th></tr></thead><tbody>${returnRows}</tbody></table>
+        <div class="detail-section-title">Hàng khách đổi/lấy mới</div>
+        <table class="items-table exchange-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Giá bán/giá đổi</th><th class="num">Thành tiền đổi</th></tr></thead><tbody>${exchangeRows}</tbody></table>
         <div class="detail-bottom">
           <textarea class="note" placeholder="Ghi chú...">${escapeHtml(slip.ghi_chu || '')}</textarea>
           <div>
-            <div class="total-line"><span>Tổng tiền hàng trả (${items.length})</span><strong>${money(total)}</strong></div>
-            <div class="total-line"><span>Giảm giá phiếu trả</span><span>0</span></div>
+            <div class="total-line"><span>Tổng tiền hàng trả (${returnItems.length})</span><strong>${money(returnTotal)}</strong></div>
+            <div class="total-line"><span>Tổng tiền hàng đổi (${exchangeItems.length})</span><strong>${money(exchangeTotal)}</strong></div>
+            <div class="total-line"><span>Chênh lệch</span><strong>${money(difference)}</strong></div>
+            <div class="total-line"><span>Giảm giá</span><span>${money(discount)}</span></div>
             <div class="total-line"><span>Phí trả hàng</span><span>${money(fee)}</span></div>
-            <div class="total-line"><span>Cần trả khách</span><strong>${money(slip.tong_tien_tra)}</strong></div>
-            <div class="total-line"><span>Đã trả khách</span><strong>${money(slip.tong_tien_tra)}</strong></div>
+            <div class="total-line settlement-line ${settlementClass}"><span>${settlementLabel}</span><strong>${settlementValue ? money(settlementValue) : '0'}</strong></div>
           </div>
         </div>
         <div class="detail-actions">
-          <div class="detail-action-group"><button type="button" class="btn"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/tra-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+          <div class="detail-action-group"><button type="button" class="btn"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/tra-hang/${slip._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
           <div class="detail-action-group"><button type="button" class="btn solid"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
         </div>`;
     }

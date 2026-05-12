@@ -16,6 +16,16 @@
     giao_thieu: 'Giao thiếu',
     giao_du: 'Giao đủ'
   })[status] || 'Chưa giao';
+  const exportParams = new URLSearchParams();
+  Object.keys(safeFilters).forEach(function(key) {
+    const value = safeFilters[key];
+    if (Array.isArray(value)) {
+      value.forEach(function(item) { exportParams.append(key, item); });
+    } else if (value !== undefined && value !== null && value !== '') {
+      exportParams.append(key, value);
+    }
+  });
+  const exportQuery = exportParams.toString();
 %>
 <!DOCTYPE html>
 <html>
@@ -83,7 +93,7 @@
           <div class="actions">
             <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Đặt hàng</a>
             <button type="button" class="btn" onclick="alert('Chọn các đơn cần gộp trước khi dùng chức năng này.')"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
-            <a class="btn" href="/don-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <a class="btn" href="/don-hang/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
             <span class="icon"><i class="fa-solid fa-list"></i></span><span class="icon"><i class="fa-solid fa-gear"></i></span><span class="icon"><i class="fa-regular fa-circle-question"></i></span>
           </div>
         </div>
@@ -133,15 +143,16 @@
       if (!data.success) return alert(data.message || 'Không tải được đơn hàng');
       const order = data.data.order;
       const shipment = data.data.shipment;
+      const invoice = data.data.invoice;
       const items = data.data.items || [];
       orderDetailCache[id] = data.data;
       const totalGoods = items.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
       const discount = Math.max(totalGoods - Number(order.tong_thanh_toan || order.tong_tien || 0), 0);
-      detailRow.querySelector('.order-detail').innerHTML = renderOrderDetail(order, shipment, items, totalGoods, discount);
+      detailRow.querySelector('.order-detail').innerHTML = renderOrderDetail(order, shipment, invoice, items, totalGoods, discount);
       detailRow.dataset.loaded = 'true';
     }
 
-    function renderOrderDetail(order, shipment, items, totalGoods, discount) {
+    function renderOrderDetail(order, shipment, invoice, items, totalGoods, discount) {
       const customer = order.khach_hang_id || {};
       const receiver = shipment?.ten_nguoi_nhan || customer.ten_khach_hang || '';
       const phone = shipment?.sdt_nguoi_nhan || customer.sdt || '';
@@ -163,6 +174,9 @@
           <td class="num"><strong>${money(item.thanh_tien)}</strong></td>
         </tr>`;
       }).join('') || '<tr><td colspan="11" class="loading-detail">Đơn chưa có hàng hóa</td></tr>';
+      const invoiceAction = invoice
+        ? `<a class="btn solid" href="/don-hang/tra-hang/create?invoice_id=${invoice._id}"><i class="fa-solid fa-rotate-left"></i> Trả hàng</a>`
+        : `<a class="btn solid" href="/don-hang/hoa-don/create?don_hang_id=${order._id}"><i class="fa-solid fa-file-invoice-dollar"></i> Tạo hóa đơn</a>`;
 
       return `
         <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
@@ -206,8 +220,8 @@
           </div>
         </div>
         <div class="detail-actions">
-          <div class="detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
-          <div class="detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button><button type="button" class="btn"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
+          <div class="detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/${order._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+          <div class="detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>${invoiceAction}<button type="button" class="btn"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
         </div>`;
     }
 

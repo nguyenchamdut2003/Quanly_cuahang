@@ -41,6 +41,7 @@
 
   <main class="admin-shell store-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
+    <% var filterQueryString = filterQueryString || buildFilterQueryString(filter); %>
 
     <div class="store-toolbar">
       <h1>Nhà cung cấp</h1>
@@ -50,6 +51,7 @@
       </div>
       <div class="page-actions">
         <a class="btn btn-primary" href="/nha-cung-cap?mode=create">+ Tạo mới</a>
+        <a class="btn btn-light" href="/nha-cung-cap/export.xlsx?<%= filterQueryString || '' %>">Xuất file</a>
         <button class="btn btn-danger" type="submit" form="bulkDeleteSuppliersForm" onclick="return confirm('Xóa các nhà cung cấp đã chọn?')">Xóa đã chọn</button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
 const {
   CuaHang,
   Kho,
@@ -17,6 +18,42 @@ const {
 } = require('../models/kiot.model');
 const { truTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
+
+const RETURN_IMPORT_STATUS_MAP = {
+  draft: 'Phiếu tạm',
+  completed: 'Đã trả hàng',
+  cancelled: 'Đã hủy'
+};
+
+const RETURN_IMPORT_EXPORT_COLUMNS = [
+  { header: 'Mã trả hàng nhập', key: 'ma_phieu_tra_nhap' },
+  { header: 'Thời gian trả', key: 'thoi_gian_tra' },
+  { header: 'Nhà cung cấp', key: 'nha_cung_cap' },
+  { header: 'Mã phiếu nhập', key: 'ma_phieu_nhap' },
+  { header: 'Kho', key: 'kho' },
+  { header: 'Người tạo', key: 'nguoi_tao' },
+  { header: 'Người trả', key: 'nguoi_tra' },
+  { header: 'Tổng tiền hàng', key: 'tong_tien_hang', style: { numFmt: '#,##0' } },
+  { header: 'Giảm giá', key: 'giam_gia', style: { numFmt: '#,##0.##' } },
+  { header: 'NCC cần trả', key: 'ncc_can_tra', style: { numFmt: '#,##0' } },
+  { header: 'NCC đã trả', key: 'ncc_da_tra', style: { numFmt: '#,##0' } },
+  { header: 'Tính vào công nợ', key: 'tinh_vao_cong_no' },
+  { header: 'Tổng tiền trả', key: 'tong_tien_tra', style: { numFmt: '#,##0' } },
+  { header: 'Lý do', key: 'ly_do' },
+  { header: 'Ghi chú', key: 'ghi_chu' },
+  { header: 'Trạng thái', key: 'trang_thai' },
+  { header: 'Mã hàng', key: 'ma_hang' },
+  { header: 'Tên hàng', key: 'ten_hang' },
+  { header: 'Thương hiệu', key: 'thuong_hieu' },
+  { header: 'Đơn vị tính', key: 'don_vi_tinh' },
+  { header: 'Lô hàng', key: 'lo_hang' },
+  { header: 'Số lượng trả', key: 'so_luong_tra', style: { numFmt: '#,##0.##' } },
+  { header: 'Đơn giá', key: 'don_gia', style: { numFmt: '#,##0' } },
+  { header: 'Giá nhập', key: 'gia_nhap', style: { numFmt: '#,##0' } },
+  { header: 'Giá trả lại', key: 'gia_tra_lai', style: { numFmt: '#,##0' } },
+  { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } },
+  { header: 'Ghi chú dòng', key: 'ghi_chu_dong' }
+];
 
 function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || '').trim());
@@ -117,6 +154,103 @@ function statusLabel(value) {
   return 'Đã trả hàng';
 }
 
+function formatExportDate(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+function getUserName(user) {
+  return user ? (user.ho_ten || user.username || user.email || '') : '';
+}
+
+function getLotName(lot) {
+  return lot ? (lot.ma_lo || lot.ten_lo || '') : '';
+}
+
+function buildExportRow(ticket, detail) {
+  const product = detail && detail.hang_hoa_id ? detail.hang_hoa_id : {};
+  const detailUnit = detail && detail.don_vi_tinh_id ? detail.don_vi_tinh_id : null;
+  const productUnit = product.don_vi_tinh_id || null;
+  return {
+    ma_phieu_tra_nhap: ticket.ma_phieu_tra_nhap || '',
+    thoi_gian_tra: formatExportDate(ticket.ngay_tra || ticket.created_at),
+    nha_cung_cap: ticket.nha_cung_cap_id ? (ticket.nha_cung_cap_id.ten_ncc || ticket.nha_cung_cap_id.ma_ncc || '') : '',
+    ma_phieu_nhap: ticket.phieu_nhap_id ? (ticket.phieu_nhap_id.ma_phieu_nhap || '') : '',
+    kho: ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '',
+    nguoi_tao: getUserName(ticket.nguoi_tao_id),
+    nguoi_tra: getUserName(ticket.nguoi_tra_id),
+    tong_tien_hang: Number(ticket.tong_tien_hang || 0),
+    giam_gia: Number(ticket.giam_gia || 0),
+    ncc_can_tra: Number(ticket.ncc_can_tra || 0),
+    ncc_da_tra: Number(ticket.ncc_da_tra || 0),
+    tinh_vao_cong_no: ticket.tinh_vao_cong_no ? 'Có' : 'Không',
+    tong_tien_tra: Number(ticket.tong_tien_tra || 0),
+    ly_do: ticket.ly_do || '',
+    ghi_chu: ticket.ghi_chu || '',
+    trang_thai: RETURN_IMPORT_STATUS_MAP[ticket.trang_thai] || ticket.trang_thai || '',
+    ma_hang: product.ma_hang || '',
+    ten_hang: product.ten_hang || '',
+    thuong_hieu: product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '',
+    don_vi_tinh: detailUnit
+      ? (detailUnit.ten_don_vi || detailUnit.ma_don_vi || '')
+      : (productUnit ? (productUnit.ten_don_vi || productUnit.ma_don_vi || '') : ''),
+    lo_hang: getLotName(detail && detail.lo_hang_id),
+    so_luong_tra: detail ? Number(detail.so_luong || 0) : 0,
+    don_gia: detail ? Number(detail.don_gia || 0) : 0,
+    gia_nhap: detail ? Number(detail.gia_nhap || 0) : 0,
+    gia_tra_lai: detail ? Number(detail.gia_tra_lai || 0) : 0,
+    thanh_tien: detail ? Number(detail.thanh_tien || 0) : 0,
+    ghi_chu_dong: detail ? (detail.ghi_chu || '') : ''
+  };
+}
+
+function applyWorksheetFormat(worksheet) {
+  const headerRow = worksheet.getRow(1);
+  headerRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: 'FF111827' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF3FF' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+      bottom: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+      left: { style: 'thin', color: { argb: 'FFD8E8FB' } },
+      right: { style: 'thin', color: { argb: 'FFD8E8FB' } }
+    };
+  });
+  worksheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: RETURN_IMPORT_EXPORT_COLUMNS.length }
+  };
+  worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    row.eachCell(cell => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+        right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+      };
+      cell.alignment = { vertical: 'middle' };
+    });
+  });
+  worksheet.columns.forEach(column => {
+    let maxLength = String(column.header || '').length;
+    column.eachCell({ includeEmpty: true }, cell => {
+      const value = cell.value == null ? '' : String(cell.value);
+      maxLength = Math.max(maxLength, value.length);
+    });
+    column.width = Math.min(Math.max(maxLength + 2, 12), 36);
+  });
+}
+
 async function buildListFilter(req, storeId) {
   const query = {};
   if (isObjectId(storeId)) query.cua_hang_id = storeId;
@@ -143,6 +277,58 @@ async function buildListFilter(req, storeId) {
   if (isObjectId(req.query.nguoi_tao)) query.nguoi_tao_id = req.query.nguoi_tao;
   if (isObjectId(req.query.nguoi_tra)) query.nguoi_tra_id = req.query.nguoi_tra;
   return query;
+}
+
+async function loadExportReturns(filter) {
+  const returns = await PhieuTraHangNhap.find(filter)
+    .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
+    .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
+    .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+    .populate({ path: 'nguoi_tao_id', select: 'ho_ten username email' })
+    .populate({ path: 'nguoi_tra_id', select: 'ho_ten username email' })
+    .sort({ ngay_tra: -1, created_at: -1 });
+  const returnIds = returns.map(row => row._id);
+  const details = returnIds.length
+    ? await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: { $in: returnIds } })
+      .populate({
+        path: 'hang_hoa_id',
+        populate: [
+          { path: 'thuong_hieu_id' },
+          { path: 'don_vi_tinh_id' }
+        ]
+      })
+      .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
+      .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+      .sort({ created_at: 1 })
+    : [];
+  const detailMap = details.reduce((map, detail) => {
+    const key = String(detail.phieu_tra_nhap_id);
+    if (!map[key]) map[key] = [];
+    map[key].push(detail);
+    return map;
+  }, {});
+  return { returns, detailMap };
+}
+
+async function sendReturnImportWorkbook(res, filename, returns, detailMap) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Trả hàng nhập');
+  worksheet.columns = RETURN_IMPORT_EXPORT_COLUMNS;
+
+  returns.forEach(ticket => {
+    const details = detailMap[String(ticket._id)] || [];
+    if (!details.length) {
+      worksheet.addRow(buildExportRow(ticket, null));
+      return;
+    }
+    details.forEach(detail => worksheet.addRow(buildExportRow(ticket, detail)));
+  });
+
+  applyWorksheetFormat(worksheet);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+  await workbook.xlsx.write(res);
+  res.end();
 }
 
 async function loadCreateData(storeId) {
@@ -508,6 +694,10 @@ exports.createPage = async function(req, res, next) {
     const storeId = await resolveStoreId(req);
     const data = await loadCreateData(storeId);
     const nextCode = await makeReturnCode();
+    const selectedPurchaseId = String(req.query?.phieu_nhap_id || '').trim();
+    const selectedPurchase = isObjectId(selectedPurchaseId)
+      ? await PhieuNhap.findById(selectedPurchaseId).select('_id kho_id nha_cung_cap_id').lean()
+      : null;
     res.render('tra-hang-nhap/create', {
       title: 'Trả hàng nhập',
       activeMenu: 'mua-hang',
@@ -518,7 +708,10 @@ exports.createPage = async function(req, res, next) {
       suppliers: data.suppliers,
       users: data.users,
       productsJson: JSON.stringify(data.productOptions),
-      receipts: data.receipts
+      receipts: data.receipts,
+      selectedPurchaseId: selectedPurchase ? String(selectedPurchase._id) : '',
+      selectedPurchaseKhoId: selectedPurchase ? String(selectedPurchase.kho_id || '') : '',
+      selectedPurchaseSupplierId: selectedPurchase ? String(selectedPurchase.nha_cung_cap_id || '') : ''
     });
   } catch (error) {
     next(error);
@@ -818,6 +1011,40 @@ exports.cancel = async function(req, res) {
     return res.json({ success: true, message: 'Đã hủy phiếu trả hàng nhập' });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể hủy phiếu' });
+  }
+};
+
+exports.exportExcel = async function(req, res, next) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const query = await buildListFilter(req, storeId);
+    const { returns, detailMap } = await loadExportReturns(query);
+    await sendReturnImportWorkbook(res, 'tra-hang-nhap.xlsx', returns, detailMap);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportOneExcel = async function(req, res, next) {
+  try {
+    if (!isObjectId(req.params.id)) {
+      return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
+    }
+    const storeId = await resolveStoreId(req);
+    const query = { _id: req.params.id };
+    if (isObjectId(storeId)) query.cua_hang_id = storeId;
+    const { returns, detailMap } = await loadExportReturns(query);
+    if (!returns.length) {
+      return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
+    }
+    await sendReturnImportWorkbook(
+      res,
+      'tra-hang-nhap-' + (returns[0].ma_phieu_tra_nhap || 'unknown') + '.xlsx',
+      returns,
+      detailMap
+    );
+  } catch (error) {
+    next(error);
   }
 };
 

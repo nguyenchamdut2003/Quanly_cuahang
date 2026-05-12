@@ -20,5 +20,6 @@ router.post('/groups/:groupId/delete', hangHoaController.removeGroup);
 router.post('/units/add', hangHoaController.addUnit);
 router.post('/units/:unitId/update', hangHoaController.updateUnit);
 router.post('/units/:unitId/delete', hangHoaController.removeUnit);
+router.post('/export-excel', hangHoaController.exportExcel);
 
 module.exports = router;

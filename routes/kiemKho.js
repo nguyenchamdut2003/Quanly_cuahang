@@ -15,6 +15,59 @@ const { congTonKho, truTonKho } = require('../services/kho.service');
 
 router.use(isAuthenticated);
 
+function getSelectedStatuses(query) {
+    if (Array.isArray(query.trang_thai)) return query.trang_thai;
+    if (query.trang_thai) return String(query.trang_thai).split(',').filter(Boolean);
+    return ['pending', 'completed'];
+}
+
+function buildKiemKhoFilter(query = {}) {
+    const filter = {};
+    const q = String(query.q || '').trim();
+    const dateMode = query.date_mode || 'this_month';
+    const statuses = getSelectedStatuses(query);
+
+    if (q) {
+        filter.ma_kiem_kho = { $regex: q, $options: 'i' };
+    }
+
+    if (statuses.length) {
+        filter.trang_thai = { $in: statuses };
+    }
+
+    if (query.nguoi_tao_id) {
+        filter.nguoi_tao_id = query.nguoi_tao_id;
+    }
+
+    const now = new Date();
+    if (dateMode === 'this_month') {
+        filter.created_at = {
+            $gte: new Date(now.getFullYear(), now.getMonth(), 1),
+            $lt: new Date(now.getFullYear(), now.getMonth() + 1, 1)
+        };
+    } else if (dateMode === 'custom' && (query.from_date || query.to_date)) {
+        filter.created_at = {};
+        if (query.from_date) filter.created_at.$gte = new Date(query.from_date);
+        if (query.to_date) {
+            const toDate = new Date(query.to_date);
+            toDate.setDate(toDate.getDate() + 1);
+            filter.created_at.$lt = toDate;
+        }
+    }
+
+    return { filter, q, dateMode, statuses };
+}
+
+function escapeCsv(value) {
+    return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+function sendCsv(res, filename, rows) {
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('\uFEFF' + rows.map(row => row.map(escapeCsv).join(',')).join('\r\n'));
+}
+
 function parseItems(rawItems) {
     if (Array.isArray(rawItems)) return rawItems;
     if (typeof rawItems === 'string' && rawItems.trim() !== '') {
@@ -30,40 +83,7 @@ function parseItems(rawItems) {
 
 router.get('/', async (req, res, next) => {
     try {
-        const filter = {};
-        const q = String(req.query.q || '').trim();
-        const dateMode = req.query.date_mode || 'this_month';
-        const statuses = Array.isArray(req.query.trang_thai)
-            ? req.query.trang_thai
-            : (req.query.trang_thai ? [req.query.trang_thai] : ['pending', 'completed']);
-
-        if (q) {
-            filter.ma_kiem_kho = { $regex: q, $options: 'i' };
-        }
-
-        if (statuses.length) {
-            filter.trang_thai = { $in: statuses };
-        }
-
-        if (req.query.nguoi_tao_id) {
-            filter.nguoi_tao_id = req.query.nguoi_tao_id;
-        }
-
-        const now = new Date();
-        if (dateMode === 'this_month') {
-            filter.created_at = {
-                $gte: new Date(now.getFullYear(), now.getMonth(), 1),
-                $lt: new Date(now.getFullYear(), now.getMonth() + 1, 1)
-            };
-        } else if (dateMode === 'custom' && (req.query.from_date || req.query.to_date)) {
-            filter.created_at = {};
-            if (req.query.from_date) filter.created_at.$gte = new Date(req.query.from_date);
-            if (req.query.to_date) {
-                const toDate = new Date(req.query.to_date);
-                toDate.setDate(toDate.getDate() + 1);
-                filter.created_at.$lt = toDate;
-            }
-        }
+        const { filter, q, dateMode, statuses } = buildKiemKhoFilter(req.query);
 
         const pageSize = Math.min(Math.max(Number(req.query.page_size || 15), 1), 100);
         const [list, users] = await Promise.all([
@@ -114,6 +134,172 @@ router.get('/', async (req, res, next) => {
                 page_size: req.query.page_size || '15'
             }
         });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/export.csv', async (req, res, next) => {
+    try {
+        const { filter } = buildKiemKhoFilter(req.query);
+        const tickets = await PhieuKiemKho.find(filter)
+            .populate('kho_id')
+            .populate('nguoi_tao_id')
+            .sort({ created_at: -1 });
+
+        const ticketIds = tickets.map(item => item._id);
+        const details = ticketIds.length
+            ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: ticketIds } })
+            : [];
+        const summaryMap = details.reduce((acc, item) => {
+            const key = String(item.phieu_kiem_kho_id);
+            if (!acc[key]) acc[key] = { positive: 0, negative: 0, actual: 0, value: 0 };
+            const diff = Number(item.so_luong_lech || 0);
+            if (diff > 0) acc[key].positive += diff;
+            if (diff < 0) acc[key].negative += Math.abs(diff);
+            acc[key].actual += Number(item.so_luong_thuc_te || 0);
+            acc[key].value += Number(item.gia_tri_lech || 0);
+            return acc;
+        }, {});
+
+        const rows = [[
+            'Mã kiểm kho',
+            'Ngày tạo',
+            'Ngày cân bằng',
+            'Kho',
+            'Người tạo',
+            'SL thực tế',
+            'Tổng chênh lệch',
+            'SL lệch tăng',
+            'SL lệch giảm',
+            'Giá trị chênh lệch',
+            'Trạng thái',
+            'Ghi chú'
+        ]];
+
+        tickets.forEach(ticket => {
+            const summary = summaryMap[String(ticket._id)] || {};
+            const creator = ticket.nguoi_tao_id
+                ? (ticket.nguoi_tao_id.ho_ten || ticket.nguoi_tao_id.username || ticket.nguoi_tao_id.email || '')
+                : '';
+            rows.push([
+                ticket.ma_kiem_kho || '',
+                ticket.created_at ? ticket.created_at.toISOString() : '',
+                ticket.trang_thai === 'completed' && ticket.updated_at ? ticket.updated_at.toISOString() : '',
+                ticket.kho_id ? ticket.kho_id.ten_kho : '',
+                creator,
+                ticket.tong_so_luong_thuc_te || summary.actual || 0,
+                ticket.tong_so_luong_lech || 0,
+                summary.positive || 0,
+                summary.negative || 0,
+                ticket.tong_gia_tri_lech || summary.value || 0,
+                ticket.trang_thai || '',
+                ticket.ghi_chu || ''
+            ]);
+        });
+
+        sendCsv(res, 'kiem-kho.csv', rows);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/:id/export.csv', async (req, res, next) => {
+    try {
+        if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+            return res.status(404).send('Khong tim thay phieu kiem kho');
+        }
+
+        const ticket = await PhieuKiemKho.findById(req.params.id)
+            .populate('kho_id')
+            .populate('nguoi_tao_id');
+        if (!ticket) {
+            return res.status(404).send('Khong tim thay phieu kiem kho');
+        }
+
+        const details = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: ticket._id })
+            .populate({
+                path: 'hang_hoa_id',
+                populate: [
+                    { path: 'thuong_hieu_id' },
+                    { path: 'don_vi_tinh_id' }
+                ]
+            })
+            .populate('lo_hang_id');
+        const creator = ticket.nguoi_tao_id
+            ? (ticket.nguoi_tao_id.ho_ten || ticket.nguoi_tao_id.username || ticket.nguoi_tao_id.email || '')
+            : '';
+        const totalActual = details.reduce((sum, item) => sum + Number(item.so_luong_thuc_te || 0), 0);
+        const positiveDiff = details.reduce((sum, item) => {
+            const diff = Number(item.so_luong_lech || 0);
+            return diff > 0 ? sum + diff : sum;
+        }, 0);
+        const negativeDiff = details.reduce((sum, item) => {
+            const diff = Number(item.so_luong_lech || 0);
+            return diff < 0 ? sum + Math.abs(diff) : sum;
+        }, 0);
+        const rows = [[
+            'Mã kiểm kho',
+            'Thời gian',
+            'Ngày cân bằng',
+            'SL thực tế',
+            'Tổng thực tế',
+            'Tổng chênh lệch',
+            'SL lệch tăng',
+            'SL lệch giảm',
+            'Ghi chú',
+            'Trạng thái',
+            'Mã hàng',
+            'Tên hàng',
+            'Thương hiệu',
+            'Đơn vị tính',
+            'Tồn kho',
+            'Kiểm thực tế',
+            'SL lệch',
+            'Giá trị lệch'
+        ]];
+
+        details.forEach(item => {
+            const product = item.hang_hoa_id || {};
+            rows.push([
+                ticket.ma_kiem_kho || '',
+                ticket.created_at ? ticket.created_at.toISOString() : '',
+                ticket.trang_thai === 'completed' && ticket.updated_at ? ticket.updated_at.toISOString() : '',
+                ticket.tong_so_luong_thuc_te || totalActual || 0,
+                ticket.tong_gia_tri_thuc_te || 0,
+                ticket.tong_so_luong_lech || 0,
+                positiveDiff,
+                negativeDiff,
+                ticket.ghi_chu || '',
+                ticket.trang_thai || '',
+                product.ma_hang || '',
+                product.ten_hang || '',
+                product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '',
+                product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi : '',
+                item.ton_kho_he_thong || 0,
+                item.so_luong_thuc_te || 0,
+                item.so_luong_lech || 0,
+                item.gia_tri_lech || 0
+            ]);
+        });
+
+        if (!details.length) {
+            rows.push([
+                ticket.ma_kiem_kho || '',
+                ticket.created_at ? ticket.created_at.toISOString() : '',
+                ticket.trang_thai === 'completed' && ticket.updated_at ? ticket.updated_at.toISOString() : '',
+                ticket.tong_so_luong_thuc_te || 0,
+                ticket.tong_gia_tri_thuc_te || 0,
+                ticket.tong_so_luong_lech || 0,
+                0,
+                0,
+                ticket.ghi_chu || '',
+                ticket.trang_thai || '',
+                '', '', '', '', '', '', '', ''
+            ]);
+        }
+
+        sendCsv(res, `${ticket.ma_kiem_kho || 'kiem-kho'}.csv`, rows);
     } catch (error) {
         next(error);
     }

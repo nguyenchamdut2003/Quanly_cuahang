@@ -91,6 +91,13 @@ app.use('/ban-hang', banHangRouter);
 // APIs for nhapHang feature
 app.get('/api/hang-hoa', isAuthenticated, nhapHangController.apiHangHoa);
 app.get('/api/nha-cung-cap/:id/hang-hoa', isAuthenticated, nhapHangController.apiSupplierProducts);
+app.get('/api/hang-hoa/:id/lo-hang', isAuthenticated, nhapHangController.apiProductLots);
+app.get('/phieu-nhap/:id/in', isAuthenticated, nhapHangController.printPurchase);
+app.get('/phieu-nhap/:id/in/pdf', isAuthenticated, nhapHangController.printPhieuNhapPdf);
+app.get('/phieu-nhap/:id/bang-ke-02-tndn', isAuthenticated, nhapHangController.printBangKe02Tndn);
+app.get('/phieu-nhap/:id/bang-ke-02-tndn/pdf', isAuthenticated, nhapHangController.printBangKe02TndnPdf);
+app.get('/phieu-nhap/:id/hd-mua-ban-nguyen-tac', isAuthenticated, nhapHangController.printContract);
+app.get('/phieu-nhap/:id/hd-mua-ban-nguyen-tac/pdf', isAuthenticated, nhapHangController.printHdMuaBanNguyenTacPdf);
 app.get('/api/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);
 app.get('/api/phieu-nhap/con-hang-xuat-huy', isAuthenticated, xuatHuyController.apiPurchasesWithStock);
 app.get('/api/kho/:khoId/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);

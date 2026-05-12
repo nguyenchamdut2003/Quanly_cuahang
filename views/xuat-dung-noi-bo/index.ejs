@@ -37,6 +37,18 @@
 </head>
 <body>
   <%- include('../partials/header') %>
+  <%
+    const exportParams = new URLSearchParams();
+    Object.keys(filters || {}).forEach(key => {
+      const value = filters[key];
+      if (Array.isArray(value)) {
+        value.forEach(item => exportParams.append(key, item));
+      } else if (value !== undefined && value !== null && value !== '') {
+        exportParams.append(key, value);
+      }
+    });
+    const exportQuery = exportParams.toString();
+  %>
 
   <form class="xnb-page" method="GET" action="/xuat-dung-noi-bo" id="filterForm">
     <aside class="xnb-sidebar">
@@ -67,7 +79,7 @@
         </div>
         <div class="toolbar-actions">
           <a class="kv-btn primary" href="/xuat-dung-noi-bo/create"><i class="fa-solid fa-plus"></i> Xuất dùng nội bộ</a>
-          <a class="kv-btn" href="/xuat-dung-noi-bo/export.csv?<%= new URLSearchParams(filters).toString() %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
+          <a class="kv-btn" href="/xuat-dung-noi-bo/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
           <button type="button" class="tool-icon" title="Danh sách"><i class="fa-solid fa-list"></i></button>
           <button type="button" class="tool-icon" title="Thiết lập"><i class="fa-solid fa-gear"></i></button>
           <button type="button" class="tool-icon" title="Trợ giúp"><i class="fa-regular fa-circle-question"></i></button>

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="vi">
 <head>
   <meta charset="utf-8">
@@ -191,6 +191,22 @@
               </div>
             </div>
           </section>
+ 
+           <section class="customer-filter-section">
+             <h4>Bảng giá</h4>
+             <div style="max-height:160px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;flex-direction:column;gap:6px">
+               <% (bangGiaList || []).forEach(function(bg) { %>
+                 <% var isChecked = (filter.bangGiaIds || []).indexOf(String(bg._id)) >= 0; %>
+                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                   <input type="checkbox" name="bangGia" value="<%= bg._id %>" <%= isChecked ? 'checked' : '' %>>
+                   <span><%= bg.ten_bang_gia %></span>
+                 </label>
+               <% }) %>
+               <% if (!bangGiaList || bangGiaList.length === 0) { %>
+                 <span style="font-size:12px;color:#64748b">Không có bảng giá hoạt động.</span>
+               <% } %>
+             </div>
+           </section>
 
           <section class="customer-filter-section">
             <h4>Tồn kho</h4>
@@ -261,7 +277,7 @@
             <button class="btn btn-primary" type="button" id="openAddProductModal">+ Tạo mới</button>
             <button class="btn btn-danger" type="submit" form="bulkDeleteProductsForm" onclick="return confirm('Xóa các hàng hóa đã chọn?')">Xóa đã chọn</button>
             <button class="btn btn-light" type="button">Import file</button>
-            <button class="btn btn-light" type="button">Xuất file</button>
+            <button class="btn btn-light" type="button" id="openExportColsModal">Xuất file</button>
           </div>
         </div>
 
@@ -463,6 +479,72 @@
       </section>
     </div>
   </main>
+
+  <!-- ── Export Columns Picker Modal ────────────────────────── -->
+  <div id="exportColsModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:10px;padding:24px 28px;width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 80px);overflow-y:auto;box-shadow:0 18px 44px rgba(15,23,42,.28)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="margin:0;font-size:17px">Tùy chọn cột xuất file</h3>
+        <button id="exportColsModalClose" type="button" style="border:0;background:none;font-size:22px;cursor:pointer;line-height:1">×</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:18px" id="exportColsGrid">
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="loai_hang" checked> Loại hàng</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ma_hang" checked> Mã hàng</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ten_hang" checked> Tên hàng</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="thuong_hieu"> Thương hiệu</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="nhom_hang" checked> Nhóm hàng</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="hinh_anh"> Hình ảnh</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="dang_kinh_doanh" checked> Đang kinh doanh</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ban_truc_tiep"> Được bán trực tiếp</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="gia_ban" checked> Giá bán</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="gia_von" checked> Giá vốn</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ton_kho" checked> Tồn kho</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="kh_dat"> KH đặt</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="du_kien_het"> Dự kiến hết hàng</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ton_nho_nhat"> Tồn nhỏ nhất</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ton_lon_nhat"> Tồn lớn nhất</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="dvt"> ĐVT</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ma_dvt_co_ban"> Mã ĐVT cơ bản</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="quy_doi"> Quy đổi</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="thuoc_tinh"> Thuộc tính nếu có</label>
+      </div>
+      
+      <div style="margin-bottom:16px">
+        <h4 style="margin:0 0 10px 0;font-size:14px;color:#475569">Bảng giá muốn xuất kèm</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 24px" id="exportBangGiaGrid">
+          <% (bangGiaList || []).forEach(function(bg) { %>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-bang-gia-cb" value="<%= bg._id %>"> <%= bg.ten_bang_gia %></label>
+          <% }) %>
+          <% if (!bangGiaList || bangGiaList.length === 0) { %>
+            <span style="grid-column: span 2; font-size:12px;color:#94a3b8">Không có bảng giá khả dụng.</span>
+          <% } %>
+        </div>
+      </div>
+      <div id="exportColsError" style="color:#d92d20;font-size:13px;margin-bottom:10px;display:none">Vui lòng chọn ít nhất 1 cột.</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <button id="exportColsDeselectAll" type="button" class="btn btn-light btn-sm">Bỏ chọn tất cả</button>
+        <div style="display:flex;gap:8px">
+          <button id="exportColsCancel" type="button" class="btn btn-light btn-sm">Hủy</button>
+          <button id="exportColsSubmit" type="button" class="btn btn-primary btn-sm">Xuất file</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- hidden form to POST export request -->
+  <form id="exportColsForm" method="POST" action="/hang-hoa/export-excel" style="display:none">
+    <div id="exportColsFormInputs"></div>
+    <!-- pass current filter values so backend applies same filter -->
+    <input type="hidden" name="groupId" value="<%= filter.groupId || 'all' %>">
+    <input type="hidden" name="supplierId" value="<%= filter.supplierId || 'all' %>">
+    <input type="hidden" name="stockFrom" value="<%= filter.stockFrom || '' %>">
+    <input type="hidden" name="stockTo" value="<%= filter.stockTo || '' %>">
+    <input type="hidden" name="created" value="<%= filter.created || 'all' %>">
+    <input type="hidden" name="createdFrom" value="<%= filter.createdFrom || '' %>">
+    <input type="hidden" name="createdTo" value="<%= filter.createdTo || '' %>">
+    <input type="hidden" name="salesLink" value="<%= filter.salesLink || 'all' %>">
+    <input type="hidden" name="status" value="<%= filter.status || 'all' %>">
+    <input type="hidden" name="keyword" value="<%= filter.keyword || '' %>">
+  </form>
   <div id="productGroupModalOverlay" class="group-modal-overlay">
     <div class="group-modal">
       <div class="group-modal-header">
@@ -1123,6 +1205,86 @@
         }
       });
     });
+  </script>
+
+  <script>
+    // --- Export Columns Popup ----------------------------------------
+    (function() {
+      var overlay   = document.getElementById('exportColsModalOverlay');
+      var openBtn   = document.getElementById('openExportColsModal');
+      var closeBtn  = document.getElementById('exportColsModalClose');
+      var cancelBtn = document.getElementById('exportColsCancel');
+      var deselectBtn = document.getElementById('exportColsDeselectAll');
+      var submitBtn = document.getElementById('exportColsSubmit');
+      var errorDiv  = document.getElementById('exportColsError');
+      var form      = document.getElementById('exportColsForm');
+      var formInputs = document.getElementById('exportColsFormInputs');
+
+      function openModal() {
+        if (overlay) overlay.style.display = 'flex';
+        if (errorDiv) errorDiv.style.display = 'none';
+      }
+      function closeModal() {
+        if (overlay) overlay.style.display = 'none';
+      }
+
+      if (openBtn)   openBtn.addEventListener('click', openModal);
+      if (closeBtn)  closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+      // Close on backdrop click
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeModal();
+        });
+      }
+
+      // Deselect all
+      if (deselectBtn) {
+        deselectBtn.addEventListener('click', function() {
+          var cbs = Array.prototype.slice.call(document.querySelectorAll('.export-col-cb'));
+          cbs.forEach(function(cb) { cb.checked = false; });
+        });
+      }
+
+      // Submit
+      if (submitBtn) {
+        submitBtn.addEventListener('click', function() {
+          var cbs = Array.prototype.slice.call(document.querySelectorAll('.export-col-cb'));
+          var selected = cbs.filter(function(cb) { return cb.checked; });
+
+          if (selected.length === 0) {
+            if (errorDiv) errorDiv.style.display = 'block';
+            return;
+          }
+          if (errorDiv) errorDiv.style.display = 'none';
+
+          // Build column hidden inputs
+          if (formInputs) {
+            formInputs.innerHTML = '';
+            selected.forEach(function(cb) {
+              var input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = 'columns';
+              input.value = cb.value;
+              formInputs.appendChild(input);
+            });
+
+            // Collect selected price books to export
+            var bgCbs = Array.prototype.slice.call(document.querySelectorAll('.export-bang-gia-cb'));
+            bgCbs.filter(function(cb) { return cb.checked; }).forEach(function(cb) {
+              var input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = 'bangGia';
+              input.value = cb.value;
+              formInputs.appendChild(input);
+            });
+          }
+
+          if (form) form.submit();
+        });
+      }
+    })();
   </script>
 </body>
 </html>

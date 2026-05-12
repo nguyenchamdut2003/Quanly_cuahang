@@ -6,30 +6,30 @@
     <link rel="stylesheet" href="/stylesheets/style.css">
     <style>
       body{background:#f2f4f7}
-      .kk-page{height:calc(100vh - 98px);display:grid;grid-template-columns:242px minmax(0,1fr);gap:10px;padding:8px 6px 0}
-      .kk-sidebar{background:#fff;border-radius:8px;padding:14px 12px;overflow:auto}
+      .kk-page{height:calc(100vh - 98px);display:grid;grid-template-columns:302px minmax(0,1fr);gap:14px;padding:10px 8px 0}
+      .kk-sidebar{background:#fff;border-radius:8px;padding:18px 14px;overflow:auto;border:1px solid #edf0f5}
       .kk-main{min-width:0;display:flex;flex-direction:column}
-      .kk-top{height:40px;display:grid;grid-template-columns:240px minmax(260px,470px) 1fr auto;align-items:center;gap:8px}
-      .kk-title{font-size:20px;font-weight:800;color:#050505}
-      .kk-search{height:30px;border:1px solid #c7d0dc;border-radius:7px;background:#fff;display:flex;align-items:center;padding:0 10px;gap:8px}
+      .kk-top{min-height:44px;display:grid;grid-template-columns:240px minmax(320px,590px) 1fr auto;align-items:center;gap:10px;margin-bottom:6px}
+      .kk-title{font-size:22px;font-weight:800;color:#050505;line-height:1.2}
+      .kk-search{height:36px;border:1px solid #c7d0dc;border-radius:8px;background:#fff;display:flex;align-items:center;padding:0 12px;gap:10px}
       .kk-search input{border:0;outline:0;flex:1;font-size:14px}
       .kk-search button{border:0;background:transparent;color:#344054;cursor:pointer}
       .kk-actions{display:flex;align-items:center;gap:8px}
-      .kk-btn{height:30px;border:1px solid #c7d0dc;background:#fff;border-radius:7px;color:#1f2937;padding:0 11px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+      .kk-btn{height:36px;border:1px solid #c7d0dc;background:#fff;border-radius:8px;color:#1f2937;padding:0 13px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
       .kk-btn.primary{border-color:#006dff;color:#006dff}
-      .kk-icon{width:30px;height:30px;border:1px solid #c7d0dc;border-radius:7px;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#344054}
+      .kk-icon{width:36px;height:36px;border:1px solid #c7d0dc;border-radius:8px;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#344054}
       .filter-title{font-size:14px;font-weight:800;margin:0 0 10px;color:#050505}
       .filter-block{margin-bottom:20px}
       .radio-row,.check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px;color:#111827}
       .radio-row input,.check-row input{width:15px;height:15px;accent-color:#0070f4}
-      .filter-line{height:30px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 9px;color:#111827}
-      .filter-line input,.filter-line select{border:0;outline:0;width:100%;height:28px;background:transparent;color:#667085}
+      .filter-line{height:36px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;color:#111827}
+      .filter-line input,.filter-line select{border:0;outline:0;width:100%;height:34px;background:transparent;color:#667085}
       .date-range{display:none;margin:8px 0 0 23px;gap:6px}
       .date-range.show{display:grid}
-      .kk-table-wrap{background:#fff;flex:1;overflow:auto}
+      .kk-table-wrap{background:#fff;flex:1;overflow:auto;border:1px solid #e5e7eb;border-radius:8px 8px 0 0}
       .kk-table{width:100%;min-width:1180px;border-collapse:collapse;font-size:13px}
       .kk-table th{height:37px;background:#e8f3ff;border-bottom:1px solid #a8cdfc;text-align:left;color:#050505;font-weight:800;padding:0 10px;white-space:nowrap}
-      .kk-table td{height:42px;border-bottom:1px solid #e5e7eb;padding:0 10px;vertical-align:top}
+      .kk-table td{height:42px;border-bottom:1px solid #e5e7eb;padding:0 10px;vertical-align:middle}
       .kk-table .num{text-align:right}
       .select-col{width:26px;text-align:center}
       .row-check{width:14px;height:14px;accent-color:#0070f4}
@@ -40,13 +40,13 @@
       .detail-row{display:none}
       .detail-row.open{display:table-row}
       .detail-cell{padding:0!important;border:2px solid #006dff!important;border-top:0!important;background:#fff}
-      .detail-panel{padding:12px 22px 16px}
+      .detail-panel{padding:16px 24px 18px}
       .detail-tab{display:inline-flex;height:28px;align-items:center;border-bottom:2px solid #006dff;color:#006dff;font-weight:700;margin-bottom:14px}
       .detail-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin:0 0 14px}
       .status-pill{font-size:13px;color:#047857;background:#dcfce7;border-radius:4px;padding:3px 7px;font-weight:700}
       .detail-meta{display:flex;gap:12px;align-items:center;font-size:14px;margin:8px 0;color:#111827}
       .meta-sep{height:14px;width:1px;background:#d1d5db}
-      .detail-table{width:100%;border-collapse:collapse;margin-top:38px;font-size:13px}
+      .detail-table{width:100%;border-collapse:collapse;margin-top:22px;font-size:13px}
       .detail-table th{height:34px;background:#f0f1f3;border-bottom:1px solid #cfd5dd;text-align:left;padding:0 10px}
       .detail-table td{height:39px;border-bottom:0;padding:0 10px}
       .detail-table .num{text-align:right}
@@ -57,11 +57,16 @@
       .detail-total{display:grid;grid-template-columns:1fr 90px;gap:12px;font-size:14px;line-height:30px}
       .detail-actions{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;margin-top:16px;padding-top:16px}
       .detail-action-left,.detail-action-right{display:flex;gap:26px;align-items:center}
-      .detail-link-btn{border:0;background:transparent;color:#111827;font-weight:700;display:inline-flex;gap:7px;align-items:center;cursor:pointer}
+      .detail-link-btn{border:0;background:transparent;color:#111827;font-weight:700;display:inline-flex;gap:7px;align-items:center;cursor:pointer;text-decoration:none}
       .small-outline{height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:0 12px;display:inline-flex;align-items:center;gap:7px;font-weight:700}
       .kk-footer{height:34px;display:flex;align-items:center;gap:6px;font-size:13px;color:#344054}
       .page-size{height:24px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:0 25px 0 8px}
       .empty-row{height:140px!important;text-align:center;color:#667085}
+      @media (max-width:1200px){
+        .kk-page{grid-template-columns:260px minmax(0,1fr)}
+        .kk-top{grid-template-columns:1fr;align-items:stretch}
+        .kk-actions{justify-content:flex-start;flex-wrap:wrap}
+      }
     </style>
   </head>
   <body>
@@ -71,6 +76,16 @@
       const selectedStatuses = safeFilters.trang_thai || [];
       const fmtNumber = n => Number(n || 0).toLocaleString('vi-VN');
       const fmtDateTime = d => d ? new Date(d).toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+      const exportParams = new URLSearchParams();
+      Object.keys(safeFilters).forEach(key => {
+        const value = safeFilters[key];
+        if (Array.isArray(value)) {
+          value.forEach(item => exportParams.append(key, item));
+        } else if (value !== undefined && value !== null && value !== '') {
+          exportParams.append(key, value);
+        }
+      });
+      const exportQuery = exportParams.toString();
     %>
     <form id="kkFilterForm" class="kk-page" method="GET" action="/kiem-kho">
       <aside class="kk-sidebar">
@@ -121,7 +136,7 @@
           <div></div>
           <div class="kk-actions">
             <a class="kk-btn primary" href="/kiem-kho/create"><i class="fa-solid fa-plus"></i> Kiểm kho</a>
-            <a class="kk-btn" href="/kiem-kho/export.csv?<%= new URLSearchParams(safeFilters).toString() %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
+            <a class="kk-btn" href="/kiem-kho/export.csv<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
             <span class="kk-icon"><i class="fa-solid fa-list"></i></span>
             <span class="kk-icon"><i class="fa-solid fa-gear"></i></span>
             <span class="kk-icon"><i class="fa-regular fa-circle-question"></i></span>
@@ -234,7 +249,7 @@
                         <div class="detail-action-left">
                           <button class="detail-link-btn" type="button"><i class="fa-regular fa-trash-can"></i> Hủy</button>
                           <button class="detail-link-btn" type="button"><i class="fa-regular fa-copy"></i> Sao chép</button>
-                          <button class="detail-link-btn" type="button"><i class="fa-solid fa-file-export"></i> Xuất file</button>
+                          <a class="detail-link-btn" href="/kiem-kho/<%= t._id %>/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a>
                         </div>
                         <div class="detail-action-right">
                           <button class="small-outline" type="button"><i class="fa-regular fa-floppy-disk"></i> Lưu</button>
