@@ -8,10 +8,15 @@ const {
     TonKhoLo,
     LoHang,
     DiaChiDoiTuong,
+    DiaChiKhachHang,
+    DiaChiNcc,
     PhanBoHang,
     CTPhanBoHang,
     PhieuNhap,
     DonHang,
+    CTDonHang,
+    BangGia,
+    CTBangGia,
     HoaDonBanHang,
     PhieuTraHang,
     PhieuKiemKho,
@@ -165,6 +170,77 @@ router.get('/ton-kho', async (req, res, next) => {
 
         const data = await layTonKhoTheoKho(req.query.kho_id);
         res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/kho/:id/ton-kho', async (req, res, next) => {
+    try {
+        const data = await layTonKhoTheoKho(req.params.id);
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/kho/:id/ton-kho-lo', async (req, res, next) => {
+    try {
+        const filter = { kho_id: req.params.id };
+        if (req.query.hang_hoa_id) filter.hang_hoa_id = req.query.hang_hoa_id;
+        const rows = await TonKhoLo.find(filter)
+            .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang gia_von' })
+            .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo ngay_nhap han_su_dung trang_thai' })
+            .sort({ updated_at: -1, created_at: -1 })
+            .lean();
+        res.json({ success: true, data: rows });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/hang-hoa/:id/gia', async (req, res, next) => {
+    try {
+        const product = await HangHoa.findById(req.params.id)
+            .select('ma_hang ten_hang loai_gia gia_co_dinh gia_von gia_nhap_cuoi')
+            .lean();
+        if (!product) return res.status(404).json({ success: false, message: 'Khong tim thay hang hoa' });
+
+        let price = product.loai_gia === 'co_dinh' ? Number(product.gia_co_dinh || 0) : null;
+        let priceSource = product.loai_gia === 'co_dinh' ? 'gia_co_dinh' : 'thi_truong';
+        const bangGiaId = String(req.query.bang_gia_id || '').trim();
+        if (bangGiaId) {
+            const priceRow = await CTBangGia.findOne({ bang_gia_id: bangGiaId, hang_hoa_id: product._id }).lean();
+            if (priceRow) {
+                price = Number(priceRow.gia_ban || 0);
+                priceSource = 'bang_gia';
+            }
+        } else {
+            const activePriceList = await BangGia.findOne({ trang_thai: 'active' }).sort({ created_at: -1 }).lean();
+            if (activePriceList) {
+                const priceRow = await CTBangGia.findOne({ bang_gia_id: activePriceList._id, hang_hoa_id: product._id }).lean();
+                if (priceRow) {
+                    price = Number(priceRow.gia_ban || 0);
+                    priceSource = 'bang_gia';
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                hang_hoa_id: product._id,
+                ma_hang: product.ma_hang || '',
+                ten_hang: product.ten_hang || '',
+                loai_gia: product.loai_gia || 'thi_truong',
+                gia_ban: price,
+                nguon_gia: priceSource,
+                gia_von: Number(product.gia_von || 0),
+                gia_nhap_cuoi: Number(product.gia_nhap_cuoi || 0),
+                cho_phep_nhap_tay: product.loai_gia !== 'co_dinh' && price == null
+            }
+        });
     } catch (error) {
         next(error);
     }
@@ -354,6 +430,44 @@ router.get('/ton-kho/lo', async (req, res, next) => {
     }
 });
 
+router.get('/ton-kho-lo/bao-cao', async (req, res, next) => {
+    try {
+        const filter = {};
+        if (req.query.cua_hang_id) filter.cua_hang_id = req.query.cua_hang_id;
+        if (req.query.kho_id) filter.kho_id = req.query.kho_id;
+        if (req.query.hang_hoa_id) filter.hang_hoa_id = req.query.hang_hoa_id;
+        const rows = await TonKhoLo.find(filter)
+            .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang gia_von' })
+            .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo ngay_nhap han_su_dung' })
+            .sort({ updated_at: -1, created_at: -1 })
+            .lean();
+        const data = rows.map(row => {
+            const quantity = Number(row.so_luong || 0);
+            const cost = Number(row.gia_von || row.hang_hoa_id?.gia_von || 0);
+            return {
+                hang_hoa_id: row.hang_hoa_id?._id || row.hang_hoa_id,
+                ma_hang: row.hang_hoa_id?.ma_hang || '',
+                ten_hang: row.hang_hoa_id?.ten_hang || '',
+                kho_id: row.kho_id?._id || row.kho_id,
+                ma_kho: row.kho_id?.ma_kho || '',
+                ten_kho: row.kho_id?.ten_kho || '',
+                lo_hang_id: row.lo_hang_id?._id || row.lo_hang_id,
+                ma_lo: row.lo_hang_id?.ma_lo || '',
+                ten_lo: row.lo_hang_id?.ten_lo || '',
+                ngay_nhap: row.lo_hang_id?.ngay_nhap || '',
+                han_su_dung: row.lo_hang_id?.han_su_dung || '',
+                so_luong_con_lai: quantity,
+                gia_von: cost,
+                tong_gia_tri: quantity * cost
+            };
+        });
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/lo-hang', async (req, res, next) => {
     try {
         const filter = {};
@@ -412,6 +526,28 @@ router.get('/dia-chi-doi-tuong', async (req, res, next) => {
         });
 
         const data = await DiaChiDoiTuong.find(filter).sort({ mac_dinh: -1, created_at: -1 });
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/khach-hang/:id/dia-chi', async (req, res, next) => {
+    try {
+        const data = await DiaChiKhachHang.find({ khach_hang_id: req.params.id })
+            .sort({ mac_dinh: -1, created_at: -1 })
+            .lean();
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/nha-cung-cap/:id/dia-chi', async (req, res, next) => {
+    try {
+        const data = await DiaChiNcc.find({ nha_cung_cap_id: req.params.id })
+            .sort({ mac_dinh: -1, created_at: -1 })
+            .lean();
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -481,6 +617,41 @@ router.get('/phan-bo-hang', async (req, res, next) => {
             .populate('don_hang_id')
             .sort({ created_at: -1 });
         res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/don-hang/:id/phan-bo', async (req, res, next) => {
+    try {
+        const order = await DonHang.findById(req.params.id)
+            .populate('khach_hang_id')
+            .populate('kho_id')
+            .lean();
+        if (!order) return res.status(404).json({ success: false, message: 'Khong tim thay don hang' });
+        const details = await CTDonHang.find({ don_hang_id: order._id })
+            .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang quan_ly_theo_lo gia_co_dinh loai_gia' })
+            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+            .lean();
+        const allocations = await PhanBoHang.find({ don_hang_id: order._id })
+            .sort({ created_at: -1 })
+            .lean();
+        const allocationIds = allocations.map(item => item._id);
+        const allocationDetails = allocationIds.length
+            ? await CTPhanBoHang.find({ phan_bo_hang_id: { $in: allocationIds } })
+                .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
+                .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+                .lean()
+            : [];
+        res.json({
+            success: true,
+            data: {
+                don_hang: order,
+                chi_tiet: details,
+                phan_bo: allocations,
+                chi_tiet_phan_bo: allocationDetails
+            }
+        });
     } catch (error) {
         next(error);
     }

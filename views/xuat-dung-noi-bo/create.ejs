@@ -61,11 +61,14 @@
       <div class="side-body">
         <div class="field"><label>Mã xuất dùng nội bộ</label><input class="input" disabled placeholder="Mã phiếu tự động"></div>
         <div class="field"><label>Trạng thái</label><div class="readonly">Phiếu tạm</div></div>
-        <div class="field"><label>Loại xuất</label><select class="input" id="loaiXuat"><option>Xuất dùng nội bộ</option><option>Hỏng mất</option><option>Khác</option></select></div>
-        <div class="field"><label>Người nhận</label><select class="input" id="nguoiNhan"><option value="">Chọn người nhận</option><% users.forEach(u=>{ %><option value="<%= u.ho_ten || u.email %>"><%= u.ho_ten || u.email %></option><% }) %></select></div>
+        <div class="field"><label>Loai xuat</label><select class="input" id="loaiXuat"><option>Xuat van phong pham, dung cu lam viec</option><option>Xuat vat tu tieu hao, cong cu dung cu</option><option>Xuat phuc vu su kien, hoi nghi noi bo</option><option>Xuat boi thuong, den bu</option><option>Xuat mau trung bay, demo san pham</option><option>Xuat qua tang khach hang, doi tac</option><option>Khac</option></select></div>
+        <div class="field"><label>Loai nguoi nhan</label><select class="input" id="loaiNguoiNhan" onchange="renderReceiverOptions()"><option value="nhan_vien">Nhan vien</option><option value="khach_hang">Khach hang</option><option value="nha_cung_cap">Nha cung cap</option><option value="khac">Khac</option></select></div>
+        <div class="field" id="receiverSelectWrap"><label>Nguoi nhan</label><select class="input" id="nguoiNhan"><option value="">Chon nguoi nhan</option></select></div>
+        <div class="field" id="receiverOtherWrap" style="display:none"><label>Nguoi nhan khac</label><input class="input" id="nguoiNhanKhac" placeholder="Nhap ten nguoi nhan"></div>
         <div class="field"><label>Chi nhánh</label><select class="input" id="storeId"><option value="">Chọn chi nhánh</option><% stores.forEach(s=>{ %><option value="<%= s._id %>"><%= s.ten_cua_hang %></option><% }) %></select></div>
         <div class="field"><label>Kho</label><select class="input" id="khoId" disabled><option value="">Vui lòng chọn cửa hàng trước</option></select></div>
         <div class="total"><span>Tổng giá trị <i class="fa-regular fa-circle-question"></i></span><strong id="totalValue">0</strong></div>
+        <div class="field"><label><input type="checkbox" id="congDonVaoThe" disabled> Cong don vao the tung thanh vien (chua ho tro du lieu nhan)</label></div>
         <div class="field"><textarea class="input textarea" id="ghiChu" placeholder="Ghi chú"></textarea></div>
       </div>
       <div class="side-footer"><button class="btn secondary" onclick="saveXnb('draft')">Lưu tạm</button><button class="btn primary" onclick="saveXnb('completed')">Hoàn thành</button></div>
@@ -73,11 +76,32 @@
   </div>
   <script>
     const products = <%- JSON.stringify(products.map(p => ({_id:String(p._id),ma_hang:p.ma_hang,ten_hang:p.ten_hang,don_vi_tinh:p.don_vi_tinh || 'cái',gia_von:p.gia_von || 0,ton_kho:p.ton_kho || 0}))) %>;
+    const receiverSources = {
+      nhan_vien: <%- JSON.stringify(users.map(u => ({value: u.ho_ten || u.email || u.username || "", label: u.ho_ten || u.email || u.username || ""}))) %>,
+      khach_hang: <%- JSON.stringify((customers || []).map(c => ({value: c.ten_khach_hang || c.ten || c.sdt || "", label: c.ten_khach_hang || c.ten || c.sdt || ""}))) %>,
+      nha_cung_cap: <%- JSON.stringify((suppliers || []).map(n => ({value: n.ten_ncc || n.ten_cong_ty || n.sdt || "", label: n.ten_ncc || n.ten_cong_ty || n.sdt || ""}))) %>
+    };
     let items = [];
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
     const storeSelect = document.getElementById('storeId');
     const khoSelect = document.getElementById('khoId');
+
+    function renderReceiverOptions(){
+      const type = document.getElementById('loaiNguoiNhan').value;
+      const selectWrap = document.getElementById('receiverSelectWrap');
+      const otherWrap = document.getElementById('receiverOtherWrap');
+      const select = document.getElementById('nguoiNhan');
+      if(type === 'khac') {
+        selectWrap.style.display = 'none';
+        otherWrap.style.display = 'block';
+        return;
+      }
+      selectWrap.style.display = 'block';
+      otherWrap.style.display = 'none';
+      const rows = receiverSources[type] || [];
+      select.innerHTML = '<option value="">Chon nguoi nhan</option>' + rows.map(row => `<option value="${row.value}">${row.label}</option>`).join('');
+    }
 
     async function loadKhoByStore(){
       const storeId = storeSelect.value;
@@ -97,6 +121,7 @@
 
     storeSelect.addEventListener('change', loadKhoByStore);
     document.addEventListener('DOMContentLoaded', loadKhoByStore);
+    document.addEventListener('DOMContentLoaded', renderReceiverOptions);
 
     searchInput.addEventListener('input', function(){
       const q = this.value.trim().toLowerCase();
@@ -148,7 +173,10 @@
     async function saveXnb(status){
       if(!items.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
       if(!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
-      const data = {trang_thai:status,loai_xuat:document.getElementById('loaiXuat').value,nguoi_nhan:document.getElementById('nguoiNhan').value,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items};
+      const loaiNguoiNhan = document.getElementById('loaiNguoiNhan').value;
+      const receiverName = loaiNguoiNhan === 'khac' ? document.getElementById('nguoiNhanKhac').value : document.getElementById('nguoiNhan').value;
+      if(!receiverName.trim()) return alert('Vui long chon hoac nhap nguoi nhan.');
+      const data = {trang_thai:status,loai_xuat:document.getElementById('loaiXuat').value,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items};
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         const result = await res.json();

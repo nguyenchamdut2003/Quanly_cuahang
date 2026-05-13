@@ -615,8 +615,7 @@ exports.remove = async function(req, res, next) {
         var productId = normalizeIdParam(req?.params?.id);
         if (!productId) return res.redirect('/hang-hoa?error=invalid_product');
 
-        await TonKho.deleteMany({ hang_hoa_id: productId });
-        await HangHoa.findByIdAndDelete(productId);
+        await HangHoa.findByIdAndUpdate(productId, { trang_thai: 'inactive' });
         res.redirect('/hang-hoa?success=deleted');
     } catch (error) {
         next(error);
@@ -630,8 +629,7 @@ exports.removeSelected = async function(req, res, next) {
         ids = ids.map(function(item) { return String(item || '').trim(); }).filter(Boolean);
         if (ids.length === 0) return res.redirect('/hang-hoa?error=no_selection');
 
-        await TonKho.deleteMany({ hang_hoa_id: { $in: ids } });
-        await HangHoa.deleteMany({ _id: { $in: ids } });
+        await HangHoa.updateMany({ _id: { $in: ids } }, { $set: { trang_thai: 'inactive' } });
         res.redirect('/hang-hoa?success=deleted');
     } catch (error) {
         next(error);
@@ -723,17 +721,20 @@ exports.removeGroup = async function(req, res, next) {
             return respondProductGroupError(req, res, 400, 'Nhóm hàng không hợp lệ.');
         }
 
-        await HangHoa.updateMany(
-            { nhom_hang_id: groupId },
-            { $unset: { nhom_hang_id: 1 } }
-        );
-        var deleted = await NhomHang.findByIdAndDelete(groupId);
-        if (!deleted) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
-
+        var usedCount = await HangHoa.countDocuments({ nhom_hang_id: groupId });
+        var deleted = null;
+        var message = 'Da xoa nhom hang.';
+        if (usedCount > 0) {
+            deleted = await NhomHang.findByIdAndUpdate(groupId, { trang_thai: 'inactive' }, { new: true });
+            message = 'Nhom hang dang duoc su dung nen da chuyen sang ngung hoat dong.';
+        } else {
+            deleted = await NhomHang.findByIdAndDelete(groupId);
+        }
+        if (!deleted) return respondProductGroupError(req, res, 404, 'Khong tim thay nhom hang.');
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'Đã xóa nhóm hàng.',
+                message: message,
                 groups: await loadProductGroups()
             });
         }

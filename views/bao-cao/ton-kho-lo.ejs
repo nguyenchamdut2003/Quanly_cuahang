@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    body{background:#f3f6f9;color:#20242a}.page{height:calc(100vh - 112px);padding:22px 60px;display:grid;grid-template-columns:282px minmax(0,1fr);gap:14px;overflow:hidden}.title{grid-column:1 / -1;font-size:25px;font-weight:800;margin:0}.filters{background:#fff;border-radius:8px;padding:14px;overflow:auto}.filter-block{margin-bottom:18px}.filter-title{font-size:15px;font-weight:800;margin-bottom:8px}.select{height:36px;width:100%;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 12px;font-size:14px}.btn{height:36px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 14px;font-weight:800;cursor:pointer;text-decoration:none;color:#111827;display:inline-flex;align-items:center}.btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}.content{background:#fff;overflow:auto}.summary{display:grid;grid-template-columns:repeat(2,220px);gap:12px;padding:14px;border-bottom:1px solid #e5e9ee}.summary-card{border:1px solid #e1e7ef;border-radius:6px;padding:10px}.summary-card label{display:block;color:#64748b;margin-bottom:6px}.summary-card strong{font-size:20px}.report-table{width:100%;border-collapse:collapse;font-size:14px}.report-table th{height:42px;background:#eaf3ff;text-align:left;border:1px solid #d8e8fb;padding:0 10px}.report-table td{height:42px;border:1px solid #e5e7eb;padding:0 10px}.num{text-align:right}.empty{text-align:center;color:#777;padding:32px!important}@media print{.topbar,.nav-bar,.filters{display:none!important}.page{display:block;height:auto;padding:0}.title{display:none}.content{overflow:visible}.summary{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form class="page" method="GET" action="/bao-cao/ton-kho-lo">
+    <h1 class="title">Bao cao ton kho theo lo</h1>
+    <aside class="filters">
+      <div class="filter-block">
+        <div class="filter-title">Cua hang/co so</div>
+        <select class="select" name="cua_hang_id">
+          <option value="">Tat ca</option>
+          <% (report.stores || []).forEach(store => { %>
+            <option value="<%= store._id %>" <%= String(report.filters.cua_hang_id || '') === String(store._id) ? 'selected' : '' %>><%= store.ten_cua_hang %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">Kho</div>
+        <select class="select" name="kho_id">
+          <option value="">Tat ca</option>
+          <% (report.warehouses || []).forEach(kho => { %>
+            <option value="<%= kho._id %>" <%= String(report.filters.kho_id || '') === String(kho._id) ? 'selected' : '' %>><%= kho.ten_kho %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">Hang hoa</div>
+        <select class="select" name="hang_hoa_id">
+          <option value="">Tat ca</option>
+          <% (report.products || []).forEach(product => { %>
+            <option value="<%= product._id %>" <%= String(report.filters.hang_hoa_id || '') === String(product._id) ? 'selected' : '' %>><%= product.ma_hang %> - <%= product.ten_hang %></option>
+          <% }) %>
+        </select>
+      </div>
+      <button class="btn primary" type="submit">Loc</button>
+      <a class="btn" href="/bao-cao/ton-kho-lo">Bo loc</a>
+    </aside>
+    <main class="content">
+      <div class="summary">
+        <div class="summary-card"><label>Tong so luong</label><strong><%= Number(report.totals.quantity || 0).toLocaleString('vi-VN') %></strong></div>
+        <div class="summary-card"><label>Tong gia tri</label><strong><%= Number(report.totals.value || 0).toLocaleString('vi-VN') %></strong></div>
+      </div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Ma hang</th>
+            <th>Ten hang</th>
+            <th>Kho</th>
+            <th>Lo</th>
+            <th>Ngay nhap</th>
+            <th>Han su dung</th>
+            <th class="num">So luong con lai</th>
+            <th class="num">Gia von</th>
+            <th class="num">Tong gia tri</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!(report.rows || []).length) { %>
+            <tr><td class="empty" colspan="9">Khong co du lieu ton kho theo lo.</td></tr>
+          <% } %>
+          <% (report.rows || []).forEach(row => { %>
+            <tr>
+              <td><%= row.ma_hang %></td>
+              <td><%= row.ten_hang %></td>
+              <td><%= row.kho %></td>
+              <td><%= row.ma_lo %></td>
+              <td><%= row.ngay_nhap ? new Date(row.ngay_nhap).toLocaleDateString('vi-VN') : '' %></td>
+              <td><%= row.han_su_dung ? new Date(row.han_su_dung).toLocaleDateString('vi-VN') : '' %></td>
+              <td class="num"><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %></td>
+              <td class="num"><%= Number(row.gia_von || 0).toLocaleString('vi-VN') %></td>
+              <td class="num"><%= Number(row.tong_gia_tri || 0).toLocaleString('vi-VN') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </main>
+  </form>
+</body>
+</html>

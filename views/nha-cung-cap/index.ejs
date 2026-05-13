@@ -41,7 +41,7 @@
 
   <main class="admin-shell store-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
-    <% var filterQueryString = filterQueryString || buildFilterQueryString(filter); %>
+    <% filterQueryString = filterQueryString || ''; %>
 
     <div class="store-toolbar">
       <h1>Nhà cung cấp</h1>

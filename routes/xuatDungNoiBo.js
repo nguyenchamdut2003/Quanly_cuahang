@@ -8,7 +8,9 @@ const {
     HangHoa,
     CuaHang,
     NguoiDung,
-    Kho
+    Kho,
+    KhachHang,
+    NhaCungCap
 } = require('../models/kiot.model');
 const { truTonKho } = require('../services/kho.service');
 
@@ -245,18 +247,22 @@ router.get('/', async (req, res, next) => {
 
 router.get('/create', async (req, res, next) => {
     try {
-        const [products, stores, users, warehouses] = await Promise.all([
+        const [products, stores, users, warehouses, customers, suppliers] = await Promise.all([
             HangHoa.find().sort({ ten_hang: 1 }),
             CuaHang.find().sort({ ten_cua_hang: 1 }),
             NguoiDung.find().sort({ ho_ten: 1 }),
-            Kho.find({ trang_thai: 'active' }).sort({ ten_kho: 1 })
+            Kho.find({ trang_thai: 'active' }).sort({ ten_kho: 1 }),
+            KhachHang.find().sort({ ten_khach_hang: 1 }),
+            NhaCungCap.find().sort({ ten_ncc: 1 })
         ]);
         res.render('xuat-dung-noi-bo/create', {
             title: 'Xuat dung noi bo',
             products,
             stores,
             users,
-            warehouses
+            warehouses,
+            customers,
+            suppliers
         });
     } catch (error) {
         next(error);
@@ -289,6 +295,11 @@ router.post('/add', async (req, res, next) => {
         if (!items.length) {
             return res.status(400).json({ success: false, message: 'Vui long chon it nhat 1 hang hoa' });
         }
+        const finalReceiverType = ['nhan_vien', 'khach_hang', 'nha_cung_cap', 'khac'].includes(loai_nguoi_nhan) ? loai_nguoi_nhan : 'khac';
+        const finalReceiverName = String(nguoi_nhan || '').trim();
+        if (!finalReceiverName) {
+            return res.status(400).json({ success: false, message: 'Vui long chon hoac nhap nguoi nhan' });
+        }
 
         const finalStatus = trang_thai === 'completed' ? 'completed' : (trang_thai === 'cancelled' ? 'cancelled' : 'draft');
         let tongGiaTri = 0;
@@ -320,11 +331,11 @@ router.post('/add', async (req, res, next) => {
             cua_hang_id: cua_hang_id || kho.cua_hang_id,
             kho_id: kho._id,
             nguoi_tao_id: req.user?._id,
-            nguoi_nhan: nguoi_nhan || '',
-            loai_nguoi_nhan: ['nhan_vien', 'khach_hang', 'nha_cung_cap', 'khac'].includes(loai_nguoi_nhan) ? loai_nguoi_nhan : 'khac',
+            nguoi_nhan: finalReceiverName,
+            loai_nguoi_nhan: finalReceiverType,
             tong_so_luong: tongSoLuong,
             tong_gia_tri: tongGiaTri,
-            cong_don_vao_the: cong_don_vao_the === true || cong_don_vao_the === 'true',
+            cong_don_vao_the: false,
             trang_thai: finalStatus,
             ghi_chu: ghi_chu || ''
         });

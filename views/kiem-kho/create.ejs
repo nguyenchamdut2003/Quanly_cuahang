@@ -119,6 +119,7 @@
               <th width="100" style="text-align: right;">Hệ thống</th>
               <th width="100" style="text-align: right;">Thực tế</th>
               <th width="100" style="text-align: right;">Lệch</th>
+              <th width="220">Nguyên nhân lệch</th>
             </tr>
           </thead>
           <tbody id="kkBody">
@@ -303,9 +304,12 @@
               <td style="text-align: right;" class="${lech > 0 ? 'lech-positive' : (lech < 0 ? 'lech-negative' : '')}">
                 ${lech > 0 ? '+' + lech : lech}
               </td>
+              <td>
+                <input class="input-thuc-te" style="width: 100%; text-align: left;" value="${item.nguyen_nhan_lech || ''}" placeholder="${lech !== 0 ? 'Bắt buộc khi lệch' : ''}" onchange="updateReason('${item.key}', this.value)">
+              </td>
             </tr>
           `;
-        }).join('') || '<tr><td colspan="9" style="text-align:center;color:#777;padding:40px;">Chọn kho để tải hàng hóa đang có tồn.</td></tr>';
+        }).join('') || '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">Chọn kho để tải hàng hóa đang có tồn.</td></tr>';
 
         document.getElementById('totalThucTe').innerText = totalTT;
         document.getElementById('totalLech').innerText = totalL;
@@ -318,9 +322,19 @@
         renderKK();
       }
 
+      function updateReason(key, val) {
+        const item = kkItems.find(i => i.key === key);
+        if (item) item.nguyen_nhan_lech = val || '';
+      }
+
       async function saveKiemKho() {
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
         if (kkItems.length === 0) return alert('Kho không có hàng hóa còn tồn để kiểm.');
+        const missingReason = kkItems.find(item => {
+          const lech = Number(item.so_luong_thuc_te || 0) - Number(item.ton_kho_he_thong || 0);
+          return lech !== 0 && !String(item.nguyen_nhan_lech || '').trim();
+        });
+        if (missingReason) return alert('Vui lòng nhập nguyên nhân lệch cho hàng hóa có chênh lệch.');
 
         const data = {
           cua_hang_id: document.getElementById('storeId').value,

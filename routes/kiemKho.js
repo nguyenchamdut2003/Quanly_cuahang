@@ -370,6 +370,13 @@ async function saveKiemKho(req, res, next) {
                 : await TonKho.findOne({ kho_id: kho._id, hang_hoa_id: item.hang_hoa_id });
             const systemQuantity = Number(stock?.so_luong || 0);
             const difference = actualQuantity - systemQuantity;
+            const differenceReason = String(item.nguyen_nhan_lech || '').trim();
+            if (difference !== 0 && !differenceReason) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Vui long nhap nguyen nhan lech cho hang hoa co chenhlech'
+                });
+            }
 
             const cost = Number(product.gia_von) || 0;
             const differenceValue = difference * cost;
@@ -385,7 +392,7 @@ async function saveKiemKho(req, res, next) {
                 so_luong_thuc_te: actualQuantity,
                 so_luong_lech: difference,
                 gia_tri_lech: differenceValue,
-                nguyen_nhan_lech: item.nguyen_nhan_lech || ''
+                nguyen_nhan_lech: differenceReason
             });
 
             if (difference > 0) {
@@ -398,7 +405,7 @@ async function saveKiemKho(req, res, next) {
                     nguoi_tao_id: req.user?._id,
                     loai_phieu: 'kiem_kho',
                     ma_phieu: ma_kiem_kho,
-                    ghi_chu: item.nguyen_nhan_lech || ghi_chu
+                    ghi_chu: differenceReason || ghi_chu
                 });
             } else if (difference < 0) {
                 try {
@@ -410,7 +417,7 @@ async function saveKiemKho(req, res, next) {
                         nguoi_tao_id: req.user?._id,
                         loai_phieu: 'kiem_kho',
                         ma_phieu: ma_kiem_kho,
-                        ghi_chu: item.nguyen_nhan_lech || ghi_chu
+                        ghi_chu: differenceReason || ghi_chu
                     });
                 } catch (_) {
                     return res.status(400).json({ success: false, message: 'Khong du ton kho de dieu chinh kiem kho' });
