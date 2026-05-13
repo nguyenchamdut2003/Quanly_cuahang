@@ -44,13 +44,13 @@
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}
-    table{width:100%;table-layout:fixed;border-collapse:collapse}
+    table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:1200px}
     th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
     td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
     tbody tr:hover{background:#f7fbff}
     .num{text-align:right}
     .check-col,.star-col{width:36px;text-align:center}
-    .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.status-col{width:115px}
+    .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.status-col{width:115px}.vendor-col{width:200px}
     .ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}
     .status-badge.draft{background:#fff4d6;color:#9a6700}
@@ -142,7 +142,7 @@
                 <th class="star-col">☆</th>
                 <th class="code-col">Mã trả hàng nhập</th>
                 <th class="time-col">Thời gian</th>
-                <th>Nhà cung cấp</th>
+                <th class="vendor-col">Nhà cung cấp</th>
                 <th class="num money-col">Tổng tiền hàng</th>
                 <th class="num money-col">Giảm giá</th>
                 <th class="num money-col">NCC cần trả</th>

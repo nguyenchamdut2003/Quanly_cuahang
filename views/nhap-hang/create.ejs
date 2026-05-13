@@ -113,10 +113,10 @@
       <section class="purchase-left">
         <div class="purchase-top">
           <a href="/nhap-hang" class="back-link"><i class="fa-solid fa-arrow-left"></i></a>
-          <div class="purchase-title">Nháº­p hÃ ng</div>
+          <div class="purchase-title">Nhập hàng</div>
           <div class="product-search">
             <i class="fa-solid fa-magnifying-glass"></i>
-            <input id="productSearch" placeholder="TÃ¬m hÃ ng hÃ³a theo mÃ£ hoáº·c tÃªn (F3)" autocomplete="off">
+            <input id="productSearch" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)" autocomplete="off">
             <div class="search-actions"><i class="fa-solid fa-table-cells"></i><i class="fa-solid fa-plus"></i></div>
             <div id="searchResults" class="search-results"></div>
           </div>
@@ -126,22 +126,22 @@
             <thead>
               <tr>
                 <th style="width:60px;text-align:center">STT</th>
-                <th style="width:110px">MÃ£ hÃ ng</th>
-                <th>TÃªn hÃ ng</th>
-                <th style="width:80px">ÄVT</th>
-                <th class="num" style="width:120px">Sá»‘ lÆ°á»£ng</th>
-                <th class="num" style="width:130px">ÄÆ¡n giÃ¡ nháº­p</th>
-                <th class="num" style="width:150px">Giáº£m giÃ¡</th>
-                <th class="num" style="width:140px">ThÃ nh tiá»n</th>
+                <th style="width:110px">Mã hàng</th>
+                <th>Tên hàng</th>
+                <th style="width:80px">ĐVT</th>
+                <th class="num" style="width:120px">Số lượng</th>
+                <th class="num" style="width:130px">Đơn giá nhập</th>
+                <th class="num" style="width:150px">Giảm giá</th>
+                <th class="num" style="width:140px">Thành tiền</th>
                 <th style="width:42px"></th>
               </tr>
             </thead>
             <tbody id="itemsBody"></tbody>
           </table>
           <div id="emptyImport" class="empty-import">
-            <h3>ThÃªm sáº£n pháº©m tá»« file excel</h3>
-            <p>(Táº£i vá» file máº«u: <a href="#">Excel file</a>)</p>
-            <button class="file-btn" type="button"><i class="fa-regular fa-copy"></i> Chá»n file dá»¯ liá»‡u</button>
+            <h3>Thêm sản phẩm từ file excel</h3>
+            <p>(Tải về file mẫu: <a href="#">Excel file</a>)</p>
+            <button class="file-btn" type="button"><i class="fa-regular fa-copy"></i> Chọn file dữ liệu</button>
           </div>
         </div>
       </section>
@@ -156,38 +156,38 @@
           </div>
         </div>
         <div class="right-row">
-          <input class="select-like" value="<%= user && user.ho_ten ? user.ho_ten : 'NgÆ°á»i dÃ¹ng' %>" readonly>
+          <input class="select-like" value="<%= user && user.ho_ten ? user.ho_ten : 'Người dùng' %>" readonly>
           <input id="importDate" class="date-input" name="ngay_nhap_hien_thi" value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>" readonly>
         </div>
         <div class="right-row">
           <select name="kho_id" id="khoId" class="select-like" required>
-            <option value="">Chá»n kho nháº­p</option>
+            <option value="">Chọn kho nhập</option>
             <% (warehouses || []).forEach(function(w) { %>
               <option value="<%= w._id %>"><%= w.ten_kho || w.ma_kho || '---' %></option>
             <% }) %>
           </select>
         </div>
         <div class="supplier-search">
-          <input id="supplierSearch" placeholder="TÃ¬m nhÃ  cung cáº¥p" autocomplete="off">
+          <input id="supplierSearch" placeholder="Tìm nhà cung cấp" autocomplete="off">
           <i class="fa-solid fa-plus"></i>
           <div id="supplierResults" class="supplier-results"></div>
         </div>
         <section class="supplier-products">
           <div class="supplier-products-head">
-            <strong>HÃ ng hÃ³a cá»§a nhÃ  cung cáº¥p</strong>
-            <button type="button" class="btn-add-mini" id="quickAddProductBtn">+ ThÃªm hÃ ng hÃ³a</button>
+            <strong>Hàng hóa của nhà cung cấp</strong>
+            <button type="button" class="btn-add-mini" id="quickAddProductBtn">+ Thêm hàng hóa</button>
           </div>
-          <input id="supplierProductKeyword" class="supplier-products-search" placeholder="TÃ¬m hÃ ng hÃ³a cá»§a nhÃ  cung cáº¥p" autocomplete="off">
+          <input id="supplierProductKeyword" class="supplier-products-search" placeholder="Tìm hàng hóa của nhà cung cấp" autocomplete="off">
           <div id="supplierProductsList" class="supplier-products-list">
-            <div class="supplier-products-empty">Chá»n nhÃ  cung cáº¥p Ä‘á»ƒ hiá»ƒn thá»‹ hÃ ng hÃ³a.</div>
+            <div class="supplier-products-empty">Chọn nhà cung cấp để hiển thị hàng hóa.</div>
           </div>
         </section>
-        <div class="summary-line"><span>MÃ£ phiáº¿u nháº­p</span><input class="side-input" placeholder="MÃ£ phiáº¿u tá»± Ä‘á»™ng" readonly></div>
-        <div class="summary-line"><span>MÃ£ Ä‘áº·t hÃ ng nháº­p</span><span></span></div>
-        <div class="summary-line"><span>Tráº¡ng thÃ¡i</span><span>Phiáº¿u táº¡m</span></div>
-        <div class="summary-line"><span>Tá»•ng tiá»n hÃ ng <i class="fa-regular fa-circle-question"></i></span><span class="num" id="goodsTotal">0</span></div>
+        <div class="summary-line"><span>Mã phiếu nhập</span><input class="side-input" placeholder="Mã phiếu tự động" readonly></div>
+        <div class="summary-line"><span>Mã đặt hàng nhập</span><span></span></div>
+        <div class="summary-line"><span>Trạng thái</span><span>Phiếu tạm</span></div>
+        <div class="summary-line"><span>Tổng tiền hàng <i class="fa-regular fa-circle-question"></i></span><span class="num" id="goodsTotal">0</span></div>
         <div class="summary-line">
-          <span>Giáº£m giÃ¡</span>
+          <span>Giảm giá</span>
           <div class="discount-combo">
             <input id="discount" class="discount-input" name="giam_gia" value="0" oninput="renderItems()">
             <select id="discountType" class="discount-type" name="kieu_giam_gia" onchange="renderItems()">
@@ -196,39 +196,40 @@
             </select>
           </div>
         </div>
-        <div class="summary-line"><strong>Tá»•ng tiá»n</strong><span class="num payable" id="grandTotal">0</span></div>
-        <div class="summary-line"><strong>Cáº§n tráº£ nhÃ  cung cáº¥p</strong><input id="payableTotalInput" class="discount-input payable" name="can_tra_ncc_edit" value="0" oninput="renderItems()"></div>
-        <div class="summary-line"><span>PhÆ°Æ¡ng thá»©c thanh toÃ¡n</span>
+        <div class="summary-line"><strong>Tổng tiền</strong><span class="num payable" id="grandTotal">0</span></div>
+        <div class="summary-line"><strong>Cần trả nhà cung cấp</strong><input id="payableTotalInput" class="discount-input payable" name="can_tra_ncc_edit" value="0" oninput="renderItems()"></div>
+        <div class="summary-line"><span>Phương thức thanh toán</span>
           <select id="paymentMethod" class="side-input" name="phuong_thuc_thanh_toan">
-            <option value="cong_no" selected>CÃ´ng ná»£</option>
-            <option value="tien_mat">Tiá»n máº·t</option>
-            <option value="chuyen_khoan">Chuyá»ƒn khoáº£n</option>
+            <option value="cong_no" selected>Công nợ</option>
+            <option value="tien_mat">Tiền mặt</option>
+            <option value="chuyen_khoan">Chuyển khoản</option>
           </select>
-        </div>        <div class="summary-line"><span>Sá»• quá»¹</span>
+        </div>
+        <div class="summary-line"><span>Sổ quỹ</span>
           <select id="cashBookId" class="side-input" name="so_quy_id">
-            <option value="">Tá»± chá»n sá»• quá»¹</option>
+            <option value="">Tự chọn sổ quỹ</option>
             <% (cashBooks || []).forEach(function(book) { %>
-              <option value="<%= book._id %>"><%= book.ten_so_quy || book.loai || 'Sá»• quá»¹' %> - <%= Number(book.so_du || 0).toLocaleString('vi-VN') %></option>
+              <option value="<%= book._id %>"><%= book.ten_so_quy || book.loai || 'Sổ quỹ' %> - <%= Number(book.so_du || 0).toLocaleString('vi-VN') %></option>
             <% }) %>
           </select>
         </div>
         <label class="check-option" style="font-size:13px;margin:4px 0 8px">
           <input id="includeDebt" type="checkbox" name="tinh_vao_cong_no" value="1" checked>
-          TÃ­nh vÃ o cÃ´ng ná»£
+          Tính vào công nợ
         </label>
         <div class="summary-line">
-          <span>Tiá»n tráº£ nhÃ  cung cáº¥p</span>
+          <span>Tiền trả nhà cung cấp</span>
           <div class="paid-combo">
             <input id="paidToSupplier" class="discount-input" name="da_tra_ncc" value="0" oninput="renderItems()">
-            <button type="button" class="btn-pay-all" id="payAllBtn">Táº¥t cáº£</button>
+            <button type="button" class="btn-pay-all" id="payAllBtn">Tất cả</button>
           </div>
         </div>
-        <div class="summary-line"><strong>Ná»£ nhÃ  cung cáº¥p</strong><span class="num payable" id="debtToSupplier">0</span></div>
-        <textarea id="note" class="note" name="ghi_chu" placeholder="Ghi chÃº"></textarea>
+        <div class="summary-line"><strong>Nợ nhà cung cấp</strong><span class="num payable" id="debtToSupplier">0</span></div>
+        <textarea id="note" class="note" name="ghi_chu" placeholder="Ghi chú"></textarea>
         <div class="right-spacer"></div>
         <div class="bottom-actions">
-          <button class="btn-draft" type="button" id="saveDraftBtn">LÆ°u táº¡m</button>
-          <button class="btn-complete" type="button" id="completeBtn">HoÃ n thÃ nh</button>
+          <button class="btn-draft" type="button" id="saveDraftBtn">Lưu tạm</button>
+          <button class="btn-complete" type="button" id="completeBtn">Hoàn thành</button>
         </div>
       </aside>
     </main>
@@ -240,67 +241,67 @@
   <script id="nhapHangUnitsSeed" type="application/json"><%- JSON.stringify(units || []) %></script>
   <div class="quick-modal" id="quickProductModal">
     <div class="quick-modal-card">
-      <div class="quick-modal-title" id="quickModalTitle">ThÃªm hÃ ng hÃ³a nhanh</div>
+      <div class="quick-modal-title" id="quickModalTitle">Thêm hàng hóa nhanh</div>
       <div class="quick-grid">
-        <input id="qpMaHang" class="quick-input" placeholder="MÃ£ hÃ ng (Ä‘á»ƒ trá»‘ng Ä‘á»ƒ tá»± Ä‘á»™ng)">
-        <input id="qpTenHang" class="quick-input" placeholder="TÃªn hÃ ng *">
+        <input id="qpMaHang" class="quick-input" placeholder="Mã hàng (để trống để tự động)">
+        <input id="qpTenHang" class="quick-input" placeholder="Tên hàng *">
         <select id="qpDonViTinh" class="quick-input"></select>
         <select id="qpNhomHang" class="quick-input"></select>
-        <input id="qpGiaVon" class="quick-input" placeholder="GiÃ¡ vá»‘n" value="0">
-        <input id="qpGiaNhapCuoi" class="quick-input" placeholder="GiÃ¡ nháº­p cuá»‘i" value="0">
+        <input id="qpGiaVon" class="quick-input" placeholder="Giá vốn" value="0">
+        <input id="qpGiaNhapCuoi" class="quick-input" placeholder="Giá nhập cuối" value="0">
         <select id="qpLoaiGia" class="quick-input">
-          <option value="thi_truong">GiÃ¡ thá»‹ trÆ°á»ng</option>
-          <option value="co_dinh">GiÃ¡ cá»‘ Ä‘á»‹nh</option>
+          <option value="thi_truong">Giá thị trường</option>
+          <option value="co_dinh">Giá cố định</option>
         </select>
-        <input id="qpGiaCoDinh" class="quick-input" placeholder="GiÃ¡ cá»‘ Ä‘á»‹nh" value="0">
-        <label class="quick-check"><input type="checkbox" id="qpQuanLyLo"> Quáº£n lÃ½ theo lÃ´</label>
+        <input id="qpGiaCoDinh" class="quick-input" placeholder="Giá cố định" value="0">
+        <label class="quick-check"><input type="checkbox" id="qpQuanLyLo"> Quản lý theo lô</label>
         <select id="qpTrangThai" class="quick-input">
-          <option value="active">Äang kinh doanh</option>
-          <option value="inactive">NgÆ°ng kinh doanh</option>
+          <option value="active">Đang kinh doanh</option>
+          <option value="inactive">Ngưng kinh doanh</option>
         </select>
       </div>
       <div class="quick-actions">
-        <button type="button" class="btn-row" id="quickModalCancel">ÄÃ³ng</button>
-        <button type="button" class="btn-row primary" id="quickModalSave">LÆ°u</button>
+        <button type="button" class="btn-row" id="quickModalCancel">Đóng</button>
+        <button type="button" class="btn-row primary" id="quickModalSave">Lưu</button>
       </div>
     </div>
   </div>
   <div class="lot-modal" id="lotModal">
     <div class="lot-modal-card">
-      <div class="lot-modal-title">ThÃ´ng tin lÃ´ hÃ ng</div>
+      <div class="lot-modal-title">Thông tin lô hàng</div>
       <div class="lot-grid">
         <div class="lot-mode full">
-          <label><input type="radio" name="lotMode" id="lotModeNew" value="new" checked> Táº¡o lÃ´ má»›i</label>
-          <label><input type="radio" name="lotMode" id="lotModeExisting" value="existing"> Chá»n lÃ´ cÃ³ sáºµn</label>
+          <label><input type="radio" name="lotMode" id="lotModeNew" value="new" checked> Tạo lô mới</label>
+          <label><input type="radio" name="lotMode" id="lotModeExisting" value="existing"> Chọn lô có sẵn</label>
         </div>
         <select id="lotExistingId" class="lot-input full" style="display:none"></select>
-        <input id="lotMaLo" class="lot-input" placeholder="MÃ£ lÃ´ (Ä‘á»ƒ trá»‘ng tá»± Ä‘á»™ng)">
-        <input id="lotTenLo" class="lot-input" placeholder="TÃªn lÃ´">
+        <input id="lotMaLo" class="lot-input" placeholder="Mã lô (để trống tự động)">
+        <input id="lotTenLo" class="lot-input" placeholder="Tên lô">
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">NgÃ y sáº£n xuáº¥t</div>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày sản xuất</div>
           <input id="lotNgaySanXuat" type="date" class="lot-input">
         </label>
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">NgÃ y nháº­p</div>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày nhập</div>
           <input id="lotNgayNhap" type="date" class="lot-input">
         </label>
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">NgÃ y thu hoáº¡ch</div>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày thu hoạch</div>
           <input id="lotNgayThuHoach" type="date" class="lot-input">
         </label>
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">Háº¡n sá»­ dá»¥ng</div>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Hạn sử dụng</div>
           <input id="lotHanSuDung" type="date" class="lot-input">
         </label>
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">Sá»‘ lÆ°á»£ng lÃ´</div>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Số lượng lô</div>
           <input id="lotSoLuong" class="lot-input" value="1">
         </label>
-        <textarea id="lotGhiChu" class="lot-note full" placeholder="Ghi chÃº lÃ´"></textarea>
+        <textarea id="lotGhiChu" class="lot-note full" placeholder="Ghi chú lô"></textarea>
       </div>
       <div class="lot-actions">
-        <button type="button" class="btn-row" id="lotCancelBtn">ÄÃ³ng</button>
-        <button type="button" class="btn-row primary" id="lotSaveBtn">LÆ°u lÃ´</button>
+        <button type="button" class="btn-row" id="lotCancelBtn">Đóng</button>
+        <button type="button" class="btn-row primary" id="lotSaveBtn">Lưu lô</button>
       </div>
     </div>
   </div>
@@ -310,7 +311,7 @@
       _id: String(p._id),
       ma_hang: p.ma_hang || '',
       ten_hang: p.ten_hang || '',
-      don_vi_tinh: p.don_vi_tinh || 'cÃ¡i',
+      don_vi_tinh: p.don_vi_tinh || 'cái',
       gia_nhap_cuoi: Number(p.gia_nhap_cuoi || 0),
       gia_von: Number(p.gia_von || 0),
       nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id) : '',
@@ -374,7 +375,7 @@
 
     function renderProductResults(list) {
       if (!list || !list.length) {
-        searchResults.innerHTML = '<div class="search-item"><span>KhÃ´ng cÃ³ hÃ ng hÃ³a</span><span></span></div>';
+        searchResults.innerHTML = '<div class="search-item"><span>Không có hàng hóa</span><span></span></div>';
         searchResults.style.display = 'block';
         return;
       }
@@ -386,7 +387,7 @@
 
     function renderSupplierResults(list) {
       if (!list || !list.length) {
-        supplierResults.innerHTML = '<div class="search-item"><span>KhÃ´ng cÃ³ nhÃ  cung cáº¥p</span><span></span></div>';
+        supplierResults.innerHTML = '<div class="search-item"><span>Không có nhà cung cấp</span><span></span></div>';
         supplierResults.style.display = 'block';
         return;
       }
@@ -444,23 +445,23 @@
 
     function renderSupplierProducts(list) {
       if (!list || !list.length) {
-        supplierProductsList.innerHTML = '<div class="supplier-products-empty">KhÃ´ng cÃ³ hÃ ng hÃ³a phÃ¹ há»£p.</div>';
+        supplierProductsList.innerHTML = '<div class="supplier-products-empty">Không có hàng hóa phù hợp.</div>';
         return;
       }
       supplierProductsList.innerHTML = list.map(p => {
         const price = Number(p.gia_nhap_cuoi || p.gia_von || 0);
         const statusBtn = String(p.trang_thai || 'active') === 'active'
-          ? `<button type="button" class="btn-row" onclick="setInactiveProduct('${p._id}')">NgÆ°ng</button>`
-          : `<button type="button" class="btn-row" disabled>NgÆ°ng</button>`;
+          ? `<button type="button" class="btn-row" onclick="setInactiveProduct('${p._id}')">Ngưng</button>`
+          : `<button type="button" class="btn-row" disabled>Ngưng</button>`;
         return `<div class="supplier-product-row">
           <div class="supplier-product-main">
             <b>${escapeHtml(p.ma_hang || '')} - ${escapeHtml(p.ten_hang || '')}</b>
             <span>${escapeHtml(p?.don_vi_tinh_id?.ten_don_vi || '---')}</span>
           </div>
           <div class="supplier-product-price">${fmt(price)}</div>
-          <button type="button" class="btn-row primary" onclick="pickSupplierProduct('${p._id}')">Chá»n</button>
+          <button type="button" class="btn-row primary" onclick="pickSupplierProduct('${p._id}')">Chọn</button>
           <div style="display:flex;gap:4px">
-            <button type="button" class="btn-row" onclick="openQuickEditModal('${p._id}')">Sá»­a</button>
+            <button type="button" class="btn-row" onclick="openQuickEditModal('${p._id}')">Sửa</button>
             ${statusBtn}
           </div>
         </div>`;
@@ -516,7 +517,7 @@
           _id: String(p._id),
           ma_hang: p.ma_hang || '',
           ten_hang: p.ten_hang || '',
-          don_vi_tinh: p.don_vi_tinh || 'cÃ¡i',
+          don_vi_tinh: p.don_vi_tinh || 'cái',
           gia_nhap_cuoi: Number(p.gia_nhap_cuoi || 0),
           gia_von: Number(p.gia_von || 0),
           nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id) : '',
@@ -613,7 +614,7 @@
 
     function openQuickModal(type, product) {
       quickEditId = type === 'edit' && product ? String(product._id) : '';
-      document.getElementById('quickModalTitle').textContent = type === 'edit' ? 'Sá»­a hÃ ng hÃ³a nhanh' : 'ThÃªm hÃ ng hÃ³a nhanh';
+      document.getElementById('quickModalTitle').textContent = type === 'edit' ? 'Sửa hàng hóa nhanh' : 'Thêm hàng hóa nhanh';
       document.getElementById('qpMaHang').value = type === 'edit' ? (product.ma_hang || '') : '';
       document.getElementById('qpTenHang').value = type === 'edit' ? (product.ten_hang || '') : '';
       document.getElementById('qpDonViTinh').value = type === 'edit' ? String(product?.don_vi_tinh_id?._id || product?.don_vi_tinh_id || '') : '';
@@ -629,7 +630,7 @@
 
     function openQuickAddModal() {
       if (!supplierIdInput.value) {
-        alert('Vui lÃ²ng chá»n nhÃ  cung cáº¥p trÆ°á»›c');
+        alert('Vui lòng chọn nhà cung cấp trước');
         return;
       }
       openQuickModal('create', null);
@@ -656,7 +657,7 @@
         nha_cung_cap_id: supplierIdInput.value
       };
       if (!payload.ten_hang) {
-        alert('TÃªn hÃ ng lÃ  báº¯t buá»™c');
+        alert('Tên hàng là bắt buộc');
         return;
       }
       const isEdit = Boolean(quickEditId);
@@ -668,7 +669,7 @@
       });
       const json = await res.json();
       if (!json || !json.success) {
-        alert(json && json.message ? json.message : 'KhÃ´ng thá»ƒ lÆ°u hÃ ng hÃ³a');
+        alert(json && json.message ? json.message : 'Không thể lưu hàng hóa');
         return;
       }
       quickProductModal.classList.remove('open');
@@ -679,14 +680,14 @@
     }
 
     async function setInactiveProduct(id) {
-      if (!confirm('NgÆ°ng kinh doanh hÃ ng hÃ³a nÃ y?')) return;
+      if (!confirm('Ngưng kinh doanh hàng hóa này?')) return;
       const res = await fetch(`/api/hang-hoa/${id}/inactive`, {
         method: 'POST',
         headers: { 'Accept': 'application/json' }
       });
       const json = await res.json();
       if (!json || !json.success) {
-        alert((json && json.message) || 'KhÃ´ng thá»ƒ ngÆ°ng hÃ ng hÃ³a');
+        alert((json && json.message) || 'Không thể ngưng hàng hóa');
         return;
       }
       await fetchSupplierProducts(supplierProductKeyword.value.trim());
@@ -722,9 +723,9 @@
           <td></td>
           <td colspan="8">
             <div class="lot-line">
-              <span>Nháº­p lÃ´, háº¡n sá»­ dá»¥ng</span>
-              <a class="lot-link" onclick="openLotModal('${item.hang_hoa_id}')">Chá»n lÃ´</a>
-              <span>${item.lo_info ? `LÃ´: ${escapeHtml(item.lo_info.ten_lo || item.lo_info.ma_lo || '---')} - HSD: ${escapeHtml(formatDateVi(item.lo_info.han_su_dung))} - SL: ${fmt(item.lo_info.so_luong_lo || 0)}` : 'ChÆ°a chá»n lÃ´'}</span>
+              <span>Nhập lô, hạn sử dụng</span>
+              <a class="lot-link" onclick="openLotModal('${item.hang_hoa_id}')">Chọn lô</a>
+              <span>${item.lo_info ? `Lô: ${escapeHtml(item.lo_info.ten_lo || item.lo_info.ma_lo || '---')} - HSD: ${escapeHtml(formatDateVi(item.lo_info.han_su_dung))} - SL: ${fmt(item.lo_info.so_luong_lo || 0)}` : 'Chưa chọn lô'}</span>
             </div>
           </td>
         </tr>` : '');
@@ -769,8 +770,8 @@
       }
       if (cashBookIdInput) cashBookIdInput.disabled = method === 'cong_no';
       if (payAllBtn) {
-        payAllBtn.textContent = 'Táº¥t cáº£';
-        payAllBtn.title = 'Tráº£ Ä‘á»§';
+        payAllBtn.textContent = 'Tất cả';
+        payAllBtn.title = 'Trả đủ';
       }
       document.getElementById('emptyImport').style.display = selectedItems.length ? 'none' : 'flex';
       itemsJsonInput.value = JSON.stringify(selectedItems.map(item => ({
@@ -835,7 +836,7 @@
 
     async function loadLotsForItem(itemId, selectedLotId) {
       if (!lotExistingId) return;
-      lotExistingId.innerHTML = '<option value="">Chá»n lÃ´ cÃ³ sáºµn</option>';
+      lotExistingId.innerHTML = '<option value="">Chọn lô có sẵn</option>';
       const params = new URLSearchParams();
       const khoId = document.getElementById('khoId') ? document.getElementById('khoId').value : '';
       if (khoId) params.set('kho_id', khoId);
@@ -843,7 +844,7 @@
         const res = await fetch(`/api/hang-hoa/${itemId}/lo-hang` + (params.toString() ? `?${params.toString()}` : ''));
         const json = await res.json();
         const lots = json && json.success && Array.isArray(json.items) ? json.items : [];
-        lotExistingId.innerHTML += lots.map(lot => `<option value="${lot._id}" ${String(lot._id) === String(selectedLotId || '') ? 'selected' : ''}>${escapeHtml(lot.ma_lo || lot.ten_lo || 'LÃ´')} - Tồn ${fmt(lot.so_luong_con_lai || 0)} - HSD ${escapeHtml(formatDateVi(lot.han_su_dung))}</option>`).join('');
+        lotExistingId.innerHTML += lots.map(lot => `<option value="${lot._id}" ${String(lot._id) === String(selectedLotId || '') ? 'selected' : ''}>${escapeHtml(lot.ma_lo || lot.ten_lo || 'Lô')} - Tồn ${fmt(lot.so_luong_con_lai || 0)} - HSD ${escapeHtml(formatDateVi(lot.han_su_dung))}</option>`).join('');
       } catch (_) {}
     }
 
@@ -859,7 +860,7 @@
       if (lotModeNew) lotModeNew.checked = !Boolean(lo.lo_hang_id);
       await loadLotsForItem(itemId, lo.lo_hang_id);
       document.getElementById('lotMaLo').value = lo.ma_lo || '';
-      document.getElementById('lotTenLo').value = lo.ten_lo || `LÃ´ ${formatDateVi(currentNgayNhap || today)}`;
+      document.getElementById('lotTenLo').value = lo.ten_lo || `Lô ${formatDateVi(currentNgayNhap || today)}`;
       document.getElementById('lotNgaySanXuat').value = lo.ngay_san_xuat || '';
       document.getElementById('lotNgayNhap').value = lo.ngay_nhap || currentNgayNhap || today;
       document.getElementById('lotNgayThuHoach').value = lo.ngay_thu_hoach || '';
@@ -876,16 +877,16 @@
       const soLuongDong = Math.max(1, numeric(item.so_luong || 1));
       const soLuongLo = Math.max(0, numeric(document.getElementById('lotSoLuong').value));
       if (soLuongLo > soLuongDong) {
-        alert('Sá»‘ lÆ°á»£ng lÃ´ khÃ´ng Ä‘Æ°á»£c lá»›n hÆ¡n sá»‘ lÆ°á»£ng dÃ²ng hÃ ng');
+        alert('Số lượng lô không được lớn hơn số lượng dòng hàng');
         return;
       }
       if (soLuongLo !== soLuongDong) {
-        alert('Sá»‘ lÆ°á»£ng lÃ´ pháº£i báº±ng sá»‘ lÆ°á»£ng dÃ²ng hÃ ng');
+        alert('Số lượng lô phải bằng số lượng dòng hàng');
         return;
       }
       if (lotModeExisting && lotModeExisting.checked) {
         if (!lotExistingId.value) {
-          alert('Vui lÃ²ng chá»n lÃ´ cÃ³ sáºµn hoáº·c chuyá»ƒn sang táº¡o lÃ´ má»›i');
+          alert('Vui lòng chọn lô có sẵn hoặc chuyển sang tạo lô mới');
           return;
         }
         const text = lotExistingId.options[lotExistingId.selectedIndex] ? lotExistingId.options[lotExistingId.selectedIndex].text : '';
@@ -926,7 +927,7 @@
         return soLuongLo <= 0 || soLuongLo > numeric(item.so_luong || 0);
       });
       if (invalidLotItem) {
-        alert('HÃ ng quáº£n lÃ½ theo lÃ´ cáº§n cÃ³ thÃ´ng tin lÃ´ há»£p lá»‡ trÆ°á»›c khi HoÃ n thÃ nh.');
+        alert('Hàng quản lý theo lô cần có thông tin lô hợp lệ trước khi Hoàn thành.');
         return;
       }
       submitModeInput.value = 'completed';
@@ -984,8 +985,8 @@
 
     const unitSelect = document.getElementById('qpDonViTinh');
     const groupSelect = document.getElementById('qpNhomHang');
-    unitSelect.innerHTML = `<option value="">ÄÆ¡n vá»‹ tÃ­nh</option>` + units.map(u => `<option value="${u._id}">${escapeHtml(u.ten_don_vi)}</option>`).join('');
-    groupSelect.innerHTML = `<option value="">NhÃ³m hÃ ng</option>` + groups.map(g => `<option value="${g._id}">${escapeHtml(g.ten_nhom)}</option>`).join('');
+    unitSelect.innerHTML = `<option value="">Đơn vị tính</option>` + units.map(u => `<option value="${u._id}">${escapeHtml(u.ten_don_vi)}</option>`).join('');
+    groupSelect.innerHTML = `<option value="">Nhóm hàng</option>` + groups.map(g => `<option value="${g._id}">${escapeHtml(g.ten_nhom)}</option>`).join('');
 
     document.addEventListener('click', e => {
       if (!productSearch.parentElement.contains(e.target)) searchResults.style.display = 'none';

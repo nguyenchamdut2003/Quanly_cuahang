@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const ExcelJS = require('exceljs');
 const { isAuthenticated } = require('../middlewares/auth.middleware');
@@ -1668,7 +1668,7 @@ router.get('/export.xlsx', async (req, res, next) => {
 router.get('/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
-            return res.status(404).send('Không tìm thấy đơn hàng');
+            return next();
         }
         const { orders, detailMap, shipmentMap } = await loadOrderExportData({ _id: req.params.id });
         if (!orders.length) return res.status(404).send('Không tìm thấy đơn hàng');
