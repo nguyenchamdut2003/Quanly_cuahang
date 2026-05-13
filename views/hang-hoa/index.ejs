@@ -194,18 +194,18 @@
  
            <section class="customer-filter-section">
              <h4>Bảng giá</h4>
-             <div style="max-height:160px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;display:flex;flex-direction:column;gap:6px">
-               <% (bangGiaList || []).forEach(function(bg) { %>
-                 <% var isChecked = (filter.bangGiaIds || []).indexOf(String(bg._id)) >= 0; %>
-                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
-                   <input type="checkbox" name="bangGia" value="<%= bg._id %>" <%= isChecked ? 'checked' : '' %>>
-                   <span><%= bg.ten_bang_gia %></span>
-                 </label>
-               <% }) %>
-               <% if (!bangGiaList || bangGiaList.length === 0) { %>
-                 <span style="font-size:12px;color:#64748b">Không có bảng giá hoạt động.</span>
-               <% } %>
-             </div>
+            <div class="filter-check-list">
+              <% (bangGiaList || []).forEach(function(bg) { %>
+                <% var isChecked = (filter.bangGiaIds || []).indexOf(String(bg._id)) >= 0; %>
+                <label class="filter-check-item <%= isChecked ? 'is-checked' : '' %>">
+                  <input type="checkbox" name="bangGia" value="<%= bg._id %>" <%= isChecked ? 'checked' : '' %> onchange="this.parentElement.classList.toggle('is-checked', this.checked)">
+                  <span class="filter-check-label"><%= bg.ten_bang_gia %></span>
+                </label>
+              <% }) %>
+              <% if (!bangGiaList || bangGiaList.length === 0) { %>
+                <span style="font-size:12px;color:#64748b;padding:4px 12px">Không có bảng giá hoạt động.</span>
+              <% } %>
+            </div>
            </section>
 
           <section class="customer-filter-section">
