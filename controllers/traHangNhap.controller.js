@@ -14,9 +14,11 @@ const {
   CTPhieuNhap,
   PhieuTraHangNhap,
   CTPhieuTraHangNhap,
-  CongNoNhaCungCap
+  CongNoNhaCungCap,
+  SoQuy,
+  PhieuThuChi
 } = require('../models/kiot.model');
-const { truTonKho } = require('../services/kho.service');
+const { truTonKho, congTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
 
 const RETURN_IMPORT_STATUS_MAP = {
@@ -90,6 +92,7 @@ function parseItems(raw) {
     lo_hang_id: String(item.lo_hang_id || '').trim(),
     phieu_nhap_id: String(item.phieu_nhap_id || '').trim(),
     ct_phieu_nhap_id: String(item.ct_phieu_nhap_id || '').trim(),
+    gia_tri_thuoc_tinh_id: String(item.gia_tri_thuoc_tinh_id || '').trim(),
     so_luong: Number(item.so_luong || 0),
     gia_nhap: parseMoney(item.gia_nhap || item.don_gia || item.don_gia_nhap || 0),
     gia_tra_lai: parseMoney(item.gia_tra_lai || item.don_gia || item.don_gia_nhap || 0),
@@ -406,7 +409,8 @@ async function loadCreateData(storeId) {
 }
 
 async function validateReturnItems(params) {
-  const { items, storeId, khoId, phieuNhapId, returnId } = params;
+  const { items, storeId, khoId, phieuNhapId, returnId, ignorePhieuTraNhapIds } = params;
+  const ignoreSet = new Set((ignorePhieuTraNhapIds || []).filter(id => isObjectId(id)).map(id => String(id)));
   if (!items.length) throw new Error('Vui lòng chọn ít nhất một hàng hóa cần trả');
   if (!isObjectId(khoId)) throw new Error('Vui lòng chọn kho trả hàng');
 
@@ -467,6 +471,7 @@ async function validateReturnItems(params) {
       ct_phieu_nhap_id: isObjectId(item.ct_phieu_nhap_id) ? item.ct_phieu_nhap_id : undefined,
       hang_hoa_id: item.hang_hoa_id,
       lo_hang_id: lotId || undefined,
+      gia_tri_thuoc_tinh_id: isObjectId(item.gia_tri_thuoc_tinh_id) ? item.gia_tri_thuoc_tinh_id : undefined,
       don_vi_tinh_id: product.don_vi_tinh_id || undefined,
       so_luong: item.so_luong,
       don_gia: item.gia_tra_lai,
@@ -480,7 +485,11 @@ async function validateReturnItems(params) {
   if (isObjectId(phieuNhapId)) {
     const purchaseDetails = await CTPhieuNhap.find({ phieu_nhap_id: phieuNhapId }).lean();
     const currentReturnFilter = { phieu_nhap_id: phieuNhapId };
-    if (returnId && isObjectId(returnId)) currentReturnFilter.phieu_tra_nhap_id = { $ne: returnId };
+    if (ignoreSet.size) {
+      currentReturnFilter.phieu_tra_nhap_id = { $nin: Array.from(ignoreSet) };
+    } else if (returnId && isObjectId(returnId)) {
+      currentReturnFilter.phieu_tra_nhap_id = { $ne: returnId };
+    }
     const completedReturns = await CTPhieuTraHangNhap.find(currentReturnFilter)
       .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
       .lean();
@@ -496,6 +505,8 @@ async function validateReturnItems(params) {
     const returned = {};
     const returnedByProduct = {};
     completedReturns.forEach(row => {
+      const ptId0 = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
+      if (ptId0 && ignoreSet.has(String(ptId0))) return;
       if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
       const key = String(row.hang_hoa_id) + ':' + String(row.lo_hang_id || '');
       returned[key] = (returned[key] || 0) + Number(row.so_luong || 0);
@@ -531,6 +542,8 @@ async function validateReturnItems(params) {
     }, {});
     const returnedByDetail = {};
     completedReturns.forEach(row => {
+      const ptId2 = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
+      if (ptId2 && ignoreSet.has(String(ptId2))) return;
       if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
       if (!row.ct_phieu_nhap_id) return;
       const key = String(row.ct_phieu_nhap_id);
@@ -634,6 +647,126 @@ async function createSupplierRefundReceipt(returnDoc, userId) {
   });
 }
 
+/** Hoàn tác tồn kho, công nợ, phiếu thu khi hủy phiếu đã hoàn thành */
+async function rollbackReturnImportEffects(returnDoc, userId) {
+  if (!returnDoc || String(returnDoc.trang_thai) !== 'completed') return;
+  const rows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: returnDoc._id }).lean();
+  for (const row of rows) {
+    await congTonKho({
+      kho_id: returnDoc.kho_id,
+      hang_hoa_id: row.hang_hoa_id,
+      lo_hang_id: row.lo_hang_id,
+      so_luong: row.so_luong,
+      gia_von: row.gia_tra_lai || row.gia_nhap || row.don_gia || 0,
+      nguoi_tao_id: userId,
+      loai_phieu: 'dieu_chinh',
+      ma_phieu: String(returnDoc.ma_phieu_tra_nhap || ''),
+      ghi_chu: 'Hoàn tồn kho — hủy phiếu trả hàng nhập'
+    });
+  }
+
+  const receipts = await PhieuThuChi.find({ phieu_tra_hang_nhap_id: returnDoc._id }).lean();
+  for (const rec of receipts) {
+    const linked = await CongNoNhaCungCap.find({ phieu_thu_chi_id: rec._id }).lean();
+    for (const c of linked) {
+      if (!c.nha_cung_cap_id) continue;
+      const st = Number(c.so_tien || 0);
+      if (c.loai === 'giam_no') {
+        await NhaCungCap.updateOne({ _id: c.nha_cung_cap_id }, { $inc: { tong_no: st } });
+      } else if (c.loai === 'thanh_toan') {
+        await NhaCungCap.updateOne({ _id: c.nha_cung_cap_id }, { $inc: { tong_no: -st } });
+      }
+    }
+    await CongNoNhaCungCap.deleteMany({ phieu_thu_chi_id: rec._id });
+    const amt = Number(rec.gia_tri || 0);
+    if (rec.loai_phieu === 'thu' && rec.so_quy_id && amt > 0) {
+      await SoQuy.findByIdAndUpdate(rec.so_quy_id, { $inc: { so_du: -amt } });
+    }
+    await PhieuThuChi.findByIdAndDelete(rec._id);
+  }
+
+  const standalone = await CongNoNhaCungCap.find({
+    phieu_tra_nhap_id: returnDoc._id,
+    $or: [{ phieu_thu_chi_id: { $exists: false } }, { phieu_thu_chi_id: null }]
+  }).lean();
+  for (const c of standalone) {
+    if (c.loai === 'giam_no' && c.nha_cung_cap_id) {
+      await NhaCungCap.updateOne({ _id: c.nha_cung_cap_id }, { $inc: { tong_no: Number(c.so_tien || 0) } });
+    }
+  }
+  await CongNoNhaCungCap.deleteMany({
+    phieu_tra_nhap_id: returnDoc._id,
+    $or: [{ phieu_thu_chi_id: { $exists: false } }, { phieu_thu_chi_id: null }]
+  });
+}
+
+function slugReturnExportFilename(ma) {
+  var s = String(ma || 'phieu').trim().replace(/[/\\?%*:|"<>]/g, '-').replace(/\s+/g, '-');
+  s = s.replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return s || 'phieu';
+}
+
+async function sendSingleReturnDetailWorkbook(res, ticket, details) {
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet('Chi tiết');
+  var rowIdx = 1;
+  function addPair(label, value) {
+    ws.getCell(rowIdx, 1).value = label;
+    ws.getCell(rowIdx, 2).value = value == null ? '' : value;
+    rowIdx += 1;
+  }
+  addPair('Mã phiếu trả hàng nhập', ticket.ma_phieu_tra_nhap || '');
+  addPair('Trạng thái', RETURN_IMPORT_STATUS_MAP[ticket.trang_thai] || ticket.trang_thai || '');
+  addPair('Ngày trả', formatExportDate(ticket.ngay_tra || ticket.created_at));
+  addPair('Nhà cung cấp', ticket.nha_cung_cap_id ? (ticket.nha_cung_cap_id.ten_ncc || ticket.nha_cung_cap_id.ma_ncc || '') : '');
+  addPair('Kho', ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '');
+  addPair('Phiếu nhập gốc', ticket.phieu_nhap_id ? (ticket.phieu_nhap_id.ma_phieu_nhap || '') : '');
+  addPair('Người tạo', getUserName(ticket.nguoi_tao_id));
+  addPair('Người trả', getUserName(ticket.nguoi_tra_id));
+  addPair('Lý do', ticket.ly_do || '');
+  addPair('Ghi chú', ticket.ghi_chu || '');
+  rowIdx += 1;
+  addPair('--- Chi tiết hàng ---', '');
+  var hdr = ['Mã hàng', 'Tên hàng', 'Lô', 'Số lượng', 'Đơn giá', 'Giá nhập', 'Giá trả lại', 'Thành tiền', 'Ghi chú dòng'];
+  hdr.forEach(function(h, i) {
+    ws.getCell(rowIdx, i + 1).value = h;
+  });
+  rowIdx += 1;
+  (details || []).forEach(function(d) {
+    var p = d.hang_hoa_id || {};
+    var lot = d.lo_hang_id || {};
+    ws.getCell(rowIdx, 1).value = p.ma_hang || '';
+    ws.getCell(rowIdx, 2).value = p.ten_hang || '';
+    ws.getCell(rowIdx, 3).value = getLotName(lot);
+    ws.getCell(rowIdx, 4).value = Number(d.so_luong || 0);
+    ws.getCell(rowIdx, 5).value = Number(d.don_gia || 0);
+    ws.getCell(rowIdx, 6).value = Number(d.gia_nhap || 0);
+    ws.getCell(rowIdx, 7).value = Number(d.gia_tra_lai || 0);
+    ws.getCell(rowIdx, 8).value = Number(d.thanh_tien || 0);
+    ws.getCell(rowIdx, 9).value = d.ghi_chu || '';
+    rowIdx += 1;
+  });
+  rowIdx += 1;
+  addPair('Số lượng mặt hàng', details ? details.length : 0);
+  addPair('Tổng tiền hàng', Number(ticket.tong_tien_hang || 0));
+  addPair('Giảm giá', ticket.kieu_giam_gia === 'percent' ? String(ticket.giam_gia || 0) + '%' : Number(ticket.giam_gia || 0));
+  addPair('NCC cần trả', Number(ticket.ncc_can_tra || 0));
+  addPair('NCC đã trả', Number(ticket.ncc_da_tra || 0));
+  addPair('Tổng tiền trả', Number(ticket.tong_tien_tra || 0));
+
+  ws.getColumn(1).width = 22;
+  ws.getColumn(2).width = 36;
+  for (var c = 1; c <= 9; c++) {
+    ws.getColumn(c).width = Math.max(ws.getColumn(c).width || 12, 14);
+  }
+
+  var fname = 'phieu-tra-hang-nhap-' + slugReturnExportFilename(ticket.ma_phieu_tra_nhap) + '.xlsx';
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="' + fname + '"');
+  await workbook.xlsx.write(res);
+  res.end();
+}
+
 exports.index = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
@@ -694,10 +827,22 @@ exports.createPage = async function(req, res, next) {
     const storeId = await resolveStoreId(req);
     const data = await loadCreateData(storeId);
     const nextCode = await makeReturnCode();
-    const selectedPurchaseId = String(req.query?.phieu_nhap_id || '').trim();
-    const selectedPurchase = isObjectId(selectedPurchaseId)
+    const copyFromId = String(req.query?.copy_from || '').trim();
+    let copyDraft = null;
+    let copyFromError = '';
+    if (isObjectId(copyFromId)) {
+      copyDraft = await loadReturnCopyDraft(req, storeId, copyFromId);
+      if (!copyDraft) {
+        copyFromError = 'Không tải được phiếu để sao chép, phiếu không có chi tiết, hoặc thiếu kho.';
+      }
+    }
+    const selectedPurchaseId = copyDraft && copyDraft.phieu_nhap_id
+      ? String(copyDraft.phieu_nhap_id)
+      : String(req.query?.phieu_nhap_id || '').trim();
+    const selectedPurchase = !copyDraft && isObjectId(selectedPurchaseId)
       ? await PhieuNhap.findById(selectedPurchaseId).select('_id kho_id nha_cung_cap_id').lean()
       : null;
+    const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
     res.render('tra-hang-nhap/create', {
       title: 'Trả hàng nhập',
       activeMenu: 'mua-hang',
@@ -709,14 +854,271 @@ exports.createPage = async function(req, res, next) {
       users: data.users,
       productsJson: JSON.stringify(data.productOptions),
       receipts: data.receipts,
-      selectedPurchaseId: selectedPurchase ? String(selectedPurchase._id) : '',
-      selectedPurchaseKhoId: selectedPurchase ? String(selectedPurchase.kho_id || '') : '',
-      selectedPurchaseSupplierId: selectedPurchase ? String(selectedPurchase.nha_cung_cap_id || '') : ''
+      selectedPurchaseId: copyDraft && copyDraft.phieu_nhap_id ? String(copyDraft.phieu_nhap_id) : (selectedPurchase ? String(selectedPurchase._id) : ''),
+      selectedPurchaseKhoId: copyDraft && copyDraft.kho_id ? String(copyDraft.kho_id) : (selectedPurchase ? String(selectedPurchase.kho_id || '') : ''),
+      selectedPurchaseSupplierId: copyDraft && copyDraft.nha_cung_cap && copyDraft.nha_cung_cap._id
+        ? String(copyDraft.nha_cung_cap._id)
+        : (selectedPurchase ? String(selectedPurchase.nha_cung_cap_id || '') : ''),
+      copyDraftJson,
+      copyFromError
     });
   } catch (error) {
     next(error);
   }
 };
+
+async function buildPurchaseReturnGridItems(purchase, storeId, requestedKhoId, options = {}) {
+  void storeId;
+  void requestedKhoId;
+  const ignoreReturnIds = new Set((options.ignorePhieuTraNhapIds || []).filter(id => isObjectId(id)).map(id => String(id)));
+  const details = await CTPhieuNhap.find({ phieu_nhap_id: purchase._id })
+    .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang don_vi_tinh_id quan_ly_theo_lo' })
+    .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
+    .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo so_luong_con_lai han_su_dung' })
+    .populate({ path: 'gia_tri_thuoc_tinh_id', select: 'ten_gia_tri ma_gia_tri' })
+    .sort({ created_at: 1 })
+    .lean();
+
+  const returnRows = await CTPhieuTraHangNhap.find({ phieu_nhap_id: purchase._id })
+    .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
+    .lean();
+  const returnedByDetail = {};
+  returnRows.forEach(row => {
+    if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
+    const retId = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
+    if (retId && ignoreReturnIds.has(String(retId))) return;
+    if (!row.ct_phieu_nhap_id) return;
+    const key = String(row.ct_phieu_nhap_id);
+    returnedByDetail[key] = (returnedByDetail[key] || 0) + Number(row.so_luong || 0);
+  });
+
+  const khoRef = purchase.kho_id && purchase.kho_id._id ? purchase.kho_id._id : purchase.kho_id;
+  const inventoryRows = await TonKho.find({
+    kho_id: khoRef,
+    hang_hoa_id: { $in: details.map(r => r.hang_hoa_id && r.hang_hoa_id._id).filter(Boolean) }
+  }).lean();
+  const inventoryByProduct = inventoryRows.reduce((map, row) => {
+    map[String(row.hang_hoa_id)] = Number(row.so_luong || 0);
+    return map;
+  }, {});
+
+  const lotIds = details.map(row => row.lo_hang_id && row.lo_hang_id._id).filter(Boolean);
+  const lotInventoryRows = lotIds.length
+    ? await TonKhoLo.find({ kho_id: khoRef, lo_hang_id: { $in: lotIds } }).lean()
+    : [];
+  const inventoryByLot = lotInventoryRows.reduce((map, row) => {
+    map[String(row.lo_hang_id)] = Number(row.so_luong || 0);
+    return map;
+  }, {});
+
+  return details.map(row => {
+    const detailId = String(row._id);
+    const importedQty = Number(row.so_luong || 0);
+    const returnedQty = Number(returnedByDetail[detailId] || 0);
+    const canReturnByPurchase = Math.max(0, importedQty - returnedQty);
+    const productId = row.hang_hoa_id && row.hang_hoa_id._id ? String(row.hang_hoa_id._id) : String(row.hang_hoa_id || '');
+    const lotId = row.lo_hang_id && row.lo_hang_id._id ? String(row.lo_hang_id._id) : '';
+    const currentStock = lotId
+      ? Number(inventoryByLot[lotId] || 0)
+      : Number(inventoryByProduct[productId] || 0);
+    let tenHang = row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '';
+    let giaTriThuocTinhId = '';
+    if (row.gia_tri_thuoc_tinh_id) {
+      const g = row.gia_tri_thuoc_tinh_id;
+      giaTriThuocTinhId = g._id ? String(g._id) : String(row.gia_tri_thuoc_tinh_id);
+      const gl = (g.ten_gia_tri || g.ma_gia_tri || '').trim();
+      if (gl) tenHang = tenHang ? `${tenHang} · ${gl}` : gl;
+    }
+    return {
+      ct_phieu_nhap_id: detailId,
+      phieu_nhap_id: String(purchase._id),
+      hang_hoa_id: productId,
+      ma_hang: row.hang_hoa_id ? (row.hang_hoa_id.ma_hang || '') : '',
+      ten_hang: tenHang,
+      gia_tri_thuoc_tinh_id: giaTriThuocTinhId,
+      don_vi_tinh_id: row.don_vi_tinh_id ? String(row.don_vi_tinh_id._id || row.don_vi_tinh_id) : '',
+      don_vi_tinh: row.don_vi_tinh_id ? (row.don_vi_tinh_id.ten_don_vi || row.don_vi_tinh_id.ma_don_vi || '') : '',
+      quan_ly_theo_lo: Boolean(row.hang_hoa_id && row.hang_hoa_id.quan_ly_theo_lo),
+      lo_hang_id: lotId,
+      ma_lo: row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '',
+      ten_lo: row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : '',
+      so_luong_nhap: importedQty,
+      tong_so_luong_da_tra: returnedQty,
+      so_luong_con_co_the_tra: canReturnByPurchase,
+      ton_kho_hien_tai: currentStock,
+      so_luong_toi_da_tra: Math.min(canReturnByPurchase, currentStock),
+      so_luong: 0,
+      gia_nhap: Number(row.don_gia_nhap || row.don_gia || 0),
+      gia_tra_lai: Number(row.don_gia_nhap || row.don_gia || 0),
+      thanh_tien: 0,
+      ghi_chu: ''
+    };
+  });
+}
+
+async function buildGridItemFromReturnLine(line, khoId, storeId) {
+  void storeId;
+  const hangId = line.hang_hoa_id && line.hang_hoa_id._id ? String(line.hang_hoa_id._id) : String(line.hang_hoa_id || '');
+  if (!isObjectId(hangId) || !isObjectId(khoId)) return null;
+  const product = line.hang_hoa_id && line.hang_hoa_id._id
+    ? line.hang_hoa_id
+    : await HangHoa.findById(hangId).select('ma_hang ten_hang don_vi_tinh_id quan_ly_theo_lo').lean();
+  if (!product) return null;
+
+  let tenHang = product.ten_hang || '';
+  let giaTriId = '';
+  if (line.ct_phieu_nhap_id) {
+    const ctPn = await CTPhieuNhap.findById(line.ct_phieu_nhap_id)
+      .populate({ path: 'gia_tri_thuoc_tinh_id', select: 'ten_gia_tri ma_gia_tri' })
+      .lean();
+    if (ctPn && ctPn.gia_tri_thuoc_tinh_id) {
+      const g = ctPn.gia_tri_thuoc_tinh_id;
+      giaTriId = g._id ? String(g._id) : String(ctPn.gia_tri_thuoc_tinh_id);
+      const gl = (g.ten_gia_tri || g.ma_gia_tri || '').trim();
+      if (gl) tenHang = tenHang ? `${tenHang} · ${gl}` : gl;
+    }
+  }
+
+  const lotId = line.lo_hang_id && line.lo_hang_id._id ? String(line.lo_hang_id._id) : (line.lo_hang_id ? String(line.lo_hang_id) : '');
+  const inv = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: hangId }).lean();
+  const ton = Number(inv && inv.so_luong || 0);
+  let tonLo = ton;
+  if (product.quan_ly_theo_lo && lotId) {
+    const tl = await TonKhoLo.findOne({ kho_id: khoId, hang_hoa_id: hangId, lo_hang_id: lotId }).lean();
+    tonLo = Number(tl && tl.so_luong || 0);
+  }
+
+  let donViTinh = '';
+  let donViId = '';
+  if (line.don_vi_tinh_id && line.don_vi_tinh_id._id) {
+    donViId = String(line.don_vi_tinh_id._id);
+    donViTinh = line.don_vi_tinh_id.ten_don_vi || line.don_vi_tinh_id.ma_don_vi || '';
+  } else if (product.don_vi_tinh_id) {
+    donViId = String(product.don_vi_tinh_id);
+    const u = await DonViTinh.findById(product.don_vi_tinh_id).select('ma_don_vi ten_don_vi').lean();
+    if (u) donViTinh = u.ten_don_vi || u.ma_don_vi || '';
+  }
+
+  return {
+    ct_phieu_nhap_id: line.ct_phieu_nhap_id ? String(line.ct_phieu_nhap_id) : '',
+    phieu_nhap_id: line.phieu_nhap_id ? String(line.phieu_nhap_id) : '',
+    hang_hoa_id: hangId,
+    ma_hang: product.ma_hang || '',
+    ten_hang: tenHang,
+    don_vi_tinh_id: donViId,
+    don_vi_tinh: donViTinh,
+    quan_ly_theo_lo: Boolean(product.quan_ly_theo_lo),
+    lo_hang_id: lotId,
+    ma_lo: line.lo_hang_id ? (line.lo_hang_id.ma_lo || line.lo_hang_id.ten_lo || '') : '',
+    ten_lo: line.lo_hang_id ? (line.lo_hang_id.ten_lo || '') : '',
+    gia_tri_thuoc_tinh_id: giaTriId,
+    so_luong_nhap: 0,
+    tong_so_luong_da_tra: 0,
+    so_luong_con_co_the_tra: tonLo,
+    ton_kho_hien_tai: tonLo,
+    so_luong_toi_da_tra: tonLo,
+    so_luong: 0,
+    gia_nhap: Number(line.gia_nhap || 0),
+    gia_tra_lai: Number(line.gia_tra_lai || line.don_gia || 0),
+    ghi_chu: String(line.ghi_chu || '').trim(),
+    thanh_tien: 0
+  };
+}
+
+async function buildReturnLinesOnlyGridItems(lines, khoId) {
+  if (!isObjectId(khoId)) return [];
+  const out = [];
+  for (const line of lines) {
+    const row = await buildGridItemFromReturnLine(line, khoId, '');
+    if (!row) continue;
+    const copiedQty = Math.floor(Number(line.so_luong || 0));
+    const maxTra = Number(row.so_luong_toi_da_tra != null ? row.so_luong_toi_da_tra : row.so_luong_con_co_the_tra || 0);
+    row.so_luong = Math.min(Math.max(0, copiedQty), Math.max(0, maxTra));
+    row.gia_nhap = Number(line.gia_nhap || row.gia_nhap || 0);
+    row.gia_tra_lai = Number(line.gia_tra_lai || line.don_gia || row.gia_tra_lai || 0);
+    row.ghi_chu = String(line.ghi_chu || '').trim();
+    out.push(row);
+  }
+  return out;
+}
+
+async function loadReturnCopyDraft(req, storeId, copyFromId) {
+  if (!isObjectId(copyFromId) || !isObjectId(storeId)) return null;
+  const source = await PhieuTraHangNhap.findOne({ _id: copyFromId, cua_hang_id: storeId })
+    .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
+    .lean();
+  if (!source) return null;
+
+  const lines = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: source._id })
+    .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang don_vi_tinh_id quan_ly_theo_lo' })
+    .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+    .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
+    .sort({ created_at: 1 })
+    .lean();
+
+  if (!lines.length) return null;
+
+  const khoId = source.kho_id ? String(source.kho_id) : '';
+  const phieuNhapId = source.phieu_nhap_id ? String(source.phieu_nhap_id) : '';
+
+  let gridItems = [];
+
+  if (isObjectId(phieuNhapId) && isObjectId(khoId)) {
+    const purchaseFilter = { _id: phieuNhapId, kho_id: khoId };
+    if (isObjectId(storeId)) purchaseFilter.cua_hang_id = storeId;
+    const purchase = await PhieuNhap.findOne(purchaseFilter)
+      .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
+      .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+      .lean();
+    if (purchase) {
+      const baseItems = await buildPurchaseReturnGridItems(purchase, storeId, khoId, {
+        ignorePhieuTraNhapIds: [String(copyFromId)]
+      });
+      const byCt = {};
+      baseItems.forEach(row => {
+        if (row.ct_phieu_nhap_id) byCt[String(row.ct_phieu_nhap_id)] = row;
+      });
+      for (const line of lines) {
+        const ctId = line.ct_phieu_nhap_id ? String(line.ct_phieu_nhap_id) : '';
+        let row = ctId && byCt[ctId] ? Object.assign({}, byCt[ctId]) : await buildGridItemFromReturnLine(line, khoId, storeId);
+        if (!row) continue;
+        const copiedQty = Math.floor(Number(line.so_luong || 0));
+        const maxTra = Number(row.so_luong_toi_da_tra != null ? row.so_luong_toi_da_tra : row.so_luong_con_co_the_tra || 0);
+        row.so_luong = Math.min(Math.max(0, copiedQty), Math.max(0, maxTra));
+        row.gia_nhap = Number(line.gia_nhap || row.gia_nhap || 0);
+        row.gia_tra_lai = Number(line.gia_tra_lai || line.don_gia || row.gia_tra_lai || 0);
+        row.ghi_chu = String(line.ghi_chu || '').trim();
+        gridItems.push(row);
+      }
+    } else {
+      gridItems = await buildReturnLinesOnlyGridItems(lines, khoId);
+    }
+  } else if (isObjectId(khoId)) {
+    gridItems = await buildReturnLinesOnlyGridItems(lines, khoId);
+  } else {
+    return null;
+  }
+
+  const supplier = source.nha_cung_cap_id && source.nha_cung_cap_id._id
+    ? {
+      _id: String(source.nha_cung_cap_id._id),
+      ma_ncc: source.nha_cung_cap_id.ma_ncc || '',
+      ten_ncc: source.nha_cung_cap_id.ten_ncc || ''
+    }
+    : null;
+
+  return {
+    kho_id: khoId,
+    phieu_nhap_id: phieuNhapId,
+    nha_cung_cap: supplier,
+    giam_gia: Number(source.giam_gia || 0),
+    kieu_giam_gia: source.kieu_giam_gia === 'percent' ? 'percent' : 'vnd',
+    ghi_chu: String(source.ghi_chu || ''),
+    tinh_vao_cong_no: source.tinh_vao_cong_no !== false,
+    require_phieu_nhap: Boolean(phieuNhapId),
+    items: gridItems
+  };
+}
 
 exports.apiPurchaseReturnDetail = async function(req, res) {
   try {
@@ -738,78 +1140,7 @@ exports.apiPurchaseReturnDetail = async function(req, res) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
     }
 
-    const details = await CTPhieuNhap.find({ phieu_nhap_id: purchase._id })
-      .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang don_vi_tinh_id quan_ly_theo_lo' })
-      .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
-      .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo so_luong_con_lai han_su_dung' })
-      .sort({ created_at: 1 })
-      .lean();
-
-    const returnRows = await CTPhieuTraHangNhap.find({ phieu_nhap_id: purchase._id })
-      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
-      .lean();
-    const returnedByDetail = {};
-    returnRows.forEach(row => {
-      if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
-      if (!row.ct_phieu_nhap_id) return;
-      const key = String(row.ct_phieu_nhap_id);
-      returnedByDetail[key] = (returnedByDetail[key] || 0) + Number(row.so_luong || 0);
-    });
-
-    const inventoryRows = await TonKho.find({
-      kho_id: purchase.kho_id && purchase.kho_id._id ? purchase.kho_id._id : purchase.kho_id,
-      hang_hoa_id: { $in: details.map(row => row.hang_hoa_id && row.hang_hoa_id._id).filter(Boolean) }
-    }).lean();
-    const inventoryByProduct = inventoryRows.reduce((map, row) => {
-      map[String(row.hang_hoa_id)] = Number(row.so_luong || 0);
-      return map;
-    }, {});
-
-    const lotIds = details.map(row => row.lo_hang_id && row.lo_hang_id._id).filter(Boolean);
-    const lotInventoryRows = lotIds.length
-      ? await TonKhoLo.find({
-        kho_id: purchase.kho_id && purchase.kho_id._id ? purchase.kho_id._id : purchase.kho_id,
-        lo_hang_id: { $in: lotIds }
-      }).lean()
-      : [];
-    const inventoryByLot = lotInventoryRows.reduce((map, row) => {
-      map[String(row.lo_hang_id)] = Number(row.so_luong || 0);
-      return map;
-    }, {});
-
-    const items = details.map(row => {
-      const detailId = String(row._id);
-      const importedQty = Number(row.so_luong || 0);
-      const returnedQty = Number(returnedByDetail[detailId] || 0);
-      const canReturnByPurchase = Math.max(0, importedQty - returnedQty);
-      const productId = row.hang_hoa_id && row.hang_hoa_id._id ? String(row.hang_hoa_id._id) : String(row.hang_hoa_id || '');
-      const lotId = row.lo_hang_id && row.lo_hang_id._id ? String(row.lo_hang_id._id) : '';
-      const currentStock = lotId
-        ? Number(inventoryByLot[lotId] || 0)
-        : Number(inventoryByProduct[productId] || 0);
-      return {
-        ct_phieu_nhap_id: detailId,
-        phieu_nhap_id: String(purchase._id),
-        hang_hoa_id: productId,
-        ma_hang: row.hang_hoa_id ? (row.hang_hoa_id.ma_hang || '') : '',
-        ten_hang: row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '',
-        don_vi_tinh_id: row.don_vi_tinh_id ? String(row.don_vi_tinh_id._id || row.don_vi_tinh_id) : '',
-        don_vi_tinh: row.don_vi_tinh_id ? (row.don_vi_tinh_id.ten_don_vi || row.don_vi_tinh_id.ma_don_vi || '') : '',
-        quan_ly_theo_lo: Boolean(row.hang_hoa_id && row.hang_hoa_id.quan_ly_theo_lo),
-        lo_hang_id: lotId,
-        ma_lo: row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '',
-        ten_lo: row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : '',
-        so_luong_nhap: importedQty,
-        tong_so_luong_da_tra: returnedQty,
-        so_luong_con_co_the_tra: canReturnByPurchase,
-        ton_kho_hien_tai: currentStock,
-        so_luong_toi_da_tra: Math.min(canReturnByPurchase, currentStock),
-        so_luong: 0,
-        gia_nhap: Number(row.don_gia_nhap || row.don_gia || 0),
-        gia_tra_lai: Number(row.don_gia_nhap || row.don_gia || 0),
-        thanh_tien: 0
-      };
-    });
+    const items = await buildPurchaseReturnGridItems(purchase, storeId, requestedKhoId, {});
 
     const supplier = purchase.nha_cung_cap_id
       ? {
@@ -898,6 +1229,8 @@ exports.createSubmit = async function(req, res, next) {
         return res.status(400).json({ success: false, message: 'Không cho chọn nhà cung cấp khác với phiếu nhập gốc' });
       }
       supplierId = purchaseSupplierId || supplierId;
+    } else if (!supplierId) {
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn nhà cung cấp hoặc phiếu nhập gốc' });
     }
     const discountType = ['vnd', 'percent'].includes(String(body.kieu_giam_gia || '').trim()) ? String(body.kieu_giam_gia).trim() : 'vnd';
     const rawItems = parseItems(body.items_json || body.items);
@@ -937,7 +1270,7 @@ exports.createSubmit = async function(req, res, next) {
       await createSupplierRefundReceipt(returnDoc, req.user?._id);
     }
 
-    return res.json({ success: true, redirect: '/tra-hang-nhap', id: returnDoc._id, ma_phieu_tra_nhap: maPhieu });
+    return res.json({ success: true, redirect: '/tra-hang-nhap', id: returnDoc._id, ma_phieu_tra_nhap: maPhieu, print_url: '/chung-tu-kho/tra-hang-nhap/' + returnDoc._id });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể lưu phiếu trả hàng nhập' });
   }
@@ -1003,8 +1336,11 @@ exports.cancel = async function(req, res) {
   try {
     const returnDoc = await PhieuTraHangNhap.findById(req.params.id);
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
+    if (returnDoc.trang_thai === 'cancelled') {
+      return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
+    }
     if (returnDoc.trang_thai === 'completed') {
-      return res.status(400).json({ success: false, message: 'Phiếu đã hoàn thành không thể hủy trực tiếp' });
+      await rollbackReturnImportEffects(returnDoc, req.user?._id);
     }
     returnDoc.trang_thai = 'cancelled';
     await returnDoc.save();
@@ -1033,16 +1369,23 @@ exports.exportOneExcel = async function(req, res, next) {
     const storeId = await resolveStoreId(req);
     const query = { _id: req.params.id };
     if (isObjectId(storeId)) query.cua_hang_id = storeId;
-    const { returns, detailMap } = await loadExportReturns(query);
-    if (!returns.length) {
+    const ticket = await PhieuTraHangNhap.findOne(query)
+      .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
+      .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+      .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
+      .populate({ path: 'nguoi_tao_id', select: 'ho_ten email username' })
+      .populate({ path: 'nguoi_tra_id', select: 'ho_ten email username' })
+      .lean();
+    if (!ticket) {
       return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
     }
-    await sendReturnImportWorkbook(
-      res,
-      'tra-hang-nhap-' + (returns[0].ma_phieu_tra_nhap || 'unknown') + '.xlsx',
-      returns,
-      detailMap
-    );
+    const details = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: ticket._id })
+      .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
+      .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+      .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
+      .sort({ created_at: 1 })
+      .lean();
+    await sendSingleReturnDetailWorkbook(res, ticket, details);
   } catch (error) {
     next(error);
   }

@@ -5,6 +5,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -22,7 +23,7 @@
     <div class="bar"><h1>Hóa đơn đầu vào</h1><div class="actions"><button class="btn primary" onclick="openModal()"><i class="fa-solid fa-plus"></i> Hóa đơn</button><a class="btn" href="/phieu-nhap">Nhập hàng</a></div></div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Mã hóa đơn</th><th>Thời gian</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th class="num">Tổng tiền</th><th>Trạng thái</th></tr></thead><tbody>
       <% if (safeDocs.length) { %>
-        <% safeDocs.forEach(d => { %><tr><td><%= d.ma_hoa_don %></td><td><%= new Date(d.ngay_hoa_don).toLocaleString('vi-VN') %></td><td><%= d.nha_cung_cap_id ? d.nha_cung_cap_id.ten_ncc : '' %></td><td><%= d.phieu_nhap_id ? d.phieu_nhap_id.ma_phieu_nhap : '' %></td><td class="num"><%= fmt(d.tong_tien) %></td><td>Hoàn thành</td></tr><% }) %>
+        <% safeDocs.forEach(d => { %><tr><td><%= d.ma_hoa_don %></td><td><%= new Date(d.ngay_hoa_don).toLocaleString('vi-VN') %></td><td><%= d.nha_cung_cap_id ? d.nha_cung_cap_id.ten_ncc : '' %></td><td><%- d.phieu_nhap_id ? refLink('purchase', d.phieu_nhap_id, d.phieu_nhap_id.ma_phieu_nhap || '') : '' %></td><td class="num"><%= fmt(d.tong_tien) %></td><td>Hoàn thành</td></tr><% }) %>
       <% } else { %><tr><td colspan="6" class="empty">Chưa có hóa đơn đầu vào</td></tr><% } %>
     </tbody></table></div>
   </main>

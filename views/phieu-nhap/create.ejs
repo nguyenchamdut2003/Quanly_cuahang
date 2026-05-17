@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -24,10 +25,8 @@
     .items-table .num{text-align:right}
     .input-small{width:92px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 7px}
     .empty-import{height:calc(100vh - 260px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#111827}
-    .empty-import h3{font-size:18px;margin:0 0 22px}
-    .empty-import p{font-size:13px;margin:0 0 32px}
-    .empty-import a{color:#0070f4;text-decoration:none}
-    .file-btn{height:52px;border:0;background:#0070f4;color:#fff;border-radius:3px;padding:0 24px;font-size:18px;font-weight:700;display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+    .empty-import h3{font-size:18px;margin:0 0 12px}
+    .empty-import p{font-size:13px;margin:0;color:#667085}
     .purchase-right{background:#fff;border-radius:6px;display:flex;flex-direction:column;padding:18px 12px 10px}
     .right-tools{height:28px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
     .icon-group{display:flex;gap:6px}
@@ -86,9 +85,8 @@
           <tbody id="itemsBody"></tbody>
         </table>
         <div id="emptyImport" class="empty-import">
-          <h3>Thêm sản phẩm từ file excel</h3>
-          <p>(Tải về file mẫu:<a href="#">Excel file</a>)</p>
-          <button class="file-btn" type="button"><i class="fa-regular fa-copy"></i> Chọn file dữ liệu</button>
+          <h3>Chưa có hàng trong phiếu</h3>
+          <p>Tìm và thêm sản phẩm bằng ô tìm kiếm phía trên.</p>
         </div>
       </div>
     </section>

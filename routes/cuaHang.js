@@ -6,7 +6,9 @@ var cuaHangController = require('../controllers/cuaHang.controller');
 router.use(isAuthenticated);
 
 router.get('/', cuaHangController.index);
+router.get('/export.xlsx', cuaHangController.exportExcel);
 router.post('/add', cuaHangController.add);
+router.get('/:id/export/:section.xlsx', cuaHangController.exportSectionExcel);
 router.post('/:id/update', cuaHangController.update);
 router.post('/:id/delete', cuaHangController.remove);
 router.post('/:id/warehouse/add', cuaHangController.addWarehouse);

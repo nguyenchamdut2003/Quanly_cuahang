@@ -5,6 +5,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -21,7 +22,7 @@
     <div class="bar"><h1>Trả hàng nhập</h1><button class="btn primary" onclick="openModal()"><i class="fa-solid fa-plus"></i> Trả hàng nhập</button></div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Mã phiếu trả</th><th>Thời gian</th><th>Nhà cung cấp</th><th>Phiếu nhập</th><th class="num">Tổng tiền trả</th><th>Trạng thái</th></tr></thead><tbody>
       <% if (safeReturns.length) { %>
-        <% safeReturns.forEach(r => { %><tr><td><%= r.ma_phieu_tra_nhap %></td><td><%= new Date(r.ngay_tra).toLocaleString('vi-VN') %></td><td><%= r.nha_cung_cap_id ? r.nha_cung_cap_id.ten_ncc : '' %></td><td><%= r.phieu_nhap_id ? r.phieu_nhap_id.ma_phieu_nhap : '' %></td><td class="num"><%= fmt(r.tong_tien_tra) %></td><td>Hoàn thành</td></tr><% }) %>
+        <% safeReturns.forEach(r => { %><tr><td><%= r.ma_phieu_tra_nhap %></td><td><%= new Date(r.ngay_tra).toLocaleString('vi-VN') %></td><td><%= r.nha_cung_cap_id ? r.nha_cung_cap_id.ten_ncc : '' %></td><td><%- r.phieu_nhap_id ? refLink('purchase', r.phieu_nhap_id, r.phieu_nhap_id.ma_phieu_nhap || '') : '' %></td><td class="num"><%= fmt(r.tong_tien_tra) %></td><td>Hoàn thành</td></tr><% }) %>
       <% } else { %><tr><td colspan="6" class="empty">Chưa có phiếu trả hàng nhập</td></tr><% } %>
     </tbody></table></div>
   </main>

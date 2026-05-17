@@ -1,0 +1,169 @@
+<%
+  const selected = (attributes || []).find(function(a) { return String(a._id) === String(selectedId); }) || null;
+  const statusText = value => value === 'inactive' ? 'Ngưng hoạt động' : 'Hoạt động';
+%>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .attr-page{min-height:calc(100vh - 98px);background:#f3f6f9;padding:18px}
+    .attr-shell{display:grid;grid-template-columns:minmax(520px,1.15fr) minmax(420px,.85fr);gap:14px;max-width:1420px;margin:0 auto}
+    .attr-card{background:#fff;border:1px solid #dbe4ee;border-radius:8px;overflow:hidden}
+    .attr-head{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;border-bottom:1px solid #e4eaf2}
+    .attr-head h1,.attr-head h2{margin:0;font-size:18px;color:#111827}
+    .attr-body{padding:14px}
+    .attr-form{display:grid;grid-template-columns:120px 1fr 1fr 130px auto;gap:8px;align-items:end;margin-bottom:12px}
+    .value-form{display:grid;grid-template-columns:105px 1fr 78px 120px auto;gap:8px;align-items:end;margin-bottom:12px}
+    .attr-field{display:flex;flex-direction:column;gap:5px}
+    .attr-field span{font-size:12px;font-weight:700;color:#475467}
+    .attr-field input,.attr-field select{height:34px;border:1px solid #cfd8e3;border-radius:6px;padding:6px 8px}
+    .attr-btn{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 10px;font-weight:700;cursor:pointer;text-decoration:none;color:#111827;display:inline-flex;align-items:center;justify-content:center}
+    .attr-btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}
+    .attr-btn.danger{color:#d92d20}
+    .attr-table{width:100%;border-collapse:collapse;font-size:13px}
+    .attr-table th,.attr-table td{border-bottom:1px solid #edf2f7;padding:9px 8px;text-align:left;vertical-align:middle}
+    .attr-table th{background:#f8fafc;color:#344054;font-weight:800}
+    .attr-table tr.is-selected{background:#eff6ff}
+    .attr-table .muted{color:#667085}
+    .status-pill{display:inline-flex;align-items:center;height:22px;border-radius:999px;padding:0 8px;font-size:12px;font-weight:800;background:#dcfae6;color:#067647}
+    .status-pill.inactive{background:#f2f4f7;color:#667085}
+    .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+    .inline-form{display:inline}
+    .edit-row{display:none;background:#fbfdff}
+    .edit-row.open{display:table-row}
+    .edit-grid{display:grid;grid-template-columns:120px 1fr 1fr 130px auto;gap:8px;align-items:end}
+    .value-edit-grid{display:grid;grid-template-columns:105px 1fr 78px 120px auto;gap:8px;align-items:end}
+    .empty-state{padding:28px;text-align:center;color:#667085}
+    @media(max-width:1100px){.attr-shell{grid-template-columns:1fr}.attr-form,.value-form,.edit-grid,.value-edit-grid{grid-template-columns:1fr 1fr}.attr-btn{width:100%}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="attr-page">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+    <div class="attr-shell">
+      <section class="attr-card">
+        <div class="attr-head">
+          <h1>Thuộc tính hàng hóa</h1>
+          <a class="attr-btn" href="/hang-hoa">Danh sách hàng hóa</a>
+        </div>
+        <div class="attr-body">
+          <form class="attr-form" method="post" action="/hang-hoa/thuoc-tinh/add">
+            <label class="attr-field"><span>Mã</span><input name="ma_thuoc_tinh" placeholder="Tự động"></label>
+            <label class="attr-field"><span>Tên thuộc tính</span><input name="ten_thuoc_tinh" required placeholder="Size, Màu sắc..."></label>
+            <label class="attr-field"><span>Mô tả</span><input name="mo_ta"></label>
+            <label class="attr-field"><span>Trạng thái</span><select name="trang_thai"><option value="active">Hoạt động</option><option value="inactive">Ngưng</option></select></label>
+            <button class="attr-btn primary" type="submit">Thêm</button>
+          </form>
+
+          <table class="attr-table">
+            <thead>
+              <tr><th>Mã thuộc tính</th><th>Tên thuộc tính</th><th>Mô tả</th><th>Trạng thái</th><th>Số giá trị</th><th>Thao tác</th></tr>
+            </thead>
+            <tbody>
+              <% if (!(attributes || []).length) { %>
+                <tr><td colspan="6" class="empty-state">Chưa có thuộc tính hàng hóa.</td></tr>
+              <% } %>
+              <% (attributes || []).forEach(function(item) { %>
+                <tr class="<%= String(item._id) === String(selectedId) ? 'is-selected' : '' %>">
+                  <td><%= item.ma_thuoc_tinh || '--' %></td>
+                  <td><strong><%= item.ten_thuoc_tinh || '--' %></strong></td>
+                  <td class="muted"><%= item.mo_ta || '--' %></td>
+                  <td><span class="status-pill <%= item.trang_thai === 'inactive' ? 'inactive' : '' %>"><%= statusText(item.trang_thai) %></span></td>
+                  <td><%= valueCounts[String(item._id)] || 0 %></td>
+                  <td>
+                    <div class="row-actions">
+                      <a class="attr-btn" href="/hang-hoa/thuoc-tinh?thuoc_tinh_id=<%= item._id %>">Chọn</a>
+                      <button class="attr-btn" type="button" onclick="toggleEdit('attr-edit-<%= item._id %>')">Sửa</button>
+                      <form class="inline-form" method="post" action="/hang-hoa/thuoc-tinh/<%= item._id %>/delete" onsubmit="return confirm('Xóa hoặc ngưng hoạt động thuộc tính này?')">
+                        <button class="attr-btn danger" type="submit">Xóa</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                <tr class="edit-row" id="attr-edit-<%= item._id %>">
+                  <td colspan="6">
+                    <form class="edit-grid" method="post" action="/hang-hoa/thuoc-tinh/<%= item._id %>/update">
+                      <label class="attr-field"><span>Mã</span><input name="ma_thuoc_tinh" value="<%= item.ma_thuoc_tinh || '' %>"></label>
+                      <label class="attr-field"><span>Tên</span><input name="ten_thuoc_tinh" value="<%= item.ten_thuoc_tinh || '' %>" required></label>
+                      <label class="attr-field"><span>Mô tả</span><input name="mo_ta" value="<%= item.mo_ta || '' %>"></label>
+                      <label class="attr-field"><span>Trạng thái</span><select name="trang_thai"><option value="active" <%= item.trang_thai !== 'inactive' ? 'selected' : '' %>>Hoạt động</option><option value="inactive" <%= item.trang_thai === 'inactive' ? 'selected' : '' %>>Ngưng</option></select></label>
+                      <button class="attr-btn primary" type="submit">Lưu</button>
+                    </form>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="attr-card">
+        <div class="attr-head">
+          <h2>Giá trị <%= selected ? ('- ' + selected.ten_thuoc_tinh) : '' %></h2>
+        </div>
+        <div class="attr-body">
+          <% if (selected) { %>
+            <form class="value-form" method="post" action="/hang-hoa/thuoc-tinh/<%= selected._id %>/gia-tri/add">
+              <label class="attr-field"><span>Mã</span><input name="ma_gia_tri" placeholder="Tự động"></label>
+              <label class="attr-field"><span>Tên giá trị</span><input name="ten_gia_tri" required placeholder="Lớn, Trung, Bi..."></label>
+              <label class="attr-field"><span>Thứ tự</span><input name="thu_tu" type="number" min="0" value="0"></label>
+              <label class="attr-field"><span>Trạng thái</span><select name="trang_thai"><option value="active">Hoạt động</option><option value="inactive">Ngưng</option></select></label>
+              <button class="attr-btn primary" type="submit">Thêm</button>
+            </form>
+            <table class="attr-table">
+              <thead>
+                <tr><th>Mã giá trị</th><th>Tên giá trị</th><th>Thứ tự</th><th>Trạng thái</th><th>Thao tác</th></tr>
+              </thead>
+              <tbody>
+                <% if (!(values || []).length) { %>
+                  <tr><td colspan="5" class="empty-state">Chưa có giá trị cho thuộc tính này.</td></tr>
+                <% } %>
+                <% (values || []).forEach(function(value) { %>
+                  <tr>
+                    <td><%= value.ma_gia_tri || '--' %></td>
+                    <td><strong><%= value.ten_gia_tri || '--' %></strong><div class="muted"><%= value.mo_ta || '' %></div></td>
+                    <td><%= value.thu_tu || 0 %></td>
+                    <td><span class="status-pill <%= value.trang_thai === 'inactive' ? 'inactive' : '' %>"><%= statusText(value.trang_thai) %></span></td>
+                    <td>
+                      <div class="row-actions">
+                        <button class="attr-btn" type="button" onclick="toggleEdit('value-edit-<%= value._id %>')">Sửa</button>
+                        <form class="inline-form" method="post" action="/hang-hoa/thuoc-tinh/gia-tri/<%= value._id %>/delete" onsubmit="return confirm('Xóa hoặc ngưng hoạt động giá trị này?')">
+                          <button class="attr-btn danger" type="submit">Xóa</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="edit-row" id="value-edit-<%= value._id %>">
+                    <td colspan="5">
+                      <form class="value-edit-grid" method="post" action="/hang-hoa/thuoc-tinh/gia-tri/<%= value._id %>/update">
+                        <label class="attr-field"><span>Mã</span><input name="ma_gia_tri" value="<%= value.ma_gia_tri || '' %>"></label>
+                        <label class="attr-field"><span>Tên</span><input name="ten_gia_tri" value="<%= value.ten_gia_tri || '' %>" required></label>
+                        <label class="attr-field"><span>Thứ tự</span><input name="thu_tu" type="number" min="0" value="<%= value.thu_tu || 0 %>"></label>
+                        <label class="attr-field"><span>Trạng thái</span><select name="trang_thai"><option value="active" <%= value.trang_thai !== 'inactive' ? 'selected' : '' %>>Hoạt động</option><option value="inactive" <%= value.trang_thai === 'inactive' ? 'selected' : '' %>>Ngưng</option></select></label>
+                        <button class="attr-btn primary" type="submit">Lưu</button>
+                      </form>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          <% } else { %>
+            <div class="empty-state">Chọn hoặc thêm thuộc tính để quản lý giá trị.</div>
+          <% } %>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    function toggleEdit(id) {
+      var row = document.getElementById(id);
+      if (row) row.classList.toggle('open');
+    }
+  </script>
+</body>
+</html>

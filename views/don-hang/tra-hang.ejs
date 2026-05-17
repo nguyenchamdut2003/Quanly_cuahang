@@ -24,6 +24,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -75,7 +76,7 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th class="check-col"><input type="checkbox"></th><th>Lo&#7841;i</th><th>Mã trả hàng</th><th>Người bán</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">H&#224;ng tr&#7843;</th><th class="num">H&#224;ng &#273;&#7893;i</th><th class="num">C&#7847;n thu/tr&#7843;</th><th>Trạng thái</th></tr></thead>
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th>Loại</th><th>Mã trả hàng</th><th>Người bán</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Hàng trả</th><th class="num">Hàng đổi</th><th class="num">Cần thu/trả</th><th>Trạng thái</th></tr></thead>
             <tbody>
               <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td></td></tr>
               <% if (safeReturns.length) { %>
@@ -86,7 +87,7 @@
                     <td><%= item.ma_phieu_tra %></td>
                     <td><%= userName(item.nguoi_tao_id) %></td>
                     <td><%= item.ngay_tra ? new Date(item.ngay_tra).toLocaleString('vi-VN') : '' %></td>
-                    <td><%= item.khach_hang_id?.ma_khach_hang || '' %></td>
+                    <td><%- item.khach_hang_id ? refLink('customer', item.khach_hang_id, item.khach_hang_id.ma_khach_hang || '') : '' %></td>
                     <td><%= item.khach_hang_id?.ten_khach_hang || '' %></td>
                     <td class="num"><%= fmt(returnGoodsTotal(item)) %></td>
                     <td class="num"><%= fmt(exchangeGoodsTotal(item)) %></td>
@@ -107,28 +108,28 @@
   <div id="invoiceModal" class="invoice-modal-backdrop">
     <div class="invoice-modal">
       <button type="button" class="invoice-close" onclick="closeInvoiceModal()">&times;</button>
-      <h2>Ch&#7885;n h&#243;a &#273;&#417;n tr&#7843; h&#224;ng</h2>
+      <h2>Chọn hóa đơn trả hàng</h2>
       <div class="invoice-modal-grid">
         <aside>
           <div class="invoice-filter-card">
-            <h3>T&#236;m ki&#7871;m</h3>
-            <input class="invoice-filter-input" id="invoiceSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#243;a &#273;&#417;n">
-            <input class="invoice-filter-input" id="shipmentSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; v&#7853;n &#273;&#417;n b&#225;n">
-            <input class="invoice-filter-input" id="customerSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo kh&#225;ch h&#224;ng ho&#7863;c &#272;T">
-            <input class="invoice-filter-input" id="itemCodeSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#224;ng">
-            <input class="invoice-filter-input" id="itemNameSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo t&#234;n h&#224;ng">
+            <h3>Tìm kiếm</h3>
+            <input class="invoice-filter-input" id="invoiceSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo mã hóa đơn">
+            <input class="invoice-filter-input" id="shipmentSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo mã vận đơn bán">
+            <input class="invoice-filter-input" id="customerSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo khách hàng hoặc ĐT">
+            <input class="invoice-filter-input" id="itemCodeSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo mã hàng">
+            <input class="invoice-filter-input" id="itemNameSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo tên hàng">
           </div>
           <div class="invoice-filter-card">
-            <h3>Th&#7901;i gian</h3>
+            <h3>Thời gian</h3>
             <input class="invoice-filter-input" id="fromDateSearch" type="date" onchange="loadInvoices(1)">
-            <input class="invoice-filter-input" id="toDateSearch" type="date" onchange="loadInvoices(1)" placeholder="&#272;&#7871;n ng&#224;y">
+            <input class="invoice-filter-input" id="toDateSearch" type="date" onchange="loadInvoices(1)" placeholder="Đến ngày">
           </div>
         </aside>
         <section>
           <div class="invoice-pick-table">
             <table>
               <thead>
-                <tr><th style="width:190px">M&#227; h&#243;a &#273;&#417;n</th><th style="width:180px">Th&#7901;i gian <i class="fa-solid fa-caret-down"></i></th><th>Nh&#226;n vi&#234;n</th><th>Kh&#225;ch h&#224;ng</th><th class="num" style="width:150px">T&#7893;ng c&#7897;ng</th><th style="width:130px"></th></tr>
+                <tr><th style="width:190px">Mã hóa đơn</th><th style="width:180px">Thời gian <i class="fa-solid fa-caret-down"></i></th><th>Nhân viên</th><th>Khách hàng</th><th class="num" style="width:150px">Tổng cộng</th><th style="width:130px"></th></tr>
               </thead>
               <tbody id="invoiceRows"></tbody>
             </table>
@@ -136,7 +137,7 @@
           </div>
         </section>
       </div>
-      <button class="quick-return" type="button" onclick="window.location.href='/don-hang/tra-hang/create'">Tr&#7843; nhanh</button>
+      <button class="quick-return" type="button" onclick="window.location.href='/don-hang/tra-hang/create'">Trả nhanh</button>
     </div>
   </div>
   <script>
@@ -175,20 +176,20 @@
         from_date: fromDateSearch.value,
         to_date: toDateSearch.value
       });
-      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">&#272;ang t&#7843;i d&#7919; li&#7879;u...</td></tr>';
+      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">Đang tải dữ liệu...</td></tr>';
       try {
         const res = await fetch('/don-hang/tra-hang/invoices/search?' + params.toString());
         const result = await res.json();
-        if (!result.success) throw new Error(result.message || 'Khong tai duoc danh sach hoa don');
+        if (!result.success) throw new Error(result.message || 'Không tải được danh sách hóa đơn');
         renderInvoices(result.data || [], result.pagination || { page: 1, limit: 7, total: 0, pages: 1 });
       } catch (error) {
-        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Khong tai duoc danh sach hoa don</td></tr>';
+        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Không tải được danh sách hóa đơn</td></tr>';
         invoicePager.innerHTML = '';
       }
     }
 
     function renderInvoices(rows, pagination) {
-      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="chooseInvoice('${i._id}');return false">${escapeHtml(i.ma_hoa_don)}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' })}</td><td>${escapeHtml(i.nguoi_ban)}</td><td>${escapeHtml(i.khach_hang)}</td><td class="num">${money(i.thanh_toan || i.tong_tien)}</td><td><button class="invoice-choose" onclick="chooseInvoice('${i._id}')" type="button">Ch&#7885;n</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Kh&#244;ng t&#236;m th&#7845;y h&#243;a &#273;&#417;n ph&#249; h&#7907;p</td></tr>';
+      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="chooseInvoice('${i._id}');return false">${escapeHtml(i.ma_hoa_don)}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN', { hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit', year:'numeric' })}</td><td>${escapeHtml(i.nguoi_ban)}</td><td>${escapeHtml(i.khach_hang)}</td><td class="num">${money(i.thanh_toan || i.tong_tien)}</td><td><button class="invoice-choose" onclick="chooseInvoice('${i._id}')" type="button">Chọn</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Không tìm thấy hóa đơn phù hợp</td></tr>';
       renderInvoicePager(pagination);
     }
 
@@ -209,7 +210,7 @@
         ${pageNumbers.map(p => `<button class="invoice-page-btn ${p === page ? 'active' : ''}" type="button" onclick="loadInvoices(${p})">${p}</button>`).join('')}
         <button class="invoice-page-btn" type="button" onclick="loadInvoices(${page + 1})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
         <button class="invoice-page-btn" type="button" onclick="loadInvoices(${pages})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-angles-right"></i></button>
-        <span>Hi&#7875;n th&#7883; ${start} - ${end} tr&#234;n t&#7893;ng s&#7889; ${total} h&#243;a &#273;&#417;n</span>`;
+        <span>Hiển thị ${start} - ${end} trên tổng số ${total} hóa đơn</span>`;
     }
 
     function chooseInvoice(id) {
@@ -270,7 +271,7 @@
               <div class="mini-field"><label>Người tạo</label><span>${escapeHtml(slip.nguoi_tao_id?.ho_ten || slip.nguoi_tao_id?.username || '')}</span></div>
               <div class="mini-field"><label>Người nhận trả</label><input class="mini-input" value="${escapeHtml(slip.nguoi_tao_id?.ho_ten || slip.nguoi_tao_id?.username || '')}"></div>
               <div class="mini-field"><label>Ngày trả</label><input class="mini-input" value="${escapeHtml(new Date(slip.ngay_tra || slip.created_at).toLocaleString('vi-VN'))}"></div>
-              <div class="mini-field"><label>Mã hóa đơn</label><a class="detail-link" href="/don-hang/hoa-don">${escapeHtml(slip.hoa_don_id?.ma_hoa_don || invoice.ma_hoa_don || '')}</a></div>
+              <div class="mini-field"><label>Mã hóa đơn</label><a class="detail-link" href="${invoice._id ? '/don-hang/hoa-don?invoice=' + invoice._id : '/don-hang/hoa-don'}">${escapeHtml(slip.hoa_don_id?.ma_hoa_don || invoice.ma_hoa_don || '')}</a></div>
               <div class="mini-field"><label>Kênh bán</label><input class="mini-input" value="Bán trực tiếp"></div>
               <div class="mini-field"><label>Bảng giá</label><input class="mini-input" value="Bảng giá chung"></div>
             </div>
@@ -283,7 +284,7 @@
         <div class="detail-section-title">Hàng khách đổi/lấy mới</div>
         <table class="items-table exchange-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">Số lượng</th><th class="num">Giá bán/giá đổi</th><th class="num">Thành tiền đổi</th></tr></thead><tbody>${exchangeRows}</tbody></table>
         <div class="detail-bottom">
-          <textarea class="note" placeholder="Ghi chú...">${escapeHtml(slip.ghi_chu || '')}</textarea>
+          <textarea class="note js-return-note" data-slip-id="${slip._id}" placeholder="Ghi chú...">${escapeHtml(slip.ghi_chu || '')}</textarea>
           <div>
             <div class="total-line"><span>Tổng tiền hàng trả (${returnItems.length})</span><strong>${money(returnTotal)}</strong></div>
             <div class="total-line"><span>Tổng tiền hàng đổi (${exchangeItems.length})</span><strong>${money(exchangeTotal)}</strong></div>
@@ -293,10 +294,30 @@
             <div class="total-line settlement-line ${settlementClass}"><span>${settlementLabel}</span><strong>${settlementValue ? money(settlementValue) : '0'}</strong></div>
           </div>
         </div>
-        <div class="detail-actions">
-          <div class="detail-action-group"><button type="button" class="btn"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/tra-hang/${slip._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
-          <div class="detail-action-group"><button type="button" class="btn solid"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
+        <div class="page-actions page-actions--split page-actions--bordered detail-actions">
+          <div class="page-actions__left detail-action-group"><button type="button" class="btn" onclick="cancelReturnSlip('${slip._id}')" ${slip.trang_thai === 'cancelled' ? 'disabled' : ''}><i class="fa-regular fa-trash-can"></i> Hủy</button><a class="btn" href="/don-hang/tra-hang/create?copy_from=${slip._id}"><i class="fa-regular fa-copy"></i> Sao chép</a><a class="btn" href="/don-hang/tra-hang/${slip._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+          <div class="page-actions__right detail-action-group"><button type="button" class="btn solid" onclick="saveReturnSlip('${slip._id}')"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><a class="btn" href="/chung-tu-kho/tra-hang-ban/${slip._id}" target="_blank"><i class="fa-solid fa-print"></i> Mở riêng</a></div>
         </div>`;
+    }
+
+    async function cancelReturnSlip(id) {
+      if (!confirm('Hủy phiếu trả hàng này? Hệ thống sẽ hoàn tồn kho và đảo các phiếu thu/chi liên quan.')) return;
+      const res = await fetch('/don-hang/tra-hang/' + id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không hủy được phiếu trả hàng');
+      location.reload();
+    }
+
+    async function saveReturnSlip(id) {
+      const noteEl = document.querySelector('.js-return-note[data-slip-id="' + id + '"]');
+      const res = await fetch('/don-hang/tra-hang/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ghi_chu: noteEl ? noteEl.value : '' })
+      });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không lưu được phiếu trả hàng');
+      alert(data.message || 'Đã lưu');
     }
   </script>
 </body>

@@ -1,0 +1,56 @@
+<%
+  const item = business || {};
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .config-page{min-height:calc(100vh - 98px);background:#f3f6f9;padding:18px 10%}
+    .config-card{background:#fff;border:1px solid #dbe4ee;border-radius:8px;padding:18px;max-width:980px}
+    .config-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+    .config-title{font-size:22px;font-weight:800;color:#111827}
+    .config-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .config-field.full{grid-column:1/-1}
+    .config-field span{display:block;font-size:13px;font-weight:700;color:#344054;margin-bottom:6px}
+    .config-field input,.config-field select,.config-field textarea{width:100%;border:1px solid #cfd8e3;border-radius:7px;padding:9px 10px;font-size:14px;outline:none}
+    .config-field textarea{min-height:74px;resize:vertical}
+    .config-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+    .config-btn{height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;padding:0 14px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;color:#111827}
+    .config-btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}
+    .config-alert{background:#e7f8ee;color:#067647;border:1px solid #abefc6;border-radius:7px;padding:10px 12px;margin-bottom:14px;font-size:13px}
+    @media(max-width:900px){.config-page{padding:12px}.config-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="config-page">
+    <form method="post" action="/cau-hinh/doanh-nghiep" class="config-card">
+      <input type="hidden" name="id" value="<%= item._id || '' %>">
+      <div class="config-head">
+        <div class="config-title">Cấu hình doanh nghiệp</div>
+        <a class="config-btn" href="/nhap-hang">Quay lại</a>
+      </div>
+      <% if (flash && flash.success) { %>
+        <div class="config-alert">Đã lưu thông tin doanh nghiệp.</div>
+      <% } %>
+      <div class="config-grid">
+        <label class="config-field full"><span>Tên doanh nghiệp</span><input name="ten_doanh_nghiep" value="<%= item.ten_doanh_nghiep || '' %>" required></label>
+        <label class="config-field"><span>Mã số thuế</span><input name="ma_so_thue" value="<%= item.ma_so_thue || '' %>"></label>
+        <label class="config-field"><span>Số điện thoại</span><input name="so_dien_thoai" value="<%= item.so_dien_thoai || '' %>"></label>
+        <label class="config-field"><span>Email</span><input type="email" name="email" value="<%= item.email || '' %>"></label>
+        <label class="config-field"><span>Trạng thái</span><select name="trang_thai"><option value="active" <%= item.trang_thai !== 'inactive' ? 'selected' : '' %>>Hoạt động</option><option value="inactive" <%= item.trang_thai === 'inactive' ? 'selected' : '' %>>Ngưng</option></select></label>
+        <label class="config-field"><span>Người đại diện</span><input name="nguoi_dai_dien" value="<%= item.nguoi_dai_dien || '' %>"></label>
+        <label class="config-field"><span>Chức vụ người đại diện</span><input name="chuc_vu_nguoi_dai_dien" value="<%= item.chuc_vu_nguoi_dai_dien || '' %>"></label>
+        <label class="config-field full"><span>Địa chỉ</span><textarea name="dia_chi"><%= item.dia_chi || '' %></textarea></label>
+      </div>
+      <div class="config-actions">
+        <button class="config-btn primary" type="submit">Lưu thông tin</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

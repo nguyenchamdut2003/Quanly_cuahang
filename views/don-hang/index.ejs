@@ -30,6 +30,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -94,7 +95,6 @@
             <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Đặt hàng</a>
             <button type="button" class="btn" onclick="alert('Chọn các đơn cần gộp trước khi dùng chức năng này.')"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
             <a class="btn" href="/don-hang/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
-            <span class="icon"><i class="fa-solid fa-list"></i></span><span class="icon"><i class="fa-solid fa-gear"></i></span><span class="icon"><i class="fa-regular fa-circle-question"></i></span>
           </div>
         </div>
         <div class="table-wrap">
@@ -103,7 +103,7 @@
             <tbody>
               <% if (safeOrders.length) { %>
                 <% safeOrders.forEach(o => { %>
-                  <tr class="order-row" data-order-row="<%= o._id %>" onclick="toggleOrderDetail('<%= o._id %>')"><td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%= o.ma_don_hang %></td><td><%= new Date(o.ngay_dat || o.created_at).toLocaleString('vi-VN') %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ma_khach_hang : '' %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td class="num"><%= fmt(o.tong_thanh_toan || o.tong_tien) %></td><td class="num"><%= fmt(o.khach_thanh_toan || 0) %></td><td><span class="status-badge <%= o.trang_thai %>"><%= statusText(o.trang_thai) %></span></td><td><span class="status-badge <%= o.trang_thai_giao_hang %>"><%= deliveryStatusText(o.trang_thai_giao_hang) %></span></td></tr>
+                  <tr class="order-row" data-order-row="<%= o._id %>" onclick="toggleOrderDetail('<%= o._id %>')"><td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('order', o, o.ma_don_hang, 'onclick="event.stopPropagation()"') %></td><td><%= new Date(o.ngay_dat || o.created_at).toLocaleString('vi-VN') %></td><td><%- o.khach_hang_id ? refLink('customer', o.khach_hang_id, o.khach_hang_id.ma_khach_hang, 'onclick="event.stopPropagation()"') : '' %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td class="num"><%= fmt(o.tong_thanh_toan || o.tong_tien) %></td><td class="num"><%= fmt(o.khach_thanh_toan || 0) %></td><td><span class="status-badge <%= o.trang_thai %>"><%= statusText(o.trang_thai) %></span></td><td><span class="status-badge <%= o.trang_thai_giao_hang %>"><%= deliveryStatusText(o.trang_thai_giao_hang) %></span></td></tr>
                   <tr class="detail-row" data-order-detail="<%= o._id %>"><td class="detail-cell" colspan="10"><div class="order-detail"><div class="loading-detail">Đang tải thông tin đơn...</div></div></td></tr>
                 <% }) %>
               <% } else { %>
@@ -121,6 +121,7 @@
     const deliveryStatusLabels = { chua_giao: 'Chưa giao', giao_mot_phan: 'Giao một phần', giao_thieu: 'Giao thiếu', giao_du: 'Giao đủ' };
     const deliveryStatusText = status => deliveryStatusLabels[status] || 'Chưa giao';
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const refAnchor = (href, text) => href ? `<a class="ref-link" href="${escapeHtml(href)}" onclick="event.stopPropagation()">${escapeHtml(text || '--')}</a>` : escapeHtml(text || '--');
     const orderDetailCache = {};
 
     async function toggleOrderDetail(id) {
@@ -136,6 +137,17 @@
       if (detailRow.dataset.loaded === 'true') return;
       await loadOrderDetail(id, detailRow);
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const id = new URLSearchParams(window.location.search).get('order');
+      if (id) {
+        const row = document.querySelector('[data-order-row="' + id + '"]');
+        if (row) {
+          toggleOrderDetail(id);
+          row.scrollIntoView({ block: 'center' });
+        }
+      }
+    });
 
     async function loadOrderDetail(id, detailRow) {
       const res = await fetch('/don-hang/' + id + '/detail');
@@ -161,7 +173,7 @@
         const product = item.hang_hoa_id || {};
         const deliveryStatus = deliveryStatusLabels[item.trang_thai_giao] || deliveryStatusLabels.chua_giao;
         return `<tr>
-          <td><a href="#" class="detail-link">${escapeHtml(product.ma_hang || '')}</a></td>
+          <td>${refAnchor(product._id ? '/hang-hoa/' + product._id : '', product.ma_hang || '')}</td>
           <td>${escapeHtml(product.ten_hang || '')}</td>
           <td class="num">${money(item.so_luong_dat || item.so_luong || 0)}</td>
           <td class="num">${money(item.so_luong_xac_nhan || 0)}</td>
@@ -182,7 +194,7 @@
         <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
         <div class="detail-head">
           <div>
-            <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <span>${escapeHtml(order.ma_don_hang || '')}</span></div>
+            <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <span>${refAnchor(order._id ? '/don-hang/' + order._id : '', order.ma_don_hang || '')}</span></div>
             <div class="detail-meta">
               <div class="mini-field"><label>Người tạo</label><span>${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}</span></div>
               <div class="mini-field"><label>Người nhận đặt</label><input class="mini-input" value="${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}"></div>
@@ -198,7 +210,7 @@
           <div class="delivery-title"><span><i class="fa-regular fa-hand-point-right"></i> Tự giao đến: <strong>${escapeHtml(address || 'Chưa có địa chỉ giao hàng')}</strong></span><i class="fa-solid fa-chevron-up"></i></div>
           <div class="delivery-grid">
             <div class="mini-field"><label>Người nhận</label><input class="mini-input" value="${escapeHtml(receiver)}"></div>
-            <div class="mini-field"><label>Mã vận đơn</label><input class="mini-input" value="${escapeHtml(shipment?.ma_van_don || '')}"></div>
+            <div class="mini-field"><label>Mã vận đơn</label><span>${refAnchor(shipment?._id ? '/don-hang/van-don/' + shipment._id : '', shipment?.ma_van_don || '')}</span></div>
             <div class="mini-field"><label>Người giao</label><input class="mini-input" value="${escapeHtml(shipment?.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng')}"></div>
             <div class="mini-field"><label>Điện thoại</label><input class="mini-input" value="${escapeHtml(phone)}"></div>
             <div class="mini-field"><label>Trọng lượng</label><input class="mini-input" value="500 g"></div>
@@ -207,11 +219,11 @@
             <div class="mini-field"><label>Dịch vụ</label><input class="mini-input" value="Giao thường"></div>
             <div class="mini-field"><label>Phí trả ĐTGH</label><input class="mini-input" value="${money(shipment?.phi_giao_hang || 0)}"></div>
           </div>
-          <textarea class="note" placeholder="Ghi chú giao...">${escapeHtml(shipment?.ghi_chu || '')}</textarea>
+          <textarea class="note js-shipment-note" data-order-id="${order._id}" placeholder="Ghi chú giao...">${escapeHtml(shipment?.ghi_chu || '')}</textarea>
         </div>
         <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">SL đặt</th><th class="num">SL xác nhận</th><th class="num">SL đã giao</th><th class="num">SL còn thiếu</th><th>Trạng thái giao</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
         <div class="detail-bottom">
-          <textarea class="note" placeholder="Ghi chú...">${escapeHtml(order.ghi_chu || '')}</textarea>
+          <textarea class="note js-order-note" data-order-id="${order._id}" placeholder="Ghi chú...">${escapeHtml(order.ghi_chu || '')}</textarea>
           <div class="totals">
             <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${money(totalGoods)}</strong></div>
             <div class="total-line"><span>Giảm giá phiếu đặt</span><span>${money(discount)}</span></div>
@@ -219,9 +231,9 @@
             <div class="total-line"><span>Khách đã trả</span><span>0</span></div>
           </div>
         </div>
-        <div class="detail-actions">
-          <div class="detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><button type="button" class="btn"><i class="fa-regular fa-copy"></i> Sao chép</button><a class="btn" href="/don-hang/${order._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
-          <div class="detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>${invoiceAction}<button type="button" class="btn"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><button type="button" class="btn"><i class="fa-solid fa-print"></i> In</button></div>
+        <div class="page-actions page-actions--split page-actions--bordered detail-actions">
+          <div class="page-actions__left detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><a class="btn" href="/don-hang/create?copy_from=${order._id}"><i class="fa-regular fa-copy"></i> Sao chép</a><a class="btn" href="/don-hang/${order._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+          <div class="page-actions__right detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>${invoiceAction}<button type="button" class="btn" onclick="saveOrderDetail('${order._id}')"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><a class="btn" href="/chung-tu-kho/ban-hang/${order._id}" target="_blank"><i class="fa-solid fa-print"></i> Mở riêng</a></div>
         </div>`;
     }
 
@@ -274,6 +286,30 @@
     async function deleteOrder(id) {
       if (!confirm('Hủy đơn đặt hàng này?')) return;
       await updateOrderStatus(id, 'cancelled');
+    }
+
+    async function saveOrderDetail(id) {
+      const detailRow = document.querySelector('[data-order-detail="' + id + '"]');
+      const panel = detailRow?.querySelector('.order-detail');
+      if (!panel) return alert('Vui lòng mở chi tiết đơn trước khi lưu.');
+      const deliveryInputs = panel.querySelectorAll('.delivery-grid .mini-input');
+      const payload = {
+        ghi_chu: panel.querySelector('.js-order-note')?.value || '',
+        shipment: {
+          ten_nguoi_nhan: deliveryInputs[0]?.value || '',
+          sdt_nguoi_nhan: deliveryInputs[3]?.value || '',
+          dia_chi_nhan: deliveryInputs[6]?.value || '',
+          ghi_chu: panel.querySelector('.js-shipment-note')?.value || ''
+        }
+      };
+      const res = await fetch('/don-hang/' + id + '/detail', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không lưu được đơn hàng');
+      alert(data.message || 'Đã lưu thông tin đơn hàng');
     }
   </script>
 </body>

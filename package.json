@@ -9,6 +9,7 @@
     "start": "node ./bin/www",
     "seed:bulk": "node seed_bulk_activity.js",
     "migrate:ton-kho:kho": "node scripts/migrate-ton-kho-to-kho.js",
+    "migrate:lo-hang-remove-old-fields": "node scripts/remove-lo-hang-old-date-fields.js",
     "seed:kho-flow": "node scripts/seed-kho-flow.js"
   },
   "dependencies": {

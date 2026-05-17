@@ -1,14 +1,74 @@
-<%
+﻿<%
   const safeTickets = Array.isArray(locals.importSlips) ? locals.importSlips : [];
   const safeFilters = locals.filter || {};
   const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const statusBadge = status => status === 'draft' ? 'draft' : '';
+  const formatDateOnly = value => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('vi-VN');
+  };
+  const lotLabel = row => {
+    const product = row && row.hang_hoa_id ? row.hang_hoa_id : {};
+    if (!product.quan_ly_theo_lo) return 'Không theo lô';
+    const lot = row && row.lo_hang_id ? row.lo_hang_id : null;
+    if (!lot) return '--';
+    const lotName = lot.ten_lo || lot.ma_lo || '--';
+    const lotText = lot._id ? refLink('lot', lot, lotName) : lotName;
+    const expiry = formatDateOnly(lot.han_su_dung);
+    return expiry ? `${lotText} - HSD: ${expiry}` : lotText;
+  };
+  const attributeList = row => {
+    if (Array.isArray(row?.attribute_values) && row.attribute_values.length) return row.attribute_values;
+    const value = row && row.gia_tri_thuoc_tinh_id ? row.gia_tri_thuoc_tinh_id : null;
+    if (!value) return [];
+    const attr = value.thuoc_tinh_id || {};
+    return [{
+      ten_thuoc_tinh: attr.ten_thuoc_tinh || attr.ma_thuoc_tinh || 'Thuộc tính',
+      ten_gia_tri: value.ten_gia_tri || value.ma_gia_tri || ''
+    }].filter(item => item.ten_gia_tri);
+  };
+  const isSizeName = name => {
+    const text = String(name || '').toLowerCase();
+    return text === 'size' || text.includes('kích cỡ') || text.includes('kich co');
+  };
+  const attributeSummary = row => {
+    const attrs = attributeList(row);
+    if (!attrs.length) return 'Không phân loại';
+    if (attrs.length === 1 && isSizeName(attrs[0].ten_thuoc_tinh)) return attrs[0].ten_gia_tri;
+    return attrs.map(item => `${item.ten_thuoc_tinh}: ${item.ten_gia_tri}`).join(' - ');
+  };
+  const detailGroups = rows => {
+    const groups = [];
+    const index = {};
+    (rows || []).forEach(row => {
+      const product = row && row.hang_hoa_id ? row.hang_hoa_id : {};
+      const lot = row && row.lo_hang_id ? row.lo_hang_id : null;
+      const productId = String(product._id || row.hang_hoa_id || '');
+      const lotId = product.quan_ly_theo_lo ? String(lot?._id || row.lo_hang_id || 'missing') : 'no-lot';
+      const key = productId + '::' + lotId;
+      if (!index[key]) {
+        index[key] = {
+          product,
+          lot,
+          lot_label: lotLabel(row),
+          rows: [],
+          total: 0
+        };
+        groups.push(index[key]);
+      }
+      index[key].rows.push(row);
+      index[key].total += Number(row.thanh_tien || 0);
+    });
+    return groups;
+  };
 %>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -27,12 +87,17 @@
     .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none}
     .po-main{min-width:0;display:flex;flex-direction:column;gap:10px}
     .po-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .po-search{position:relative;flex:1;max-width:470px}
+    .po-search-group{display:flex;align-items:center;gap:8px;flex:1;max-width:700px}
+    .po-search{position:relative;flex:1;min-width:220px}
     .po-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 12px;font-size:13px;outline:none}
+    .po-sort-label{font-size:12px;font-weight:800;color:#344054;white-space:nowrap}
+    .po-sort-select{height:31px;width:190px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none}
     .toolbar-actions{display:flex;align-items:center;gap:8px}
     .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
-    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .supplier-code-link{color:#0070f4;text-decoration:none;font-weight:700}
+    .supplier-code-link:hover{text-decoration:underline}
+    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none}
     .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:hidden}
     .po-table{width:100%;table-layout:fixed;border-collapse:collapse}
     .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
@@ -68,22 +133,48 @@
     .mini-table{width:100%;border-collapse:collapse}
     .mini-table th,.mini-table td{border:1px solid #e4eaf2;padding:6px 8px;font-size:12px}
     .mini-table th{background:#f4f8fc;text-align:left}
+    .mini-table .lot-cell{width:140px;max-width:140px;font-size:11px;color:#475467;line-height:1.35}
+    .lot-group-title{font-size:13px;font-weight:800;color:#111827;margin:10px 0 6px}
+    .lot-group-title:first-child{margin-top:0}
+    .grouped-lot-table th,.grouped-lot-table td{vertical-align:top}
+    .grouped-lot-table .lot-cell{width:170px;max-width:170px;color:#111827;font-weight:700}
+    .grouped-lot-table .attr-cell{min-width:170px}
+    .grouped-lot-table .lot-total-cell{width:120px;font-weight:800;color:#006dff;text-align:right;vertical-align:middle}
     .lot-note{font-size:11px;color:#667085}
     .summary-card{border:1px solid #e4eaf2;border-radius:6px;padding:10px}
     .summary-line{display:flex;justify-content:space-between;font-size:12px;margin:6px 0}
     .summary-line b{font-size:13px}
-    .detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
     .po-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
     .po-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000}
     .po-modal.open{display:flex}
-    .po-modal-card{width:min(760px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}
+    .po-modal-card{width:min(1120px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}
     .po-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
     .po-modal-head h3{margin:0;font-size:18px}
     .po-modal-close{border:0;background:#fff;font-size:24px;cursor:pointer}
     .po-modal textarea{width:100%;min-height:90px;border:1px solid #cfd8e3;border-radius:6px;padding:8px}
+    .quick-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .quick-pay-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
+    .quick-pay-grid label.full{grid-column:1/-1}
+    .quick-pay-grid input,.quick-pay-grid select,.quick-pay-grid textarea{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}
+    .quick-pay-grid textarea{height:76px;min-height:76px}
+    .edit-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+    .edit-field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
+    .edit-field label{font-weight:700;color:#344054}
+    .edit-field input,.edit-field select,.edit-field textarea{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}
+    .edit-field textarea{height:70px;min-height:70px}
+    .edit-field.full{grid-column:1/-1}
+    .edit-table-wrap{overflow-x:auto;border:1px solid #dbe4ee;border-radius:6px;margin-top:8px}
+    .edit-table{width:100%;min-width:920px;border-collapse:collapse;font-size:13px}
+    .edit-table th,.edit-table td{border-bottom:1px solid #e4e7ec;padding:7px;text-align:left;vertical-align:middle}
+    .edit-table th{background:#f8fafc;font-weight:800;color:#344054}
+    .edit-table input,.edit-table select{width:100%;height:32px;border:1px solid #cfd8e3;border-radius:5px;padding:5px 6px}
+    .edit-table .num{text-align:right}
+    .edit-total-box{display:grid;grid-template-columns:1fr 220px;gap:8px;margin-top:12px;align-items:center}
+    .edit-total-box span{color:#667085}
+    .edit-total-box b{text-align:right}
     .label-options{display:flex;gap:12px;margin:10px 0}.label-options select{height:32px;border:1px solid #cfd8e3;border-radius:6px}
     @media print{body>*:not(#labelPrintArea){display:none!important}#labelPrintArea{display:block!important}.label-sheet{display:grid;grid-template-columns:repeat(3,64mm);gap:3mm}.label-item{border:1px solid #111;padding:3mm;height:28mm;font-size:11px;break-inside:avoid}.label-code{font-weight:800;font-size:13px}.label-bar{font-family:monospace;letter-spacing:2px;margin-top:3px}}
-    @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+    @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}.edit-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
 </head>
 <body class="admin-body">
@@ -118,14 +209,24 @@
 
       <main class="po-main">
         <div class="po-toolbar">
-          <div class="po-search">
-            <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu nhập">
+          <div class="po-search-group">
+            <div class="po-search">
+              <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu nhập">
+            </div>
+            <span class="po-sort-label">Sắp xếp công nợ</span>
+            <select class="po-sort-select" name="sort" aria-label="Sắp xếp công nợ" onchange="this.form.submit()">
+              <option value="newest" <%= safeFilters.sort === 'newest' ? 'selected' : '' %>>Mới nhất</option>
+              <option value="oldest" <%= safeFilters.sort === 'oldest' ? 'selected' : '' %>>Cũ nhất</option>
+              <option value="debt_high" <%= safeFilters.sort === 'debt_high' ? 'selected' : '' %>>Nợ NCC cao nhất</option>
+              <option value="debt_low" <%= safeFilters.sort === 'debt_low' ? 'selected' : '' %>>Nợ NCC thấp nhất</option>
+              <option value="oldest_debt" <%= safeFilters.sort === 'oldest_debt' ? 'selected' : '' %>>Nợ xa nhất</option>
+            </select>
           </div>
           <div class="toolbar-actions">
             <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
             <button class="kv-btn" type="button">Xuất file ▾</button>
             <button type="button" class="tool-icon">☰</button>
-            <button type="button" class="tool-icon">⚙</button>
+            <a href="/cau-hinh/doanh-nghiep" class="tool-icon" title="Cấu hình doanh nghiệp">⚙</a>
             <button type="button" class="tool-icon">?</button>
           </div>
         </div>
@@ -150,9 +251,15 @@
                   <tr class="expand-row" data-expand-id="<%= t._id %>">
                     <td class="check-col"><input class="row-check" type="checkbox"></td>
                     <td class="star-col">☆</td>
-                    <td class="cell-ellipsis"><%= t.ma_phieu_nhap || '' %></td>
+                    <td class="cell-ellipsis"><%- refLink('purchase', t, t.ma_phieu_nhap || '') %></td>
                     <td class="cell-ellipsis"><%= formatDate(t.ngay_nhap || t.created_at) %></td>
-                    <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ma_ncc || '--') : '--' %></td>
+                    <td class="cell-ellipsis">
+                      <% if (t.nha_cung_cap_id && t.nha_cung_cap_id._id) { %>
+                        <%- refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '--', 'onclick="event.stopPropagation()"') %>
+                      <% } else { %>
+                        --
+                      <% } %>
+                    </td>
                     <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
                     <td class="num"><%= fmt((t.con_no_ncc ?? 0)) %></td>
                     <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
@@ -167,7 +274,7 @@
                         <div class="po-detail-pane is-active" data-tab-pane="info">
                           <div class="detail-head">
                             <div>
-                              <div class="detail-title"><%= t.ma_phieu_nhap || '--' %></div>
+                              <div class="detail-title"><%- refLink('purchase', t, t.ma_phieu_nhap || '--') %></div>
                               <span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span>
                             </div>
                             <div><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></div>
@@ -178,37 +285,55 @@
                             <div class="item">Ngày nhập<b><%= formatDate(t.ngay_nhap || t.created_at) %></b></div>
                             <div class="item">Kho nhập<b><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></b></div>
                             <div class="item">Tên NCC<b><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></b></div>
-                            <div class="item">Mã NCC<b><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ma_ncc || '--') : '--' %></b></div>
+                            <div class="item">Mã NCC<b>
+                              <% if (t.nha_cung_cap_id && t.nha_cung_cap_id._id) { %>
+                                <%- refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '--') %>
+                              <% } else { %>
+                                --
+                              <% } %>
+                            </b></div>
                             <div class="item" style="grid-column: span 2;">Ghi chú<b><%= t.ghi_chu || '--' %></b></div>
                           </div>
                           <div class="detail-body">
                             <div>
-                              <table class="mini-table">
-                                <thead>
-                                  <tr>
-                                    <th>Mã hàng</th><th>Tên hàng</th><th>Số lượng</th><th>Đơn giá nhập</th><th>Giảm giá</th><th>Giá nhập</th><th>Thành tiền</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <% if (!(t.detail_rows || []).length) { %>
-                                    <tr><td colspan="7">Không có chi tiết hàng.</td></tr>
-                                  <% } %>
-                                  <% (t.detail_rows || []).forEach(function(r) { %>
+                              <% if (!(t.detail_rows || []).length) { %>
+                                <table class="mini-table"><tbody><tr><td>Không có chi tiết hàng.</td></tr></tbody></table>
+                              <% } %>
+                              <% detailGroups(t.detail_rows || []).forEach(function(group) { %>
+                                <div class="lot-group-title">
+                                  <%- group.product ? (refLink('product', group.product, group.product.ma_hang || '--') + ' - ' + (group.product.ten_hang || '--')) : '--' %>
+                                </div>
+                                <table class="mini-table grouped-lot-table">
+                                  <thead>
                                     <tr>
-                                      <td><%= r.hang_hoa_id ? (r.hang_hoa_id.ma_hang || '--') : '--' %></td>
-                                      <td><%= r.hang_hoa_id ? (r.hang_hoa_id.ten_hang || '--') : '--' %></td>
-                                      <td><%= fmt(r.so_luong || 0) %></td>
-                                      <td><%= fmt(r.don_gia_nhap || 0) %></td>
-                                      <td><%= (r.kieu_giam_gia_dong === 'percent' ? ((r.giam_gia_dong || 0) + '%') : fmt(r.giam_gia_dong || 0)) %></td>
-                                      <td><%= fmt(r.don_gia_nhap || 0) %></td>
-                                      <td><%= fmt(r.thanh_tien || 0) %></td>
+                                      <th>Ngày / Lô</th>
+                                      <th>Thuộc tính</th>
+                                      <th class="num">Số Kg</th>
+                                      <th class="num">Đơn giá</th>
+                                      <th class="num">Thành tiền</th>
+                                      <th class="num">Tổng theo lô</th>
                                     </tr>
-                                    <% if (r.lo_hang_id) { %>
-                                      <tr><td colspan="7" class="lot-note">Lô: <%= r.lo_hang_id.ten_lo || r.lo_hang_id.ma_lo || '--' %> - HSD: <%= formatDate(r.lo_hang_id.han_su_dung) %> - SL: <%= fmt(r.lo_hang_id.so_luong_ban_dau || r.lo_hang_id.so_luong_con_lai || 0) %></td></tr>
-                                    <% } %>
-                                  <% }) %>
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    <% group.rows.forEach(function(r, rowIndex) { %>
+                                      <tr>
+                                        <% if (rowIndex === 0) { %>
+                                          <td class="lot-cell" rowspan="<%= group.rows.length %>"><%- group.lot_label %></td>
+                                        <% } %>
+                                        <td class="attr-cell">
+                                          <div><%= attributeSummary(r) %></div>
+                                        </td>
+                                        <td class="num"><%= fmt(r.so_luong || 0) %></td>
+                                        <td class="num"><%= fmt(r.don_gia_nhap || 0) %></td>
+                                        <td class="num"><%= fmt(r.thanh_tien || 0) %></td>
+                                        <% if (rowIndex === 0) { %>
+                                          <td class="lot-total-cell" rowspan="<%= group.rows.length %>"><%= fmt(group.total || 0) %></td>
+                                        <% } %>
+                                      </tr>
+                                    <% }) %>
+                                  </tbody>
+                                </table>
+                              <% }) %>
                             </div>
                             <div class="summary-card">
                               <div class="summary-line"><span>Số lượng mặt hàng</span><b><%= fmt(t?.detail_summary?.tong_mat_hang || 0) %></b></div>
@@ -217,17 +342,18 @@
                               <div class="summary-line"><span>Tổng cộng / Cần trả NCC</span><b><%= fmt(t.can_tra_ncc || t.tong_tien || 0) %></b></div>
                               <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmt(t.da_tra_ncc || 0) %></b></div>
                               <div class="summary-line"><span>Nợ NCC</span><b><%= fmt(t.con_no_ncc || 0) %></b></div>
+                              <% if (Number(t.con_no_ncc || 0) > 0) { %>
+                                <button type="button" class="kv-btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="openPaySupplierModal('<%= t._id %>')">Trả NCC</button>
+                              <% } %>
                             </div>
                           </div>
-                          <div class="detail-actions">
+                          <div class="page-actions page-actions--bordered detail-actions">
+                            <button type="button" class="kv-btn primary" onclick="openPurchase('<%= t._id %>')">Chỉnh sửa</button>
                             <button type="button" class="kv-btn" onclick="cancelPurchase('<%= t._id %>')" <%= t.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
                             <button type="button" class="kv-btn" onclick="copyPurchase('<%= t._id %>')">Sao chép</button>
                             <a class="kv-btn" href="/nhap-hang/<%= t._id %>/export.xlsx">Xuất file</a>
-                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/in" target="_blank">In phiếu</a>
-                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/bang-ke-02-tndn" target="_blank">02/TNDN</a>
+                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/in-tong-hop" target="_blank">In phiếu + 02/TNDN</a>
                             <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/hd-mua-ban-nguyen-tac" target="_blank">HĐ nguyên tắc</a>
-                            <button type="button" class="kv-btn" onclick="openPurchase('<%= t._id %>')">Mở phiếu</button>
-                            <button type="button" class="kv-btn" onclick="openPurchase('<%= t._id %>')">Lưu</button>
                             <button type="button" class="kv-btn" onclick="returnPurchase('<%= t._id %>')">Trả hàng nhập</button>
                             <button type="button" class="kv-btn" onclick="openLabelModal('<%= t._id %>')">In tem mã</button>
                           </div>
@@ -235,20 +361,21 @@
                         <div class="po-detail-pane" data-tab-pane="payment">
                           <table class="mini-table">
                             <thead>
-                              <tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th>Phương thức</th><th>Trạng thái</th><th>Tiền chi</th></tr>
+                              <tr><th>Ngày</th><th>Mã phiếu chi</th><th>Số tiền</th><th>Phương thức</th><th>Sổ quỹ</th><th>Người tạo</th><th>Ghi chú</th></tr>
                             </thead>
                             <tbody>
                               <% if (!(t.payment_rows || []).length) { %>
-                                <tr><td colspan="6">Chưa có lịch sử thanh toán.</td></tr>
+                                <tr><td colspan="7">Chưa có lịch sử thanh toán.</td></tr>
                               <% } %>
                               <% (t.payment_rows || []).forEach(function(p) { %>
                                 <tr>
-                                  <td><%= p.ma_phieu || '--' %></td>
                                   <td><%= formatDate(p.thoi_gian) %></td>
-                                  <td><%= p.nguoi_tao || '--' %></td>
-                                  <td><%= p.phuong_thuc || '--' %></td>
-                                  <td><%= p.trang_thai || '--' %></td>
+                                  <td><%- p._id ? refLink('receipt', p._id, p.ma_phieu || '--') : (p.ma_phieu || '--') %></td>
                                   <td><%= fmt(p.tien_chi || 0) %></td>
+                                  <td><%= p.phuong_thuc || '--' %></td>
+                                  <td><%= p.so_quy || '--' %></td>
+                                  <td><%= p.nguoi_tao || '--' %></td>
+                                  <td><%= p.ghi_chu || '--' %></td>
                                 </tr>
                               <% }) %>
                             </tbody>
@@ -271,11 +398,11 @@
   <div id="purchaseModal" class="po-modal">
     <div class="po-modal-card">
       <div class="po-modal-head">
-        <h3 id="purchaseModalTitle">Phiếu nhập</h3>
-        <button class="po-modal-close" type="button" onclick="closePurchaseModal()">×</button>
+        <h3 id="purchaseModalTitle">Chỉnh sửa phiếu nhập</h3>
+        <button class="po-modal-close" type="button" onclick="closePurchaseModal()">&times;</button>
       </div>
       <div id="purchaseModalBody"></div>
-      <div class="detail-actions">
+      <div class="page-actions page-actions--bordered detail-actions">
         <button class="kv-btn primary" type="button" onclick="savePurchaseNote()">Lưu</button>
         <button class="kv-btn" type="button" onclick="closePurchaseModal()">Đóng</button>
       </div>
@@ -285,7 +412,7 @@
     <div class="po-modal-card">
       <div class="po-modal-head">
         <h3>In tem mã</h3>
-        <button class="po-modal-close" type="button" onclick="closeLabelModal()">×</button>
+        <button class="po-modal-close" type="button" onclick="closeLabelModal()">&times;</button>
       </div>
       <div class="label-options">
         <label>Mẫu giấy
@@ -296,18 +423,48 @@
         </label>
       </div>
       <div id="labelItems"></div>
-      <div class="detail-actions">
+      <div class="page-actions page-actions--bordered detail-actions">
         <button class="kv-btn primary" type="button" onclick="printLabels()">In / Preview</button>
         <button class="kv-btn" type="button" onclick="closeLabelModal()">Đóng</button>
       </div>
     </div>
   </div>
+  <div id="paySupplierModal" class="po-modal">
+    <div class="po-modal-card" style="width:min(640px,calc(100vw - 32px))">
+      <div class="po-modal-head">
+        <h3>Trả NCC</h3>
+        <button class="po-modal-close" type="button" onclick="closePaySupplierModal()">&times;</button>
+      </div>
+      <div id="paySupplierBody"></div>
+      <div class="page-actions page-actions--bordered detail-actions">
+        <button class="kv-btn primary" type="button" onclick="submitPaySupplier()">Lưu phiếu chi</button>
+        <button class="kv-btn" type="button" onclick="closePaySupplierModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
   <div id="labelPrintArea" style="display:none"></div>
   <script id="purchaseData" type="application/json"><%- JSON.stringify(safeTickets || []).replace(/</g, '\\u003c') %></script>
+  <script id="supplierData" type="application/json"><%- JSON.stringify(locals.suppliers || []).replace(/</g, '\\u003c') %></script>
+  <script id="warehouseData" type="application/json"><%- JSON.stringify(locals.warehouses || []).replace(/</g, '\\u003c') %></script>
+  <script id="cashBookData" type="application/json"><%- JSON.stringify(locals.cashBooks || []).replace(/</g, '\\u003c') %></script>
   <script>
     const purchases = JSON.parse(document.getElementById('purchaseData')?.textContent || '[]');
+    const suppliers = JSON.parse(document.getElementById('supplierData')?.textContent || '[]');
+    const warehouses = JSON.parse(document.getElementById('warehouseData')?.textContent || '[]');
+    const cashBooks = JSON.parse(document.getElementById('cashBookData')?.textContent || '[]');
     let currentPurchaseId = '';
+    let currentPurchaseEdit = null;
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
+    function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '')) || 0; }
+    function toDateInput(value){
+      if (!value) return '';
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toISOString().split('T')[0];
+    }
+    function escapeHtml(value){
+      return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
     function findPurchase(id){ return purchases.find(item => String(item._id) === String(id)); }
     async function postJson(url, body){
       const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body || {}) });
@@ -349,8 +506,33 @@
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Không tải được phiếu nhập');
         const ticket = data.data.ticket;
-        const readonly = ticket.trang_thai === 'completed' || ticket.trang_thai === 'cancelled';
-        title.textContent = `${ticket.ma_phieu_nhap || 'Phiếu nhập'} - ${readonly ? 'chỉ sửa ghi chú' : 'phiếu tạm'}`;
+        const readonly = ticket.trang_thai === 'cancelled';
+        currentPurchaseEdit = { ticket, items: data.data.items || [] };
+        title.textContent = `Chỉnh sửa ${ticket.ma_phieu_nhap || 'phiếu nhập'}`;
+        const supplierOptions = suppliers.map(s => {
+          const selected = String(s._id) === String(ticket.nha_cung_cap_id?._id || ticket.nha_cung_cap_id || '');
+          return `<option value="${s._id}" ${selected ? 'selected' : ''}>${escapeHtml((s.ma_ncc ? s.ma_ncc + ' - ' : '') + (s.ten_ncc || s.ten_cong_ty || ''))}</option>`;
+        }).join('');
+        const warehouseOptions = warehouses.map(k => {
+          const selected = String(k._id) === String(ticket.kho_id?._id || ticket.kho_id || '');
+          return `<option value="${k._id}" ${selected ? 'selected' : ''}>${escapeHtml(k.ten_kho || k.ma_kho || '')}</option>`;
+        }).join('');
+        const itemRows = currentPurchaseEdit.items.map((row, index) => {
+          const product = row.hang_hoa_id || {};
+          const discountType = row.kieu_giam_gia_dong || 'vnd';
+          return `
+            <tr data-edit-row="${row._id}">
+              <td>${index + 1}</td>
+              <td>${escapeHtml(product.ma_hang || '')}</td>
+              <td>${escapeHtml(product.ten_hang || '')}</td>
+              <td><input data-edit-field="so_luong" type="number" min="1" step="1" value="${Number(row.so_luong || 1)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="don_gia_nhap" inputmode="numeric" value="${money(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="giam_gia_dong" inputmode="numeric" value="${money(row.giam_gia_dong || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><select data-edit-field="kieu_giam_gia_dong" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${discountType === 'vnd' ? 'selected' : ''}>VND</option><option value="percent" ${discountType === 'percent' ? 'selected' : ''}>%</option></select></td>
+              <td class="num" data-edit-total>${money(row.thanh_tien || 0)}</td>
+              <td><input data-edit-field="ghi_chu" value="${escapeHtml(row.ghi_chu || '')}" ${readonly ? 'disabled' : ''}></td>
+            </tr>`;
+        }).join('');
         body.innerHTML = `
           <div class="detail-grid">
             <div class="item">Nhà cung cấp<b>${ticket.nha_cung_cap_id?.ten_ncc || '--'}</b></div>
@@ -358,19 +540,91 @@
             <div class="item">Trạng thái<b>${ticket.trang_thai || '--'}</b></div>
             <div class="item">Cần trả NCC<b>${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}</b></div>
           </div>
-          <label>Ghi chú</label>
-          <textarea id="purchaseNote">${ticket.ghi_chu || ''}</textarea>
-          <p class="lot-note">${readonly ? 'Phiếu đã hoàn thành/hủy: chỉ lưu ghi chú để tránh lệch tồn kho và công nợ.' : 'Phiếu tạm: thay đổi hàng hóa nên thực hiện ở màn tạo/sửa chuyên dụng.'}</p>
+          <div class="edit-form-grid">
+            <div class="edit-field"><label>Nhà cung cấp</label><select id="editSupplier" ${readonly ? 'disabled' : ''}>${supplierOptions}</select></div>
+            <div class="edit-field"><label>Kho nhập</label><select id="editWarehouse" ${readonly ? 'disabled' : ''}>${warehouseOptions}</select></div>
+            <div class="edit-field"><label>Ngày nhập</label><input id="editImportDate" type="date" value="${toDateInput(ticket.ngay_nhap || ticket.created_at)}" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Phương thức</label><select id="editPaymentMethod" ${readonly ? 'disabled' : ''}><option value="cong_no" ${ticket.phuong_thuc_thanh_toan === 'cong_no' ? 'selected' : ''}>Công nợ</option><option value="tien_mat" ${ticket.phuong_thuc_thanh_toan === 'tien_mat' ? 'selected' : ''}>Tiền mặt</option><option value="chuyen_khoan" ${ticket.phuong_thuc_thanh_toan === 'chuyen_khoan' ? 'selected' : ''}>Chuyển khoản</option></select></div>
+            <div class="edit-field"><label>Giảm giá phiếu</label><input id="editDiscount" inputmode="numeric" value="${money(ticket.giam_gia || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Kiểu giảm giá</label><select id="editDiscountType" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${ticket.kieu_giam_gia !== 'percent' ? 'selected' : ''}>VND</option><option value="percent" ${ticket.kieu_giam_gia === 'percent' ? 'selected' : ''}>%</option></select></div>
+            <div class="edit-field"><label>Cần trả NCC</label><input id="editPayable" inputmode="numeric" value="${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}" oninput="this.dataset.touched='1';calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Đã trả NCC</label><input id="editPaid" inputmode="numeric" value="${money(ticket.da_tra_ncc || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field full"><label>Ghi chú phiếu</label><textarea id="purchaseNote" ${readonly ? 'disabled' : ''}>${escapeHtml(ticket.ghi_chu || '')}</textarea></div>
+          </div>
+          <div class="edit-table-wrap">
+            <table class="edit-table">
+              <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Số lượng</th><th>Đơn giá</th><th>Giảm dòng</th><th>Kiểu</th><th class="num">Thành tiền</th><th>Ghi chú</th></tr></thead>
+              <tbody>${itemRows}</tbody>
+            </table>
+          </div>
+          <div class="edit-total-box">
+            <span>Tổng tiền hàng</span><b id="editGoodsTotal">0</b>
+            <span>Tổng cộng / Cần trả NCC</span><b id="editTotal">0</b>
+            <span>Nợ NCC</span><b id="editDebt">0</b>
+          </div>
+          <p class="lot-note">${readonly ? 'Phiếu đã hủy: không thể chỉnh sửa.' : 'Phiếu đã nhập hàng: khi đổi số lượng hoặc kho, hệ thống sẽ điều chỉnh tồn kho theo chênh lệch.'}</p>
         `;
+        calculatePurchaseEditTotals();
       } catch (error) {
         body.innerHTML = `<span style="color:#d92d20">${error.message}</span>`;
       }
     }
     function closePurchaseModal(){ document.getElementById('purchaseModal').classList.remove('open'); }
+    function calcEditLineTotal(rowEl){
+      const qty = Math.max(0, Math.floor(numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0)));
+      const price = numberValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0);
+      const discount = numberValue(rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0);
+      const type = rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd';
+      const base = qty * price;
+      const discountMoney = type === 'percent' ? Math.floor(base * Math.min(discount, 100) / 100) : discount;
+      return Math.max(0, Math.floor(base - discountMoney));
+    }
+    function calculatePurchaseEditTotals(){
+      let goodsTotal = 0;
+      document.querySelectorAll('[data-edit-row]').forEach(rowEl => {
+        const line = calcEditLineTotal(rowEl);
+        goodsTotal += line;
+        const totalCell = rowEl.querySelector('[data-edit-total]');
+        if (totalCell) totalCell.textContent = money(line);
+      });
+      const discount = numberValue(document.getElementById('editDiscount')?.value || 0);
+      const discountType = document.getElementById('editDiscountType')?.value || 'vnd';
+      const discountMoney = discountType === 'percent' ? Math.floor(goodsTotal * Math.min(discount, 100) / 100) : discount;
+      const total = Math.max(0, goodsTotal - discountMoney);
+      const payableInput = document.getElementById('editPayable');
+      if (payableInput && !payableInput.dataset.touched) payableInput.value = money(total);
+      const payable = Math.min(numberValue(payableInput?.value || total), total);
+      const paid = Math.min(numberValue(document.getElementById('editPaid')?.value || 0), payable);
+      const goodsEl = document.getElementById('editGoodsTotal');
+      const totalEl = document.getElementById('editTotal');
+      const debtEl = document.getElementById('editDebt');
+      if (goodsEl) goodsEl.textContent = money(goodsTotal);
+      if (totalEl) totalEl.textContent = money(total);
+      if (debtEl) debtEl.textContent = money(Math.max(0, payable - paid));
+    }
     async function savePurchaseNote(){
       if (!currentPurchaseId) return;
       try {
-        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', { ghi_chu: document.getElementById('purchaseNote')?.value || '' });
+        const items = Array.from(document.querySelectorAll('[data-edit-row]')).map(rowEl => ({
+          _id: rowEl.dataset.editRow,
+          so_luong: rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0,
+          don_gia_nhap: rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0,
+          giam_gia_dong: rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0,
+          kieu_giam_gia_dong: rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd',
+          ghi_chu: rowEl.querySelector('[data-edit-field="ghi_chu"]')?.value || ''
+        }));
+        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', {
+          nha_cung_cap_id: document.getElementById('editSupplier')?.value || '',
+          kho_id: document.getElementById('editWarehouse')?.value || '',
+          ngay_nhap: document.getElementById('editImportDate')?.value || '',
+          phuong_thuc_thanh_toan: document.getElementById('editPaymentMethod')?.value || 'cong_no',
+          giam_gia: document.getElementById('editDiscount')?.value || 0,
+          kieu_giam_gia: document.getElementById('editDiscountType')?.value || 'vnd',
+          can_tra_ncc: document.getElementById('editPayable')?.value || 0,
+          da_tra_ncc: document.getElementById('editPaid')?.value || 0,
+          ghi_chu: document.getElementById('purchaseNote')?.value || '',
+          items
+        });
         alert(data.message || 'Đã lưu');
         location.reload();
       } catch (error) {
@@ -381,6 +635,50 @@
       const p = findPurchase(id);
       if (p && p.trang_thai !== 'completed') return alert('Chỉ trả hàng nhập từ phiếu đã nhập hàng.');
       location.href = '/tra-hang-nhap/create?phieu_nhap_id=' + encodeURIComponent(id);
+    }
+    function openPaySupplierModal(id){
+      const p = findPurchase(id);
+      if (!p) return alert('Không tìm thấy phiếu nhập');
+      const debt = Number(p.con_no_ncc || 0);
+      if (debt <= 0) return alert('Phiếu nhập không còn nợ NCC');
+      currentPurchaseId = id;
+      const supplier = p.nha_cung_cap_id || {};
+      const cashBookOptions = cashBooks.map(book => {
+        const name = book.ten_so_quy || book.loai || 'Sổ quỹ';
+        const balance = money(book.so_du || 0);
+        return `<option value="${book._id}">${escapeHtml(name)} - ${balance}</option>`;
+      }).join('');
+      document.getElementById('paySupplierBody').innerHTML = `
+        <div class="quick-pay-grid">
+          <label><span>Loại phiếu</span><input value="Chi" readonly></label>
+          <label><span>Nhóm đối tượng</span><input value="Nhà cung cấp" readonly></label>
+          <label><span>Nhà cung cấp</span><input value="${escapeHtml((supplier.ma_ncc ? supplier.ma_ncc + ' - ' : '') + (supplier.ten_ncc || ''))}" readonly></label>
+          <label><span>Phiếu nhập</span><input value="${escapeHtml(p.ma_phieu_nhap || '')}" readonly></label>
+          <label><span>Giá trị</span><input id="paySupplierAmount" inputmode="numeric" value="${money(debt)}"></label>
+          <label><span>Phương thức</span><select id="paySupplierMethod"><option value="tien_mat">Tiền mặt</option><option value="chuyen_khoan">Chuyển khoản</option></select></label>
+          <label class="full"><span>Sổ quỹ</span><select id="paySupplierCashBook">${cashBookOptions || '<option value="">Chưa có sổ quỹ</option>'}</select></label>
+          <label class="full"><span>Ghi chú</span><textarea id="paySupplierNote">Thanh toán tiền nhập hàng cho phiếu ${escapeHtml(p.ma_phieu_nhap || '')}</textarea></label>
+        </div>
+      `;
+      document.getElementById('paySupplierModal').classList.add('open');
+    }
+    function closePaySupplierModal(){
+      document.getElementById('paySupplierModal').classList.remove('open');
+    }
+    async function submitPaySupplier(){
+      if (!currentPurchaseId) return;
+      try {
+        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/pay-supplier', {
+          gia_tri: document.getElementById('paySupplierAmount')?.value || 0,
+          phuong_thuc_thanh_toan: document.getElementById('paySupplierMethod')?.value || 'tien_mat',
+          so_quy_id: document.getElementById('paySupplierCashBook')?.value || '',
+          ghi_chu: document.getElementById('paySupplierNote')?.value || ''
+        });
+        alert(data.message || 'Đã tạo phiếu chi');
+        location.reload();
+      } catch (error) {
+        alert(error.message || 'Không tạo được phiếu chi');
+      }
     }
     function openLabelModal(id){
       currentPurchaseId = id;
@@ -421,6 +719,15 @@
           detail.style.display = detail.style.display === 'none' ? 'table-row' : 'none';
         });
       });
+      var purchaseId = new URLSearchParams(window.location.search).get('purchase');
+      if (purchaseId) {
+        var purchaseRow = document.querySelector('[data-expand-id="' + purchaseId + '"]');
+        var purchaseDetail = document.getElementById('detail-' + purchaseId);
+        if (purchaseRow && purchaseDetail) {
+          purchaseDetail.style.display = 'table-row';
+          purchaseRow.scrollIntoView({ block: 'center' });
+        }
+      }
       var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.po-detail'));
       detailBlocks.forEach(function(block) {
         var tabs = Array.prototype.slice.call(block.querySelectorAll('.po-detail-tab'));
@@ -441,3 +748,4 @@
   </script>
 </body>
 </html>
+

@@ -31,6 +31,22 @@ function normalizePaymentMethod(daTraNcc, conNoNcc, inputMethod) {
     return 'da_thanh_toan';
 }
 
+function safeLotCodeSegment(value) {
+    return String(value || '').trim().replace(/\s+/g, '').replace(/[^A-Za-z0-9_-]/g, '');
+}
+
+function makePurchaseLotCode(purchaseCode, productCode) {
+    const safePurchaseCode = safeLotCodeSegment(purchaseCode);
+    const safeProductCode = safeLotCodeSegment(productCode);
+    return safePurchaseCode && safeProductCode ? `LO-${safePurchaseCode}-${safeProductCode}` : '';
+}
+
+function formatLotName(dateValue) {
+    const d = dateValue ? new Date(dateValue) : new Date();
+    if (Number.isNaN(d.getTime())) return 'Lô';
+    return 'Lô ' + d.toLocaleDateString('vi-VN');
+}
+
 async function buildPurchaseFilter(query = {}) {
     const filter = {};
     if (query.q && query.q.trim() !== '') {
@@ -289,7 +305,7 @@ router.post('/add', async (req, res, next) => {
         const items = parseItems(req.body?.items);
 
         if (!items.length) {
-            return res.status(400).json({ success: false, message: 'Vui long chon it nhat 1 hang hoa' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 hàng hóa' });
         }
 
         if (!kho_id) {
@@ -298,13 +314,13 @@ router.post('/add', async (req, res, next) => {
 
         const kho = await Kho.findById(kho_id);
         if (!kho) {
-            return res.status(400).json({ success: false, message: 'Kho nhap hang khong hop le' });
+            return res.status(400).json({ success: false, message: 'Kho nhập hàng không hợp lệ' });
         }
 
         if (nha_cung_cap_id) {
             const supplier = await NhaCungCap.findById(nha_cung_cap_id);
             if (!supplier) {
-                return res.status(400).json({ success: false, message: 'Nha cung cap khong hop le' });
+                return res.status(400).json({ success: false, message: 'Nhà cung cấp không hợp lệ' });
             }
         }
 
@@ -318,16 +334,16 @@ router.post('/add', async (req, res, next) => {
             const so_luong = Number(item.so_luong);
             const don_gia_nhap = Number(item.don_gia_nhap);
             if (!Number.isFinite(so_luong) || so_luong <= 0) {
-                return res.status(400).json({ success: false, message: 'So luong nhap phai lon hon 0' });
+                return res.status(400).json({ success: false, message: 'Số lượng nhập phải lớn hơn 0' });
             }
 
             if (!Number.isFinite(don_gia_nhap) || don_gia_nhap < 0) {
-                return res.status(400).json({ success: false, message: 'Don gia nhap khong hop le' });
+                return res.status(400).json({ success: false, message: 'Đơn giá nhập không hợp lệ' });
             }
 
             const product = await HangHoa.findById(item.hang_hoa_id);
             if (!product) {
-                return res.status(400).json({ success: false, message: 'Hang hoa khong hop le' });
+                return res.status(400).json({ success: false, message: 'Hàng hóa không hợp lệ' });
             }
 
             const thanh_tien = so_luong * don_gia_nhap;
@@ -374,26 +390,52 @@ router.post('/add', async (req, res, next) => {
             ghi_chu
         });
 
+        const lotCache = new Map();
         for (const item of normalizedItems) {
             let loHangId = item.lo_hang_id;
             if (!loHangId && item.product.quan_ly_theo_lo) {
-                const lotCount = await LoHang.countDocuments({ hang_hoa_id: item.hang_hoa_id });
-                const lot = await LoHang.create({
-                    cua_hang_id: cua_hang_id || kho.cua_hang_id,
-                    ma_lo: `LO_${ma_phieu_nhap}_${String(lotCount + 1).padStart(3, '0')}`,
-                    ten_lo: `Lo ${item.product.ten_hang || ma_phieu_nhap}`,
-                    ngay_nhap: ngay_nhap || new Date(),
-                    hang_hoa_id: item.hang_hoa_id,
-                    nha_cung_cap_id: nha_cung_cap_id || item.product.nha_cung_cap_id,
-                    dia_chi_vuon_id: item.product.dia_chi_vuon_id,
-                    kho_id: kho._id,
-                    so_luong_ban_dau: item.so_luong,
-                    so_luong_con_lai: 0,
-                    gia_von: item.don_gia_nhap,
-                    trang_thai: 'active',
-                    ghi_chu: item.ghi_chu_lo || `Tao tu phieu nhap ${ma_phieu_nhap}`
-                });
-                loHangId = lot._id;
+                const maLo = makePurchaseLotCode(ma_phieu_nhap, item.product.ma_hang);
+                if (!maLo) return res.status(400).json({ success: false, message: 'Không thể sinh mã lô từ phiếu nhập và hàng hóa' });
+                if (lotCache.has(maLo)) {
+                    loHangId = lotCache.get(maLo);
+                    await LoHang.updateOne(
+                        { _id: loHangId },
+                        { $inc: { so_luong_ban_dau: item.so_luong }, $set: { gia_von: item.don_gia_nhap } }
+                    );
+                } else {
+                    const existingLot = await LoHang.findOne({
+                        ma_lo: maLo,
+                        hang_hoa_id: item.hang_hoa_id,
+                        phieu_nhap_id: phieu._id,
+                        trang_thai: { $ne: 'huy' }
+                    });
+                    if (existingLot) {
+                        loHangId = existingLot._id;
+                        await LoHang.updateOne(
+                            { _id: loHangId },
+                            { $inc: { so_luong_ban_dau: item.so_luong }, $set: { gia_von: item.don_gia_nhap } }
+                        );
+                    } else {
+                        const lot = await LoHang.create({
+                            cua_hang_id: cua_hang_id || kho.cua_hang_id,
+                            ma_lo: maLo,
+                            ten_lo: formatLotName(ngay_nhap || new Date()),
+                            ngay_nhap: ngay_nhap || new Date(),
+                            hang_hoa_id: item.hang_hoa_id,
+                            nha_cung_cap_id: nha_cung_cap_id || item.product.nha_cung_cap_id,
+                            phieu_nhap_id: phieu._id,
+                            dia_chi_vuon_id: item.product.dia_chi_vuon_id,
+                            kho_id: kho._id,
+                            so_luong_ban_dau: item.so_luong,
+                            so_luong_con_lai: 0,
+                            gia_von: item.don_gia_nhap,
+                            trang_thai: 'active',
+                            ghi_chu: item.ghi_chu_lo || `Tao tu phieu nhap ${ma_phieu_nhap}`
+                        });
+                        loHangId = lot._id;
+                    }
+                    lotCache.set(maLo, loHangId);
+                }
             }
 
             await CTPhieuNhap.create({
@@ -461,7 +503,7 @@ router.post('/add', async (req, res, next) => {
             }
         }
 
-        return res.json({ success: true, message: 'Nhap hang thanh cong', ma_phieu_nhap, phieu_id: phieu._id });
+        return res.json({ success: true, message: 'Nhập hàng thành công', ma_phieu_nhap, phieu_id: phieu._id });
     } catch (error) {
         return next(error);
     }

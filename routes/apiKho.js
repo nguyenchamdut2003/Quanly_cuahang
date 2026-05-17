@@ -122,7 +122,7 @@ router.get('/kho/:id', async (req, res, next) => {
     try {
         const data = await Kho.findById(req.params.id)
             .populate('cua_hang_id');
-        if (!data) return res.status(404).json({ success: false, message: 'Khong tim thay kho' });
+        if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy kho' });
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -141,7 +141,7 @@ router.post('/kho', async (req, res, next) => {
 router.put('/kho/:id', async (req, res, next) => {
     try {
         const data = await Kho.findByIdAndUpdate(req.params.id, { $set: scopedBody(req.body) }, { new: true, runValidators: true });
-        if (!data) return res.status(404).json({ success: false, message: 'Khong tim thay kho' });
+        if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy kho' });
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -151,7 +151,7 @@ router.put('/kho/:id', async (req, res, next) => {
 router.delete('/kho/:id', async (req, res, next) => {
     try {
         const kho = await Kho.findById(req.params.id);
-        if (!kho) return res.status(404).json({ success: false, message: 'Khong tim thay kho' });
+        if (!kho) return res.status(404).json({ success: false, message: 'Không tìm thấy kho' });
 
         await khoHasActivity(kho._id);
         kho.trang_thai = 'inactive';
@@ -205,7 +205,7 @@ router.get('/hang-hoa/:id/gia', async (req, res, next) => {
         const product = await HangHoa.findById(req.params.id)
             .select('ma_hang ten_hang loai_gia gia_co_dinh gia_von gia_nhap_cuoi')
             .lean();
-        if (!product) return res.status(404).json({ success: false, message: 'Khong tim thay hang hoa' });
+        if (!product) return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
 
         let price = product.loai_gia === 'co_dinh' ? Number(product.gia_co_dinh || 0) : null;
         let priceSource = product.loai_gia === 'co_dinh' ? 'gia_co_dinh' : 'thi_truong';
@@ -257,11 +257,22 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
         today.setHours(0, 0, 0, 0);
 
         const normalRows = await TonKho.find({ kho_id: khoId, so_luong: { $gt: 0 } })
-            .populate('hang_hoa_id')
+            .populate({
+                path: 'hang_hoa_id',
+                populate: { path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty' }
+            })
             .sort({ updated_at: -1, created_at: -1 })
             .lean();
 
         const products = new Map();
+        const supplierFields = product => {
+            const supplier = product.nha_cung_cap_id;
+            return {
+                nha_cung_cap_id: supplier ? String(supplier._id || supplier) : '',
+                ten_ncc: supplier ? (supplier.ten_ncc || supplier.ten_cong_ty || '') : '',
+                ma_ncc: supplier ? (supplier.ma_ncc || '') : ''
+            };
+        };
         normalRows
             .filter(row => row.hang_hoa_id && !row.hang_hoa_id.quan_ly_theo_lo && row.hang_hoa_id.trang_thai !== 'inactive')
             .forEach(row => {
@@ -272,12 +283,16 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                     ten_hang: product.ten_hang || '',
                     gia_co_dinh: Number(product.gia_co_dinh || 0),
                     quan_ly_theo_lo: false,
-                    ton_kho: Number(row.so_luong || 0)
+                    ton_kho: Number(row.so_luong || 0),
+                    ...supplierFields(product)
                 });
             });
 
         const lotRows = await TonKhoLo.find({ kho_id: khoId, so_luong: { $gt: 0 } })
-            .populate('hang_hoa_id')
+            .populate({
+                path: 'hang_hoa_id',
+                populate: { path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty' }
+            })
             .populate({ path: 'lo_hang_id', select: 'han_su_dung trang_thai' })
             .lean();
 
@@ -299,14 +314,16 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                     ten_hang: product.ten_hang || '',
                     gia_co_dinh: Number(product.gia_co_dinh || 0),
                     quan_ly_theo_lo: true,
-                    ton_kho: 0
+                    ton_kho: 0,
+                    ...supplierFields(product)
                 };
                 current.ton_kho += Number(row.so_luong || 0);
                 products.set(id, current);
             });
 
         const activeProducts = await HangHoa.find({ trang_thai: { $ne: 'inactive' } })
-            .select('_id ma_hang ten_hang gia_co_dinh quan_ly_theo_lo')
+            .select('_id ma_hang ten_hang gia_co_dinh quan_ly_theo_lo nha_cung_cap_id')
+            .populate('nha_cung_cap_id', 'ma_ncc ten_ncc ten_cong_ty')
             .lean();
         activeProducts.forEach(product => {
             const id = String(product._id);
@@ -317,7 +334,8 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                 ten_hang: product.ten_hang || '',
                 gia_co_dinh: Number(product.gia_co_dinh || 0),
                 quan_ly_theo_lo: !!product.quan_ly_theo_lo,
-                ton_kho: 0
+                ton_kho: 0,
+                ...supplierFields(product)
             });
         });
 
@@ -492,7 +510,7 @@ router.get('/lo-hang/:id', async (req, res, next) => {
             .populate('hang_hoa_id')
             .populate('nha_cung_cap_id')
             .populate('kho_id');
-        if (!data) return res.status(404).json({ success: false, message: 'Khong tim thay lo hang' });
+        if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy lô hàng' });
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -511,7 +529,7 @@ router.post('/lo-hang', async (req, res, next) => {
 router.put('/lo-hang/:id', async (req, res, next) => {
     try {
         const data = await LoHang.findByIdAndUpdate(req.params.id, { $set: scopedBody(req.body) }, { new: true, runValidators: true });
-        if (!data) return res.status(404).json({ success: false, message: 'Khong tim thay lo hang' });
+        if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy lô hàng' });
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -566,7 +584,7 @@ router.post('/dia-chi-doi-tuong', async (req, res, next) => {
 router.put('/dia-chi-doi-tuong/:id', async (req, res, next) => {
     try {
         const data = await DiaChiDoiTuong.findByIdAndUpdate(req.params.id, { $set: scopedBody(req.body) }, { new: true, runValidators: true });
-        if (!data) return res.status(404).json({ success: false, message: 'Khong tim thay dia chi' });
+        if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy địa chỉ' });
         res.json({ success: true, data });
     } catch (error) {
         next(error);
@@ -576,8 +594,8 @@ router.put('/dia-chi-doi-tuong/:id', async (req, res, next) => {
 router.delete('/dia-chi-doi-tuong/:id', async (req, res, next) => {
     try {
         const data = await DiaChiDoiTuong.findByIdAndDelete(req.params.id);
-        if (!data) return res.status(404).json({ success: false, message: 'Khong tim thay dia chi' });
-        res.json({ success: true, message: 'Da xoa dia chi' });
+        if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy địa chỉ' });
+        res.json({ success: true, message: 'Đã xóa địa chỉ' });
     } catch (error) {
         next(error);
     }
@@ -628,7 +646,7 @@ router.get('/don-hang/:id/phan-bo', async (req, res, next) => {
             .populate('khach_hang_id')
             .populate('kho_id')
             .lean();
-        if (!order) return res.status(404).json({ success: false, message: 'Khong tim thay don hang' });
+        if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         const details = await CTDonHang.find({ don_hang_id: order._id })
             .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang quan_ly_theo_lo gia_co_dinh loai_gia' })
             .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
@@ -673,7 +691,7 @@ router.post('/phan-bo-hang', async (req, res, next) => {
             ghi_chu: req.body.ghi_chu
         });
         await writeAllocationDetails(allocation, items);
-        res.status(201).json({ success: true, data: allocation });
+        res.status(201).json({ success: true, data: allocation, print_url: '/chung-tu-kho/phan-bo/' + allocation._id });
     } catch (error) {
         next(error);
     }
@@ -682,9 +700,9 @@ router.post('/phan-bo-hang', async (req, res, next) => {
 router.put('/phan-bo-hang/:id', async (req, res, next) => {
     try {
         const allocation = await PhanBoHang.findById(req.params.id);
-        if (!allocation) return res.status(404).json({ success: false, message: 'Khong tim thay phan bo hang' });
+        if (!allocation) return res.status(404).json({ success: false, message: 'Không tìm thấy phân bổ hàng' });
         if (allocation.trang_thai === 'confirmed') {
-            return res.status(400).json({ success: false, message: 'Phan bo da xac nhan khong the sua' });
+            return res.status(400).json({ success: false, message: 'Phân bổ đã xác nhận không thể sửa' });
         }
 
         Object.assign(allocation, scopedBody(req.body));
@@ -700,15 +718,15 @@ router.put('/phan-bo-hang/:id', async (req, res, next) => {
 router.put('/phan-bo-hang/:id/xac-nhan', async (req, res, next) => {
     try {
         const allocation = await PhanBoHang.findById(req.params.id);
-        if (!allocation) return res.status(404).json({ success: false, message: 'Khong tim thay phan bo hang' });
+        if (!allocation) return res.status(404).json({ success: false, message: 'Không tìm thấy phân bổ hàng' });
         if (allocation.trang_thai === 'cancelled') {
-            return res.status(400).json({ success: false, message: 'Phan bo da huy' });
+            return res.status(400).json({ success: false, message: 'Phân bổ đã hủy' });
         }
 
         allocation.trang_thai = 'confirmed';
         allocation.ngay_xac_nhan = new Date();
         await allocation.save();
-        res.json({ success: true, message: 'Da xac nhan phan bo hang. Ton kho se tru o buoc giao hang.', data: allocation });
+        res.json({ success: true, message: 'Da xac nhan phan bo hang. Ton kho se tru o buoc giao hang.', data: allocation, print_url: '/chung-tu-kho/phan-bo/' + allocation._id });
     } catch (error) {
         next(error);
     }

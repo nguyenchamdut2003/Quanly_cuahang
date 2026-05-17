@@ -1,0 +1,58 @@
+<%
+  const _className = typeof className !== 'undefined' && className ? String(className) : '';
+  const _sticky = typeof sticky !== 'undefined' && sticky;
+  const _split = typeof split !== 'undefined' && split;
+  const _size = typeof size === 'string' && size === 'sm' ? ' page-actions--sm' : '';
+  const _leftHtml = typeof leftHtml !== 'undefined' ? leftHtml : '';
+  const _rightHtml = typeof rightHtml !== 'undefined' ? rightHtml : '';
+  const _html = typeof html !== 'undefined' ? html : '';
+  const _items = Array.isArray(items) ? items : [];
+  const _leftItems = Array.isArray(left) ? left : [];
+  const _rightItems = Array.isArray(right) ? right : [];
+
+  function renderActionItem(item) {
+    if (!item || !item.text) return '';
+    const tag = item.tag || (item.href ? 'a' : 'button');
+    const classes = ['btn', item.class || 'btn-secondary'].filter(Boolean).join(' ');
+    const disabled = item.disabled ? ' disabled' : '';
+    const target = item.target ? ' target="' + item.target + '"' : '';
+    const rel = item.rel ? ' rel="' + item.rel + '"' : '';
+    const typeAttr = item.type ? ' type="' + item.type + '"' : (tag === 'button' ? ' type="button"' : '');
+    const formAttr = item.form ? ' form="' + item.form + '"' : '';
+    const formaction = item.formaction ? ' formaction="' + item.formaction + '"' : '';
+    const formmethod = item.formmethod ? ' formmethod="' + item.formmethod + '"' : '';
+    const idAttr = item.id ? ' id="' + item.id + '"' : '';
+    const onclickBase = item.onclick ? item.onclick : '';
+    const confirmAttr = item.confirm ? "return confirm('" + String(item.confirm).replace(/'/g, "\\'") + "')" : '';
+    const onclickAttr = (onclickBase || confirmAttr)
+      ? ' onclick="' + (confirmAttr && onclickBase ? confirmAttr + ';' + onclickBase : (confirmAttr || onclickBase)) + '"'
+      : '';
+    const iconHtml = item.icon ? '<i class="' + item.icon + '"></i> ' : '';
+    const label = iconHtml + item.text;
+
+    if (tag === 'a') {
+      return '<a class="' + classes + '" href="' + (item.href || '#') + '"' + target + rel + onclickAttr + idAttr + '>' + label + '</a>';
+    }
+    if (tag === 'submit') {
+      return '<button class="' + classes + '" type="submit"' + formAttr + formaction + formmethod + onclickAttr + idAttr + disabled + '>' + label + '</button>';
+    }
+    return '<button class="' + classes + '"' + typeAttr + formAttr + formaction + formmethod + onclickAttr + idAttr + disabled + '>' + label + '</button>';
+  }
+
+  function renderItems(list) {
+    return list.map(renderActionItem).join('');
+  }
+
+  const hasLeft = _split || _leftHtml || _leftItems.length;
+  const hasRightContent = _rightHtml || _html || _rightItems.length || _items.length;
+  const innerRight = _rightHtml || _html || renderItems(_rightItems.length ? _rightItems : _items);
+  const innerLeft = _leftHtml || renderItems(_leftItems);
+%>
+<div class="page-actions<%= _split || hasLeft ? ' page-actions--split' : '' %><%= _sticky ? ' page-actions--sticky' : '' %><%= _size %><%= _className ? ' ' + _className : '' %>">
+  <% if (hasLeft) { %>
+    <div class="page-actions__left"><%- innerLeft %></div>
+  <% } %>
+  <% if (hasRightContent || !hasLeft) { %>
+    <div class="page-actions__right"><%- innerRight %></div>
+  <% } %>
+</div>

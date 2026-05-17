@@ -8,6 +8,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -120,9 +121,9 @@
                   <tr onclick="openTicketDetail('<%= t._id %>')">
                     <td class="check-col"><input class="row-check" type="checkbox"></td>
                     <td class="star-col"><i class="fa-regular fa-star"></i></td>
-                    <td><%= t.ma_phieu_nhap %></td>
+                    <td><%- refLink('purchase', t, t.ma_phieu_nhap || '', 'onclick="event.stopPropagation()"') %></td>
                     <td><%= new Date(t.ngay_nhap || t.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) %></td>
-                    <td><%= t.nha_cung_cap_id ? t.nha_cung_cap_id.ma_ncc : '' %></td>
+                    <td><%- t.nha_cung_cap_id ? refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '', 'onclick="event.stopPropagation()"') : '' %></td>
                     <td><%= t.nha_cung_cap_id ? t.nha_cung_cap_id.ten_ncc : '' %></td>
                     <td class="num"><%= fmt(t.tong_tien) %></td>
                     <td><span class="status-badge <%= t.trang_thai === 'draft' ? 'draft' : '' %>"><%= statusLabel(t.trang_thai) %></span></td>

@@ -13,7 +13,8 @@ router.get('/', async (req, res, next) => {
     try {
         const [customersRaw, products, stores, partners, addresses, draftOrdersRaw] = await Promise.all([
             KhachHang.find(),
-            HangHoa.find({ ton_kho: { $gt: 0 } }),
+            HangHoa.find({ ton_kho: { $gt: 0 } })
+                .populate('nha_cung_cap_id', 'ma_ncc ten_ncc ten_cong_ty'),
             CuaHang.find(),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
             DiaChiKhachHang.find(),

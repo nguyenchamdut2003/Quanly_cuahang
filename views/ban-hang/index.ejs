@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+  <meta charset="UTF-8">
     <title><%= title %></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel='stylesheet' href='/stylesheets/style.css' />
@@ -247,12 +248,38 @@
         display: none;
       }
       .search-item {
-        padding: 10px 15px;
+        min-height: 52px;
+        padding: 7px 15px;
         cursor: pointer;
         display: flex;
+        align-items: center;
+        gap: 12px;
         justify-content: space-between;
       }
       .search-item:hover { background: #e6f7ff; }
+      .search-item-info {
+        min-width: 0;
+      }
+      .search-item-main {
+        display: block;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-item-supplier {
+        display: block;
+        color: #667085;
+        font-size: 12px;
+        margin-top: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .search-item-price {
+        flex: 0 0 auto;
+        font-weight: bold;
+      }
     </style>
   </head>
   <body>
@@ -578,6 +605,21 @@
         return store ? (store.dia_chi_gui_hang || formatAddress(store) || store.ten_cua_hang || '') : '';
       }
 
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[char]));
+      }
+
+      function supplierName(product) {
+        const supplier = product?.nha_cung_cap_id || {};
+        return supplier.ten_ncc || supplier.ten_cong_ty || product?.ten_ncc || 'Chưa có';
+      }
+
       async function calculateShippingFee() {
         if (shippingFeeManuallyEdited) return;
         const customerId = document.getElementById('customerId').value;
@@ -620,8 +662,11 @@
 
         resultsDiv.innerHTML = filtered.map(p => `
           <div class="search-item" onclick="addToCart('${p._id}')">
-            <span>${p.ten_hang}</span>
-            <span style="font-weight: bold;">${p.gia_ban.toLocaleString()}</span>
+            <span class="search-item-info">
+              <span class="search-item-main">${escapeHtml(p.ma_hang || '')} - ${escapeHtml(p.ten_hang || '')}</span>
+              <span class="search-item-supplier">NCC: ${escapeHtml(supplierName(p))}</span>
+            </span>
+            <span class="search-item-price">${Number(p.gia_ban || 0).toLocaleString('vi-VN')}</span>
           </div>
         `).join('');
         resultsDiv.style.display = 'block';

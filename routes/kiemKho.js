@@ -207,14 +207,14 @@ router.get('/export.csv', async (req, res, next) => {
 router.get('/:id/export.csv', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
-            return res.status(404).send('Khong tim thay phieu kiem kho');
+            return res.status(404).send('Không tìm thấy phiếu kiểm kho');
         }
 
         const ticket = await PhieuKiemKho.findById(req.params.id)
             .populate('kho_id')
             .populate('nguoi_tao_id');
         if (!ticket) {
-            return res.status(404).send('Khong tim thay phieu kiem kho');
+            return res.status(404).send('Không tìm thấy phiếu kiểm kho');
         }
 
         const details = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: ticket._id })
@@ -305,6 +305,31 @@ router.get('/:id/export.csv', async (req, res, next) => {
     }
 });
 
+async function loadKiemKhoCopyDraft(copyFromId) {
+    if (!/^[0-9a-fA-F]{24}$/.test(String(copyFromId || ''))) return null;
+    const ticket = await PhieuKiemKho.findById(copyFromId).lean();
+    if (!ticket) return null;
+    const lines = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: ticket._id })
+        .populate('hang_hoa_id')
+        .populate('lo_hang_id')
+        .lean();
+    if (!lines.length) return null;
+    return {
+        cua_hang_id: ticket.cua_hang_id ? String(ticket.cua_hang_id) : '',
+        kho_id: ticket.kho_id ? String(ticket.kho_id) : '',
+        ghi_chu: ticket.ghi_chu || '',
+        items: lines.map(row => ({
+            hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''),
+            lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
+            ma_hang: row.hang_hoa_id?.ma_hang || '',
+            ten_hang: row.hang_hoa_id?.ten_hang || '',
+            ton_kho_he_thong: Number(row.ton_kho_he_thong || 0),
+            so_luong_thuc_te: Number(row.so_luong_thuc_te || 0),
+            nguyen_nhan_lech: row.nguyen_nhan_lech || ''
+        })).filter(row => row.hang_hoa_id)
+    };
+}
+
 router.get('/create', async (req, res, next) => {
     try {
         const [stores, warehouses, products] = await Promise.all([
@@ -312,7 +337,23 @@ router.get('/create', async (req, res, next) => {
             Kho.find({ trang_thai: 'active' }).sort({ ten_kho: 1 }),
             HangHoa.find()
         ]);
-        res.render('kiem-kho/create', { title: 'Kiem kho moi', user: req.user, stores, warehouses, products });
+        let copyDraft = null;
+        let copyFromError = '';
+        const copyFromId = String(req.query?.copy_from || '').trim();
+        if (copyFromId) {
+            copyDraft = await loadKiemKhoCopyDraft(copyFromId);
+            if (!copyDraft) copyFromError = 'Không tải được phiếu kiểm kho để sao chép.';
+        }
+        const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
+        res.render('kiem-kho/create', {
+            title: 'Kiểm kho mới',
+            user: req.user,
+            stores,
+            warehouses,
+            products,
+            copyDraftJson,
+            copyFromError
+        });
     } catch (error) {
         next(error);
     }
@@ -329,11 +370,11 @@ async function saveKiemKho(req, res, next) {
 
         const kho = await Kho.findById(kho_id);
         if (!kho) {
-            return res.status(400).json({ success: false, message: 'Kho kiem khong hop le' });
+            return res.status(400).json({ success: false, message: 'Kho kiểm không hợp lệ' });
         }
 
         if (!items.length) {
-            return res.status(400).json({ success: false, message: 'Chua chon hang hoa kiem kho' });
+            return res.status(400).json({ success: false, message: 'Chưa chọn hàng hóa kiểm kho' });
         }
 
         const ma_kiem_kho = 'KK' + Date.now();
@@ -354,15 +395,15 @@ async function saveKiemKho(req, res, next) {
         for (const item of items) {
             const actualQuantity = Number(item.so_luong_thuc_te);
             if (!item.hang_hoa_id || !Number.isFinite(actualQuantity) || actualQuantity < 0) {
-                return res.status(400).json({ success: false, message: 'Du lieu kiem kho khong hop le' });
+                return res.status(400).json({ success: false, message: 'Dữ liệu kiểm kho không hợp lệ' });
             }
 
             const product = await HangHoa.findById(item.hang_hoa_id);
             if (!product) {
-                return res.status(400).json({ success: false, message: 'Hang hoa khong hop le' });
+                return res.status(400).json({ success: false, message: 'Hàng hóa không hợp lệ' });
             }
             if (product.quan_ly_theo_lo && !item.lo_hang_id) {
-                return res.status(400).json({ success: false, message: 'Hang quan ly theo lo phai co lo hang' });
+                return res.status(400).json({ success: false, message: 'Hàng quản lý theo lô phải có lô hàng' });
             }
 
             const stock = item.lo_hang_id
@@ -374,7 +415,7 @@ async function saveKiemKho(req, res, next) {
             if (difference !== 0 && !differenceReason) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Vui long nhap nguyen nhan lech cho hang hoa co chenhlech'
+                    message: 'Vui lòng nhập nguyên nhân lệch cho hàng hóa có chênh lệch'
                 });
             }
 
@@ -420,7 +461,7 @@ async function saveKiemKho(req, res, next) {
                         ghi_chu: differenceReason || ghi_chu
                     });
                 } catch (_) {
-                    return res.status(400).json({ success: false, message: 'Khong du ton kho de dieu chinh kiem kho' });
+                    return res.status(400).json({ success: false, message: 'Không đủ tồn kho để điều chỉnh kiểm kho' });
                 }
             }
         }
@@ -430,11 +471,60 @@ async function saveKiemKho(req, res, next) {
         phieu.tong_gia_tri_lech = tongGiaTriLech;
         await phieu.save();
 
-        return res.json({ success: true, message: 'Hoan thanh kiem kho', ma_kiem_kho });
+        return res.json({ success: true, message: 'Hoàn thành kiểm kho', ma_kiem_kho, id: phieu._id, print_url: '/chung-tu-kho/kiem-kho/' + phieu._id });
     } catch (error) {
         next(error);
     }
 }
+
+router.post('/:id/cancel', async (req, res, next) => {
+    try {
+        const phieu = await PhieuKiemKho.findById(req.params.id);
+        if (!phieu) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu kiểm kho' });
+        if (phieu.trang_thai === 'cancelled') {
+            return res.json({ success: true, message: 'Phiếu đã hủy' });
+        }
+
+        const lines = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: phieu._id }).lean();
+        const maPhieu = phieu.ma_kiem_kho || String(phieu._id);
+        for (const row of lines) {
+            const diff = Number(row.so_luong_lech || 0);
+            if (!diff) continue;
+            const product = await HangHoa.findById(row.hang_hoa_id).select('gia_von').lean();
+            const cost = Number(product?.gia_von || 0);
+            if (diff > 0) {
+                await truTonKho({
+                    kho_id: phieu.kho_id,
+                    hang_hoa_id: row.hang_hoa_id,
+                    lo_hang_id: row.lo_hang_id,
+                    so_luong: diff,
+                    nguoi_tao_id: req.user?._id,
+                    loai_phieu: 'kiem_kho',
+                    ma_phieu: maPhieu,
+                    ghi_chu: `Huy kiem kho ${maPhieu}`
+                });
+            } else {
+                await congTonKho({
+                    kho_id: phieu.kho_id,
+                    hang_hoa_id: row.hang_hoa_id,
+                    lo_hang_id: row.lo_hang_id,
+                    so_luong: Math.abs(diff),
+                    gia_von: cost,
+                    nguoi_tao_id: req.user?._id,
+                    loai_phieu: 'kiem_kho',
+                    ma_phieu: maPhieu,
+                    ghi_chu: `Huy kiem kho ${maPhieu}`
+                });
+            }
+        }
+
+        phieu.trang_thai = 'cancelled';
+        await phieu.save();
+        res.json({ success: true, message: 'Đã hủy phiếu kiểm kho' });
+    } catch (error) {
+        next(error);
+    }
+});
 
 router.post('/', saveKiemKho);
 router.post('/add', saveKiemKho);

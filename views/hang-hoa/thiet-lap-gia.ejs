@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -140,9 +140,6 @@
           <div class="price-setup-head-actions">
             <button type="button" class="btn btn-outline-kv js-open-bang-gia-modal">+ Bảng giá</button>
             <button type="button" class="btn btn-light price-setup-btn-icon">
-              <span aria-hidden="true">↑</span> Import
-            </button>
-            <button type="button" class="btn btn-light price-setup-btn-icon">
               <span aria-hidden="true">↓</span> Xuất file
             </button>
             <div class="price-setup-icon-group">
@@ -197,7 +194,7 @@
                   <td class="price-setup-col-icon">
                     <button type="button" class="price-setup-row-icon" disabled title="Xóa">🗑</button>
                   </td>
-                  <td><%= item.ma_hang || '—' %></td>
+                  <td><%- refLink('product', item, item.ma_hang || '---') %></td>
                   <td><%= item.ten_hang || '—' %></td>
                   <td class="text-right"><%= giaVon.toLocaleString('vi-VN') %></td>
                   <td class="text-right"><%= giaNhapDisplay %></td>
@@ -278,7 +275,7 @@
           <input id="priceSetupGroupDescInput" type="text" placeholder="Nhập ghi chú">
         </label>
       </div>
-      <div class="group-modal-footer">
+      <div class="page-actions group-modal-footer">
         <button class="btn btn-light btn-sm" type="button" id="priceSetupGroupModalCancel">Bỏ qua</button>
         <button class="btn btn-primary btn-sm" type="button" id="priceSetupGroupModalSubmit">Lưu</button>
       </div>
@@ -378,7 +375,7 @@
           <p class="bang-gia-scope-placeholder">Chọn cửa hàng, kênh bán và nhóm khách áp dụng bảng giá. Tính năng đang được hoàn thiện.</p>
         </div>
 
-        <div class="bang-gia-modal-footer">
+        <div class="page-actions bang-gia-modal-footer">
           <button type="button" class="btn btn-light bang-gia-btn-skip" id="bangGiaModalCancel">Bỏ qua</button>
           <button type="submit" class="btn btn-primary bang-gia-btn-save">Lưu</button>
         </div>

@@ -5,8 +5,17 @@ var hangHoaController = require('../controllers/hangHoa.controller');
 
 router.use(isAuthenticated);
 
+router.get('/api/:id/detail', hangHoaController.apiProductDetail);
 router.get('/', hangHoaController.index);
 router.get('/thiet-lap-gia', hangHoaController.priceSetup);
+router.get('/thuoc-tinh', hangHoaController.attributesPage);
+router.get('/:id/thuoc-tinh', hangHoaController.apiProductAttributes);
+router.post('/thuoc-tinh/add', hangHoaController.addAttribute);
+router.post('/thuoc-tinh/:id/update', hangHoaController.updateAttribute);
+router.post('/thuoc-tinh/:id/delete', hangHoaController.deleteAttribute);
+router.post('/thuoc-tinh/:attributeId/gia-tri/add', hangHoaController.addAttributeValue);
+router.post('/thuoc-tinh/gia-tri/:id/update', hangHoaController.updateAttributeValue);
+router.post('/thuoc-tinh/gia-tri/:id/delete', hangHoaController.deleteAttributeValue);
 router.post('/thiet-lap-gia/ct-bang-gia', hangHoaController.updateCTBangGiaPrice);
 router.post('/thiet-lap-gia/:id/retail-price', hangHoaController.updateRetailPrice);
 router.post('/bang-gia/add', hangHoaController.addBangGia);
@@ -21,5 +30,12 @@ router.post('/units/add', hangHoaController.addUnit);
 router.post('/units/:unitId/update', hangHoaController.updateUnit);
 router.post('/units/:unitId/delete', hangHoaController.removeUnit);
 router.post('/export-excel', hangHoaController.exportExcel);
+router.get('/:id', function(req, res) {
+  var id = String(req.params.id || '');
+  if (!/^[a-f0-9]{24}$/i.test(id)) {
+    return res.redirect('/hang-hoa');
+  }
+  res.redirect(302, '/hang-hoa#p-' + id);
+});
 
 module.exports = router;

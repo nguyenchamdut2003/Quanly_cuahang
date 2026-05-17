@@ -1,4 +1,5 @@
 <header class="kv-header">
+  <meta charset="UTF-8">
   <!-- Top Bar -->
   <div class="kv-topbar">
     <div></div>
@@ -7,6 +8,7 @@
         <% if (locals.user) { %>
           <%
             const store = locals.currentStore || null;
+            const stores = Array.isArray(locals.availableStores) ? locals.availableStores : [];
             const storeName = store?.ten_cua_hang || 'Thông tin cửa hàng';
             const storeInitial = (storeName || 'C').trim().charAt(0).toUpperCase();
             const storeAddress = [
@@ -23,6 +25,20 @@
           <div class="user-dropdown-menu">
             <div class="header-store-info">
               <strong><%= storeName %></strong>
+              <% if (stores.length > 0) { %>
+                <form method="post" action="/auth/current-store" class="header-store-switch">
+                  <input type="hidden" name="returnTo" value="<%= locals.originalUrl || '' %>">
+                  <div class="header-store-label">Cửa hàng đang làm việc</div>
+                  <select name="cua_hang_id" class="header-store-select" aria-label="Chọn cửa hàng làm việc" onchange="this.form.submit()">
+                    <% stores.forEach(function(item) {
+                      const selected = store && String(store._id) === String(item._id);
+                      const label = (item.ten_cua_hang || item.ma_cua_hang || item._id) + (item.ma_cua_hang && item.ten_cua_hang ? (' — ' + item.ma_cua_hang) : '');
+                    %>
+                      <option value="<%= item._id %>" <%= selected ? 'selected' : '' %>><%= selected ? '✓ ' : '' %><%= label %></option>
+                    <% }) %>
+                  </select>
+                </form>
+              <% } %>
               <% if (store?.ma_cua_hang) { %>
                 <small>Mã cửa hàng: <%= store.ma_cua_hang %></small>
               <% } %>
@@ -42,6 +58,9 @@
                 <small>Chưa có cửa hàng. Bấm bên dưới để thêm thông tin.</small>
               <% } %>
             </div>
+            <a href="/cau-hinh/doanh-nghiep" class="dropdown-item">
+              <i class="fa-solid fa-building"></i> Cấu hình doanh nghiệp
+            </a>
             <a href="<%= storeEditUrl %>" class="dropdown-item">
               <i class="fa-solid fa-store"></i> Xem và sửa cửa hàng
             </a>
@@ -76,6 +95,7 @@
           <div class="nav-mega-col">
             <a href="/hang-hoa" class="nav-mega-item">Danh sách hàng hóa</a>
             <a href="/hang-hoa/thiet-lap-gia" class="nav-mega-item">Thiết lập giá</a>
+            <a href="/hang-hoa/thuoc-tinh" class="nav-mega-item">Thuộc tính hàng hóa</a>
           </div>
           <div class="nav-mega-col">
             <a href="/kiem-kho" class="nav-mega-item">Kiểm kho</a>
@@ -165,7 +185,16 @@
     if (dropdownContainer && dropdownMenu) {
       dropdownContainer.addEventListener('click', function (e) {
         e.stopPropagation();
+        if (dropdownMenu.contains(e.target)) {
+          return;
+        }
         dropdownMenu.classList.toggle('show');
+      });
+    }
+
+    if (dropdownMenu) {
+      dropdownMenu.addEventListener('click', function (e) {
+        e.stopPropagation();
       });
     }
 

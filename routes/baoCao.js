@@ -427,8 +427,8 @@ const reportTitles = {
     'dat-hang': 'Báo cáo đặt hàng',
     'hang-hoa': 'Báo cáo hàng hóa',
     'khach-hang': 'Báo cáo khách hàng',
-    'nha-cung-cap': 'Bao cao nha cung cap',
-    'ton-kho-lo': 'Bao cao ton kho theo lo'
+    'nha-cung-cap': 'Báo cáo nhà cung cấp',
+    'ton-kho-lo': 'Báo cáo tồn kho theo lô'
 };
 
 async function buildLotStockReport(query = {}) {
@@ -455,6 +455,9 @@ async function buildLotStockReport(query = {}) {
         const quantity = Number(row.so_luong || row.so_luong_con_lai || 0);
         const cost = Number(row.gia_von || product.gia_von || 0);
         return {
+            hang_hoa_id: product._id || row.hang_hoa_id,
+            kho_id: row.kho_id?._id || row.kho_id,
+            lo_hang_id: lot._id || row.lo_hang_id,
             ma_hang: product.ma_hang || '',
             ten_hang: product.ten_hang || '',
             kho: row.kho_id?.ten_kho || '',

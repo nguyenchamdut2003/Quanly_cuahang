@@ -10,6 +10,7 @@ const {
     DonHang,
     HoaDonBanHang,
     PhieuNhap,
+    CTPhieuNhap,
     PhieuTraHangNhap,
     VanDon
 } = require('../models/kiot.model');
@@ -172,7 +173,7 @@ router.get('/', async (req, res, next) => {
         };
 
         res.render('so-quy/index', {
-            title: 'So quy tien mat',
+            title: 'Sổ quỹ tiền mặt',
             list,
             cashBooks,
             customers,
@@ -216,12 +217,38 @@ router.get('/export.csv', async (req, res, next) => {
     }
 });
 
+router.get('/phieu-thu-chi/:id', function(req, res) {
+    res.redirect('/so-quy?receipt=' + encodeURIComponent(req.params.id));
+});
+
+router.get('/:id/detail', async (req, res, next) => {
+    try {
+        if (!isObjectId(req.params.id)) return res.status(400).json({ success: false, message: 'id khong hop le' });
+        const receipt = await PhieuThuChi.findById(req.params.id)
+            .populate('nguoi_tao_id')
+            .populate('nha_cung_cap_id')
+            .populate('khach_hang_id')
+            .populate('so_quy_id')
+            .populate('phieu_nhap_id')
+            .lean();
+        if (!receipt) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu thu chi' });
+        const items = receipt.phieu_nhap_id
+            ? await CTPhieuNhap.find({ phieu_nhap_id: receipt.phieu_nhap_id._id || receipt.phieu_nhap_id })
+                .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
+                .lean()
+            : [];
+        return res.json({ success: true, data: { receipt, items } });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/add', async (req, res, next) => {
     try {
         const cashBook = req.body?.so_quy_id && isObjectId(req.body.so_quy_id)
             ? await SoQuy.findById(req.body.so_quy_id)
             : await ensureCashBook(req.body?.cua_hang_id);
-        if (!cashBook) return res.status(400).json({ success: false, message: 'Khong tim thay so quy' });
+        if (!cashBook) return res.status(400).json({ success: false, message: 'Không tìm thấy sổ quỹ' });
 
         const receipt = await taoPhieuThuChi({
             ...req.body,

@@ -1,5 +1,6 @@
 var mongoose = require('mongoose');
-var { HangHoa, NhomHang, DonViTinh, NhaCungCap, TonKho, Kho, BangGia, CTBangGia, CuaHang, LoHang, TonKhoLo, LichSuKho } = require('../models/kiot.model');
+var querystring = require('querystring');
+var { HangHoa, NhomHang, DonViTinh, NhaCungCap, TonKho, Kho, BangGia, CTBangGia, CuaHang, LoHang, TonKhoLo, LichSuKho, ThuocTinhHang, GiaTriThuocTinh, HangHoaThuocTinh } = require('../models/kiot.model');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -27,6 +28,15 @@ function normalizeFilterQuery(query) {
         keyword: String(query.keyword || '').trim(),
         bangGiaIds: normalizeBangGiaIdsFromQuery(query)
     };
+}
+
+/** Danh sách mặc định: chỉ active; chỉ khi filter "Ngừng kinh doanh" mới lấy inactive. */
+function applyProductListStatusFilter(productQuery, filter) {
+    if (filter && filter.status === 'inactive') {
+        productQuery.trang_thai = 'inactive';
+    } else {
+        productQuery.trang_thai = 'active';
+    }
 }
 
 function normalizeBangGiaIdsFromQuery(query) {
@@ -121,6 +131,115 @@ function normalizeProductPayload(body) {
         quan_ly_theo_lo: body.quan_ly_theo_lo === 'true' || body.quan_ly_theo_lo === 'on',
         trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
     };
+}
+
+function normalizeAttributePayload(body) {
+    body = body || {};
+    return {
+        ma_thuoc_tinh: String(body.ma_thuoc_tinh || '').trim(),
+        ten_thuoc_tinh: String(body.ten_thuoc_tinh || '').trim(),
+        mo_ta: String(body.mo_ta || '').trim(),
+        trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
+    };
+}
+
+function normalizeAttributeValuePayload(body) {
+    body = body || {};
+    var order = Number(body.thu_tu || 0);
+    if (!Number.isFinite(order) || order < 0) order = 0;
+    return {
+        ma_gia_tri: String(body.ma_gia_tri || '').trim(),
+        ten_gia_tri: String(body.ten_gia_tri || '').trim(),
+        mo_ta: String(body.mo_ta || '').trim(),
+        thu_tu: Math.floor(order),
+        trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
+    };
+}
+
+async function nextAttributeCode(storeId) {
+    var query = { ma_thuoc_tinh: /^TT\d+$/ };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
+    var last = await ThuocTinhHang.findOne(query).sort({ ma_thuoc_tinh: -1 }).lean();
+    var nextNumber = last ? Number(String(last.ma_thuoc_tinh || '').replace(/\D/g, '')) + 1 : 1;
+    return 'TT' + String(nextNumber).padStart(4, '0');
+}
+
+async function nextAttributeValueCode(attributeId) {
+    var last = await GiaTriThuocTinh.findOne({ thuoc_tinh_id: attributeId, ma_gia_tri: /^GT\d+$/ }).sort({ ma_gia_tri: -1 }).lean();
+    var nextNumber = last ? Number(String(last.ma_gia_tri || '').replace(/\D/g, '')) + 1 : 1;
+    return 'GT' + String(nextNumber).padStart(4, '0');
+}
+
+async function ensureDefaultAttributes(storeId) {
+    var query = { ten_thuoc_tinh: 'Size' };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
+    var attr = await ThuocTinhHang.findOne(query);
+    if (!attr) {
+        attr = await ThuocTinhHang.create({
+            cua_hang_id: storeId && mongoose.Types.ObjectId.isValid(storeId) ? storeId : undefined,
+            ma_thuoc_tinh: 'SIZE',
+            ten_thuoc_tinh: 'Size',
+            mo_ta: 'Kích cỡ hàng hóa',
+            trang_thai: 'active'
+        });
+    }
+    var defaults = ['Lớn', 'Trung', 'Bi'];
+    for (var i = 0; i < defaults.length; i++) {
+        var exists = await GiaTriThuocTinh.findOne({ thuoc_tinh_id: attr._id, ten_gia_tri: defaults[i] }).select('_id').lean();
+        if (!exists) {
+            await GiaTriThuocTinh.create({
+                cua_hang_id: attr.cua_hang_id || (storeId && mongoose.Types.ObjectId.isValid(storeId) ? storeId : undefined),
+                thuoc_tinh_id: attr._id,
+                ma_gia_tri: 'SIZE_' + (i + 1),
+                ten_gia_tri: defaults[i],
+                thu_tu: i + 1,
+                trang_thai: 'active'
+            });
+        }
+    }
+    var sizeValues = await GiaTriThuocTinh.find({ thuoc_tinh_id: attr._id, ten_gia_tri: { $in: defaults } }).select('_id thuoc_tinh_id').lean();
+    var cucumberProducts = await HangHoa.find({
+        ten_hang: { $regex: 'Dưa leo Lỗ', $options: 'i' },
+        trang_thai: { $ne: 'deleted' }
+    }).select('_id').lean();
+    for (var p = 0; p < cucumberProducts.length; p++) {
+        for (var v = 0; v < sizeValues.length; v++) {
+            await HangHoaThuocTinh.updateOne(
+                { hang_hoa_id: cucumberProducts[p]._id, thuoc_tinh_id: attr._id, gia_tri_id: sizeValues[v]._id },
+                { $setOnInsert: { hang_hoa_id: cucumberProducts[p]._id, thuoc_tinh_id: attr._id, gia_tri_id: sizeValues[v]._id } },
+                { upsert: true }
+            );
+        }
+    }
+}
+
+function normalizeSelectedAttributeValues(body) {
+    var raw = body ? body.gia_tri_thuoc_tinh_ids : [];
+    if (typeof raw === 'string') {
+        try { raw = JSON.parse(raw); } catch (_) { raw = raw ? [raw] : []; }
+    }
+    if (!Array.isArray(raw)) raw = [raw];
+    var seen = {};
+    return raw.map(function(id) { return String(id || '').trim(); })
+        .filter(function(id) {
+            if (!mongoose.Types.ObjectId.isValid(id) || seen[id]) return false;
+            seen[id] = true;
+            return true;
+        });
+}
+
+async function saveProductAttributeValues(productId, valueIds) {
+    await HangHoaThuocTinh.deleteMany({ hang_hoa_id: productId });
+    if (!valueIds || !valueIds.length) return;
+    var values = await GiaTriThuocTinh.find({ _id: { $in: valueIds }, trang_thai: 'active' }).select('_id thuoc_tinh_id').lean();
+    var rows = values.map(function(v) {
+        return {
+            hang_hoa_id: productId,
+            thuoc_tinh_id: v.thuoc_tinh_id,
+            gia_tri_id: v._id
+        };
+    });
+    if (rows.length) await HangHoaThuocTinh.insertMany(rows, { ordered: false });
 }
 
 async function makeProductCode() {
@@ -366,9 +485,98 @@ async function seedProductsIfEmpty() {
     }));
 }
 
+async function loadProductDetailById(productId) {
+    if (!mongoose.Types.ObjectId.isValid(productId)) return null;
+    var item = await HangHoa.findById(productId).lean();
+    if (!item) return null;
+
+    var groups = await loadProductGroups();
+    var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
+    var units = await loadUnitOptions();
+    var warehouses = await Kho.find({}).sort({ ten_kho: 1, ma_kho: 1 }).lean();
+    var groupMap = groups.reduce(function(map, group) {
+        map[String(group._id)] = group.ten_nhom_hang || '---';
+        return map;
+    }, {});
+    var supplierMap = suppliers.reduce(function(map, supplier) {
+        map[String(supplier._id)] = supplier.ten_ncc || '---';
+        return map;
+    }, {});
+    var unitMap = units.reduce(function(map, unit) {
+        map[String(unit._id)] = unit.ten_don_vi || '---';
+        return map;
+    }, {});
+    var warehouseMap = warehouses.reduce(function(map, warehouse) {
+        map[String(warehouse._id)] = warehouse.ten_kho || warehouse.ma_kho || '---';
+        return map;
+    }, {});
+
+    var inventoryRows = await TonKho.aggregate([
+        { $match: { hang_hoa_id: new mongoose.Types.ObjectId(productId) } },
+        { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+    ]);
+    item.ton_kho = inventoryRows[0] ? Number(inventoryRows[0].total || 0) : 0;
+    item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
+    item.nha_cung_cap_ten = supplierMap[String(item.nha_cung_cap_id || '')] || '---';
+    item.don_vi_tinh_ten = unitMap[String(item.don_vi_tinh_id || '')] || '---';
+    item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
+
+    var selectedProductInventory = await TonKho.find({ hang_hoa_id: item._id }).sort({ updated_at: -1 }).lean();
+    selectedProductInventory = selectedProductInventory.map(function(row) {
+        row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+        return row;
+    });
+
+    var selectedProductHistories = await LichSuKho.find({ hang_hoa_id: item._id })
+        .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+        .sort({ ngay: -1, created_at: -1 })
+        .lean();
+    selectedProductHistories = selectedProductHistories.map(function(row) {
+        row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+        return row;
+    });
+
+    var selectedProductLots = item.quan_ly_theo_lo
+        ? await TonKhoLo.find({ hang_hoa_id: item._id })
+            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung ngay_nhap so_luong_ban_dau so_luong_con_lai trang_thai' })
+            .sort({ updated_at: -1, created_at: -1 })
+            .lean()
+        : [];
+    selectedProductLots = selectedProductLots.map(function(row) {
+        row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+        return row;
+    });
+
+    return {
+        item: item,
+        selectedProductInventory: selectedProductInventory,
+        selectedProductHistories: selectedProductHistories,
+        selectedProductLots: selectedProductLots,
+        formatDate: formatDate
+    };
+}
+
+exports.apiProductDetail = async function(req, res, next) {
+    try {
+        var ctx = await loadProductDetailById(req.params.id);
+        if (!ctx) {
+            return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tìm thấy hàng hóa.</p></div>');
+        }
+        res.render('hang-hoa/_detail-panel', ctx);
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.index = async function(req, res, next) {
     try {
         var requestQuery = req?.query || {};
+        if (Object.prototype.hasOwnProperty.call(requestQuery, 'product')) {
+            var redirectQuery = Object.assign({}, requestQuery);
+            delete redirectQuery.product;
+            var qs = querystring.stringify(redirectQuery);
+            return res.redirect(302, '/hang-hoa' + (qs ? '?' + qs : ''));
+        }
         var filter = normalizeFilterQuery(requestQuery);
         var dateRange = getDateRange(filter);
         var productQuery = {};
@@ -377,7 +585,7 @@ exports.index = async function(req, res, next) {
         if (filter.supplierId !== 'all') productQuery.nha_cung_cap_id = filter.supplierId;
         if (filter.salesLink === 'yes') productQuery.ban_truc_tiep = true;
         if (filter.salesLink === 'no') productQuery.ban_truc_tiep = false;
-        if (filter.status !== 'all') productQuery.trang_thai = filter.status;
+        applyProductListStatusFilter(productQuery, filter);
         if (filter.keyword) {
             productQuery.$or = [
                 { ma_hang: { $regex: filter.keyword, $options: 'i' } },
@@ -417,7 +625,6 @@ exports.index = async function(req, res, next) {
         var groups = await loadProductGroups();
         var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
         var units = await loadUnitOptions();
-        var warehouses = await Kho.find({}).sort({ ten_kho: 1, ma_kho: 1 }).lean();
         var groupMap = groups.reduce(function(map, group) {
             map[String(group._id)] = group.ten_nhom_hang || '---';
             return map;
@@ -430,10 +637,6 @@ exports.index = async function(req, res, next) {
             map[String(unit._id)] = unit.ten_don_vi || '---';
             return map;
         }, {});
-        var warehouseMap = warehouses.reduce(function(map, warehouse) {
-            map[String(warehouse._id)] = warehouse.ten_kho || warehouse.ma_kho || '---';
-            return map;
-        }, {});
 
         products = products.map(function(item) {
             item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
@@ -443,42 +646,27 @@ exports.index = async function(req, res, next) {
             item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
             return item;
         });
-        var selectedProductId = Object.prototype.hasOwnProperty.call(requestQuery, 'product')
-            ? String(requestQuery.product || '')
-            : '';
-        var selectedProduct = selectedProductId
-            ? products.find(function(item) { return String(item._id) === selectedProductId; }) || null
-            : null;
-        var selectedProductInventory = selectedProduct
-            ? await TonKho.find({ hang_hoa_id: selectedProduct._id }).sort({ updated_at: -1 }).lean()
-            : [];
-        selectedProductInventory = selectedProductInventory.map(function(row) {
-            row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
-            return row;
-        });
-        var selectedProductHistories = selectedProduct
-            ? await LichSuKho.find({ hang_hoa_id: selectedProduct._id })
-                .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
-                .sort({ ngay: -1, created_at: -1 })
-                .lean()
-            : [];
-        selectedProductHistories = selectedProductHistories.map(function(row) {
-            row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
-            return row;
-        });
-        var selectedProductLots = selectedProduct && selectedProduct.quan_ly_theo_lo
-            ? await TonKhoLo.find({ hang_hoa_id: selectedProduct._id })
-                .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung ngay_nhap so_luong_ban_dau so_luong_con_lai trang_thai' })
-                .sort({ updated_at: -1, created_at: -1 })
-                .lean()
-            : [];
-        selectedProductLots = selectedProductLots.map(function(row) {
-            row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
-            return row;
-        });
         var filterQueryString = buildFilterQueryString(filter);
 
         var bangGiaList = await BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }).lean();
+        var storeId = await resolveStoreId(req);
+        await ensureDefaultAttributes(storeId);
+        var attrQuery = storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' };
+        var attributes = await ThuocTinhHang.find(attrQuery).sort({ ten_thuoc_tinh: 1 }).lean();
+        if (attributes.length === 0 && attrQuery.cua_hang_id) attributes = await ThuocTinhHang.find({ trang_thai: 'active' }).sort({ ten_thuoc_tinh: 1 }).lean();
+        var attrIds = attributes.map(function(a) { return a._id; });
+        var attributeValues = attrIds.length
+            ? await GiaTriThuocTinh.find({ thuoc_tinh_id: { $in: attrIds }, trang_thai: 'active' }).sort({ thu_tu: 1, ten_gia_tri: 1 }).lean()
+            : [];
+        var productAttributeRows = productIds.length
+            ? await HangHoaThuocTinh.find({ hang_hoa_id: { $in: productIds } }).lean()
+            : [];
+        var productAttributeIds = {};
+        productAttributeRows.forEach(function(row) {
+            var pid = String(row.hang_hoa_id);
+            if (!productAttributeIds[pid]) productAttributeIds[pid] = [];
+            productAttributeIds[pid].push(String(row.gia_tri_id));
+        });
 
         res.render('hang-hoa/index', {
             title: 'Hàng hóa',
@@ -491,11 +679,9 @@ exports.index = async function(req, res, next) {
             groups: groups,
             units: units,
             suppliers: suppliers,
-            warehouses: warehouses,
-            selectedProduct: selectedProduct,
-            selectedProductInventory: selectedProductInventory,
-            selectedProductHistories: selectedProductHistories,
-            selectedProductLots: selectedProductLots,
+            attributes: attributes,
+            attributeValues: attributeValues,
+            productAttributeIds: productAttributeIds,
             filter: filter,
             formatDate: formatDate,
             filterQueryString: filterQueryString,
@@ -521,6 +707,7 @@ exports.add = async function(req, res, next) {
 
         var initialQty = Number(payload.ton_ban_dau || 0);
         var created = await HangHoa.create(payload);
+        await saveProductAttributeValues(created._id, normalizeSelectedAttributeValues(req.body));
         if (initialQty > 0) {
             var warehouse = await getDefaultWarehouseForProduct(created, req);
             if (warehouse) {
@@ -593,6 +780,7 @@ exports.update = async function(req, res, next) {
 
         var oldProduct = await HangHoa.findById(productId).lean();
         var updatedProduct = await HangHoa.findByIdAndUpdate(productId, payload, { runValidators: true, new: true });
+        await saveProductAttributeValues(productId, normalizeSelectedAttributeValues(req.body));
         if (oldProduct && !oldProduct.quan_ly_theo_lo && updatedProduct && updatedProduct.quan_ly_theo_lo) {
             var inventoryRows = await TonKho.find({ hang_hoa_id: updatedProduct._id, so_luong: { $gt: 0 } }).lean();
             await createDefaultLotFromInventory(updatedProduct, inventoryRows, req, {
@@ -730,7 +918,7 @@ exports.removeGroup = async function(req, res, next) {
         } else {
             deleted = await NhomHang.findByIdAndDelete(groupId);
         }
-        if (!deleted) return respondProductGroupError(req, res, 404, 'Khong tim thay nhom hang.');
+        if (!deleted) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
@@ -976,6 +1164,271 @@ exports.priceSetup = async function(req, res, next) {
     }
 };
 
+exports.attributesPage = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        await ensureDefaultAttributes(storeId);
+        var attrQuery = {};
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) attrQuery.cua_hang_id = storeId;
+        var attributes = await ThuocTinhHang.find(attrQuery).sort({ created_at: 1, ten_thuoc_tinh: 1 }).lean();
+        if (attributes.length === 0 && attrQuery.cua_hang_id) {
+            attributes = await ThuocTinhHang.find({}).sort({ created_at: 1, ten_thuoc_tinh: 1 }).lean();
+        }
+        var selectedId = String(req.query.thuoc_tinh_id || (attributes[0] && attributes[0]._id) || '');
+        if (selectedId && !attributes.some(function(a) { return String(a._id) === selectedId; })) {
+            selectedId = attributes[0] ? String(attributes[0]._id) : '';
+        }
+        var valueQuery = selectedId && mongoose.Types.ObjectId.isValid(selectedId) ? { thuoc_tinh_id: selectedId } : { _id: null };
+        var values = await GiaTriThuocTinh.find(valueQuery).sort({ thu_tu: 1, ten_gia_tri: 1 }).lean();
+        var countsAgg = await GiaTriThuocTinh.aggregate([
+            { $match: { thuoc_tinh_id: { $in: attributes.map(function(a) { return a._id; }) } } },
+            { $group: { _id: '$thuoc_tinh_id', count: { $sum: 1 } } }
+        ]);
+        var valueCounts = {};
+        countsAgg.forEach(function(row) { valueCounts[String(row._id)] = row.count; });
+
+        res.render('hang-hoa/thuoc-tinh', {
+            title: 'Thuộc tính hàng hóa',
+            pageTitle: 'Thuộc tính hàng hóa',
+            activeMenu: 'hang-hoa',
+            user: req.user,
+            flash: req.query || {},
+            attributes: attributes,
+            values: values,
+            valueCounts: valueCounts,
+            selectedId: selectedId
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.addAttribute = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var payload = normalizeAttributePayload(req.body);
+        if (!payload.ten_thuoc_tinh) return res.redirect('/hang-hoa/thuoc-tinh?error=missing_name');
+        if (!payload.ma_thuoc_tinh) payload.ma_thuoc_tinh = await nextAttributeCode(storeId);
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) payload.cua_hang_id = storeId;
+        var created = await ThuocTinhHang.create(payload);
+        res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + created._id + '&success=created');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateAttribute = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.redirect('/hang-hoa/thuoc-tinh?error=invalid_id');
+        var payload = normalizeAttributePayload(req.body);
+        if (!payload.ten_thuoc_tinh) return res.redirect('/hang-hoa/thuoc-tinh?error=missing_name');
+        await ThuocTinhHang.updateOne({ _id: id }, { $set: payload }, { runValidators: true });
+        res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + id + '&success=updated');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.deleteAttribute = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.redirect('/hang-hoa/thuoc-tinh?error=invalid_id');
+        var usedByProduct = await HangHoaThuocTinh.exists({ thuoc_tinh_id: id });
+        var hasValues = await GiaTriThuocTinh.exists({ thuoc_tinh_id: id });
+        if (usedByProduct || hasValues) {
+            await ThuocTinhHang.updateOne({ _id: id }, { $set: { trang_thai: 'inactive' } });
+        } else {
+            await ThuocTinhHang.deleteOne({ _id: id });
+        }
+        res.redirect('/hang-hoa/thuoc-tinh?success=deleted');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.addAttributeValue = async function(req, res, next) {
+    try {
+        var attrId = String(req.params.attributeId || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(attrId)) return res.redirect('/hang-hoa/thuoc-tinh?error=invalid_attribute');
+        var attr = await ThuocTinhHang.findById(attrId).lean();
+        if (!attr) return res.redirect('/hang-hoa/thuoc-tinh?error=attribute_not_found');
+        var payload = normalizeAttributeValuePayload(req.body);
+        if (!payload.ten_gia_tri) return res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + attrId + '&error=missing_value');
+        if (!payload.ma_gia_tri) payload.ma_gia_tri = await nextAttributeValueCode(attrId);
+        payload.thuoc_tinh_id = attrId;
+        payload.cua_hang_id = attr.cua_hang_id || undefined;
+        await GiaTriThuocTinh.create(payload);
+        res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + attrId + '&success=value_created');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateAttributeValue = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.redirect('/hang-hoa/thuoc-tinh?error=invalid_value');
+        var value = await GiaTriThuocTinh.findById(id).lean();
+        if (!value) return res.redirect('/hang-hoa/thuoc-tinh?error=value_not_found');
+        var payload = normalizeAttributeValuePayload(req.body);
+        if (!payload.ten_gia_tri) return res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + value.thuoc_tinh_id + '&error=missing_value');
+        await GiaTriThuocTinh.updateOne({ _id: id }, { $set: payload }, { runValidators: true });
+        res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + value.thuoc_tinh_id + '&success=value_updated');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.deleteAttributeValue = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.redirect('/hang-hoa/thuoc-tinh?error=invalid_value');
+        var value = await GiaTriThuocTinh.findById(id).lean();
+        if (!value) return res.redirect('/hang-hoa/thuoc-tinh?error=value_not_found');
+        var used = await HangHoaThuocTinh.exists({ gia_tri_id: id });
+        if (used) await GiaTriThuocTinh.updateOne({ _id: id }, { $set: { trang_thai: 'inactive' } });
+        else await GiaTriThuocTinh.deleteOne({ _id: id });
+        res.redirect('/hang-hoa/thuoc-tinh?thuoc_tinh_id=' + value.thuoc_tinh_id + '&success=value_deleted');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiAttributes = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        await ensureDefaultAttributes(storeId);
+        var query = {};
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
+        var items = await ThuocTinhHang.find(query).sort({ ten_thuoc_tinh: 1 }).lean();
+        return res.json({ success: true, data: items });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiCreateAttribute = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var payload = normalizeAttributePayload(req.body);
+        if (!payload.ten_thuoc_tinh) return res.status(400).json({ success: false, message: 'Tên thuộc tính là bắt buộc' });
+        if (!payload.ma_thuoc_tinh) payload.ma_thuoc_tinh = await nextAttributeCode(storeId);
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) payload.cua_hang_id = storeId;
+        var created = await ThuocTinhHang.create(payload);
+        return res.json({ success: true, data: created });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiUpdateAttribute = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '');
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
+        var payload = normalizeAttributePayload(req.body);
+        await ThuocTinhHang.updateOne({ _id: id }, { $set: payload }, { runValidators: true });
+        return res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiDeleteAttribute = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '');
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
+        var used = await HangHoaThuocTinh.exists({ thuoc_tinh_id: id });
+        var hasValues = await GiaTriThuocTinh.exists({ thuoc_tinh_id: id });
+        if (used || hasValues) await ThuocTinhHang.updateOne({ _id: id }, { $set: { trang_thai: 'inactive' } });
+        else await ThuocTinhHang.deleteOne({ _id: id });
+        return res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiAttributeValues = async function(req, res, next) {
+    try {
+        var query = {};
+        var attrId = String(req.query.thuoc_tinh_id || '').trim();
+        if (mongoose.Types.ObjectId.isValid(attrId)) query.thuoc_tinh_id = attrId;
+        var items = await GiaTriThuocTinh.find(query).sort({ thu_tu: 1, ten_gia_tri: 1 }).lean();
+        return res.json({ success: true, data: items });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiCreateAttributeValue = async function(req, res, next) {
+    try {
+        var attrId = String(req.body.thuoc_tinh_id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(attrId)) return res.status(400).json({ success: false, message: 'Thuộc tính không hợp lệ' });
+        var attr = await ThuocTinhHang.findById(attrId).lean();
+        if (!attr) return res.status(404).json({ success: false, message: 'Không tìm thấy thuộc tính' });
+        var payload = normalizeAttributeValuePayload(req.body);
+        if (!payload.ten_gia_tri) return res.status(400).json({ success: false, message: 'Tên giá trị là bắt buộc' });
+        if (!payload.ma_gia_tri) payload.ma_gia_tri = await nextAttributeValueCode(attrId);
+        payload.thuoc_tinh_id = attrId;
+        payload.cua_hang_id = attr.cua_hang_id || undefined;
+        var created = await GiaTriThuocTinh.create(payload);
+        return res.json({ success: true, data: created });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiUpdateAttributeValue = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '');
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
+        var payload = normalizeAttributeValuePayload(req.body);
+        await GiaTriThuocTinh.updateOne({ _id: id }, { $set: payload }, { runValidators: true });
+        return res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiDeleteAttributeValue = async function(req, res, next) {
+    try {
+        var id = String(req.params.id || '');
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
+        var used = await HangHoaThuocTinh.exists({ gia_tri_id: id });
+        if (used) await GiaTriThuocTinh.updateOne({ _id: id }, { $set: { trang_thai: 'inactive' } });
+        else await GiaTriThuocTinh.deleteOne({ _id: id });
+        return res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.apiProductAttributes = async function(req, res, next) {
+    try {
+        var productId = String(req.params.id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'Hàng hóa không hợp lệ' });
+        var rows = await HangHoaThuocTinh.find({ hang_hoa_id: productId })
+            .populate({ path: 'thuoc_tinh_id', select: 'ten_thuoc_tinh trang_thai' })
+            .populate({ path: 'gia_tri_id', select: 'ten_gia_tri thu_tu trang_thai' })
+            .lean();
+        var grouped = {};
+        rows.forEach(function(row) {
+            if (!row.thuoc_tinh_id || !row.gia_tri_id) return;
+            if (row.thuoc_tinh_id.trang_thai === 'inactive' || row.gia_tri_id.trang_thai === 'inactive') return;
+            var key = String(row.thuoc_tinh_id._id);
+            if (!grouped[key]) grouped[key] = { thuoc_tinh_id: key, ten_thuoc_tinh: row.thuoc_tinh_id.ten_thuoc_tinh, values: [] };
+            grouped[key].values.push({ gia_tri_id: String(row.gia_tri_id._id), ten_gia_tri: row.gia_tri_id.ten_gia_tri, thu_tu: row.gia_tri_id.thu_tu || 0 });
+        });
+        var data = Object.values(grouped).map(function(group) {
+            group.values.sort(function(a, b) { return (a.thu_tu || 0) - (b.thu_tu || 0) || String(a.ten_gia_tri || '').localeCompare(String(b.ten_gia_tri || ''), 'vi'); });
+            return group;
+        });
+        return res.json({ success: true, data: data });
+    } catch (error) {
+        next(error);
+    }
+};
+
 exports.updateRetailPrice = async function(req, res, next) {
     try {
         var productId = normalizeIdParam(req?.params?.id);
@@ -1179,7 +1632,7 @@ exports.exportExcel = async function(req, res, next) {
         if (filter.supplierId !== 'all') productQuery.nha_cung_cap_id = filter.supplierId;
         if (filter.salesLink === 'yes') productQuery.ban_truc_tiep = true;
         if (filter.salesLink === 'no') productQuery.ban_truc_tiep = false;
-        if (filter.status !== 'all') productQuery.trang_thai = filter.status;
+        applyProductListStatusFilter(productQuery, filter);
         if (filter.keyword) {
             productQuery.$or = [
                 { ma_hang: { $regex: filter.keyword, $options: 'i' } },

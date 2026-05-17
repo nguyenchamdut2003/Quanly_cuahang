@@ -1,4 +1,5 @@
 var { CuaHang, Kho } = require('../models/kiot.model');
+var ExcelJS = require('exceljs');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -91,6 +92,99 @@ function buildFilterQueryString(filter) {
     if (filter.created === 'custom' && filter.createdTo) params.push('createdTo=' + encodeURIComponent(filter.createdTo));
 
     return params.join('&');
+}
+
+async function buildStoreQueryFromFilter(filter) {
+    var dateRange = getDateRange(filter);
+    var storeQuery = {};
+
+    if (filter.status !== 'all') {
+        storeQuery.trang_thai = filter.status;
+    }
+
+    if (filter.city !== 'all') {
+        storeQuery.tinh_thanh = filter.city;
+    }
+
+    if (dateRange.start || dateRange.end) {
+        storeQuery.created_at = {};
+        if (dateRange.start) storeQuery.created_at.$gte = dateRange.start;
+        if (dateRange.end) storeQuery.created_at.$lte = dateRange.end;
+    }
+
+    if (filter.warehouse === 'none') {
+        var storeIdsHaveWarehouse = await Kho.distinct('cua_hang_id');
+        storeQuery._id = { $nin: storeIdsHaveWarehouse };
+    }
+
+    if (filter.warehouse === 'has' || filter.warehouse === 'gte1') {
+        var storeIdsWithAtLeastOneWarehouse = await Kho.distinct('cua_hang_id');
+        storeQuery._id = { $in: storeIdsWithAtLeastOneWarehouse };
+    }
+
+    if (filter.warehouse === 'gte2') {
+        var groupedWarehouses = await Kho.aggregate([
+            { $group: { _id: '$cua_hang_id', total: { $sum: 1 } } },
+            { $match: { total: { $gte: 2 } } }
+        ]);
+
+        storeQuery._id = {
+            $in: groupedWarehouses.map(function(item) {
+                return item._id;
+            })
+        };
+    }
+
+    return storeQuery;
+}
+
+function exportText(value) {
+    if (value === null || typeof value === 'undefined' || value === '') return '---';
+    return value;
+}
+
+function exportStatus(value) {
+    return value === 'inactive' ? 'Ngừng hoạt động' : 'Đang hoạt động';
+}
+
+function exportDate(value) {
+    return value ? formatDate(value) : '---';
+}
+
+function safeExportFilenamePart(value) {
+    return String(value || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'unknown';
+}
+
+function applyExportWorksheetFormat(worksheet) {
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+    worksheet.getRow(1).alignment = { vertical: 'middle' };
+    worksheet.eachRow(function(row) {
+        row.eachCell(function(cell) {
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+            };
+            cell.alignment = { vertical: 'top', wrapText: true };
+        });
+    });
+}
+
+function addExportSheet(workbook, name, columns, rows) {
+    var worksheet = workbook.addWorksheet(name);
+    worksheet.columns = columns;
+    rows.forEach(function(row) {
+        worksheet.addRow(row);
+    });
+    applyExportWorksheetFormat(worksheet);
+    return worksheet;
+}
+
+function buildStoreAddress(store) {
+    return store.dia_chi || [store.phuong_xa, store.quan_huyen, store.tinh_thanh].filter(Boolean).join(', ') || store.dia_chi_gui_hang || '';
 }
 
 async function seedStoresIfEmpty() {
@@ -220,45 +314,7 @@ exports.index = async function(req, res, next) {
     try {
         var requestQuery = req?.query || {};
         var filter = normalizeFilterQuery(requestQuery);
-        var dateRange = getDateRange(filter);
-        var storeQuery = {};
-
-        if (filter.status !== 'all') {
-            storeQuery.trang_thai = filter.status;
-        }
-
-        if (filter.city !== 'all') {
-            storeQuery.tinh_thanh = filter.city;
-        }
-
-        if (dateRange.start || dateRange.end) {
-            storeQuery.created_at = {};
-            if (dateRange.start) storeQuery.created_at.$gte = dateRange.start;
-            if (dateRange.end) storeQuery.created_at.$lte = dateRange.end;
-        }
-
-        if (filter.warehouse === 'none') {
-            var storeIdsHaveWarehouse = await Kho.distinct('cua_hang_id');
-            storeQuery._id = { $nin: storeIdsHaveWarehouse };
-        }
-
-        if (filter.warehouse === 'has' || filter.warehouse === 'gte1') {
-            var storeIdsWithAtLeastOneWarehouse = await Kho.distinct('cua_hang_id');
-            storeQuery._id = { $in: storeIdsWithAtLeastOneWarehouse };
-        }
-
-        if (filter.warehouse === 'gte2') {
-            var groupedWarehouses = await Kho.aggregate([
-                { $group: { _id: '$cua_hang_id', total: { $sum: 1 } } },
-                { $match: { total: { $gte: 2 } } }
-            ]);
-
-            storeQuery._id = {
-                $in: groupedWarehouses.map(function(item) {
-                    return item._id;
-                })
-            };
-        }
+        var storeQuery = await buildStoreQueryFromFilter(filter);
 
         var stores = await CuaHang.find(storeQuery).sort({ created_at: 1, ma_cua_hang: 1 }).lean();
         var storeIds = stores.map(function(store) { return store._id; });
@@ -298,8 +354,8 @@ exports.index = async function(req, res, next) {
             : null;
 
         res.render('cua-hang/index', {
-            title: 'Cua hang',
-            pageTitle: 'Cua hang',
+            title: 'Cửa hàng',
+            pageTitle: 'Cửa hàng',
             activeMenu: 'cua-hang',
             user: req.user,
             flash: requestQuery,
@@ -314,6 +370,130 @@ exports.index = async function(req, res, next) {
             filterQueryString: buildFilterQueryString(filter),
             provinceOptions: provinceOptions
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.exportExcel = async function(req, res, next) {
+    try {
+        var filter = normalizeFilterQuery(req?.query || {});
+        var storeQuery = await buildStoreQueryFromFilter(filter);
+        var stores = await CuaHang.find(storeQuery).sort({ created_at: 1, ma_cua_hang: 1 }).lean();
+        var storeIds = stores.map(function(store) { return store._id; });
+        var warehouseRows = storeIds.length
+            ? await Kho.find({ cua_hang_id: { $in: storeIds } }).select('cua_hang_id').lean()
+            : [];
+        var warehouseCountMap = warehouseRows.reduce(function(map, warehouse) {
+            var key = String(warehouse.cua_hang_id || '');
+            map[key] = (map[key] || 0) + 1;
+            return map;
+        }, {});
+
+        var workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Quan ly cua hang';
+        workbook.created = new Date();
+        addExportSheet(workbook, 'Cửa hàng', [
+            { header: 'Mã cửa hàng', key: 'ma_cua_hang', width: 16 },
+            { header: 'Tên cửa hàng', key: 'ten_cua_hang', width: 28 },
+            { header: 'Địa chỉ', key: 'dia_chi', width: 42 },
+            { header: 'Điện thoại', key: 'sdt', width: 16 },
+            { header: 'Email', key: 'email', width: 28 },
+            { header: 'Số lượng kho', key: 'so_luong_kho', width: 14 },
+            { header: 'Trạng thái', key: 'trang_thai', width: 18 },
+            { header: 'Thời gian tạo', key: 'created_at', width: 20 }
+        ], stores.map(function(store) {
+            return {
+                ma_cua_hang: exportText(store.ma_cua_hang),
+                ten_cua_hang: exportText(store.ten_cua_hang),
+                dia_chi: exportText(buildStoreAddress(store)),
+                sdt: exportText(store.sdt),
+                email: exportText(store.email),
+                so_luong_kho: warehouseCountMap[String(store._id)] || 0,
+                trang_thai: exportStatus(store.trang_thai),
+                created_at: exportDate(store.created_at)
+            };
+        }));
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="danh-sach-cua-hang.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.exportSectionExcel = async function(req, res, next) {
+    try {
+        var storeId = normalizeIdParam(req?.params?.id);
+        var section = normalizeIdParam(req?.params?.section);
+        var sectionMap = {
+            info: { label: 'thong-tin', sheet: 'Thông tin' },
+            warehouses: { label: 'danh-sach-kho', sheet: 'Danh sách kho' },
+            notes: { label: 'ghi-chu', sheet: 'Ghi chú' }
+        };
+        if (!storeId || !sectionMap[section]) return res.redirect('/cua-hang?error=invalid_store');
+
+        var store = await CuaHang.findById(storeId).lean();
+        if (!store) return res.redirect('/cua-hang?error=invalid_store');
+
+        var workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Quan ly cua hang';
+        workbook.created = new Date();
+
+        if (section === 'info') {
+            addExportSheet(workbook, 'Thông tin', [
+                { header: 'Trường thông tin', key: 'label', width: 28 },
+                { header: 'Giá trị', key: 'value', width: 44 }
+            ], [
+                { label: 'Mã cửa hàng', value: exportText(store.ma_cua_hang) },
+                { label: 'Tên cửa hàng', value: exportText(store.ten_cua_hang) },
+                { label: 'Địa chỉ', value: exportText(store.dia_chi) },
+                { label: 'Địa chỉ gửi hàng', value: exportText(store.dia_chi_gui_hang) },
+                { label: 'Phường/xã', value: exportText(store.phuong_xa) },
+                { label: 'Quận/huyện', value: exportText(store.quan_huyen) },
+                { label: 'Tỉnh/thành', value: exportText(store.tinh_thanh) },
+                { label: 'Điện thoại', value: exportText(store.sdt) },
+                { label: 'Email', value: exportText(store.email) },
+                { label: 'Trạng thái', value: exportStatus(store.trang_thai) },
+                { label: 'Thời gian tạo', value: exportDate(store.created_at) },
+                { label: 'Cập nhật lúc', value: exportDate(store.updated_at) }
+            ]);
+        }
+
+        if (section === 'warehouses') {
+            var warehouses = await Kho.find({ cua_hang_id: store._id }).sort({ created_at: 1, ma_kho: 1 }).lean();
+            addExportSheet(workbook, 'Danh sách kho', [
+                { header: 'Mã kho', key: 'ma_kho', width: 16 },
+                { header: 'Tên kho', key: 'ten_kho', width: 28 },
+                { header: 'Địa chỉ', key: 'dia_chi', width: 42 },
+                { header: 'Trạng thái', key: 'trang_thai', width: 18 },
+                { header: 'Thời gian tạo', key: 'created_at', width: 20 }
+            ], warehouses.map(function(warehouse) {
+                return {
+                    ma_kho: exportText(warehouse.ma_kho),
+                    ten_kho: exportText(warehouse.ten_kho),
+                    dia_chi: exportText(warehouse.dia_chi),
+                    trang_thai: exportStatus(warehouse.trang_thai),
+                    created_at: exportDate(warehouse.created_at)
+                };
+            }));
+        }
+
+        if (section === 'notes') {
+            addExportSheet(workbook, 'Ghi chú', [
+                { header: 'Nội dung ghi chú', key: 'ghi_chu', width: 60 }
+            ], [
+                { ghi_chu: exportText(store.ghi_chu) }
+            ]);
+        }
+
+        var filename = 'cua-hang-' + safeExportFilenamePart(store.ma_cua_hang || store._id) + '-' + sectionMap[section].label + '.xlsx';
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+        await workbook.xlsx.write(res);
+        res.end();
     } catch (error) {
         next(error);
     }

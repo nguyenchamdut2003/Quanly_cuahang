@@ -1,6 +1,7 @@
 ﻿<!DOCTYPE html>
 <html>
   <head>
+  <meta charset="UTF-8">
     <title><%= title %></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel='stylesheet' href='/stylesheets/style.css' />
@@ -172,7 +173,18 @@
       </div>
     </div>
 
+    <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
+    <script id="copy-draft-embed" type="application/json"><%- copyDraftJson %></script>
+    <% } %>
     <script>
+      let copyDraft = null;
+      (function() {
+        const el = document.getElementById('copy-draft-embed');
+        if (el) {
+          try { copyDraft = JSON.parse(el.textContent || 'null'); } catch (e) { copyDraft = null; }
+        }
+      })();
+      const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
       let kkItems = [];
 
       const searchInput = document.getElementById('kkSearch');
@@ -243,9 +255,40 @@
         }
       }
 
+      function overlayCopyDraftItems() {
+        if (!copyDraft || !Array.isArray(copyDraft.items) || !copyDraft.items.length) return;
+        const draftMap = new Map(copyDraft.items.map(row => [
+          String(row.hang_hoa_id || '') + '::' + String(row.lo_hang_id || ''),
+          row
+        ]));
+        kkItems.forEach(item => {
+          const draft = draftMap.get(item.key);
+          if (!draft) return;
+          item.so_luong_thuc_te = Number(draft.so_luong_thuc_te ?? item.so_luong_thuc_te);
+          item.nguyen_nhan_lech = draft.nguyen_nhan_lech || '';
+        });
+        renderKK();
+      }
+
+      async function applyCopyDraft() {
+        if (!copyDraft) return;
+        if (copyDraft.ghi_chu) document.getElementById('ghiChu').value = copyDraft.ghi_chu;
+        if (copyDraft.cua_hang_id) storeSelect.value = copyDraft.cua_hang_id;
+        await loadKhoByStore();
+        if (copyDraft.kho_id) {
+          khoSelect.value = copyDraft.kho_id;
+          await loadHangKiemKho();
+          overlayCopyDraftItems();
+        }
+      }
+
       storeSelect.addEventListener('change', loadKhoByStore);
       khoSelect.addEventListener('change', loadHangKiemKho);
-      document.addEventListener('DOMContentLoaded', loadKhoByStore);
+      document.addEventListener('DOMContentLoaded', async () => {
+        await loadKhoByStore();
+        if (copyFromError) alert(copyFromError);
+        if (copyDraft) await applyCopyDraft();
+      });
 
       function renderSearchResults() {
         const query = searchInput.value.trim().toLowerCase();

@@ -1,6 +1,7 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -18,17 +19,28 @@
     .item-table-wrap{flex:1;overflow:auto}.item-table{width:100%;min-width:850px;border-collapse:collapse}
     .item-table th{height:38px;background:#f1f4ff;color:#374151;font-size:13px;text-align:left;padding:0 12px}.item-table td{height:46px;border-bottom:1px solid #edf0f3;color:#374151;font-size:13px;padding:0 12px}
     .num{text-align:right}.qty-input{width:78px;height:30px;border:1px solid #d5dde7;border-radius:4px;text-align:right;padding:0 8px}.remove{border:none;background:transparent;color:#9ca3af;cursor:pointer}
-    .empty-upload{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:#374151}
-    .upload-btn{height:44px;border:none;background:#0070f4;color:#fff;border-radius:4px;padding:0 28px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:8px;margin-top:24px}
+    .empty-hint{padding:48px 24px;text-align:center;color:#64748b;font-size:14px}
     .side-head{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;border-bottom:1px solid #e8edf3;color:#6b7280;font-size:13px}
-    .side-body{padding:18px;flex:1}.field{margin-bottom:16px}.field label{display:block;color:#374151;font-size:13px;font-weight:700;margin-bottom:7px}
+    .side-body{padding:18px;flex:1;overflow:auto}.field{margin-bottom:16px}.field label{display:block;color:#374151;font-size:13px;font-weight:700;margin-bottom:7px}
     .input{width:100%;height:34px;border:1px solid #dfe5ed;border-radius:6px;padding:0 10px;font-size:13px;outline:none;background:#fff}.textarea{height:38px;padding:9px 10px;resize:vertical}
     .readonly{height:34px;display:flex;align-items:center;color:#4b5563;font-size:13px}.total{display:flex;align-items:center;justify-content:space-between;margin:20px 0;font-weight:700;color:#374151}.total strong{font-size:18px}
-    .side-footer{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid #e8edf3}.btn{height:42px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}.btn.secondary{background:#fff;border:1px solid #aeb9c7;color:#426080}.btn.primary{background:#0070f4;border:1px solid #0070f4;color:#fff}
+    .side-footer{padding:18px;border-top:1px solid #e8edf3}.btn{height:42px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}.btn.secondary{background:#fff;border:1px solid #aeb9c7;color:#426080}.btn.primary{background:#0070f4;border:1px solid #0070f4;color:#fff}
+    .xnb-create .address-type-wrapper{position:relative}
+    .xnb-create .address-type-header{display:flex;gap:8px;align-items:center}
+    .xnb-create .address-type-trigger{flex:1;height:34px;border:1px solid #dfe5ed;border-radius:6px;background:#fff;padding:0 10px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#374151;cursor:pointer}
+    .xnb-create .address-type-dropdown{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:30;background:#fff;border:1px solid #dfe5ed;border-radius:6px;box-shadow:0 8px 18px rgba(0,0,0,.12);max-height:220px;overflow:auto}
+    .xnb-create .address-type-dropdown.is-open{display:block}
+    .loai-xuat-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;align-items:center;justify-content:center}
+    .loai-xuat-modal-overlay.is-visible{display:flex}
+    .loai-xuat-modal{background:#fff;border-radius:10px;padding:20px 24px;width:min(400px,calc(100vw - 32px));box-shadow:0 18px 44px rgba(15,23,42,.28)}
+    .loai-xuat-modal h3{margin:0 0 14px;font-size:17px}
+    .loai-xuat-modal label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:#374151}
+    .loai-xuat-modal input{width:100%;height:34px;border:1px solid #dfe5ed;border-radius:6px;padding:0 10px;font-size:13px;margin-bottom:14px}
   </style>
 </head>
 <body>
   <%- include('../partials/header') %>
+  
   <div class="xnb-create">
     <section class="left">
       <div class="create-top">
@@ -39,21 +51,14 @@
           <input id="searchInput" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)">
           <div id="results" class="results"></div>
         </div>
-        <div class="top-tools"><button class="tool"><i class="fa-solid fa-barcode"></i></button><button class="tool"><i class="fa-solid fa-print"></i></button><button class="tool"><i class="fa-solid fa-eye"></i></button><button class="tool"><i class="fa-solid fa-exclamation"></i></button></div>
+        <div class="top-tools"><button class="tool" type="button"><i class="fa-solid fa-barcode"></i></button><button class="tool" type="button"><i class="fa-solid fa-print"></i></button><button class="tool" type="button"><i class="fa-solid fa-eye"></i></button><button class="tool" type="button"><i class="fa-solid fa-exclamation"></i></button></div>
       </div>
       <div class="item-table-wrap">
         <table class="item-table">
           <thead><tr><th style="width:60px">STT</th><th>Mã hàng hóa</th><th>Tên hàng hóa</th><th>Đơn vị tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th><th></th></tr></thead>
           <tbody id="itemBody"></tbody>
         </table>
-        <div class="empty-upload" id="emptyUpload">
-          <div>
-            <h3>Thêm sản phẩm từ file excel</h3>
-            <p>(Tải về file mẫu: <a href="#" onclick="downloadTemplate(event)">Excel file</a>)</p>
-            <button class="upload-btn" onclick="document.getElementById('fileInput').click()"><i class="fa-regular fa-copy"></i> Chọn file dữ liệu</button>
-            <input id="fileInput" type="file" accept=".csv" style="display:none" onchange="importCsv(this)">
-          </div>
-        </div>
+        <div class="empty-hint" id="emptyHint">Tìm và chọn hàng hóa bằng ô tìm kiếm phía trên.</div>
       </div>
     </section>
     <aside class="right">
@@ -61,19 +66,61 @@
       <div class="side-body">
         <div class="field"><label>Mã xuất dùng nội bộ</label><input class="input" disabled placeholder="Mã phiếu tự động"></div>
         <div class="field"><label>Trạng thái</label><div class="readonly">Phiếu tạm</div></div>
-        <div class="field"><label>Loai xuat</label><select class="input" id="loaiXuat"><option>Xuat van phong pham, dung cu lam viec</option><option>Xuat vat tu tieu hao, cong cu dung cu</option><option>Xuat phuc vu su kien, hoi nghi noi bo</option><option>Xuat boi thuong, den bu</option><option>Xuat mau trung bay, demo san pham</option><option>Xuat qua tang khach hang, doi tac</option><option>Khac</option></select></div>
-        <div class="field"><label>Loai nguoi nhan</label><select class="input" id="loaiNguoiNhan" onchange="renderReceiverOptions()"><option value="nhan_vien">Nhan vien</option><option value="khach_hang">Khach hang</option><option value="nha_cung_cap">Nha cung cap</option><option value="khac">Khac</option></select></div>
-        <div class="field" id="receiverSelectWrap"><label>Nguoi nhan</label><select class="input" id="nguoiNhan"><option value="">Chon nguoi nhan</option></select></div>
-        <div class="field" id="receiverOtherWrap" style="display:none"><label>Nguoi nhan khac</label><input class="input" id="nguoiNhanKhac" placeholder="Nhap ten nguoi nhan"></div>
+        <div class="field">
+          <label>Loại xuất</label>
+          <% var initialLoaiXuat = (loaiXuatList && loaiXuatList[0]) ? loaiXuatList[0] : null; %>
+          <div class="address-type-wrapper">
+            <div class="address-type-header">
+              <button class="address-type-trigger" type="button" id="loaiXuatTrigger">
+                <span id="loaiXuatSelectedLabel"><%= initialLoaiXuat ? initialLoaiXuat.ten_loai : 'Chọn loại xuất' %></span>
+                <span>▾</span>
+              </button>
+              <button class="btn btn-primary btn-sm" type="button" id="loaiXuatAddBtn" style="height:34px;padding:0 12px;font-size:12px">Thêm</button>
+            </div>
+            <input type="hidden" id="loaiXuatValue" value="<%= initialLoaiXuat ? initialLoaiXuat.ten_loai : '' %>">
+            <div class="address-type-dropdown" id="loaiXuatDropdown">
+              <% (loaiXuatList || []).forEach(function(loai) { %>
+                <div
+                  class="address-type-item <%= initialLoaiXuat && String(initialLoaiXuat._id) === String(loai._id) ? 'is-active' : '' %>"
+                  data-id="<%= loai._id %>"
+                  data-value="<%= loai.ten_loai %>"
+                  data-name="<%= loai.ten_loai %>"
+                >
+                  <button class="address-type-option" type="button"><%= loai.ten_loai %></button>
+                  <div class="address-type-actions">
+                    <button class="address-type-action-edit" type="button">Sửa</button>
+                    <button class="address-type-action-delete" type="button">Xóa</button>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>Loại người nhận</label><select class="input" id="loaiNguoiNhan" onchange="renderReceiverOptions()"><option value="nhan_vien">Nhân viên</option><option value="khach_hang">Khách hàng</option><option value="nha_cung_cap">Nhà cung cấp</option><option value="khac">Khác</option></select></div>
+        <div class="field" id="receiverSelectWrap"><label>Người nhận</label><select class="input" id="nguoiNhan"><option value="">Chọn người nhận</option></select></div>
+        <div class="field" id="receiverOtherWrap" style="display:none"><label>Người nhận khác</label><input class="input" id="nguoiNhanKhac" placeholder="Nhập tên người nhận"></div>
         <div class="field"><label>Chi nhánh</label><select class="input" id="storeId"><option value="">Chọn chi nhánh</option><% stores.forEach(s=>{ %><option value="<%= s._id %>"><%= s.ten_cua_hang %></option><% }) %></select></div>
         <div class="field"><label>Kho</label><select class="input" id="khoId" disabled><option value="">Vui lòng chọn cửa hàng trước</option></select></div>
         <div class="total"><span>Tổng giá trị <i class="fa-regular fa-circle-question"></i></span><strong id="totalValue">0</strong></div>
-        <div class="field"><label><input type="checkbox" id="congDonVaoThe" disabled> Cong don vao the tung thanh vien (chua ho tro du lieu nhan)</label></div>
+        <div class="field"><label><input type="checkbox" id="congDonVaoThe" disabled> Cộng dồn vào thẻ từng thành viên (chưa hỗ trợ dữ liệu nhận)</label></div>
         <div class="field"><textarea class="input textarea" id="ghiChu" placeholder="Ghi chú"></textarea></div>
       </div>
-      <div class="side-footer"><button class="btn secondary" onclick="saveXnb('draft')">Lưu tạm</button><button class="btn primary" onclick="saveXnb('completed')">Hoàn thành</button></div>
+      <div class="page-actions page-actions--grid2 side-footer"><button class="btn secondary" type="button" onclick="saveXnb('draft')">Lưu tạm</button><button class="btn primary" type="button" onclick="saveXnb('completed')">Hoàn thành</button></div>
     </aside>
   </div>
+
+  <div class="loai-xuat-modal-overlay" id="loaiXuatModalOverlay">
+    <div class="loai-xuat-modal">
+      <h3 id="loaiXuatModalTitle">Thêm loại xuất</h3>
+      <label for="loaiXuatNameInput">Tên loại xuất</label>
+      <input id="loaiXuatNameInput" type="text" placeholder="Ví dụ: Xuất văn phòng phẩm">
+      <div class="page-actions loai-xuat-modal-footer">
+        <button class="btn secondary" type="button" id="loaiXuatModalCancel" style="height:36px;padding:0 16px">Bỏ qua</button>
+        <button class="btn primary" type="button" id="loaiXuatModalSubmit" style="height:36px;padding:0 16px">Lưu</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const products = <%- JSON.stringify(products.map(p => ({_id:String(p._id),ma_hang:p.ma_hang,ten_hang:p.ten_hang,don_vi_tinh:p.don_vi_tinh || 'cái',gia_von:p.gia_von || 0,ton_kho:p.ton_kho || 0}))) %>;
     const receiverSources = {
@@ -81,11 +128,26 @@
       khach_hang: <%- JSON.stringify((customers || []).map(c => ({value: c.ten_khach_hang || c.ten || c.sdt || "", label: c.ten_khach_hang || c.ten || c.sdt || ""}))) %>,
       nha_cung_cap: <%- JSON.stringify((suppliers || []).map(n => ({value: n.ten_ncc || n.ten_cong_ty || n.sdt || "", label: n.ten_ncc || n.ten_cong_ty || n.sdt || ""}))) %>
     };
+    let loaiXuatList = <%- JSON.stringify((loaiXuatList || []).map(l => ({ _id: String(l._id), ten_loai: l.ten_loai, ma_loai: l.ma_loai }))) %>;
     let items = [];
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
     const storeSelect = document.getElementById('storeId');
     const khoSelect = document.getElementById('khoId');
+    const emptyHint = document.getElementById('emptyHint');
+    const loaiXuatTrigger = document.getElementById('loaiXuatTrigger');
+    const loaiXuatDropdown = document.getElementById('loaiXuatDropdown');
+    const loaiXuatSelectedLabel = document.getElementById('loaiXuatSelectedLabel');
+    const loaiXuatValue = document.getElementById('loaiXuatValue');
+    const loaiXuatModalOverlay = document.getElementById('loaiXuatModalOverlay');
+    const loaiXuatModalTitle = document.getElementById('loaiXuatModalTitle');
+    const loaiXuatNameInput = document.getElementById('loaiXuatNameInput');
+    let loaiXuatModalMode = 'add';
+    let activeLoaiXuatItem = null;
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
 
     function renderReceiverOptions(){
       const type = document.getElementById('loaiNguoiNhan').value;
@@ -100,8 +162,138 @@
       selectWrap.style.display = 'block';
       otherWrap.style.display = 'none';
       const rows = receiverSources[type] || [];
-      select.innerHTML = '<option value="">Chon nguoi nhan</option>' + rows.map(row => `<option value="${row.value}">${row.label}</option>`).join('');
+      select.innerHTML = '<option value="">Chọn người nhận</option>' + rows.map(row => `<option value="${escapeHtml(row.value)}">${escapeHtml(row.label)}</option>`).join('');
     }
+
+    function renderLoaiXuatDropdown(selectedTenLoai) {
+      if (!loaiXuatDropdown) return;
+      let selected = null;
+      if (selectedTenLoai) {
+        selected = loaiXuatList.find(item => item.ten_loai === selectedTenLoai) || null;
+      }
+      if (!selected && loaiXuatList.length) selected = loaiXuatList[0];
+
+      loaiXuatDropdown.innerHTML = loaiXuatList.map(function(loai) {
+        const isActive = selected && selected.ten_loai === loai.ten_loai;
+        return (
+          '<div class="address-type-item ' + (isActive ? 'is-active' : '') + '" data-id="' + escapeHtml(loai._id) + '" data-value="' + escapeHtml(loai.ten_loai) + '" data-name="' + escapeHtml(loai.ten_loai) + '">' +
+            '<button class="address-type-option" type="button">' + escapeHtml(loai.ten_loai) + '</button>' +
+            '<div class="address-type-actions">' +
+              '<button class="address-type-action-edit" type="button">Sửa</button>' +
+              '<button class="address-type-action-delete" type="button">Xóa</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+
+      if (loaiXuatSelectedLabel) loaiXuatSelectedLabel.textContent = selected ? selected.ten_loai : 'Ch\u1ecdn lo\u1ea1i xu\u1ea5t';
+      if (loaiXuatValue) loaiXuatValue.value = selected ? selected.ten_loai : '';
+      bindLoaiXuatItems();
+    }
+
+    function bindLoaiXuatItems() {
+      const nodes = Array.prototype.slice.call(loaiXuatDropdown.querySelectorAll('.address-type-item'));
+      nodes.forEach(function(item) {
+        const optionBtn = item.querySelector('.address-type-option');
+        const editBtn = item.querySelector('.address-type-action-edit');
+        const deleteBtn = item.querySelector('.address-type-action-delete');
+
+        if (optionBtn) {
+          optionBtn.addEventListener('click', function() {
+            nodes.forEach(function(node) { node.classList.remove('is-active'); });
+            item.classList.add('is-active');
+            if (loaiXuatSelectedLabel) loaiXuatSelectedLabel.textContent = item.getAttribute('data-name') || '';
+            if (loaiXuatValue) loaiXuatValue.value = item.getAttribute('data-value') || '';
+            if (loaiXuatDropdown) loaiXuatDropdown.classList.remove('is-open');
+          });
+        }
+
+        if (editBtn) {
+          editBtn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            activeLoaiXuatItem = item;
+            openLoaiXuatModal('edit');
+          });
+        }
+
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            const typeId = item.getAttribute('data-id') || '';
+            if (!typeId) return;
+            if (!confirm('Bạn có chắc muốn xóa loại xuất này?')) return;
+            requestLoaiXuat('/xuat-dung-noi-bo/loai-xuat/' + typeId + '/delete', {});
+          });
+        }
+      });
+    }
+
+    async function requestLoaiXuat(url, body) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          body: JSON.stringify(body || {})
+        });
+        const result = await res.json();
+        if (!result.success) {
+          alert(result.message || 'Không thực hiện được thao tác.');
+          return;
+        }
+        loaiXuatList = (result.loaiXuatList || []).map(function(item) {
+          return { _id: String(item._id), ten_loai: item.ten_loai, ma_loai: item.ma_loai };
+        });
+        const selectedTen = result.selectedId
+          ? (loaiXuatList.find(function(item) { return item._id === result.selectedId; }) || {}).ten_loai
+          : loaiXuatValue.value;
+        renderLoaiXuatDropdown(selectedTen || loaiXuatValue.value);
+        closeLoaiXuatModal();
+      } catch (e) {
+        alert('Lỗi khi xử lý loại xuất.');
+      }
+    }
+
+    function openLoaiXuatModal(mode) {
+      loaiXuatModalMode = mode;
+      if (loaiXuatModalTitle) loaiXuatModalTitle.textContent = mode === 'edit' ? 'Sửa loại xuất' : 'Thêm loại xuất';
+      if (loaiXuatNameInput) {
+        loaiXuatNameInput.value = mode === 'edit' && activeLoaiXuatItem
+          ? (activeLoaiXuatItem.getAttribute('data-name') || '')
+          : '';
+      }
+      if (loaiXuatModalOverlay) loaiXuatModalOverlay.classList.add('is-visible');
+    }
+
+    function closeLoaiXuatModal() {
+      if (loaiXuatModalOverlay) loaiXuatModalOverlay.classList.remove('is-visible');
+      activeLoaiXuatItem = null;
+    }
+
+    if (loaiXuatTrigger && loaiXuatDropdown) {
+      loaiXuatTrigger.addEventListener('click', function() {
+        loaiXuatDropdown.classList.toggle('is-open');
+      });
+    }
+    document.getElementById('loaiXuatAddBtn').addEventListener('click', function() {
+      activeLoaiXuatItem = null;
+      openLoaiXuatModal('add');
+    });
+    document.getElementById('loaiXuatModalCancel').addEventListener('click', closeLoaiXuatModal);
+    document.getElementById('loaiXuatModalSubmit').addEventListener('click', function() {
+      const tenLoai = (loaiXuatNameInput.value || '').trim();
+      if (!tenLoai) return alert('Vui lòng nhập tên loại xuất.');
+      if (loaiXuatModalMode === 'edit' && activeLoaiXuatItem) {
+        const typeId = activeLoaiXuatItem.getAttribute('data-id') || '';
+        requestLoaiXuat('/xuat-dung-noi-bo/loai-xuat/' + typeId + '/update', { ten_loai: tenLoai });
+      } else {
+        requestLoaiXuat('/xuat-dung-noi-bo/loai-xuat/add', { ten_loai: tenLoai });
+      }
+    });
+    loaiXuatModalOverlay.addEventListener('click', function(event) {
+      if (event.target === loaiXuatModalOverlay) closeLoaiXuatModal();
+    });
+
+    bindLoaiXuatItems();
 
     async function loadKhoByStore(){
       const storeId = storeSelect.value;
@@ -112,7 +304,7 @@
         const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
         const result = await res.json();
         const warehouses = result.success ? (result.data || []) : [];
-        khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${escapeHtml(k.ten_kho)}</option>`).join('');
         khoSelect.disabled = false;
       }catch(e){
         khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
@@ -127,9 +319,17 @@
       const q = this.value.trim().toLowerCase();
       if(!q){results.style.display='none';return;}
       const matched = products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)).slice(0,20);
-      results.innerHTML = matched.map(p => `<div class="result-item" onclick="addItem('${p._id}')"><span><strong>${p.ma_hang}</strong> - ${p.ten_hang}</span><span>Tồn: ${p.ton_kho}</span></div>`).join('');
+      results.innerHTML = matched.map(p => `<div class="result-item" onclick="addItem('${p._id}')"><span><strong>${escapeHtml(p.ma_hang)}</strong> - ${escapeHtml(p.ten_hang)}</span><span>Tồn: ${p.ton_kho}</span></div>`).join('');
       results.style.display = matched.length ? 'block' : 'none';
     });
+
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'F3') {
+        event.preventDefault();
+        searchInput.focus();
+      }
+    });
+
     function addItem(id){
       const product = products.find(p => p._id === id);
       if(!product) return;
@@ -144,39 +344,23 @@
       body.innerHTML = items.map((item,index)=>{
         const value = Number(item.so_luong) * Number(item.gia_von);
         total += value;
-        return `<tr><td>${index+1}</td><td>${item.ma_hang}</td><td>${item.ten_hang}</td><td>${item.don_vi_tinh}</td><td class="num"><input class="qty-input" type="number" min="1" max="${item.ton_kho}" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}',this.value)"></td><td class="num">${Number(item.gia_von).toLocaleString('vi-VN')}</td><td class="num">${value.toLocaleString('vi-VN')}</td><td><button class="remove" onclick="removeItem('${item.hang_hoa_id}')"><i class="fa-solid fa-xmark"></i></button></td></tr>`;
+        return `<tr><td>${index+1}</td><td>${escapeHtml(item.ma_hang)}</td><td>${escapeHtml(item.ten_hang)}</td><td>${escapeHtml(item.don_vi_tinh)}</td><td class="num"><input class="qty-input" type="number" min="1" max="${item.ton_kho}" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}',this.value)"></td><td class="num">${Number(item.gia_von).toLocaleString('vi-VN')}</td><td class="num">${value.toLocaleString('vi-VN')}</td><td><button class="remove" type="button" onclick="removeItem('${item.hang_hoa_id}')"><i class="fa-solid fa-xmark"></i></button></td></tr>`;
       }).join('');
-      document.getElementById('emptyUpload').style.display = items.length ? 'none' : 'flex';
+      if (emptyHint) emptyHint.style.display = items.length ? 'none' : 'block';
       document.getElementById('totalValue').textContent = total.toLocaleString('vi-VN');
     }
     function updateQty(id,val){const item=items.find(i=>i.hang_hoa_id===id); if(item)item.so_luong=Math.max(1,Number(val)||1); renderItems();}
     function removeItem(id){items=items.filter(i=>i.hang_hoa_id!==id); renderItems();}
-    function importCsv(input){
-      const file = input.files && input.files[0]; if(!file)return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        reader.result.split(/\r?\n/).slice(1).forEach(line => {
-          const [code, qty] = line.split(',').map(v => (v || '').replace(/^"|"$/g,'').trim());
-          const p = products.find(x => x.ma_hang === code);
-          if(p){ addItem(p._id); updateQty(p._id, Number(qty) || 1); }
-        });
-        input.value='';
-      };
-      reader.readAsText(file);
-    }
-    function downloadTemplate(e){
-      e.preventDefault();
-      const blob = new Blob(['\ufeff"Mã hàng","SL xuất"\r\n"HH0001","1"'], {type:'text/csv;charset=utf-8;'});
-      const url = URL.createObjectURL(blob); const a = document.createElement('a');
-      a.href = url; a.download = 'mau-xuat-dung-noi-bo.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
+
     async function saveXnb(status){
       if(!items.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
       if(!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
+      const loaiXuat = (loaiXuatValue.value || '').trim();
+      if (!loaiXuat) return alert('Vui lòng chọn loại xuất.');
       const loaiNguoiNhan = document.getElementById('loaiNguoiNhan').value;
       const receiverName = loaiNguoiNhan === 'khac' ? document.getElementById('nguoiNhanKhac').value : document.getElementById('nguoiNhan').value;
-      if(!receiverName.trim()) return alert('Vui long chon hoac nhap nguoi nhan.');
-      const data = {trang_thai:status,loai_xuat:document.getElementById('loaiXuat').value,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items};
+      if(!receiverName.trim()) return alert('Vui lòng chọn hoặc nhập người nhận.');
+      const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items};
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         const result = await res.json();

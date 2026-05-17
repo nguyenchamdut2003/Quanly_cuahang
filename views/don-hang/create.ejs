@@ -2,6 +2,7 @@
 <html>
 
 <head>
+  <meta charset="UTF-8">
   <title>
     <%= title %>
   </title>
@@ -86,6 +87,38 @@
 
     .search-item:hover {
       background: #f0f7ff
+    }
+
+    .search-item.product-search-item {
+      height: auto;
+      min-height: 52px;
+      padding: 7px 12px;
+      gap: 12px
+    }
+
+    .search-item-info {
+      min-width: 0
+    }
+
+    .search-item-main {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .search-item-meta {
+      display: block;
+      margin-top: 3px;
+      color: #667085;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .search-item-price {
+      flex: 0 0 auto
     }
 
     .cart-area {
@@ -609,7 +642,7 @@
           </div>
           <div class="delivery-row" style="margin-top:16px">
             <label>Người trả phí giao hàng</label>
-            <select id="shippingFeePayer" class="delivery-input" onchange="renderCart()">
+            <select id="shippingFeePayer" class="delivery-input" onchange="handleShippingFeePayerChange()">
               <option value="khach">Khách trả</option>
               <option value="cua_hang">Cửa hàng trả</option>
             </select>
@@ -631,15 +664,31 @@
       let previousKhoId = '';
       let shippingFeeManuallyEdited = false;
       let shippingFeeTimer = null;
-      const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0 }))) %>;
+      const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0, nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id._id || p.nha_cung_cap_id) : '', ten_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ten_ncc || p.nha_cung_cap_id.ten_cong_ty || '') : '', ma_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ma_ncc || '') : '' }))) %>;
       const priceRows = <%- JSON.stringify((priceRows || []).map(r => ({ bang_gia_id: String(r.bang_gia_id || ''), hang_hoa_id: String(r.hang_hoa_id || ''), gia_ban: Number(r.gia_ban || 0) }))) %>;
       const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi: a.dia_chi || a.dia_chi_day_du || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
       const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi || '', dia_chi_gui_hang: s.dia_chi_gui_hang || '', tinh_thanh: s.tinh_thanh || '', quan_huyen: s.quan_huyen || '', phuong_xa: s.phuong_xa || '' }))) %>;
+      const sourceOrder = <%- JSON.stringify(sourceOrder || null) %>;
+      const sourceOrderItems = <%- JSON.stringify((sourceOrderItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.hang_hoa_id?.ma_hang || '', ten_hang: row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong_dat || row.so_luong || 0), don_gia_ban: Number(row.don_gia_ban || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: row.kieu_chiet_khau || 'vnd' }))) %>;
+      const sourceShipment = <%- JSON.stringify(sourceShipment || null) %>;
+      const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
       const fmt = n => Number(n || 0).toLocaleString('vi-VN');
       const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
       const stockByProduct = new Map();
       const productSearch = document.getElementById('productSearch'), productResults = document.getElementById('productResults');
       const selectedPriceBookId = () => document.getElementById('priceBookId')?.value || '';
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, char => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        }[char]));
+      }
+      function supplierName(product) {
+        return product?.ten_ncc || 'Chưa có';
+      }
       function priceFor(productId) {
         const row = priceRows.find(r => r.bang_gia_id === selectedPriceBookId() && r.hang_hoa_id === productId);
         if (row && Number(row.gia_ban || 0) > 0) return Number(row.gia_ban || 0);
@@ -684,7 +733,7 @@
         const rows = (q ? availableProducts.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : availableProducts).slice(0, 30);
         productResults.innerHTML = rows.map(p => {
           const stock = stockFor(p._id);
-          return `<div class="search-item" onclick="addProduct('${p._id}')"><span><b>${p.ma_hang || ''}</b> - ${p.ten_hang}<span class="stock-text">Tồn: ${fmt(stock)}</span></span><b>${fmt(priceFor(p._id))}</b></div>`;
+          return `<div class="search-item product-search-item" onclick="addProduct('${p._id}')"><span class="search-item-info"><span class="search-item-main"><b>${escapeHtml(p.ma_hang || '')}</b> - ${escapeHtml(p.ten_hang || '')}</span><span class="search-item-meta">NCC: ${escapeHtml(supplierName(p))} - Tồn: ${fmt(stock)}</span></span><b class="search-item-price">${fmt(priceFor(p._id))}</b></div>`;
         }).join('') || '<div class="search-item"><span>Không có hàng hóa phù hợp</span></div>';
         productResults.style.display = 'block';
       }
@@ -715,11 +764,11 @@
           const lineDiscount = discountAmount(i.chiet_khau, i.kieu_chiet_khau, lineBase);
           const line = Math.max(lineBase - lineDiscount, 0);
           subtotal += line;
-          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(i.ton_kho)}</span></td><td>${i.ten_hang}</td><td class="num"><input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)"></td><td class="num">${fmt(i.ton_kho)}</td><td class="num">${fmt(i.don_gia_ban)}</td><td class="num"><span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td><td class="num">${fmt(line)}</td><td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td></tr>`;
+          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(i.ton_kho)}</span></td><td>${i.ten_hang}</td><td class="num"><input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)"></td><td class="num">${fmt(i.ton_kho)}</td><td class="num"><input class="small" value="${fmt(i.don_gia_ban)}" onchange="updUnitPrice('${i.hang_hoa_id}',this.value)"></td><td class="num"><span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td><td class="num">${fmt(line)}</td><td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td></tr>`;
         }).join('');
         const orderDiscount = discountAmount(num(discount.value), orderDiscountType.value, subtotal);
         const shippingFeeValue = num(shippingFee.value);
-        const shippingFeeForCustomer = shippingFeePayer.value === 'cua_hang' ? 0 : shippingFeeValue;
+        const shippingFeeForCustomer = 0;
         const total = Math.max(subtotal - orderDiscount + shippingFeeForCustomer, 0);
         document.getElementById('subtotal').textContent = fmt(subtotal);
         grandTotal.textContent = fmt(total);
@@ -744,6 +793,12 @@
         const nextQty = Math.max(1, num(v));
         if (nextQty > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
         i.so_luong = nextQty;
+        renderCart();
+      }
+      function updUnitPrice(id, v) {
+        const i = cart.find(x => x.hang_hoa_id === id);
+        if (!i) return;
+        i.don_gia_ban = Math.max(0, num(v));
         renderCart();
       }
       function updLineDiscount(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.chiet_khau = num(v); renderCart(); }
@@ -853,13 +908,42 @@
       }
       function scheduleShippingFee() {
         clearTimeout(shippingFeeTimer);
+        if (shippingFeePayer.value === 'khach') {
+          shippingFee.value = 0;
+          shippingFee.disabled = true;
+          shippingFeeHelp.textContent = 'Khách trả phí giao hàng trực tiếp, không cộng vào đơn.';
+          renderCart();
+          return;
+        }
+        shippingFee.disabled = false;
         shippingFeeTimer = setTimeout(calculateShippingFee, 350);
       }
+      function handleShippingFeePayerChange() {
+        shippingFeeManuallyEdited = false;
+        if (shippingFeePayer.value === 'khach') {
+          shippingFee.value = 0;
+          shippingFee.disabled = true;
+          shippingFeeHelp.textContent = 'Khách trả phí giao hàng trực tiếp, không cộng vào đơn.';
+          renderCart();
+          return;
+        }
+        shippingFee.disabled = false;
+        scheduleShippingFee();
+        renderCart();
+      }
       function handleManualShippingFee() {
+        if (shippingFeePayer.value === 'khach') {
+          shippingFee.value = 0;
+          return renderCart();
+        }
         shippingFeeManuallyEdited = true;
         renderCart();
       }
       async function calculateShippingFee() {
+        if (shippingFeePayer.value === 'khach') {
+          shippingFee.value = 0;
+          return renderCart();
+        }
         if (!partnerId.value || !pickupStoreId.value) return;
         const endPoint = getShippingEndPoint();
         const addressId = getRecipientAddressId();
@@ -923,7 +1007,10 @@
             ten_hang: row.ten_hang || '',
             gia_co_dinh: Number(row.gia_co_dinh || 0),
             quan_ly_theo_lo: !!row.quan_ly_theo_lo,
-            ton_kho: Number(row.ton_kho || 0)
+            ton_kho: Number(row.ton_kho || 0),
+            nha_cung_cap_id: row.nha_cung_cap_id || '',
+            ten_ncc: row.ten_ncc || '',
+            ma_ncc: row.ma_ncc || ''
           }));
           stockByProduct.clear();
           availableProducts.forEach(product => {
@@ -1005,7 +1092,50 @@
           alert(err.message || 'Lỗi khi tạo đơn hàng');
         }
       }
-      document.addEventListener('DOMContentLoaded', () => { renderPickupStore(); loadKhoByStore(); renderCod(); document.getElementById('khoId').addEventListener('change', handleWarehouseChange); });
+      async function prefillFromCopyOrder() {
+        if (!sourceOrder || !sourceOrderItems.length) return;
+        const storeId = String(sourceOrder.cua_hang_id?._id || sourceOrder.cua_hang_id || '');
+        const khoId = String(sourceOrder.kho_id?._id || sourceOrder.kho_id || '');
+        if (storeId) pickupStoreId.value = storeId;
+        renderPickupStore();
+        await loadKhoByStore();
+        if (khoId) {
+          document.getElementById('khoId').value = khoId;
+          await handleWarehouseChange();
+        }
+        if (sourceOrder.bang_gia_id) priceBookId.value = String(sourceOrder.bang_gia_id);
+        const customerIdValue = String(sourceOrder.khach_hang_id?._id || sourceOrder.khach_hang_id || '');
+        if (customerIdValue) fillRecipientFromCustomer(customers.find(x => x._id === customerIdValue));
+        if (sourceShipment) {
+          recipientPhone.value = sourceShipment.sdt_nguoi_nhan || recipientPhone.value;
+          if (sourceShipment.dia_chi_nhan) recipientAddress.value = sourceShipment.dia_chi_nhan;
+          shippingFee.value = fmt(sourceShipment.phi_giao_hang || 0);
+          if (sourceShipment.nguoi_tra_phi_giao_hang) shippingFeePayer.value = sourceShipment.nguoi_tra_phi_giao_hang;
+          selectPartnerIfExists(String(sourceShipment.doi_tac_giao_hang_id || ''));
+        }
+        codEnabled = !!sourceOrder.cod_enabled;
+        discount.value = sourceOrder.giam_gia || 0;
+        orderDiscountType.value = sourceOrder.kieu_giam_gia || 'vnd';
+        cart = sourceOrderItems.map(item => ({
+          ...item,
+          ton_kho: stockFor(item.hang_hoa_id)
+        }));
+        renderCart();
+      }
+      function selectPartnerIfExists(id) {
+        if (!id) return;
+        const option = document.querySelector(`.partner-option[data-partner-id="${id}"]`);
+        if (option) selectPartner(id, option.textContent.trim());
+      }
+      document.addEventListener('DOMContentLoaded', async () => {
+        renderPickupStore();
+        loadKhoByStore();
+        handleShippingFeePayerChange();
+        renderCod();
+        document.getElementById('khoId').addEventListener('change', handleWarehouseChange);
+        if (copyFromError) alert(copyFromError);
+        await prefillFromCopyOrder();
+      });
       document.addEventListener('click', e => { if (!partnerPicker.contains(e.target)) partnerPicker.classList.remove('open'); });
     </script>
 </body>

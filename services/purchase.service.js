@@ -10,7 +10,8 @@ const {
   LichSuKho,
   CongNoNhaCungCap,
   PhieuThuChi,
-  SoQuy
+  SoQuy,
+  HangHoaThuocTinh
 } = require('../models/kiot.model');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('./soQuy.service');
 
@@ -34,6 +35,26 @@ function parseDate(value) {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
+function safeLotCodeSegment(value) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^A-Za-z0-9_-]/g, '');
+}
+
+function makePurchaseLotCode(purchaseCode, productCode) {
+  const safePurchaseCode = safeLotCodeSegment(purchaseCode);
+  const safeProductCode = safeLotCodeSegment(productCode);
+  if (!safePurchaseCode || !safeProductCode) return '';
+  return 'LO-' + safePurchaseCode + '-' + safeProductCode;
+}
+
+function formatLotName(dateValue) {
+  const d = dateValue ? new Date(dateValue) : new Date();
+  if (Number.isNaN(d.getTime())) return 'Lô';
+  return 'Lô ' + d.toLocaleDateString('vi-VN');
+}
+
 function normalizeItems(raw) {
   let parsed = raw;
   if (typeof raw === 'string') {
@@ -45,6 +66,7 @@ function normalizeItems(raw) {
     return {
       hang_hoa_id: cleanId(item.hang_hoa_id),
       lo_hang_id: cleanId(item.lo_hang_id),
+      gia_tri_thuoc_tinh_id: cleanId(item.gia_tri_thuoc_tinh_id),
       so_luong: Math.floor(Number(item.so_luong || 0)),
       don_gia_nhap: parseMoney(item.don_gia_nhap ?? item.don_gia),
       giam_gia_dong: parseMoney(item.giam_gia_dong ?? item.giam_gia),
@@ -52,11 +74,8 @@ function normalizeItems(raw) {
       lo_info: item.lo_info && typeof item.lo_info === 'object' ? {
         ma_lo: String(item.lo_info.ma_lo || '').trim(),
         ten_lo: String(item.lo_info.ten_lo || '').trim(),
-        ngay_san_xuat: String(item.lo_info.ngay_san_xuat || '').trim(),
-        ngay_thu_hoach: String(item.lo_info.ngay_thu_hoach || '').trim(),
         han_su_dung: String(item.lo_info.han_su_dung || '').trim(),
         ngay_nhap: String(item.lo_info.ngay_nhap || '').trim(),
-        so_luong_lo: Math.floor(Number(item.lo_info.so_luong_lo || item.so_luong || 0)),
         ghi_chu: String(item.lo_info.ghi_chu || '').trim()
       } : null
     };
@@ -92,7 +111,7 @@ async function makeCode(model, field, prefix, width) {
   return prefix + String(next).padStart(width, '0');
 }
 
-async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, productId, item, now }) {
+async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, product, productId, item, now, lotCache }) {
   if (item.lo_hang_id) {
     const existing = await LoHang.findOne({
       _id: item.lo_hang_id,
@@ -106,10 +125,47 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
 
   const lotInfo = item.lo_info;
   if (!lotInfo) throw new Error('Hang quan ly theo lo can thong tin lo');
-  const lotQty = Math.floor(Number(lotInfo.so_luong_lo || item.so_luong || 0));
-  if (lotQty <= 0 || lotQty !== item.so_luong) throw new Error('So luong lo phai bang so luong dong hang');
+  const lotQty = Math.floor(Number(item.so_luong || 0));
+  if (lotQty <= 0) throw new Error('So luong dong hang khong hop le');
 
-  const maLo = lotInfo.ma_lo || await makeCode(LoHang, 'ma_lo', 'LO', 6);
+  const maLo = makePurchaseLotCode(purchase.ma_phieu_nhap, product && product.ma_hang);
+  if (!maLo) throw new Error('Khong the sinh ma lo tu phieu nhap va hang hoa');
+  if (lotCache && lotCache.has(maLo)) {
+    const lotId = lotCache.get(maLo);
+    await LoHang.updateOne(
+      { _id: lotId },
+      {
+        $inc: { so_luong_ban_dau: lotQty },
+        $set: {
+          nha_cung_cap_id: supplierId || undefined,
+          don_gia_nhap: item.don_gia_nhap,
+          gia_von: item.don_gia_nhap
+        }
+      }
+    );
+    return lotId;
+  }
+  const existingByCode = await LoHang.findOne({
+    ma_lo: maLo,
+    hang_hoa_id: productId,
+    phieu_nhap_id: purchase._id,
+    trang_thai: { $ne: 'huy' }
+  });
+  if (existingByCode) {
+    await LoHang.updateOne(
+      { _id: existingByCode._id },
+      {
+        $inc: { so_luong_ban_dau: lotQty },
+        $set: {
+          nha_cung_cap_id: supplierId || undefined,
+          don_gia_nhap: item.don_gia_nhap,
+          gia_von: item.don_gia_nhap
+        }
+      }
+    );
+    if (lotCache) lotCache.set(maLo, existingByCode._id);
+    return existingByCode._id;
+  }
   const created = await LoHang.create({
     cua_hang_id: storeId,
     kho_id: khoId,
@@ -118,10 +174,8 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
     phieu_nhap_id: purchase._id,
     ct_phieu_nhap_id: ctDoc._id,
     ma_lo: maLo,
-    ten_lo: lotInfo.ten_lo || maLo,
+    ten_lo: lotInfo.ten_lo || formatLotName(parseDate(lotInfo.ngay_nhap) || purchase.ngay_nhap || now),
     ngay_nhap: parseDate(lotInfo.ngay_nhap) || now,
-    ngay_san_xuat: parseDate(lotInfo.ngay_san_xuat),
-    ngay_thu_hoach: parseDate(lotInfo.ngay_thu_hoach),
     han_su_dung: parseDate(lotInfo.han_su_dung),
     so_luong_ban_dau: lotQty,
     so_luong_con_lai: 0,
@@ -130,6 +184,7 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
     trang_thai: 'active',
     ghi_chu: lotInfo.ghi_chu || undefined
   });
+  if (lotCache) lotCache.set(maLo, created._id);
   return created._id;
 }
 
@@ -151,7 +206,8 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
           cua_hang_id: purchase.cua_hang_id,
           kho_id: purchase.kho_id,
           hang_hoa_id: row.hang_hoa_id,
-          lo_hang_id: row.lo_hang_id
+          lo_hang_id: row.lo_hang_id,
+          gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || null
         },
         { $inc: { so_luong: qty }, $set: { gia_von: row.don_gia_nhap } },
         { upsert: true, new: true }
@@ -167,6 +223,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
       kho_id: purchase.kho_id,
       hang_hoa_id: row.hang_hoa_id,
       lo_hang_id: row.lo_hang_id || undefined,
+      gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || undefined,
       nguoi_tao_id: options.userId,
       loai_phieu: 'nhap_hang',
       ma_phieu: purchase.ma_phieu_nhap,
@@ -265,21 +322,30 @@ async function createPurchase(data = {}) {
     && data.tinh_vao_cong_no !== 'off';
 
   const productDocs = await HangHoa.find({ _id: { $in: items.map(x => x.hang_hoa_id) }, trang_thai: 'active' })
-    .select('_id don_vi_tinh_id quan_ly_theo_lo')
+    .select('_id ma_hang don_vi_tinh_id quan_ly_theo_lo')
     .lean();
   const productMap = new Map(productDocs.map(p => [String(p._id), p]));
   if (productMap.size !== new Set(items.map(x => String(x.hang_hoa_id))).size) {
     throw new Error('Co hang hoa khong hop le hoac da ngung kinh doanh');
   }
+  const productIds = Array.from(productMap.keys());
+  const productAttributeRows = await HangHoaThuocTinh.find({ hang_hoa_id: { $in: productIds } }).select('hang_hoa_id gia_tri_id').lean();
+  const productsWithAttributes = new Set(productAttributeRows.map(row => String(row.hang_hoa_id)));
+  const allowedAttributeValues = new Set(productAttributeRows.map(row => String(row.hang_hoa_id) + ':' + String(row.gia_tri_id)));
   for (const item of items) {
     const product = productMap.get(String(item.hang_hoa_id));
     lineTotal(item);
+    const productKey = String(item.hang_hoa_id);
+    if (productsWithAttributes.has(productKey)) {
+      if (!item.gia_tri_thuoc_tinh_id) throw new Error('Hang hoa co thuoc tinh can chon gia tri thuoc tinh');
+      if (!allowedAttributeValues.has(productKey + ':' + String(item.gia_tri_thuoc_tinh_id))) {
+        throw new Error('Gia tri thuoc tinh khong hop le voi hang hoa da chon');
+      }
+    } else if (item.gia_tri_thuoc_tinh_id) {
+      item.gia_tri_thuoc_tinh_id = undefined;
+    }
     if (product.quan_ly_theo_lo && mode === 'completed') {
       if (!item.lo_hang_id && !item.lo_info) throw new Error('Hang quan ly theo lo can chon hoac tao lo');
-      if (item.lo_info && !item.lo_hang_id) {
-        const lotQty = Math.floor(Number(item.lo_info.so_luong_lo || item.so_luong || 0));
-        if (lotQty <= 0 || lotQty !== item.so_luong) throw new Error('So luong lo phai bang so luong dong hang');
-      }
     }
   }
 
@@ -303,6 +369,7 @@ async function createPurchase(data = {}) {
   });
 
   const rows = [];
+  const lotCache = new Map();
   for (const item of items) {
     const product = productMap.get(String(item.hang_hoa_id));
     if (product.quan_ly_theo_lo && mode === 'completed' && !item.lo_hang_id && !item.lo_info) {
@@ -312,6 +379,7 @@ async function createPurchase(data = {}) {
     const ctDoc = await CTPhieuNhap.create({
       phieu_nhap_id: purchase._id,
       hang_hoa_id: item.hang_hoa_id,
+      gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || undefined,
       don_vi_tinh_id: product.don_vi_tinh_id || undefined,
       so_luong: item.so_luong,
       don_gia_nhap: item.don_gia_nhap,
@@ -327,9 +395,11 @@ async function createPurchase(data = {}) {
         supplierId,
         purchase,
         ctDoc,
+        product,
         productId: item.hang_hoa_id,
         item,
-        now
+        now,
+        lotCache
       });
       await CTPhieuNhap.updateOne({ _id: ctDoc._id }, { $set: { lo_hang_id: lotId } });
     }
@@ -337,6 +407,7 @@ async function createPurchase(data = {}) {
       _id: ctDoc._id,
       hang_hoa_id: item.hang_hoa_id,
       lo_hang_id: lotId,
+      gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || undefined,
       so_luong: item.so_luong,
       don_gia_nhap: item.don_gia_nhap,
       thanh_tien: total
@@ -368,7 +439,7 @@ async function cancelPurchase(id, storeId, userId) {
       const stock = await TonKho.findOne({ kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id }).lean();
       if (!stock || Number(stock.so_luong || 0) < qty) throw new Error('Ton kho khong du de huy phieu nhap');
       if (row.lo_hang_id) {
-        const lotStock = await TonKhoLo.findOne({ kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: row.lo_hang_id }).lean();
+        const lotStock = await TonKhoLo.findOne({ kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: row.lo_hang_id, gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || null }).lean();
         if (!lotStock || Number(lotStock.so_luong || 0) < qty) throw new Error('Ton kho lo khong du de huy phieu nhap');
       }
     }
@@ -382,7 +453,7 @@ async function cancelPurchase(id, storeId, userId) {
       ).lean();
       if (row.lo_hang_id) {
         await TonKhoLo.findOneAndUpdate(
-          { kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: row.lo_hang_id },
+          { kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: row.lo_hang_id, gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || null },
           { $inc: { so_luong: -qty } },
           { new: true }
         );
@@ -393,6 +464,7 @@ async function cancelPurchase(id, storeId, userId) {
         kho_id: purchase.kho_id,
         hang_hoa_id: row.hang_hoa_id,
         lo_hang_id: row.lo_hang_id || undefined,
+        gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || undefined,
         nguoi_tao_id: cleanId(userId),
         loai_phieu: 'dieu_chinh',
         ma_phieu: purchase.ma_phieu_nhap,

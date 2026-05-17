@@ -1,5 +1,15 @@
 <% const currentFlash = typeof flash !== 'undefined' ? flash : {}; %>
-<% if (currentFlash && currentFlash.error === 'missing_bang_gia_name') { %>
+<% if (currentFlash && currentFlash.error === 'missing_name') { %>
+  <div class="flash-message flash-error">Vui l&#242;ng nh&#7853;p t&#234;n.</div>
+<% } else if (currentFlash && currentFlash.error === 'missing_phone') { %>
+  <div class="flash-message flash-error">Vui l&#242;ng nh&#7853;p s&#7889; &#273;i&#7879;n tho&#7841;i.</div>
+<% } else if (currentFlash && currentFlash.error === 'invalid_phone') { %>
+  <div class="flash-message flash-error">S&#7889; &#273;i&#7879;n tho&#7841;i ph&#7843;i &#273;&#7911; 10 s&#7889; v&#224; b&#7855;t &#273;&#7847;u b&#7857;ng 0.</div>
+<% } else if (currentFlash && currentFlash.error === 'missing_cccd') { %>
+  <div class="flash-message flash-error">Vui l&#242;ng nh&#7853;p CCCD.</div>
+<% } else if (currentFlash && currentFlash.error === 'invalid_cccd') { %>
+  <div class="flash-message flash-error">CCCD ph&#7843;i &#273;&#7911; 12 s&#7889;.</div>
+<% } else if (currentFlash && currentFlash.error === 'missing_bang_gia_name') { %>
   <div class="flash-message flash-error">Vui lòng nhập tên bảng giá.</div>
 <% } else if (currentFlash && currentFlash.error) { %>
   <div class="flash-message flash-error">Thao tác không thành công. Vui lòng thử lại.</div>

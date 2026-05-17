@@ -1210,6 +1210,44 @@ async function generateInvoiceCode() {
     return 'HD' + String(counter.seq).padStart(6, '0');
 }
 
+async function generateOrderCode() {
+    const lastOrder = await DonHang.findOne({ ma_don_hang: /^DH\d+$/ })
+        .sort({ ma_don_hang: -1 })
+        .select('ma_don_hang')
+        .lean();
+    const currentMax = Number(String(lastOrder?.ma_don_hang || '').replace(/^DH/, '')) || 0;
+    await Counter.updateOne(
+        { _id: 'don_hang' },
+        { $max: { seq: currentMax } },
+        { upsert: true }
+    );
+    const counter = await Counter.findOneAndUpdate(
+        { _id: 'don_hang' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    ).lean();
+    return 'DH' + String(counter.seq).padStart(6, '0');
+}
+
+async function generateShipmentCode() {
+    const lastShipment = await VanDon.findOne({ ma_van_don: /^VD\d+$/ })
+        .sort({ ma_van_don: -1 })
+        .select('ma_van_don')
+        .lean();
+    const currentMax = Number(String(lastShipment?.ma_van_don || '').replace(/^VD/, '')) || 0;
+    await Counter.updateOne(
+        { _id: 'van_don' },
+        { $max: { seq: currentMax } },
+        { upsert: true }
+    );
+    const counter = await Counter.findOneAndUpdate(
+        { _id: 'van_don' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    ).lean();
+    return 'VD' + String(counter.seq).padStart(6, '0');
+}
+
 function resolveInvoiceStatus(payable, paid) {
     if (paid >= payable) return 'paid';
     if (paid > 0) return 'partial';
@@ -1565,7 +1603,9 @@ async function buildReturnFilter(query = {}) {
 async function getOrderCreateData() {
     const [customersRaw, products, stores, partners, addresses, priceBooks, priceRows] = await Promise.all([
         KhachHang.find().sort({ ten_khach_hang: 1 }),
-        HangHoa.find({ trang_thai: 'active' }).sort({ ten_hang: 1 }),
+        HangHoa.find({ trang_thai: 'active' })
+            .populate('nha_cung_cap_id', 'ma_ncc ten_ncc ten_cong_ty')
+            .sort({ ten_hang: 1 }),
         CuaHang.find().sort({ ten_cua_hang: 1 }),
         DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
         DiaChiKhachHang.find(),
@@ -1687,7 +1727,35 @@ router.get('/:id/export.xlsx', async (req, res, next) => {
 router.get('/create', async (req, res, next) => {
     try {
         const data = await getOrderCreateData();
-        res.render('don-hang/create', { title: 'Đặt hàng', ...data });
+        let sourceOrder = null;
+        let sourceOrderItems = [];
+        let sourceShipment = null;
+        let copyFromError = '';
+        const copyFromId = String(req.query?.copy_from || '').trim();
+        if (/^[0-9a-fA-F]{24}$/.test(copyFromId)) {
+            sourceOrder = await DonHang.findById(copyFromId)
+                .populate('khach_hang_id')
+                .populate('cua_hang_id')
+                .populate('kho_id')
+                .lean();
+            if (!sourceOrder) {
+                copyFromError = 'Không tìm thấy đơn hàng để sao chép.';
+            } else {
+                sourceOrderItems = await CTDonHang.find({ don_hang_id: sourceOrder._id }).populate('hang_hoa_id').lean();
+                if (!sourceOrderItems.length) {
+                    copyFromError = 'Đơn hàng chưa có sản phẩm để sao chép.';
+                }
+                sourceShipment = await VanDon.findOne({ don_hang_id: sourceOrder._id }).lean();
+            }
+        }
+        res.render('don-hang/create', {
+            title: 'Đặt hàng',
+            ...data,
+            sourceOrder,
+            sourceOrderItems,
+            sourceShipment,
+            copyFromError
+        });
     } catch (error) {
         next(error);
     }
@@ -1754,7 +1822,13 @@ router.post('/add', async (req, res, next) => {
             if (!product) {
                 return res.status(400).json({ success: false, message: 'Không tìm thấy hàng hóa.' });
             }
-            const unitPrice = await resolveSalePrice(product, validBangGiaId);
+            const manualUnitPrice = Number(item.don_gia_ban ?? item.don_gia);
+            if (Number.isFinite(manualUnitPrice) && manualUnitPrice < 0) {
+                return res.status(400).json({ success: false, message: 'Đơn giá không được âm.' });
+            }
+            const unitPrice = Number.isFinite(manualUnitPrice) && manualUnitPrice >= 0
+                ? manualUnitPrice
+                : await resolveSalePrice(product, validBangGiaId);
             const lineBase = quantity * unitPrice;
             const lineDiscountAmount = normalizeDiscount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
             const lineDiscountValue = item.kieu_chiet_khau === 'phan_tram'
@@ -1798,23 +1872,23 @@ router.post('/add', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Phí giao hàng không được âm.' });
         }
         const shippingFeePayer = nguoi_tra_phi_giao_hang === 'cua_hang' ? 'cua_hang' : 'khach';
+        const effectiveShippingFee = shippingFeePayer === 'khach' ? 0 : shippingFee;
         await luuPhiVanChuyenKhachHang({
             cua_hang_id: cua_hang_id || kho.cua_hang_id || null,
             khach_hang_id,
             dia_chi_khach_hang_id,
             doi_tac_giao_hang_id,
-            phi_van_chuyen: shippingFee,
+            phi_van_chuyen: effectiveShippingFee,
             ghi_chu: ghi_chu_giao_hang
         });
-        const shippingFeeForCustomer = shippingFeePayer === 'khach' ? shippingFee : 0;
+        const shippingFeeForCustomer = 0;
         const tong_thanh_toan = Math.max(tong_tien_hang - orderDiscount + shippingFeeForCustomer, 0);
         const codEnabled = thu_ho_cod === true || thu_ho_cod === 'true' || cod_enabled === true || cod_enabled === 'true';
         const khachCanTra = tong_thanh_toan;
         const khachThanhToan = codEnabled ? 0 : khachCanTra;
         const codAmount = codEnabled ? khachCanTra : 0;
         const tienThuaTraKhach = khachThanhToan - khachCanTra;
-        const count = await DonHang.countDocuments();
-        const ma_don_hang = 'DH' + String(count + 1).padStart(6, '0');
+        const ma_don_hang = await generateOrderCode();
 
         const order = await DonHang.create({
             ma_don_hang,
@@ -1858,9 +1932,8 @@ router.post('/add', async (req, res, next) => {
             });
         }
 
-        const shipmentCount = await VanDon.countDocuments();
         const shipment = await VanDon.create({
-            ma_van_don: 'VD' + String(shipmentCount + 1).padStart(6, '0'),
+            ma_van_don: await generateShipmentCode(),
             don_hang_id: order._id,
             doi_tac_giao_hang_id: doi_tac_giao_hang_id || null,
             cua_hang_id: cua_hang_id || kho.cua_hang_id || null,
@@ -1869,7 +1942,7 @@ router.post('/add', async (req, res, next) => {
             ten_nguoi_nhan,
             sdt_nguoi_nhan,
             dia_chi_nhan,
-            phi_giao_hang: shippingFee,
+            phi_giao_hang: effectiveShippingFee,
             nguoi_tra_phi_giao_hang: shippingFeePayer,
             cod_enabled: codEnabled,
             cod_amount: codAmount,
@@ -1971,6 +2044,11 @@ router.get('/hoa-don/create', async (req, res, next) => {
         let sourceOrderItems = [];
         let sourceShipment = null;
         let existingInvoice = null;
+        let sourceInvoice = null;
+        let sourceInvoiceItems = [];
+        let sourceInvoiceShipment = null;
+        let copyFromError = '';
+
         const orderId = String(req.query?.don_hang_id || '').trim();
         if (/^[0-9a-fA-F]{24}$/.test(orderId)) {
             sourceOrder = await DonHang.findById(orderId)
@@ -1986,13 +2064,43 @@ router.get('/hoa-don/create', async (req, res, next) => {
                 ]);
             }
         }
+
+        const copyFromId = String(req.query?.copy_from || '').trim();
+        if (!sourceOrder && /^[0-9a-fA-F]{24}$/.test(copyFromId)) {
+            sourceInvoice = await HoaDonBanHang.findById(copyFromId)
+                .populate('khach_hang_id')
+                .populate('cua_hang_id')
+                .populate('kho_id')
+                .lean();
+            if (!sourceInvoice) {
+                copyFromError = 'Không tìm thấy hóa đơn để sao chép.';
+            } else {
+                sourceInvoiceItems = await CTHoaDonBanHang.find({ hoa_don_id: sourceInvoice._id })
+                    .populate('hang_hoa_id')
+                    .lean();
+                if (!sourceInvoiceItems.length) {
+                    copyFromError = 'Hóa đơn chưa có hàng hóa để sao chép.';
+                }
+                sourceInvoiceShipment = await VanDon.findOne({
+                    $or: [
+                        { hoa_don_id: sourceInvoice._id },
+                        ...(sourceInvoice.don_hang_id ? [{ don_hang_id: sourceInvoice.don_hang_id }] : [])
+                    ]
+                }).lean();
+            }
+        }
+
         res.render('don-hang/hoa-don-create', {
             title: 'Hóa đơn',
             ...data,
             sourceOrder,
             sourceOrderItems,
             sourceShipment,
-            existingInvoice
+            existingInvoice,
+            sourceInvoice,
+            sourceInvoiceItems,
+            sourceInvoiceShipment,
+            copyFromError
         });
     } catch (error) {
         next(error);
@@ -2069,6 +2177,55 @@ router.get('/hoa-don/:id', async (req, res, next) => {
         const [decorated] = await decorateInvoices([invoice]);
         const items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id');
         res.json({ success: true, data: { invoice: decorated, items } });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/hoa-don/:id/duplicate', async (req, res, next) => {
+    try {
+        const sourceInvoice = await HoaDonBanHang.findById(req.params.id).lean();
+        if (!sourceInvoice) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        }
+
+        const sourceItems = await CTHoaDonBanHang.find({ hoa_don_id: sourceInvoice._id }).lean();
+        if (!sourceItems.length) {
+            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có hàng hóa để sao chép' });
+        }
+
+        const newInvoice = await HoaDonBanHang.create({
+            ma_hoa_don: await generateInvoiceCode(),
+            ngay_ban: new Date(),
+            tong_tien: Number(sourceInvoice.tong_tien || 0),
+            giam_gia: Number(sourceInvoice.giam_gia || 0),
+            thanh_toan: Number(sourceInvoice.thanh_toan || 0),
+            phuong_thuc_tt: sourceInvoice.phuong_thuc_tt || '',
+            trang_thai: 'draft',
+            ghi_chu: sourceInvoice.ghi_chu || '',
+            cua_hang_id: sourceInvoice.cua_hang_id || null,
+            chi_nhanh_id: sourceInvoice.chi_nhanh_id || null,
+            kho_id: sourceInvoice.kho_id || null,
+            khach_hang_id: sourceInvoice.khach_hang_id || null,
+            nguoi_ban_id: req.user?._id || sourceInvoice.nguoi_ban_id || null
+        });
+
+        await CTHoaDonBanHang.insertMany(sourceItems.map(item => ({
+            hoa_don_id: newInvoice._id,
+            hang_hoa_id: item.hang_hoa_id,
+            lo_hang_id: item.lo_hang_id || null,
+            so_luong: Number(item.so_luong || 0),
+            don_gia: Number(item.don_gia || 0),
+            chiet_khau: Number(item.chiet_khau || 0),
+            thanh_tien: Number(item.thanh_tien || 0)
+        })));
+
+        res.json({
+            success: true,
+            message: 'Đã sao chép hóa đơn',
+            invoice_id: String(newInvoice._id),
+            ma_hoa_don: newInvoice.ma_hoa_don
+        });
     } catch (error) {
         next(error);
     }
@@ -2466,11 +2623,61 @@ router.get('/tra-hang/export.xlsx', async (req, res, next) => {
     }
 });
 
+async function loadSalesReturnCopyDraft(copyFromId) {
+    if (!/^[0-9a-fA-F]{24}$/.test(String(copyFromId || ''))) return null;
+    const slip = await PhieuTraHang.findById(copyFromId).lean();
+    if (!slip || slip.trang_thai === 'cancelled') return null;
+    const lines = await CTPhieuTraHang.find({ phieu_tra_hang_id: slip._id })
+        .populate('hang_hoa_id')
+        .populate('lo_hang_id')
+        .lean();
+    if (!lines.length) return null;
+    return {
+        hoa_don_id: slip.hoa_don_id ? String(slip.hoa_don_id) : '',
+        khach_hang_id: slip.khach_hang_id ? String(slip.khach_hang_id) : '',
+        kho_id: slip.kho_id ? String(slip.kho_id) : '',
+        ghi_chu: slip.ghi_chu || '',
+        return_items: lines
+            .filter(row => row.loai_dong !== 'hang_doi')
+            .map(row => ({
+                hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''),
+                lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
+                so_luong: Number(row.so_luong || 0),
+                don_gia: Number(row.don_gia || 0),
+                chiet_khau: 0
+            }))
+            .filter(row => row.hang_hoa_id && row.so_luong > 0),
+        exchange_items: lines
+            .filter(row => row.loai_dong === 'hang_doi')
+            .map(row => ({
+                hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''),
+                lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
+                so_luong: Number(row.so_luong || 0),
+                don_gia: Number(row.don_gia || 0)
+            }))
+            .filter(row => row.hang_hoa_id && row.so_luong > 0)
+    };
+}
+
 router.get('/tra-hang/create', async (req, res, next) => {
     try {
         const products = await HangHoa.find({ trang_thai: 'active' }).sort({ ten_hang: 1 });
         const invoices = [];
-        res.render('don-hang/tra-hang-create', { title: 'Trả hàng', invoices, products });
+        let copyDraft = null;
+        let copyFromError = '';
+        const copyFromId = String(req.query?.copy_from || '').trim();
+        if (copyFromId) {
+            copyDraft = await loadSalesReturnCopyDraft(copyFromId);
+            if (!copyDraft) copyFromError = 'Không tải được phiếu trả hàng để sao chép.';
+        }
+        const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
+        res.render('don-hang/tra-hang-create', {
+            title: 'Trả hàng',
+            invoices,
+            products,
+            copyDraftJson,
+            copyFromError
+        });
     } catch (error) {
         next(error);
     }
@@ -2669,6 +2876,97 @@ router.get('/tra-hang/:id/export.xlsx', async (req, res, next) => {
     }
 });
 
+router.post('/tra-hang/:id/cancel', async (req, res, next) => {
+    try {
+        const slip = await PhieuTraHang.findById(req.params.id);
+        if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
+        if (slip.trang_thai === 'cancelled') {
+            return res.json({ success: true, message: 'Phiếu đã hủy' });
+        }
+
+        const items = await CTPhieuTraHang.find({ phieu_tra_hang_id: slip._id }).lean();
+        const khoId = slip.kho_id;
+        const maPhieu = slip.ma_phieu_tra || String(slip._id);
+
+        for (const item of items) {
+            const qty = Number(item.so_luong || 0);
+            if (!qty || !item.hang_hoa_id) continue;
+            if (item.loai_dong === 'hang_doi') {
+                await congTonKho({
+                    kho_id: khoId,
+                    hang_hoa_id: item.hang_hoa_id,
+                    lo_hang_id: item.lo_hang_id || undefined,
+                    so_luong: qty,
+                    nguoi_tao_id: req.user?._id,
+                    loai_phieu: 'tra_hang',
+                    ma_phieu: maPhieu,
+                    ghi_chu: `Huy doi hang ${maPhieu}`
+                });
+            } else {
+                await truTonKho({
+                    kho_id: khoId,
+                    hang_hoa_id: item.hang_hoa_id,
+                    lo_hang_id: item.lo_hang_id || undefined,
+                    so_luong: qty,
+                    nguoi_tao_id: req.user?._id,
+                    loai_phieu: 'tra_hang',
+                    ma_phieu: maPhieu,
+                    ghi_chu: `Huy tra hang ${maPhieu}`
+                });
+            }
+        }
+
+        const receipts = await PhieuThuChi.find({ ma_chung_tu_goc: maPhieu, trang_thai: { $ne: 'cancelled' } });
+        for (const receipt of receipts) {
+            const amount = Number(receipt.gia_tri || 0);
+            if (receipt.so_quy_id && amount > 0) {
+                await SoQuy.findByIdAndUpdate(receipt.so_quy_id, {
+                    $inc: { so_du: receipt.loai_phieu === 'thu' ? -amount : amount }
+                });
+            }
+            receipt.trang_thai = 'cancelled';
+            await receipt.save();
+        }
+
+        const debtRows = await CongNoKhachHang.find({
+            $or: [
+                { hoa_don_id: slip.hoa_don_id || undefined },
+                { ghi_chu: { $regex: maPhieu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') } }
+            ]
+        }).lean();
+        let debtDelta = 0;
+        for (const row of debtRows) {
+            const amount = Math.abs(Number(row.so_tien || 0));
+            if (row.loai === 'tang_no') debtDelta -= amount;
+            else if (row.loai === 'giam_no') debtDelta += amount;
+        }
+        if (slip.khach_hang_id && debtDelta !== 0) {
+            await KhachHang.updateOne({ _id: slip.khach_hang_id }, { $inc: { tong_no: debtDelta } });
+        }
+
+        slip.trang_thai = 'cancelled';
+        await slip.save();
+        res.json({ success: true, message: 'Đã hủy phiếu trả hàng' });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.patch('/tra-hang/:id', async (req, res, next) => {
+    try {
+        const slip = await PhieuTraHang.findById(req.params.id);
+        if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
+        if (slip.trang_thai === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Phiếu đã hủy, không thể sửa' });
+        }
+        if (req.body?.ghi_chu !== undefined) slip.ghi_chu = String(req.body.ghi_chu || '').trim();
+        await slip.save();
+        res.json({ success: true, message: 'Đã lưu phiếu trả hàng' });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/tra-hang/:id/detail', async (req, res, next) => {
     try {
         const returnSlip = await PhieuTraHang.findById(req.params.id)
@@ -2692,6 +2990,9 @@ router.get('/tra-hang/invoice/:id', async (req, res, next) => {
     try {
         const invoice = await HoaDonBanHang.findById(req.params.id)
             .populate('khach_hang_id')
+            .populate('kho_id')
+            .populate('cua_hang_id')
+            .populate('don_hang_id')
             .populate('nguoi_ban_id');
         if (!invoice) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
@@ -2712,20 +3013,22 @@ router.get('/tra-hang/invoice/:id', async (req, res, next) => {
         }).select('_id').lean();
         const returnedItems = returns.length
             ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } })
-                .select('hang_hoa_id so_luong')
+                .select('hang_hoa_id lo_hang_id so_luong')
                 .lean()
             : [];
-        const returnedByProduct = returnedItems.reduce((map, row) => {
-            const productId = String(row.hang_hoa_id);
-            map[productId] = (map[productId] || 0) + Number(row.so_luong || 0);
+        const returnedByLine = returnedItems.reduce((map, row) => {
+            const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
+            map[key] = (map[key] || 0) + Number(row.so_luong || 0);
             return map;
         }, {});
         const returnableItems = items
             .map(item => {
                 const object = item.toObject();
                 const productId = String(object.hang_hoa_id?._id || object.hang_hoa_id);
-                const remainingQty = Math.max(Number(object.so_luong || 0) - Number(returnedByProduct[productId] || 0), 0);
-                object.so_luong_da_tra = Number(returnedByProduct[productId] || 0);
+                const key = productId + '::' + String(object.lo_hang_id?._id || object.lo_hang_id || '');
+                const returnedQty = Number(returnedByLine[key] || 0);
+                const remainingQty = Math.max(Number(object.so_luong || 0) - returnedQty, 0);
+                object.so_luong_da_tra = returnedQty;
                 object.so_luong_con_lai = remainingQty;
                 object.so_luong = remainingQty;
                 return object;
@@ -2775,24 +3078,24 @@ router.post('/tra-hang/add', async (req, res, next) => {
             if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
                 return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể trả hàng' });
             }
-            const invoiceItems = await CTHoaDonBanHang.find({ hoa_don_id }).select('hang_hoa_id so_luong').lean();
+            const invoiceItems = await CTHoaDonBanHang.find({ hoa_don_id }).select('hang_hoa_id lo_hang_id so_luong').lean();
             const returns = await PhieuTraHang.find({ hoa_don_id, trang_thai: { $ne: 'cancelled' } }).select('_id').lean();
             const returnedItems = returns.length
-                ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } }).select('hang_hoa_id so_luong').lean()
+                ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } }).select('hang_hoa_id lo_hang_id so_luong').lean()
                 : [];
-            const soldByProduct = invoiceItems.reduce((map, row) => {
-                const productId = String(row.hang_hoa_id);
-                map[productId] = (map[productId] || 0) + Number(row.so_luong || 0);
+            const soldByLine = invoiceItems.reduce((map, row) => {
+                const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
+                map[key] = (map[key] || 0) + Number(row.so_luong || 0);
                 return map;
             }, {});
-            const returnedByProduct = returnedItems.reduce((map, row) => {
-                const productId = String(row.hang_hoa_id);
-                map[productId] = (map[productId] || 0) + Number(row.so_luong || 0);
+            const returnedByLine = returnedItems.reduce((map, row) => {
+                const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
+                map[key] = (map[key] || 0) + Number(row.so_luong || 0);
                 return map;
             }, {});
             for (const item of cleanItems) {
-                const productId = String(item.hang_hoa_id);
-                const remainingQty = Math.max(Number(soldByProduct[productId] || 0) - Number(returnedByProduct[productId] || 0), 0);
+                const key = String(item.hang_hoa_id) + '::' + String(item.lo_hang_id || '');
+                const remainingQty = Math.max(Number(soldByLine[key] || 0) - Number(returnedByLine[key] || 0), 0);
                 if (item.so_luong > remainingQty) {
                     return res.status(400).json({ success: false, message: 'Số lượng trả vượt quá số lượng còn có thể trả' });
                 }
@@ -2978,7 +3281,7 @@ router.post('/tra-hang/add', async (req, res, next) => {
             }
         }
 
-        res.json({ success: true, message: 'Đã tạo phiếu trả hàng', ma_phieu_tra });
+        res.json({ success: true, message: 'Đã tạo phiếu trả hàng', ma_phieu_tra, id: returnSlip._id, print_url: '/chung-tu-kho/tra-hang-ban/' + returnSlip._id });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message || 'Không tạo được phiếu trả hàng' });
     }
@@ -3262,6 +3565,110 @@ router.get('/van-don', async (req, res, next) => {
     }
 });
 
+router.get('/van-don/:id', function(req, res) {
+    res.redirect('/don-hang/van-don?shipment=' + encodeURIComponent(req.params.id));
+});
+
+router.post('/:id/duplicate', async (req, res, next) => {
+    try {
+        const sourceOrder = await DonHang.findById(req.params.id).lean();
+        if (!sourceOrder) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn đặt hàng' });
+        }
+
+        const sourceItems = await CTDonHang.find({ don_hang_id: sourceOrder._id }).lean();
+        if (!sourceItems.length) {
+            return res.status(400).json({ success: false, message: 'Đơn đặt hàng chưa có sản phẩm để sao chép' });
+        }
+
+        const sourceShipment = await VanDon.findOne({ don_hang_id: sourceOrder._id }).lean();
+        const now = new Date();
+        const maDonHang = await generateOrderCode();
+        const payable = Number(sourceOrder.tong_thanh_toan || sourceOrder.tong_tien || sourceOrder.khach_can_tra || 0);
+        const codEnabled = sourceShipment ? Boolean(sourceShipment.cod_enabled) : Boolean(sourceOrder.cod_enabled);
+
+        const newOrder = await DonHang.create({
+            ma_don_hang: maDonHang,
+            bang_gia_id: sourceOrder.bang_gia_id || null,
+            khach_hang_id: sourceOrder.khach_hang_id || null,
+            cua_hang_id: sourceOrder.cua_hang_id || null,
+            kho_id: sourceOrder.kho_id || null,
+            nguoi_tao_id: req.user?._id || sourceOrder.nguoi_tao_id || null,
+            ngay_dat: now,
+            ngay_tao: now,
+            tong_tien: Number(sourceOrder.tong_tien || payable || 0),
+            tong_tien_hang: Number(sourceOrder.tong_tien_hang || 0),
+            giam_gia: Number(sourceOrder.giam_gia || 0),
+            kieu_giam_gia: sourceOrder.kieu_giam_gia === 'phan_tram' ? 'phan_tram' : 'vnd',
+            tong_thanh_toan: payable,
+            khach_can_tra: Number(sourceOrder.khach_can_tra || payable || 0),
+            khach_thanh_toan: 0,
+            tien_thua_tra_khach: 0,
+            cod_enabled: codEnabled,
+            cod_amount: codEnabled ? Number(sourceOrder.khach_can_tra || payable || 0) : 0,
+            trang_thai: 'draft',
+            trang_thai_giao_hang: 'chua_giao',
+            ghi_chu: sourceOrder.ghi_chu || ''
+        });
+
+        await CTDonHang.insertMany(sourceItems.map(item => {
+            const quantity = Number(item.so_luong_dat || item.so_luong || 0);
+            return {
+                don_hang_id: newOrder._id,
+                hang_hoa_id: item.hang_hoa_id,
+                so_luong: quantity,
+                so_luong_dat: quantity,
+                so_luong_xac_nhan: 0,
+                so_luong_da_giao: 0,
+                so_luong_con_thieu: quantity,
+                trang_thai_giao: 'chua_giao',
+                lo_hang_id: item.lo_hang_id || null,
+                don_gia_ban: Number(item.don_gia_ban || 0),
+                chiet_khau: Number(item.chiet_khau || 0),
+                kieu_chiet_khau: item.kieu_chiet_khau === 'phan_tram' ? 'phan_tram' : 'vnd',
+                thanh_tien: Number(item.thanh_tien || 0)
+            };
+        }));
+
+        if (sourceShipment) {
+            await VanDon.create({
+                ma_van_don: await generateShipmentCode(),
+                don_hang_id: newOrder._id,
+                doi_tac_giao_hang_id: sourceShipment.doi_tac_giao_hang_id || null,
+                cua_hang_id: sourceShipment.cua_hang_id || sourceOrder.cua_hang_id || null,
+                khach_hang_id: sourceShipment.khach_hang_id || sourceOrder.khach_hang_id || null,
+                dia_chi_khach_hang_id: sourceShipment.dia_chi_khach_hang_id || null,
+                ten_nguoi_nhan: sourceShipment.ten_nguoi_nhan || '',
+                sdt_nguoi_nhan: sourceShipment.sdt_nguoi_nhan || '',
+                dia_chi_nhan: sourceShipment.dia_chi_nhan || '',
+                phi_giao_hang: Number(sourceShipment.phi_giao_hang || 0),
+                don_gia_van_chuyen_ap_dung: Number(sourceShipment.don_gia_van_chuyen_ap_dung || 0),
+                so_luong_tinh_phi: Number(sourceShipment.so_luong_tinh_phi || 1),
+                thanh_tien_van_chuyen: Number(sourceShipment.thanh_tien_van_chuyen || 0),
+                nguoi_tra_phi_giao_hang: sourceShipment.nguoi_tra_phi_giao_hang === 'cua_hang' ? 'cua_hang' : 'khach',
+                cod_enabled: codEnabled,
+                cod_amount: codEnabled ? Number(sourceOrder.khach_can_tra || payable || 0) : 0,
+                trang_thai_cod: codEnabled ? 'chua_thu' : 'khong_cod',
+                trang_thai: 'draft',
+                ghi_chu: sourceShipment.ghi_chu || ''
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Đã sao chép đơn đặt hàng',
+            order_id: String(newOrder._id),
+            ma_don_hang: newOrder.ma_don_hang
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/:id', function(req, res) {
+    res.redirect('/don-hang?order=' + encodeURIComponent(req.params.id));
+});
+
 router.get('/:id/detail', async (req, res, next) => {
     try {
         const order = await DonHang.findById(req.params.id)
@@ -3278,6 +3685,38 @@ router.get('/:id/detail', async (req, res, next) => {
     }
 });
 
+router.put('/:id/detail', async (req, res, next) => {
+    try {
+        const order = await DonHang.findById(req.params.id);
+        if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+        if (order.trang_thai === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Đơn đã hủy, không thể sửa' });
+        }
+
+        const body = req.body || {};
+        if (body.ghi_chu !== undefined) order.ghi_chu = String(body.ghi_chu || '').trim();
+        if (body.trang_thai && ['draft', 'shipping', 'completed', 'cancelled'].includes(body.trang_thai)) {
+            order.trang_thai = body.trang_thai;
+        }
+        await order.save();
+
+        const shipmentPayload = body.shipment || {};
+        let shipment = await VanDon.findOne({ don_hang_id: order._id });
+        if (shipment) {
+            if (shipmentPayload.ten_nguoi_nhan !== undefined) shipment.ten_nguoi_nhan = String(shipmentPayload.ten_nguoi_nhan || '').trim();
+            if (shipmentPayload.sdt_nguoi_nhan !== undefined) shipment.sdt_nguoi_nhan = String(shipmentPayload.sdt_nguoi_nhan || '').trim();
+            if (shipmentPayload.dia_chi_nhan !== undefined) shipment.dia_chi_nhan = String(shipmentPayload.dia_chi_nhan || '').trim();
+            if (shipmentPayload.ghi_chu !== undefined) shipment.ghi_chu = String(shipmentPayload.ghi_chu || '').trim();
+            if (shipmentPayload.phi_giao_hang !== undefined) shipment.phi_giao_hang = Math.max(0, Number(shipmentPayload.phi_giao_hang || 0));
+            await shipment.save();
+        }
+
+        res.json({ success: true, message: 'Đã lưu thông tin đơn hàng' });
+    } catch (error) {
+        next(error);
+    }
+});
+
 async function confirmOrderDelivery(req, res, next) {
     try {
         const { kho_id, items } = req.body || {};
@@ -3289,16 +3728,16 @@ async function confirmOrderDelivery(req, res, next) {
 
         const warehouse = await Kho.findById(kho_id);
         if (!warehouse) {
-            return res.status(400).json({ success: false, message: 'Kho giao hang khong hop le' });
+            return res.status(400).json({ success: false, message: 'Kho giao hàng không hợp lệ' });
         }
 
         if (!deliveryItems.length) {
-            return res.status(400).json({ success: false, message: 'Vui long chon hang can giao' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn hàng cần giao' });
         }
 
         const order = await DonHang.findById(req.params.id);
         if (!order) {
-            return res.status(404).json({ success: false, message: 'Khong tim thay don hang' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         }
 
         let hasDelivered = false;
@@ -3313,7 +3752,7 @@ async function confirmOrderDelivery(req, res, next) {
                 : await CTDonHang.findOne({ don_hang_id: order._id, hang_hoa_id: item.hang_hoa_id });
 
             if (!detail) {
-                return res.status(400).json({ success: false, message: 'Dong hang giao khong hop le' });
+                return res.status(400).json({ success: false, message: 'Dòng hàng giao không hợp lệ' });
             }
 
             const orderedQuantity = Number(detail.so_luong_dat || detail.so_luong || 0);
@@ -3381,7 +3820,8 @@ async function confirmOrderDelivery(req, res, next) {
                 don_hang_id: order._id,
                 trang_thai_giao_hang: order.trang_thai_giao_hang,
                 ngay_giao_thuc_te: order.ngay_giao_thuc_te
-            }
+            },
+            print_url: '/chung-tu-kho/ban-hang/' + order._id
         });
     } catch (error) {
         next(error);

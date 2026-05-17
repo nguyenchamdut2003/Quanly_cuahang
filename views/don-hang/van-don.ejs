@@ -22,6 +22,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -87,10 +88,10 @@
                 <% safeShipments.forEach(item => { %>
                   <tr>
                     <td class="check-col"><input type="checkbox"></td>
-                    <td><a href="#" class="link" onclick="showShipment('<%= item._id %>');return false"><%= item.ma_van_don %></a></td>
+                    <td><%- refLink('shipment', item, item.ma_van_don || '') %></td>
                     <td><%= item.created_at ? new Date(item.created_at).toLocaleString('vi-VN') : '' %></td>
-                    <td><%= invoiceCode(item) %></td>
-                    <td><%= customerCode(item) %></td>
+                    <td><%- item.hoa_don_id ? refLink('invoice', item.hoa_don_id, invoiceCode(item)) : item.don_hang_id ? refLink('order', item.don_hang_id, invoiceCode(item)) : invoiceCode(item) %></td>
+                    <td><%- item.khach_hang_id ? refLink('customer', item.khach_hang_id, customerCode(item)) : customerCode(item) %></td>
                     <td><%= customerName(item) %></td>
                     <td><%= item.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng' %></td>
                     <td>
@@ -146,6 +147,7 @@
       }
       select.className = `status ${value}`;
     }
+    document.addEventListener('DOMContentLoaded',()=>{const id=new URLSearchParams(location.search).get('shipment');if(id)showShipment(id)})
   </script>
 </body>
 </html>

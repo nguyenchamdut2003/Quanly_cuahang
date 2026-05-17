@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -34,6 +34,17 @@
     .history-type-icon { font-size: 14px; width: 16px; text-align: center; }
     .history-amount { font-weight: 700; font-size: 14px; }
     .history-amount.is-return { color: #ef4444; }
+    .supplier-detail-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding-top: 14px;
+      margin-top: 12px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .supplier-metric-readonly { font-size: 14px; font-weight: 700; color: #111827; }
+    .supplier-metric-hint { font-size: 11px; color: #64748b; margin-top: 2px; font-weight: 400; }
   </style>
 </head>
 <body class="admin-body">
@@ -72,8 +83,12 @@
           <label><span>Email</span><input name="email" type="email"></label>
           <label><span>Tên công ty</span><input name="ten_cong_ty"></label>
           <label><span>Mã số thuế</span><input name="ma_so_thue"></label>
-          <label><span>Tổng nợ</span><input name="tong_no" type="number" min="0" value="0"></label>
-          <label><span>Tổng mua</span><input name="tong_mua" type="number" min="0" value="0"></label>
+          <label><span>Tổng nợ</span><strong class="supplier-metric-readonly">0</strong>
+            <span class="supplier-metric-hint"> — Tự động tính từ công nợ phiếu nhập</span>
+          </label>
+          <label><span>Tổng mua</span><strong class="supplier-metric-readonly">0</strong>
+            <span class="supplier-metric-hint"> — Tự động tính từ phiếu đã nhập hàng</span>
+          </label>
           <label class="span-2"><span>Ghi chú</span><input name="ghi_chu"></label>
           <label><span>Trạng thái</span>
             <select name="trang_thai">
@@ -204,7 +219,7 @@
                             <div class="store-image-placeholder">NCC</div>
                             <div>
                               <h2><%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %></h2>
-                              <p><%= selectedSupplier.ma_ncc || '---' %></p>
+                              <p><%- refLink('supplier', selectedSupplier, selectedSupplier.ma_ncc || '---') %></p>
                               <div class="tag-row"><span class="tag">Nhà cung cấp</span><span class="tag tag-green"><%= selectedSupplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></div>
                             </div>
                           </div>
@@ -215,8 +230,18 @@
                             <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
                             <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>"></div>
                             <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
-                            <div><span>Tổng nợ</span><input name="tong_no" type="number" min="0" value="<%= selectedSupplier.tong_no || 0 %>"></div>
-                            <div><span>Tổng mua</span><input name="tong_mua" type="number" min="0" value="<%= selectedSupplier.tong_mua || 0 %>"></div>
+                            <div><span>Tổng nợ</span>
+                              <div>
+                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
+                                <div class="supplier-metric-hint">Tự động tính từ phiếu nhập</div>
+                              </div>
+                            </div>
+                            <div><span>Tổng mua</span>
+                              <div>
+                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_mua || 0).toLocaleString('vi-VN') %></strong>
+                                <div class="supplier-metric-hint">Tự động tính từ phiếu đã nhập hàng</div>
+                              </div>
+                            </div>
                             <div><span>Trạng thái</span>
                               <select name="trang_thai">
                                 <option value="active" <%= selectedSupplier.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
@@ -225,15 +250,6 @@
                             </div>
                             <div><span>Thời gian tạo</span><strong><%= formatDate(selectedSupplier.created_at) %></strong></div>
                             <div class="span-2"><span>Ghi chú</span><input name="ghi_chu" value="<%= selectedSupplier.ghi_chu || '' %>"></div>
-                          </div>
-                          <div class="warehouse-section">
-                            <div class="warehouse-heading">
-                              <h3>Thao tác</h3>
-                              <div class="detail-actions">
-                                <button class="btn btn-light" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/update" formmethod="post" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Lưu chỉnh sửa</button>
-                                <button class="btn btn-danger" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/delete" formmethod="post" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
-                              </div>
-                            </div>
                           </div>
                           </div>
                           <div class="detail-pane" data-detail-pane="address">
@@ -376,7 +392,7 @@
                                   <% (supplierPurchaseHistory || []).forEach(function(row) { %>
                                     <tr>
                                       <td>
-                                        <a href="/nhap-hang" class="table-code-link">
+                                        <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
                                           <% if (row.loai === 'nhap') { %>
                                             <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
                                           <% } else { %>
@@ -433,7 +449,7 @@
                                   <% } %>
                                   <% (supplierDebtHistory || []).forEach(function(row) { %>
                                     <tr>
-                                      <td><%= row.ma_phieu || '--' %></td>
+                                      <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.ma_phieu || '--') %></td>
                                       <td><%= formatDate(row.thoi_gian) %></td>
                                       <td><%= mapCongNoLoai(row.loai) %></td>
                                       <td><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
@@ -449,6 +465,15 @@
                               <button class="btn btn-light" type="button">Chiết khấu thanh toán</button>
                             </div>
                           </div>
+                        </div>
+                        <div class="page-actions detail-panel-footer supplier-detail-footer page-actions--sm">
+                          <button class="btn btn-danger btn-sm" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/delete" formmethod="post" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
+                          <button class="btn btn-success btn-sm" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/update" formmethod="post" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
+                          <a
+                            class="btn btn-primary btn-sm supplier-detail-export-link"
+                            href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
+                            data-supplier-id="<%= selectedSupplier._id %>"
+                          >Xuất thông tin</a>
                         </div>
                       </div>
                     </td>
@@ -478,7 +503,7 @@
           <input id="supplierGroupDescInput" type="text" placeholder="Nhập ghi chú">
         </label>
       </div>
-      <div class="group-modal-footer">
+      <div class="page-actions group-modal-footer">
         <button class="btn btn-light btn-sm" type="button" id="supplierGroupModalCancel">Bỏ qua</button>
         <button class="btn btn-primary btn-sm" type="button" id="supplierGroupModalSubmit">Lưu</button>
       </div>
@@ -719,6 +744,17 @@
       refreshSupplierGroupWidget((supplierGroupFilterValue && supplierGroupFilterValue.value) || 'all');
 
       var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.store-detail'));
+      var exportLabels = { info: 'Xuất thông tin', address: 'Xuất địa chỉ', history: 'Xuất lịch sử', debt: 'Xuất công nợ' };
+      function syncSupplierExportLink(detailBlock) {
+        var link = detailBlock.querySelector('.supplier-detail-export-link');
+        if (!link) return;
+        var id = link.getAttribute('data-supplier-id');
+        if (!id) return;
+        var activeBtn = detailBlock.querySelector('.detail-tab.is-active[data-detail-tab]');
+        var tab = activeBtn ? activeBtn.getAttribute('data-detail-tab') : 'info';
+        link.href = '/nha-cung-cap/' + id + '/export/' + tab;
+        link.textContent = exportLabels[tab] || 'Xuất';
+      }
       detailBlocks.forEach(function (detailBlock) {
         var tabButtons = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab[data-detail-tab]'));
         var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-pane[data-detail-pane]'));
@@ -730,17 +766,20 @@
             btn.classList.add('is-active');
             var activePane = detailBlock.querySelector('.detail-pane[data-detail-pane="' + target + '"]');
             if (activePane) activePane.classList.add('is-active');
+            syncSupplierExportLink(detailBlock);
           });
         });
+        syncSupplierExportLink(detailBlock);
 
         var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
         var detailBody = detailBlock.querySelector('.store-detail-body');
-        if (!collapseBtn || !detailBody) return;
-        collapseBtn.addEventListener('click', function () {
-          var isCollapsed = detailBlock.classList.toggle('is-collapsed');
-          collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
-          collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-        });
+        if (collapseBtn && detailBody) {
+          collapseBtn.addEventListener('click', function () {
+            var isCollapsed = detailBlock.classList.toggle('is-collapsed');
+            collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
+            collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          });
+        }
       });
 
       function submitSupplierAddressForm(action, formId, confirmMessage) {
@@ -805,7 +844,8 @@
       clickableRows.forEach(function(row) {
         row.addEventListener('click', function(event) {
           if (event.defaultPrevented) return;
-          if (event.target && event.target.closest('a,button,input,select,textarea,label,form')) return;
+          var t = event.target;
+          if (t && t.closest && t.closest('a,button,input,select,textarea,label')) return;
           var href = row.getAttribute('data-href');
           if (href) window.location.href = href;
         });

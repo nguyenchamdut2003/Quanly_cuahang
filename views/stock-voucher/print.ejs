@@ -1,0 +1,134 @@
+<%
+  const v = voucher || {};
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const d = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
+  const business = v.business || {};
+  const store = v.store || {};
+  const warehouse = v.warehouse || {};
+  const creator = v.creator || {};
+  const creatorName = creator.ho_ten || creator.username || creator.email || '';
+  const storeName = business.ten_doanh_nghiep || store.ten_cua_hang || 'Cửa hàng';
+  const storeAddress = business.dia_chi || store.dia_chi || store.dia_chi_gui_hang || '';
+  const storePhone = business.sdt || store.sdt || business.email || store.email || '';
+  const printUrl = '/chung-tu-kho/' + v.type + '/' + v.id;
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title><%= title || v.title || 'Chứng từ kho' %></title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#111;margin:0;background:#f3f4f6}
+    .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:16mm;box-sizing:border-box}
+    h1{text-align:center;font-size:22px;margin:14px 0 6px;text-transform:uppercase}
+    .store{text-align:center;font-size:13px}
+    .movement{text-align:center;font-size:13px;font-weight:bold;margin-top:4px}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin:14px 0}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #333;padding:5px 6px;font-size:11.5px}
+    th{text-align:center;background:#f1f5f9}
+    .num{text-align:right}
+    .note-cell{word-break:break-word}
+    .summary{width:80mm;margin-left:auto;margin-top:12px;font-size:13px}
+    .summary div{display:flex;justify-content:space-between;padding:4px 0;gap:16px}
+    .sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:32px;text-align:center;font-size:13px}
+    .sign b{display:block;margin-bottom:46px}
+    .print-actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}
+    .print-actions button,.print-actions a{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer;text-decoration:none}
+    @media print{body{background:#fff}.page{margin:0;width:auto;min-height:auto;padding:12mm}.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+  <% if (!v.embeddedPrint) { %>
+    <div class="print-actions no-print">
+      <button type="button" onclick="window.print()">In</button>
+      <a href="<%= printUrl %>/pdf">Tải PDF</a>
+    </div>
+  <% } %>
+  <main class="page">
+    <div class="store">
+      <strong><%= storeName %></strong><br>
+      <%= storeAddress %><%= storePhone ? (' - ' + storePhone) : '' %>
+    </div>
+    <h1><%= v.heading || v.title || 'Chứng từ kho' %></h1>
+    <div class="movement"><%= v.movement || '' %></div>
+    <div style="text-align:center;font-size:13px">Mã phiếu: <strong><%= v.code || '' %></strong></div>
+
+    <section class="meta">
+      <div>Ngày lập: <strong><%= d(v.date) %></strong></div>
+      <div>Kho: <strong><%= warehouse.ten_kho || warehouse.ma_kho || '' %></strong></div>
+      <div>Người lập: <strong><%= creatorName %></strong></div>
+      <div>Loại chứng từ: <strong><%= v.movement || '' %></strong></div>
+      <% if (v.partnerLabel || v.partnerText) { %>
+        <div><%= v.partnerLabel || 'Đối tượng' %>: <strong><%= v.partnerText || '' %></strong></div>
+      <% } %>
+      <% if (v.sourceLabel || v.sourceText) { %>
+        <div><%= v.sourceLabel || 'Chứng từ gốc' %>: <strong><%= v.sourceText || '' %></strong></div>
+      <% } %>
+      <% if (v.reasonLabel || v.reasonText) { %>
+        <div><%= v.reasonLabel || 'Lý do' %>: <strong><%= v.reasonText || '' %></strong></div>
+      <% } %>
+      <div>Ghi chú: <strong><%= v.note || '' %></strong></div>
+    </section>
+
+    <% if (v.isInventoryCheck) { %>
+      <table>
+        <thead>
+          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính/Size</th><th>Lô</th><th>Tồn hệ thống</th><th>Tồn thực tế</th><th>Chênh lệch</th><th>Giá trị lệch</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody>
+          <% (v.items || []).forEach(function(row, index) { %>
+            <tr>
+              <td class="num"><%= index + 1 %></td>
+              <td><%= row.ma_hang || '' %></td>
+              <td><%= row.ten_hang || '' %></td>
+              <td><%= row.thuoc_tinh || '' %></td>
+              <td><%= row.lo || '' %></td>
+              <td class="num"><%= fmt(row.ton_he_thong) %></td>
+              <td class="num"><%= fmt(row.ton_thuc_te) %></td>
+              <td class="num"><%= fmt(row.chenh_lech) %></td>
+              <td class="num"><%= fmt(row.gia_tri_lech) %> VND</td>
+              <td class="note-cell"><%= row.ghi_chu || '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <section class="summary">
+        <div><span>Tổng chênh lệch</span><strong><%= fmt(v.totals && v.totals.quantity) %></strong></div>
+        <div><span>Tổng giá trị lệch</span><strong><%= fmt(v.totals && v.totals.value) %> VND</strong></div>
+      </section>
+    <% } else { %>
+      <table>
+        <thead>
+          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính/Size</th><th>Lô</th><th>Số lượng</th><th>Đơn giá/Giá vốn</th><th>Thành tiền</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody>
+          <% (v.items || []).forEach(function(row, index) { %>
+            <tr>
+              <td class="num"><%= index + 1 %></td>
+              <td><%= row.ma_hang || '' %></td>
+              <td><%= row.ten_hang || '' %></td>
+              <td><%= row.thuoc_tinh || '' %></td>
+              <td><%= row.lo || '' %></td>
+              <td class="num"><%= fmt(row.so_luong) %></td>
+              <td class="num"><%= fmt(row.don_gia) %></td>
+              <td class="num"><%= fmt(row.thanh_tien) %></td>
+              <td class="note-cell"><%= row.ghi_chu || '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <section class="summary">
+        <div><span>Tổng số lượng</span><strong><%= fmt(v.totals && v.totals.quantity) %></strong></div>
+        <div><span>Tổng giá trị</span><strong><%= fmt(v.totals && v.totals.value) %> VND</strong></div>
+      </section>
+    <% } %>
+
+    <section class="sign">
+      <div><b>Người lập phiếu</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Thủ kho</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Người nhận/đối soát</b>(Ký, ghi rõ họ tên)</div>
+    </section>
+  </main>
+</body>
+</html>

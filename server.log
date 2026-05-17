@@ -1,7 +1,0 @@
-
-> baocao-kiot@0.0.0 start
-> node ./bin/www
-
-◇ injected env (11) from .env // tip: ⌘ override existing { override: true }
-◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
-◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }

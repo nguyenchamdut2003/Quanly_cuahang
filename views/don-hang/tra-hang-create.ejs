@@ -21,6 +21,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -30,9 +31,9 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="itemSearch" placeholder="T&#236;m h&#224;ng tr&#7843; (F3)" onfocus="handleItemSearch(true)" oninput="handleItemSearch()"><div id="productResults" class="product-results"></div></div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="itemSearch" placeholder="Tìm hàng trả (F3)" onfocus="handleItemSearch(true)" oninput="handleItemSearch()"><div id="productResults" class="product-results"></div></div>
     <button class="topbar-scan" type="button"><i class="fa-solid fa-barcode"></i></button>
-    <div class="tab">Tr&#7843; h&#224;ng 1 <i class="fa-solid fa-xmark"></i></div>
+    <div class="tab">Trả hàng 1 <i class="fa-solid fa-xmark"></i></div>
     <button class="add-tab" type="button" onclick="openInvoiceModal()"><i class="fa-solid fa-plus"></i></button>
     <i class="fa-solid fa-caret-down"></i>
     <div class="top-actions">
@@ -47,63 +48,75 @@
   <main class="return-app">
     <section class="left">
       <div id="returnItems" class="cart"></div>
-      <div class="return-swap"><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="swapSearch" placeholder="T&#236;m h&#224;ng &#273;&#7893;i (F7)" onfocus="handleSwapSearch(true)" oninput="handleSwapSearch()"><div id="swapResults" class="product-results"></div></div></div>
+      <div class="return-swap"><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="swapSearch" placeholder="Tìm hàng đổi (F7)" onfocus="handleSwapSearch(true)" oninput="handleSwapSearch()"><div id="swapResults" class="product-results"></div></div></div>
       <div id="swapItems" class="cart swap-cart"></div>
-      <div class="note"><i class="fa-solid fa-pen"></i> Ghi ch&#250; &#273;&#417;n h&#224;ng</div>
+      <div class="note"><i class="fa-solid fa-pen"></i> Ghi chú đơn hàng</div>
     </section>
     <section class="right">
-      <div class="right-head"><span id="sellerName">Nguy&#7877;n V&#259;n Nguy&#7877;n</span><span><%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %></span></div>
-      <div class="customer"><i class="fa-solid fa-user"></i> <span id="customerName">Ch&#432;a ch&#7885;n kh&#225;ch h&#224;ng</span></div>
-      <div class="link-line">Tr&#7843; h&#224;ng / <a id="invoiceLink" href="#">Ch&#432;a ch&#7885;n h&#243;a &#273;&#417;n</a></div>
-      <div class="sum-line"><span>T&#7893;ng gi&#225; g&#7889;c h&#224;ng mua</span><span id="originTotal">0</span><span class="num">0</span></div>
-      <div class="sum-line"><span>T&#7893;ng ti&#7873;n h&#224;ng tr&#7843;</span><span id="returnTotal">0</span><span class="num">0</span></div>
-      <div class="sum-line"><span>T&#7893;ng ti&#7873;n h&#224;ng &#273;&#7893;i</span><span id="exchangeTotal">0</span><span class="num">0</span></div>
-      <div class="sum-line"><span>Ch&#234;nh l&#7879;ch</span><span></span><strong id="differenceTotal" class="num">0</strong></div>
-      <div class="sum-line"><span>Gi&#7843;m gi&#225;</span><span></span><input id="discount" value="0" oninput="renderTotals()"></div>
-      <div class="sum-line"><span>Ph&#237; tr&#7843; h&#224;ng</span><span></span><input id="returnFee" value="0" oninput="renderTotals()"></div>
-      <div class="sum-line"><strong id="payableLabel">C&#7847;n tr&#7843; kh&#225;ch</strong><span></span><strong id="payable" class="payable num">0</strong></div>
-      <div class="sum-line" id="customerPaidExtraRow" style="display:none"><span>Kh&#225;ch thanh to&#225;n th&#234;m</span><span></span><input id="customerPaidExtra" value="0" oninput="customerPaidExtraTouched=true"></div>
+      <div class="right-head"><span id="sellerName">Nguyễn Văn Nguyễn</span><span><%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %></span></div>
+      <div class="customer"><i class="fa-solid fa-user"></i> <span id="customerName">Chưa chọn khách hàng</span></div>
+      <div class="link-line"><span id="returnInvoiceTitle">Trả hàng</span> / <a id="invoiceLink" href="#">Chưa chọn hóa đơn</a></div>
+      <div class="sum-line"><span>Tổng giá gốc hàng mua</span><span id="originTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>Tổng tiền hàng trả</span><span id="returnTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>Tổng tiền hàng đổi</span><span id="exchangeTotal">0</span><span class="num">0</span></div>
+      <div class="sum-line"><span>Chênh lệch</span><span></span><strong id="differenceTotal" class="num">0</strong></div>
+      <div class="sum-line"><span>Giảm giá</span><span></span><input id="discount" value="0" oninput="renderTotals()"></div>
+      <div class="sum-line"><span>Phí trả hàng</span><span></span><input id="returnFee" value="0" oninput="renderTotals()"></div>
+      <div class="sum-line"><strong id="payableLabel">Cần trả khách</strong><span></span><strong id="payable" class="payable num">0</strong></div>
+      <div class="sum-line" id="customerPaidExtraRow" style="display:none"><span>Khách thanh toán thêm</span><span></span><input id="customerPaidExtra" value="0" oninput="customerPaidExtraTouched=true"></div>
       <div id="returnStatus" style="min-height:24px;margin-top:auto;color:#667085;font-size:14px"></div>
-      <button id="submitReturnBtn" class="submit" type="button" onclick="submitReturn()">TR&#7842; H&#192;NG</button>
+      <button id="submitReturnBtn" class="submit" type="button" onclick="submitReturn()">TRẢ HÀNG</button>
     </section>
   </main>
   <div id="invoiceModal" class="modal-backdrop">
     <div class="modal">
       <button type="button" class="close" onclick="closeInvoiceModal()">&times;</button>
-      <h2>Ch&#7885;n h&#243;a &#273;&#417;n tr&#7843; h&#224;ng</h2>
+      <h2>Chọn hóa đơn trả hàng</h2>
       <div class="modal-grid">
         <aside>
           <div class="filter-card">
-            <h3>T&#236;m ki&#7871;m</h3>
-            <input class="filter-input" id="invoiceSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#243;a &#273;&#417;n">
-            <input class="filter-input" id="shipmentSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; v&#7853;n &#273;&#417;n b&#225;n">
-            <input class="filter-input" id="customerSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo kh&#225;ch h&#224;ng ho&#7863;c &#272;T">
-            <input class="filter-input" id="itemCodeSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo m&#227; h&#224;ng">
-            <input class="filter-input" id="itemNameSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo t&#234;n h&#224;ng">
+            <h3>Tìm kiếm</h3>
+            <input class="filter-input" id="invoiceSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo mã hóa đơn">
+            <input class="filter-input" id="shipmentSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo mã vận đơn bán">
+            <input class="filter-input" id="customerSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo khách hàng hoặc ĐT">
+            <input class="filter-input" id="itemCodeSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo mã hàng">
+            <input class="filter-input" id="itemNameSearch" oninput="scheduleInvoiceSearch()" placeholder="Theo tên hàng">
           </div>
           <div class="filter-card">
-            <h3>Th&#7901;i gian</h3>
+            <h3>Thời gian</h3>
             <input class="filter-input" id="fromDateSearch" type="date" onchange="loadInvoices(1)">
-            <input class="filter-input" id="toDateSearch" type="date" onchange="loadInvoices(1)" placeholder="&#272;&#7871;n ng&#224;y">
+            <input class="filter-input" id="toDateSearch" type="date" onchange="loadInvoices(1)" placeholder="Đến ngày">
           </div>
         </aside>
         <section>
           <div class="invoice-table">
             <table>
-              <thead><tr><th>M&#227; h&#243;a &#273;&#417;n</th><th>Th&#7901;i gian <i class="fa-solid fa-caret-down"></i></th><th>Ng&#432;&#7901;i b&#225;n</th><th>Kh&#225;ch h&#224;ng</th><th class="num">T&#7893;ng c&#7897;ng</th><th></th></tr></thead>
+              <thead><tr><th>Mã hóa đơn</th><th>Thời gian <i class="fa-solid fa-caret-down"></i></th><th>Người bán</th><th>Khách hàng</th><th class="num">Tổng cộng</th><th></th></tr></thead>
               <tbody id="invoiceRows"></tbody>
             </table>
             <div class="pager" id="invoicePager"></div>
           </div>
         </section>
       </div>
-      <button class="quick" onclick="quickReturn()" type="button">Tr&#7843; nhanh</button>
+      <button class="quick" onclick="quickReturn()" type="button">Trả nhanh</button>
     </div>
   </div>
+  <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
+  <script id="copy-draft-embed" type="application/json"><%- copyDraftJson %></script>
+  <% } %>
   <script>
+    let copyDraft = null;
+    (function() {
+      const el = document.getElementById('copy-draft-embed');
+      if (el) {
+        try { copyDraft = JSON.parse(el.textContent || 'null'); } catch (e) { copyDraft = null; }
+      }
+    })();
+    const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
     const invoices = <%- JSON.stringify(invoicePayload) %>;
     const products = <%- JSON.stringify(productPayload) %>;
-    const initialInvoiceId = new URLSearchParams(window.location.search).get('invoice_id') || '';
+    const queryParams = new URLSearchParams(window.location.search);
+    const initialInvoiceId = queryParams.get('hoa_don_id') || queryParams.get('invoice_id') || '';
     let selectedInvoice = null;
     let returnItems = [];
     let swapItems = [];
@@ -140,19 +153,19 @@
         from_date: fromDateSearch.value,
         to_date: toDateSearch.value
       });
-      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">&#272;ang t&#7843;i d&#7919; li&#7879;u...</td></tr>';
+      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">Đang tải dữ liệu...</td></tr>';
       try {
         const res = await fetch('/don-hang/tra-hang/invoices/search?' + params.toString());
         const result = await res.json();
-        if(!result.success) throw new Error(result.message || 'Khong tai duoc danh sach hoa don');
+        if(!result.success) throw new Error(result.message || 'Không tải được danh sách hóa đơn');
         renderInvoices(result.data || [], result.pagination || { page: 1, limit: 7, total: 0, pages: 1 });
       } catch (error) {
-        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Khong tai duoc danh sach hoa don</td></tr>';
+        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Không tải được danh sách hóa đơn</td></tr>';
         invoicePager.innerHTML = '';
       }
     }
     function renderInvoices(rows, pagination){
-      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmt(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Ch&#7885;n</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Kh&#244;ng t&#236;m th&#7845;y h&#243;a &#273;&#417;n ph&#249; h&#7907;p</td></tr>';
+      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmt(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Chọn</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Không tìm thấy hóa đơn phù hợp</td></tr>';
       renderInvoicePager(pagination);
     }
     function renderInvoicePager(pagination){
@@ -172,25 +185,29 @@
         ${pageNumbers.map(p => `<button class="page-btn ${p === page ? 'active' : ''}" type="button" onclick="loadInvoices(${p})">${p}</button>`).join('')}
         <button class="page-btn" type="button" onclick="loadInvoices(${page + 1})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-chevron-right"></i></button>
         <button class="page-btn" type="button" onclick="loadInvoices(${pages})" ${page >= pages ? 'disabled' : ''}><i class="fa-solid fa-angles-right"></i></button>
-        <span>Hi&#7875;n th&#7883; ${start} - ${end} tr&#234;n t&#7893;ng s&#7889; ${total} h&#243;a &#273;&#417;n</span>`;
+        <span>Hiển thị ${start} - ${end} trên tổng số ${total} hóa đơn</span>`;
     }
     async function selectInvoice(id){
       const res = await fetch(`/don-hang/tra-hang/invoice/${id}`);
       const result = await res.json();
-      if(!result.success) return alert(result.message || 'Khong tai duoc hoa don');
+      if(!result.success) return alert(result.message || 'Không tải được hóa đơn');
       selectedInvoice = result.data.invoice;
       returnItems = result.data.items.map(item => ({
+        line_key: item._id || `${item.hang_hoa_id?._id || item.hang_hoa_id}::${item.lo_hang_id?._id || item.lo_hang_id || ''}`,
         hang_hoa_id: item.hang_hoa_id?._id || item.hang_hoa_id,
         ma_hang: item.hang_hoa_id?.ma_hang || '',
         ten_hang: item.hang_hoa_id?.ten_hang || '',
         so_luong_goc: Number(item.so_luong || 0),
-        so_luong: 0,
+        so_luong: Number(item.so_luong || 0),
         lo_hang_id: item.lo_hang_id?._id || item.lo_hang_id || '',
+        lo_hang: item.lo_hang_id?.ma_lo || item.lo_hang_id?.ten_lo || '',
+        chiet_khau: Number(item.chiet_khau || 0),
         don_gia: Number(item.don_gia || 0),
         thanh_tien_goc: Number(item.thanh_tien || 0)
       }));
       sellerName.textContent = selectedInvoice.nguoi_ban_id?.ho_ten || selectedInvoice.nguoi_ban_id?.username || 'Hoang - Kinh Doanh';
-      customerName.textContent = selectedInvoice.khach_hang_id?.ten_khach_hang || 'Kh\u00e1ch l\u1ebb';
+      customerName.textContent = selectedInvoice.khach_hang_id?.ten_khach_hang || 'Khách lẻ';
+      returnInvoiceTitle.textContent = `Trả hàng từ hóa đơn ${selectedInvoice.ma_hoa_don || ''}`;
       invoiceLink.textContent = `${selectedInvoice.ma_hoa_don} - ${sellerName.textContent}`;
       closeInvoiceModal();
       itemSearch.value = '';
@@ -199,8 +216,8 @@
     }
     function quickReturn(){
       closeInvoiceModal();
-      customerName.textContent = 'Kh\u00e1ch l\u1ebb';
-      invoiceLink.textContent = 'Tr\u1ea3 nhanh';
+      customerName.textContent = 'Khách lẻ';
+      invoiceLink.textContent = 'Trả nhanh';
       selectedInvoice = null;
       returnItems = [];
       renderItems();
@@ -282,7 +299,7 @@
       const q = itemSearch.value.trim().toLowerCase();
       const rows = returnItems.filter(i => !q || i.ma_hang.toLowerCase().includes(q) || i.ten_hang.toLowerCase().includes(q));
       const returnItemsEl = document.getElementById('returnItems');
-      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Ch&#7885;n h&#243;a &#273;&#417;n &#273;&#7875; l&#7845;y h&#224;ng tr&#7843;</div>';
+      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
       renderTotals();
     }
     function renderSwapItems(){
@@ -292,18 +309,18 @@
       renderTotals();
     }
     function setQty(id, value){
-      const item = returnItems.find(i => String(i.hang_hoa_id) === String(id));
+      const item = returnItems.find(i => String(i.line_key || i.hang_hoa_id) === String(id));
       if(!item) return;
       item.so_luong = Math.max(0, Math.min(num(value), item.so_luong_goc));
       renderItems();
     }
     function setPrice(id, value){
-      const item = returnItems.find(i => String(i.hang_hoa_id) === String(id));
+      const item = returnItems.find(i => String(i.line_key || i.hang_hoa_id) === String(id));
       if(!item) return;
       item.don_gia = num(value);
       renderItems();
     }
-    function removeItem(id){ returnItems = returnItems.filter(i => String(i.hang_hoa_id) !== String(id)); renderItems(); }
+    function removeItem(id){ returnItems = returnItems.filter(i => String(i.line_key || i.hang_hoa_id) !== String(id)); renderItems(); }
     function setSwapQty(id, value){
       const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
       if(!item) return;
@@ -344,8 +361,8 @@
         openInvoiceModal();
         return;
       }
-      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ hang_hoa_id: i.hang_hoa_id, lo_hang_id: i.lo_hang_id || '', so_luong: i.so_luong, don_gia: i.don_gia }));
-      if(!items.length) return alert('Vui long nhap so luong hang tra');
+      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ hang_hoa_id: i.hang_hoa_id, lo_hang_id: i.lo_hang_id || '', so_luong: i.so_luong, don_gia: i.don_gia, chiet_khau: i.chiet_khau || 0 }));
+      if(!items.length) return alert('Vui lòng nhập số lượng hàng trả');
       const exchangeItems = swapItems.filter(i => i.so_luong > 0).map(i => ({
         hang_hoa_id: i.hang_hoa_id,
         so_luong: i.so_luong,
@@ -353,7 +370,7 @@
         thanh_tien: i.so_luong * i.don_gia
       }));
       const selectedCustomerId = selectedInvoice?.khach_hang_id?._id || selectedInvoice?.khach_hang_id || null;
-      if(exchangeItems.length && !selectedCustomerId) return alert('Vui long chon khach hang truoc khi dat don doi');
+      if(exchangeItems.length && !selectedCustomerId) return alert('Vui lòng chọn khách hàng trước khi đặt đơn đổi');
       const payload = {
         hoa_don_id: selectedInvoice?._id || null,
         khach_hang_id: selectedCustomerId,
@@ -390,9 +407,39 @@
         button.textContent = 'TRẢ HÀNG';
       }
     }
-    document.addEventListener('DOMContentLoaded', () => {
+    async function applyCopyDraft() {
+      if (!copyDraft || !copyDraft.hoa_don_id) return;
+      await selectInvoice(copyDraft.hoa_don_id);
+      if (copyDraft.return_items && copyDraft.return_items.length) {
+        const byKey = {};
+        returnItems.forEach(item => { byKey[String(item.line_key || item.hang_hoa_id)] = item; });
+        copyDraft.return_items.forEach(row => {
+          const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
+          const target = returnItems.find(item => String(item.hang_hoa_id) + '::' + String(item.lo_hang_id || '') === key);
+          if (target) target.so_luong = Number(row.so_luong || 0);
+        });
+      }
+      if (copyDraft.exchange_items && copyDraft.exchange_items.length) {
+        swapItems = copyDraft.exchange_items.map(row => {
+          const product = products.find(p => p._id === row.hang_hoa_id) || {};
+          return {
+            hang_hoa_id: row.hang_hoa_id,
+            ma_hang: product.ma_hang || '',
+            ten_hang: product.ten_hang || '',
+            so_luong_goc: Number(row.so_luong || 0),
+            so_luong: Number(row.so_luong || 0),
+            don_gia: Number(row.don_gia || product.gia_ban || 0)
+          };
+        });
+      }
+      renderItems();
+      renderSwapItems();
+    }
+    document.addEventListener('DOMContentLoaded', async () => {
       loadInvoices(1);
-      if (initialInvoiceId) selectInvoice(initialInvoiceId);
+      if (copyFromError) alert(copyFromError);
+      if (initialInvoiceId) await selectInvoice(initialInvoiceId);
+      else if (copyDraft) await applyCopyDraft();
     });
     document.addEventListener('click', event => {
       if (!itemSearch.contains(event.target) && !productResults.contains(event.target)) productResults.style.display = 'none';

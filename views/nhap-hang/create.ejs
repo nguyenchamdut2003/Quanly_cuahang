@@ -1,13 +1,13 @@
 ﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    .purchase-page{height:calc(100vh - 98px);background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1fr) 398px;gap:10px;padding:10px 11% 0}
+    .purchase-page{height:calc(100vh - 98px);background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1fr) 498px;gap:12px;padding:10px 30px 0}
     .purchase-left{min-width:0;display:flex;flex-direction:column;background:#fff;border:1px solid #d7dde5}
     .purchase-top{height:43px;display:flex;align-items:center;gap:12px;padding:0 0 0 4px;background:#f3f6f9;border-bottom:1px solid #d7dde5}
     .back-link{width:26px;height:32px;display:flex;align-items:center;justify-content:center;color:#111827;text-decoration:none;font-size:18px}
@@ -20,19 +20,18 @@
     .search-item{height:42px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;font-size:13px;cursor:pointer}
     .search-item:hover{background:#f0f7ff}
     .table-wrap{flex:1;min-height:0;overflow:auto;background:#fff}
-    .items-table{width:100%;min-width:920px;border-collapse:collapse}
+    .items-table{width:100%;min-width:860px;border-collapse:collapse;table-layout:fixed}
     .items-table th{height:36px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:13px;font-weight:700;padding:0 10px;text-align:left}
     .items-table td{height:42px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
     .items-table .lot-row td{height:auto;padding:6px 10px;background:#fbfdff}
     .lot-line{display:flex;align-items:center;gap:10px;font-size:12px;color:#344054}
     .lot-line .lot-link{color:#0070f4;cursor:pointer;text-decoration:none;font-weight:600}
     .items-table .num{text-align:right}
-    .input-small{width:92px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 7px}
+    .input-small{width:82px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 7px}
+    .qty-input{width:68px}
     .empty-import{height:calc(100vh - 260px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#111827}
-    .empty-import h3{font-size:18px;margin:0 0 22px}
-    .empty-import p{font-size:13px;margin:0 0 32px}
-    .empty-import a{color:#0070f4;text-decoration:none}
-    .file-btn{height:52px;border:0;background:#0070f4;color:#fff;border-radius:3px;padding:0 24px;font-size:18px;font-weight:700;display:inline-flex;align-items:center;gap:10px;cursor:pointer}
+    .empty-import h3{font-size:18px;margin:0 0 12px}
+    .empty-import p{font-size:13px;margin:0;color:#667085}
     .purchase-right{background:#fff;border-radius:6px;display:flex;flex-direction:column;padding:18px 12px 10px}
     .right-tools{height:28px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
     .icon-group{display:flex;gap:6px}
@@ -59,6 +58,9 @@
     .supplier-product-price{font-size:12px;text-align:right}
     .btn-row{height:24px;border-radius:6px;border:1px solid #cfd8e3;background:#fff;font-size:11px;cursor:pointer}
     .btn-row.primary{background:#0070f4;color:#fff;border-color:#0070f4}
+    .row-index-cell{display:flex;align-items:center;justify-content:center;gap:8px}
+    .row-delete-btn{width:24px;height:24px;border:1px solid #fda29b;background:#fff;color:#d92d20;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .row-delete-btn:hover{background:#fff1f3}
     .quick-modal{position:fixed;inset:0;background:rgba(15,23,42,.3);display:none;align-items:center;justify-content:center;z-index:999}
     .quick-modal.open{display:flex}
     .quick-modal-card{width:520px;max-width:calc(100vw - 20px);background:#fff;border-radius:10px;padding:14px}
@@ -86,9 +88,15 @@
     .paid-combo{display:flex;gap:6px;justify-content:flex-end}
     .btn-pay-all{height:30px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:7px;padding:0 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
     .discount-combo{display:flex;gap:6px;justify-content:flex-end}
-    .discount-type{height:30px;border:1px solid #cfd8e3;border-radius:7px;padding:0 6px;font-size:12px;background:#fff}
+    .discount-type{width:68px;height:30px;border:1px solid #cfd8e3;border-radius:7px;padding:0 6px;font-size:12px;background:#fff}
     .line-discount-wrap{display:flex;gap:4px;justify-content:flex-end}
-    .line-discount-wrap .input-small{width:68px}
+    .line-discount-wrap .input-small{width:58px}
+    .line-discount-wrap .discount-type{width:54px;min-width:54px}
+    .attribute-select-wrap{display:flex;align-items:center;gap:4px;white-space:nowrap;max-width:100%;overflow:hidden}
+    .attribute-select-label{max-width:38px;font-size:11px;color:#475467;overflow:hidden;text-overflow:ellipsis}
+    .attribute-select{width:58px;height:28px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;padding:0 5px;font-size:11px}
+    .attribute-empty{color:#667085;font-size:12px}
+    .unit-cell{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .payable{color:#006dff!important;font-weight:700}
     .note{height:60px;border:1px solid #cfd8e3;border-radius:7px;padding:10px;resize:none;font-size:13px;margin-top:20px}
     .right-spacer{flex:1}
@@ -96,7 +104,7 @@
     .btn-draft,.btn-complete{height:45px;border-radius:9px;font-size:15px;font-weight:700;cursor:pointer}
     .btn-draft{border:1px solid #0070f4;background:#fff;color:#0070f4}
     .btn-complete{border:0;background:#0070f4;color:#fff}
-    @media(max-width:1150px){.purchase-page{padding:10px;grid-template-columns:minmax(0,1fr) 360px}}
+    @media(max-width:1150px){.purchase-page{padding:10px 30px 0;grid-template-columns:minmax(0,1fr) 360px}}
   </style>
 </head>
 <body class="admin-body">
@@ -125,23 +133,22 @@
           <table class="items-table">
             <thead>
               <tr>
-                <th style="width:60px;text-align:center">STT</th>
-                <th style="width:110px">Mã hàng</th>
+                <th style="width:66px;text-align:center">STT</th>
+                <th style="width:104px">Mã hàng</th>
                 <th>Tên hàng</th>
-                <th style="width:80px">ĐVT</th>
-                <th class="num" style="width:120px">Số lượng</th>
-                <th class="num" style="width:130px">Đơn giá nhập</th>
-                <th class="num" style="width:150px">Giảm giá</th>
-                <th class="num" style="width:140px">Thành tiền</th>
-                <th style="width:42px"></th>
+                <th style="width:96px">Thuộc tính</th>
+                <th style="width:54px">ĐVT</th>
+                <th class="num" style="width:88px">Số lượng</th>
+                <th class="num" style="width:116px">Đơn giá nhập</th>
+                <th class="num" style="width:124px">Giảm giá</th>
+                <th class="num" style="width:118px">Thành tiền</th>
               </tr>
             </thead>
             <tbody id="itemsBody"></tbody>
           </table>
           <div id="emptyImport" class="empty-import">
-            <h3>Thêm sản phẩm từ file excel</h3>
-            <p>(Tải về file mẫu: <a href="#">Excel file</a>)</p>
-            <button class="file-btn" type="button"><i class="fa-regular fa-copy"></i> Chọn file dữ liệu</button>
+            <h3>Chưa có hàng trong phiếu</h3>
+            <p>Tìm và thêm sản phẩm bằng ô tìm kiếm phía trên.</p>
           </div>
         </div>
       </section>
@@ -278,24 +285,12 @@
         <input id="lotMaLo" class="lot-input" placeholder="Mã lô (để trống tự động)">
         <input id="lotTenLo" class="lot-input" placeholder="Tên lô">
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày sản xuất</div>
-          <input id="lotNgaySanXuat" type="date" class="lot-input">
-        </label>
-        <label>
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày nhập</div>
           <input id="lotNgayNhap" type="date" class="lot-input">
         </label>
         <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày thu hoạch</div>
-          <input id="lotNgayThuHoach" type="date" class="lot-input">
-        </label>
-        <label>
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Hạn sử dụng</div>
           <input id="lotHanSuDung" type="date" class="lot-input">
-        </label>
-        <label>
-          <div style="font-size:12px;margin-bottom:4px;color:#475467">Số lượng lô</div>
-          <input id="lotSoLuong" class="lot-input" value="1">
         </label>
         <textarea id="lotGhiChu" class="lot-note full" placeholder="Ghi chú lô"></textarea>
       </div>
@@ -333,6 +328,7 @@
       ten_don_vi: u.ten_don_vi || ''
     }));
     let supplierProducts = [];
+    const productAttributeCache = {};
     let quickEditId = '';
     let lotEditItemId = '';
     let isPayAllMode = false;
@@ -371,6 +367,51 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    async function getProductAttributes(productId) {
+      const key = String(productId || '');
+      if (!key) return [];
+      if (Object.prototype.hasOwnProperty.call(productAttributeCache, key)) return productAttributeCache[key];
+      try {
+        const res = await fetch(`/hang-hoa/${encodeURIComponent(key)}/thuoc-tinh`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const json = await res.json();
+        productAttributeCache[key] = json && json.success && Array.isArray(json.data) ? json.data : [];
+      } catch (_error) {
+        productAttributeCache[key] = [];
+      }
+      return productAttributeCache[key];
+    }
+
+    async function loadProductAttributesForItem(rowId) {
+      const item = selectedItems.find(i => String(i.row_id) === String(rowId));
+      if (!item) return;
+      item.attribute_groups = await getProductAttributes(item.hang_hoa_id);
+      item.attributes_loading = false;
+      const firstGroup = item.attribute_groups && item.attribute_groups[0];
+      const firstValue = firstGroup && firstGroup.values && firstGroup.values[0];
+      if (firstValue && !item.gia_tri_thuoc_tinh_id) {
+        item.gia_tri_thuoc_tinh_id = String(firstValue.gia_tri_id);
+      }
+      renderItems();
+    }
+
+    function renderAttributeSelect(item) {
+      const groups = Array.isArray(item.attribute_groups) ? item.attribute_groups : [];
+      if (!groups.length) {
+        if (item.attributes_loading) return '<span class="attribute-empty">Đang tải...</span>';
+        return '<span class="attribute-empty">-</span>';
+      }
+      const group = groups[0];
+      const values = Array.isArray(group.values) ? group.values : [];
+      if (!values.length) return '<span class="attribute-empty">-</span>';
+      const options = values.map(value => {
+        const valueId = String(value.gia_tri_id || '');
+        return `<option value="${escapeHtml(valueId)}" ${String(item.gia_tri_thuoc_tinh_id || '') === valueId ? 'selected' : ''}>${escapeHtml(value.ten_gia_tri || '')}</option>`;
+      }).join('');
+      return `<div class="attribute-select-wrap"><span class="attribute-select-label">${escapeHtml(group.ten_thuoc_tinh || 'Thuộc tính')}:</span><select class="attribute-select" onchange="updateAttributeValue('${item.row_id}', this.value)">${options}</select></div>`;
     }
 
     function renderProductResults(list) {
@@ -436,6 +477,13 @@
       return d.toISOString().slice(0, 10);
     }
 
+    function addDaysToDate(dateString, days) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      date.setDate(date.getDate() + days);
+      return date.toISOString().split('T')[0];
+    }
+
     function formatDateVi(value) {
       if (!value) return '---';
       const d = new Date(value);
@@ -443,12 +491,27 @@
       return d.toLocaleDateString('vi-VN');
     }
 
-    function renderSupplierProducts(list) {
-      if (!list || !list.length) {
+    function makeRowId() {
+      return String(Date.now()) + '_' + Math.random().toString(36).slice(2);
+    }
+
+    function renderSupplierProducts() {
+      const supplierId = String(supplierIdInput.value || '').trim();
+      if (!supplierId) {
+        supplierProductsList.innerHTML = '<div class="supplier-products-empty">Vui lòng chọn nhà cung cấp.</div>';
+        return;
+      }
+      const keyword = supplierProductKeyword ? supplierProductKeyword.value.trim().toLowerCase() : '';
+      const visibleProducts = supplierProducts.filter(p => {
+        if (!keyword) return true;
+        return String(p.ma_hang || '').toLowerCase().includes(keyword)
+          || String(p.ten_hang || '').toLowerCase().includes(keyword);
+      });
+      if (!visibleProducts.length) {
         supplierProductsList.innerHTML = '<div class="supplier-products-empty">Không có hàng hóa phù hợp.</div>';
         return;
       }
-      supplierProductsList.innerHTML = list.map(p => {
+      supplierProductsList.innerHTML = visibleProducts.map(p => {
         const price = Number(p.gia_nhap_cuoi || p.gia_von || 0);
         const statusBtn = String(p.trang_thai || 'active') === 'active'
           ? `<button type="button" class="btn-row" onclick="setInactiveProduct('${p._id}')">Ngưng</button>`
@@ -468,33 +531,65 @@
       }).join('');
     }
 
-    async function fetchSupplierProducts(keyword) {
-      const supplierId = String(supplierIdInput.value || '').trim();
-      if (!supplierId) {
-        supplierProducts = [];
-        renderSupplierProducts([]);
-        return [];
-      }
-      const params = new URLSearchParams();
-      if (keyword) params.set('keyword', String(keyword || '').trim());
-      const url = `/api/nha-cung-cap/${supplierId}/hang-hoa` + (params.toString() ? `?${params.toString()}` : '');
+    async function loadSupplierProducts(supplierId) {
+      supplierId = String(supplierId || '').trim();
+      supplierProducts = [];
+      renderSupplierProducts();
+      if (!supplierId) return [];
+      const url = `/nhap-hang/api/nha-cung-cap/${supplierId}/hang-hoa`;
       try {
         const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
         const json = await response.json();
-        supplierProducts = json && json.success && Array.isArray(json.items) ? json.items : [];
-        renderSupplierProducts(supplierProducts);
+        const list = json && json.success && Array.isArray(json.data) ? json.data : (json && json.success && Array.isArray(json.items) ? json.items : []);
+        supplierProducts = list.filter(p => String(p.nha_cung_cap_id?._id || p.nha_cung_cap_id || '') === supplierId);
+        renderSupplierProducts();
         return supplierProducts;
       } catch (e) {
         supplierProducts = [];
-        renderSupplierProducts([]);
+        renderSupplierProducts();
         return [];
       }
     }
 
+    async function fetchSupplierProducts(keyword) {
+      if (supplierProductKeyword && supplierProductKeyword.value !== String(keyword || '')) {
+        supplierProductKeyword.value = String(keyword || '');
+      }
+      renderSupplierProducts();
+      return supplierProducts;
+    }
+
+    function renderImportTable() {
+      renderItems();
+    }
+
+    function calculateTotals() {
+      renderItems();
+    }
+
+    function addProductToImport(productId) {
+      addItem(productId);
+    }
+
+    function removeProductFromImport(rowId) {
+      removeItem(rowId);
+    }
+
     function getLocalProductSuggest(limit) {
       const q = (productSearch && productSearch.value ? productSearch.value : '').trim().toLowerCase();
-      const base = products && products.length ? products : seedProducts;
-      const matched = base.filter(p => {
+      const supplyId = (supplierIdInput && supplierIdInput.value ? supplierIdInput.value : '').trim();
+      let pool;
+      if (supplyId) {
+        if (supplierProducts && supplierProducts.length) {
+          pool = supplierProducts;
+        } else {
+          const base = products && products.length ? products : seedProducts;
+          pool = base.filter(p => String(p.nha_cung_cap_id || '') === supplyId);
+        }
+      } else {
+        pool = products && products.length ? products : seedProducts;
+      }
+      const matched = (pool || []).filter(p => {
         if (!q) return true;
         return String(p.ma_hang || '').toLowerCase().includes(q) || String(p.ten_hang || '').toLowerCase().includes(q);
       });
@@ -560,6 +655,11 @@
     }
 
     supplierSearch.addEventListener('input', function() {
+      if (!this.value.trim()) {
+        supplierIdInput.value = '';
+        supplierProducts = [];
+        renderSupplierProducts();
+      }
       openSupplierSuggest(false);
     });
 
@@ -579,37 +679,42 @@
       supplierIdInput.value = supplier._id;
       supplierSearch.value = supplier.ten_ncc;
       supplierResults.style.display = 'none';
+      if (supplierProductKeyword) supplierProductKeyword.value = '';
+      supplierProducts = [];
+      renderSupplierProducts();
       fetchProductsForSuggest(productSearch.value.trim()).then(list => renderProductResults(list.slice(0, 12)));
-      fetchSupplierProducts('');
+      loadSupplierProducts(supplier._id);
     }
 
     function addItem(id) {
-      const product = products.find(p => p._id === id) || supplierProducts.find(p => String(p._id) === String(id));
+      const product = supplierProducts.find(p => String(p._id) === String(id)) || products.find(p => String(p._id) === String(id));
       if (!product) return;
-      const existing = selectedItems.find(item => item.hang_hoa_id === id);
-      if (existing) {
-        existing.so_luong += 1;
-      } else {
-        selectedItems.push({
-          hang_hoa_id: id,
-          ma_hang: product.ma_hang,
-          ten_hang: product.ten_hang,
-          don_vi_tinh: product.don_vi_tinh || (product.don_vi_tinh_id && product.don_vi_tinh_id.ten_don_vi) || '---',
-          so_luong: 1,
-          don_gia_nhap: numeric(product.gia_nhap_cuoi || product.gia_von || 0),
-          giam_gia: 0,
-          kieu_giam_gia_dong: 'vnd',
-          quan_ly_theo_lo: Boolean(product.quan_ly_theo_lo),
-          lo_info: null
-        });
-      }
+      const rowId = makeRowId();
+      selectedItems.push({
+        row_id: rowId,
+        hang_hoa_id: String(id),
+        ma_hang: product.ma_hang,
+        ten_hang: product.ten_hang,
+        dvt: product.don_vi_tinh || (product.don_vi_tinh_id && product.don_vi_tinh_id.ten_don_vi) || '---',
+        don_vi_tinh: product.don_vi_tinh || (product.don_vi_tinh_id && product.don_vi_tinh_id.ten_don_vi) || '---',
+        so_luong: 1,
+        don_gia_nhap: numeric(product.gia_nhap_cuoi || product.gia_von || 0),
+        giam_gia: 0,
+        kieu_giam_gia_dong: 'vnd',
+        gia_tri_thuoc_tinh_id: '',
+        attribute_groups: [],
+        attributes_loading: true,
+        quan_ly_theo_lo: Boolean(product.quan_ly_theo_lo),
+        lo_info: null
+      });
       productSearch.value = '';
       searchResults.style.display = 'none';
       renderItems();
+      loadProductAttributesForItem(rowId);
     }
 
     function pickSupplierProduct(id) {
-      addItem(id);
+      addProductToImport(id);
     }
 
     function openQuickModal(type, product) {
@@ -673,7 +778,7 @@
         return;
       }
       quickProductModal.classList.remove('open');
-      await fetchSupplierProducts(supplierProductKeyword.value.trim());
+      await loadSupplierProducts(supplierIdInput.value);
       if (!isEdit && json.item && json.item._id) {
         pickSupplierProduct(String(json.item._id));
       }
@@ -690,7 +795,7 @@
         alert((json && json.message) || 'Không thể ngưng hàng hóa');
         return;
       }
-      await fetchSupplierProducts(supplierProductKeyword.value.trim());
+      await loadSupplierProducts(supplierIdInput.value);
     }
 
     function renderItems() {
@@ -702,30 +807,30 @@
         const lineDiscountType = item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd';
         const lineDiscountValue = clampDiscountValue(item.giam_gia || 0, lineDiscountType);
         return `<tr>
-          <td style="text-align:center">${index + 1}</td>
+          <td style="text-align:center"><div class="row-index-cell"><span>${index + 1}</span><button type="button" class="row-delete-btn" title="Xóa dòng" onclick="removeProductFromImport('${item.row_id}')"><i class="fa-regular fa-trash-can"></i></button></div></td>
           <td>${item.ma_hang}</td>
           <td>${item.ten_hang}</td>
-          <td>${item.don_vi_tinh || '---'}</td>
-          <td class="num"><input class="input-small" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}', this.value)"></td>
-          <td class="num"><input class="input-small" value="${fmt(item.don_gia_nhap)}" onchange="updatePrice('${item.hang_hoa_id}', this.value)"></td>
+          <td>${renderAttributeSelect(item)}</td>
+          <td class="unit-cell">${item.dvt || item.don_vi_tinh || '---'}</td>
+          <td class="num"><input class="input-small qty-input" value="${item.so_luong}" onchange="updateQty('${item.row_id}', this.value)"></td>
+          <td class="num"><input class="input-small" value="${fmt(item.don_gia_nhap)}" onchange="updatePrice('${item.row_id}', this.value)"></td>
           <td class="num">
             <div class="line-discount-wrap">
-              <input class="input-small" value="${fmt(lineDiscountValue)}" onchange="updateLineDiscount('${item.hang_hoa_id}', this.value)">
-              <select class="discount-type" onchange="updateLineDiscountType('${item.hang_hoa_id}', this.value)">
+              <input class="input-small" value="${fmt(lineDiscountValue)}" onchange="updateLineDiscount('${item.row_id}', this.value)">
+              <select class="discount-type" onchange="updateLineDiscountType('${item.row_id}', this.value)">
                 <option value="vnd" ${lineDiscountType === 'vnd' ? 'selected' : ''}>VND</option>
                 <option value="percent" ${lineDiscountType === 'percent' ? 'selected' : ''}>%</option>
               </select>
             </div>
           </td>
           <td class="num">${fmt(lineTotal)}</td>
-          <td><i class="fa-solid fa-trash" style="color:#ef4444;cursor:pointer" onclick="removeItem('${item.hang_hoa_id}')"></i></td>
         </tr>` + (item.quan_ly_theo_lo ? `<tr class="lot-row">
           <td></td>
           <td colspan="8">
             <div class="lot-line">
               <span>Nhập lô, hạn sử dụng</span>
-              <a class="lot-link" onclick="openLotModal('${item.hang_hoa_id}')">Chọn lô</a>
-              <span>${item.lo_info ? `Lô: ${escapeHtml(item.lo_info.ten_lo || item.lo_info.ma_lo || '---')} - HSD: ${escapeHtml(formatDateVi(item.lo_info.han_su_dung))} - SL: ${fmt(item.lo_info.so_luong_lo || 0)}` : 'Chưa chọn lô'}</span>
+              <a class="lot-link" onclick="openLotModal('${item.row_id}')">Chọn lô</a>
+              <span>${item.lo_info ? `Lô: ${escapeHtml(item.lo_info.ten_lo || item.lo_info.ma_lo || '---')} - HSD: ${escapeHtml(formatDateVi(item.lo_info.han_su_dung))}` : 'Chưa chọn lô'}</span>
             </div>
           </td>
         </tr>` : '');
@@ -776,6 +881,7 @@
       document.getElementById('emptyImport').style.display = selectedItems.length ? 'none' : 'flex';
       itemsJsonInput.value = JSON.stringify(selectedItems.map(item => ({
         hang_hoa_id: item.hang_hoa_id,
+        gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || '',
         lo_hang_id: item.lo_info ? String(item.lo_info.lo_hang_id || '').trim() : '',
         so_luong: numeric(item.so_luong),
         don_gia: numeric(item.don_gia_nhap),
@@ -785,61 +891,65 @@
           lo_hang_id: String(item.lo_info.lo_hang_id || '').trim(),
           ma_lo: String(item.lo_info.ma_lo || '').trim(),
           ten_lo: String(item.lo_info.ten_lo || '').trim(),
-          ngay_san_xuat: String(item.lo_info.ngay_san_xuat || '').trim(),
           ngay_nhap: String(item.lo_info.ngay_nhap || '').trim(),
-          ngay_thu_hoach: String(item.lo_info.ngay_thu_hoach || '').trim(),
           han_su_dung: String(item.lo_info.han_su_dung || '').trim(),
-          so_luong_lo: numeric(item.lo_info.so_luong_lo || 0),
           ghi_chu: String(item.lo_info.ghi_chu || '').trim()
         } : null
       })));
     }
 
-    function updateQty(id, val) {
-      const item = selectedItems.find(i => i.hang_hoa_id === id);
+    function updateQty(rowId, val) {
+      const item = selectedItems.find(i => i.row_id === rowId);
       if (item) item.so_luong = Math.max(1, Math.floor(numeric(val)));
-      if (item && item.quan_ly_theo_lo && item.lo_info) {
-        item.lo_info.so_luong_lo = Math.min(numeric(item.lo_info.so_luong_lo || 0), item.so_luong);
-      }
       renderItems();
     }
-    function updatePrice(id, val) {
-      const item = selectedItems.find(i => i.hang_hoa_id === id);
+    function updatePrice(rowId, val) {
+      const item = selectedItems.find(i => i.row_id === rowId);
       if (item) item.don_gia_nhap = Math.floor(numeric(val));
       renderItems();
     }
-    function updateLineDiscount(id, val) {
-      const item = selectedItems.find(i => i.hang_hoa_id === id);
+    function updateLineDiscount(rowId, val) {
+      const item = selectedItems.find(i => i.row_id === rowId);
       if (item) item.giam_gia = Math.floor(clampDiscountValue(val, item.kieu_giam_gia_dong));
       renderItems();
     }
-    function updateLineDiscountType(id, val) {
-      const item = selectedItems.find(i => i.hang_hoa_id === id);
+    function updateLineDiscountType(rowId, val) {
+      const item = selectedItems.find(i => i.row_id === rowId);
       if (item) item.kieu_giam_gia_dong = val === 'percent' ? 'percent' : 'vnd';
       renderItems();
     }
-    function removeItem(id) {
-      selectedItems = selectedItems.filter(i => i.hang_hoa_id !== id);
+    function updateAttributeValue(rowId, val) {
+      const item = selectedItems.find(i => String(i.row_id) === String(rowId));
+      if (item) {
+        const nextValue = String(val || '');
+        if (String(item.gia_tri_thuoc_tinh_id || '') !== nextValue) item.lo_info = null;
+        item.gia_tri_thuoc_tinh_id = nextValue;
+      }
+      renderItems();
+    }
+    function removeItem(rowId) {
+      selectedItems = selectedItems.filter(i => String(i.row_id) !== String(rowId));
       renderItems();
     }
 
     function toggleLotMode() {
       const useExisting = lotModeExisting && lotModeExisting.checked;
       if (lotExistingId) lotExistingId.style.display = useExisting ? 'block' : 'none';
-      ['lotMaLo','lotTenLo','lotNgaySanXuat','lotNgayNhap','lotNgayThuHoach','lotHanSuDung','lotSoLuong','lotGhiChu'].forEach(id => {
+      ['lotMaLo','lotTenLo','lotNgayNhap','lotHanSuDung','lotGhiChu'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         const wrapper = el.closest('label') || el;
-        wrapper.style.display = useExisting && id !== 'lotSoLuong' ? 'none' : '';
+        wrapper.style.display = useExisting ? 'none' : '';
       });
     }
 
-    async function loadLotsForItem(itemId, selectedLotId) {
+    async function loadLotsForItem(itemId, selectedLotId, attributeValueId) {
       if (!lotExistingId) return;
       lotExistingId.innerHTML = '<option value="">Chọn lô có sẵn</option>';
       const params = new URLSearchParams();
       const khoId = document.getElementById('khoId') ? document.getElementById('khoId').value : '';
       if (khoId) params.set('kho_id', khoId);
+      if (attributeValueId) params.set('gia_tri_thuoc_tinh_id', attributeValueId);
       try {
         const res = await fetch(`/api/hang-hoa/${itemId}/lo-hang` + (params.toString() ? `?${params.toString()}` : ''));
         const json = await res.json();
@@ -848,42 +958,28 @@
       } catch (_) {}
     }
 
-    async function openLotModal(itemId) {
-      const item = selectedItems.find(i => i.hang_hoa_id === itemId);
+    async function openLotModal(rowId) {
+      const item = selectedItems.find(i => i.row_id === rowId);
       if (!item || !item.quan_ly_theo_lo) return;
-      lotEditItemId = itemId;
+      lotEditItemId = rowId;
       const today = toISODate(new Date());
-      const currentNgayNhap = toISODate(document.getElementById('importDate') ? new Date() : new Date());
-      const soLuongMacDinh = Math.max(1, numeric(item.so_luong || 1));
       const lo = item.lo_info || {};
       if (lotModeExisting) lotModeExisting.checked = Boolean(lo.lo_hang_id);
       if (lotModeNew) lotModeNew.checked = !Boolean(lo.lo_hang_id);
-      await loadLotsForItem(itemId, lo.lo_hang_id);
+      await loadLotsForItem(item.hang_hoa_id, lo.lo_hang_id, item.gia_tri_thuoc_tinh_id);
+      const lotNgayNhapValue = lo.ngay_nhap || today;
       document.getElementById('lotMaLo').value = lo.ma_lo || '';
-      document.getElementById('lotTenLo').value = lo.ten_lo || `Lô ${formatDateVi(currentNgayNhap || today)}`;
-      document.getElementById('lotNgaySanXuat').value = lo.ngay_san_xuat || '';
-      document.getElementById('lotNgayNhap').value = lo.ngay_nhap || currentNgayNhap || today;
-      document.getElementById('lotNgayThuHoach').value = lo.ngay_thu_hoach || '';
-      document.getElementById('lotHanSuDung').value = lo.han_su_dung || '';
-      document.getElementById('lotSoLuong').value = String(Math.min(numeric(lo.so_luong_lo || soLuongMacDinh), soLuongMacDinh));
+      document.getElementById('lotTenLo').value = lo.ten_lo || `Lô ${formatDateVi(lotNgayNhapValue)}`;
+      document.getElementById('lotNgayNhap').value = lotNgayNhapValue;
+      document.getElementById('lotHanSuDung').value = lo.han_su_dung || addDaysToDate(lotNgayNhapValue, 5);
       document.getElementById('lotGhiChu').value = lo.ghi_chu || '';
       toggleLotMode();
       lotModal.classList.add('open');
     }
 
     function saveLotInfo() {
-      const item = selectedItems.find(i => i.hang_hoa_id === lotEditItemId);
+      const item = selectedItems.find(i => i.row_id === lotEditItemId);
       if (!item) return;
-      const soLuongDong = Math.max(1, numeric(item.so_luong || 1));
-      const soLuongLo = Math.max(0, numeric(document.getElementById('lotSoLuong').value));
-      if (soLuongLo > soLuongDong) {
-        alert('Số lượng lô không được lớn hơn số lượng dòng hàng');
-        return;
-      }
-      if (soLuongLo !== soLuongDong) {
-        alert('Số lượng lô phải bằng số lượng dòng hàng');
-        return;
-      }
       if (lotModeExisting && lotModeExisting.checked) {
         if (!lotExistingId.value) {
           alert('Vui lòng chọn lô có sẵn hoặc chuyển sang tạo lô mới');
@@ -894,7 +990,6 @@
           lo_hang_id: lotExistingId.value,
           ma_lo: text,
           ten_lo: text,
-          so_luong_lo: soLuongLo,
           ghi_chu: ''
         };
         lotModal.classList.remove('open');
@@ -904,30 +999,41 @@
       item.lo_info = {
         ma_lo: document.getElementById('lotMaLo').value.trim(),
         ten_lo: document.getElementById('lotTenLo').value.trim(),
-        ngay_san_xuat: document.getElementById('lotNgaySanXuat').value,
         ngay_nhap: document.getElementById('lotNgayNhap').value,
-        ngay_thu_hoach: document.getElementById('lotNgayThuHoach').value,
         han_su_dung: document.getElementById('lotHanSuDung').value,
-        so_luong_lo: soLuongLo,
         ghi_chu: document.getElementById('lotGhiChu').value.trim()
       };
       lotModal.classList.remove('open');
       renderItems();
     }
 
+    function hasInvalidAttributeSelection() {
+      return selectedItems.some(item => {
+        const groups = Array.isArray(item.attribute_groups) ? item.attribute_groups : [];
+        const hasValues = groups.some(group => Array.isArray(group.values) && group.values.length > 0);
+        return hasValues && !item.gia_tri_thuoc_tinh_id;
+      });
+    }
+
     document.getElementById('saveDraftBtn').addEventListener('click', function() {
+      if (hasInvalidAttributeSelection()) {
+        alert('Vui lòng chọn thuộc tính cho hàng hóa có phân loại.');
+        return;
+      }
       submitModeInput.value = 'draft';
       document.getElementById('nhapHangCreateForm').submit();
     });
     document.getElementById('completeBtn').addEventListener('click', function() {
       const invalidLotItem = selectedItems.find(item => {
         if (!item.quan_ly_theo_lo) return false;
-        if (!item.lo_info) return true;
-        const soLuongLo = numeric(item.lo_info.so_luong_lo || 0);
-        return soLuongLo <= 0 || soLuongLo > numeric(item.so_luong || 0);
+        return !item.lo_info;
       });
       if (invalidLotItem) {
         alert('Hàng quản lý theo lô cần có thông tin lô hợp lệ trước khi Hoàn thành.');
+        return;
+      }
+      if (hasInvalidAttributeSelection()) {
+        alert('Vui lòng chọn thuộc tính cho hàng hóa có phân loại.');
         return;
       }
       submitModeInput.value = 'completed';
@@ -950,6 +1056,12 @@
     }
     if (lotModeNew) lotModeNew.addEventListener('change', toggleLotMode);
     if (lotModeExisting) lotModeExisting.addEventListener('change', toggleLotMode);
+    const lotNgayNhapInput = document.getElementById('lotNgayNhap');
+    if (lotNgayNhapInput) {
+      lotNgayNhapInput.addEventListener('change', function() {
+        document.getElementById('lotHanSuDung').value = addDaysToDate(this.value, 5);
+      });
+    }
     document.addEventListener('keydown', function(e) {
       if (e.key !== 'F8') return;
       const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
@@ -959,7 +1071,7 @@
     });
     if (payAllBtn) {
       payAllBtn.addEventListener('click', function() {
-        const canTra = numeric(document.getElementById('payableTotal').textContent || 0);
+        const canTra = numeric(payableTotalInput ? payableTotalInput.value : document.getElementById('grandTotal').textContent || 0);
         if (paymentMethodInput && paymentMethodInput.value === 'cong_no') {
           paymentMethodInput.value = 'tien_mat';
         }
@@ -969,9 +1081,7 @@
       });
     }
 
-    supplierProductKeyword.addEventListener('input', function() {
-      fetchSupplierProducts(this.value.trim());
-    });
+    supplierProductKeyword.addEventListener('input', renderSupplierProducts);
 
     document.getElementById('quickAddProductBtn').addEventListener('click', openQuickAddModal);
     document.getElementById('quickModalCancel').addEventListener('click', function() {
@@ -1005,7 +1115,14 @@
     window.openQuickEditModal = openQuickEditModal;
     window.setInactiveProduct = setInactiveProduct;
     window.addItem = addItem;
+    window.addProductToImport = addProductToImport;
+    window.removeProductFromImport = removeProductFromImport;
+    window.renderImportTable = renderImportTable;
+    window.renderSupplierProducts = renderSupplierProducts;
+    window.loadSupplierProducts = loadSupplierProducts;
+    window.calculateTotals = calculateTotals;
     window.updateLineDiscountType = updateLineDiscountType;
+    window.updateAttributeValue = updateAttributeValue;
     window.openLotModal = openLotModal;
   </script>
 </body>

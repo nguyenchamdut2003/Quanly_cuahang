@@ -16,17 +16,30 @@
     }
   });
   const exportQuery = exportParams.toString();
+  function branchLabel(t) {
+    if (t.cua_hang_id && (t.cua_hang_id.ten_cua_hang || t.cua_hang_id.ma_cua_hang)) {
+      return t.cua_hang_id.ten_cua_hang || t.cua_hang_id.ma_cua_hang;
+    }
+    if (t.kho_id && (t.kho_id.ten_kho || t.kho_id.ma_kho)) return t.kho_id.ten_kho || t.kho_id.ma_kho;
+    return 'Chi nhánh trung tâm';
+  }
+  function detailNote(t) {
+    const parts = [];
+    if (t.ly_do_huy) parts.push(String(t.ly_do_huy));
+    if (t.ghi_chu) parts.push(String(t.ghi_chu));
+    return parts.length ? parts.join('\n') : 'Chưa có';
+  }
 %>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    .page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
-    .shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 0}
+    .xh-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column;width:100%;min-width:0;box-sizing:border-box}
+    .xh-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 16px;box-sizing:border-box;width:100%}
     .sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
     .title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
     .filter-block{margin-bottom:22px}.filter-title{font-size:13px;font-weight:800;margin-bottom:10px}
@@ -36,19 +49,62 @@
     .main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .search{flex:1;max-width:470px}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 12px;font-size:13px;outline:none}
     .actions{display:flex;align-items:center;gap:8px}.kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.kv-btn.primary{border-color:#0070f4;color:#0070f4}.tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
-    .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}table{width:100%;table-layout:fixed;border-collapse:collapse}
-    th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
-    td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}tbody tr:hover{background:#f7fbff}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}
-    .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.qty-col{width:110px}.status-col{width:115px}.ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
+    table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
+    th{min-height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:6px 10px;white-space:normal;word-break:break-word;line-height:1.25}
+    td{min-height:43px;border-bottom:1px solid #e5e9ee;padding:7px 10px;font-size:13px;line-height:1.35;color:#111827}
+    tbody tr:hover{background:#f7fbff}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}
+    .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.qty-col{width:110px}.status-col{width:115px}.reason-col{width:140px}.ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}.status-badge.draft{background:#fff4d6;color:#9a6700}.status-badge.cancelled{background:#eef2f7;color:#667085}
-    .empty{height:420px;text-align:center}.empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085}.empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}.empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
-    .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}@media(max-width:1100px){.shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+    .xh-row{cursor:pointer}.xh-row.is-open{outline:2px solid #0070f4;outline-offset:-2px;background:#eef6ff}
+    .detail-row td{height:auto;padding:0;background:#fff;border-bottom:2px solid #0070f4;word-break:break-word;vertical-align:top;width:100%;box-sizing:border-box}
+    .detail-card{border:2px solid #0070f4;border-top:0;padding:10px 12px 12px;background:#fff;box-sizing:border-box;width:100%;max-width:100%;min-width:0}
+    .xh-detail-split{display:flex;flex-wrap:wrap;align-items:flex-start;gap:30px;margin-top:12px;width:100%;min-width:0;box-sizing:border-box}
+    .xh-detail-main{flex:1 1 0%;min-width:0}
+    .xh-summary-box{flex:0 0 240px;width:240px;max-width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;background:#fafcff;align-self:flex-start;min-width:min(240px,100%)}
+    .xh-summary-title{font-size:12px;font-weight:800;color:#111827;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
+    .xh-summary-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;line-height:1.3;margin:8px 0;color:#374151}
+    .xh-summary-row .summary-val{text-align:right;font-weight:700;color:#111827;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .detail-tabs{height:28px;display:flex;align-items:center;border-bottom:1px solid #dbe4ee;margin:-2px -12px 10px;padding:0 12px}
+    .detail-tab{font-size:12px;font-weight:800;color:#0070f4}
+    .detail-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap;min-width:0}
+    .detail-code{font-size:16px;font-weight:800;color:#111827;display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0;word-break:break-word;line-height:1.3}
+    .detail-status{height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 8px;display:inline-flex;align-items:center;font-size:12px;font-weight:800}
+    .detail-status.draft{background:#fff4d6;color:#9a6700}
+    .detail-status.cancelled{background:#eef2f7;color:#667085}
+    .detail-branch{font-size:12px;color:#111827;margin-top:2px;word-break:break-word;min-width:0;text-align:right}
+    .detail-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:10px 14px;margin-bottom:10px;min-width:0}
+    .info-line{display:grid;grid-template-columns:108px minmax(0,1fr);align-items:start;gap:6px;font-size:11px;margin:6px 0;color:#111827;min-width:0;line-height:1.35}
+    .info-line input,.info-line select{height:26px;border:1px solid #cfd8e3;border-radius:5px;padding:0 6px;font-size:11px;background:#fff;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+    .info-line .info-value{display:block;min-width:0;word-break:break-word;font-weight:600;line-height:1.35;padding:5px 7px;border:1px solid #cfd8e3;border-radius:5px;background:#fff;box-sizing:border-box;font-size:11px}
+    .mini-table-wrap{min-width:0;width:100%;max-width:100%;margin-top:6px}
+    .mini-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
+    .mini-table thead th:nth-child(1),.mini-table tbody td:nth-child(1){width:14%}
+    .mini-table thead th:nth-child(2),.mini-table tbody td:nth-child(2){width:40%}
+    .mini-table thead th:nth-child(3),.mini-table tbody td:nth-child(3){width:12%}
+    .mini-table thead th:nth-child(4),.mini-table tbody td:nth-child(4){width:17%}
+    .mini-table thead th:nth-child(5),.mini-table tbody td:nth-child(5){width:17%}
+    .mini-table th{font-size:10px;font-weight:700;background:#f0f2f4;border-bottom:1px solid #cfd8e3;white-space:normal;word-break:break-word;line-height:1.2;padding:6px 5px}
+    .mini-table td{font-size:11px;padding:7px 5px;line-height:1.35;vertical-align:top;word-break:break-word;border-bottom:1px solid #eef2f6}
+    .mini-table td.num{font-size:11px;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;word-break:normal}
+    .mini-table td.cell-code{color:#0070f4;font-size:11px;font-weight:600}
+    .mini-table td.cell-code a{color:inherit;text-decoration:none}
+    .mini-table td.cell-code a:hover{text-decoration:underline}
+    .mini-table td.cell-ten{font-size:13px;line-height:1.35;color:#111827}
+    .mini-wrap-meta{font-size:10px;color:#667085;margin-top:2px;line-height:1.25;word-break:break-word}
+    .detail-note{min-height:56px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:11px;line-height:1.4;color:#667085;margin-top:10px;background:#fff;white-space:pre-wrap;word-break:break-word}
+    .empty{height:420px;text-align:center}.empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085}
+    .empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}
+    .empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
+    .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    @media(max-width:1100px){.xh-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+    @media(max-width:1024px){.xh-detail-split{flex-direction:column;align-items:stretch;gap:20px}.xh-summary-box{flex:none;width:100%;max-width:100%;min-width:0}}
   </style>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
-  <form method="GET" action="/xuat-huy" class="page">
-    <div class="shell">
+  <form method="GET" action="/xuat-huy" class="xh-page">
+    <div class="xh-shell">
       <aside class="sidebar">
         <h1 class="title">Xuất hủy</h1>
         <div class="filter-block">
@@ -77,7 +133,9 @@
           <div class="filter-title">Người tạo</div>
           <select class="filter-control" name="nguoi_tao" onchange="this.form.submit()">
             <option value="">Chọn người tạo</option>
-            <% safeUsers.forEach(function(u) { %><option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option><% }) %>
+            <% safeUsers.forEach(function(u) { %>
+              <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option>
+            <% }) %>
           </select>
         </div>
       </aside>
@@ -86,19 +144,138 @@
           <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã xuất hủy"></div>
           <div class="actions">
             <a class="kv-btn primary" href="/xuat-huy/create">+ Xuất hủy</a>
-            <a class="kv-btn" href="/xuat-huy/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a><span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
+            <a class="kv-btn" href="/xuat-huy/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
+            <span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
           </div>
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col">☆</th><th class="code-col">Mã xuất hủy</th><th class="time-col">Thời gian</th><th>Kho</th><th class="num qty-col">Tổng số lượng</th><th class="num money-col">Tổng giá trị</th><th>Lý do hủy</th><th class="status-col">Trạng thái</th></tr></thead>
+            <thead>
+              <tr>
+                <th class="check-col"><input type="checkbox"></th>
+                <th class="star-col">☆</th>
+                <th class="code-col">Mã xuất hủy</th>
+                <th class="time-col">Thời gian</th>
+                <th>Kho</th>
+                <th class="num qty-col">Tổng số lượng</th>
+                <th class="num money-col">Tổng giá trị</th>
+                <th class="reason-col">Lý do hủy</th>
+                <th class="status-col">Trạng thái</th>
+              </tr>
+            </thead>
             <tbody>
               <% if (safeTickets.length) { %>
                 <% safeTickets.forEach(function(t) { %>
-                  <tr><td class="check-col"><input type="checkbox"></td><td class="star-col">☆</td><td class="ellipsis"><%= t.ma_xuat_huy || '' %></td><td><%= formatDate(t.ngay_xuat || t.created_at) %></td><td class="ellipsis"><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></td><td class="num"><%= fmt(t.tong_so_luong || 0) %></td><td class="num"><%= fmt(t.tong_gia_tri || 0) %></td><td class="ellipsis"><%= t.ly_do_huy || '--' %></td><td><span class="status-badge <%= badgeClass(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td></tr>
+                  <tr class="xh-row" data-detail-id="<%= t._id %>">
+                    <td class="check-col"><input type="checkbox"></td>
+                    <td class="star-col">☆</td>
+                    <td class="ellipsis"><%= t.ma_xuat_huy || '' %></td>
+                    <td><%= formatDate(t.ngay_xuat || t.created_at) %></td>
+                    <td class="ellipsis"><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></td>
+                    <td class="num"><%= fmt(t.tong_so_luong || 0) %></td>
+                    <td class="num"><%= fmt(t.tong_gia_tri || 0) %></td>
+                    <td class="ellipsis"><%= t.ly_do_huy || '--' %></td>
+                    <td><span class="status-badge <%= badgeClass(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
+                  </tr>
+                  <tr class="detail-row" id="detail-<%= t._id %>" style="display:none">
+                    <td colspan="9">
+                      <div class="detail-card">
+                        <div class="detail-tabs"><span class="detail-tab">Thông tin</span></div>
+                        <div class="detail-head">
+                          <div>
+                            <div class="detail-code">
+                              <%= t.ma_xuat_huy || '--' %>
+                              <span class="detail-status <%= badgeClass(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span>
+                            </div>
+                          </div>
+                          <div class="detail-branch"><%= branchLabel(t) %></div>
+                        </div>
+                        <div class="xh-detail-split">
+                          <div class="xh-detail-main">
+                            <div class="detail-info">
+                              <div>
+                                <div class="info-line"><span>Người tạo:</span><span class="info-value"><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || t.nguoi_tao_id.email || '--') : '--' %></span></div>
+                              </div>
+                              <div>
+                                <div class="info-line"><span>Người xuất hủy:</span><select disabled><option><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || t.nguoi_tao_id.email || '--') : '--' %></option></select></div>
+                              </div>
+                              <div>
+                                <div class="info-line"><span>Ngày xuất hủy:</span><input readonly value="<%= formatDate(t.ngay_xuat || t.created_at) %>"></div>
+                              </div>
+                            </div>
+                            <div class="mini-table-wrap">
+                              <table class="mini-table">
+                                <thead>
+                                  <tr>
+                                    <th scope="col">Mã hàng</th>
+                                    <th scope="col">Tên hàng</th>
+                                    <th scope="col" class="num">SL hủy</th>
+                                    <th scope="col" class="num">Giá vốn</th>
+                                    <th scope="col" class="num">Giá trị hủy</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if (!(t.detail_rows || []).length) { %>
+                                    <tr><td colspan="5">Chưa có chi tiết hàng hủy.</td></tr>
+                                  <% } %>
+                                  <% (t.detail_rows || []).forEach(function(item) { %>
+                                    <% const hh = item.hang_hoa_id; const hhId = hh && hh._id ? String(hh._id) : ''; const lineVal = Number(item.thanh_tien || (Number(item.so_luong || 0) * Number(item.gia_von || 0))); %>
+                                    <tr>
+                                      <td class="cell-code">
+                                        <% if (hhId) { %>
+                                          <a href="/hang-hoa#p-<%= hhId %>"><%= hh.ma_hang || '--' %></a>
+                                        <% } else { %>--<% } %>
+                                      </td>
+                                      <td class="cell-ten">
+                                        <%= hh ? (hh.ten_hang || '--') : '--' %>
+                                        <% if (item.lo_hang_id) { %>
+                                          <div class="mini-wrap-meta">Lô: <%= item.lo_hang_id.ma_lo || item.lo_hang_id.ten_lo || '--' %></div>
+                                        <% } %>
+                                      </td>
+                                      <td class="num"><%= fmt(item.so_luong || 0) %></td>
+                                      <td class="num"><%= fmt(item.gia_von || 0) %></td>
+                                      <td class="num"><%= fmt(lineVal) %></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="detail-note"><%= detailNote(t) %></div>
+                          </div>
+                          <aside class="xh-summary-box" aria-label="Tổng kết">
+                            <h3 class="xh-summary-title">Tổng kết</h3>
+                            <div class="xh-summary-row">
+                              <span>Tổng số lượng hủy</span>
+                              <span class="summary-val"><%= fmt(t.detail_summary ? t.detail_summary.tong_so_luong : (t.tong_so_luong || 0)) %></span>
+                            </div>
+                            <div class="xh-summary-row">
+                              <span>Tổng giá trị hủy</span>
+                              <span class="summary-val"><%= fmt(t.detail_summary ? t.detail_summary.tong_gia_tri : (t.tong_gia_tri || 0)) %></span>
+                            </div>
+                          </aside>
+                        </div>
+                        <div class="page-actions page-actions--bordered">
+                          <div class="page-actions__left">
+                            <button type="button" class="btn btn-light btn-cancel-outline js-xh-cancel" data-id="<%= t._id %>" data-status="<%= t.trang_thai || '' %>" <%= t.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
+                            <a class="btn btn-light btn-copy-outline" href="/xuat-huy/create?copy_from=<%= t._id %>">Sao chép</a>
+                            <a class="btn btn-primary" href="/xuat-huy/<%= t._id %>/export.xlsx">Xuất file</a>
+                            <a class="btn btn-light" href="/chung-tu-kho/xuat-huy/<%= t._id %>" target="_blank" rel="noopener">Chứng từ</a>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
                 <% }) %>
               <% } else { %>
-                <tr><td colspan="9" class="empty"><div class="empty-box"><div class="empty-icon">▤</div><div class="empty-title">Không tìm thấy kết quả</div><div>Không tìm thấy giao dịch nào phù hợp trong tháng này.</div></div></td></tr>
+                <tr>
+                  <td colspan="9" class="empty">
+                    <div class="empty-box">
+                      <div class="empty-icon">▤</div>
+                      <div class="empty-title">Không tìm thấy kết quả</div>
+                      <div>Không tìm thấy giao dịch nào phù hợp trong tháng này.</div>
+                    </div>
+                  </td>
+                </tr>
               <% } %>
             </tbody>
           </table>
@@ -107,5 +284,79 @@
       </main>
     </div>
   </form>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      function expandXhDetail(id, scroll) {
+        var row = document.querySelector('.xh-row[data-detail-id="' + id + '"]');
+        var detail = document.getElementById('detail-' + id);
+        if (!row || !detail) return;
+        document.querySelectorAll('.detail-row').forEach(function(x) { x.style.display = 'none'; });
+        document.querySelectorAll('.xh-row').forEach(function(x) { x.classList.remove('is-open'); });
+        detail.style.display = 'table-row';
+        row.classList.add('is-open');
+        if (scroll) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+
+      document.querySelectorAll('.xh-row').forEach(function(row) {
+        row.addEventListener('click', function(e) {
+          if (e.target && e.target.closest('input,button,a,select')) return;
+          var id = row.getAttribute('data-detail-id');
+          var detail = document.getElementById('detail-' + id);
+          if (!detail) return;
+          var isOpen = detail.style.display !== 'none';
+          document.querySelectorAll('.detail-row').forEach(function(x) { x.style.display = 'none'; });
+          document.querySelectorAll('.xh-row').forEach(function(x) { x.classList.remove('is-open'); });
+          if (!isOpen) {
+            detail.style.display = 'table-row';
+            row.classList.add('is-open');
+          }
+        });
+      });
+
+      var params = new URLSearchParams(window.location.search);
+      var openId = params.get('open');
+      if (openId) {
+        expandXhDetail(openId, true);
+        params.delete('open');
+        var qs = params.toString();
+        var path = window.location.pathname + (qs ? '?' + qs : '') + window.location.hash;
+        try { window.history.replaceState({}, '', path); } catch (err) {}
+      }
+
+      document.body.addEventListener('click', function(e) {
+        var cancelBtn = e.target.closest('.js-xh-cancel');
+        if (!cancelBtn) return;
+        if (cancelBtn.disabled) return;
+        var st = cancelBtn.getAttribute('data-status') || '';
+        if (st === 'cancelled') return;
+        if (!confirm('Bạn có chắc muốn hủy phiếu xuất hủy này không?')) return;
+        var cid = cancelBtn.getAttribute('data-id');
+        cancelBtn.disabled = true;
+        fetch('/xuat-huy/' + cid + '/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: '{}'
+        })
+          .then(function(res) {
+            return res.json().then(function(data) {
+              return { ok: res.ok, data: data };
+            });
+          })
+          .then(function(result) {
+            if (!result.ok || !result.data.success) {
+              alert((result.data && result.data.message) || 'Không hủy được phiếu');
+              cancelBtn.disabled = (cancelBtn.getAttribute('data-status') === 'cancelled');
+              return;
+            }
+            location.reload();
+          })
+          .catch(function() {
+            alert('Không kết nối được máy chủ');
+            cancelBtn.disabled = false;
+          });
+      });
+    });
+  </script>
 </body>
 </html>

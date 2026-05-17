@@ -37,9 +37,6 @@ function formatDate(value) {
 
 function normalizeSupplierPayload(body) {
     body = body || {};
-    var tongNo = Number(body.tong_no || 0);
-    var tongMua = Number(body.tong_mua || 0);
-
     return {
         ma_ncc: String(body.ma_ncc || '').trim(),
         ten_ncc: String(body.ten_ncc || '').trim(),
@@ -48,10 +45,60 @@ function normalizeSupplierPayload(body) {
         ten_cong_ty: String(body.ten_cong_ty || '').trim(),
         ma_so_thue: String(body.ma_so_thue || '').trim(),
         ghi_chu: String(body.ghi_chu || '').trim(),
-        tong_no: Number.isFinite(tongNo) && tongNo > 0 ? tongNo : 0,
-        tong_mua: Number.isFinite(tongMua) && tongMua > 0 ? tongMua : 0,
         trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
     };
+}
+
+function slugifyFilePart(value) {
+    var s = String(value || 'ncc').trim().replace(/[/\\?%*:|"<>]/g, '-');
+    s = s.replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    return s || 'ncc';
+}
+
+/** Tổng mua / tổng nợ / đã trả tích lũy từ phiếu nhập đã hoàn thành (theo cửa hàng nếu có). */
+async function aggregateSupplierPurchaseTotals(storeId) {
+    var match = {
+        trang_thai: 'completed',
+        nha_cung_cap_id: { $exists: true, $ne: null }
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        match.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
+    }
+    var rows = await PhieuNhap.aggregate([
+        { $match: match },
+        {
+            $group: {
+                _id: '$nha_cung_cap_id',
+                tong_mua: { $sum: { $ifNull: ['$tong_tien', 0] } },
+                tong_no: { $sum: { $ifNull: ['$con_no_ncc', 0] } },
+                da_tra_tong: { $sum: { $ifNull: ['$da_tra_ncc', 0] } }
+            }
+        }
+    ]);
+    var map = {};
+    rows.forEach(function(r) {
+        if (!r._id) return;
+        map[String(r._id)] = {
+            tong_mua: Number(r.tong_mua || 0),
+            tong_no: Number(r.tong_no || 0),
+            da_tra_tong: Number(r.da_tra_tong || 0)
+        };
+    });
+    return map;
+}
+
+function applySupplierTotalsFromMap(supplier, totalsMap) {
+    if (!supplier) return;
+    var t = totalsMap[String(supplier._id)];
+    if (t) {
+        supplier.tong_mua = t.tong_mua;
+        supplier.tong_no = t.tong_no;
+        supplier.da_tra_tong = t.da_tra_tong;
+    } else {
+        supplier.tong_mua = 0;
+        supplier.tong_no = 0;
+        supplier.da_tra_tong = 0;
+    }
 }
 
 function normalizeIdParam(value) {
@@ -248,7 +295,9 @@ function getSupplierStatusLabel(value) {
 function buildSupplierExportRow(supplier, address) {
     var debt = Number(supplier.tong_no || 0);
     var totalBuy = Number(supplier.tong_mua || 0);
-    var paid = Math.max(0, totalBuy - debt);
+    var paid = Number(supplier.da_tra_tong || 0);
+    if (!Number.isFinite(paid) || paid < 0) paid = 0;
+    if (!paid && (totalBuy || debt)) paid = Math.max(0, totalBuy - debt);
     return {
         ma_ncc: supplier.ma_ncc || '',
         ten_ncc: supplier.ten_ncc || '',
@@ -384,10 +433,14 @@ exports.index = async function(req, res, next) {
         var supplierGroups = await loadSupplierGroups();
         var addressTypes = await loadAddressTypes();
         var suppliers = await NhaCungCap.find(supplierQuery).sort({ created_at: 1, ma_ncc: 1 }).lean();
+        var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
+        suppliers.forEach(function(s) { applySupplierTotalsFromMap(s, totalsMap); });
+
         var selectedSupplierId = String(requestQuery.supplier || '').trim();
         var selectedSupplier = null;
         if (selectedSupplierId && mongoose.Types.ObjectId.isValid(selectedSupplierId)) {
             selectedSupplier = await NhaCungCap.findOne({ _id: selectedSupplierId }).lean();
+            if (selectedSupplier) applySupplierTotalsFromMap(selectedSupplier, totalsMap);
         }
         var supplierPurchaseHistory = [];
         var supplierDebtHistory = [];
@@ -400,6 +453,9 @@ exports.index = async function(req, res, next) {
                 nha_cung_cap_id: selectedSupplier._id,
                 trang_thai: { $in: ['completed', 'draft', 'cancelled'] }
             };
+            if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+                phieuNhapQuery.cua_hang_id = storeId;
+            }
             var nhapRows = await PhieuNhap.find(phieuNhapQuery)
                 .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
                 .populate({ path: 'kho_id', select: 'ten_kho ma_kho' })
@@ -408,6 +464,7 @@ exports.index = async function(req, res, next) {
             supplierPurchaseHistory = nhapRows.map(function(row) {
                 return {
                     loai: 'nhap',
+                    phieu_nhap_id: row._id,
                     ma_phieu: row.ma_phieu_nhap || '--',
                     thoi_gian: row.ngay_nhap || row.created_at,
                     nguoi_tao: row?.nguoi_tao_id?.ho_ten || row?.nguoi_tao_id?.email || '--',
@@ -418,6 +475,9 @@ exports.index = async function(req, res, next) {
 
             if (PhieuTraHangNhap) {
                 var phieuTraQuery = { nha_cung_cap_id: selectedSupplier._id };
+                if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+                    phieuTraQuery.cua_hang_id = storeId;
+                }
                 var traRows = await PhieuTraHangNhap.find(phieuTraQuery)
                     .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
                     .sort({ ngay_tra: -1, created_at: -1 })
@@ -425,6 +485,8 @@ exports.index = async function(req, res, next) {
                 supplierPurchaseHistory = supplierPurchaseHistory.concat(traRows.map(function(row) {
                     return {
                         loai: 'tra',
+                        phieu_tra_hang_nhap_id: row._id,
+                        phieu_nhap_id: row.phieu_nhap_id,
                         ma_phieu: row.ma_phieu_tra_nhap || '--',
                         thoi_gian: row.ngay_tra || row.created_at,
                         nguoi_tao: row?.nguoi_tao_id?.ho_ten || row?.nguoi_tao_id?.email || '--',
@@ -438,6 +500,9 @@ exports.index = async function(req, res, next) {
             });
 
             var debtQuery = { nha_cung_cap_id: selectedSupplier._id };
+            if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+                debtQuery.cua_hang_id = storeId;
+            }
             var debtRows = await CongNoNhaCungCap.find(debtQuery)
                 .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
                 .sort({ ngay: -1, created_at: -1 })
@@ -449,6 +514,7 @@ exports.index = async function(req, res, next) {
                 if (row.loai === 'tang_no') runningDebt += soTien;
                 if (row.loai === 'giam_no' || row.loai === 'thanh_toan') runningDebt = Math.max(0, runningDebt - soTien);
                 return {
+                    phieu_nhap_id: row.phieu_nhap_id,
                     ma_phieu: row?.phieu_nhap_id?.ma_phieu_nhap || '--',
                     thoi_gian: row.ngay || row.created_at,
                     loai: row.loai || 'tang_no',
@@ -460,8 +526,8 @@ exports.index = async function(req, res, next) {
         }
 
         res.render('nha-cung-cap/index', {
-            title: 'Nha cung cap',
-            pageTitle: 'Nha cung cap',
+            title: 'Nhà cung cấp',
+            pageTitle: 'Nhà cung cấp',
             activeMenu: 'nha-cung-cap',
             user: req.user,
             flash: requestQuery,
@@ -486,12 +552,16 @@ exports.index = async function(req, res, next) {
 
 exports.exportExcel = async function(req, res, next) {
     try {
+        var storeId = await resolveStoreId(req);
         var filter = normalizeFilterQuery(req?.query || {});
         var supplierQuery = buildSupplierQueryFromFilter(filter);
         var suppliers = await NhaCungCap.find(supplierQuery)
             .populate({ path: 'nhom_nha_cung_cap_id', select: 'ten_nhom_ncc ma_nhom_ncc' })
             .populate({ path: 'nguoi_tao_id', select: 'ho_ten username email' })
-            .sort({ created_at: 1, ma_ncc: 1 });
+            .sort({ created_at: 1, ma_ncc: 1 })
+            .lean();
+        var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
+        suppliers.forEach(function(s) { applySupplierTotalsFromMap(s, totalsMap); });
         var supplierIds = suppliers.map(function(supplier) { return supplier._id; });
         var addresses = supplierIds.length
             ? await DiaChiNhaCungCap.find({ nha_cung_cap_id: { $in: supplierIds } })
@@ -513,8 +583,195 @@ exports.exportExcel = async function(req, res, next) {
         applySupplierWorksheetFormat(worksheet);
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="nha-cung-cap.xlsx"');
+        res.setHeader('Content-Disposition', 'attachment; filename="danh-sach-nha-cung-cap.xlsx"');
         await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+function mapTraHangStatus(value) {
+    if (value === 'draft') return 'Phiếu tạm';
+    if (value === 'cancelled') return 'Đã hủy';
+    return 'Đã trả';
+}
+
+async function exportSupplierDetailWorkbook(section, supplier, storeId) {
+    var workbook = new ExcelJS.Workbook();
+    var safeMa = slugifyFilePart(supplier.ma_ncc);
+    if (section === 'info') {
+        var ws = workbook.addWorksheet('Thông tin');
+        ws.columns = [
+            { header: 'Mã NCC', key: 'ma_ncc', width: 14 },
+            { header: 'Tên NCC', key: 'ten_ncc', width: 28 },
+            { header: 'Tên công ty', key: 'ten_cong_ty', width: 28 },
+            { header: 'Mã số thuế', key: 'ma_so_thue', width: 16 },
+            { header: 'Điện thoại', key: 'sdt', width: 14 },
+            { header: 'Email', key: 'email', width: 24 },
+            { header: 'Tổng nợ', key: 'tong_no', style: { numFmt: '#,##0' } },
+            { header: 'Tổng mua', key: 'tong_mua', style: { numFmt: '#,##0' } },
+            { header: 'Trạng thái', key: 'trang_thai', width: 18 },
+            { header: 'Ghi chú', key: 'ghi_chu', width: 36 }
+        ];
+        var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
+        applySupplierTotalsFromMap(supplier, totalsMap);
+        ws.addRow({
+            ma_ncc: supplier.ma_ncc || '',
+            ten_ncc: supplier.ten_ncc || '',
+            ten_cong_ty: supplier.ten_cong_ty || '',
+            ma_so_thue: supplier.ma_so_thue || '',
+            sdt: supplier.sdt || '',
+            email: supplier.email || '',
+            tong_no: Number(supplier.tong_no || 0),
+            tong_mua: Number(supplier.tong_mua || 0),
+            trang_thai: getSupplierStatusLabel(supplier.trang_thai),
+            ghi_chu: supplier.ghi_chu || ''
+        });
+        applySupplierWorksheetFormat(ws);
+        return { workbook: workbook, filename: 'ncc-' + safeMa + '-thong-tin.xlsx' };
+    }
+    if (section === 'address') {
+        var wsA = workbook.addWorksheet('Địa chỉ');
+        wsA.columns = [
+            { header: 'Mã địa chỉ', key: 'ma_dia_chi', width: 14 },
+            { header: 'Tên người nhận', key: 'ten_nguoi_nhan', width: 22 },
+            { header: 'SĐT', key: 'sdt', width: 14 },
+            { header: 'Địa chỉ đầy đủ', key: 'dia_chi_day_du', width: 36 },
+            { header: 'Số nhà', key: 'so_nha', width: 12 },
+            { header: 'Phường/Xã', key: 'phuong_xa', width: 16 },
+            { header: 'Quận/Huyện', key: 'quan_huyen', width: 16 },
+            { header: 'Tỉnh/Thành', key: 'tinh_thanh', width: 16 },
+            { header: 'Loại địa chỉ', key: 'loai_dia_chi', width: 14 },
+            { header: 'Mặc định', key: 'mac_dinh', width: 10 },
+            { header: 'Ghi chú', key: 'ghi_chu', width: 28 },
+            { header: 'Tạo lúc', key: 'tao_luc', width: 20 }
+        ];
+        var addrList = await DiaChiNhaCungCap.find({ nha_cung_cap_id: supplier._id }).sort({ created_at: -1 }).lean();
+        addrList.forEach(function(a) {
+            wsA.addRow({
+                ma_dia_chi: a.ma_dia_chi || '',
+                ten_nguoi_nhan: a.ten_nguoi_nhan || '',
+                sdt: a.sdt_nguoi_nhan || '',
+                dia_chi_day_du: a.dia_chi_day_du || '',
+                so_nha: a.so_nha || '',
+                phuong_xa: a.phuong_xa || '',
+                quan_huyen: a.quan_huyen || '',
+                tinh_thanh: a.tinh_thanh || '',
+                loai_dia_chi: a.loai_dia_chi || '',
+                mac_dinh: a.mac_dinh ? 'Có' : 'Không',
+                ghi_chu: a.ghi_chu || '',
+                tao_luc: formatExportDate(a.created_at)
+            });
+        });
+        applySupplierWorksheetFormat(wsA);
+        return { workbook: workbook, filename: 'ncc-' + safeMa + '-dia-chi.xlsx' };
+    }
+    if (section === 'history') {
+        var wsH = workbook.addWorksheet('Lịch sử');
+        wsH.columns = [
+            { header: 'Loại phiếu', key: 'loai_phieu', width: 22 },
+            { header: 'Mã phiếu', key: 'ma_phieu', width: 18 },
+            { header: 'Ngày', key: 'ngay', width: 20 },
+            { header: 'Tổng tiền', key: 'tong_tien', style: { numFmt: '#,##0' } },
+            { header: 'Đã trả', key: 'da_tra', style: { numFmt: '#,##0' } },
+            { header: 'Còn nợ', key: 'con_no', style: { numFmt: '#,##0' } },
+            { header: 'Trạng thái', key: 'trang_thai', width: 16 }
+        ];
+        var pnMatch = { nha_cung_cap_id: supplier._id, trang_thai: { $in: ['completed', 'draft', 'cancelled'] } };
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) pnMatch.cua_hang_id = storeId;
+        var nhapRows = await PhieuNhap.find(pnMatch).sort({ ngay_nhap: -1, created_at: -1 }).lean();
+        nhapRows.forEach(function(row) {
+            wsH.addRow({
+                loai_phieu: 'Phiếu nhập',
+                ma_phieu: row.ma_phieu_nhap || '',
+                ngay: formatExportDate(row.ngay_nhap || row.created_at),
+                tong_tien: Number(row.can_tra_ncc || row.tong_tien || 0),
+                da_tra: Number(row.da_tra_ncc || 0),
+                con_no: Number(row.con_no_ncc || 0),
+                trang_thai: mapNhapHangStatus(row.trang_thai)
+            });
+        });
+        if (PhieuTraHangNhap) {
+            var ptMatch = { nha_cung_cap_id: supplier._id };
+            if (storeId && mongoose.Types.ObjectId.isValid(storeId)) ptMatch.cua_hang_id = storeId;
+            var traRows = await PhieuTraHangNhap.find(ptMatch).sort({ ngay_tra: -1, created_at: -1 }).lean();
+            traRows.forEach(function(row) {
+                var can = Number(row.ncc_can_tra || row.tong_tien_tra || 0);
+                var da = Number(row.ncc_da_tra || 0);
+                wsH.addRow({
+                    loai_phieu: 'Phiếu trả hàng nhập',
+                    ma_phieu: row.ma_phieu_tra_nhap || '',
+                    ngay: formatExportDate(row.ngay_tra || row.created_at),
+                    tong_tien: Number(row.tong_tien_tra || 0),
+                    da_tra: da,
+                    con_no: Math.max(0, can - da),
+                    trang_thai: mapTraHangStatus(row.trang_thai)
+                });
+            });
+        }
+        applySupplierWorksheetFormat(wsH);
+        return { workbook: workbook, filename: 'ncc-' + safeMa + '-lich-su.xlsx' };
+    }
+    if (section === 'debt') {
+        var wsD = workbook.addWorksheet('Công nợ');
+        wsD.columns = [
+            { header: 'Mã phiếu nhập', key: 'ma_phieu', width: 18 },
+            { header: 'Ngày nhập', key: 'ngay_nhap', width: 20 },
+            { header: 'Cần trả NCC', key: 'can_tra', style: { numFmt: '#,##0' } },
+            { header: 'Đã trả NCC', key: 'da_tra', style: { numFmt: '#,##0' } },
+            { header: 'Còn nợ NCC', key: 'con_no', style: { numFmt: '#,##0' } },
+            { header: 'Tuổi nợ (ngày)', key: 'tuoi_no', width: 16 },
+            { header: 'Trạng thái', key: 'trang_thai', width: 16 }
+        ];
+        var debtMatch = { nha_cung_cap_id: supplier._id, trang_thai: { $ne: 'cancelled' } };
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) debtMatch.cua_hang_id = storeId;
+        var slips = await PhieuNhap.find(debtMatch).sort({ ngay_nhap: -1, created_at: -1 }).lean();
+        var today = Date.now();
+        slips.forEach(function(row) {
+            var conNo = Number(row.con_no_ncc || 0);
+            var ngay = row.ngay_nhap || row.created_at;
+            var tuoi = '';
+            if (conNo > 0 && ngay) {
+                var d = new Date(ngay).getTime();
+                if (!isNaN(d)) tuoi = String(Math.max(0, Math.floor((today - d) / 86400000)));
+            } else {
+                tuoi = '0';
+            }
+            wsD.addRow({
+                ma_phieu: row.ma_phieu_nhap || '',
+                ngay_nhap: formatExportDate(ngay),
+                can_tra: Number(row.can_tra_ncc || row.tong_tien || 0),
+                da_tra: Number(row.da_tra_ncc || 0),
+                con_no: conNo,
+                tuoi_no: tuoi,
+                trang_thai: mapNhapHangStatus(row.trang_thai)
+            });
+        });
+        applySupplierWorksheetFormat(wsD);
+        return { workbook: workbook, filename: 'ncc-' + safeMa + '-cong-no.xlsx' };
+    }
+    return null;
+}
+
+exports.exportSupplierDetail = async function(req, res, next) {
+    try {
+        var supplierId = normalizeIdParam(req?.params?.id);
+        var section = String(req?.params?.section || '').trim().toLowerCase();
+        if (!supplierId || !mongoose.Types.ObjectId.isValid(supplierId)) {
+            return res.redirect('/nha-cung-cap?error=invalid_supplier');
+        }
+        if (['info', 'address', 'history', 'debt'].indexOf(section) < 0) {
+            return res.redirect('/nha-cung-cap?supplier=' + supplierId + '&error=invalid_export');
+        }
+        var supplier = await NhaCungCap.findById(supplierId).lean();
+        if (!supplier) return res.redirect('/nha-cung-cap?error=invalid_supplier');
+        var storeId = await resolveStoreId(req);
+        var pack = await exportSupplierDetailWorkbook(section, supplier, storeId);
+        if (!pack) return res.redirect('/nha-cung-cap?supplier=' + supplierId + '&error=invalid_export');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + pack.filename + '"');
+        await pack.workbook.xlsx.write(res);
         res.end();
     } catch (error) {
         next(error);

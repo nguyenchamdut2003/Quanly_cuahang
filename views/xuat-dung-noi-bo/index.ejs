@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -66,7 +67,7 @@
       </div>
       <div class="filter-block"><div class="filter-title">Người tạo</div><select class="filter-control" name="nguoi_tao_id" onchange="submitFilters()"><option value="">Chọn người tạo</option><% users.forEach(u=>{ %><option value="<%= u._id %>" <%= filters.nguoi_tao_id == u._id ? 'selected' : '' %>><%= u.ho_ten || u.email %></option><% }) %></select></div>
       <div class="filter-block"><div class="filter-title">Người xuất dùng nội bộ</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người xuất"></div>
-      <div class="filter-block"><div class="filter-title">Loại xuất</div><select class="filter-control" name="loai_xuat" onchange="submitFilters()"><option value="">Chọn loại xuất</option><option value="Xuất dùng nội bộ" <%= filters.loai_xuat === 'Xuất dùng nội bộ' ? 'selected' : '' %>>Xuất dùng nội bộ</option><option value="Hỏng mất" <%= filters.loai_xuat === 'Hỏng mất' ? 'selected' : '' %>>Hỏng mất</option><option value="Khác" <%= filters.loai_xuat === 'Khác' ? 'selected' : '' %>>Khác</option></select></div>
+      <div class="filter-block"><div class="filter-title">Loại xuất</div><select class="filter-control" name="loai_xuat" onchange="submitFilters()"><option value="">Chọn loại xuất</option><% (loaiXuatList || []).forEach(function(loai) { %><option value="<%= loai.ten_loai %>" <%= filters.loai_xuat === loai.ten_loai ? 'selected' : '' %>><%= loai.ten_loai %></option><% }) %></select></div>
       <div class="filter-block"><div class="filter-title">Người nhận</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người nhận"></div>
     </aside>
 
@@ -103,6 +104,25 @@
   </form>
   <script>
     function submitFilters(){document.getElementById('filterForm').submit();}
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const table = document.querySelector('.xnb-table');
+      if (!table) return;
+      const headRow = table.querySelector('thead tr');
+      if (headRow) {
+        const th = document.createElement('th');
+        th.textContent = 'Chứng từ';
+        headRow.appendChild(th);
+      }
+      const ids = [<%- (tickets || []).map(t => "'" + String(t._id) + "'").join(',') %>];
+      table.querySelectorAll('tbody tr').forEach(function(row, index) {
+        if (!ids[index]) return;
+        const td = document.createElement('td');
+        td.innerHTML = '<a class="kv-btn" target="_blank" href="/chung-tu-kho/xuat-noi-bo/' + ids[index] + '">Mở riêng</a>';
+        row.appendChild(td);
+      });
+    });
   </script>
 </body>
 </html>

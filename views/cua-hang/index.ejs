@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -21,8 +21,7 @@
       <div class="page-actions">
         <a class="btn btn-primary" href="/cua-hang?mode=create">+ Tạo mới</a>
         <button class="btn btn-danger" type="submit" form="bulkDeleteForm" onclick="return confirm('Xóa các cửa hàng đã chọn?')">Xóa đã chọn</button>
-        <button class="btn btn-light" type="button">Import file</button>
-        <button class="btn btn-light" type="button">Xuất file</button>
+        <a class="btn btn-light" href="/cua-hang/export.xlsx">Xuất file</a>
       </div>
     </div>
 
@@ -292,20 +291,6 @@
                             <div class="warehouse-heading">
                               <h3>Danh sách kho</h3>
                               <div class="detail-actions">
-                                <button
-                                  class="btn btn-light"
-                                  type="submit"
-                                  formaction="/cua-hang/<%= selectedStore._id %>/update"
-                                  formmethod="post"
-                                  onclick="return confirm('Bạn có muốn lưu thay đổi cửa hàng này không?')"
-                                >💾 Lưu chỉnh sửa</button>
-                                <button
-                                  class="btn btn-danger"
-                                  type="submit"
-                                  formaction="/cua-hang/<%= selectedStore._id %>/delete"
-                                  formmethod="post"
-                                  onclick="return confirm('Bạn có chắc muốn xóa cửa hàng này và các kho trực thuộc không?')"
-                                >🗑️ Xóa</button>
                                 <button class="btn btn-light" type="button">➕ Thêm kho</button>
 
                               </div>
@@ -391,6 +376,36 @@
                             </div>
                           </div>
                         </div>
+                        <div class="page-actions detail-panel-footer page-actions--sm">
+                          <button
+                            class="btn btn-danger btn-sm"
+                            type="submit"
+                            formaction="/cua-hang/<%= selectedStore._id %>/delete"
+                            formmethod="post"
+                            onclick="return confirm('Bạn có chắc muốn xóa cửa hàng này và các kho trực thuộc không?')"
+                          >Xóa</button>
+                          <button
+                            class="btn btn-success btn-sm"
+                            type="submit"
+                            formaction="/cua-hang/<%= selectedStore._id %>/update"
+                            formmethod="post"
+                            onclick="return confirm('Bạn có muốn lưu thay đổi cửa hàng này không?')"
+                          >Chỉnh sửa</button>
+                          <a
+                            class="btn btn-success btn-sm"
+                            href="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
+                            data-store-export-action
+                            data-store-info-url="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
+                            data-store-info-label="Xuất thông tin"
+                            data-store-info-disabled="0"
+                            data-store-warehouses-url="/cua-hang/<%= selectedStore._id %>/export/warehouses.xlsx"
+                            data-store-warehouses-label="Xuất kho"
+                            data-store-warehouses-disabled="<%= warehouses.length ? '0' : '1' %>"
+                            data-store-notes-url="/cua-hang/<%= selectedStore._id %>/export/notes.xlsx"
+                            data-store-notes-label="Xuất ghi chú"
+                            data-store-notes-disabled="1"
+                          >Xuất thông tin</a>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -475,7 +490,22 @@
         var detailBody = detailBlock.querySelector('.store-detail-body');
         var tabs = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab'));
         var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.store-detail-pane'));
+        var exportAction = detailBlock.querySelector('[data-store-export-action]');
         if (!collapseBtn || !detailBody) return;
+
+        function syncStoreExportAction(target) {
+          if (!exportAction || !target) return;
+          var key = String(target || '').replace(/^store-/, '');
+          var url = exportAction.getAttribute('data-store-' + key + '-url') || '#';
+          var label = exportAction.getAttribute('data-store-' + key + '-label') || 'Xuất thông tin';
+          var disabled = exportAction.getAttribute('data-store-' + key + '-disabled') === '1';
+          exportAction.textContent = label;
+          exportAction.href = disabled ? '#' : url;
+          exportAction.classList.toggle('is-disabled', disabled);
+          exportAction.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        }
+
+        syncStoreExportAction('store-info');
 
         tabs.forEach(function(tab) {
           tab.addEventListener('click', function(event) {
@@ -487,8 +517,18 @@
             panes.forEach(function(pane) {
               pane.classList.toggle('is-active', pane.getAttribute('data-tab-pane') === target);
             });
+            syncStoreExportAction(target);
           });
         });
+
+        if (exportAction) {
+          exportAction.addEventListener('click', function(event) {
+            if (exportAction.getAttribute('aria-disabled') === 'true') {
+              event.preventDefault();
+              alert('Không có dữ liệu để xuất');
+            }
+          });
+        }
 
         collapseBtn.addEventListener('click', function () {
           var isCollapsed = detailBlock.classList.toggle('is-collapsed');

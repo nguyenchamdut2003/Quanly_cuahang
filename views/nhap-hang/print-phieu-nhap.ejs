@@ -16,9 +16,10 @@
     .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin:14px 0}
     .store{text-align:center;font-size:13px}
     table{width:100%;border-collapse:collapse;margin-top:12px}
-    th,td{border:1px solid #333;padding:6px 7px;font-size:12px}
+    th,td{border:1px solid #333;padding:5px 6px;font-size:11.5px}
     th{text-align:center;background:#f1f5f9}
     .num{text-align:right}
+    .note-cell{word-break:break-word}
     .summary{width:72mm;margin-left:auto;margin-top:12px;font-size:13px}
     .summary div{display:flex;justify-content:space-between;padding:4px 0}
     .sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:28px;text-align:center;font-size:13px}
@@ -29,13 +30,16 @@
   </style>
 </head>
 <body>
-  <div class="print-actions no-print">
-    <button type="button" onclick="window.print()">In</button>
-    <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf'">Tải PDF</button>
-  </div>
+  <% if (!embeddedPrint) { %>
+    <div class="print-actions no-print">
+      <button type="button" onclick="window.print()">In</button>
+      <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf'">Tải PDF</button>
+      <button type="button" onclick="window.open(window.location.href, '_blank')">Mở riêng</button>
+    </div>
+  <% } %>
   <main class="page">
     <div class="store">
-      <strong><%= store ? (store.ten_cua_hang || 'Cua hang') : 'Cua hang' %></strong><br>
+      <strong><%= store ? (store.ten_cua_hang || 'Cửa hàng') : 'Cửa hàng' %></strong><br>
       <%= store ? (store.dia_chi || '') : '' %> <%= store && store.sdt ? (' - ' + store.sdt) : '' %>
     </div>
     <h1>Phiếu nhập hàng</h1>
@@ -49,7 +53,7 @@
       <div>Ghi chú: <strong><%= ticket.ghi_chu || '' %></strong></div>
     </section>
     <table>
-      <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Lô</th><th>Số lượng</th><th>Đơn giá</th><th>Giảm giá</th><th>Thành tiền</th></tr></thead>
+      <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Lô</th><th>Số lượng</th><th>Đơn giá</th><th>Giảm giá</th><th>Thành tiền</th><th>Ghi chú</th></tr></thead>
       <tbody>
         <% items.forEach(function(row, index){ %>
           <tr>
@@ -61,16 +65,17 @@
             <td class="num"><%= fmt(row.don_gia_nhap) %></td>
             <td class="num"><%= row.kieu_giam_gia_dong === 'percent' ? ((row.giam_gia_dong || 0) + '%') : fmt(row.giam_gia_dong) %></td>
             <td class="num"><%= fmt(row.thanh_tien) %></td>
+            <td class="note-cell"><%= row.ghi_chu || '' %></td>
           </tr>
         <% }) %>
       </tbody>
     </table>
     <section class="summary">
-      <div><span>Tổng tiền hàng</span><strong><%= fmt(ticket.tong_tien_hang) %></strong></div>
-      <div><span>Giảm giá</span><strong><%= ticket.kieu_giam_gia === 'percent' ? ((ticket.giam_gia || 0) + '%') : fmt(ticket.giam_gia) %></strong></div>
-      <div><span>Tổng tiền</span><strong><%= fmt(ticket.tong_tien) %></strong></div>
-      <div><span>Đã trả</span><strong><%= fmt(ticket.da_tra_ncc) %></strong></div>
-      <div><span>Còn nợ</span><strong><%= fmt(ticket.con_no_ncc) %></strong></div>
+      <div><span>Tổng tiền hàng</span><strong><%= fmt(ticket.tong_tien_hang) %> VND</strong></div>
+      <div><span>Giảm giá</span><strong><%= ticket.kieu_giam_gia === 'percent' ? ((ticket.giam_gia || 0) + '%') : (fmt(ticket.giam_gia) + ' VND') %></strong></div>
+      <div><span>Tổng tiền</span><strong><%= fmt(ticket.tong_tien) %> VND</strong></div>
+      <div><span>Đã trả</span><strong><%= fmt(ticket.da_tra_ncc) %> VND</strong></div>
+      <div><span>Còn nợ</span><strong><%= fmt(ticket.con_no_ncc) %> VND</strong></div>
     </section>
     <section class="sign">
       <div><b>Người lập phiếu</b>(Ký, ghi rõ họ tên)</div>

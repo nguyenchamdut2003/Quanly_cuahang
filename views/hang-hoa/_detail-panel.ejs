@@ -1,0 +1,137 @@
+<div class="kv-detail-panel product-detail">
+  <div class="detail-tabs">
+    <div class="detail-tab-list">
+      <button class="detail-tab is-active" type="button" data-tab-target="product-info">Thông tin</button>
+      <button class="detail-tab" type="button" data-tab-target="product-note">Mô tả, ghi chú</button>
+      <button class="detail-tab" type="button" data-tab-target="product-card">Thẻ kho</button>
+      <button class="detail-tab" type="button" data-tab-target="product-stock">Tồn kho</button>
+      <% if (item.quan_ly_theo_lo) { %>
+        <button class="detail-tab" type="button" data-tab-target="product-lots">Lô hàng</button>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="product-detail-body">
+    <section class="detail-pane is-active" data-tab-panel="product-info">
+      <div class="product-info-head">
+        <div class="product-thumb">▰</div>
+        <div>
+          <h2><%= item.ten_hang || 'Hàng hóa' %></h2>
+          <p>Nhóm hàng: <%= item.nhom_hang_ten || '---' %></p>
+          <div class="tag-row">
+            <span class="tag">Hàng hóa thường</span>
+            <span class="tag tag-green"><%= item.ban_truc_tiep ? 'Bán trực tiếp' : 'Không bán trực tiếp' %></span>
+            <span class="tag"><%= item.quan_ly_theo_lo ? 'Quản lý theo lô' : 'Không quản lý theo lô' %></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="product-info-grid">
+        <div><span>Mã hàng</span><strong><%- refLink('product', item, item.ma_hang || '---') %></strong></div>
+        <div><span>Tồn kho</span><strong><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Định mức tồn</span><strong><%= Number(item.dinh_muc_toi_thieu || 0).toLocaleString('vi-VN') %> - 0</strong></div>
+        <div><span>Giá vốn</span><strong><%= Number(item.gia_von || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Giá bán</span><strong><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Đơn vị tính</span><strong><%= item.don_vi_tinh_ten || '---' %></strong></div>
+        <div><span>Nhà cung cấp</span><strong><%= item.nha_cung_cap_ten || '---' %></strong></div>
+        <div><span>Trạng thái</span><strong><%= item.trang_thai === 'inactive' ? 'Ngừng kinh doanh' : 'Đang kinh doanh' %></strong></div>
+      </div>
+    </section>
+
+    <section class="detail-pane" data-tab-panel="product-note">
+      <div class="product-note-box">
+        <span>Mô tả, ghi chú</span>
+        <p><%= item.mo_ta || 'Chưa có mô tả hoặc ghi chú cho hàng hóa này.' %></p>
+      </div>
+    </section>
+
+    <section class="detail-pane" data-tab-panel="product-card">
+      <table class="admin-table product-inner-table">
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Kho</th>
+            <th>Loại chứng từ</th>
+            <th class="text-right">Số lượng</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!selectedProductHistories || selectedProductHistories.length === 0) { %>
+            <tr><td colspan="4" class="empty-cell">Chưa có phát sinh thẻ kho.</td></tr>
+          <% } %>
+          <% (selectedProductHistories || []).forEach(function(row) { %>
+            <tr>
+              <td><%= formatDate(row.ngay || row.created_at) %></td>
+              <td><%= row.kho_ten || '---' %></td>
+              <td><%= row.loai_phieu || '---' %><% if (row.lo_hang_id) { %> - <%- refLink('lot', row.lo_hang_id, row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || 'Lô') %><% } %></td>
+              <td class="text-right"><%= Number(row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="detail-pane" data-tab-panel="product-stock">
+      <table class="admin-table product-inner-table">
+        <thead>
+          <tr>
+            <th>Kho</th>
+            <th class="text-right">Tồn kho</th>
+            <th>Cập nhật</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!selectedProductInventory || selectedProductInventory.length === 0) { %>
+            <tr><td colspan="3" class="empty-cell">Chưa có tồn kho theo kho.</td></tr>
+          <% } %>
+          <% (selectedProductInventory || []).forEach(function(row) { %>
+            <tr>
+              <td><%= row.kho_ten || '---' %></td>
+              <td class="text-right"><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %></td>
+              <td><%= formatDate(row.updated_at || row.created_at) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+
+    <% if (item.quan_ly_theo_lo) { %>
+      <section class="detail-pane" data-tab-panel="product-lots">
+        <table class="admin-table product-inner-table">
+          <thead>
+            <tr>
+              <th>Mã lô</th>
+              <th>Tên lô</th>
+              <th>Kho</th>
+              <th>Hạn sử dụng</th>
+              <th class="text-right">Tồn lô</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!selectedProductLots || selectedProductLots.length === 0) { %>
+              <tr><td colspan="6" class="empty-cell">Chưa có tồn theo lô.</td></tr>
+            <% } %>
+            <% (selectedProductLots || []).forEach(function(row) { %>
+              <tr>
+                <td><%- row.lo_hang_id ? refLink('lot', row.lo_hang_id, row.lo_hang_id.ma_lo || '---') : '---' %></td>
+                <td><%= row.lo_hang_id && row.lo_hang_id.ten_lo ? row.lo_hang_id.ten_lo : '---' %></td>
+                <td><%= row.kho_ten || '---' %></td>
+                <td><%= row.lo_hang_id && row.lo_hang_id.han_su_dung ? formatDate(row.lo_hang_id.han_su_dung) : '---' %></td>
+                <td class="text-right"><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %></td>
+                <td><%= row.lo_hang_id && row.lo_hang_id.trang_thai ? row.lo_hang_id.trang_thai : '---' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+    <% } %>
+  </div>
+
+  <div class="page-actions product-detail-footer page-actions--sm">
+    <button class="btn btn-danger btn-sm" type="submit" form="deleteProductForm_<%= item._id %>" onclick="return confirm('Bạn có chắc muốn xóa hàng hóa này không?')">Xóa</button>
+    <button class="btn btn-light btn-sm btn-copy-product" type="button" data-product='<%- JSON.stringify(item) %>'>Sao chép</button>
+    <button class="btn btn-primary btn-sm btn-edit-product" type="button" data-product='<%- JSON.stringify(item) %>'>Chỉnh sửa</button>
+    <button class="btn btn-light btn-sm btn-print-label" type="button" data-product='<%- JSON.stringify(item) %>'>In tem mã</button>
+  </div>
+</div>

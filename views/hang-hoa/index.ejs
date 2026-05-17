@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
@@ -148,9 +148,36 @@
                 </div>
               </div>
             </section>
+            <section class="product-form-section">
+              <h4>Thuộc tính hàng hóa</h4>
+              <% if ((attributes || []).length) { %>
+                <div class="product-attribute-list">
+                  <% (attributes || []).forEach(function(attr) { %>
+                    <% var valuesForAttr = (attributeValues || []).filter(function(value) { return String(value.thuoc_tinh_id) === String(attr._id); }); %>
+                    <div class="product-attribute-block">
+                      <div class="product-attribute-title"><%= attr.ten_thuoc_tinh %></div>
+                      <% if (valuesForAttr.length) { %>
+                        <div class="product-attribute-values">
+                          <% valuesForAttr.forEach(function(value) { %>
+                            <label class="product-attribute-option">
+                              <input class="product-attribute-value" type="checkbox" name="gia_tri_thuoc_tinh_ids" value="<%= value._id %>">
+                              <span><%= value.ten_gia_tri %></span>
+                            </label>
+                          <% }); %>
+                        </div>
+                      <% } else { %>
+                        <div class="muted-small">Chưa có giá trị thuộc tính</div>
+                      <% } %>
+                    </div>
+                  <% }); %>
+                </div>
+              <% } else { %>
+                <div class="muted-small">Chưa có thuộc tính hàng hóa</div>
+              <% } %>
+            </section>
           </div>
         </form>
-        <div class="modal-footer">
+        <div class="page-actions modal-footer">
           <button class="btn btn-light" type="button" id="addProductModalCancel">Bỏ qua</button>
           <button class="btn btn-primary" type="submit" form="productCreateForm" id="productModalSubmitBtn">Lưu</button>
         </div>
@@ -276,14 +303,13 @@
           <div class="customer-toolbar-actions">
             <button class="btn btn-primary" type="button" id="openAddProductModal">+ Tạo mới</button>
             <button class="btn btn-danger" type="submit" form="bulkDeleteProductsForm" onclick="return confirm('Xóa các hàng hóa đã chọn?')">Xóa đã chọn</button>
-            <button class="btn btn-light" type="button">Import file</button>
             <button class="btn btn-light" type="button" id="openExportColsModal">Xuất file</button>
           </div>
         </div>
 
         <div class="customer-table-wrap">
           <form id="bulkDeleteProductsForm" method="post" action="/hang-hoa/delete-selected">
-          <table class="admin-table customer-table">
+          <table class="admin-table customer-table" data-kv-master="hang-hoa">
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllProducts" type="checkbox" aria-label="Chọn tất cả"></th>
@@ -295,22 +321,19 @@
                 <th>Nhóm hàng</th>
                 <th>Nhà cung cấp</th>
                 <th>Thời gian tạo</th>
-                <th class="text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody>
               <% if (!products || products.length === 0) { %>
                 <tr>
-                  <td colspan="10" class="empty-cell">Không có hàng hóa phù hợp với bộ lọc.</td>
+                  <td colspan="9" class="empty-cell">Không có hàng hóa phù hợp với bộ lọc.</td>
                 </tr>
               <% } %>
               <% (products || []).forEach(function(item) { %>
-                <% var isSelectedProduct = selectedProduct && String(selectedProduct._id) === String(item._id); %>
-                <% var productBaseQuery = filterQueryString ? ('?' + filterQueryString) : '?'; %>
-                <% var productRowHref = isSelectedProduct ? ('/hang-hoa' + (filterQueryString ? ('?' + filterQueryString) : '')) : ('/hang-hoa' + productBaseQuery + (filterQueryString ? '&' : '') + 'product=' + item._id); %>
-                <tr class="product-list-row <%= isSelectedProduct ? 'is-selected' : '' %>" data-row-href="<%= productRowHref %>">
+                <% var listBase = '/hang-hoa' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
+                <tr class="product-list-row" data-kv-detail-id="<%= item._id %>">
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="product-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn hàng hóa"></td>
-                  <td><a class="table-code-link" href="<%= productRowHref %>"><%= item.ma_hang || '---' %></a></td>
+                  <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_hang || '---' %></a></td>
                   <td><strong><%= item.ten_hang || '---' %></strong></td>
                   <td><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></td>
                   <td><%= Number(item.gia_von || 0).toLocaleString('vi-VN') %></td>
@@ -318,156 +341,7 @@
                   <td><%= item.nhom_hang_ten || '---' %></td>
                   <td><%= item.nha_cung_cap_ten || '---' %></td>
                   <td><%= formatDate(item.created_at) %></td>
-                  <td class="text-right" onclick="event.stopPropagation()">
-                    <div class="warehouse-action-buttons">
-                      <button class="btn btn-light btn-sm btn-edit-product" type="button" data-product='<%= JSON.stringify(item) %>'>Sửa</button>
-                      <button class="btn btn-danger btn-sm" type="submit" form="deleteProductForm_<%= item._id %>" onclick="return confirm('Bạn có chắc muốn xóa hàng hóa này không?')">Xóa</button>
-                    </div>
-                  </td>
                 </tr>
-                <% if (isSelectedProduct) { %>
-                  <tr class="product-detail-row">
-                    <td colspan="10">
-                      <div class="product-detail">
-                        <div class="detail-tabs">
-                          <div class="detail-tab-list">
-                            <button class="detail-tab is-active" type="button" data-tab-target="product-info">Thông tin</button>
-                            <button class="detail-tab" type="button" data-tab-target="product-note">Mô tả, ghi chú</button>
-                            <button class="detail-tab" type="button" data-tab-target="product-card">Thẻ kho</button>
-                            <button class="detail-tab" type="button" data-tab-target="product-stock">Tồn kho</button>
-                            <% if (item.quan_ly_theo_lo) { %>
-                              <button class="detail-tab" type="button" data-tab-target="product-lots">Lô hàng</button>
-                            <% } %>
-                          </div>
-                        </div>
-
-                        <div class="product-detail-body">
-                          <section class="detail-pane is-active" data-tab-panel="product-info">
-                            <div class="product-info-head">
-                              <div class="product-thumb">▰</div>
-                              <div>
-                                <h2><%= item.ten_hang || 'Hàng hóa' %></h2>
-                                <p>Nhóm hàng: <%= item.nhom_hang_ten || '---' %></p>
-                                <div class="tag-row">
-                                  <span class="tag">Hàng hóa thường</span>
-                                  <span class="tag tag-green"><%= item.ban_truc_tiep ? 'Bán trực tiếp' : 'Không bán trực tiếp' %></span>
-                                  <span class="tag"><%= item.quan_ly_theo_lo ? 'Quản lý theo lô' : 'Không quản lý theo lô' %></span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div class="product-info-grid">
-                              <div><span>Mã hàng</span><strong><%= item.ma_hang || '---' %></strong></div>
-                              <div><span>Tồn kho</span><strong><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></strong></div>
-                              <div><span>Định mức tồn</span><strong><%= Number(item.dinh_muc_toi_thieu || 0).toLocaleString('vi-VN') %> - 0</strong></div>
-                              <div><span>Giá vốn</span><strong><%= Number(item.gia_von || 0).toLocaleString('vi-VN') %></strong></div>
-                              <div><span>Giá bán</span><strong><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></strong></div>
-                              <div><span>Đơn vị tính</span><strong><%= item.don_vi_tinh_ten || '---' %></strong></div>
-                              <div><span>Nhà cung cấp</span><strong><%= item.nha_cung_cap_ten || '---' %></strong></div>
-                              <div><span>Trạng thái</span><strong><%= item.trang_thai === 'inactive' ? 'Ngừng kinh doanh' : 'Đang kinh doanh' %></strong></div>
-                            </div>
-                          </section>
-
-                          <section class="detail-pane" data-tab-panel="product-note">
-                            <div class="product-note-box">
-                              <span>Mô tả, ghi chú</span>
-                              <p><%= item.mo_ta || 'Chưa có mô tả hoặc ghi chú cho hàng hóa này.' %></p>
-                            </div>
-                          </section>
-
-                          <section class="detail-pane" data-tab-panel="product-card">
-                            <table class="admin-table product-inner-table">
-                              <thead>
-                                <tr>
-                                  <th>Thời gian</th>
-                                  <th>Kho</th>
-                                  <th>Loại chứng từ</th>
-                                  <th class="text-right">Số lượng</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <% if (!selectedProductHistories || selectedProductHistories.length === 0) { %>
-                                  <tr><td colspan="4" class="empty-cell">Chưa có phát sinh thẻ kho.</td></tr>
-                                <% } %>
-                                <% (selectedProductHistories || []).forEach(function(row) { %>
-                                  <tr>
-                                    <td><%= formatDate(row.ngay || row.created_at) %></td>
-                                    <td><%= row.kho_ten || '---' %></td>
-                                    <td><%= row.loai_phieu || '---' %><% if (row.lo_hang_id) { %> - <%= row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || 'Lô' %><% } %></td>
-                                    <td class="text-right"><%= Number(row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
-                                  </tr>
-                                <% }) %>
-                              </tbody>
-                            </table>
-                          </section>
-
-                          <section class="detail-pane" data-tab-panel="product-stock">
-                            <table class="admin-table product-inner-table">
-                              <thead>
-                                <tr>
-                                  <th>Kho</th>
-                                  <th class="text-right">Tồn kho</th>
-                                  <th>Cập nhật</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <% if (!selectedProductInventory || selectedProductInventory.length === 0) { %>
-                                  <tr><td colspan="3" class="empty-cell">Chưa có tồn kho theo kho.</td></tr>
-                                <% } %>
-                                <% (selectedProductInventory || []).forEach(function(row) { %>
-                                  <tr>
-                                    <td><%= row.kho_ten || '---' %></td>
-                                    <td class="text-right"><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %></td>
-                                    <td><%= formatDate(row.updated_at || row.created_at) %></td>
-                                  </tr>
-                                <% }) %>
-                              </tbody>
-                            </table>
-                          </section>
-
-                          <% if (item.quan_ly_theo_lo) { %>
-                            <section class="detail-pane" data-tab-panel="product-lots">
-                              <table class="admin-table product-inner-table">
-                                <thead>
-                                  <tr>
-                                    <th>Mã lô</th>
-                                    <th>Tên lô</th>
-                                    <th>Kho</th>
-                                    <th>Hạn sử dụng</th>
-                                    <th class="text-right">Tồn lô</th>
-                                    <th>Trạng thái</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <% if (!selectedProductLots || selectedProductLots.length === 0) { %>
-                                    <tr><td colspan="6" class="empty-cell">Chưa có tồn theo lô.</td></tr>
-                                  <% } %>
-                                  <% (selectedProductLots || []).forEach(function(row) { %>
-                                    <tr>
-                                      <td><%= row.lo_hang_id?.ma_lo || '---' %></td>
-                                      <td><%= row.lo_hang_id?.ten_lo || '---' %></td>
-                                      <td><%= row.kho_ten || '---' %></td>
-                                      <td><%= formatDate(row.lo_hang_id?.han_su_dung) %></td>
-                                      <td class="text-right"><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %></td>
-                                      <td><%= row.lo_hang_id?.trang_thai || '---' %></td>
-                                    </tr>
-                                  <% }) %>
-                                </tbody>
-                              </table>
-                            </section>
-                          <% } %>
-                        </div>
-
-                        <div class="product-detail-footer">
-                          <button class="btn btn-light btn-sm" type="button">Xóa</button>
-                          <button class="btn btn-light btn-sm" type="button">Sao chép</button>
-                          <button class="btn btn-primary btn-sm" type="button">Chỉnh sửa</button>
-                          <button class="btn btn-light btn-sm" type="button">In tem mã</button>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                <% } %>
               <% }) %>
             </tbody>
           </table>
@@ -561,7 +435,7 @@
           <input id="productGroupDescInput" type="text" placeholder="Nhập ghi chú">
         </label>
       </div>
-      <div class="group-modal-footer">
+      <div class="page-actions group-modal-footer">
         <button class="btn btn-light btn-sm" type="button" id="productGroupModalCancel">Bỏ qua</button>
         <button class="btn btn-primary btn-sm" type="button" id="productGroupModalSubmit">Lưu</button>
       </div>
@@ -583,7 +457,7 @@
           <input id="unitTypeCodeInput" type="text" placeholder="Ví dụ: DVT001">
         </label>
       </div>
-      <div class="group-modal-footer">
+      <div class="page-actions group-modal-footer">
         <button class="btn btn-light btn-sm" type="button" id="unitTypeModalCancel">Bỏ qua</button>
         <button class="btn btn-primary btn-sm" type="button" id="unitTypeModalSubmit">Lưu</button>
       </div>
@@ -591,33 +465,29 @@
   </div>
   <script id="productGroupsSeed" type="application/json"><%- JSON.stringify(groups || []) %></script>
   <script id="unitTypesSeed" type="application/json"><%- JSON.stringify(units || []) %></script>
+  <script id="productAttributeIdsSeed" type="application/json"><%- JSON.stringify(productAttributeIds || {}) %></script>
+  <script src="/js/kv-inline-detail.js"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      var productDetail = document.querySelector('.product-detail');
-      if (productDetail) {
-        var productTabs = Array.prototype.slice.call(productDetail.querySelectorAll('.detail-tab'));
-        var productPanels = Array.prototype.slice.call(productDetail.querySelectorAll('.detail-pane'));
-        productTabs.forEach(function(tab) {
-          tab.addEventListener('click', function() {
-            var target = tab.getAttribute('data-tab-target');
-            productTabs.forEach(function(item) { item.classList.remove('is-active'); });
-            productPanels.forEach(function(panel) {
-              panel.classList.toggle('is-active', panel.getAttribute('data-tab-panel') === target);
-            });
-            tab.classList.add('is-active');
-          });
+      var masterTable = document.querySelector('table[data-kv-master="hang-hoa"]');
+      if (masterTable && typeof KvInlineDetail !== 'undefined') {
+        var kvHangHoa = new KvInlineDetail({
+          table: masterTable,
+          colspan: 9,
+          buildUrl: function(id) {
+            return '/hang-hoa/api/' + encodeURIComponent(id) + '/detail';
+          }
         });
+        if (/^#p-/.test(location.hash)) {
+          var pid = decodeURIComponent(location.hash.slice(3));
+          if (pid) {
+            kvHangHoa.openById(pid);
+            var clean = location.pathname + (location.search || '');
+            history.replaceState(null, '', clean);
+          }
+        }
       }
-
-      var productRows = Array.prototype.slice.call(document.querySelectorAll('.product-list-row'));
-      productRows.forEach(function(row) {
-        row.addEventListener('click', function(event) {
-          if (event.target.closest('a, button, input, select, textarea, label')) return;
-          var href = row.getAttribute('data-row-href');
-          if (href) window.location.href = href;
-        });
-      });
 
       var createdRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="created"]'));
       var customDateRange = document.getElementById('customDateRange');
@@ -658,7 +528,14 @@
       var initialLotFields = document.getElementById('initialLotFields');
       var selectAllProducts = document.getElementById('selectAllProducts');
       var productCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.product-checkbox'));
-      var editProductButtons = Array.prototype.slice.call(document.querySelectorAll('.btn-edit-product'));
+      var customerTableWrap = document.querySelector('.customer-table-wrap');
+      var productAttributeIdsSeed = document.getElementById('productAttributeIdsSeed');
+      var productAttributeIds = {};
+      try {
+        productAttributeIds = productAttributeIdsSeed ? JSON.parse(productAttributeIdsSeed.textContent || '{}') : {};
+      } catch (_error) {
+        productAttributeIds = {};
+      }
 
       function toggleFixedPrice() {
         if (!fixedPriceWrap || !productPriceType) return;
@@ -684,6 +561,16 @@
         input.checked = !!value;
       }
 
+      function setProductAttributeValues(ids) {
+        if (!productCreateForm) return;
+        var selected = {};
+        (ids || []).forEach(function(id) { selected[String(id)] = true; });
+        var boxes = Array.prototype.slice.call(productCreateForm.querySelectorAll('.product-attribute-value'));
+        boxes.forEach(function(box) {
+          box.checked = !!selected[String(box.value)];
+        });
+      }
+
       function openAddProductModal() {
         if (!addProductModalOverlay) return;
         if (productModalTitle) productModalTitle.textContent = 'Tạo hàng hóa';
@@ -692,6 +579,7 @@
           productCreateForm.setAttribute('action', '/hang-hoa/add');
           productCreateForm.reset();
         }
+        setProductAttributeValues([]);
         if (unitTypeSelectedLabel) unitTypeSelectedLabel.textContent = 'Chọn đơn vị tính';
         if (unitTypeValue) unitTypeValue.value = '';
         if (unitTypeDropdown) {
@@ -724,6 +612,7 @@
         setProductFormValue('trang_thai', product.trang_thai || 'active');
         setProductCheckbox('ban_truc_tiep', !!product.ban_truc_tiep);
         setProductCheckbox('quan_ly_theo_lo', !!product.quan_ly_theo_lo);
+        setProductAttributeValues(productAttributeIds[String(product._id)] || []);
 
         var selectedUnitId = String(product.don_vi_tinh_id || '');
         if (unitTypeValue) unitTypeValue.value = selectedUnitId;
@@ -761,19 +650,57 @@
       toggleFixedPrice();
       toggleInitialLotFields();
 
-      editProductButtons.forEach(function(button) {
-        button.addEventListener('click', function(event) {
+      function openCopyProductModal(product) {
+        if (!product) return;
+        openAddProductModal();
+        if (productModalTitle) productModalTitle.textContent = 'Sao chép hàng hóa';
+        if (productModalSubmitBtn) productModalSubmitBtn.textContent = 'Lưu';
+        setProductFormValue('ma_hang', '');
+        setProductFormValue('ten_hang', (product.ten_hang || '') + ' (bản sao)');
+        setProductFormValue('nhom_hang_id', product.nhom_hang_id || '');
+        setProductFormValue('nha_cung_cap_id', product.nha_cung_cap_id || '');
+        setProductFormValue('gia_von', Number(product.gia_von || 0));
+        setProductFormValue('loai_gia', product.loai_gia || 'thi_truong');
+        setProductFormValue('gia_co_dinh', Number(product.gia_co_dinh || 0));
+        setProductFormValue('ton_ban_dau', 0);
+        setProductFormValue('dinh_muc_toi_thieu', Number(product.dinh_muc_toi_thieu || 0));
+        setProductFormValue('mo_ta', product.mo_ta || '');
+        setProductFormValue('trang_thai', 'active');
+        setProductCheckbox('ban_truc_tiep', !!product.ban_truc_tiep);
+        setProductCheckbox('quan_ly_theo_lo', !!product.quan_ly_theo_lo);
+        setProductAttributeValues(productAttributeIds[String(product._id)] || []);
+        if (unitTypeValue) unitTypeValue.value = String(product.don_vi_tinh_id || '');
+      }
+
+      function printProductLabel(product) {
+        if (!product) return;
+        const win = window.open('', '_blank');
+        if (!win) return alert('Trình duyệt chặn cửa sổ in.');
+        const price = Number(product.gia_co_dinh || product.gia_ban || 0).toLocaleString('vi-VN');
+        const labelHtml = '<html><head><title>In tem ' + (product.ma_hang || '') + '</title><style>body{font-family:Arial;padding:16px}.label{width:220px;border:1px solid #ccc;padding:12px;margin:8px;display:inline-block}.code{font-size:18px;font-weight:700}</style></head><body><div class="label"><div class="code">' + (product.ma_hang || '') + '</div><div>' + (product.ten_hang || '') + '</div><div>Gi\u00e1: ' + price + '</div></div></body></html>';
+        win.document.write(labelHtml);
+        win.document.close();
+        win.focus();
+        win.print();
+      }
+
+      if (customerTableWrap) {
+        customerTableWrap.addEventListener('click', function(event) {
+          var button = event.target.closest('.btn-edit-product, .btn-copy-product, .btn-print-label');
+          if (!button || !customerTableWrap.contains(button)) return;
           event.preventDefault();
           event.stopPropagation();
           var payload = button.getAttribute('data-product') || '{}';
           try {
             var product = JSON.parse(payload);
-            openEditProductModal(product);
+            if (button.classList.contains('btn-edit-product')) openEditProductModal(product);
+            else if (button.classList.contains('btn-copy-product')) openCopyProductModal(product);
+            else if (button.classList.contains('btn-print-label')) printProductLabel(product);
           } catch (_error) {
-            alert('Không đọc được dữ liệu hàng hóa để sửa.');
+            alert('Không đọc được dữ liệu hàng hóa.');
           }
         });
-      });
+      }
 
       if (selectAllProducts && productCheckboxes.length > 0) {
         selectAllProducts.addEventListener('change', function() {

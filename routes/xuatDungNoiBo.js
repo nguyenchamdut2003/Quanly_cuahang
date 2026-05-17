@@ -5,6 +5,7 @@ const { isAuthenticated } = require('../middlewares/auth.middleware');
 const {
     PhieuXuatNoiBo,
     CTXuatNoiBo,
+    LoaiXuatNoiBo,
     HangHoa,
     CuaHang,
     NguoiDung,
@@ -17,9 +18,9 @@ const { truTonKho } = require('../services/kho.service');
 router.use(isAuthenticated);
 
 const STATUS_MAP = {
-    draft: 'Phieu tam',
-    completed: 'Hoan thanh',
-    cancelled: 'Da huy'
+    draft: 'Phiếu tạm',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy'
 };
 
 const EXPORT_STATUS_MAP = {
@@ -57,6 +58,35 @@ const XUAT_NOI_BO_EXPORT_COLUMNS = [
     { header: 'Giá vốn', key: 'gia_von', style: { numFmt: '#,##0' } },
     { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } }
 ];
+
+function slugifyLoaiXuat(text) {
+    return String(text || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase();
+}
+
+async function seedLoaiXuatIfEmpty() {
+    const count = await LoaiXuatNoiBo.countDocuments();
+    if (count > 0) return;
+
+    await LoaiXuatNoiBo.insertMany([
+        { ma_loai: 'van_phong_pham', ten_loai: 'Xuất văn phòng phẩm, dụng cụ làm việc', trang_thai: 'active' },
+        { ma_loai: 'vat_tu_tieu_hao', ten_loai: 'Xuất vật tư tiêu hao, công cụ dụng cụ', trang_thai: 'active' },
+        { ma_loai: 'su_kien_noi_bo', ten_loai: 'Xuất phục vụ sự kiện, hội nghị nội bộ', trang_thai: 'active' },
+        { ma_loai: 'boi_thuong', ten_loai: 'Xuất bồi thường, đền bù', trang_thai: 'active' },
+        { ma_loai: 'mau_trung_bay', ten_loai: 'Xuất mẫu trưng bày, demo sản phẩm', trang_thai: 'active' },
+        { ma_loai: 'qua_tang', ten_loai: 'Xuất quà tặng khách hàng, đối tác', trang_thai: 'active' },
+        { ma_loai: 'khac', ten_loai: 'Khác', trang_thai: 'active' }
+    ]);
+}
+
+async function loadLoaiXuatList() {
+    await seedLoaiXuatIfEmpty();
+    return LoaiXuatNoiBo.find({ trang_thai: 'active' }).sort({ created_at: 1 }).lean();
+}
 
 function parseItems(rawItems) {
     if (Array.isArray(rawItems)) return rawItems;
@@ -231,11 +261,13 @@ router.get('/', async (req, res, next) => {
             .populate('nguoi_tao_id')
             .sort({ created_at: -1 });
         const users = await NguoiDung.find().sort({ ho_ten: 1 });
+        const loaiXuatList = await loadLoaiXuatList();
 
         res.render('xuat-dung-noi-bo/index', {
-            title: 'Xuat dung noi bo',
+            title: 'Xuất dùng nội bộ',
             tickets,
             users,
+            loaiXuatList,
             filters: req.query,
             selectedStatuses: statuses,
             statusMap: STATUS_MAP
@@ -255,14 +287,110 @@ router.get('/create', async (req, res, next) => {
             KhachHang.find().sort({ ten_khach_hang: 1 }),
             NhaCungCap.find().sort({ ten_ncc: 1 })
         ]);
+        const loaiXuatList = await loadLoaiXuatList();
         res.render('xuat-dung-noi-bo/create', {
-            title: 'Xuat dung noi bo',
+            title: 'Xuất dùng nội bộ',
             products,
             stores,
             users,
             warehouses,
             customers,
-            suppliers
+            suppliers,
+            loaiXuatList
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/loai-xuat/add', async (req, res, next) => {
+    try {
+        const tenLoai = String(req.body.ten_loai || '').trim();
+        let maLoai = String(req.body.ma_loai || '').trim().toLowerCase();
+        if (!tenLoai) {
+            return res.status(400).json({ success: false, message: 'Vui lòng nhập tên loại xuất.' });
+        }
+        if (!maLoai) maLoai = slugifyLoaiXuat(tenLoai);
+        if (!maLoai) maLoai = 'loai_' + Date.now();
+
+        const created = await LoaiXuatNoiBo.create({
+            ma_loai: maLoai,
+            ten_loai: tenLoai,
+            trang_thai: 'active'
+        });
+
+        return res.json({
+            success: true,
+            message: 'Đã thêm loại xuất.',
+            selectedId: String(created._id),
+            loaiXuatList: await loadLoaiXuatList()
+        });
+    } catch (error) {
+        if (error && error.code === 11000) {
+            return res.status(400).json({ success: false, message: 'Loại xuất đã tồn tại.' });
+        }
+        next(error);
+    }
+});
+
+router.post('/loai-xuat/:id/update', async (req, res, next) => {
+    try {
+        const id = String(req.params.id || '');
+        const tenLoai = String(req.body.ten_loai || '').trim();
+        if (!tenLoai) {
+            return res.status(400).json({ success: false, message: 'Vui lòng nhập tên loại xuất.' });
+        }
+
+        const existing = await LoaiXuatNoiBo.findById(id).lean();
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy loại xuất.' });
+        }
+
+        await LoaiXuatNoiBo.findByIdAndUpdate(id, { ten_loai: tenLoai }, { runValidators: true });
+        if (existing.ten_loai && existing.ten_loai !== tenLoai) {
+            await PhieuXuatNoiBo.updateMany(
+                { loai_xuat: existing.ten_loai },
+                { $set: { loai_xuat: tenLoai } }
+            );
+        }
+
+        return res.json({
+            success: true,
+            message: 'Đã cập nhật loại xuất.',
+            selectedId: id,
+            loaiXuatList: await loadLoaiXuatList()
+        });
+    } catch (error) {
+        if (error && error.code === 11000) {
+            return res.status(400).json({ success: false, message: 'Tên loại xuất đã tồn tại.' });
+        }
+        next(error);
+    }
+});
+
+router.post('/loai-xuat/:id/delete', async (req, res, next) => {
+    try {
+        const id = String(req.params.id || '');
+        const existing = await LoaiXuatNoiBo.findById(id).lean();
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy loại xuất.' });
+        }
+
+        const inUse = await PhieuXuatNoiBo.countDocuments({ loai_xuat: existing.ten_loai });
+        if (inUse > 0) {
+            await LoaiXuatNoiBo.findByIdAndUpdate(id, { trang_thai: 'inactive' });
+            return res.json({
+                success: true,
+                message: 'Loại xuất đang được dùng — đã ẩn khỏi danh sách chọn.',
+                loaiXuatList: await loadLoaiXuatList()
+            });
+        }
+
+        await LoaiXuatNoiBo.findByIdAndDelete(id);
+        return res.json({
+            success: true,
+            message: 'Đã xóa loại xuất.',
+            loaiXuatList: await loadLoaiXuatList()
         });
     } catch (error) {
         next(error);
@@ -289,16 +417,16 @@ router.post('/add', async (req, res, next) => {
 
         const kho = await Kho.findById(kho_id);
         if (!kho) {
-            return res.status(400).json({ success: false, message: 'Kho xuat khong hop le' });
+            return res.status(400).json({ success: false, message: 'Kho xuất không hợp lệ' });
         }
 
         if (!items.length) {
-            return res.status(400).json({ success: false, message: 'Vui long chon it nhat 1 hang hoa' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 hàng hóa' });
         }
         const finalReceiverType = ['nhan_vien', 'khach_hang', 'nha_cung_cap', 'khac'].includes(loai_nguoi_nhan) ? loai_nguoi_nhan : 'khac';
         const finalReceiverName = String(nguoi_nhan || '').trim();
         if (!finalReceiverName) {
-            return res.status(400).json({ success: false, message: 'Vui long chon hoac nhap nguoi nhan' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn hoặc nhập người nhận' });
         }
 
         const finalStatus = trang_thai === 'completed' ? 'completed' : (trang_thai === 'cancelled' ? 'cancelled' : 'draft');
@@ -321,7 +449,7 @@ router.post('/add', async (req, res, next) => {
         }
 
         if (!normalizedItems.length) {
-            return res.status(400).json({ success: false, message: 'So luong xuat khong hop le' });
+            return res.status(400).json({ success: false, message: 'Số lượng xuất không hợp lệ' });
         }
 
         const ma_xuat_noi_bo = 'XNB' + Date.now();
@@ -363,7 +491,7 @@ router.post('/add', async (req, res, next) => {
                         ghi_chu: ghi_chu || 'Xuat dung noi bo'
                     });
                 } catch (_) {
-                    return res.status(400).json({ success: false, message: 'Khong du ton kho de xuat' });
+                    return res.status(400).json({ success: false, message: 'Không đủ tồn kho để xuất' });
                 }
 
                 await HangHoa.findByIdAndUpdate(item.product._id, { $inc: { ton_kho: -item.soLuong } });
@@ -372,8 +500,10 @@ router.post('/add', async (req, res, next) => {
 
         return res.json({
             success: true,
-            message: finalStatus === 'completed' ? 'Da hoan thanh phieu xuat' : 'Da luu phieu',
-            ma_xuat_noi_bo
+            message: finalStatus === 'completed' ? 'Đã hoàn thành phiếu xuất' : 'Đã lưu phiếu',
+            ma_xuat_noi_bo,
+            id: phieu._id,
+            print_url: '/chung-tu-kho/xuat-noi-bo/' + phieu._id
         });
     } catch (error) {
         next(error);
@@ -422,12 +552,12 @@ router.get('/export.xlsx', async (req, res, next) => {
 router.get('/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
-            return res.status(404).send('Khong tim thay phieu xuat noi bo');
+            return res.status(404).send('Không tìm thấy phiếu xuất nội bộ');
         }
 
         const { tickets, detailMap } = await loadExportTickets({ _id: req.params.id });
         if (!tickets.length) {
-            return res.status(404).send('Khong tim thay phieu xuat noi bo');
+            return res.status(404).send('Không tìm thấy phiếu xuất nội bộ');
         }
 
         const ticket = tickets[0];

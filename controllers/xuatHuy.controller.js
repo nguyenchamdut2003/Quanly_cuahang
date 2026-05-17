@@ -391,10 +391,39 @@ exports.index = async function(req, res, next) {
       loadWarehousesAndUsers(storeId),
       PhieuXuatHuy.find(query)
         .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+        .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang' })
         .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
         .sort({ ngay_xuat: -1, created_at: -1 })
         .lean()
     ]);
+
+    const ticketIds = tickets.map(function(t) { return t._id; });
+    var detailRows = [];
+    if (ticketIds.length) {
+      detailRows = await CTXuatHuy.find({ phieu_xuat_huy_id: { $in: ticketIds } })
+        .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
+        .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+        .sort({ created_at: 1 })
+        .lean();
+    }
+    const detailsByTicket = detailRows.reduce(function(map, row) {
+      const key = String(row.phieu_xuat_huy_id);
+      if (!map[key]) map[key] = [];
+      map[key].push(row);
+      return map;
+    }, {});
+    tickets.forEach(function(row) {
+      row.detail_rows = detailsByTicket[String(row._id)] || [];
+      row.detail_summary = {
+        tong_so_luong: row.detail_rows.reduce(function(sum, item) {
+          return sum + Number(item.so_luong || 0);
+        }, 0),
+        tong_gia_tri: row.detail_rows.reduce(function(sum, item) {
+          return sum + Number(item.thanh_tien || (Number(item.so_luong || 0) * Number(item.gia_von || 0)));
+        }, 0)
+      };
+    });
+
     res.render('xuat-huy/index', {
       title: 'Xuất hủy',
       activeMenu: 'hang-hoa',
@@ -443,17 +472,53 @@ exports.exportOneExcel = async function(req, res, next) {
   }
 };
 
+async function loadDestroyCopyDraft(copyFromId) {
+  if (!isObjectId(copyFromId)) return null;
+  const ticket = await PhieuXuatHuy.findById(copyFromId).lean();
+  if (!ticket || ticket.trang_thai === 'cancelled') return null;
+  const lines = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id })
+    .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
+    .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+    .sort({ created_at: 1 })
+    .lean();
+  if (!lines.length) return null;
+  return {
+    kho_id: ticket.kho_id ? String(ticket.kho_id) : '',
+    ly_do_huy: ticket.ly_do_huy || '',
+    ghi_chu: ticket.ghi_chu || '',
+    items: lines.map(row => ({
+      hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''),
+      lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
+      ma_hang: row.hang_hoa_id?.ma_hang || '',
+      ten_hang: row.hang_hoa_id?.ten_hang || '',
+      ma_lo: row.lo_hang_id?.ma_lo || row.lo_hang_id?.ten_lo || '',
+      so_luong: Number(row.so_luong || 0),
+      gia_von: Number(row.gia_von || 0)
+    })).filter(row => row.hang_hoa_id && row.so_luong > 0)
+  };
+}
+
 exports.createPage = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const { warehouses } = await loadWarehousesAndUsers(storeId);
+    const copyFromId = String(req.query?.copy_from || '').trim();
+    let copyDraft = null;
+    let copyFromError = '';
+    if (copyFromId) {
+      copyDraft = await loadDestroyCopyDraft(copyFromId);
+      if (!copyDraft) copyFromError = 'Không tải được phiếu xuất hủy để sao chép.';
+    }
+    const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
     res.render('xuat-huy/create', {
       title: 'Xuất hủy',
       activeMenu: 'hang-hoa',
       user: req.user,
       warehouses,
       nextCode: await makeCode(),
-      todayValue: new Date().toISOString().slice(0, 16)
+      todayValue: new Date().toISOString().slice(0, 16),
+      copyDraftJson,
+      copyFromError
     });
   } catch (error) {
     next(error);
@@ -500,7 +565,7 @@ exports.createSubmit = async function(req, res) {
     });
     await persistDetails(ticket._id, rows);
     if (mode === 'completed') await applyInventoryOut(ticket, rows, req.user?._id);
-    return res.json({ success: true, redirect: '/xuat-huy', id: ticket._id, ma_xuat_huy: code });
+    return res.json({ success: true, redirect: '/xuat-huy', id: ticket._id, ma_xuat_huy: code, print_url: '/chung-tu-kho/xuat-huy/' + ticket._id });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể lưu phiếu xuất hủy' });
   }

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
@@ -10,12 +11,12 @@
 <body>
   <%- include('../partials/header') %>
   <form class="page" method="GET" action="/bao-cao/ton-kho-lo">
-    <h1 class="title">Bao cao ton kho theo lo</h1>
+    <h1 class="title">Báo cáo tồn kho theo lô</h1>
     <aside class="filters">
       <div class="filter-block">
-        <div class="filter-title">Cua hang/co so</div>
+        <div class="filter-title">Cửa hàng/cơ sở</div>
         <select class="select" name="cua_hang_id">
-          <option value="">Tat ca</option>
+          <option value="">Tất cả</option>
           <% (report.stores || []).forEach(store => { %>
             <option value="<%= store._id %>" <%= String(report.filters.cua_hang_id || '') === String(store._id) ? 'selected' : '' %>><%= store.ten_cua_hang %></option>
           <% }) %>
@@ -24,53 +25,53 @@
       <div class="filter-block">
         <div class="filter-title">Kho</div>
         <select class="select" name="kho_id">
-          <option value="">Tat ca</option>
+          <option value="">Tất cả</option>
           <% (report.warehouses || []).forEach(kho => { %>
             <option value="<%= kho._id %>" <%= String(report.filters.kho_id || '') === String(kho._id) ? 'selected' : '' %>><%= kho.ten_kho %></option>
           <% }) %>
         </select>
       </div>
       <div class="filter-block">
-        <div class="filter-title">Hang hoa</div>
+        <div class="filter-title">Hàng hóa</div>
         <select class="select" name="hang_hoa_id">
-          <option value="">Tat ca</option>
+          <option value="">Tất cả</option>
           <% (report.products || []).forEach(product => { %>
             <option value="<%= product._id %>" <%= String(report.filters.hang_hoa_id || '') === String(product._id) ? 'selected' : '' %>><%= product.ma_hang %> - <%= product.ten_hang %></option>
           <% }) %>
         </select>
       </div>
-      <button class="btn primary" type="submit">Loc</button>
-      <a class="btn" href="/bao-cao/ton-kho-lo">Bo loc</a>
+      <button class="btn primary" type="submit">Lọc</button>
+      <a class="btn" href="/bao-cao/ton-kho-lo">Bỏ lọc</a>
     </aside>
     <main class="content">
       <div class="summary">
-        <div class="summary-card"><label>Tong so luong</label><strong><%= Number(report.totals.quantity || 0).toLocaleString('vi-VN') %></strong></div>
-        <div class="summary-card"><label>Tong gia tri</label><strong><%= Number(report.totals.value || 0).toLocaleString('vi-VN') %></strong></div>
+        <div class="summary-card"><label>Tổng số lượng</label><strong><%= Number(report.totals.quantity || 0).toLocaleString('vi-VN') %></strong></div>
+        <div class="summary-card"><label>Tổng giá trị</label><strong><%= Number(report.totals.value || 0).toLocaleString('vi-VN') %></strong></div>
       </div>
       <table class="report-table">
         <thead>
           <tr>
-            <th>Ma hang</th>
-            <th>Ten hang</th>
+            <th>Mã hàng</th>
+            <th>Tên hàng</th>
             <th>Kho</th>
-            <th>Lo</th>
-            <th>Ngay nhap</th>
-            <th>Han su dung</th>
-            <th class="num">So luong con lai</th>
-            <th class="num">Gia von</th>
-            <th class="num">Tong gia tri</th>
+            <th>Lô</th>
+            <th>Ngày nhập</th>
+            <th>Hạn sử dụng</th>
+            <th class="num">Số lượng còn lại</th>
+            <th class="num">Giá vốn</th>
+            <th class="num">Tổng giá trị</th>
           </tr>
         </thead>
         <tbody>
           <% if (!(report.rows || []).length) { %>
-            <tr><td class="empty" colspan="9">Khong co du lieu ton kho theo lo.</td></tr>
+            <tr><td class="empty" colspan="9">Không có dữ liệu tồn kho theo lô.</td></tr>
           <% } %>
           <% (report.rows || []).forEach(row => { %>
             <tr>
-              <td><%= row.ma_hang %></td>
+              <td><%- refLink('product', row.hang_hoa_id, row.ma_hang) %></td>
               <td><%= row.ten_hang %></td>
-              <td><%= row.kho %></td>
-              <td><%= row.ma_lo %></td>
+              <td><%- refLink('warehouse', row.kho_id, row.kho) %></td>
+              <td><%- refLink('lot', row.lo_hang_id, row.ma_lo) %></td>
               <td><%= row.ngay_nhap ? new Date(row.ngay_nhap).toLocaleDateString('vi-VN') : '' %></td>
               <td><%= row.han_su_dung ? new Date(row.han_su_dung).toLocaleDateString('vi-VN') : '' %></td>
               <td class="num"><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %></td>
