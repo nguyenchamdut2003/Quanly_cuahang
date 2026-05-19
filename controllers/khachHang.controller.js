@@ -10,6 +10,7 @@ var {
     NguoiDung
 } = require('../models/kiot.model');
 var ExcelJS = require('exceljs');
+var { buildFullAddress, normalizeAddress } = require('../utils/address');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -286,15 +287,15 @@ async function makeAddressCode() {
 
 function normalizeAddressPayload(body) {
     body = body || {};
+    var address = normalizeAddress(body);
     return {
         ma_dia_chi: String(body.ma_dia_chi || '').trim(),
         ten_nguoi_nhan: String(body.ten_nguoi_nhan || '').trim(),
         sdt_nguoi_nhan: String(body.sdt_nguoi_nhan || '').trim(),
-        so_nha: String(body.so_nha || '').trim(),
-        dia_chi_day_du: String(body.dia_chi_day_du || '').trim(),
-        tinh_thanh: String(body.tinh_thanh || '').trim(),
-        quan_huyen: String(body.quan_huyen || '').trim(),
-        phuong_xa: String(body.phuong_xa || '').trim(),
+        dia_chi_chi_tiet: address.dia_chi_chi_tiet,
+        dia_chi_day_du: address.dia_chi_day_du,
+        tinh_thanh: address.tinh_thanh,
+        phuong_xa: address.phuong_xa,
         loai_dia_chi: String(body.loai_dia_chi || '').trim(),
         ghi_chu: String(body.ghi_chu || body.ghi_chu_dia_chi || '').trim(),
         mac_dinh: body.mac_dinh === 'true' || body.mac_dinh === true || body.mac_dinh === 'on'
@@ -354,7 +355,7 @@ async function seedCustomersIfEmpty() {
             gioi_tinh: 'other',
             tong_ban: 15000000,
             tong_no: 1200000,
-            khu_vuc_giao_hang: 'TP.HCM - Quận 1',
+            khu_vuc_giao_hang: 'TP.HCM',
             trang_thai: 'active'
         },
         {
@@ -499,7 +500,7 @@ function exportStatus(value) {
 }
 
 function exportAddress(address) {
-    return address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '---';
+    return address.dia_chi_day_du || buildFullAddress(address) || '---';
 }
 
 function exportRelatedCode(item, fields) {
@@ -1170,7 +1171,7 @@ exports.add = async function(req, res, next) {
 
         // Save address if provided
         var addressPayload = normalizeAddressPayload(req?.body);
-        var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.so_nha || addressPayload.tinh_thanh || addressPayload.quan_huyen || addressPayload.phuong_xa;
+        var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.dia_chi_chi_tiet || addressPayload.tinh_thanh || addressPayload.phuong_xa;
         if (hasAddressData) {
             if (!addressPayload.ma_dia_chi) addressPayload.ma_dia_chi = await makeAddressCode();
             if (!addressPayload.loai_dia_chi) addressPayload.loai_dia_chi = 'khac';
@@ -1227,7 +1228,7 @@ exports.update = async function(req, res, next) {
 
         // Save address if provided
         var addressPayload = normalizeAddressPayload(req?.body);
-        var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.so_nha || addressPayload.tinh_thanh || addressPayload.quan_huyen || addressPayload.phuong_xa;
+        var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.dia_chi_chi_tiet || addressPayload.tinh_thanh || addressPayload.phuong_xa;
         if (hasAddressData) {
             if (!addressPayload.loai_dia_chi) addressPayload.loai_dia_chi = 'khac';
             addressPayload.khach_hang_id = customerId;

@@ -301,11 +301,6 @@ exports.index = async function(req, res, next) {
         .populate({ path: 'hang_hoa_id' })
         .populate({ path: 'don_vi_tinh_id', select: 'ten_don_vi' })
         .populate({ path: 'lo_hang_id' })
-        .populate({
-          path: 'gia_tri_thuoc_tinh_id',
-          select: 'ten_gia_tri ma_gia_tri thuoc_tinh_id',
-          populate: { path: 'thuoc_tinh_id', select: 'ten_thuoc_tinh ma_thuoc_tinh' }
-        })
         .sort({ created_at: 1 })
         .lean();
     }
@@ -515,7 +510,7 @@ async function loadPurchaseWithItems(id, storeId) {
   var filter = { _id: id };
   if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
   var ticket = await PhieuNhap.findOne(filter)
-    .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang dia_chi dia_chi_gui_hang sdt email' })
+    .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang dia_chi_day_du dia_chi_gui_hang_day_du sdt email' })
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty ma_so_thue sdt email ghi_chu tong_no tong_mua' })
     .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
     .populate({ path: 'kho_id', select: 'ten_kho ma_kho' });
@@ -524,11 +519,6 @@ async function loadPurchaseWithItems(id, storeId) {
     .populate({ path: 'hang_hoa_id' })
     .populate({ path: 'don_vi_tinh_id', select: 'ten_don_vi ma_don_vi' })
     .populate({ path: 'lo_hang_id' })
-    .populate({
-      path: 'gia_tri_thuoc_tinh_id',
-      select: 'ten_gia_tri ma_gia_tri thuoc_tinh_id',
-      populate: { path: 'thuoc_tinh_id', select: 'ten_thuoc_tinh ma_thuoc_tinh' }
-    })
     .sort({ created_at: 1 });
   return { ticket: ticket, items: items };
 }
@@ -907,12 +897,9 @@ exports.apiProductLots = async function(req, res, next) {
     var query = { hang_hoa_id: productId, trang_thai: { $ne: 'huy' } };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
     if (mongoose.Types.ObjectId.isValid(String(req.query.kho_id || ''))) query.kho_id = String(req.query.kho_id);
-    if (mongoose.Types.ObjectId.isValid(String(req.query.gia_tri_thuoc_tinh_id || ''))) {
-      query.gia_tri_thuoc_tinh_id = String(req.query.gia_tri_thuoc_tinh_id);
-    }
     var items = await LoHang.find(query)
       .sort({ han_su_dung: 1, ngay_nhap: -1 })
-      .select('ma_lo ten_lo ngay_nhap han_su_dung so_luong_ban_dau so_luong_con_lai don_gia_nhap gia_von trang_thai kho_id gia_tri_thuoc_tinh_id')
+      .select('ma_lo ten_lo ngay_nhap han_su_dung so_luong_ban_dau so_luong_con_lai don_gia_nhap gia_von trang_thai kho_id quy_cach_items')
       .lean();
     return res.json({ success: true, items: items });
   } catch (error) {

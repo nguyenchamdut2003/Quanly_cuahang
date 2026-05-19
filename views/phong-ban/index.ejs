@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .hr-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .hr-toolbar h1{margin:0;font-size:22px;font-weight:700;color:#111827}
+    .hr-search{flex:1;min-width:220px;max-width:420px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px;height:36px}
+    .hr-search input{border:0;outline:0;flex:1;font-size:13px}
+    .hr-table-panel{background:#fff;border:1px solid #d7dde5;border-radius:8px;overflow:hidden}
+    .hr-table{width:100%;border-collapse:collapse}
+    .hr-table thead th{background:#e8f3ff;color:#111827;font-size:13px;font-weight:700;height:38px;padding:0 12px;text-align:left;border-bottom:1px solid #bcd9ff}
+    .hr-table tbody td{padding:10px 12px;border-bottom:1px solid #e5e9ee;font-size:13px;color:#111827}
+    .hr-table tbody tr:hover{background:#f8fbff}
+    .hr-empty{padding:48px 20px;text-align:center;color:#475467}
+    .hr-empty a{color:#0070f4;cursor:pointer;font-weight:600}
+    .status-pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:5px;font-size:11px;font-weight:700}
+    .status-pill.is-active{background:#dcfce7;color:#166534}
+    .status-pill.is-inactive{background:#fee2e2;color:#991b1b}
+    .hr-actions{display:flex;gap:6px}
+    .hr-btn-icon{border:1px solid #cfd8e3;background:#fff;border-radius:6px;width:30px;height:28px;cursor:pointer;color:#344054}
+    .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1200;padding:20px}
+    .modal-overlay.is-open{display:flex}
+    .modal-card{background:#fff;border-radius:10px;width:min(520px,100%);box-shadow:0 20px 50px rgba(0,0,0,.18)}
+    .modal-head{padding:16px 20px;border-bottom:1px solid #e5e9ee;font-size:18px;font-weight:700}
+    .modal-body{padding:16px 20px;display:grid;gap:12px}
+    .modal-body label{display:grid;gap:4px;font-size:12px;color:#475467}
+    .modal-body input,.modal-body select,.modal-body textarea{height:34px;border:1px solid #cfd8e3;border-radius:7px;padding:0 10px;font-size:13px}
+    .modal-body textarea{height:72px;padding:8px 10px;resize:vertical}
+    .modal-foot{padding:12px 20px 16px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #e5e9ee}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="admin-shell store-page">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+    <div class="hr-toolbar">
+      <h1>Phòng ban</h1>
+      <div class="hr-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="pbKeyword" placeholder="Tìm kiếm phòng ban" value="<%= filter.keyword || '' %>">
+      </div>
+      <button type="button" class="btn btn-primary" id="pbAddBtn">+ Phòng ban</button>
+    </div>
+
+    <section class="hr-table-panel">
+      <table class="hr-table">
+        <thead>
+          <tr>
+            <th>Mã phòng ban</th>
+            <th>Tên phòng ban</th>
+            <th>Mô tả</th>
+            <th>Trạng thái</th>
+            <th style="width:100px">Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="pbTableBody">
+          <% if (!(phongBans || []).length) { %>
+            <tr><td colspan="5" class="hr-empty">Chưa có phòng ban. <a id="pbEmptyAdd">Nhấn vào đây để thêm phòng ban</a>.</td></tr>
+          <% } %>
+          <% (phongBans || []).forEach(function(pb) { %>
+            <tr data-id="<%= pb._id %>">
+              <td><%= pb.ma_phong_ban || '---' %></td>
+              <td><strong><%= pb.ten_phong_ban || '---' %></strong></td>
+              <td><%= pb.mo_ta || '---' %></td>
+              <td>
+                <span class="status-pill <%= pb.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+                  <%= pb.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
+                </span>
+              </td>
+              <td>
+                <div class="hr-actions">
+                  <button type="button" class="hr-btn-icon pb-edit" title="Sửa"><i class="fa-regular fa-pen-to-square"></i></button>
+                  <button type="button" class="hr-btn-icon pb-delete" title="Xóa"><i class="fa-regular fa-trash-can"></i></button>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <div class="modal-overlay" id="pbModal">
+    <div class="modal-card">
+      <div class="modal-head" id="pbModalTitle">Thêm phòng ban</div>
+      <form id="pbForm" class="modal-body">
+        <input type="hidden" id="pbId">
+        <label>Mã phòng ban<input id="pbMa" placeholder="Để trống tự động"></label>
+        <label>Tên phòng ban *<input id="pbTen" required></label>
+        <label>Mô tả<textarea id="pbMoTa"></textarea></label>
+        <label>Trạng thái
+          <select id="pbTrangThai">
+            <option value="active">Đang hoạt động</option>
+            <option value="inactive">Ngừng hoạt động</option>
+          </select>
+        </label>
+      </form>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-light" id="pbCancelBtn">Bỏ qua</button>
+        <button type="button" class="btn btn-primary" id="pbSaveBtn">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const pbModal = document.getElementById('pbModal');
+    const pbForm = document.getElementById('pbForm');
+    const pbKeyword = document.getElementById('pbKeyword');
+    let pbEditId = '';
+
+    function openPbModal(item) {
+      pbEditId = item && item._id ? String(item._id) : '';
+      document.getElementById('pbModalTitle').textContent = pbEditId ? 'Sửa phòng ban' : 'Thêm phòng ban';
+      document.getElementById('pbId').value = pbEditId;
+      document.getElementById('pbMa').value = item && item.ma_phong_ban ? item.ma_phong_ban : '';
+      document.getElementById('pbTen').value = item && item.ten_phong_ban ? item.ten_phong_ban : '';
+      document.getElementById('pbMoTa').value = item && item.mo_ta ? item.mo_ta : '';
+      document.getElementById('pbTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+      pbModal.classList.add('is-open');
+    }
+
+    function closePbModal() { pbModal.classList.remove('is-open'); }
+
+    function reloadWithKeyword() {
+      const params = new URLSearchParams();
+      const kw = pbKeyword.value.trim();
+      if (kw) params.set('keyword', kw);
+      window.location.href = '/phong-ban' + (params.toString() ? '?' + params.toString() : '');
+    }
+
+    document.getElementById('pbAddBtn').addEventListener('click', () => openPbModal(null));
+    document.getElementById('pbEmptyAdd')?.addEventListener('click', (e) => { e.preventDefault(); openPbModal(null); });
+    document.getElementById('pbCancelBtn').addEventListener('click', closePbModal);
+    pbModal.addEventListener('click', (e) => { if (e.target === pbModal) closePbModal(); });
+    pbKeyword.addEventListener('keydown', (e) => { if (e.key === 'Enter') reloadWithKeyword(); });
+
+    document.querySelectorAll('.pb-edit').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const row = this.closest('tr');
+        openPbModal({
+          _id: row.dataset.id,
+          ma_phong_ban: row.children[0].textContent.trim() === '---' ? '' : row.children[0].textContent.trim(),
+          ten_phong_ban: row.querySelector('strong')?.textContent.trim() || '',
+          mo_ta: row.children[2].textContent.trim() === '---' ? '' : row.children[2].textContent.trim(),
+          trang_thai: row.querySelector('.status-pill')?.classList.contains('is-inactive') ? 'inactive' : 'active'
+        });
+      });
+    });
+
+    document.querySelectorAll('.pb-delete').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const id = this.closest('tr').dataset.id;
+        if (!confirm('Ngừng hoạt động / xóa mềm phòng ban này?')) return;
+        const res = await fetch('/api/phong-ban/' + id, { method: 'DELETE' });
+        const json = await res.json();
+        if (!json.success) return alert(json.message || 'Lỗi');
+        alert(json.message || 'Đã xử lý');
+        location.reload();
+      });
+    });
+
+    document.getElementById('pbSaveBtn').addEventListener('click', async function() {
+      const payload = {
+        ma_phong_ban: document.getElementById('pbMa').value.trim(),
+        ten_phong_ban: document.getElementById('pbTen').value.trim(),
+        mo_ta: document.getElementById('pbMoTa').value.trim(),
+        trang_thai: document.getElementById('pbTrangThai').value
+      };
+      if (!payload.ten_phong_ban) return alert('Vui lòng nhập tên phòng ban');
+      const url = pbEditId ? ('/api/phong-ban/' + pbEditId) : '/api/phong-ban';
+      const method = pbEditId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json.success) return alert(json.message || 'Lỗi lưu phòng ban');
+      location.reload();
+    });
+  </script>
+</body>
+</html>

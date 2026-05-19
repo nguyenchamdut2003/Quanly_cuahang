@@ -28,6 +28,8 @@
     th{height:34px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:12px;font-weight:800;padding:0 8px;text-align:left}
     td{height:40px;border-bottom:1px solid #edf1f5;padding:0 8px;font-size:13px;color:#111827}
     .num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.lot{width:118px}.smallqty{width:118px}.qty{width:105px}.money{width:122px}.remove{width:42px}
+    .cell-input { width: 100%; height: 28px; border: 1px solid #cfd8e3; border-radius: 4px; padding: 0 6px; font-size: 13px; outline: none; text-align: right; box-sizing: border-box; transition: border-color 0.15s; }
+    .cell-input:focus { border-color: #0070f4; box-shadow: 0 0 0 2px rgba(0,112,244,0.1); }
     .cell-input.cell-input-left{text-align:left;font-size:12px}
     .line-note{min-width:72px}
     .lot-select{display:block;width:260px;max-width:100%;height:25px;margin-top:5px;border:1px solid #cfd8e3;border-radius:5px;font-size:12px;color:#475467}
@@ -380,6 +382,9 @@
       });
       const data = await res.json();
       if (!data.success) return showError(data.message || 'Không thể lưu phiếu trả hàng nhập');
+      if (data.print_url && confirm('Đã lưu phiếu. Bạn có muốn in phiếu trả hàng nhập không?')) {
+        window.open(data.print_url, '_blank');
+      }
       location.href = data.redirect || '/tra-hang-nhap';
     }
 

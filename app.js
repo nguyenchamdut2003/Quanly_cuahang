@@ -32,12 +32,26 @@ var stockVoucherRouter = require('./routes/stockVoucher');
 var xuatHuyController = require('./controllers/xuatHuy.controller');
 var apiKhoRouter = require('./routes/apiKho');
 var traHangNhapRouter = require('./routes/traHangNhap');
+var phongBanRouter = require('./routes/phongBan');
+var apiPhongBanRouter = require('./routes/apiPhongBan');
+var nhanVienRouter = require('./routes/nhanVien');
+var apiNhanVienRouter = require('./routes/apiNhanVien');
+var nhanVienController = require('./controllers/nhanVien.controller');
 
 var app = express();
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
+
+app.use(function(req, res, next) {
+  var render = res.render;
+  res.render = function() {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return render.apply(res, arguments);
+  };
+  next();
+});
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -180,6 +194,7 @@ app.get('/api/phieu-nhap/con-hang-xuat-huy', isAuthenticated, xuatHuyController.
 app.get('/api/kho/:khoId/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);
 app.get('/api/phieu-nhap/:id/chi-tiet-tra-hang', isAuthenticated, traHangNhapController.apiPurchaseReturnDetail);
 app.get('/api/phieu-nhap/:id/chi-tiet-xuat-huy', isAuthenticated, xuatHuyController.apiPurchaseDestroyDetail);
+app.get('/api/xuat-huy/lo-hang/:loHangId/quy-cach-ton', isAuthenticated, xuatHuyController.apiLotQuyCachTon);
 app.get('/api/kho/:khoId/hang-xuat-huy', isAuthenticated, xuatHuyController.apiWarehouseProducts);
 app.post('/api/hang-hoa/quick-create', isAuthenticated, nhapHangController.quickCreateProduct);
 app.post('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
@@ -191,6 +206,11 @@ app.use('/api/don-hang', donHangRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);
 app.use('/bao-cao', baoCaoRouter);
+app.use('/api/phong-ban', apiPhongBanRouter);
+app.use('/api/nhan-vien', apiNhanVienRouter);
+app.use('/phong-ban', phongBanRouter);
+app.use('/nhan-vien', nhanVienRouter);
+app.get('/chuc-danh', isAuthenticated, nhanVienController.chucDanhPlaceholder);
 app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);
 app.use('/xuat-dung-noi-bo', xuatDungNoiBoRouter);

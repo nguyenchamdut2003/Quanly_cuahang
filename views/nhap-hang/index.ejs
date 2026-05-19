@@ -20,25 +20,15 @@
     const expiry = formatDateOnly(lot.han_su_dung);
     return expiry ? `${lotText} - HSD: ${expiry}` : lotText;
   };
-  const attributeList = row => {
-    if (Array.isArray(row?.attribute_values) && row.attribute_values.length) return row.attribute_values;
-    const value = row && row.gia_tri_thuoc_tinh_id ? row.gia_tri_thuoc_tinh_id : null;
-    if (!value) return [];
-    const attr = value.thuoc_tinh_id || {};
-    return [{
-      ten_thuoc_tinh: attr.ten_thuoc_tinh || attr.ma_thuoc_tinh || 'Thuộc tính',
-      ten_gia_tri: value.ten_gia_tri || value.ma_gia_tri || ''
-    }].filter(item => item.ten_gia_tri);
-  };
-  const isSizeName = name => {
-    const text = String(name || '').toLowerCase();
-    return text === 'size' || text.includes('kích cỡ') || text.includes('kich co');
-  };
-  const attributeSummary = row => {
-    const attrs = attributeList(row);
-    if (!attrs.length) return 'Không phân loại';
-    if (attrs.length === 1 && isSizeName(attrs[0].ten_thuoc_tinh)) return attrs[0].ten_gia_tri;
-    return attrs.map(item => `${item.ten_thuoc_tinh}: ${item.ten_gia_tri}`).join(' - ');
+  const quyCachSummary = row => {
+    const info = row && row.lot_info ? row.lot_info : null;
+    const items = info && Array.isArray(info.quy_cach_items) ? info.quy_cach_items : [];
+    if (!items.length) return '--';
+    const unit = row?.don_vi_tinh_id?.ten_don_vi || '';
+    return items
+      .filter(item => Number(item.so_luong || 0) > 0)
+      .map(item => `${item.ten_thuoc_tinh || '--'} ${fmt(item.so_luong || 0)}${unit}`)
+      .join(', ');
   };
   const detailGroups = rows => {
     const groups = [];
@@ -307,7 +297,7 @@
                                   <thead>
                                     <tr>
                                       <th>Ngày / Lô</th>
-                                      <th>Thuộc tính</th>
+                                      <th>Quy cách</th>
                                       <th class="num">Số Kg</th>
                                       <th class="num">Đơn giá</th>
                                       <th class="num">Thành tiền</th>
@@ -321,7 +311,7 @@
                                           <td class="lot-cell" rowspan="<%= group.rows.length %>"><%- group.lot_label %></td>
                                         <% } %>
                                         <td class="attr-cell">
-                                          <div><%= attributeSummary(r) %></div>
+                                          <div><%= quyCachSummary(r) %></div>
                                         </td>
                                         <td class="num"><%= fmt(r.so_luong || 0) %></td>
                                         <td class="num"><%= fmt(r.don_gia_nhap || 0) %></td>
@@ -353,7 +343,6 @@
                             <button type="button" class="kv-btn" onclick="copyPurchase('<%= t._id %>')">Sao chép</button>
                             <a class="kv-btn" href="/nhap-hang/<%= t._id %>/export.xlsx">Xuất file</a>
                             <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/in-tong-hop" target="_blank">In phiếu + 02/TNDN</a>
-                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/hd-mua-ban-nguyen-tac" target="_blank">HĐ nguyên tắc</a>
                             <button type="button" class="kv-btn" onclick="returnPurchase('<%= t._id %>')">Trả hàng nhập</button>
                             <button type="button" class="kv-btn" onclick="openLabelModal('<%= t._id %>')">In tem mã</button>
                           </div>

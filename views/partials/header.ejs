@@ -11,11 +11,10 @@
             const stores = Array.isArray(locals.availableStores) ? locals.availableStores : [];
             const storeName = store?.ten_cua_hang || 'Thông tin cửa hàng';
             const storeInitial = (storeName || 'C').trim().charAt(0).toUpperCase();
-            const storeAddress = [
-              store?.dia_chi_gui_hang || store?.dia_chi,
-              store?.phuong_xa,
-              store?.quan_huyen,
-              store?.tinh_thanh
+            const storeAddress = store?.dia_chi_gui_hang_day_du || store?.dia_chi_day_du || [
+              store?.dia_chi_gui_hang_chi_tiet || store?.dia_chi_chi_tiet,
+              store?.phuong_xa_gui_hang || store?.phuong_xa,
+              store?.tinh_thanh_gui_hang || store?.tinh_thanh
             ].filter(Boolean).join(', ');
             const storeEditUrl = store?._id ? `/cua-hang?open=${store._id}` : '/cua-hang';
           %>
@@ -95,7 +94,6 @@
           <div class="nav-mega-col">
             <a href="/hang-hoa" class="nav-mega-item">Danh sách hàng hóa</a>
             <a href="/hang-hoa/thiet-lap-gia" class="nav-mega-item">Thiết lập giá</a>
-            <a href="/hang-hoa/thuoc-tinh" class="nav-mega-item">Thuộc tính hàng hóa</a>
           </div>
           <div class="nav-mega-col">
             <a href="/kiem-kho" class="nav-mega-item">Kiểm kho</a>
@@ -132,6 +130,16 @@
             <a href="/don-hang/tra-hang" class="nav-mega-item">Trả hàng</a>
             <a href="/don-hang/doi-tac-giao-hang" class="nav-mega-item nav-mega-item--separated">Đối tác giao hàng</a>
             <a href="/don-hang/van-don" class="nav-mega-item">Vận đơn</a>
+          </div>
+        </div>
+      </div>
+      <div class="nav-dropdown" id="nhanVienNav">
+        <button type="button" class="nav-item nav-dropdown-trigger">Nhân viên</button>
+        <div class="nav-mega-menu nav-mega-menu--single">
+          <div class="nav-mega-col">
+            <a href="/nhan-vien" class="nav-mega-item">Danh sách nhân viên</a>
+            <a href="/phong-ban" class="nav-mega-item">Phòng ban</a>
+            <a href="/chuc-danh" class="nav-mega-item">Chức danh</a>
           </div>
         </div>
       </div>

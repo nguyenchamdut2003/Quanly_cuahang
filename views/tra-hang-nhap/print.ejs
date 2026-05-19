@@ -1,0 +1,120 @@
+<%
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const d = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
+  const supplier = ticket.nha_cung_cap_id || {};
+  const warehouse = ticket.kho_id || {};
+  const purchase = ticket.phieu_nhap_id || {};
+  const creator = ticket.nguoi_tao_id || {};
+  const returner = ticket.nguoi_tra_id || {};
+  const discountText = ticket.kieu_giam_gia === 'percent'
+    ? ((ticket.giam_gia || 0) + '%')
+    : (fmt(ticket.giam_gia) + ' VND');
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title><%= title %></title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#111;margin:0;background:#f3f4f6}
+    .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:16mm;box-sizing:border-box}
+    h1{text-align:center;font-size:22px;margin:14px 0 6px;text-transform:uppercase}
+    .store{text-align:center;font-size:13px}
+    .status{text-align:center;font-size:13px;margin-top:4px}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin:14px 0}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #333;padding:5px 6px;font-size:11.5px}
+    th{text-align:center;background:#f1f5f9}
+    .num{text-align:right}
+    .note-cell{word-break:break-word}
+    .summary{width:80mm;margin-left:auto;margin-top:12px;font-size:13px}
+    .summary div{display:flex;justify-content:space-between;padding:4px 0;gap:12px}
+    .sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:28px;text-align:center;font-size:13px}
+    .sign b{display:block;margin-bottom:46px}
+    .print-actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}
+    .print-actions button{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer}
+    @media print{body{background:#fff}.page{margin:0;width:auto;min-height:auto;padding:12mm}.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+  <% if (!embeddedPrint) { %>
+    <div class="print-actions no-print">
+      <button type="button" onclick="window.print()">In</button>
+      <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf'">Tải PDF</button>
+      <button type="button" onclick="window.open(window.location.href, '_blank')">Mở riêng</button>
+    </div>
+  <% } %>
+  <main class="page">
+    <div class="store">
+      <strong><%= store ? (store.ten_cua_hang || 'Cửa hàng') : 'Cửa hàng' %></strong><br>
+      <%= store ? (store.dia_chi_day_du || store.dia_chi_gui_hang_day_du || '') : '' %><%= store && store.sdt ? (' - ' + store.sdt) : '' %>
+    </div>
+    <h1>Phiếu trả hàng nhập</h1>
+    <div style="text-align:center;font-size:13px">Mã phiếu: <strong><%= ticket.ma_phieu_tra_nhap || '' %></strong></div>
+    <div class="status">Trạng thái: <strong><%= statusLabel(ticket.trang_thai) %></strong></div>
+
+    <section class="meta">
+      <div>Ngày trả: <strong><%= d(ticket.ngay_tra || ticket.created_at) %></strong></div>
+      <div>Kho: <strong><%= warehouse.ten_kho || warehouse.ma_kho || '' %></strong></div>
+      <div>Nhà cung cấp: <strong><%= supplier.ten_ncc || supplier.ten_cong_ty || '' %></strong></div>
+      <div>Mã NCC: <strong><%= supplier.ma_ncc || '' %></strong></div>
+      <div>Phiếu nhập gốc: <strong><%= purchase.ma_phieu_nhap || '' %></strong></div>
+      <div>Ngày nhập gốc: <strong><%= d(purchase.ngay_nhap) %></strong></div>
+      <div>Người tạo: <strong><%= creator.ho_ten || creator.email || '' %></strong></div>
+      <div>Người trả: <strong><%= returner.ho_ten || returner.email || '' %></strong></div>
+      <div>Lý do: <strong><%= ticket.ly_do || '' %></strong></div>
+      <div>Ghi chú: <strong><%= ticket.ghi_chu || '' %></strong></div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Mã hàng</th>
+          <th>Tên hàng</th>
+          <th>ĐVT</th>
+          <th>Lô</th>
+          <th>Số lượng</th>
+          <th>Giá nhập</th>
+          <th>Giá trả lại</th>
+          <th>Thành tiền</th>
+          <th>Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% items.forEach(function(row, index) { %>
+          <tr>
+            <td class="num"><%= index + 1 %></td>
+            <td><%= row.hang_hoa_id ? (row.hang_hoa_id.ma_hang || '') : '' %></td>
+            <td>
+              <%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %>
+            </td>
+            <td><%= row.don_vi_tinh_id ? (row.don_vi_tinh_id.ten_don_vi || row.don_vi_tinh_id.ma_don_vi || '') : '' %></td>
+            <td><%= row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '' %></td>
+            <td class="num"><%= fmt(row.so_luong) %></td>
+            <td class="num"><%= fmt(row.gia_nhap || row.don_gia) %></td>
+            <td class="num"><%= fmt(row.gia_tra_lai || row.don_gia) %></td>
+            <td class="num"><%= fmt(row.thanh_tien) %></td>
+            <td class="note-cell"><%= row.ghi_chu || '' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div><span>Tổng tiền hàng trả</span><strong><%= fmt(ticket.tong_tien_hang) %> VND</strong></div>
+      <div><span>Giảm giá</span><strong><%= discountText %></strong></div>
+      <div><span>NCC cần trả</span><strong><%= fmt(ticket.ncc_can_tra != null ? ticket.ncc_can_tra : ticket.tong_tien_tra) %> VND</strong></div>
+      <div><span>NCC đã trả</span><strong><%= fmt(ticket.ncc_da_tra) %> VND</strong></div>
+      <div><span>Tổng tiền trả</span><strong><%= fmt(ticket.tong_tien_tra) %> VND</strong></div>
+      <div><span>Tính vào công nợ</span><strong><%= ticket.tinh_vao_cong_no === false ? 'Không' : 'Có' %></strong></div>
+    </section>
+
+    <section class="sign">
+      <div><b>Người lập phiếu</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Nhà cung cấp</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Thủ kho</b>(Ký, ghi rõ họ tên)</div>
+    </section>
+  </main>
+</body>
+</html>

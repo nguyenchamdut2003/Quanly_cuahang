@@ -81,7 +81,7 @@
         </div>
         <div class="filter-block"><div class="filter-title">Đối tác giao hàng</div><select name="doi_tac" class="filter-control" onchange="this.form.submit()"><option value="">Chọn đối tác giao hàng</option><% (locals.partners || []).forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
         <div class="filter-block"><div class="filter-title">Thời gian giao hàng</div><label class="radio-line"><input type="radio" name="delivery_time_type" value="all" <%= safeFilters.delivery_time_type !== 'custom' ? 'checked' : '' %>><span class="radio-pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label><label class="radio-line"><input type="radio" name="delivery_time_type" value="custom" <%= safeFilters.delivery_time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label><div class="date-range"><input type="date" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>"><input type="date" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>"></div></div>
-        <div class="filter-block"><div class="filter-title">Khu vực giao hàng</div><input name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" class="filter-control" placeholder="Chọn Tỉnh/TP - Quận/Huyện"></div>
+        <div class="filter-block"><div class="filter-title">Khu vực giao hàng</div><input name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" class="filter-control" placeholder="Chọn Tỉnh/Thành phố"></div>
         <div class="filter-block"><div class="filter-title">Phương thức thanh toán</div><select name="phuong_thuc_tt" class="filter-control" onchange="this.form.submit()"><option value="">Chọn phương thức thanh toán...</option><option value="COD" <%= safeFilters.phuong_thuc_tt === 'COD' ? 'selected' : '' %>>COD</option></select></div>
         <div class="filter-block"><div class="filter-title">Người tạo</div><input name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" list="userList" class="filter-control" placeholder="Chọn người tạo"></div>
         <div class="filter-block"><div class="filter-title">Người nhận đặt</div><input name="nguoi_nhan" value="<%= safeFilters.nguoi_nhan || '' %>" class="filter-control" placeholder="Chọn người nhận đặt"></div>
@@ -168,7 +168,7 @@
       const customer = order.khach_hang_id || {};
       const receiver = shipment?.ten_nguoi_nhan || customer.ten_khach_hang || '';
       const phone = shipment?.sdt_nguoi_nhan || customer.sdt || '';
-      const address = shipment?.dia_chi_nhan || customer.dia_chi || '';
+      const address = shipment?.dia_chi_nhan || customer.dia_chi_day_du || '';
       const itemRows = items.map(item => {
         const product = item.hang_hoa_id || {};
         const deliveryStatus = deliveryStatusLabels[item.trang_thai_giao] || deliveryStatusLabels.chua_giao;

@@ -231,6 +231,9 @@
                                         <% if (item.lo_hang_id) { %>
                                           <div class="mini-wrap-meta">Lô: <%= item.lo_hang_id.ma_lo || item.lo_hang_id.ten_lo || '--' %></div>
                                         <% } %>
+                                        <% if (item.ten_quy_cach) { %>
+                                          <div class="mini-wrap-meta">QC: <%= item.ten_quy_cach %></div>
+                                        <% } %>
                                       </td>
                                       <td class="num"><%= fmt(item.so_luong || 0) %></td>
                                       <td class="num"><%= fmt(item.gia_von || 0) %></td>

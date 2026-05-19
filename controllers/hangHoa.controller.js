@@ -1,6 +1,8 @@
 var mongoose = require('mongoose');
 var querystring = require('querystring');
+var path = require('path');
 var { HangHoa, NhomHang, DonViTinh, NhaCungCap, TonKho, Kho, BangGia, CTBangGia, CuaHang, LoHang, TonKhoLo, LichSuKho, ThuocTinhHang, GiaTriThuocTinh, HangHoaThuocTinh } = require('../models/kiot.model');
+var pdfService = require('../services/pdf.service');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -129,6 +131,7 @@ function normalizeProductPayload(body) {
         dinh_muc_toi_thieu: Number.isFinite(dinhMucRaw) && dinhMucRaw > 0 ? dinhMucRaw : 0,
         ban_truc_tiep: body.ban_truc_tiep === 'false' ? false : true,
         quan_ly_theo_lo: body.quan_ly_theo_lo === 'true' || body.quan_ly_theo_lo === 'on',
+        han_su_dung_mac_dinh_so_ngay: Number.isFinite(Number(body.han_su_dung_mac_dinh_so_ngay)) && Number(body.han_su_dung_mac_dinh_so_ngay) >= 0 ? Number(body.han_su_dung_mac_dinh_so_ngay) : 5,
         trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
     };
 }
@@ -373,8 +376,35 @@ function shouldRespondJson(req) {
     return requestedWith === 'xmlhttprequest' || accept.indexOf('application/json') >= 0;
 }
 
-async function loadProductGroups() {
-    return await NhomHang.find({}).sort({ ten_nhom_hang: 1 }).lean();
+function escapeRegExp(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function loadProductGroups(storeId) {
+    var query = { trang_thai: 'active' };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        query.$or = [
+            { cua_hang_id: storeId },
+            { cua_hang_id: null },
+            { cua_hang_id: { $exists: false } }
+        ];
+    }
+    return await NhomHang.find(query).sort({ ten_nhom_hang: 1 }).lean();
+}
+
+async function findDuplicateGroupName(storeId, tenNhom, excludeId) {
+    var name = String(tenNhom || '').trim();
+    if (!name) return null;
+    var query = {
+        ten_nhom_hang: new RegExp('^' + escapeRegExp(name) + '$', 'i')
+    };
+    if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
+        query._id = { $ne: excludeId };
+    }
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        query.cua_hang_id = storeId;
+    }
+    return await NhomHang.findOne(query).select('_id ten_nhom_hang').lean();
 }
 
 async function makeProductGroupCode() {
@@ -439,6 +469,102 @@ function getDateRange(filter) {
         }
     }
     return { start: start, end: end };
+}
+
+function buildProductQueryFromFilter(filter) {
+    var productQuery = {};
+    if (filter.groupId !== 'all') productQuery.nhom_hang_id = filter.groupId;
+    if (filter.supplierId !== 'all') productQuery.nha_cung_cap_id = filter.supplierId;
+    if (filter.salesLink === 'yes') productQuery.ban_truc_tiep = true;
+    if (filter.salesLink === 'no') productQuery.ban_truc_tiep = false;
+    applyProductListStatusFilter(productQuery, filter);
+    if (filter.keyword) {
+        productQuery.$or = [
+            { ma_hang: { $regex: filter.keyword, $options: 'i' } },
+            { ten_hang: { $regex: filter.keyword, $options: 'i' } }
+        ];
+    }
+    var dateRange = getDateRange(filter);
+    if (dateRange.start || dateRange.end) {
+        productQuery.created_at = {};
+        if (dateRange.start) productQuery.created_at.$gte = dateRange.start;
+        if (dateRange.end) productQuery.created_at.$lte = dateRange.end;
+    }
+    return productQuery;
+}
+
+async function loadProductContractData(req) {
+    var filter = normalizeFilterQuery(req.query || {});
+    var products = await HangHoa.find(buildProductQueryFromFilter(filter))
+        .populate({ path: 'nhom_hang_id', select: 'ten_nhom_hang ma_nhom_hang' })
+        .populate({ path: 'don_vi_tinh_id', select: 'ten_don_vi ma_don_vi' })
+        .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc sdt email ma_so_thue' })
+        .sort({ created_at: -1, ma_hang: 1 })
+        .lean();
+
+    var productIds = products.map(function(item) { return item._id; });
+    var inventoryRows = productIds.length > 0
+        ? await TonKho.aggregate([
+            { $match: { hang_hoa_id: { $in: productIds } } },
+            { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+        ])
+        : [];
+    var inventoryMap = inventoryRows.reduce(function(map, row) {
+        map[String(row._id)] = Number(row.total || 0);
+        return map;
+    }, {});
+
+    var stockRange = makeRangeFilter(filter.stockFrom, filter.stockTo);
+    var items = products.map(function(product) {
+        var tonKho = Number(inventoryMap[String(product._id)] || 0);
+        product.ton_kho = tonKho;
+        var giaVon = Number(product.gia_von || 0);
+        return {
+            hang_hoa_id: product,
+            so_luong: tonKho,
+            don_gia_nhap: giaVon,
+            thanh_tien: tonKho * giaVon
+        };
+    }).filter(function(row) {
+        if (!stockRange) return true;
+        var qty = Number(row.so_luong || 0);
+        if (stockRange.$gte != null && qty < stockRange.$gte) return false;
+        if (stockRange.$lte != null && qty > stockRange.$lte) return false;
+        return true;
+    });
+
+    var storeId = await resolveStoreId(req);
+    var store = storeId && mongoose.Types.ObjectId.isValid(storeId)
+        ? await CuaHang.findById(storeId).lean()
+        : null;
+    if (!store) store = await CuaHang.findOne({ trang_thai: 'active' }).sort({ created_at: 1 }).lean();
+
+    var totalValue = items.reduce(function(sum, row) {
+        return sum + Number(row.thanh_tien || 0);
+    }, 0);
+
+    return {
+        title: 'HĐ nguyên tắc hàng hóa',
+        activeMenu: 'hang-hoa',
+        user: req.user,
+        store: store,
+        supplierAddress: null,
+        contractMode: 'product-list',
+        ticket: {
+            ma_phieu_nhap: '',
+            ngay_nhap: new Date(),
+            tong_tien: totalValue,
+            can_tra_ncc: 0,
+            da_tra_ncc: 0,
+            con_no_ncc: 0,
+            phuong_thuc_thanh_toan: '',
+            kho_id: null,
+            nha_cung_cap_id: null
+        },
+        items: items,
+        embeddedPrint: String(req.query && req.query.embed || '') === '1',
+        formatDate: formatDate
+    };
 }
 
 async function seedProductsIfEmpty() {
@@ -622,7 +748,8 @@ exports.index = async function(req, res, next) {
             });
         }
 
-        var groups = await loadProductGroups();
+        var storeId = await resolveStoreId(req);
+        var groups = await loadProductGroups(storeId);
         var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
         var units = await loadUnitOptions();
         var groupMap = groups.reduce(function(map, group) {
@@ -649,24 +776,6 @@ exports.index = async function(req, res, next) {
         var filterQueryString = buildFilterQueryString(filter);
 
         var bangGiaList = await BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }).lean();
-        var storeId = await resolveStoreId(req);
-        await ensureDefaultAttributes(storeId);
-        var attrQuery = storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' };
-        var attributes = await ThuocTinhHang.find(attrQuery).sort({ ten_thuoc_tinh: 1 }).lean();
-        if (attributes.length === 0 && attrQuery.cua_hang_id) attributes = await ThuocTinhHang.find({ trang_thai: 'active' }).sort({ ten_thuoc_tinh: 1 }).lean();
-        var attrIds = attributes.map(function(a) { return a._id; });
-        var attributeValues = attrIds.length
-            ? await GiaTriThuocTinh.find({ thuoc_tinh_id: { $in: attrIds }, trang_thai: 'active' }).sort({ thu_tu: 1, ten_gia_tri: 1 }).lean()
-            : [];
-        var productAttributeRows = productIds.length
-            ? await HangHoaThuocTinh.find({ hang_hoa_id: { $in: productIds } }).lean()
-            : [];
-        var productAttributeIds = {};
-        productAttributeRows.forEach(function(row) {
-            var pid = String(row.hang_hoa_id);
-            if (!productAttributeIds[pid]) productAttributeIds[pid] = [];
-            productAttributeIds[pid].push(String(row.gia_tri_id));
-        });
 
         res.render('hang-hoa/index', {
             title: 'Hàng hóa',
@@ -679,14 +788,43 @@ exports.index = async function(req, res, next) {
             groups: groups,
             units: units,
             suppliers: suppliers,
-            attributes: attributes,
-            attributeValues: attributeValues,
-            productAttributeIds: productAttributeIds,
             filter: filter,
             formatDate: formatDate,
             filterQueryString: filterQueryString,
             formMode: requestQuery.mode === 'create' ? 'create' : ''
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.printContract = async function(req, res, next) {
+    try {
+        var data = await loadProductContractData(req);
+        return res.render('nhap-hang/hd-mua-ban-nguyen-tac', data);
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.printContractPdf = async function(req, res, next) {
+    try {
+        var data = await loadProductContractData(req);
+        var viewPath = path.join(__dirname, '..', 'views', 'nhap-hang', 'hd-mua-ban-nguyen-tac.ejs');
+        var html = await pdfService.renderViewToHtml(viewPath, data);
+        var buffer = await pdfService.generatePdfFromHtml(html, {
+            format: 'A4',
+            printBackground: true,
+            margin: {
+                top: '10mm',
+                right: '10mm',
+                bottom: '10mm',
+                left: '10mm'
+            }
+        });
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="hd-nguyen-tac-hang-hoa.pdf"');
+        return res.send(Buffer.from(buffer));
     } catch (error) {
         next(error);
     }
@@ -707,7 +845,6 @@ exports.add = async function(req, res, next) {
 
         var initialQty = Number(payload.ton_ban_dau || 0);
         var created = await HangHoa.create(payload);
-        await saveProductAttributeValues(created._id, normalizeSelectedAttributeValues(req.body));
         if (initialQty > 0) {
             var warehouse = await getDefaultWarehouseForProduct(created, req);
             if (warehouse) {
@@ -780,7 +917,6 @@ exports.update = async function(req, res, next) {
 
         var oldProduct = await HangHoa.findById(productId).lean();
         var updatedProduct = await HangHoa.findByIdAndUpdate(productId, payload, { runValidators: true, new: true });
-        await saveProductAttributeValues(productId, normalizeSelectedAttributeValues(req.body));
         if (oldProduct && !oldProduct.quan_ly_theo_lo && updatedProduct && updatedProduct.quan_ly_theo_lo) {
             var inventoryRows = await TonKho.find({ hang_hoa_id: updatedProduct._id, so_luong: { $gt: 0 } }).lean();
             await createDefaultLotFromInventory(updatedProduct, inventoryRows, req, {
@@ -832,13 +968,18 @@ exports.addGroup = async function(req, res, next) {
         if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lòng nhập tên nhóm hàng.');
         if (!maNhom) maNhom = await makeProductGroupCode();
 
+        var storeId = await resolveStoreId(req);
+        var duplicate = await findDuplicateGroupName(storeId, tenNhom);
+        if (duplicate) {
+            return respondProductGroupError(req, res, 409, 'Tên nhóm hàng đã tồn tại trong cửa hàng này.');
+        }
+
         var doc = {
             ma_nhom_hang: maNhom,
             ten_nhom_hang: tenNhom,
             mo_ta: moTa,
             trang_thai: 'active'
         };
-        var storeId = await resolveStoreId(req);
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) doc.cua_hang_id = storeId;
 
         var created = await NhomHang.create(doc);
@@ -849,7 +990,7 @@ exports.addGroup = async function(req, res, next) {
                 message: 'Đã thêm nhóm hàng.',
                 data: created,
                 selectedId: String(created._id),
-                groups: await loadProductGroups()
+                groups: await loadProductGroups(storeId)
             });
         }
 
@@ -876,6 +1017,15 @@ exports.updateGroup = async function(req, res, next) {
         var moTa = String(req?.body?.mo_ta || '').trim();
         if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lòng nhập tên nhóm hàng.');
 
+        var existing = await NhomHang.findById(groupId).lean();
+        if (!existing) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
+
+        var storeId = existing.cua_hang_id ? String(existing.cua_hang_id) : await resolveStoreId(req);
+        var duplicate = await findDuplicateGroupName(storeId, tenNhom, groupId);
+        if (duplicate) {
+            return respondProductGroupError(req, res, 409, 'Tên nhóm hàng đã tồn tại trong cửa hàng này.');
+        }
+
         var updated = await NhomHang.findByIdAndUpdate(
             groupId,
             { ten_nhom_hang: tenNhom, mo_ta: moTa },
@@ -889,7 +1039,7 @@ exports.updateGroup = async function(req, res, next) {
                 message: 'Đã cập nhật nhóm hàng.',
                 data: updated,
                 selectedId: groupId,
-                groups: await loadProductGroups()
+                groups: await loadProductGroups(storeId)
             });
         }
 
@@ -1603,7 +1753,6 @@ var HANG_HOA_COLUMNS = {
     dvt:             { header: 'ĐVT',                  width: 10 },
     ma_dvt_co_ban:   { header: 'Mã ĐVT cơ bản',        width: 14 },
     quy_doi:         { header: 'Quy đổi',              width: 12, numeric: true },
-    thuoc_tinh:      { header: 'Thuộc tính',           width: 24 },
     gia_nhap_cuoi:   { header: 'Giá nhập cuối',        width: 16, numeric: true }
 };
 
@@ -1800,9 +1949,6 @@ exports.exportExcel = async function(req, res, next) {
                         break;
                     case 'quy_doi':
                         rowData[key] = 1;
-                        break;
-                    case 'thuoc_tinh':
-                        rowData[key] = item.mo_ta || '';
                         break;
                     case 'gia_nhap_cuoi':
                         rowData[key] = Number(item.gia_nhap_cuoi || 0);

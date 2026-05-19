@@ -1,0 +1,665 @@
+<%
+  const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+  const statusLabel = s => s === 'da_nghi' ? 'Đã nghỉ' : 'Đang làm việc';
+  const statusClass = s => s === 'da_nghi' ? 'is-inactive' : 'is-active';
+  const formatDate = v => {
+    if (!v) return '---';
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return '---';
+    return d.toLocaleDateString('vi-VN');
+  };
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .employee-page{background:#f3f6f9;min-height:calc(100vh - 98px)}
+    .employee-shell{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;padding:12px 20px 20px}
+    .employee-main{background:#fff;border:1px solid #d7dde5;border-radius:8px;display:flex;flex-direction:column;min-height:calc(100vh - 140px)}
+    .employee-toolbar{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid #e5e9ee;flex-wrap:wrap}
+    .employee-toolbar h1{margin:0;font-size:20px;font-weight:700;flex:1}
+    .employee-search{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #0070f4;border-radius:8px;padding:0 12px;height:34px;min-width:280px}
+    .employee-search input{border:0;outline:0;flex:1;font-size:13px}
+    .employee-table-wrap{overflow:auto;flex:1}
+    .employee-table{width:100%;border-collapse:collapse;min-width:1100px}
+    .employee-table thead th{position:sticky;top:0;background:#e8f3ff;color:#111827;font-size:12px;font-weight:700;height:36px;padding:0 10px;text-align:left;border-bottom:1px solid #bcd9ff;white-space:nowrap}
+    .employee-table tbody td{padding:8px 10px;border-bottom:1px solid #e5e9ee;font-size:13px;vertical-align:middle}
+    .employee-table tbody tr:hover{background:#f8fbff}
+    .emp-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;background:#e8f3ff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#0070f4}
+    .emp-avatar img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+    .employee-empty{padding:60px 20px;text-align:center;color:#475467;font-size:14px}
+    .employee-empty a{color:#0070f4;font-weight:600;cursor:pointer}
+    .status-pill{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:5px;font-size:11px;font-weight:700}
+    .status-pill.is-active{background:#dcfce7;color:#166534}
+    .status-pill.is-inactive{background:#fee2e2;color:#991b1b}
+    .hr-btn-icon{border:1px solid #cfd8e3;background:#fff;border-radius:6px;width:30px;height:28px;cursor:pointer;color:#344054}
+    .nv-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1200;padding:16px}
+    .nv-modal-overlay.is-open{display:flex}
+    .nv-modal{background:#fff;border-radius:10px;width:min(920px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+    .nv-modal-head{padding:16px 20px;border-bottom:1px solid #e5e9ee;font-size:18px;font-weight:700}
+    .nv-tabs{display:flex;gap:0;border-bottom:1px solid #e5e9ee;padding:0 20px}
+    .nv-tab{border:0;background:transparent;height:42px;padding:0 16px;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;cursor:pointer}
+    .nv-tab.is-active{color:#0070f4;border-bottom-color:#0070f4}
+    .nv-modal-body{padding:16px 20px;overflow:auto;flex:1}
+    .nv-section{margin-bottom:18px}
+    .nv-section h3{margin:0 0 10px;font-size:14px;font-weight:700;color:#111827}
+    .nv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .nv-grid label{display:grid;gap:4px;font-size:12px;color:#475467}
+    .nv-grid input,.nv-grid select,.nv-grid textarea{height:34px;border:1px solid #cfd8e3;border-radius:7px;padding:0 10px;font-size:13px}
+    .nv-grid textarea{height:70px;padding:8px 10px;resize:vertical}
+    .nv-grid .span-2{grid-column:span 2}
+    .nv-avatar-row{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+    .nv-avatar-preview{width:72px;height:72px;border-radius:50%;background:#e8f3ff;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:24px;font-weight:700;color:#0070f4}
+    .nv-avatar-preview img{width:100%;height:100%;object-fit:cover}
+    .nv-placeholder{padding:40px;text-align:center;color:#64748b;background:#f8fafc;border-radius:8px}
+    .nv-modal-foot{padding:12px 20px 16px;border-top:1px solid #e5e9ee;display:flex;justify-content:flex-end;gap:8px}
+    .filter-check{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px}
+    .nv-modal .address-type-wrapper{position:relative}
+    .nv-modal .address-type-dropdown{z-index:1300}
+    .nv-grid .address-type-header{display:flex;align-items:center;gap:8px}
+    .nv-grid .address-type-trigger{flex:1}
+  </style>
+  <script type="application/json" id="phongBansSeed"><%- JSON.stringify(phongBans || []) %></script>
+  <script type="application/json" id="chucDanhsSeed"><%- JSON.stringify(chucDanhs || []) %></script>
+</head>
+<body class="admin-body employee-page">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="admin-shell">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+    <div class="employee-shell">
+      <aside class="customer-filter">
+        <h2>Nhân viên</h2>
+        <form method="get" action="/nhan-vien" id="nvFilterForm">
+          <section class="customer-filter-section">
+            <h4>Trạng thái nhân viên</h4>
+            <label class="filter-check">
+              <input type="checkbox" name="trang_thai" value="dang_lam_viec" <%= (filter.trang_thai || []).includes('dang_lam_viec') ? 'checked' : '' %>>
+              <span>Đang làm việc</span>
+            </label>
+            <label class="filter-check">
+              <input type="checkbox" name="trang_thai" value="da_nghi" <%= (filter.trang_thai || []).includes('da_nghi') ? 'checked' : '' %>>
+              <span>Đã nghỉ</span>
+            </label>
+            <h4>Phòng ban</h4>
+            <select name="phong_ban_id">
+              <option value="">Tất cả phòng ban</option>
+              <% (phongBans || []).forEach(function(pb) { %>
+                <option value="<%= pb._id %>" <%= filter.phong_ban_id === String(pb._id) ? 'selected' : '' %>><%= pb.ten_phong_ban %></option>
+              <% }) %>
+            </select>
+            <input type="hidden" name="keyword" value="<%= filter.keyword || '' %>" id="nvFilterKeyword">
+            <div class="customer-filter-actions" style="margin-top:12px">
+              <button class="btn btn-primary" type="submit">Áp dụng</button>
+              <a class="btn btn-light" href="/nhan-vien">Xóa lọc</a>
+            </div>
+          </section>
+        </form>
+      </aside>
+
+      <section class="employee-main">
+        <div class="employee-toolbar">
+          <h1>Danh sách nhân viên</h1>
+          <div class="employee-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" id="nvKeyword" placeholder="Tìm theo mã, tên nhân viên" value="<%= filter.keyword || '' %>">
+          </div>
+          <button type="button" class="btn btn-primary" id="nvAddBtn">+ Nhân viên</button>
+        </div>
+        <div class="employee-table-wrap">
+          <table class="employee-table">
+            <thead>
+              <tr>
+                <th>Ảnh</th><th>Mã nhân viên</th><th>Mã chấm công</th><th>Tên nhân viên</th>
+                <th>Số điện thoại</th><th>Số CMND/CCCD</th><th>Phòng ban</th><th>Chức danh</th>
+                <th>Nợ và tạm ứng</th><th>Ghi chú</th><th>Trạng thái</th><th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!(employees || []).length) { %>
+                <tr><td colspan="12" class="employee-empty">Gian hàng chưa có nhân viên. <a id="nvEmptyAdd">Nhấn vào đây để thêm mới nhân viên</a>.</td></tr>
+              <% } %>
+              <% (employees || []).forEach(function(emp) {
+                const pb = emp.phong_ban_id || {};
+                const cd = emp.chuc_danh_id || {};
+                const initials = (emp.ten_nhan_vien || 'N').trim().charAt(0).toUpperCase();
+              %>
+                <tr data-id="<%= emp._id %>">
+                  <td>
+                    <div class="emp-avatar">
+                      <% if (emp.anh_dai_dien) { %><img src="<%= emp.anh_dai_dien %>" alt=""><% } else { %><%= initials %><% } %>
+                    </div>
+                  </td>
+                  <td><%= emp.ma_nhan_vien || '---' %></td>
+                  <td><%= emp.ma_cham_cong || '---' %></td>
+                  <td><strong><%= emp.ten_nhan_vien || '---' %></strong></td>
+                  <td><%= emp.sdt || '---' %></td>
+                  <td><%= emp.cccd || '---' %></td>
+                  <td><%= pb.ten_phong_ban || '---' %></td>
+                  <td><%= cd.ten_chuc_danh || '---' %></td>
+                  <td class="num"><%= fmt(emp.no_va_tam_ung) %></td>
+                  <td><%= emp.ghi_chu || '---' %></td>
+                  <td><span class="status-pill <%= statusClass(emp.trang_thai) %>"><%= statusLabel(emp.trang_thai) %></span></td>
+                  <td>
+                    <button type="button" class="hr-btn-icon nv-edit" title="Sửa"><i class="fa-regular fa-pen-to-square"></i></button>
+                    <button type="button" class="hr-btn-icon nv-delete" title="Cho nghỉ"><i class="fa-regular fa-trash-can"></i></button>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="nv-modal-overlay" id="nvModal">
+    <div class="nv-modal">
+      <div class="nv-modal-head" id="nvModalTitle">Thêm mới nhân viên</div>
+      <div class="nv-tabs">
+        <button type="button" class="nv-tab is-active" data-tab="info">Thông tin</button>
+        <button type="button" class="nv-tab" data-tab="salary">Thiết lập lương</button>
+      </div>
+      <div class="nv-modal-body">
+        <div id="nvPaneInfo">
+          <div class="nv-section">
+            <h3>Thông tin khởi tạo</h3>
+            <div class="nv-avatar-row">
+              <div class="nv-avatar-preview" id="nvAvatarPreview">NV</div>
+              <div>
+                <label style="font-size:12px;color:#475467">Ảnh đại diện (URL)</label>
+                <input type="url" id="nvAnh" placeholder="https://..." style="width:100%;height:34px;border:1px solid #cfd8e3;border-radius:7px;padding:0 10px">
+              </div>
+            </div>
+            <div class="nv-grid">
+              <label>Mã nhân viên<input id="nvMa" placeholder="Tự động nếu để trống"></label>
+              <label>Tên nhân viên *<input id="nvTen" required></label>
+              <label>Số điện thoại<input id="nvSdt"></label>
+              <label>Mã chấm công<input id="nvMaChamCong"></label>
+            </div>
+          </div>
+          <div class="nv-section">
+            <h3>Thông tin công việc</h3>
+            <div class="nv-grid">
+              <label>Ngày bắt đầu làm việc<input type="date" id="nvNgayBatDau"></label>
+              <label class="span-2">Phòng ban
+                <div class="address-type-wrapper" id="nvPbPicker">
+                  <div class="address-type-header">
+                    <button class="address-type-trigger" type="button" id="nvPbTrigger">
+                      <span id="nvPbLabel">Chọn phòng ban</span>
+                      <span>▾</span>
+                    </button>
+                    <button class="btn btn-primary btn-sm" type="button" id="nvPbAddBtn">Thêm</button>
+                  </div>
+                  <input type="hidden" id="nvPhongBan" value="">
+                  <div class="address-type-dropdown" id="nvPbDropdown"></div>
+                </div>
+              </label>
+              <label class="span-2">Chức danh
+                <div class="address-type-wrapper" id="nvCdPicker">
+                  <div class="address-type-header">
+                    <button class="address-type-trigger" type="button" id="nvCdTrigger">
+                      <span id="nvCdLabel">Chọn chức danh</span>
+                      <span>▾</span>
+                    </button>
+                    <button class="btn btn-primary btn-sm" type="button" id="nvCdAddBtn">Thêm</button>
+                  </div>
+                  <input type="hidden" id="nvChucDanh" value="">
+                  <div class="address-type-dropdown" id="nvCdDropdown"></div>
+                </div>
+              </label>
+              <label>Tài khoản đăng nhập
+                <select id="nvNguoiDung">
+                  <option value="">-- Không liên kết --</option>
+                  <% (nguoiDungs || []).forEach(function(u) { %>
+                    <option value="<%= u._id %>"><%= u.ho_ten || u.email %></option>
+                  <% }) %>
+                </select>
+              </label>
+              <label class="span-2">Ghi chú<textarea id="nvGhiChu"></textarea></label>
+            </div>
+          </div>
+          <div class="nv-section">
+            <h3>Thông tin cá nhân</h3>
+            <div class="nv-grid">
+              <label>Số CMND/CCCD<input id="nvCccd"></label>
+              <label>Ngày sinh<input type="date" id="nvNgaySinh"></label>
+              <label>Giới tính
+                <select id="nvGioiTinh">
+                  <option value="">-- Chọn --</option>
+                  <option value="nam">Nam</option>
+                  <option value="nu">Nữ</option>
+                  <option value="khac">Khác</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="nv-section">
+            <h3>Thông tin liên hệ</h3>
+            <div class="nv-grid">
+              <label>Tỉnh/Thành phố<input id="nvTinh"></label>
+              <label>Xã/Phường<input id="nvPhuong"></label>
+              <label>Địa chỉ chi tiết<input id="nvDiaChiChiTiet"></label>
+              <label>Facebook<input id="nvFacebook"></label>
+              <label>Email<input type="email" id="nvEmail"></label>
+            </div>
+          </div>
+        </div>
+        <div id="nvPaneSalary" style="display:none">
+          <div class="nv-placeholder">Thiết lập lương — Sẽ phát triển sau</div>
+        </div>
+      </div>
+      <div class="nv-modal-foot">
+        <button type="button" class="btn btn-light" id="nvCancelBtn">Bỏ qua</button>
+        <button type="button" class="btn btn-primary" id="nvSaveBtn">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="nvPbModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="nvPbModalTitle">Thêm phòng ban</h3>
+        <button type="button" class="group-modal-close" id="nvPbModalClose">×</button>
+      </div>
+      <div class="group-modal-body">
+        <label><span>Tên phòng ban *</span><input id="nvPbNameInput" type="text" placeholder="Nhập tên phòng ban"></label>
+        <label><span>Mô tả</span><input id="nvPbDescInput" type="text" placeholder="Nhập mô tả"></label>
+      </div>
+      <div class="page-actions group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="nvPbModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="nvPbModalSubmit">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="nvCdModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="nvCdModalTitle">Thêm chức danh</h3>
+        <button type="button" class="group-modal-close" id="nvCdModalClose">×</button>
+      </div>
+      <div class="group-modal-body">
+        <label><span>Tên chức danh *</span><input id="nvCdNameInput" type="text" placeholder="Nhập tên chức danh"></label>
+        <label><span>Mô tả</span><input id="nvCdDescInput" type="text" placeholder="Nhập mô tả"></label>
+      </div>
+      <div class="page-actions group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="nvCdModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="nvCdModalSubmit">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const nvModal = document.getElementById('nvModal');
+    const nvKeyword = document.getElementById('nvKeyword');
+    const nvFilterKeyword = document.getElementById('nvFilterKeyword');
+    let nvEditId = '';
+
+    function initHrPicker(config) {
+      let items = config.seed.slice();
+      let activeItem = null;
+      let modalMode = 'add';
+
+      function esc(text) {
+        return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      }
+
+      function bindItems() {
+        const nodes = Array.prototype.slice.call(config.dropdown.querySelectorAll('.address-type-item'));
+        nodes.forEach(function(item) {
+          const optionBtn = item.querySelector('.address-type-option');
+          const editBtn = item.querySelector('.address-type-action-edit');
+          const deleteBtn = item.querySelector('.address-type-action-delete');
+          if (optionBtn) {
+            optionBtn.addEventListener('click', function() {
+              nodes.forEach(function(node) { node.classList.remove('is-active'); });
+              item.classList.add('is-active');
+              config.hidden.value = item.getAttribute('data-value') || '';
+              config.label.textContent = item.getAttribute('data-name') || config.emptyLabel;
+              config.dropdown.classList.remove('is-open');
+            });
+          }
+          if (editBtn) {
+            editBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              activeItem = item;
+              openModal('edit');
+            });
+          }
+          if (deleteBtn) {
+            deleteBtn.addEventListener('click', function(event) {
+              event.stopPropagation();
+              const id = item.getAttribute('data-id') || '';
+              if (!id) return alert('Vui lòng chọn mục cần xóa.');
+              if (!confirm('Bạn có chắc muốn xóa mục này không?')) return;
+              request(config.deleteUrl(id), {}, '');
+            });
+          }
+        });
+      }
+
+      function renderList(selectedId) {
+        const selected = selectedId ? String(selectedId) : '';
+        let html = (
+          '<div class="address-type-item' + (!selected ? ' is-active' : '') + '" data-id="" data-value="" data-name="' + esc(config.emptyLabel) + '" data-desc="">' +
+            '<button class="address-type-option" type="button">' + esc(config.emptyLabel) + '</button>' +
+          '</div>'
+        );
+        items.forEach(function(row) {
+          const id = String(row._id || '');
+          const name = row[config.nameField] || '---';
+          const desc = row.mo_ta || '';
+          const isActive = id === selected;
+          html += (
+            '<div class="address-type-item' + (isActive ? ' is-active' : '') + '" data-id="' + id + '" data-value="' + id + '" data-name="' + esc(name) + '" data-desc="' + esc(desc) + '">' +
+              '<button class="address-type-option" type="button">' + esc(name) + '</button>' +
+              '<div class="address-type-actions">' +
+                '<button class="address-type-action-edit" type="button">Sửa</button>' +
+                '<button class="address-type-action-delete" type="button">Xóa</button>' +
+              '</div>' +
+            '</div>'
+          );
+        });
+        config.dropdown.innerHTML = html;
+        bindItems();
+        if (selected) {
+          const active = config.dropdown.querySelector('.address-type-item[data-value="' + selected + '"]');
+          if (active) {
+            config.hidden.value = selected;
+            config.label.textContent = active.getAttribute('data-name') || config.emptyLabel;
+          }
+        } else {
+          config.hidden.value = '';
+          config.label.textContent = config.emptyLabel;
+        }
+        refreshFilterSelect();
+      }
+
+      function refreshFilterSelect() {
+        if (!config.filterSelect) return;
+        const selected = config.hidden.value || '';
+        let opts = '<option value="">Tất cả</option>';
+        items.forEach(function(row) {
+          const id = String(row._id || '');
+          opts += '<option value="' + id + '"' + (id === selected ? ' selected' : '') + '>' + esc(row[config.nameField] || '---') + '</option>';
+        });
+        config.filterSelect.innerHTML = opts;
+      }
+
+      function request(url, payload, selectedId) {
+        const formBody = Object.keys(payload).map(function(key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+        return fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert((data && data.message) || 'Không thể xử lý dữ liệu.');
+              return;
+            }
+            if (Array.isArray(data.items)) items = data.items;
+            renderList(data.selectedId || (data.data && data.data._id) || selectedId || '');
+            closeModal();
+          })
+          .catch(function(err) {
+            alert((err && err.message) || 'Có lỗi xảy ra.');
+          });
+      }
+
+      function openModal(mode) {
+        modalMode = mode;
+        if (mode === 'add') {
+          config.modalTitle.textContent = config.addTitle;
+          config.nameInput.value = '';
+          config.descInput.value = '';
+        } else {
+          config.modalTitle.textContent = config.editTitle;
+          config.nameInput.value = activeItem ? (activeItem.getAttribute('data-name') || '') : '';
+          config.descInput.value = activeItem ? (activeItem.getAttribute('data-desc') || '') : '';
+        }
+        config.modalOverlay.classList.add('is-open');
+      }
+
+      function closeModal() {
+        config.modalOverlay.classList.remove('is-open');
+      }
+
+      config.trigger.addEventListener('click', function() {
+        config.dropdown.classList.toggle('is-open');
+      });
+      config.addBtn.addEventListener('click', function() { openModal('add'); });
+      config.modalClose.addEventListener('click', closeModal);
+      config.modalCancel.addEventListener('click', closeModal);
+      config.modalSubmit.addEventListener('click', function() {
+        const name = config.nameInput.value.trim();
+        const desc = config.descInput.value.trim();
+        if (!name) return alert('Vui lòng nhập tên.');
+        if (modalMode === 'add') {
+          const body = {};
+          body[config.nameKey] = name;
+          body.mo_ta = desc;
+          request(config.addUrl, body, '');
+          return;
+        }
+        const id = activeItem ? (activeItem.getAttribute('data-id') || '') : '';
+        if (!id) return alert('Vui lòng chọn mục cần sửa.');
+        const body = {};
+        body[config.nameKey] = name;
+        body.mo_ta = desc;
+        request(config.updateUrl(id), body, id);
+      });
+
+      renderList(config.hidden.value || '');
+      return {
+        setValue: function(id) { renderList(id || ''); },
+        getValue: function() { return config.hidden.value || ''; }
+      };
+    }
+
+    const phongBanPicker = initHrPicker({
+      seed: JSON.parse(document.getElementById('phongBansSeed').textContent || '[]'),
+      trigger: document.getElementById('nvPbTrigger'),
+      label: document.getElementById('nvPbLabel'),
+      hidden: document.getElementById('nvPhongBan'),
+      dropdown: document.getElementById('nvPbDropdown'),
+      addBtn: document.getElementById('nvPbAddBtn'),
+      emptyLabel: 'Chọn phòng ban',
+      nameField: 'ten_phong_ban',
+      nameKey: 'ten_phong_ban',
+      addUrl: '/nhan-vien/groups/phong-ban/add',
+      updateUrl: function(id) { return '/nhan-vien/groups/phong-ban/' + id + '/update'; },
+      deleteUrl: function(id) { return '/nhan-vien/groups/phong-ban/' + id + '/delete'; },
+      modalOverlay: document.getElementById('nvPbModalOverlay'),
+      modalTitle: document.getElementById('nvPbModalTitle'),
+      modalClose: document.getElementById('nvPbModalClose'),
+      modalCancel: document.getElementById('nvPbModalCancel'),
+      modalSubmit: document.getElementById('nvPbModalSubmit'),
+      nameInput: document.getElementById('nvPbNameInput'),
+      descInput: document.getElementById('nvPbDescInput'),
+      addTitle: 'Thêm phòng ban',
+      editTitle: 'Sửa phòng ban',
+      filterSelect: document.querySelector('#nvFilterForm select[name="phong_ban_id"]')
+    });
+
+    const chucDanhPicker = initHrPicker({
+      seed: JSON.parse(document.getElementById('chucDanhsSeed').textContent || '[]'),
+      trigger: document.getElementById('nvCdTrigger'),
+      label: document.getElementById('nvCdLabel'),
+      hidden: document.getElementById('nvChucDanh'),
+      dropdown: document.getElementById('nvCdDropdown'),
+      addBtn: document.getElementById('nvCdAddBtn'),
+      emptyLabel: 'Chọn chức danh',
+      nameField: 'ten_chuc_danh',
+      nameKey: 'ten_chuc_danh',
+      addUrl: '/nhan-vien/groups/chuc-danh/add',
+      updateUrl: function(id) { return '/nhan-vien/groups/chuc-danh/' + id + '/update'; },
+      deleteUrl: function(id) { return '/nhan-vien/groups/chuc-danh/' + id + '/delete'; },
+      modalOverlay: document.getElementById('nvCdModalOverlay'),
+      modalTitle: document.getElementById('nvCdModalTitle'),
+      modalClose: document.getElementById('nvCdModalClose'),
+      modalCancel: document.getElementById('nvCdModalCancel'),
+      modalSubmit: document.getElementById('nvCdModalSubmit'),
+      nameInput: document.getElementById('nvCdNameInput'),
+      descInput: document.getElementById('nvCdDescInput'),
+      addTitle: 'Thêm chức danh',
+      editTitle: 'Sửa chức danh',
+      filterSelect: null
+    });
+
+    document.addEventListener('click', function(event) {
+      ['nvPbPicker', 'nvCdPicker'].forEach(function(id) {
+        const wrap = document.getElementById(id);
+        if (!wrap) return;
+        const trigger = wrap.querySelector('.address-type-trigger');
+        const dropdown = wrap.querySelector('.address-type-dropdown');
+        if (dropdown && trigger && !wrap.contains(event.target)) {
+          dropdown.classList.remove('is-open');
+        }
+      });
+    });
+
+    function toIsoDate(v) {
+      if (!v) return '';
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toISOString().slice(0, 10);
+    }
+
+    function setAvatarPreview(url, name) {
+      const el = document.getElementById('nvAvatarPreview');
+      const letter = (name || 'N').trim().charAt(0).toUpperCase();
+      if (url) {
+        el.innerHTML = '<img src="' + url.replace(/"/g, '&quot;') + '" alt="">';
+      } else {
+        el.textContent = letter;
+      }
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.nv-tab').forEach(btn => btn.classList.toggle('is-active', btn.dataset.tab === tab));
+      document.getElementById('nvPaneInfo').style.display = tab === 'info' ? '' : 'none';
+      document.getElementById('nvPaneSalary').style.display = tab === 'salary' ? '' : 'none';
+    }
+
+    function fillForm(item) {
+      item = item || {};
+      document.getElementById('nvMa').value = item.ma_nhan_vien || '';
+      document.getElementById('nvTen').value = item.ten_nhan_vien || '';
+      document.getElementById('nvSdt').value = item.sdt || '';
+      document.getElementById('nvMaChamCong').value = item.ma_cham_cong || '';
+      document.getElementById('nvAnh').value = item.anh_dai_dien || '';
+      document.getElementById('nvNgayBatDau').value = toIsoDate(item.ngay_bat_dau_lam_viec);
+      phongBanPicker.setValue(item.phong_ban_id ? String(item.phong_ban_id._id || item.phong_ban_id) : '');
+      chucDanhPicker.setValue(item.chuc_danh_id ? String(item.chuc_danh_id._id || item.chuc_danh_id) : '');
+      document.getElementById('nvNguoiDung').value = item.nguoi_dung_id ? String(item.nguoi_dung_id._id || item.nguoi_dung_id) : '';
+      document.getElementById('nvGhiChu').value = item.ghi_chu || '';
+      document.getElementById('nvCccd').value = item.cccd || '';
+      document.getElementById('nvNgaySinh').value = toIsoDate(item.ngay_sinh);
+      document.getElementById('nvGioiTinh').value = item.gioi_tinh || '';
+      document.getElementById('nvTinh').value = item.tinh_thanh || '';
+      document.getElementById('nvPhuong').value = item.phuong_xa || '';
+      document.getElementById('nvDiaChiChiTiet').value = item.dia_chi_chi_tiet || '';
+      document.getElementById('nvFacebook').value = item.facebook || '';
+      document.getElementById('nvEmail').value = item.email || '';
+      setAvatarPreview(item.anh_dai_dien, item.ten_nhan_vien);
+    }
+
+    function openNvModal(item) {
+      nvEditId = item && item._id ? String(item._id) : '';
+      document.getElementById('nvModalTitle').textContent = nvEditId ? 'Sửa nhân viên' : 'Thêm mới nhân viên';
+      fillForm(item);
+      switchTab('info');
+      nvModal.classList.add('is-open');
+    }
+
+    function closeNvModal() { nvModal.classList.remove('is-open'); }
+
+    function collectPayload() {
+      return {
+        ma_nhan_vien: document.getElementById('nvMa').value.trim(),
+        ten_nhan_vien: document.getElementById('nvTen').value.trim(),
+        sdt: document.getElementById('nvSdt').value.trim(),
+        ma_cham_cong: document.getElementById('nvMaChamCong').value.trim(),
+        anh_dai_dien: document.getElementById('nvAnh').value.trim(),
+        ngay_bat_dau_lam_viec: document.getElementById('nvNgayBatDau').value,
+        phong_ban_id: phongBanPicker.getValue(),
+        chuc_danh_id: chucDanhPicker.getValue(),
+        nguoi_dung_id: document.getElementById('nvNguoiDung').value,
+        ghi_chu: document.getElementById('nvGhiChu').value.trim(),
+        cccd: document.getElementById('nvCccd').value.trim(),
+        ngay_sinh: document.getElementById('nvNgaySinh').value,
+        gioi_tinh: document.getElementById('nvGioiTinh').value,
+        tinh_thanh: document.getElementById('nvTinh').value.trim(),
+        phuong_xa: document.getElementById('nvPhuong').value.trim(),
+        dia_chi_chi_tiet: document.getElementById('nvDiaChiChiTiet').value.trim(),
+        facebook: document.getElementById('nvFacebook').value.trim(),
+        email: document.getElementById('nvEmail').value.trim()
+      };
+    }
+
+    document.querySelectorAll('.nv-tab').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+    document.getElementById('nvAddBtn').addEventListener('click', () => openNvModal(null));
+    document.getElementById('nvEmptyAdd')?.addEventListener('click', e => { e.preventDefault(); openNvModal(null); });
+    document.getElementById('nvCancelBtn').addEventListener('click', closeNvModal);
+    nvModal.addEventListener('click', e => { if (e.target === nvModal) closeNvModal(); });
+    document.getElementById('nvAnh').addEventListener('input', function() {
+      setAvatarPreview(this.value.trim(), document.getElementById('nvTen').value);
+    });
+
+    nvKeyword.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      nvFilterKeyword.value = nvKeyword.value.trim();
+      document.getElementById('nvFilterForm').submit();
+    });
+
+    document.querySelectorAll('.nv-edit').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const id = this.closest('tr').dataset.id;
+        const res = await fetch('/api/nhan-vien/' + id);
+        const json = await res.json();
+        if (!json.success) return alert(json.message || 'Không tải được nhân viên');
+        openNvModal(json.item);
+      });
+    });
+
+    document.querySelectorAll('.nv-delete').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const id = this.closest('tr').dataset.id;
+        if (!confirm('Chuyển nhân viên sang trạng thái đã nghỉ?')) return;
+        const res = await fetch('/api/nhan-vien/' + id, { method: 'DELETE' });
+        const json = await res.json();
+        if (!json.success) return alert(json.message || 'Lỗi');
+        location.reload();
+      });
+    });
+
+    document.getElementById('nvSaveBtn').addEventListener('click', async function() {
+      const payload = collectPayload();
+      if (!payload.ten_nhan_vien) return alert('Vui lòng nhập tên nhân viên');
+      const url = nvEditId ? ('/api/nhan-vien/' + nvEditId) : '/api/nhan-vien';
+      const method = nvEditId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json.success) return alert(json.message || 'Lỗi lưu nhân viên');
+      location.reload();
+    });
+  </script>
+</body>
+</html>

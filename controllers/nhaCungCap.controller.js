@@ -1,6 +1,7 @@
 ﻿var mongoose = require('mongoose');
 var ExcelJS = require('exceljs');
 var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang } = require('../models/kiot.model');
+var { normalizeAddress } = require('../utils/address');
 var DiaChiNhaCungCap = DiaChiNcc || DiaChiDoiTuong;
 
 var SUPPLIER_EXPORT_COLUMNS = [
@@ -11,7 +12,6 @@ var SUPPLIER_EXPORT_COLUMNS = [
     { header: 'Email', key: 'email' },
     { header: 'Địa chỉ', key: 'dia_chi' },
     { header: 'Tỉnh/TP', key: 'tinh_tp' },
-    { header: 'Quận/Huyện', key: 'quan_huyen' },
     { header: 'Phường/Xã', key: 'phuong_xa' },
     { header: 'Mã số thuế', key: 'ma_so_thue' },
     { header: 'Nhóm nhà cung cấp', key: 'nhom_nha_cung_cap' },
@@ -55,36 +55,92 @@ function slugifyFilePart(value) {
     return s || 'ncc';
 }
 
-/** Tổng mua / tổng nợ / đã trả tích lũy từ phiếu nhập đã hoàn thành (theo cửa hàng nếu có). */
+/** Tổng mua từ phiếu nhập, tổng nợ từ sổ công nợ NCC (theo cửa hàng nếu có). */
 async function aggregateSupplierPurchaseTotals(storeId) {
-    var match = {
+    var purchaseMatch = {
         trang_thai: 'completed',
         nha_cung_cap_id: { $exists: true, $ne: null }
     };
+    var debtMatch = {
+        nha_cung_cap_id: { $exists: true, $ne: null }
+    };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
-        match.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
+        var storeObjectId = new mongoose.Types.ObjectId(String(storeId));
+        purchaseMatch.cua_hang_id = storeObjectId;
+        debtMatch.cua_hang_id = storeObjectId;
     }
-    var rows = await PhieuNhap.aggregate([
-        { $match: match },
+    var purchaseRows = await PhieuNhap.aggregate([
+        { $match: purchaseMatch },
         {
             $group: {
                 _id: '$nha_cung_cap_id',
                 tong_mua: { $sum: { $ifNull: ['$tong_tien', 0] } },
-                tong_no: { $sum: { $ifNull: ['$con_no_ncc', 0] } },
                 da_tra_tong: { $sum: { $ifNull: ['$da_tra_ncc', 0] } }
             }
         }
     ]);
+    var debtRows = await CongNoNhaCungCap.aggregate([
+        { $match: debtMatch },
+        {
+            $group: {
+                _id: '$nha_cung_cap_id',
+                tang_no: {
+                    $sum: { $cond: [{ $eq: ['$loai', 'tang_no'] }, { $ifNull: ['$so_tien', 0] }, 0] }
+                },
+                giam_no: {
+                    $sum: { $cond: [{ $in: ['$loai', ['giam_no', 'thanh_toan']] }, { $ifNull: ['$so_tien', 0] }, 0] }
+                },
+                thanh_toan: {
+                    $sum: { $cond: [{ $eq: ['$loai', 'thanh_toan'] }, { $ifNull: ['$so_tien', 0] }, 0] }
+                }
+            }
+        }
+    ]);
     var map = {};
-    rows.forEach(function(r) {
+    purchaseRows.forEach(function(r) {
         if (!r._id) return;
         map[String(r._id)] = {
             tong_mua: Number(r.tong_mua || 0),
-            tong_no: Number(r.tong_no || 0),
+            tong_no: 0,
             da_tra_tong: Number(r.da_tra_tong || 0)
         };
     });
+    debtRows.forEach(function(r) {
+        if (!r._id) return;
+        var key = String(r._id);
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0 };
+        map[key].tong_no = Math.max(0, Number(r.tang_no || 0) - Number(r.giam_no || 0));
+        map[key].da_tra_tong = Number(r.thanh_toan || 0);
+    });
     return map;
+}
+
+function getDebtDocumentInfo(row) {
+    if (row.phieu_tra_nhap_id) {
+        return {
+            type: 'tra_hang_nhap',
+            label: 'Trả hàng nhập',
+            doc: row.phieu_tra_nhap_id,
+            code: row.phieu_tra_nhap_id.ma_phieu_tra_nhap || '--'
+        };
+    }
+    if (row.phieu_thu_chi_id) {
+        return {
+            type: 'phieu_thu_chi',
+            label: 'Phiếu thu/chi',
+            doc: row.phieu_thu_chi_id,
+            code: row.phieu_thu_chi_id.ma_phieu || '--'
+        };
+    }
+    if (row.phieu_nhap_id) {
+        return {
+            type: 'phieu_nhap',
+            label: 'Phiếu nhập',
+            doc: row.phieu_nhap_id,
+            code: row.phieu_nhap_id.ma_phieu_nhap || '--'
+        };
+    }
+    return { type: '', label: 'Khác', doc: null, code: '--' };
 }
 
 function applySupplierTotalsFromMap(supplier, totalsMap) {
@@ -145,6 +201,32 @@ async function loadAddressTypes() {
     return await LoaiDiaChiKhachHang.find({ trang_thai: 'active' }).sort({ created_at: 1 }).lean();
 }
 
+function normalizeAddressTypeCode(value) {
+    var text = String(value || '').trim().toLowerCase();
+    text = text.normalize ? text.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : text;
+    text = text.replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    return text || 'loai_dia_chi';
+}
+
+async function makeAddressTypeCode(name) {
+    var base = normalizeAddressTypeCode(name);
+    var code = base;
+    var index = 1;
+    while (await LoaiDiaChiKhachHang.exists({ ma_loai: code })) {
+        index += 1;
+        code = base + '_' + index;
+    }
+    return code;
+}
+
+function respondAddressTypeError(req, res, statusCode, message) {
+    console.error('[AddressType]', message);
+    if (shouldRespondJson(req)) {
+        return res.status(statusCode || 400).json({ success: false, message: message || 'Không thể xử lý loại địa chỉ.' });
+    }
+    return res.redirect('/nha-cung-cap?error=address_type_error');
+}
+
 function normalizeFilterQuery(query) {
     query = query || {};
     var groupId = String(query.groupId || 'all').trim() || 'all';
@@ -189,6 +271,10 @@ function mapCongNoLoai(value) {
     if (value === 'thanh_toan') return 'Thanh toán';
     if (value === 'giam_no') return 'Giảm nợ';
     return 'Nhập hàng';
+}
+
+function mapCongNoDirection(value) {
+    return value === 'tang_no' ? 'Tăng nợ' : 'Giảm nợ';
 }
 
 function getDateRange(filter) {
@@ -259,10 +345,6 @@ function buildSupplierQueryFromFilter(filter) {
 
     if (filter.groupId !== 'all') supplierQuery.nhom_nha_cung_cap_id = filter.groupId;
     if (filter.status !== 'all') supplierQuery.trang_thai = filter.status;
-    var totalBuyRange = makeRangeFilter(filter.totalBuyFrom, filter.totalBuyTo);
-    if (totalBuyRange) supplierQuery.tong_mua = totalBuyRange;
-    var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
-    if (currentDebtRange) supplierQuery.tong_no = currentDebtRange;
     if (dateRange.start || dateRange.end) {
         supplierQuery.created_at = {};
         if (dateRange.start) supplierQuery.created_at.$gte = dateRange.start;
@@ -270,6 +352,23 @@ function buildSupplierQueryFromFilter(filter) {
     }
 
     return supplierQuery;
+}
+
+function isInRange(value, range) {
+    if (!range) return true;
+    var number = Number(value || 0);
+    if (range.$gte != null && number < range.$gte) return false;
+    if (range.$lte != null && number > range.$lte) return false;
+    return true;
+}
+
+function filterSuppliersByComputedTotals(suppliers, filter) {
+    var totalBuyRange = makeRangeFilter(filter.totalBuyFrom, filter.totalBuyTo);
+    var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
+    if (!totalBuyRange && !currentDebtRange) return suppliers;
+    return suppliers.filter(function(supplier) {
+        return isInRange(supplier.tong_mua, totalBuyRange) && isInRange(supplier.tong_no, currentDebtRange);
+    });
 }
 
 function formatExportDate(value) {
@@ -304,9 +403,8 @@ function buildSupplierExportRow(supplier, address) {
         nguoi_lien_he: address ? (address.ten_nguoi_nhan || '') : '',
         dien_thoai: supplier.sdt || (address ? address.sdt_nguoi_nhan || '' : ''),
         email: supplier.email || '',
-        dia_chi: address ? (address.dia_chi_day_du || address.so_nha || '') : '',
+        dia_chi: address ? (address.dia_chi_day_du || address.dia_chi_chi_tiet || '') : '',
         tinh_tp: address ? (address.tinh_thanh || '') : '',
-        quan_huyen: address ? (address.quan_huyen || '') : '',
         phuong_xa: address ? (address.phuong_xa || '') : '',
         ma_so_thue: supplier.ma_so_thue || '',
         nhom_nha_cung_cap: supplier.nhom_nha_cung_cap_id ? (supplier.nhom_nha_cung_cap_id.ten_nhom_ncc || '') : '',
@@ -385,15 +483,15 @@ async function makeSupplierAddressCode() {
 
 function normalizeSupplierAddressPayload(body) {
     body = body || {};
+    var address = normalizeAddress(body);
     return {
         ma_dia_chi: String(body.ma_dia_chi || '').trim(),
         ten_nguoi_nhan: String(body.ten_nguoi_nhan || '').trim(),
         sdt_nguoi_nhan: String(body.sdt_nguoi_nhan || '').trim(),
-        so_nha: String(body.so_nha || '').trim(),
-        dia_chi_day_du: String(body.dia_chi_day_du || '').trim(),
-        tinh_thanh: String(body.tinh_thanh || '').trim(),
-        quan_huyen: String(body.quan_huyen || '').trim(),
-        phuong_xa: String(body.phuong_xa || '').trim(),
+        dia_chi_chi_tiet: address.dia_chi_chi_tiet,
+        dia_chi_day_du: address.dia_chi_day_du,
+        tinh_thanh: address.tinh_thanh,
+        phuong_xa: address.phuong_xa,
         loai_dia_chi: String(body.loai_dia_chi || '').trim(),
         ghi_chu: String(body.ghi_chu || '').trim(),
         mac_dinh: body.mac_dinh === 'true' || body.mac_dinh === true || body.mac_dinh === 'on'
@@ -435,6 +533,7 @@ exports.index = async function(req, res, next) {
         var suppliers = await NhaCungCap.find(supplierQuery).sort({ created_at: 1, ma_ncc: 1 }).lean();
         var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
         suppliers.forEach(function(s) { applySupplierTotalsFromMap(s, totalsMap); });
+        suppliers = filterSuppliersByComputedTotals(suppliers, filter);
 
         var selectedSupplierId = String(requestQuery.supplier || '').trim();
         var selectedSupplier = null;
@@ -505,6 +604,8 @@ exports.index = async function(req, res, next) {
             }
             var debtRows = await CongNoNhaCungCap.find(debtQuery)
                 .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
+                .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap' })
+                .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
                 .sort({ ngay: -1, created_at: -1 })
                 .lean();
             var runningDebt = 0;
@@ -513,13 +614,18 @@ exports.index = async function(req, res, next) {
                 var soTien = Number(row.so_tien || 0);
                 if (row.loai === 'tang_no') runningDebt += soTien;
                 if (row.loai === 'giam_no' || row.loai === 'thanh_toan') runningDebt = Math.max(0, runningDebt - soTien);
+                var docInfo = getDebtDocumentInfo(row);
                 return {
                     phieu_nhap_id: row.phieu_nhap_id,
-                    ma_phieu: row?.phieu_nhap_id?.ma_phieu_nhap || '--',
+                    phieu_tra_nhap_id: row.phieu_tra_nhap_id,
+                    phieu_thu_chi_id: row.phieu_thu_chi_id,
+                    ma_phieu: docInfo.code,
+                    loai_chung_tu: docInfo.label,
                     thoi_gian: row.ngay || row.created_at,
                     loai: row.loai || 'tang_no',
                     gia_tri: soTien,
-                    no_con_lai: runningDebt
+                    no_con_lai: runningDebt,
+                    ghi_chu: row.ghi_chu || ''
                 };
             });
             supplierDebtHistory = mappedDebtAsc.reverse();
@@ -543,7 +649,8 @@ exports.index = async function(req, res, next) {
             filter: filter,
             filterQueryString: buildFilterQueryString(filter),
             mapNhapHangStatus: mapNhapHangStatus,
-            mapCongNoLoai: mapCongNoLoai
+            mapCongNoLoai: mapCongNoLoai,
+            mapCongNoDirection: mapCongNoDirection
         });
     } catch (error) {
         next(error);
@@ -562,6 +669,7 @@ exports.exportExcel = async function(req, res, next) {
             .lean();
         var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
         suppliers.forEach(function(s) { applySupplierTotalsFromMap(s, totalsMap); });
+        suppliers = filterSuppliersByComputedTotals(suppliers, filter);
         var supplierIds = suppliers.map(function(supplier) { return supplier._id; });
         var addresses = supplierIds.length
             ? await DiaChiNhaCungCap.find({ nha_cung_cap_id: { $in: supplierIds } })
@@ -638,9 +746,8 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             { header: 'Tên người nhận', key: 'ten_nguoi_nhan', width: 22 },
             { header: 'SĐT', key: 'sdt', width: 14 },
             { header: 'Địa chỉ đầy đủ', key: 'dia_chi_day_du', width: 36 },
-            { header: 'Số nhà', key: 'so_nha', width: 12 },
+            { header: 'Địa chỉ chi tiết', key: 'dia_chi_chi_tiet', width: 20 },
             { header: 'Phường/Xã', key: 'phuong_xa', width: 16 },
-            { header: 'Quận/Huyện', key: 'quan_huyen', width: 16 },
             { header: 'Tỉnh/Thành', key: 'tinh_thanh', width: 16 },
             { header: 'Loại địa chỉ', key: 'loai_dia_chi', width: 14 },
             { header: 'Mặc định', key: 'mac_dinh', width: 10 },
@@ -654,9 +761,8 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
                 ten_nguoi_nhan: a.ten_nguoi_nhan || '',
                 sdt: a.sdt_nguoi_nhan || '',
                 dia_chi_day_du: a.dia_chi_day_du || '',
-                so_nha: a.so_nha || '',
+                dia_chi_chi_tiet: a.dia_chi_chi_tiet || '',
                 phuong_xa: a.phuong_xa || '',
-                quan_huyen: a.quan_huyen || '',
                 tinh_thanh: a.tinh_thanh || '',
                 loai_dia_chi: a.loai_dia_chi || '',
                 mac_dinh: a.mac_dinh ? 'Có' : 'Không',
@@ -716,36 +822,40 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
     if (section === 'debt') {
         var wsD = workbook.addWorksheet('Công nợ');
         wsD.columns = [
-            { header: 'Mã phiếu nhập', key: 'ma_phieu', width: 18 },
-            { header: 'Ngày nhập', key: 'ngay_nhap', width: 20 },
-            { header: 'Cần trả NCC', key: 'can_tra', style: { numFmt: '#,##0' } },
-            { header: 'Đã trả NCC', key: 'da_tra', style: { numFmt: '#,##0' } },
-            { header: 'Còn nợ NCC', key: 'con_no', style: { numFmt: '#,##0' } },
-            { header: 'Tuổi nợ (ngày)', key: 'tuoi_no', width: 16 },
-            { header: 'Trạng thái', key: 'trang_thai', width: 16 }
+            { header: 'Ngày', key: 'ngay', width: 20 },
+            { header: 'Nhà cung cấp', key: 'nha_cung_cap', width: 28 },
+            { header: 'Loại phát sinh', key: 'loai_phat_sinh', width: 16 },
+            { header: 'Loại chứng từ', key: 'loai_chung_tu', width: 18 },
+            { header: 'Mã chứng từ', key: 'ma_chung_tu', width: 18 },
+            { header: 'Số tiền tăng nợ', key: 'tang_no', style: { numFmt: '#,##0' } },
+            { header: 'Số tiền giảm nợ', key: 'giam_no', style: { numFmt: '#,##0' } },
+            { header: 'Nợ còn lại', key: 'no_con_lai', style: { numFmt: '#,##0' } },
+            { header: 'Ghi chú', key: 'ghi_chu', width: 36 }
         ];
-        var debtMatch = { nha_cung_cap_id: supplier._id, trang_thai: { $ne: 'cancelled' } };
+        var debtMatch = { nha_cung_cap_id: supplier._id };
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) debtMatch.cua_hang_id = storeId;
-        var slips = await PhieuNhap.find(debtMatch).sort({ ngay_nhap: -1, created_at: -1 }).lean();
-        var today = Date.now();
-        slips.forEach(function(row) {
-            var conNo = Number(row.con_no_ncc || 0);
-            var ngay = row.ngay_nhap || row.created_at;
-            var tuoi = '';
-            if (conNo > 0 && ngay) {
-                var d = new Date(ngay).getTime();
-                if (!isNaN(d)) tuoi = String(Math.max(0, Math.floor((today - d) / 86400000)));
-            } else {
-                tuoi = '0';
-            }
+        var debtRows = await CongNoNhaCungCap.find(debtMatch)
+            .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
+            .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap' })
+            .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
+            .sort({ ngay: 1, created_at: 1 })
+            .lean();
+        var runningDebt = 0;
+        debtRows.forEach(function(row) {
+            var amount = Number(row.so_tien || 0);
+            if (row.loai === 'tang_no') runningDebt += amount;
+            if (row.loai === 'giam_no' || row.loai === 'thanh_toan') runningDebt = Math.max(0, runningDebt - amount);
+            var docInfo = getDebtDocumentInfo(row);
             wsD.addRow({
-                ma_phieu: row.ma_phieu_nhap || '',
-                ngay_nhap: formatExportDate(ngay),
-                can_tra: Number(row.can_tra_ncc || row.tong_tien || 0),
-                da_tra: Number(row.da_tra_ncc || 0),
-                con_no: conNo,
-                tuoi_no: tuoi,
-                trang_thai: mapNhapHangStatus(row.trang_thai)
+                ngay: formatExportDate(row.ngay || row.created_at),
+                nha_cung_cap: supplier.ten_ncc || supplier.ma_ncc || '',
+                loai_phat_sinh: mapCongNoLoai(row.loai),
+                loai_chung_tu: docInfo.label,
+                ma_chung_tu: docInfo.code,
+                tang_no: row.loai === 'tang_no' ? amount : 0,
+                giam_no: row.loai === 'giam_no' || row.loai === 'thanh_toan' ? amount : 0,
+                no_con_lai: runningDebt,
+                ghi_chu: row.ghi_chu || ''
             });
         });
         applySupplierWorksheetFormat(wsD);
@@ -938,6 +1048,120 @@ exports.removeGroup = async function(req, res, next) {
         console.error('[SupplierGroup] delete failed:', error && error.message ? error.message : error);
         if (shouldRespondJson(req)) {
             return res.status(500).json({ success: false, message: error && error.message ? error.message : 'Có lỗi khi xử lý nhóm nhà cung cấp.' });
+        }
+        next(error);
+    }
+};
+
+exports.addAddressType = async function(req, res, next) {
+    try {
+        if (!LoaiDiaChiKhachHang) return respondAddressTypeError(req, res, 500, 'Chưa cấu hình model loại địa chỉ.');
+        var tenLoai = String(req?.body?.ten_loai || '').trim();
+        var maLoai = normalizeAddressTypeCode(req?.body?.ma_loai || tenLoai);
+        if (!tenLoai) return respondAddressTypeError(req, res, 400, 'Vui lòng nhập tên loại địa chỉ.');
+        if (!maLoai) maLoai = await makeAddressTypeCode(tenLoai);
+        if (await LoaiDiaChiKhachHang.exists({ ma_loai: maLoai })) maLoai = await makeAddressTypeCode(tenLoai);
+
+        var created = await LoaiDiaChiKhachHang.create({
+            ma_loai: maLoai,
+            ten_loai: tenLoai,
+            trang_thai: 'active'
+        });
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã thêm loại địa chỉ.',
+                data: created,
+                selectedCode: created.ma_loai,
+                addressTypes: await loadAddressTypes()
+            });
+        }
+
+        res.redirect('/nha-cung-cap?success=created_address_type');
+    } catch (error) {
+        console.error('[AddressType] add failed:', error && error.message ? error.message : error);
+        if (error && error.code === 11000) return respondAddressTypeError(req, res, 409, 'Loại địa chỉ đã tồn tại.');
+        if (shouldRespondJson(req)) {
+            return res.status(500).json({ success: false, message: error && error.message ? error.message : 'Có lỗi khi xử lý loại địa chỉ.' });
+        }
+        next(error);
+    }
+};
+
+exports.updateAddressType = async function(req, res, next) {
+    try {
+        if (!LoaiDiaChiKhachHang) return respondAddressTypeError(req, res, 500, 'Chưa cấu hình model loại địa chỉ.');
+        var typeId = normalizeIdParam(req?.params?.typeId);
+        if (!typeId || !mongoose.Types.ObjectId.isValid(typeId)) {
+            return respondAddressTypeError(req, res, 400, 'Loại địa chỉ không hợp lệ.');
+        }
+
+        var tenLoai = String(req?.body?.ten_loai || '').trim();
+        if (!tenLoai) return respondAddressTypeError(req, res, 400, 'Vui lòng nhập tên loại địa chỉ.');
+
+        var updated = await LoaiDiaChiKhachHang.findByIdAndUpdate(
+            typeId,
+            { ten_loai: tenLoai, trang_thai: 'active' },
+            { runValidators: true, new: true }
+        );
+        if (!updated) return respondAddressTypeError(req, res, 404, 'Không tìm thấy loại địa chỉ.');
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã cập nhật loại địa chỉ.',
+                data: updated,
+                selectedCode: updated.ma_loai,
+                addressTypes: await loadAddressTypes()
+            });
+        }
+
+        res.redirect('/nha-cung-cap?success=updated_address_type');
+    } catch (error) {
+        console.error('[AddressType] update failed:', error && error.message ? error.message : error);
+        if (error && error.code === 11000) return respondAddressTypeError(req, res, 409, 'Tên loại địa chỉ đã tồn tại.');
+        if (shouldRespondJson(req)) {
+            return res.status(500).json({ success: false, message: error && error.message ? error.message : 'Có lỗi khi xử lý loại địa chỉ.' });
+        }
+        next(error);
+    }
+};
+
+exports.removeAddressType = async function(req, res, next) {
+    try {
+        if (!LoaiDiaChiKhachHang) return respondAddressTypeError(req, res, 500, 'Chưa cấu hình model loại địa chỉ.');
+        var typeId = normalizeIdParam(req?.params?.typeId);
+        if (!typeId || !mongoose.Types.ObjectId.isValid(typeId)) {
+            return respondAddressTypeError(req, res, 400, 'Loại địa chỉ không hợp lệ.');
+        }
+
+        var type = await LoaiDiaChiKhachHang.findById(typeId).lean();
+        if (!type) return respondAddressTypeError(req, res, 404, 'Không tìm thấy loại địa chỉ.');
+        if (String(type.ma_loai || '') === 'khac') {
+            return respondAddressTypeError(req, res, 400, 'Không thể xóa loại địa chỉ mặc định.');
+        }
+
+        await DiaChiNhaCungCap.updateMany(
+            { loai_dia_chi: type.ma_loai },
+            { $set: { loai_dia_chi: 'khac' } }
+        );
+        await LoaiDiaChiKhachHang.findByIdAndDelete(typeId);
+
+        if (shouldRespondJson(req)) {
+            return res.json({
+                success: true,
+                message: 'Đã xóa loại địa chỉ.',
+                selectedCode: 'khac',
+                addressTypes: await loadAddressTypes()
+            });
+        }
+
+        res.redirect('/nha-cung-cap?success=deleted_address_type');
+    } catch (error) {
+        console.error('[AddressType] delete failed:', error && error.message ? error.message : error);
+        if (shouldRespondJson(req)) {
+            return res.status(500).json({ success: false, message: error && error.message ? error.message : 'Có lỗi khi xử lý loại địa chỉ.' });
         }
         next(error);
     }

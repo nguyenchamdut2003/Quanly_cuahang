@@ -133,5 +133,6 @@
     <button class="btn btn-light btn-sm btn-copy-product" type="button" data-product='<%- JSON.stringify(item) %>'>Sao chép</button>
     <button class="btn btn-primary btn-sm btn-edit-product" type="button" data-product='<%- JSON.stringify(item) %>'>Chỉnh sửa</button>
     <button class="btn btn-light btn-sm btn-print-label" type="button" data-product='<%- JSON.stringify(item) %>'>In tem mã</button>
+    <a class="btn btn-light btn-sm" href="/hang-hoa/hd-nguyen-tac?keyword=<%= encodeURIComponent(item.ma_hang || item.ten_hang || '') %>" target="_blank">HĐ nguyên tắc</a>
   </div>
 </div>

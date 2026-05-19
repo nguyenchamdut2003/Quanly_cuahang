@@ -7,6 +7,8 @@ router.use(isAuthenticated);
 
 router.get('/api/:id/detail', hangHoaController.apiProductDetail);
 router.get('/', hangHoaController.index);
+router.get('/hd-nguyen-tac', hangHoaController.printContract);
+router.get('/hd-nguyen-tac/pdf', hangHoaController.printContractPdf);
 router.get('/thiet-lap-gia', hangHoaController.priceSetup);
 router.get('/thuoc-tinh', hangHoaController.attributesPage);
 router.get('/:id/thuoc-tinh', hangHoaController.apiProductAttributes);

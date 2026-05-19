@@ -72,7 +72,7 @@
     .quick-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
     .lot-modal{position:fixed;inset:0;background:rgba(15,23,42,.35);display:none;align-items:center;justify-content:center;z-index:1000}
     .lot-modal.open{display:flex}
-    .lot-modal-card{width:520px;max-width:calc(100vw - 20px);background:#fff;border-radius:10px;padding:14px}
+    .lot-modal-card{width:720px;max-width:calc(100vw - 20px);max-height:calc(100vh - 28px);overflow:auto;background:#fff;border-radius:10px;padding:14px}
     .lot-modal-title{font-size:16px;font-weight:700;margin-bottom:10px}
     .lot-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .lot-grid .full{grid-column:1/-1}
@@ -80,6 +80,21 @@
     .lot-mode{display:flex;gap:12px;align-items:center;font-size:13px;margin-bottom:10px}
     .lot-mode label,.check-option{display:flex;gap:7px;align-items:center}
     .lot-note{height:68px;border:1px solid #cfd8e3;border-radius:7px;padding:8px 10px;font-size:13px;resize:none;width:100%}
+    .lot-readonly{background:#f8fafc;color:#475467}
+    .lot-section{margin-top:12px;border-top:1px solid #e5e9ee;padding-top:12px}
+    .lot-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .lot-section-title{font-size:13px;font-weight:700;color:#111827}
+    .lot-total-text{font-size:13px;font-weight:800;color:#006dff;margin-bottom:8px}
+    .lot-qty-summary{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:12px;color:#475467;margin-top:8px}
+    .lot-qty-summary b{color:#111827}
+    .lot-qty-summary .danger{color:#d92d20}
+    .lot-qty-summary .ok{color:#027a48}
+    .lot-qc-list{display:flex;flex-direction:column;gap:6px}
+    .lot-qc-head,.lot-qc-row{display:grid;grid-template-columns:minmax(150px,1.2fr) 110px minmax(150px,1fr) 34px;gap:8px;align-items:center}
+    .lot-qc-head{font-size:12px;color:#667085}
+    .lot-qc-row .lot-input{height:32px}
+    .lot-qc-delete{width:32px;height:32px;border:1px solid #fda29b;background:#fff;color:#d92d20;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .lot-qc-delete:hover{background:#fff1f3}
     .lot-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:12px}
     .summary-line{display:grid;grid-template-columns:1fr 172px;align-items:center;min-height:40px;font-size:13px;color:#111827}
     .summary-line strong{font-weight:700}
@@ -92,10 +107,6 @@
     .line-discount-wrap{display:flex;gap:4px;justify-content:flex-end}
     .line-discount-wrap .input-small{width:58px}
     .line-discount-wrap .discount-type{width:54px;min-width:54px}
-    .attribute-select-wrap{display:flex;align-items:center;gap:4px;white-space:nowrap;max-width:100%;overflow:hidden}
-    .attribute-select-label{max-width:38px;font-size:11px;color:#475467;overflow:hidden;text-overflow:ellipsis}
-    .attribute-select{width:58px;height:28px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;padding:0 5px;font-size:11px}
-    .attribute-empty{color:#667085;font-size:12px}
     .unit-cell{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .payable{color:#006dff!important;font-weight:700}
     .note{height:60px;border:1px solid #cfd8e3;border-radius:7px;padding:10px;resize:none;font-size:13px;margin-top:20px}
@@ -136,7 +147,6 @@
                 <th style="width:66px;text-align:center">STT</th>
                 <th style="width:104px">Mã hàng</th>
                 <th>Tên hàng</th>
-                <th style="width:96px">Thuộc tính</th>
                 <th style="width:54px">ĐVT</th>
                 <th class="num" style="width:88px">Số lượng</th>
                 <th class="num" style="width:116px">Đơn giá nhập</th>
@@ -281,6 +291,10 @@
           <label><input type="radio" name="lotMode" id="lotModeNew" value="new" checked> Tạo lô mới</label>
           <label><input type="radio" name="lotMode" id="lotModeExisting" value="existing"> Chọn lô có sẵn</label>
         </div>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Đơn vị tính</div>
+          <input id="lotUnitName" class="lot-input lot-readonly" readonly>
+        </label>
         <select id="lotExistingId" class="lot-input full" style="display:none"></select>
         <input id="lotMaLo" class="lot-input" placeholder="Mã lô (để trống tự động)">
         <input id="lotTenLo" class="lot-input" placeholder="Tên lô">
@@ -293,6 +307,23 @@
           <input id="lotHanSuDung" type="date" class="lot-input">
         </label>
         <textarea id="lotGhiChu" class="lot-note full" placeholder="Ghi chú lô"></textarea>
+      </div>
+      <div class="lot-section">
+        <div class="lot-total-text" id="lotTotalQtyText">Tổng số lượng lô: 0</div>
+        <div class="lot-section-head">
+          <div class="lot-section-title">Thuộc tính / Quy cách trong lô</div>
+          <button type="button" class="btn-row primary" id="addLotQcBtn">+ Thêm thuộc tính</button>
+        </div>
+        <div class="lot-qc-head">
+          <span>Tên thuộc tính/quy cách</span>
+          <span>Số lượng</span>
+          <span>Ghi chú</span>
+          <span></span>
+        </div>
+        <div id="lotQcRows" class="lot-qc-list"></div>
+        <div class="lot-qty-summary">
+          <span>Tổng đã chia: <b id="lotQcAllocated">0</b></span>
+        </div>
       </div>
       <div class="lot-actions">
         <button type="button" class="btn-row" id="lotCancelBtn">Đóng</button>
@@ -328,7 +359,6 @@
       ten_don_vi: u.ten_don_vi || ''
     }));
     let supplierProducts = [];
-    const productAttributeCache = {};
     let quickEditId = '';
     let lotEditItemId = '';
     let isPayAllMode = false;
@@ -359,6 +389,11 @@
     const lotModeNew = document.getElementById('lotModeNew');
     const lotModeExisting = document.getElementById('lotModeExisting');
     const lotExistingId = document.getElementById('lotExistingId');
+    const lotTotalQtyText = document.getElementById('lotTotalQtyText');
+    const lotUnitNameInput = document.getElementById('lotUnitName');
+    const lotQcRows = document.getElementById('lotQcRows');
+    const lotQcAllocated = document.getElementById('lotQcAllocated');
+    const addLotQcBtn = document.getElementById('addLotQcBtn');
 
     function escapeHtml(text) {
       return String(text || '')
@@ -367,51 +402,6 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-    }
-
-    async function getProductAttributes(productId) {
-      const key = String(productId || '');
-      if (!key) return [];
-      if (Object.prototype.hasOwnProperty.call(productAttributeCache, key)) return productAttributeCache[key];
-      try {
-        const res = await fetch(`/hang-hoa/${encodeURIComponent(key)}/thuoc-tinh`, {
-          headers: { 'Accept': 'application/json' }
-        });
-        const json = await res.json();
-        productAttributeCache[key] = json && json.success && Array.isArray(json.data) ? json.data : [];
-      } catch (_error) {
-        productAttributeCache[key] = [];
-      }
-      return productAttributeCache[key];
-    }
-
-    async function loadProductAttributesForItem(rowId) {
-      const item = selectedItems.find(i => String(i.row_id) === String(rowId));
-      if (!item) return;
-      item.attribute_groups = await getProductAttributes(item.hang_hoa_id);
-      item.attributes_loading = false;
-      const firstGroup = item.attribute_groups && item.attribute_groups[0];
-      const firstValue = firstGroup && firstGroup.values && firstGroup.values[0];
-      if (firstValue && !item.gia_tri_thuoc_tinh_id) {
-        item.gia_tri_thuoc_tinh_id = String(firstValue.gia_tri_id);
-      }
-      renderItems();
-    }
-
-    function renderAttributeSelect(item) {
-      const groups = Array.isArray(item.attribute_groups) ? item.attribute_groups : [];
-      if (!groups.length) {
-        if (item.attributes_loading) return '<span class="attribute-empty">Đang tải...</span>';
-        return '<span class="attribute-empty">-</span>';
-      }
-      const group = groups[0];
-      const values = Array.isArray(group.values) ? group.values : [];
-      if (!values.length) return '<span class="attribute-empty">-</span>';
-      const options = values.map(value => {
-        const valueId = String(value.gia_tri_id || '');
-        return `<option value="${escapeHtml(valueId)}" ${String(item.gia_tri_thuoc_tinh_id || '') === valueId ? 'selected' : ''}>${escapeHtml(value.ten_gia_tri || '')}</option>`;
-      }).join('');
-      return `<div class="attribute-select-wrap"><span class="attribute-select-label">${escapeHtml(group.ten_thuoc_tinh || 'Thuộc tính')}:</span><select class="attribute-select" onchange="updateAttributeValue('${item.row_id}', this.value)">${options}</select></div>`;
     }
 
     function renderProductResults(list) {
@@ -489,6 +479,73 @@
       const d = new Date(value);
       if (Number.isNaN(d.getTime())) return '---';
       return d.toLocaleDateString('vi-VN');
+    }
+
+    function getItemUnit(item) {
+      return item ? String(item.dvt || item.don_vi_tinh || '---') : '---';
+    }
+
+    function normalizeQuyCachItems(items) {
+      return (Array.isArray(items) ? items : [])
+        .map(row => ({
+          ten_thuoc_tinh: String(row && row.ten_thuoc_tinh || '').trim(),
+          so_luong: numeric(row && row.so_luong),
+          ghi_chu: String(row && row.ghi_chu || '').trim()
+        }));
+    }
+
+    function cleanQuyCachItems(items) {
+      return normalizeQuyCachItems(items)
+        .filter(row => row.ten_thuoc_tinh || row.so_luong > 0 || row.ghi_chu);
+    }
+
+    function getLotDraftItems() {
+      return normalizeQuyCachItems(Array.from(lotQcRows ? lotQcRows.querySelectorAll('.lot-qc-row') : []).map(row => ({
+        ten_thuoc_tinh: row.querySelector('[data-field="ten_thuoc_tinh"]')?.value || '',
+        so_luong: row.querySelector('[data-field="so_luong"]')?.value || '',
+        ghi_chu: row.querySelector('[data-field="ghi_chu"]')?.value || ''
+      })));
+    }
+
+    function renderLotQuyCachRows(items) {
+      if (!lotQcRows) return;
+      const rows = normalizeQuyCachItems(items);
+      lotQcRows.innerHTML = rows.map((row, index) => `
+        <div class="lot-qc-row" data-index="${index}">
+          <input class="lot-input" data-field="ten_thuoc_tinh" value="${escapeHtml(row.ten_thuoc_tinh)}" placeholder="VD: Nhỏ, To, Loại 1">
+          <input class="lot-input" data-field="so_luong" value="${row.so_luong || ''}" inputmode="numeric" placeholder="0">
+          <input class="lot-input" data-field="ghi_chu" value="${escapeHtml(row.ghi_chu)}" placeholder="Ghi chú">
+          <button type="button" class="lot-qc-delete" data-action="delete-qc" title="Xóa dòng"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      `).join('');
+      updateLotQuyCachSummary();
+    }
+
+    function updateLotQuyCachSummary() {
+      const item = selectedItems.find(i => String(i.row_id) === String(lotEditItemId));
+      const unit = getItemUnit(item);
+      const allocated = getLotDraftItems().reduce((sum, row) => sum + numeric(row.so_luong), 0);
+      if (lotQcAllocated) lotQcAllocated.textContent = `${fmt(allocated)} ${unit}`;
+      if (lotTotalQtyText) lotTotalQtyText.textContent = `Tổng số lượng lô: ${fmt(allocated)} ${unit}`;
+    }
+
+    function makeLotSummary(item) {
+      if (!item || !item.lot_info) return 'Chưa chọn lô';
+      const lo = item.lot_info;
+      const parts = [];
+      const name = String(lo.ten_lo || '').trim();
+      const code = String(lo.ma_lo || '').trim();
+      if (name) parts.push(escapeHtml(name));
+      if (code && code !== name) parts.push(escapeHtml(code));
+      const hsd = formatDateVi(lo.han_su_dung);
+      return `Lô: ${parts.length ? parts.join(' / ') : '---'} / HSD: ${escapeHtml(hsd)}`;
+    }
+
+    function makeQuyCachSummary(item) {
+      const rows = cleanQuyCachItems(item && item.lot_info ? item.lot_info.quy_cach_items : []);
+      if (!rows.length) return '';
+      const unit = getItemUnit(item);
+      return rows.map(row => `${escapeHtml(row.ten_thuoc_tinh || '---')} ${fmt(row.so_luong)}${escapeHtml(unit)}`).join(', ');
     }
 
     function makeRowId() {
@@ -697,20 +754,16 @@
         ten_hang: product.ten_hang,
         dvt: product.don_vi_tinh || (product.don_vi_tinh_id && product.don_vi_tinh_id.ten_don_vi) || '---',
         don_vi_tinh: product.don_vi_tinh || (product.don_vi_tinh_id && product.don_vi_tinh_id.ten_don_vi) || '---',
-        so_luong: 1,
+        so_luong: Boolean(product.quan_ly_theo_lo) ? 0 : 1,
         don_gia_nhap: numeric(product.gia_nhap_cuoi || product.gia_von || 0),
         giam_gia: 0,
         kieu_giam_gia_dong: 'vnd',
-        gia_tri_thuoc_tinh_id: '',
-        attribute_groups: [],
-        attributes_loading: true,
         quan_ly_theo_lo: Boolean(product.quan_ly_theo_lo),
-        lo_info: null
+        lot_info: null
       });
       productSearch.value = '';
       searchResults.style.display = 'none';
       renderItems();
-      loadProductAttributesForItem(rowId);
     }
 
     function pickSupplierProduct(id) {
@@ -810,9 +863,8 @@
           <td style="text-align:center"><div class="row-index-cell"><span>${index + 1}</span><button type="button" class="row-delete-btn" title="Xóa dòng" onclick="removeProductFromImport('${item.row_id}')"><i class="fa-regular fa-trash-can"></i></button></div></td>
           <td>${item.ma_hang}</td>
           <td>${item.ten_hang}</td>
-          <td>${renderAttributeSelect(item)}</td>
           <td class="unit-cell">${item.dvt || item.don_vi_tinh || '---'}</td>
-          <td class="num"><input class="input-small qty-input" value="${item.so_luong}" onchange="updateQty('${item.row_id}', this.value)"></td>
+          <td class="num"><input class="input-small qty-input" value="${fmt(item.so_luong)}" readonly disabled></td>
           <td class="num"><input class="input-small" value="${fmt(item.don_gia_nhap)}" onchange="updatePrice('${item.row_id}', this.value)"></td>
           <td class="num">
             <div class="line-discount-wrap">
@@ -826,11 +878,12 @@
           <td class="num">${fmt(lineTotal)}</td>
         </tr>` + (item.quan_ly_theo_lo ? `<tr class="lot-row">
           <td></td>
-          <td colspan="8">
+          <td colspan="7">
             <div class="lot-line">
               <span>Nhập lô, hạn sử dụng</span>
               <a class="lot-link" onclick="openLotModal('${item.row_id}')">Chọn lô</a>
-              <span>${item.lo_info ? `Lô: ${escapeHtml(item.lo_info.ten_lo || item.lo_info.ma_lo || '---')} - HSD: ${escapeHtml(formatDateVi(item.lo_info.han_su_dung))}` : 'Chưa chọn lô'}</span>
+              <span>${makeLotSummary(item)}</span>
+              ${makeQuyCachSummary(item) ? `<span>Quy cách: ${makeQuyCachSummary(item)}</span>` : ''}
             </div>
           </td>
         </tr>` : '');
@@ -881,26 +934,30 @@
       document.getElementById('emptyImport').style.display = selectedItems.length ? 'none' : 'flex';
       itemsJsonInput.value = JSON.stringify(selectedItems.map(item => ({
         hang_hoa_id: item.hang_hoa_id,
-        gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || '',
-        lo_hang_id: item.lo_info ? String(item.lo_info.lo_hang_id || '').trim() : '',
+        lo_hang_id: item.lot_info ? String(item.lot_info.lo_hang_id || '').trim() : '',
         so_luong: numeric(item.so_luong),
         don_gia: numeric(item.don_gia_nhap),
         giam_gia_dong: clampDiscountValue(item.giam_gia, item.kieu_giam_gia_dong),
         kieu_giam_gia_dong: item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd',
-        lo_info: item.lo_info ? {
-          lo_hang_id: String(item.lo_info.lo_hang_id || '').trim(),
-          ma_lo: String(item.lo_info.ma_lo || '').trim(),
-          ten_lo: String(item.lo_info.ten_lo || '').trim(),
-          ngay_nhap: String(item.lo_info.ngay_nhap || '').trim(),
-          han_su_dung: String(item.lo_info.han_su_dung || '').trim(),
-          ghi_chu: String(item.lo_info.ghi_chu || '').trim()
+        lot_info: item.lot_info ? {
+          lo_hang_id: String(item.lot_info.lo_hang_id || '').trim(),
+          ma_lo: String(item.lot_info.ma_lo || '').trim(),
+          ten_lo: String(item.lot_info.ten_lo || '').trim(),
+          ngay_nhap: String(item.lot_info.ngay_nhap || '').trim(),
+          han_su_dung: String(item.lot_info.han_su_dung || '').trim(),
+          ghi_chu: String(item.lot_info.ghi_chu || '').trim(),
+          so_luong_tong: numeric(item.lot_info.so_luong_tong || item.so_luong),
+          quy_cach_items: cleanQuyCachItems(item.lot_info.quy_cach_items)
         } : null
       })));
     }
 
     function updateQty(rowId, val) {
       const item = selectedItems.find(i => i.row_id === rowId);
-      if (item) item.so_luong = Math.max(1, Math.floor(numeric(val)));
+      if (item) {
+        const nextQty = Math.max(1, Math.floor(numeric(val)));
+        item.so_luong = nextQty;
+      }
       renderItems();
     }
     function updatePrice(rowId, val) {
@@ -916,15 +973,6 @@
     function updateLineDiscountType(rowId, val) {
       const item = selectedItems.find(i => i.row_id === rowId);
       if (item) item.kieu_giam_gia_dong = val === 'percent' ? 'percent' : 'vnd';
-      renderItems();
-    }
-    function updateAttributeValue(rowId, val) {
-      const item = selectedItems.find(i => String(i.row_id) === String(rowId));
-      if (item) {
-        const nextValue = String(val || '');
-        if (String(item.gia_tri_thuoc_tinh_id || '') !== nextValue) item.lo_info = null;
-        item.gia_tri_thuoc_tinh_id = nextValue;
-      }
       renderItems();
     }
     function removeItem(rowId) {
@@ -943,18 +991,17 @@
       });
     }
 
-    async function loadLotsForItem(itemId, selectedLotId, attributeValueId) {
+    async function loadLotsForItem(itemId, selectedLotId) {
       if (!lotExistingId) return;
       lotExistingId.innerHTML = '<option value="">Chọn lô có sẵn</option>';
       const params = new URLSearchParams();
       const khoId = document.getElementById('khoId') ? document.getElementById('khoId').value : '';
       if (khoId) params.set('kho_id', khoId);
-      if (attributeValueId) params.set('gia_tri_thuoc_tinh_id', attributeValueId);
       try {
         const res = await fetch(`/api/hang-hoa/${itemId}/lo-hang` + (params.toString() ? `?${params.toString()}` : ''));
         const json = await res.json();
         const lots = json && json.success && Array.isArray(json.items) ? json.items : [];
-        lotExistingId.innerHTML += lots.map(lot => `<option value="${lot._id}" ${String(lot._id) === String(selectedLotId || '') ? 'selected' : ''}>${escapeHtml(lot.ma_lo || lot.ten_lo || 'Lô')} - Tồn ${fmt(lot.so_luong_con_lai || 0)} - HSD ${escapeHtml(formatDateVi(lot.han_su_dung))}</option>`).join('');
+        lotExistingId.innerHTML += lots.map(lot => `<option value="${lot._id}" data-ma="${escapeHtml(lot.ma_lo || '')}" data-ten="${escapeHtml(lot.ten_lo || '')}" data-hsd="${escapeHtml(toISODate(lot.han_su_dung))}" ${String(lot._id) === String(selectedLotId || '') ? 'selected' : ''}>${escapeHtml(lot.ma_lo || lot.ten_lo || 'Lô')} - Tồn ${fmt(lot.so_luong_con_lai || 0)} - HSD ${escapeHtml(formatDateVi(lot.han_su_dung))}</option>`).join('');
       } catch (_) {}
     }
 
@@ -963,16 +1010,18 @@
       if (!item || !item.quan_ly_theo_lo) return;
       lotEditItemId = rowId;
       const today = toISODate(new Date());
-      const lo = item.lo_info || {};
+      const lo = item.lot_info || {};
       if (lotModeExisting) lotModeExisting.checked = Boolean(lo.lo_hang_id);
       if (lotModeNew) lotModeNew.checked = !Boolean(lo.lo_hang_id);
-      await loadLotsForItem(item.hang_hoa_id, lo.lo_hang_id, item.gia_tri_thuoc_tinh_id);
+      await loadLotsForItem(item.hang_hoa_id, lo.lo_hang_id);
+      if (lotUnitNameInput) lotUnitNameInput.value = getItemUnit(item);
       const lotNgayNhapValue = lo.ngay_nhap || today;
       document.getElementById('lotMaLo').value = lo.ma_lo || '';
       document.getElementById('lotTenLo').value = lo.ten_lo || `Lô ${formatDateVi(lotNgayNhapValue)}`;
       document.getElementById('lotNgayNhap').value = lotNgayNhapValue;
       document.getElementById('lotHanSuDung').value = lo.han_su_dung || addDaysToDate(lotNgayNhapValue, 5);
       document.getElementById('lotGhiChu').value = lo.ghi_chu || '';
+      renderLotQuyCachRows(lo.quy_cach_items || []);
       toggleLotMode();
       lotModal.classList.add('open');
     }
@@ -980,60 +1029,64 @@
     function saveLotInfo() {
       const item = selectedItems.find(i => i.row_id === lotEditItemId);
       if (!item) return;
+      const quyCachItems = getLotDraftItems();
+      const validQuyCachItems = quyCachItems.filter(row => numeric(row.so_luong) > 0);
+      const totalQty = validQuyCachItems.reduce((sum, row) => sum + numeric(row.so_luong), 0);
+      const invalidName = validQuyCachItems.find(row => !row.ten_thuoc_tinh);
+      if (!validQuyCachItems.length || totalQty <= 0) {
+        alert('Lô hàng cần ít nhất 1 quy cách có số lượng lớn hơn 0.');
+        return;
+      }
+      if (invalidName) {
+        alert('Tên quy cách không được để trống nếu dòng đó có số lượng.');
+        return;
+      }
       if (lotModeExisting && lotModeExisting.checked) {
         if (!lotExistingId.value) {
           alert('Vui lòng chọn lô có sẵn hoặc chuyển sang tạo lô mới');
           return;
         }
-        const text = lotExistingId.options[lotExistingId.selectedIndex] ? lotExistingId.options[lotExistingId.selectedIndex].text : '';
-        item.lo_info = {
+        const selectedOption = lotExistingId.options[lotExistingId.selectedIndex];
+        const text = selectedOption ? selectedOption.text : '';
+        item.lot_info = {
           lo_hang_id: lotExistingId.value,
-          ma_lo: text,
-          ten_lo: text,
-          ghi_chu: ''
+          ma_lo: selectedOption ? (selectedOption.dataset.ma || text) : text,
+          ten_lo: selectedOption ? (selectedOption.dataset.ten || selectedOption.dataset.ma || text) : text,
+          han_su_dung: selectedOption ? (selectedOption.dataset.hsd || '') : '',
+          ghi_chu: '',
+          so_luong_tong: totalQty,
+          quy_cach_items: validQuyCachItems
         };
+        item.so_luong = totalQty;
         lotModal.classList.remove('open');
         renderItems();
         return;
       }
-      item.lo_info = {
+      item.lot_info = {
         ma_lo: document.getElementById('lotMaLo').value.trim(),
         ten_lo: document.getElementById('lotTenLo').value.trim(),
         ngay_nhap: document.getElementById('lotNgayNhap').value,
         han_su_dung: document.getElementById('lotHanSuDung').value,
-        ghi_chu: document.getElementById('lotGhiChu').value.trim()
+        ghi_chu: document.getElementById('lotGhiChu').value.trim(),
+        so_luong_tong: totalQty,
+        quy_cach_items: validQuyCachItems
       };
+      item.so_luong = totalQty;
       lotModal.classList.remove('open');
       renderItems();
     }
 
-    function hasInvalidAttributeSelection() {
-      return selectedItems.some(item => {
-        const groups = Array.isArray(item.attribute_groups) ? item.attribute_groups : [];
-        const hasValues = groups.some(group => Array.isArray(group.values) && group.values.length > 0);
-        return hasValues && !item.gia_tri_thuoc_tinh_id;
-      });
-    }
-
     document.getElementById('saveDraftBtn').addEventListener('click', function() {
-      if (hasInvalidAttributeSelection()) {
-        alert('Vui lòng chọn thuộc tính cho hàng hóa có phân loại.');
-        return;
-      }
       submitModeInput.value = 'draft';
       document.getElementById('nhapHangCreateForm').submit();
     });
     document.getElementById('completeBtn').addEventListener('click', function() {
       const invalidLotItem = selectedItems.find(item => {
         if (!item.quan_ly_theo_lo) return false;
-        return !item.lo_info;
+        return !item.lot_info;
       });
       if (invalidLotItem) {
         alert('Hàng quản lý theo lô cần có thông tin lô hợp lệ trước khi Hoàn thành.');
-        return;
-      }
-      if (hasInvalidAttributeSelection()) {
-        alert('Vui lòng chọn thuộc tính cho hàng hóa có phân loại.');
         return;
       }
       submitModeInput.value = 'completed';
@@ -1060,6 +1113,25 @@
     if (lotNgayNhapInput) {
       lotNgayNhapInput.addEventListener('change', function() {
         document.getElementById('lotHanSuDung').value = addDaysToDate(this.value, 5);
+      });
+    }
+    if (addLotQcBtn) {
+      addLotQcBtn.addEventListener('click', function() {
+        const rows = getLotDraftItems();
+        rows.push({ ten_thuoc_tinh: '', so_luong: 0, ghi_chu: '' });
+        renderLotQuyCachRows(rows);
+      });
+    }
+    if (lotQcRows) {
+      lotQcRows.addEventListener('input', updateLotQuyCachSummary);
+      lotQcRows.addEventListener('click', function(e) {
+        const btn = e.target.closest('[data-action="delete-qc"]');
+        if (!btn) return;
+        const row = btn.closest('.lot-qc-row');
+        const index = row ? Number(row.dataset.index) : -1;
+        const rows = getLotDraftItems();
+        if (index >= 0) rows.splice(index, 1);
+        renderLotQuyCachRows(rows);
       });
     }
     document.addEventListener('keydown', function(e) {
@@ -1122,7 +1194,6 @@
     window.loadSupplierProducts = loadSupplierProducts;
     window.calculateTotals = calculateTotals;
     window.updateLineDiscountType = updateLineDiscountType;
-    window.updateAttributeValue = updateAttributeValue;
     window.openLotModal = openLotModal;
   </script>
 </body>

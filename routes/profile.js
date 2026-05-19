@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 const { isAuthenticated } = require('../middlewares/auth.middleware');
 const { NguoiDung } = require('../models/kiot.model');
+const { normalizeAddress } = require('../utils/address');
 
 // Bắt buộc đăng nhập để vào trang cá nhân
 router.use(isAuthenticated);
@@ -26,7 +27,7 @@ router.post('/update', async function(req, res, next) {
 
         const ho_ten = req.body.ho_ten?.trim();
         const sdt = req.body.sdt?.trim();
-        const dia_chi = req.body.dia_chi?.trim();
+        const address = normalizeAddress(req.body);
 
         if (!ho_ten || ho_ten === '') {
             return res.status(400).send("Họ tên không được để trống");
@@ -39,7 +40,10 @@ router.post('/update', async function(req, res, next) {
 
         user.ho_ten = ho_ten;
         user.sdt = sdt || '';
-        user.dia_chi = dia_chi || '';
+        user.dia_chi_chi_tiet = address.dia_chi_chi_tiet;
+        user.phuong_xa = address.phuong_xa;
+        user.tinh_thanh = address.tinh_thanh;
+        user.dia_chi_day_du = address.dia_chi_day_du;
 
         await user.save();
 

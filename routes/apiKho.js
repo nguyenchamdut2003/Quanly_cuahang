@@ -6,6 +6,7 @@ const {
     HangHoa,
     TonKho,
     TonKhoLo,
+    TonKhoLoQuyCach,
     LoHang,
     DiaChiDoiTuong,
     DiaChiKhachHang,
@@ -396,7 +397,7 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
             .sort({ updated_at: -1, created_at: -1 })
             .lean();
 
-        const validLotRows = lotRows
+        const validLots = lotRows
             .filter(row => {
                 if (!row.hang_hoa_id || !row.hang_hoa_id.quan_ly_theo_lo || !row.lo_hang_id) return false;
                 if (row.lo_hang_id.trang_thai === 'huy') return false;
@@ -404,8 +405,26 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
                 const expiry = new Date(row.lo_hang_id.han_su_dung);
                 expiry.setHours(0, 0, 0, 0);
                 return expiry.getTime() >= today.getTime();
-            })
-            .map(row => ({
+            });
+
+        const lotIds = validLots.map(row => row.lo_hang_id._id).filter(Boolean);
+        const qcRows = lotIds.length
+            ? await TonKhoLoQuyCach.find({
+                kho_id: khoId,
+                lo_hang_id: { $in: lotIds },
+                so_luong: { $gt: 0 }
+            }).lean()
+            : [];
+        const qcByLot = qcRows.reduce((map, row) => {
+            const key = String(row.lo_hang_id);
+            if (!map[key]) map[key] = [];
+            map[key].push(row);
+            return map;
+        }, {});
+
+        const validLotRows = validLots.flatMap(row => {
+            const lotName = row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '';
+            const base = {
                 hang_hoa_id: row.hang_hoa_id._id,
                 lo_hang_id: row.lo_hang_id._id,
                 ma_hang: row.hang_hoa_id.ma_hang || '',
@@ -413,10 +432,22 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
                 don_vi_tinh: row.hang_hoa_id.don_vi_tinh_id?.ten_don_vi || '',
                 nhom_hang: row.hang_hoa_id.nhom_hang_id?.ten_nhom_hang || '',
                 quan_ly_theo_lo: true,
-                ma_lo: row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '',
-                han_su_dung: row.lo_hang_id.han_su_dung || '',
-                ton_kho_he_thong: Number(row.so_luong || 0)
-            }));
+                ma_lo: lotName,
+                han_su_dung: row.lo_hang_id.han_su_dung || ''
+            };
+            const lotQcRows = qcByLot[String(row.lo_hang_id._id)] || [];
+            if (!lotQcRows.length) {
+                return [Object.assign({}, base, { ten_quy_cach: '', ton_kho_he_thong: Number(row.so_luong || 0) })];
+            }
+            return lotQcRows.map(qc => {
+                const tenQuyCach = String(qc.ten_quy_cach || qc.ten_thuoc_tinh || '').trim();
+                return Object.assign({}, base, {
+                    ten_quy_cach: tenQuyCach,
+                    ma_lo: tenQuyCach ? `${lotName} - ${tenQuyCach}` : lotName,
+                    ton_kho_he_thong: Number(qc.so_luong || 0)
+                });
+            });
+        });
 
         res.json({ success: true, data: normalRows.concat(validLotRows) });
     } catch (error) {

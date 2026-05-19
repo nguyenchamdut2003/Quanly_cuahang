@@ -166,28 +166,18 @@
                 </div>
       
                 <div class="customer-form-field">
-                  <label>Số nhà</label>
-                  <input name="so_nha" placeholder="Nhập số nhà, đường">
+                  <label>Địa chỉ chi tiết</label>
+                  <input name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm">
                 </div>
-      
+
                 <div class="customer-form-field">
                   <label>Tỉnh/Thành</label>
                   <input name="tinh_thanh" placeholder="Chọn Tỉnh/Thành phố">
                 </div>
       
                 <div class="customer-form-field">
-                  <label>Quận/Huyện</label>
-                  <input name="quan_huyen" placeholder="Chọn Quận/Huyện">
-                </div>
-      
-                <div class="customer-form-field">
                   <label>Phường/Xã</label>
                   <input name="phuong_xa" placeholder="Chọn Phường/Xã">
-                </div>
-      
-                <div class="customer-form-field form-row-full">
-                  <label>Địa chỉ đầy đủ</label>
-                  <input name="dia_chi_day_du" placeholder="Nhập địa chỉ đầy đủ">
                 </div>
       
                 <div class="customer-form-field form-row-full">
@@ -377,7 +367,7 @@
               <div class="range-row"><span>Tới</span><input type="number" min="0" name="currentDebtTo" value="<%= filter.currentDebtTo || '' %>" placeholder="Nhập giá trị"></div>
             </div>
             <h4>Khu vực giao hàng</h4>
-            <input type="text" name="shippingArea" value="<%= filter.shippingArea || '' %>" placeholder="Chọn Tỉnh/TP - Quận/Huyện">
+            <input type="text" name="shippingArea" value="<%= filter.shippingArea || '' %>" placeholder="Chọn Tỉnh/Thành phố">
             <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
             <a class="btn btn-light" href="/khach-hang">Xóa lọc</a>
           </section>
@@ -596,7 +586,7 @@
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
                                     <td>
-                                      <input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ">
+                                      <input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết">
                                     </td>
                                     <td>
                                       <select form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
@@ -622,9 +612,8 @@
                                   <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
                                     <td colspan="7">
                                       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="so_nha" placeholder="Số nhà"></div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
                                         <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" placeholder="Phường/Xã"></div>
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" placeholder="Quận/Huyện"></div>
                                         <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
                                         <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
                                         <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
@@ -643,7 +632,7 @@
                                       <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
                                       <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
                                       <td>
-                                        <input form="<%= addressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>">
+                                        <input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>">
                                       </td>
                                       <td>
                                         <select form="<%= addressFormId %>" name="loai_dia_chi">
@@ -674,9 +663,8 @@
                                     <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
                                       <td colspan="7">
                                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" form="<%= addressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
                                           <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" form="<%= addressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" form="<%= addressFormId %>" name="quan_huyen" value="<%= address.quan_huyen || '' %>"></div>
                                           <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" form="<%= addressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
                                           <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
                                           <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
@@ -1527,7 +1515,7 @@
           var title = document.getElementById('addCustomerModalTitle');
           if (title) title.textContent = 'Cập nhật khách hàng';
 
-          var fields = ['ten_khach_hang', 'ma_khach_hang', 'sdt', 'sdt2', 'cccd', 'ngay_sinh', 'gioi_tinh', 'email', 'facebook', 'nhom_khach_hang_id', 'ghi_chu', 'loai_khach_hang', 'ma_so_thue', 'ten_cong_ty', 'stk_ngan_hang', 'chu_tai_khoan', 'ngan_hang', 'trang_thai', 'ten_nguoi_nhan', 'sdt_nguoi_nhan', 'so_nha', 'tinh_thanh', 'quan_huyen', 'phuong_xa', 'dia_chi_day_du', 'ghi_chu_dia_chi'];
+          var fields = ['ten_khach_hang', 'ma_khach_hang', 'sdt', 'sdt2', 'cccd', 'ngay_sinh', 'gioi_tinh', 'email', 'facebook', 'nhom_khach_hang_id', 'ghi_chu', 'loai_khach_hang', 'ma_so_thue', 'ten_cong_ty', 'stk_ngan_hang', 'chu_tai_khoan', 'ngan_hang', 'trang_thai', 'ten_nguoi_nhan', 'sdt_nguoi_nhan', 'dia_chi_chi_tiet', 'tinh_thanh', 'phuong_xa', 'ghi_chu_dia_chi'];
           
           fields.forEach(function(field) {
             var input = customerCreateForm.querySelector('[name="' + field + '"]');

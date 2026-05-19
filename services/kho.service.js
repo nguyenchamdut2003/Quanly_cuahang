@@ -1,10 +1,11 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const {
   Kho,
   HangHoa,
   TonKho,
   LoHang,
   TonKhoLo,
+  TonKhoLoQuyCach,
   LichSuKho
 } = require('../models/kiot.model');
 
@@ -42,6 +43,10 @@ function normalizeQuantity(value) {
   return quantity;
 }
 
+function normalizeTenQuyCach(value) {
+  return String(value || '').trim();
+}
+
 async function getWarehouse(khoId) {
   const warehouse = await Kho.findById(khoId);
 
@@ -75,12 +80,159 @@ async function ghiLichSuKho(params) {
     historyData.lo_hang_id = loHangId;
   }
 
+  if (params.ton_kho_truoc != null) {
+    historyData.ton_kho_truoc = Number(params.ton_kho_truoc) || 0;
+  }
+  if (params.ten_quy_cach) {
+    historyData.ten_quy_cach = String(params.ten_quy_cach).trim();
+  }
+  if (params.cap_ton) {
+    historyData.cap_ton = params.cap_ton;
+  }
+
   const creatorId = optionalObjectId(params.nguoi_tao_id, 'nguoi_tao_id');
   if (creatorId) {
     historyData.nguoi_tao_id = creatorId;
   }
 
   return LichSuKho.create(historyData);
+}
+
+async function resolveQuyCachStock(khoId, hangHoaId, loHangId, tenQuyCach) {
+  const name = normalizeTenQuyCach(tenQuyCach);
+  if (name) {
+    const row = await TonKhoLoQuyCach.findOne({
+      kho_id: khoId,
+      hang_hoa_id: hangHoaId,
+      lo_hang_id: loHangId,
+      $or: [{ ten_quy_cach: name }, { ten_thuoc_tinh: name }]
+    });
+    if (!row) {
+      throw new Error('Không tìm thấy tồn quy cách trong lô');
+    }
+    return row;
+  }
+
+  const rows = await TonKhoLoQuyCach.find({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    lo_hang_id: loHangId,
+    so_luong: { $gt: 0 }
+  });
+  if (!rows.length) return null;
+  if (rows.length > 1) {
+    throw new Error('Lô có nhiều quy cách, vui lòng kiểm kho theo từng quy cách');
+  }
+  return rows[0];
+}
+
+async function syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost) {
+  const qcRows = await TonKhoLoQuyCach.find({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    lo_hang_id: loHangId
+  }).lean();
+  const lotTotal = qcRows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
+  const weightedCost = qcRows.reduce((sum, row) => {
+    return sum + Number(row.so_luong || 0) * Number(row.gia_von || 0);
+  }, 0);
+  const avgCost = lotTotal > 0 ? Math.round(weightedCost / lotTotal) : Number(cost || 0);
+
+  await TonKhoLo.findOneAndUpdate(
+    {
+      kho_id: khoId,
+      hang_hoa_id: hangHoaId,
+      lo_hang_id: loHangId
+    },
+    {
+      $setOnInsert: {
+        cua_hang_id: warehouse.cua_hang_id,
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId,
+        lo_hang_id: loHangId
+      },
+      $set: {
+        so_luong: lotTotal,
+        gia_von: avgCost
+      }
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const lot = await LoHang.findById(loHangId);
+  if (lot) {
+    lot.so_luong_con_lai = lotTotal;
+    if (lot.trang_thai !== 'huy') {
+      lot.trang_thai = lotTotal > 0 ? 'active' : 'het_hang';
+    }
+    await lot.save();
+  }
+
+  const lotRows = await TonKhoLo.find({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId
+  }).lean();
+  const productTotal = lotRows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
+  const inventory = await TonKho.findOneAndUpdate(
+    {
+      kho_id: khoId,
+      hang_hoa_id: hangHoaId
+    },
+    {
+      $setOnInsert: {
+        cua_hang_id: warehouse.cua_hang_id,
+        chi_nhanh_id: warehouse.chi_nhanh_id,
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId
+      },
+      $set: {
+        so_luong: productTotal
+      }
+    },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  return { lotTotal, productTotal, inventory };
+}
+
+async function dieuChinhTonQuyCach(params, direction) {
+  const khoId = toObjectId(params.kho_id, 'kho_id');
+  const hangHoaId = toObjectId(params.hang_hoa_id, 'hang_hoa_id');
+  const loHangId = toObjectId(params.lo_hang_id, 'lo_hang_id');
+  const quantity = normalizeQuantity(params.so_luong);
+  const cost = Number(params.gia_von) || 0;
+  const warehouse = await getWarehouse(khoId);
+  const qcStock = await resolveQuyCachStock(khoId, hangHoaId, loHangId, params.ten_quy_cach);
+  if (!qcStock) return null;
+
+  const beforeQc = Number(qcStock.so_luong || 0);
+  const nextQc = beforeQc + direction * quantity;
+  if (nextQc < 0) {
+    throw new Error('Không cho tồn quy cách âm');
+  }
+
+  qcStock.so_luong = nextQc;
+  if (cost) qcStock.gia_von = cost;
+  if (!qcStock.ten_quy_cach && qcStock.ten_thuoc_tinh) qcStock.ten_quy_cach = qcStock.ten_thuoc_tinh;
+  await qcStock.save();
+
+  await ghiLichSuKho({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    lo_hang_id: loHangId,
+    ten_quy_cach: qcStock.ten_quy_cach || qcStock.ten_thuoc_tinh,
+    cap_ton: 'quy_cach',
+    nguoi_tao_id: params.nguoi_tao_id,
+    loai_phieu: params.loai_phieu,
+    ma_phieu: params.ma_phieu,
+    so_luong_thay_doi: direction * quantity,
+    ton_kho_truoc: beforeQc,
+    ton_kho_sau: nextQc,
+    gia_tri_thay_doi: direction * quantity * (Number(qcStock.gia_von) || cost),
+    ghi_chu: params.ghi_chu
+  });
+
+  return syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost);
 }
 
 async function congTonKho(params) {
@@ -97,6 +249,11 @@ async function congTonKho(params) {
     loHangId = null;
   } else if (!loHangId) {
     throw new Error('Hàng hóa quản lý theo lô phải có lô hàng khi nhập kho');
+  }
+
+  if (manageLots && loHangId && (params.sync_quy_cach || params.ten_quy_cach)) {
+    const synced = await dieuChinhTonQuyCach(params, 1);
+    if (synced) return synced.inventory;
   }
 
   const inventory = await TonKho.findOneAndUpdate(
@@ -175,6 +332,11 @@ async function truTonKho(params) {
 
   if (!manageLots) {
     loHangId = null;
+  }
+
+  if (manageLots && loHangId && (params.sync_quy_cach || params.ten_quy_cach)) {
+    const synced = await dieuChinhTonQuyCach(params, -1);
+    if (synced) return synced.inventory;
   }
 
   const inventory = await TonKho.findOne({

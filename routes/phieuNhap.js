@@ -4,7 +4,7 @@ const { isAuthenticated } = require('../middlewares/auth.middleware');
 const {
     PhieuNhap, CTPhieuNhap, HangHoa, NhaCungCap, CuaHang,
     HoaDonDauVao, PhieuTraHangNhap, CTPhieuTraHangNhap, NguoiDung,
-    Kho, LoHang, CongNoNhaCungCap
+    Kho, LoHang, TonKho, CongNoNhaCungCap
 } = require('../models/kiot.model');
 const { congTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
@@ -22,6 +22,34 @@ function parseItems(rawItems) {
         }
     }
     return [];
+}
+
+function toAggregateObjectId(value) {
+    if (value instanceof mongoose.Types.ObjectId) return value;
+    if (!mongoose.Types.ObjectId.isValid(String(value || '').trim())) return null;
+    return new mongoose.Types.ObjectId(value);
+}
+
+async function calculateMovingAverageCost(productId, quantity, unitCost) {
+    const hangHoaId = toAggregateObjectId(productId);
+    const incomingQty = Number(quantity || 0);
+    const incomingCost = Number(unitCost || 0);
+    if (!hangHoaId || incomingQty <= 0) return Math.round(incomingCost);
+
+    const [product, stockRows] = await Promise.all([
+        HangHoa.findById(hangHoaId).select('gia_von').lean(),
+        TonKho.aggregate([
+            { $match: { hang_hoa_id: hangHoaId } },
+            { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+        ])
+    ]);
+
+    const currentStock = Number(stockRows && stockRows[0] ? stockRows[0].total : 0);
+    const currentCost = Number(product && product.gia_von ? product.gia_von : 0);
+    const nextStock = currentStock + incomingQty;
+    if (currentStock <= 0 || nextStock <= 0) return Math.round(incomingCost);
+
+    return Math.round(((currentStock * currentCost) + (incomingQty * incomingCost)) / nextStock);
 }
 
 function normalizePaymentMethod(daTraNcc, conNoNcc, inputMethod) {
@@ -193,12 +221,14 @@ router.post('/tra-hang-nhap/add', async (req, res, next) => {
         }
         let total = 0;
         items.forEach(item => { total += Number(item.so_luong) * Number(item.don_gia); });
+        const sourcePurchase = phieu_nhap_id ? await PhieuNhap.findById(phieu_nhap_id).select('cua_hang_id').lean() : null;
         const count = await PhieuTraHangNhap.countDocuments();
         const ret = await PhieuTraHangNhap.create({
             ma_phieu_tra_nhap: 'THN' + String(count + 1).padStart(6, '0'),
             ngay_tra: new Date(),
             nha_cung_cap_id,
             phieu_nhap_id: phieu_nhap_id || null,
+            cua_hang_id: sourcePurchase?.cua_hang_id,
             tong_tien_tra: total,
             ly_do,
             ghi_chu,
@@ -217,6 +247,16 @@ router.post('/tra-hang-nhap/add', async (req, res, next) => {
         }
         if (nha_cung_cap_id) {
             await NhaCungCap.findByIdAndUpdate(nha_cung_cap_id, { $inc: { tong_no: -total } });
+            await CongNoNhaCungCap.create({
+                cua_hang_id: ret.cua_hang_id || undefined,
+                nha_cung_cap_id,
+                phieu_nhap_id: phieu_nhap_id || undefined,
+                phieu_tra_nhap_id: ret._id,
+                so_tien: total,
+                loai: 'giam_no',
+                ghi_chu: `Trả hàng nhập ${ret.ma_phieu_tra_nhap}`,
+                ngay: ret.ngay_tra || new Date()
+            });
         }
         res.json({ success: true, message: 'Đã tạo phiếu trả hàng nhập' });
     } catch (error) {
@@ -258,9 +298,34 @@ async function completeTicket(ticket) {
     ticket.trang_thai = 'completed';
     await ticket.save();
     if (ticket.nha_cung_cap_id) {
+        const canTra = Number(ticket.can_tra_ncc || ticket.tong_tien || 0);
+        const conNo = Number(ticket.con_no_ncc || canTra || 0);
         await NhaCungCap.findByIdAndUpdate(ticket.nha_cung_cap_id, {
-            $inc: { tong_mua: Number(ticket.tong_tien) || 0, tong_no: Number(ticket.tong_tien) || 0 }
+            $inc: { tong_mua: canTra, tong_no: conNo }
         });
+        if (canTra > 0) {
+            await CongNoNhaCungCap.create({
+                cua_hang_id: ticket.cua_hang_id,
+                nha_cung_cap_id: ticket.nha_cung_cap_id,
+                phieu_nhap_id: ticket._id,
+                so_tien: canTra,
+                loai: 'tang_no',
+                ghi_chu: `Cong no phieu nhap ${ticket.ma_phieu_nhap}`,
+                ngay: ticket.ngay_nhap || new Date()
+            });
+        }
+        const paid = Math.max(0, canTra - conNo);
+        if (paid > 0) {
+            await CongNoNhaCungCap.create({
+                cua_hang_id: ticket.cua_hang_id,
+                nha_cung_cap_id: ticket.nha_cung_cap_id,
+                phieu_nhap_id: ticket._id,
+                so_tien: paid,
+                loai: 'thanh_toan',
+                ghi_chu: `Thanh toan NCC tu phieu nhap ${ticket.ma_phieu_nhap}`,
+                ngay: ticket.ngay_nhap || new Date()
+            });
+        }
     }
 }
 
@@ -448,6 +513,11 @@ router.post('/add', async (req, res, next) => {
             });
 
             if (phieu.trang_thai === 'completed') {
+                const newProductCost = await calculateMovingAverageCost(
+                    item.hang_hoa_id,
+                    item.so_luong,
+                    item.don_gia_nhap
+                );
                 await congTonKho({
                     kho_id: kho._id,
                     hang_hoa_id: item.hang_hoa_id,
@@ -462,22 +532,22 @@ router.post('/add', async (req, res, next) => {
 
                 await HangHoa.findByIdAndUpdate(item.hang_hoa_id, {
                     $inc: { ton_kho: item.so_luong },
-                    $set: { gia_von: item.don_gia_nhap }
+                    $set: { gia_nhap_cuoi: item.don_gia_nhap, gia_von: newProductCost }
                 });
             }
         }
 
         if (phieu.trang_thai === 'completed' && nha_cung_cap_id) {
             await NhaCungCap.findByIdAndUpdate(nha_cung_cap_id, {
-                $inc: { tong_mua: tong_tien, tong_no: tong_tien }
+                $inc: { tong_mua: can_tra_ncc, tong_no: can_tra_ncc }
             });
 
-            if (tong_tien > 0) {
+            if (can_tra_ncc > 0) {
                 await CongNoNhaCungCap.create({
                     cua_hang_id: phieu.cua_hang_id,
                     nha_cung_cap_id,
                     phieu_nhap_id: phieu._id,
-                    so_tien: tong_tien,
+                    so_tien: can_tra_ncc,
                     loai: 'tang_no',
                     ghi_chu: `Cong no phieu nhap ${ma_phieu_nhap}`,
                     ngay: new Date()
@@ -557,6 +627,15 @@ router.post('/add-old', async (req, res, next) => {
         if (phieu.trang_thai === 'completed' && nha_cung_cap_id) {
             await NhaCungCap.findByIdAndUpdate(nha_cung_cap_id, {
                 $inc: { tong_mua: tong_tien, tong_no: tong_tien }
+            });
+            await CongNoNhaCungCap.create({
+                cua_hang_id: phieu.cua_hang_id,
+                nha_cung_cap_id,
+                phieu_nhap_id: phieu._id,
+                so_tien: tong_tien,
+                loai: 'tang_no',
+                ghi_chu: `Cong no phieu nhap ${ma_phieu_nhap}`,
+                ngay: phieu.ngay_nhap || new Date()
             });
         }
 

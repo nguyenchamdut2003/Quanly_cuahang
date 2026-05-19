@@ -9,7 +9,7 @@
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    body.admin-body{background:#f3f6f9}.create-page{height:calc(100vh - 98px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}.left{min-width:0;display:flex;flex-direction:column}.topline{height:52px;display:flex;align-items:center;gap:12px;position:relative}.back{width:28px;text-align:center;font-size:24px;color:#111827;text-decoration:none;line-height:1}.title{font-size:20px;font-weight:800;color:#111827;white-space:nowrap}.search{width:620px;height:32px;border:1px solid #0070f4;border-radius:6px;padding:0 12px;font-size:13px;outline:none;background:#fff}.grid-wrap{flex:1;min-height:0;background:#fff;border:1px solid #cfd8e3;overflow:auto}table{width:100%;table-layout:fixed;border-collapse:collapse}th{height:34px;background:#eef0f3;border-bottom:1px solid #cfd8e3;color:#111827;font-size:12px;font-weight:800;padding:0 8px;text-align:left}td{height:40px;border-bottom:1px solid #edf1f5;padding:0 8px;font-size:13px}.num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.lot{width:130px}.stock{width:135px}.qty{width:105px}.money{width:122px}.cell-input{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 7px;text-align:right;font-size:13px}.empty{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#111827}.empty small{color:#0070f4;margin-top:12px}
+    body.admin-body{background:#f3f6f9}.create-page{height:calc(100vh - 98px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}.left{min-width:0;display:flex;flex-direction:column}.topline{height:52px;display:flex;align-items:center;gap:12px;position:relative}.back{width:28px;text-align:center;font-size:24px;color:#111827;text-decoration:none;line-height:1}.title{font-size:20px;font-weight:800;color:#111827;white-space:nowrap}.search{width:620px;height:32px;border:1px solid #0070f4;border-radius:6px;padding:0 12px;font-size:13px;outline:none;background:#fff}.grid-wrap{flex:1;min-height:0;background:#fff;border:1px solid #cfd8e3;overflow:auto}table{width:100%;table-layout:fixed;border-collapse:collapse}th{height:34px;background:#eef0f3;border-bottom:1px solid #cfd8e3;color:#111827;font-size:12px;font-weight:800;padding:0 8px;text-align:left}td{height:40px;border-bottom:1px solid #edf1f5;padding:0 8px;font-size:13px}.num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.lot{width:150px}.stock{width:120px}.qty{width:105px}.money{width:122px}.cell-input,.cell-select{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 7px;font-size:13px}.cell-input{text-align:right}.cell-select{text-align:left}.qc-row td{background:#f8fafc;padding:8px 12px 12px}.qc-table{width:100%;table-layout:auto;margin-top:4px}.qc-table th,.qc-table td{height:32px;font-size:12px}.qc-table .cell-input{text-align:right}.empty{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#111827}.empty small{color:#0070f4;margin-top:12px}
     .right{background:#fff;border-left:1px solid #dbe4ee;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}.mini-tools{display:flex;justify-content:flex-start;gap:6px}.tool{width:29px;height:29px;border:1px solid #cfd8e3;background:#fff;border-radius:5px}.field{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;font-size:13px}.field label{font-weight:600}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px;font-size:13px;background:#fff;outline:none}.readonly-box{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#f8fafc;padding:0 9px;display:flex;align-items:center;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.readonly{height:31px;display:flex;align-items:center;justify-content:flex-end}.readonly.blue{color:#0070f4;font-weight:800}.note{height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:none}.btn{height:56px;border:1px solid #0070f4;background:#0070f4;color:#fff;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer}.btn.primary{background:#08a83e;border-color:#08a83e}.error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
     @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}}
   </style>
@@ -21,13 +21,13 @@
       <div class="topline"><a class="back" href="/xuat-huy">‹</a><div class="title">Xuất hủy</div><input id="itemSearch" class="search" placeholder="Tìm trong hàng của phiếu nhập" autocomplete="off" disabled></div>
       <div class="grid-wrap">
         <table>
-          <thead><tr><th class="stt center">STT</th><th class="code">Mã hàng</th><th>Tên hàng</th><th class="unit">ĐVT</th><th class="lot">Lô hàng</th><th class="stock num">SL đã nhập</th><th class="stock num">Tồn có thể hủy</th><th class="qty num">SL hủy</th><th class="money num">Giá vốn</th><th class="money num">Thành tiền</th></tr></thead>
+          <thead><tr><th class="stt center">STT</th><th class="code">Mã hàng</th><th>Tên hàng</th><th class="unit">ĐVT</th><th class="lot">Lô hàng</th><th class="stock num">Tồn lô</th><th class="stock num">Tồn kho</th><th class="qty num">SL hủy</th><th class="money num">Giá vốn</th><th class="money num">Thành tiền</th></tr></thead>
           <tbody id="itemsBody"><tr><td colspan="10"><div class="empty"><b>Chọn phiếu nhập gốc còn hàng để xuất hủy</b><small>Hệ thống sẽ tự lấy kho và các dòng còn tồn</small></div></td></tr></tbody>
         </table>
       </div>
     </section>
     <aside class="right">
-      <div class="mini-tools"><button class="tool">⌘</button><button class="tool">⎙</button><button class="tool">!</button></div>
+      <div class="mini-tools"><button class="tool" type="button">⌘</button><button class="tool" type="button">⎙</button><button class="tool" type="button">!</button></div>
       <div id="errorBox" class="error"></div>
       <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
       <div class="field"><label>Ngày tạo</label><input class="control" id="ngayXuat" type="datetime-local" value="<%= todayValue %>"></div>
@@ -60,20 +60,81 @@
     const money = raw => Math.max(0, Math.floor(Number(String(raw || '').replace(/\./g, '').replace(/,/g, '')) || 0));
     const body = document.getElementById('itemsBody');
     const search = document.getElementById('itemSearch');
-    function showError(msg){ const box=document.getElementById('errorBox'); box.textContent=msg; box.style.display='block'; }
-    function clearError(){ document.getElementById('errorBox').style.display='none'; }
-    function resetAll(){ items=[]; allItems=[]; document.getElementById('khoId').value=''; document.getElementById('khoText').textContent='Tự động theo phiếu nhập'; search.value=''; search.disabled=true; renderItems(); renderTotals(); }
-    function formatDateOnly(value){ if(!value) return ''; return new Date(value).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'}); }
-    async function loadPurchases(){
+
+    function lineQty(it) {
+      if (it.has_quy_cach && Array.isArray(it.quy_cach_items)) {
+        return it.quy_cach_items.reduce((sum, qc) => sum + Number(qc.so_luong_huy || 0), 0);
+      }
+      return Number(it.so_luong || 0);
+    }
+
+    function showError(msg) {
+      const box = document.getElementById('errorBox');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+    function clearError() { document.getElementById('errorBox').style.display = 'none'; }
+    function resetAll() {
+      items = [];
+      allItems = [];
+      document.getElementById('khoId').value = '';
+      document.getElementById('khoText').textContent = 'Tự động theo phiếu nhập';
+      search.value = '';
+      search.disabled = true;
+      renderItems();
+      renderTotals();
+    }
+    function formatDateOnly(value) {
+      if (!value) return '';
+      return new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function renderLotSelect(it, realIndex) {
+      const lots = it.lots || [];
+      if (!it.quan_ly_theo_lo || !lots.length) {
+        return `<span>${it.ma_lo || '--'}</span>`;
+      }
+      const opts = lots.map(lot => {
+        const selected = String(lot._id) === String(it.lo_hang_id) ? 'selected' : '';
+        const label = [lot.ma_lo, lot.ten_lo].filter(Boolean).join(' - ') || lot._id;
+        return `<option value="${lot._id}" ${selected}>${label} (${fmt(lot.so_luong)})</option>`;
+      }).join('');
+      return `<select class="cell-select" onchange="changeLot(${realIndex}, this.value)">${opts}</select>`;
+    }
+
+    function renderQuyCachBlock(it, realIndex) {
+      if (!it.has_quy_cach || !(it.quy_cach_items || []).length) return '';
+      const rows = it.quy_cach_items.map((qc, qcIdx) => `
+        <tr>
+          <th>${qc.ten_quy_cach}</th>
+          <td class="num">${fmt(qc.ton_hien_tai || 0)}</td>
+          <td><input class="cell-input" type="number" min="0" max="${qc.ton_hien_tai || 0}" value="${qc.so_luong_huy || ''}" onchange="updateQuyCach(${realIndex}, ${qcIdx}, this.value)"></td>
+        </tr>
+      `).join('');
+      return `<tr class="qc-row"><td colspan="10">
+        <table class="qc-table">
+          <thead><tr><th>Quy cách</th><th class="num">Tồn</th><th class="num">SL hủy</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td></tr>`;
+    }
+
+    async function loadPurchases() {
       const select = document.getElementById('phieuNhapId');
       select.disabled = true;
       select.innerHTML = '<option value="">Đang tải phiếu nhập...</option>';
       try {
         const res = await fetch('/api/phieu-nhap/con-hang-xuat-huy');
         const data = await res.json();
-        if(!data.success){ select.innerHTML='<option value="">Không tải được phiếu nhập</option>'; return showError(data.message || 'Không tải được phiếu nhập'); }
+        if (!data.success) {
+          select.innerHTML = '<option value="">Không tải được phiếu nhập</option>';
+          return showError(data.message || 'Không tải được phiếu nhập');
+        }
         const rows = data.items || [];
-        if(!rows.length){ select.innerHTML='<option value="">Không có phiếu nhập còn hàng</option>'; return; }
+        if (!rows.length) {
+          select.innerHTML = '<option value="">Không có phiếu nhập còn hàng</option>';
+          return;
+        }
         select.innerHTML = '<option value="">Chọn phiếu nhập gốc</option>' + rows.map(row => {
           const kho = row.kho || {};
           const supplier = row.nha_cung_cap || {};
@@ -81,68 +142,183 @@
           return `<option value="${row._id}" data-kho="${row.kho_id}" data-kho-name="${kho.ten_kho || kho.ma_kho || ''}">${label}</option>`;
         }).join('');
         select.disabled = false;
-      } catch(error) {
-        select.innerHTML='<option value="">Không tải được phiếu nhập</option>';
+      } catch (error) {
+        select.innerHTML = '<option value="">Không tải được phiếu nhập</option>';
         showError('Lỗi kết nối khi tải phiếu nhập');
       }
     }
-    async function loadPurchaseDetail(id){
+
+    async function loadPurchaseDetail(id) {
       resetAll();
-      if(!id) return;
+      if (!id) return;
       clearError();
       const res = await fetch('/api/phieu-nhap/' + id + '/chi-tiet-xuat-huy');
       const data = await res.json();
-      if(!data.success) return showError(data.message || 'Không tải được chi tiết phiếu nhập');
+      if (!data.success) return showError(data.message || 'Không tải được chi tiết phiếu nhập');
       const ticket = data.data && data.data.phieu_nhap || {};
       document.getElementById('khoId').value = ticket.kho_id || '';
       const kho = ticket.kho || {};
       document.getElementById('khoText').textContent = kho.ten_kho || kho.ma_kho || 'Kho nhập';
-      allItems = (data.data.items || []).map(row => Object.assign({}, row, { so_luong: '', gia_von: Number(row.gia_von || 0) }));
+      allItems = (data.data.items || []).map(row => Object.assign({}, row, {
+        so_luong: '',
+        quy_cach_items: (row.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_huy: qc.so_luong_huy || '' }))
+      }));
       items = allItems.slice();
       search.disabled = false;
       renderItems();
     }
-    function renderItems(){
-      if(!items.length){ body.innerHTML='<tr><td colspan="10"><div class="empty"><b>Chọn phiếu nhập gốc còn hàng để xuất hủy</b><small>Hệ thống sẽ tự lấy kho và các dòng còn tồn</small></div></td></tr>'; return; }
-      body.innerHTML = items.map((it, idx) => {
-        const realIndex = allItems.indexOf(it);
-        const line = Number(it.so_luong || 0) * Number(it.gia_von || 0);
-        return `<tr><td class="center">${idx+1}</td><td>${it.ma_hang}</td><td>${it.ten_hang}</td><td>${it.don_vi_tinh || ''}</td><td>${it.ma_lo || ''}</td><td class="num">${fmt(it.so_luong_nhap || 0)}</td><td class="num">${fmt(it.ton_hien_tai || 0)}</td><td><input class="cell-input" type="number" min="0" max="${it.ton_hien_tai}" value="${it.so_luong || ''}" onchange="updateItem(${realIndex},'so_luong',this.value)"></td><td><input class="cell-input" inputmode="numeric" value="${it.gia_von}" onchange="updateItem(${realIndex},'gia_von',this.value)"></td><td class="num"><b>${fmt(line)}</b></td></tr>`;
-      }).join('');
-      renderTotals();
-    }
-    function updateItem(idx, field, value){
-      if(!allItems[idx]) return;
-      if(field === 'so_luong') allItems[idx][field] = Math.min(money(value), Number(allItems[idx].ton_hien_tai || 0));
-      else if(field === 'gia_von') allItems[idx][field] = money(value);
+
+    async function changeLot(idx, lotId) {
+      const it = allItems[idx];
+      if (!it || !lotId) return;
+      it.lo_hang_id = lotId;
+      const lot = (it.lots || []).find(l => String(l._id) === String(lotId));
+      it.ma_lo = lot ? lot.ma_lo : it.ma_lo;
+      it.ten_lo = lot ? lot.ten_lo : it.ten_lo;
+      it.so_luong = '';
+      const khoId = document.getElementById('khoId').value;
+      try {
+        const res = await fetch('/api/xuat-huy/lo-hang/' + lotId + '/quy-cach-ton?kho_id=' + encodeURIComponent(khoId) + '&hang_hoa_id=' + encodeURIComponent(it.hang_hoa_id));
+        const data = await res.json();
+        if (data.success) {
+          it.ton_hien_tai = Number(data.data.ton_lo || 0);
+          it.has_quy_cach = Boolean(data.data.has_quy_cach);
+          it.quy_cach_items = (data.data.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_huy: '' }));
+        }
+      } catch (e) {}
       filterItems();
     }
-    function filterItems(){
+
+    function renderItems() {
+      if (!items.length) {
+        body.innerHTML = '<tr><td colspan="10"><div class="empty"><b>Chọn phiếu nhập gốc còn hàng để xuất hủy</b><small>Hệ thống sẽ tự lấy kho và các dòng còn tồn</small></div></td></tr>';
+        return;
+      }
+      let html = '';
+      items.forEach((it, idx) => {
+        const realIndex = allItems.indexOf(it);
+        const qty = lineQty(it);
+        const line = qty * Number(it.gia_von || 0);
+        const qtyCell = it.has_quy_cach
+          ? `<span class="num">${fmt(qty)}</span>`
+          : `<input class="cell-input" type="number" min="0" max="${it.ton_hien_tai || 0}" value="${it.so_luong || ''}" onchange="updateItem(${realIndex},'so_luong',this.value)">`;
+        html += `<tr>
+          <td class="center">${idx + 1}</td>
+          <td>${it.ma_hang}</td>
+          <td>${it.ten_hang}</td>
+          <td>${it.don_vi_tinh || ''}</td>
+          <td>${renderLotSelect(it, realIndex)}</td>
+          <td class="num">${fmt(it.ton_hien_tai || 0)}</td>
+          <td class="num">${fmt(it.ton_kho_tong || it.ton_hien_tai || 0)}</td>
+          <td>${qtyCell}</td>
+          <td><input class="cell-input" inputmode="numeric" value="${it.gia_von}" onchange="updateItem(${realIndex},'gia_von',this.value)"></td>
+          <td class="num"><b>${fmt(line)}</b></td>
+        </tr>`;
+        html += renderQuyCachBlock(it, realIndex);
+      });
+      body.innerHTML = html;
+      renderTotals();
+    }
+
+    function updateItem(idx, field, value) {
+      if (!allItems[idx]) return;
+      if (field === 'so_luong') {
+        allItems[idx][field] = Math.min(money(value), Number(allItems[idx].ton_hien_tai || 0));
+      } else if (field === 'gia_von') {
+        allItems[idx][field] = money(value);
+      }
+      filterItems();
+    }
+
+    function updateQuyCach(idx, qcIdx, value) {
+      const it = allItems[idx];
+      if (!it || !it.quy_cach_items || !it.quy_cach_items[qcIdx]) return;
+      const max = Number(it.quy_cach_items[qcIdx].ton_hien_tai || 0);
+      it.quy_cach_items[qcIdx].so_luong_huy = Math.min(money(value), max);
+      const total = lineQty(it);
+      if (total > Number(it.ton_hien_tai || 0)) {
+        showError('Tổng số lượng hủy theo quy cách vượt tồn lô');
+      } else {
+        clearError();
+      }
+      filterItems();
+    }
+
+    function filterItems() {
       const key = search.value.trim().toLowerCase();
-      items = key ? allItems.filter(x => (x.ma_hang + ' ' + x.ten_hang + ' ' + (x.ma_lo || '')).toLowerCase().includes(key)) : allItems.slice();
+      items = key
+        ? allItems.filter(x => (x.ma_hang + ' ' + x.ten_hang + ' ' + (x.ma_lo || '')).toLowerCase().includes(key))
+        : allItems.slice();
       renderItems();
     }
-    function renderTotals(){
-      const totals = allItems.reduce((sum,it)=>{ sum.qty += Number(it.so_luong||0); sum.value += Number(it.so_luong||0)*Number(it.gia_von||0); return sum; }, {qty:0,value:0});
+
+    function renderTotals() {
+      const totals = allItems.reduce((sum, it) => {
+        const qty = lineQty(it);
+        sum.qty += qty;
+        sum.value += qty * Number(it.gia_von || 0);
+        return sum;
+      }, { qty: 0, value: 0 });
       document.getElementById('tongSoLuong').textContent = fmt(totals.qty);
       document.getElementById('tongGiaTri').textContent = fmt(totals.value);
     }
-    async function submitTicket(mode){
+
+    function buildPayloadItem(x) {
+      const base = {
+        hang_hoa_id: x.hang_hoa_id,
+        lo_hang_id: x.lo_hang_id || '',
+        gia_von: x.gia_von,
+        ghi_chu: ''
+      };
+      if (x.has_quy_cach && (x.quy_cach_items || []).length) {
+        const quy_cach_items = x.quy_cach_items
+          .filter(qc => Number(qc.so_luong_huy || 0) > 0)
+          .map(qc => ({ ten_quy_cach: qc.ten_quy_cach, so_luong: Number(qc.so_luong_huy || 0) }));
+        const so_luong = quy_cach_items.reduce((s, qc) => s + qc.so_luong, 0);
+        return Object.assign({}, base, { quy_cach_items, so_luong });
+      }
+      return Object.assign({}, base, { so_luong: Number(x.so_luong || 0) });
+    }
+
+    async function submitTicket(mode) {
       clearError();
       const purchaseId = document.getElementById('phieuNhapId').value;
       const khoId = document.getElementById('khoId').value;
       const reason = document.getElementById('lyDoHuy').value.trim();
-      const sendItems = allItems.filter(x => Number(x.so_luong || 0) > 0);
-      if(!purchaseId) return showError('Vui lòng chọn phiếu nhập gốc');
-      if(!khoId) return showError('Phiếu nhập chưa có kho hợp lệ');
-      if(!reason) return showError('Vui lòng nhập lý do hủy');
-      if(!sendItems.length) return showError('Vui lòng nhập số lượng hủy cho ít nhất một hàng hóa');
-      const payload = { submitMode: mode, phieu_nhap_id: purchaseId, kho_id: khoId, ma_xuat_huy: document.getElementById('maPhieu').value, ngay_xuat: document.getElementById('ngayXuat').value, ly_do_huy: reason, ghi_chu: document.getElementById('ghiChu').value, items_json: JSON.stringify(sendItems.map(x => ({ hang_hoa_id:x.hang_hoa_id, lo_hang_id:x.lo_hang_id, so_luong:x.so_luong, gia_von:x.gia_von }))) };
-      const res = await fetch('/xuat-huy', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const sendItems = allItems
+        .map(buildPayloadItem)
+        .filter(x => Number(x.so_luong || 0) > 0);
+      if (!purchaseId) return showError('Vui lòng chọn phiếu nhập gốc');
+      if (!khoId) return showError('Phiếu nhập chưa có kho hợp lệ');
+      if (!reason) return showError('Vui lòng nhập lý do hủy');
+      if (!sendItems.length) return showError('Vui lòng nhập số lượng hủy cho ít nhất một hàng hóa');
+      for (const src of allItems) {
+        const qty = lineQty(src);
+        if (qty <= 0) continue;
+        if (src.quan_ly_theo_lo && !src.lo_hang_id) {
+          return showError('Hàng ' + (src.ma_hang || '') + ' phải chọn lô hàng');
+        }
+        if (src.has_quy_cach) {
+          const hasQcQty = (src.quy_cach_items || []).some(qc => Number(qc.so_luong_huy || 0) > 0);
+          if (!hasQcQty) return showError('Lô ' + (src.ma_lo || '') + ' có quy cách — vui lòng nhập SL theo quy cách');
+        }
+      }
+      const payload = {
+        submitMode: mode,
+        phieu_nhap_id: purchaseId,
+        kho_id: khoId,
+        ma_xuat_huy: document.getElementById('maPhieu').value,
+        ngay_xuat: document.getElementById('ngayXuat').value,
+        ly_do_huy: reason,
+        ghi_chu: document.getElementById('ghiChu').value,
+        items_json: JSON.stringify(sendItems)
+      };
+      const res = await fetch('/xuat-huy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
-      if(!data.success) return showError(data.message || 'Không thể lưu phiếu xuất hủy');
+      if (!data.success) return showError(data.message || 'Không thể lưu phiếu xuất hủy');
       location.href = data.redirect || '/xuat-huy';
     }
+
     async function applyCopyDraft() {
       if (!copyDraft) return;
       if (copyDraft.ly_do_huy) document.getElementById('lyDoHuy').value = copyDraft.ly_do_huy;
@@ -151,14 +327,27 @@
         document.getElementById('khoId').value = copyDraft.kho_id;
         document.getElementById('khoText').textContent = 'Chọn phiếu nhập gốc để nạp lại dòng hàng';
       }
-      allItems = (copyDraft.items || []).map(row => Object.assign({}, row, { so_luong_nhap: 0, ton_hien_tai: 0 }));
+      allItems = (copyDraft.items || []).map(row => Object.assign({}, row, {
+        so_luong_nhap: 0,
+        ton_hien_tai: 0,
+        ton_kho_tong: 0,
+        has_quy_cach: Boolean(row.ten_quy_cach),
+        quy_cach_items: row.ten_quy_cach
+          ? [{ ten_quy_cach: row.ten_quy_cach, ton_hien_tai: 0, so_luong_huy: row.so_luong }]
+          : [],
+        so_luong: row.ten_quy_cach ? '' : row.so_luong
+      }));
       items = allItems.slice();
       search.disabled = false;
       renderItems();
     }
-    document.getElementById('phieuNhapId').addEventListener('change', function(){ loadPurchaseDetail(this.value); });
+
+    document.getElementById('phieuNhapId').addEventListener('change', function() { loadPurchaseDetail(this.value); });
     search.addEventListener('input', filterItems);
-    loadPurchases().then(() => { if (copyFromError) showError(copyFromError); if (copyDraft) applyCopyDraft(); });
+    loadPurchases().then(() => {
+      if (copyFromError) showError(copyFromError);
+      if (copyDraft) applyCopyDraft();
+    });
   </script>
 </body>
 </html>

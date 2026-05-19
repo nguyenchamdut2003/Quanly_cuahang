@@ -45,6 +45,14 @@
     }
     .supplier-metric-readonly { font-size: 14px; font-weight: 700; color: #111827; }
     .supplier-metric-hint { font-size: 11px; color: #64748b; margin-top: 2px; font-weight: 400; }
+    .supplier-create-modal { max-width: 760px; }
+    .supplier-create-form.modal-body { max-height: 70vh; overflow: auto; padding: 20px 24px; }
+    .supplier-address-toolbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px}
+    .address-type-list{display:grid;gap:8px;max-height:280px;overflow:auto}
+    .address-type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:6px;padding:8px}
+    .address-type-name{font-weight:700;color:#111827}
+    .address-type-code{font-size:11px;color:#64748b;margin-top:2px}
+    .address-type-actions{display:flex;gap:6px}
   </style>
 </head>
 <body class="admin-body">
@@ -61,48 +69,45 @@
         <input type="search" placeholder="Theo mã, tên nhà cung cấp">
       </div>
       <div class="page-actions">
-        <a class="btn btn-primary" href="/nha-cung-cap?mode=create">+ Tạo mới</a>
+        <button class="btn btn-primary" type="button" id="openAddSupplierModal">+ Tạo mới</button>
         <a class="btn btn-light" href="/nha-cung-cap/export.xlsx?<%= filterQueryString || '' %>">Xuất file</a>
         <button class="btn btn-danger" type="submit" form="bulkDeleteSuppliersForm" onclick="return confirm('Xóa các nhà cung cấp đã chọn?')">Xóa đã chọn</button>
       </div>
     </div>
 
-    <% if (formMode === 'create') { %>
-      <section class="store-form-panel">
-        <div class="store-form-heading">
-          <div>
-            <h2>Tạo nhà cung cấp</h2>
-            <p>Nhập thông tin nhà cung cấp mới.</p>
-          </div>
-          <a class="link-button" href="/nha-cung-cap">Hủy</a>
+    <div id="addSupplierModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'create' ? '1' : '0' %>">
+      <div class="modal-content customer-create-modal supplier-create-modal">
+        <div class="modal-header">
+          <h3>Tạo nhà cung cấp</h3>
+          <button type="button" class="modal-close" id="addSupplierModalClose" aria-label="Đóng">×</button>
         </div>
-        <form class="store-form-grid" method="post" action="/nha-cung-cap/add">
+        <form class="modal-body store-form-grid supplier-create-form" method="post" action="/nha-cung-cap/add" id="supplierCreateForm">
           <label><span>Mã NCC</span><input name="ma_ncc" placeholder="Tự động nếu bỏ trống"></label>
-          <label><span>Tên nhà cung cấp *</span><input name="ten_ncc" required></label>
-          <label><span>Điện thoại</span><input name="sdt"></label>
-          <label><span>Email</span><input name="email" type="email"></label>
-          <label><span>Tên công ty</span><input name="ten_cong_ty"></label>
-          <label><span>Mã số thuế</span><input name="ma_so_thue"></label>
+          <label><span>Tên nhà cung cấp *</span><input name="ten_ncc" placeholder="Nhập tên nhà cung cấp" required></label>
+          <label><span>Điện thoại</span><input name="sdt" placeholder="Nhập số điện thoại"></label>
+          <label><span>Email</span><input name="email" type="email" placeholder="email@example.com"></label>
+          <label><span>Tên công ty</span><input name="ten_cong_ty" placeholder="Nhập tên công ty"></label>
+          <label><span>Mã số thuế</span><input name="ma_so_thue" placeholder="Nhập mã số thuế"></label>
           <label><span>Tổng nợ</span><strong class="supplier-metric-readonly">0</strong>
             <span class="supplier-metric-hint"> — Tự động tính từ công nợ phiếu nhập</span>
           </label>
           <label><span>Tổng mua</span><strong class="supplier-metric-readonly">0</strong>
             <span class="supplier-metric-hint"> — Tự động tính từ phiếu đã nhập hàng</span>
           </label>
-          <label class="span-2"><span>Ghi chú</span><input name="ghi_chu"></label>
+          <label class="span-2"><span>Ghi chú</span><input name="ghi_chu" placeholder="Nhập ghi chú"></label>
           <label><span>Trạng thái</span>
             <select name="trang_thai">
               <option value="active" selected>Đang hoạt động</option>
               <option value="inactive">Ngừng hoạt động</option>
             </select>
           </label>
-          <div class="store-form-actions">
-            <button class="btn btn-primary" type="submit">Tạo nhà cung cấp</button>
-            <a class="btn btn-light" href="/nha-cung-cap">Hủy</a>
-          </div>
         </form>
-      </section>
-    <% } %>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="addSupplierModalCancel">Bỏ qua</button>
+          <button class="btn btn-primary" type="submit" form="supplierCreateForm">Lưu</button>
+        </div>
+      </div>
+    </div>
 
     <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
     <div class="store-layout">
@@ -254,6 +259,9 @@
                           </div>
                           <div class="detail-pane" data-detail-pane="address">
                             <% var supplierAddressReturnQuery = filterQueryString ? (filterQueryString + '&supplier=' + selectedSupplier._id) : ('supplier=' + selectedSupplier._id); %>
+                            <div class="supplier-address-toolbar">
+                              <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
+                            </div>
                             <div class="table-wrap">
                               <table class="admin-table warehouse-table">
                                 <thead>
@@ -278,7 +286,8 @@
                                     <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
                                     <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
                                     <td>
-                                      <select data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
+                                      <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
+                                        <option value="khac">Khác</option>
                                         <% if ((addressTypes || []).length === 0) { %>
                                           <option value="khac">Khác</option>
                                         <% } %>
@@ -327,7 +336,8 @@
                                       <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
                                       <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
                                       <td>
-                                        <select data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
+                                        <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
+                                          <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
                                           <% if ((addressTypes || []).length === 0) { %>
                                             <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
                                           <% } %>
@@ -437,23 +447,27 @@
                                 <thead>
                                   <tr>
                                     <th>Mã phiếu</th>
+                                    <th>Loại chứng từ</th>
                                     <th>Thời gian</th>
                                     <th>Loại</th>
                                     <th>Giá trị</th>
                                     <th>Nợ cần trả nhà cung cấp</th>
+                                    <th>Ghi chú</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <% if ((supplierDebtHistory || []).length === 0) { %>
-                                    <tr><td colspan="5" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
                                   <% } %>
                                   <% (supplierDebtHistory || []).forEach(function(row) { %>
                                     <tr>
-                                      <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.ma_phieu || '--') %></td>
+                                      <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
+                                      <td><%= row.loai_chung_tu || '--' %></td>
                                       <td><%= formatDate(row.thoi_gian) %></td>
-                                      <td><%= mapCongNoLoai(row.loai) %></td>
+                                      <td><%= mapCongNoDirection ? mapCongNoDirection(row.loai) : mapCongNoLoai(row.loai) %></td>
                                       <td><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
                                       <td><%= Number(row.no_con_lai || 0).toLocaleString('vi-VN') %></td>
+                                      <td><%= row.ghi_chu || '--' %></td>
                                     </tr>
                                   <% }) %>
                                 </tbody>
@@ -509,9 +523,63 @@
       </div>
     </div>
   </div>
+  <div id="addressTypeModalOverlay" class="group-modal-overlay">
+    <div class="group-modal">
+      <div class="group-modal-header">
+        <h3 id="addressTypeModalTitle">Loại địa chỉ</h3>
+        <button type="button" class="group-modal-close" id="addressTypeModalClose">×</button>
+      </div>
+      <div class="group-modal-body">
+        <div class="address-type-list" id="addressTypeList"></div>
+        <label>
+          <span>Tên loại địa chỉ</span>
+          <input id="addressTypeNameInput" type="text" placeholder="Ví dụ: Nhà riêng, Công ty">
+        </label>
+      </div>
+      <div class="page-actions group-modal-footer">
+        <button class="btn btn-light btn-sm" type="button" id="addressTypeModalCancel">Bỏ qua</button>
+        <button class="btn btn-primary btn-sm" type="button" id="addressTypeModalSubmit">Thêm</button>
+      </div>
+    </div>
+  </div>
   <script id="supplierGroupsSeed" type="application/json"><%- JSON.stringify(supplierGroups || []) %></script>
+  <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      var openAddSupplierModalBtn = document.getElementById('openAddSupplierModal');
+      var addSupplierModalOverlay = document.getElementById('addSupplierModalOverlay');
+      var addSupplierModalClose = document.getElementById('addSupplierModalClose');
+      var addSupplierModalCancel = document.getElementById('addSupplierModalCancel');
+      var supplierCreateForm = document.getElementById('supplierCreateForm');
+
+      function openAddSupplierModal() {
+        if (!addSupplierModalOverlay) return;
+        if (supplierCreateForm) supplierCreateForm.reset();
+        addSupplierModalOverlay.classList.add('is-visible');
+      }
+
+      function closeAddSupplierModal() {
+        if (!addSupplierModalOverlay) return;
+        addSupplierModalOverlay.classList.remove('is-visible');
+        if (window.location.search.indexOf('mode=create') >= 0) {
+          var url = new URL(window.location.href);
+          url.searchParams.delete('mode');
+          window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
+        }
+      }
+
+      if (openAddSupplierModalBtn) openAddSupplierModalBtn.addEventListener('click', openAddSupplierModal);
+      if (addSupplierModalClose) addSupplierModalClose.addEventListener('click', closeAddSupplierModal);
+      if (addSupplierModalCancel) addSupplierModalCancel.addEventListener('click', closeAddSupplierModal);
+      if (addSupplierModalOverlay) {
+        addSupplierModalOverlay.addEventListener('click', function(event) {
+          if (event.target === addSupplierModalOverlay) closeAddSupplierModal();
+        });
+      }
+      if (addSupplierModalOverlay && addSupplierModalOverlay.getAttribute('data-auto-open') === '1') {
+        openAddSupplierModal();
+      }
+
       var selectAll = document.getElementById('selectAllSuppliers');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.supplier-checkbox'));
       if (selectAll) {
@@ -742,6 +810,161 @@
       var supplierGroupsSeed = document.getElementById('supplierGroupsSeed');
       window.__supplierGroups = supplierGroupsSeed ? JSON.parse(supplierGroupsSeed.textContent || '[]') : [];
       refreshSupplierGroupWidget((supplierGroupFilterValue && supplierGroupFilterValue.value) || 'all');
+
+      var addressTypesSeed = document.getElementById('addressTypesSeed');
+      window.__addressTypes = addressTypesSeed ? JSON.parse(addressTypesSeed.textContent || '[]') : [];
+      var addressTypeModalOverlay = document.getElementById('addressTypeModalOverlay');
+      var addressTypeModalClose = document.getElementById('addressTypeModalClose');
+      var addressTypeModalCancel = document.getElementById('addressTypeModalCancel');
+      var addressTypeModalSubmit = document.getElementById('addressTypeModalSubmit');
+      var addressTypeNameInput = document.getElementById('addressTypeNameInput');
+      var addressTypeList = document.getElementById('addressTypeList');
+      var activeAddressTypeItem = null;
+      var addressTypeMode = 'add';
+
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, function(ch) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+      }
+
+      function renderAddressTypeSelects(selectedCode) {
+        var types = window.__addressTypes || [];
+        document.querySelectorAll('.js-address-type-select').forEach(function(select) {
+          var current = selectedCode || select.value || 'khac';
+          var html = '<option value="khac">Khác</option>';
+          types.forEach(function(type) {
+            html += '<option value="' + escapeHtml(type.ma_loai || '') + '">' + escapeHtml(type.ten_loai || '') + '</option>';
+          });
+          select.innerHTML = html;
+          select.value = types.some(function(type) { return String(type.ma_loai) === String(current); }) || current === 'khac'
+            ? current
+            : 'khac';
+        });
+      }
+
+      function bindAddressTypeRows() {
+        if (!addressTypeList) return;
+        Array.prototype.slice.call(addressTypeList.querySelectorAll('.address-type-row')).forEach(function(row) {
+          var editBtn = row.querySelector('.js-address-type-edit');
+          var deleteBtn = row.querySelector('.js-address-type-delete');
+          if (editBtn) {
+            editBtn.addEventListener('click', function() {
+              activeAddressTypeItem = row;
+              addressTypeMode = 'edit';
+              if (addressTypeNameInput) addressTypeNameInput.value = row.getAttribute('data-name') || '';
+              if (addressTypeModalSubmit) addressTypeModalSubmit.textContent = 'Lưu';
+            });
+          }
+          if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+              var id = row.getAttribute('data-id') || '';
+              if (!id) return;
+              if (!confirm('Xóa loại địa chỉ này? Các địa chỉ đang dùng sẽ chuyển về Khác.')) return;
+              requestAddressTypes('/nha-cung-cap/address-types/' + id + '/delete', {}, 'khac');
+            });
+          }
+        });
+      }
+
+      function renderAddressTypeList() {
+        if (!addressTypeList) return;
+        var types = window.__addressTypes || [];
+        if (!types.length) {
+          addressTypeList.innerHTML = '<div class="empty-cell">Chưa có loại địa chỉ.</div>';
+          return;
+        }
+        addressTypeList.innerHTML = types.map(function(type) {
+          return '<div class="address-type-row" data-id="' + escapeHtml(type._id || '') + '" data-code="' + escapeHtml(type.ma_loai || '') + '" data-name="' + escapeHtml(type.ten_loai || '') + '">' +
+            '<div><div class="address-type-name">' + escapeHtml(type.ten_loai || '') + '</div><div class="address-type-code">' + escapeHtml(type.ma_loai || '') + '</div></div>' +
+            '<div class="address-type-actions">' +
+              '<button class="btn btn-light btn-sm js-address-type-edit" type="button">Sửa</button>' +
+              '<button class="btn btn-danger btn-sm js-address-type-delete" type="button">Xóa</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+        bindAddressTypeRows();
+      }
+
+      function openAddressTypeModal() {
+        activeAddressTypeItem = null;
+        addressTypeMode = 'add';
+        if (addressTypeNameInput) addressTypeNameInput.value = '';
+        if (addressTypeModalSubmit) addressTypeModalSubmit.textContent = 'Thêm';
+        renderAddressTypeList();
+        if (addressTypeModalOverlay) addressTypeModalOverlay.classList.add('is-open');
+      }
+
+      function closeAddressTypeModal() {
+        if (addressTypeModalOverlay) addressTypeModalOverlay.classList.remove('is-open');
+      }
+
+      function requestAddressTypes(url, payload, selectedCode) {
+        var formBody = Object.keys(payload).map(function(key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function(response) {
+            return response.json().catch(function() {
+              return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+            });
+          })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert((data && data.message) || 'Không thể xử lý loại địa chỉ.');
+              return;
+            }
+            if (Array.isArray(data.addressTypes)) window.__addressTypes = data.addressTypes;
+            renderAddressTypeList();
+            renderAddressTypeSelects(data.selectedCode || selectedCode || '');
+            if (addressTypeMode === 'add') {
+              if (addressTypeNameInput) addressTypeNameInput.value = '';
+            } else {
+              activeAddressTypeItem = null;
+              addressTypeMode = 'add';
+              if (addressTypeNameInput) addressTypeNameInput.value = '';
+              if (addressTypeModalSubmit) addressTypeModalSubmit.textContent = 'Thêm';
+            }
+          })
+          .catch(function(error) {
+            alert((error && error.message) || 'Có lỗi khi xử lý loại địa chỉ.');
+          });
+      }
+
+      document.querySelectorAll('.js-open-address-type-modal').forEach(function(button) {
+        button.addEventListener('click', openAddressTypeModal);
+      });
+      if (addressTypeModalClose) addressTypeModalClose.addEventListener('click', closeAddressTypeModal);
+      if (addressTypeModalCancel) addressTypeModalCancel.addEventListener('click', closeAddressTypeModal);
+      if (addressTypeModalSubmit) {
+        addressTypeModalSubmit.addEventListener('click', function() {
+          if (!addressTypeNameInput || !addressTypeNameInput.value.trim()) {
+            alert('Vui lòng nhập tên loại địa chỉ.');
+            return;
+          }
+          if (addressTypeMode === 'edit') {
+            var typeId = activeAddressTypeItem ? activeAddressTypeItem.getAttribute('data-id') : '';
+            if (!typeId) return alert('Vui lòng chọn loại địa chỉ cần sửa.');
+            requestAddressTypes('/nha-cung-cap/address-types/' + typeId + '/update', {
+              ten_loai: addressTypeNameInput.value.trim()
+            }, activeAddressTypeItem.getAttribute('data-code') || '');
+            return;
+          }
+          requestAddressTypes('/nha-cung-cap/address-types/add', {
+            ten_loai: addressTypeNameInput.value.trim()
+          }, '');
+        });
+      }
+      renderAddressTypeSelects();
 
       var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.store-detail'));
       var exportLabels = { info: 'Xuất thông tin', address: 'Xuất địa chỉ', history: 'Xuất lịch sử', debt: 'Xuất công nợ' };

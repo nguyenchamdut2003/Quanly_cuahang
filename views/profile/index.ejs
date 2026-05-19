@@ -80,8 +80,16 @@
         </div>
 
         <div class="form-group">
-          <label>Địa chỉ</label>
-          <input type="text" name="dia_chi" value="<%= user.dia_chi || '' %>" placeholder="Nhập địa chỉ">
+          <label>Địa chỉ chi tiết</label>
+          <input type="text" name="dia_chi_chi_tiet" value="<%= user.dia_chi_chi_tiet || '' %>" placeholder="Số nhà, đường, thôn/xóm">
+        </div>
+        <div class="form-group">
+          <label>Phường/Xã</label>
+          <input type="text" name="phuong_xa" value="<%= user.phuong_xa || '' %>" placeholder="Phường/Xã">
+        </div>
+        <div class="form-group">
+          <label>Tỉnh/Thành phố</label>
+          <input type="text" name="tinh_thanh" value="<%= user.tinh_thanh || '' %>" placeholder="Tỉnh/Thành phố">
         </div>
 
         <div style="text-align: right;">

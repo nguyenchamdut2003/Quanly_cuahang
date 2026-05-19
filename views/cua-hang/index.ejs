@@ -12,6 +12,68 @@
   <main class="admin-shell store-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
 
+    <div id="addStoreModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'create' ? '1' : '0' %>">
+      <div class="modal-content store-create-modal">
+        <div class="modal-header">
+          <h3>Tạo cửa hàng</h3>
+          <button type="button" class="modal-close" id="addStoreModalClose">×</button>
+        </div>
+        <form class="modal-body store-form-grid" method="post" action="/cua-hang/add" id="storeCreateForm">
+          <label>
+            <span>Mã cửa hàng</span>
+            <input name="ma_cua_hang" placeholder="Tự động nếu bỏ trống">
+          </label>
+          <label>
+            <span>Tên cửa hàng *</span>
+            <input name="ten_cua_hang" required>
+          </label>
+          <label>
+            <span>Điện thoại</span>
+            <input name="sdt">
+          </label>
+          <label>
+            <span>Email</span>
+            <input name="email" type="email">
+          </label>
+          <label class="span-2">
+            <span>Địa chỉ chi tiết</span>
+            <input name="dia_chi_chi_tiet">
+          </label>
+          <label class="span-2">
+            <span>Địa chỉ gửi hàng chi tiết</span>
+            <input name="dia_chi_gui_hang_chi_tiet">
+          </label>
+          <label>
+            <span>Phường/xã</span>
+            <input name="phuong_xa">
+          </label>
+          <label>
+            <span>Tỉnh/thành</span>
+            <input name="tinh_thanh">
+          </label>
+          <label>
+            <span>Phường/xã gửi hàng</span>
+            <input name="phuong_xa_gui_hang">
+          </label>
+          <label>
+            <span>Tỉnh/thành gửi hàng</span>
+            <input name="tinh_thanh_gui_hang">
+          </label>
+          <label>
+            <span>Trạng thái</span>
+            <select name="trang_thai">
+              <option value="active" selected>Đang hoạt động</option>
+              <option value="inactive">Ngừng hoạt động</option>
+            </select>
+          </label>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="addStoreModalCancel">Bỏ qua</button>
+          <button class="btn btn-primary" type="submit" form="storeCreateForm">Tạo cửa hàng</button>
+        </div>
+      </div>
+    </div>
+
     <div class="store-toolbar">
       <h1>Cửa hàng</h1>
       <div class="store-search">
@@ -19,13 +81,13 @@
         <input type="search" placeholder="Theo mã, tên cửa hàng">
       </div>
       <div class="page-actions">
-        <a class="btn btn-primary" href="/cua-hang?mode=create">+ Tạo mới</a>
+        <button class="btn btn-primary" type="button" id="openAddStoreModal">+ Tạo mới</button>
         <button class="btn btn-danger" type="submit" form="bulkDeleteForm" onclick="return confirm('Xóa các cửa hàng đã chọn?')">Xóa đã chọn</button>
         <a class="btn btn-light" href="/cua-hang/export.xlsx">Xuất file</a>
       </div>
     </div>
 
-    <% if (formMode === 'create' || formMode === 'edit') { %>
+    <% if (formMode === 'edit') { %>
       <section class="store-form-panel">
         <div class="store-form-heading">
           <div>
@@ -55,23 +117,27 @@
           </label>
           <label class="span-2">
             <span>Địa chỉ</span>
-            <input name="dia_chi" value="<%= formStore.dia_chi || '' %>">
+            <input name="dia_chi_chi_tiet" value="<%= formStore.dia_chi_chi_tiet || '' %>">
           </label>
           <label class="span-2">
             <span>Địa chỉ gửi hàng</span>
-            <input name="dia_chi_gui_hang" value="<%= formStore.dia_chi_gui_hang || '' %>">
+            <input name="dia_chi_gui_hang_chi_tiet" value="<%= formStore.dia_chi_gui_hang_chi_tiet || '' %>">
           </label>
           <label>
             <span>Phường/xã</span>
             <input name="phuong_xa" value="<%= formStore.phuong_xa || '' %>">
           </label>
           <label>
-            <span>Quận/huyện</span>
-            <input name="quan_huyen" value="<%= formStore.quan_huyen || '' %>">
-          </label>
-          <label>
             <span>Tỉnh/thành</span>
             <input name="tinh_thanh" value="<%= formStore.tinh_thanh || '' %>">
+          </label>
+          <label>
+            <span>Phường/xã gửi hàng</span>
+            <input name="phuong_xa_gui_hang" value="<%= formStore.phuong_xa_gui_hang || '' %>">
+          </label>
+          <label>
+            <span>Tỉnh/thành gửi hàng</span>
+            <input name="tinh_thanh_gui_hang" value="<%= formStore.tinh_thanh_gui_hang || '' %>">
           </label>
           <label>
             <span>Trạng thái</span>
@@ -196,7 +262,7 @@
                 <tr class="<%= isSelected ? 'is-selected' : '' %>" onclick="window.location.href='<%= rowHref %>'">
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
                   <td><a class="table-code-link" href="<%= rowHref %>"><%= store.ma_cua_hang || '---' %></a></td>
-                  <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi || store.dia_chi_gui_hang || 'Chưa có địa chỉ' %></div></td>
+                  <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi_day_du || store.dia_chi_gui_hang_day_du || 'Chưa có địa chỉ' %></div></td>
                   <td><%= store.sdt || '---' %></td>
                   <td><%= store.email || '---' %></td>
                   <td><%= warehouseCountMap[String(store._id)] || 0 %></td>
@@ -254,23 +320,27 @@
                             </div>
                             <div>
                               <span>Địa chỉ</span>
-                              <input name="dia_chi" value="<%= selectedStore.dia_chi || '' %>">
+                              <input name="dia_chi_chi_tiet" value="<%= selectedStore.dia_chi_chi_tiet || '' %>">
                             </div>
                             <div>
                               <span>Địa chỉ gửi hàng</span>
-                              <input name="dia_chi_gui_hang" value="<%= selectedStore.dia_chi_gui_hang || '' %>">
+                              <input name="dia_chi_gui_hang_chi_tiet" value="<%= selectedStore.dia_chi_gui_hang_chi_tiet || '' %>">
                             </div>
                             <div>
                               <span>Phường/xã</span>
                               <input name="phuong_xa" value="<%= selectedStore.phuong_xa || '' %>">
                             </div>
                             <div>
-                              <span>Quận/huyện</span>
-                              <input name="quan_huyen" value="<%= selectedStore.quan_huyen || '' %>">
-                            </div>
-                            <div>
                               <span>Tỉnh/thành</span>
                               <input name="tinh_thanh" value="<%= selectedStore.tinh_thanh || '' %>">
+                            </div>
+                            <div>
+                              <span>Phường/xã gửi hàng</span>
+                              <input name="phuong_xa_gui_hang" value="<%= selectedStore.phuong_xa_gui_hang || '' %>">
+                            </div>
+                            <div>
+                              <span>Tỉnh/thành gửi hàng</span>
+                              <input name="tinh_thanh_gui_hang" value="<%= selectedStore.tinh_thanh_gui_hang || '' %>">
                             </div>
                             <div>
                               <span>Trạng thái</span>
@@ -315,7 +385,7 @@
                                 <tr class="warehouse-edit-row warehouse-add-row">
                                   <td><input form="warehouseAddForm" name="ma_kho" value="" placeholder="Mã kho (tự động)"></td>
                                   <td><input form="warehouseAddForm" name="ten_kho" value="" placeholder="Tên kho mới"></td>
-                                  <td><input form="warehouseAddForm" name="dia_chi" value="" placeholder="Địa chỉ kho"></td>
+                                  <td><input form="warehouseAddForm" name="dia_chi_chi_tiet" value="" placeholder="Địa chỉ chi tiết"></td>
                                   <td>
                                     <select form="warehouseAddForm" name="trang_thai">
                                       <option value="active" selected>Đang hoạt động</option>
@@ -337,7 +407,7 @@
                                   <tr class="warehouse-edit-row">
                                     <td><input form="<%= warehouseFormId %>" name="ma_kho" value="<%= warehouse.ma_kho || '' %>"></td>
                                     <td><input form="<%= warehouseFormId %>" name="ten_kho" value="<%= warehouse.ten_kho || '' %>" required></td>
-                                    <td><input form="<%= warehouseFormId %>" name="dia_chi" value="<%= warehouse.dia_chi || '' %>"></td>
+                                    <td><input form="<%= warehouseFormId %>" name="dia_chi_chi_tiet" value="<%= warehouse.dia_chi_chi_tiet || warehouse.dia_chi_day_du || warehouse.dia_chi || '' %>"></td>
                                     <td>
                                       <select form="<%= warehouseFormId %>" name="trang_thai">
                                         <option value="active" <%= warehouse.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
@@ -427,6 +497,35 @@
   </main>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      var addStoreModalOverlay = document.getElementById('addStoreModalOverlay');
+      var openAddStoreModalBtn = document.getElementById('openAddStoreModal');
+      var addStoreModalClose = document.getElementById('addStoreModalClose');
+      var addStoreModalCancel = document.getElementById('addStoreModalCancel');
+      var storeCreateForm = document.getElementById('storeCreateForm');
+
+      function openAddStoreModal() {
+        if (!addStoreModalOverlay) return;
+        if (storeCreateForm) storeCreateForm.reset();
+        addStoreModalOverlay.classList.add('is-visible');
+        var nameInput = storeCreateForm ? storeCreateForm.querySelector('[name="ten_cua_hang"]') : null;
+        if (nameInput) setTimeout(function() { nameInput.focus(); }, 50);
+      }
+
+      function closeAddStoreModal() {
+        if (!addStoreModalOverlay) return;
+        addStoreModalOverlay.classList.remove('is-visible');
+      }
+
+      if (openAddStoreModalBtn) openAddStoreModalBtn.addEventListener('click', openAddStoreModal);
+      if (addStoreModalClose) addStoreModalClose.addEventListener('click', closeAddStoreModal);
+      if (addStoreModalCancel) addStoreModalCancel.addEventListener('click', closeAddStoreModal);
+      if (addStoreModalOverlay) {
+        addStoreModalOverlay.addEventListener('click', function(event) {
+          if (event.target === addStoreModalOverlay) closeAddStoreModal();
+        });
+        if (addStoreModalOverlay.getAttribute('data-auto-open') === '1') openAddStoreModal();
+      }
+
       var selectAll = document.getElementById('selectAllStores');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.store-checkbox'));
 

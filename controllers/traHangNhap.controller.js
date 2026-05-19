@@ -1,5 +1,7 @@
+const path = require('path');
 const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
+const pdfService = require('../services/pdf.service');
 const {
   CuaHang,
   Kho,
@@ -643,6 +645,7 @@ async function createSupplierRefundReceipt(returnDoc, userId) {
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
     phuong_thuc_thanh_toan: 'tien_mat',
+    ghi_chu: 'Trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
     hach_toan: returnDoc.tinh_vao_cong_no
   });
 }
@@ -1270,7 +1273,13 @@ exports.createSubmit = async function(req, res, next) {
       await createSupplierRefundReceipt(returnDoc, req.user?._id);
     }
 
-    return res.json({ success: true, redirect: '/tra-hang-nhap', id: returnDoc._id, ma_phieu_tra_nhap: maPhieu, print_url: '/chung-tu-kho/tra-hang-nhap/' + returnDoc._id });
+    return res.json({
+      success: true,
+      redirect: '/tra-hang-nhap',
+      id: returnDoc._id,
+      ma_phieu_tra_nhap: maPhieu,
+      print_url: '/tra-hang-nhap/' + returnDoc._id + '/in'
+    });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể lưu phiếu trả hàng nhập' });
   }
@@ -1419,4 +1428,87 @@ exports.exportCsv = async function(req, res, next) {
   } catch (error) {
     next(error);
   }
+};
+
+async function loadReturnWithItems(id, storeId) {
+  if (!isObjectId(id)) return null;
+  const filter = { _id: id };
+  if (isObjectId(storeId)) filter.cua_hang_id = storeId;
+  const ticket = await PhieuTraHangNhap.findOne(filter)
+    .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang dia_chi_day_du dia_chi_gui_hang_day_du sdt email' })
+    .populate({ path: 'kho_id', select: 'ten_kho ma_kho' })
+    .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty ma_so_thue sdt email' })
+    .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap' })
+    .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
+    .populate({ path: 'nguoi_tra_id', select: 'ho_ten email' })
+    .lean();
+  if (!ticket) return null;
+  const items = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: ticket._id })
+    .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
+    .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+    .populate({ path: 'don_vi_tinh_id', select: 'ten_don_vi ma_don_vi' })
+    .sort({ created_at: 1 })
+    .lean();
+  return { ticket, items };
+}
+
+async function buildReturnPrintData(req, title) {
+  const storeId = await resolveStoreId(req);
+  const loaded = await loadReturnWithItems(req.params.id, storeId);
+  if (!loaded) return null;
+  const store = loaded.ticket.cua_hang_id || null;
+  return {
+    title: title || 'In phiếu trả hàng nhập',
+    activeMenu: 'mua-hang',
+    user: req.user,
+    store,
+    ticket: loaded.ticket,
+    items: loaded.items,
+    statusLabel,
+    embeddedPrint: String(req.query && req.query.embed || '') === '1',
+    formatDate: formatDate
+  };
+}
+
+function safeReturnPdfName(ticket) {
+  const code = String(ticket && ticket.ma_phieu_tra_nhap ? ticket.ma_phieu_tra_nhap : 'tra-hang-nhap')
+    .replace(/[^\w.-]+/g, '-');
+  return 'phieu-tra-hang-nhap-' + code + '.pdf';
+}
+
+async function renderReturnPrint(req, res, next, viewName, title) {
+  try {
+    const data = await buildReturnPrintData(req, title);
+    if (!data) return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
+    return res.render(viewName, data);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function renderReturnPdf(req, res, next, viewName, title) {
+  try {
+    const data = await buildReturnPrintData(req, title);
+    if (!data) return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
+    const viewPath = path.join(__dirname, '..', 'views', viewName + '.ejs');
+    const html = await pdfService.renderViewToHtml(viewPath, data);
+    const buffer = await pdfService.generatePdfFromHtml(html, {
+      format: 'A4',
+      printBackground: true,
+      margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+    });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + safeReturnPdfName(data.ticket) + '"');
+    return res.send(Buffer.from(buffer));
+  } catch (error) {
+    next(error);
+  }
+}
+
+exports.print = function(req, res, next) {
+  return renderReturnPrint(req, res, next, 'tra-hang-nhap/print', 'In phiếu trả hàng nhập');
+};
+
+exports.printPdf = function(req, res, next) {
+  return renderReturnPdf(req, res, next, 'tra-hang-nhap/print', 'In phiếu trả hàng nhập');
 };

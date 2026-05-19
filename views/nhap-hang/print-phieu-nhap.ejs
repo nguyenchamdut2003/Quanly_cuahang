@@ -40,7 +40,7 @@
   <main class="page">
     <div class="store">
       <strong><%= store ? (store.ten_cua_hang || 'Cửa hàng') : 'Cửa hàng' %></strong><br>
-      <%= store ? (store.dia_chi || '') : '' %> <%= store && store.sdt ? (' - ' + store.sdt) : '' %>
+      <%= store ? (store.dia_chi_day_du || '') : '' %> <%= store && store.sdt ? (' - ' + store.sdt) : '' %>
     </div>
     <h1>Phiếu nhập hàng</h1>
     <div style="text-align:center;font-size:13px">Mã phiếu: <strong><%= ticket.ma_phieu_nhap || '' %></strong></div>

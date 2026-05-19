@@ -31,6 +31,7 @@ const {
 const { congTonKho, truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
+const { normalizeAddress } = require('../utils/address');
 
 router.use(isAuthenticated);
 
@@ -306,7 +307,7 @@ function exportCustomerPhone(customer, shipment) {
 }
 
 function exportAddress(customer, shipment) {
-    return shipment?.dia_chi_nhan || customer?.dia_chi || customer?.dia_chi_day_du || customer?.khu_vuc_giao_hang || '';
+    return shipment?.dia_chi_nhan || customer?.dia_chi_day_du || customer?.khu_vuc_giao_hang || '';
 }
 
 function exportLotName(lot) {
@@ -844,7 +845,7 @@ function buildReturnExportRow(returnSlip, detail, totals) {
         ma_don_hang: order.ma_don_hang || '',
         khach_hang: exportCustomerName(customer),
         dien_thoai: customer.sdt || customer.sdt2 || '',
-        dia_chi: customer.dia_chi || customer.dia_chi_day_du || customer.khu_vuc_giao_hang || '',
+        dia_chi: customer.dia_chi_day_du || customer.khu_vuc_giao_hang || '',
         kho: returnSlip.kho_id
             ? (returnSlip.kho_id.ten_kho || returnSlip.kho_id.ma_kho || '')
             : (invoice.kho_id ? (invoice.kho_id.ten_kho || invoice.kho_id.ma_kho || '') : ''),
@@ -937,7 +938,7 @@ function buildDeliveryPartnerExportRow(partner, priceList) {
         ten_doi_tac: partner.ten_doi_tac || '',
         dien_thoai: partner.sdt || '',
         email: partner.email || '',
-        dia_chi: partner.dia_chi || '',
+        dia_chi: partner.dia_chi_day_du || '',
         ghi_chu: partner.ghi_chu || '',
         trang_thai: DELIVERY_PARTNER_STATUS_MAP[partner.trang_thai] || partner.trang_thai || '',
         ngay_tao: formatExportDate(partner.created_at),
@@ -1315,10 +1316,11 @@ async function seedVanDonIfEmpty(userId) {
         store = await CuaHang.create({
             ma_cua_hang: 'CH_DEMO_VD',
             ten_cua_hang: 'Cua hang demo',
-            dia_chi: '12 Nguyen Trai',
-            dia_chi_gui_hang: '12 Nguyen Trai, Thanh Xuan, Ha Noi',
+            dia_chi_chi_tiet: '12 Nguyen Trai',
+            dia_chi_day_du: '12 Nguyen Trai, Thuong Dinh, Ha Noi',
+            dia_chi_gui_hang_chi_tiet: '12 Nguyen Trai',
+            dia_chi_gui_hang_day_du: '12 Nguyen Trai, Thuong Dinh, Ha Noi',
             tinh_thanh: 'Ha Noi',
-            quan_huyen: 'Thanh Xuan',
             phuong_xa: 'Thuong Dinh',
             sdt: '0901000001',
             email: 'demo-store@example.com',
@@ -1335,7 +1337,8 @@ async function seedVanDonIfEmpty(userId) {
                 ten_doi_tac: 'GHN Express',
                 sdt: '1900636677',
                 email: 'demo-ghn@example.com',
-                dia_chi: 'Ha Noi',
+                dia_chi_chi_tiet: 'Ha Noi',
+                dia_chi_day_du: 'Ha Noi',
                 ghi_chu: 'Du lieu mau',
                 trang_thai: 'active'
             },
@@ -1345,7 +1348,8 @@ async function seedVanDonIfEmpty(userId) {
                 ten_doi_tac: 'Giao Hang Tiet Kiem',
                 sdt: '19006092',
                 email: 'demo-ghtk@example.com',
-                dia_chi: 'TP Ho Chi Minh',
+                dia_chi_chi_tiet: 'TP Ho Chi Minh',
+                dia_chi_day_du: 'TP Ho Chi Minh',
                 ghi_chu: 'Du lieu mau',
                 trang_thai: 'active'
             }
@@ -3337,18 +3341,22 @@ router.get('/doi-tac-giao-hang/:id/export.xlsx', async (req, res, next) => {
 
 router.post('/doi-tac-giao-hang/add', async (req, res, next) => {
     try {
-        const { ma_doi_tac, ten_doi_tac, sdt, email, dia_chi, ghi_chu } = req.body || {};
+        const { ma_doi_tac, ten_doi_tac, sdt, email, ghi_chu } = req.body || {};
         if (!ten_doi_tac || ten_doi_tac.trim() === '') {
             return res.status(400).json({ success: false, message: 'Tên đối tác là bắt buộc' });
         }
         const count = await DoiTacGiaoHang.countDocuments();
         const code = ma_doi_tac && ma_doi_tac.trim() !== '' ? ma_doi_tac.trim() : 'DTGH' + String(count + 1).padStart(4, '0');
+        const address = normalizeAddress(req.body);
         await DoiTacGiaoHang.create({
             ma_doi_tac: code,
             ten_doi_tac: ten_doi_tac.trim(),
             sdt: sdt?.trim(),
             email: email?.trim(),
-            dia_chi: dia_chi?.trim(),
+            dia_chi_chi_tiet: address.dia_chi_chi_tiet,
+            phuong_xa: address.phuong_xa,
+            tinh_thanh: address.tinh_thanh,
+            dia_chi_day_du: address.dia_chi_day_du,
             ghi_chu: ghi_chu?.trim(),
             trang_thai: 'active'
         });
@@ -3360,7 +3368,7 @@ router.post('/doi-tac-giao-hang/add', async (req, res, next) => {
 
 router.post('/doi-tac-giao-hang/:id/update', async (req, res, next) => {
     try {
-        const { ma_doi_tac, ten_doi_tac, sdt, email, dia_chi, ghi_chu, trang_thai } = req.body || {};
+        const { ma_doi_tac, ten_doi_tac, sdt, email, ghi_chu, trang_thai } = req.body || {};
         if (!ten_doi_tac || ten_doi_tac.trim() === '') {
             return res.status(400).json({ success: false, message: 'Tên đối tác là bắt buộc' });
         }
@@ -3375,7 +3383,11 @@ router.post('/doi-tac-giao-hang/:id/update', async (req, res, next) => {
         partner.ten_doi_tac = ten_doi_tac.trim();
         partner.sdt = sdt?.trim();
         partner.email = email?.trim();
-        partner.dia_chi = dia_chi?.trim();
+        const address = normalizeAddress(req.body);
+        partner.dia_chi_chi_tiet = address.dia_chi_chi_tiet;
+        partner.phuong_xa = address.phuong_xa;
+        partner.tinh_thanh = address.tinh_thanh;
+        partner.dia_chi_day_du = address.dia_chi_day_du;
         partner.ghi_chu = ghi_chu?.trim();
         if (trang_thai === 'active' || trang_thai === 'inactive') partner.trang_thai = trang_thai;
         await partner.save();

@@ -1,13 +1,18 @@
 var { DoanhNghiep } = require('../models/kiot.model');
+var { normalizeAddress } = require('../utils/address');
 
 function normalizeBusinessPayload(body) {
   body = body || {};
   var status = String(body.trang_thai || 'active').trim();
   if (['active', 'inactive'].indexOf(status) < 0) status = 'active';
+  var address = normalizeAddress(body);
   return {
     ten_doanh_nghiep: String(body.ten_doanh_nghiep || '').trim(),
     ma_so_thue: String(body.ma_so_thue || '').trim(),
-    dia_chi: String(body.dia_chi || '').trim(),
+    dia_chi_chi_tiet: address.dia_chi_chi_tiet,
+    phuong_xa: address.phuong_xa,
+    tinh_thanh: address.tinh_thanh,
+    dia_chi_day_du: address.dia_chi_day_du,
     so_dien_thoai: String(body.so_dien_thoai || '').trim(),
     email: String(body.email || '').trim(),
     nguoi_dai_dien: String(body.nguoi_dai_dien || '').trim(),

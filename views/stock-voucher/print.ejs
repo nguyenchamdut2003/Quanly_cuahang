@@ -8,7 +8,7 @@
   const creator = v.creator || {};
   const creatorName = creator.ho_ten || creator.username || creator.email || '';
   const storeName = business.ten_doanh_nghiep || store.ten_cua_hang || 'Cửa hàng';
-  const storeAddress = business.dia_chi || store.dia_chi || store.dia_chi_gui_hang || '';
+  const storeAddress = business.dia_chi_day_du || store.dia_chi_day_du || store.dia_chi_gui_hang_day_du || '';
   const storePhone = business.sdt || store.sdt || business.email || store.email || '';
   const printUrl = '/chung-tu-kho/' + v.type + '/' + v.id;
 %>

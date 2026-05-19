@@ -18,7 +18,7 @@ function supplierAddressNote(supplier) {
   const text = [
     supplier.ten_ncc,
     supplier.nhom_ncc,
-    supplier.dia_chi,
+    supplier.dia_chi_day_du,
     supplier.ghi_chu
   ].filter(Boolean).join(' ').toLowerCase();
 

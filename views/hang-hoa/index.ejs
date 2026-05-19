@@ -32,42 +32,30 @@
                 </div>
                 <div>
                   <span>Nhóm hàng</span>
-                  <select name="nhom_hang_id">
-                    <option value="">Chọn nhóm hàng</option>
-                    <% (groups || []).forEach(function(group) { %>
-                      <option value="<%= group._id %>"><%= group.ten_nhom_hang || '---' %></option>
-                    <% }) %>
-                  </select>
+                  <div class="group-manage-wrapper" id="productFormGroupWrapper">
+                    <div class="group-manage-header">
+                      <button class="group-manage-trigger" type="button" id="productFormGroupTrigger">
+                        <span id="productFormGroupLabel">Chọn nhóm hàng</span>
+                        <span>▾</span>
+                      </button>
+                      <button class="btn btn-primary btn-sm" type="button" id="productGroupModalAddBtn" title="Thêm nhóm hàng">Thêm</button>
+                    </div>
+                    <input type="hidden" name="nhom_hang_id" id="productFormGroupValue" value="">
+                    <div class="group-manage-dropdown" id="productFormGroupDropdown"></div>
+                  </div>
                 </div>
                 <div>
                   <span>Đơn vị tính</span>
-                  <% var initialUnit = (units && units[0]) ? units[0] : null; %>
-                  <div class="address-type-wrapper">
-                    <div class="address-type-header">
-                      <button class="address-type-trigger" type="button" id="unitTypeTrigger">
-                        <span id="unitTypeSelectedLabel"><%= initialUnit ? initialUnit.ten_don_vi : 'Chọn đơn vị tính' %></span>
+                  <div class="group-manage-wrapper" id="productFormUnitWrapper">
+                    <div class="group-manage-header">
+                      <button class="group-manage-trigger" type="button" id="productFormUnitTrigger">
+                        <span id="productFormUnitLabel">Chọn đơn vị tính</span>
                         <span>▾</span>
                       </button>
-                      <button class="btn btn-primary btn-sm" type="button" id="unitTypeAddBtn">Thêm</button>
+                      <button class="btn btn-primary btn-sm" type="button" id="unitTypeAddBtn" title="Thêm đơn vị tính">Thêm</button>
                     </div>
-                    <input type="hidden" name="don_vi_tinh_id" id="unitTypeValue" value="<%= initialUnit ? initialUnit._id : '' %>">
-                    <div class="address-type-dropdown" id="unitTypeDropdown">
-                      <% (units || []).forEach(function(unit) { %>
-                        <div
-                          class="address-type-item <%= initialUnit && String(initialUnit._id) === String(unit._id) ? 'is-active' : '' %>"
-                          data-id="<%= unit._id %>"
-                          data-value="<%= unit._id %>"
-                          data-name="<%= unit.ten_don_vi || '---' %>"
-                          data-code="<%= unit.ma_don_vi || '' %>"
-                        >
-                          <button class="address-type-option" type="button"><%= unit.ten_don_vi || '---' %></button>
-                          <div class="address-type-actions">
-                            <button class="address-type-action-edit" type="button">Sửa</button>
-                            <button class="address-type-action-delete" type="button">Xóa</button>
-                          </div>
-                        </div>
-                      <% }) %>
-                    </div>
+                    <input type="hidden" name="don_vi_tinh_id" id="productFormUnitValue" value="">
+                    <div class="group-manage-dropdown" id="productFormUnitDropdown"></div>
                   </div>
                 </div>
                 <div>
@@ -122,6 +110,13 @@
               </div>
               <div class="store-fields product-fields" id="initialLotFields" style="display:none;">
                 <div>
+                  <span>Hạn sử dụng mặc định (ngày)</span>
+                  <input type="number" min="0" step="1" name="han_su_dung_mac_dinh_so_ngay" id="hsdMacDinhInput" value="5">
+                </div>
+                <div class="span-2">
+                  <p id="hsdMacDinhPreview" class="product-hsd-preview muted-small">HSD dự kiến: --</p>
+                </div>
+                <div>
                   <span>Mã lô ban đầu</span>
                   <input name="initial_lot_ma" placeholder="Tự động">
                 </div>
@@ -147,33 +142,6 @@
                   </select>
                 </div>
               </div>
-            </section>
-            <section class="product-form-section">
-              <h4>Thuộc tính hàng hóa</h4>
-              <% if ((attributes || []).length) { %>
-                <div class="product-attribute-list">
-                  <% (attributes || []).forEach(function(attr) { %>
-                    <% var valuesForAttr = (attributeValues || []).filter(function(value) { return String(value.thuoc_tinh_id) === String(attr._id); }); %>
-                    <div class="product-attribute-block">
-                      <div class="product-attribute-title"><%= attr.ten_thuoc_tinh %></div>
-                      <% if (valuesForAttr.length) { %>
-                        <div class="product-attribute-values">
-                          <% valuesForAttr.forEach(function(value) { %>
-                            <label class="product-attribute-option">
-                              <input class="product-attribute-value" type="checkbox" name="gia_tri_thuoc_tinh_ids" value="<%= value._id %>">
-                              <span><%= value.ten_gia_tri %></span>
-                            </label>
-                          <% }); %>
-                        </div>
-                      <% } else { %>
-                        <div class="muted-small">Chưa có giá trị thuộc tính</div>
-                      <% } %>
-                    </div>
-                  <% }); %>
-                </div>
-              <% } else { %>
-                <div class="muted-small">Chưa có thuộc tính hàng hóa</div>
-              <% } %>
             </section>
           </div>
         </form>
@@ -380,7 +348,6 @@
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="dvt"> ĐVT</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ma_dvt_co_ban"> Mã ĐVT cơ bản</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="quy_doi"> Quy đổi</label>
-        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="thuoc_tinh"> Thuộc tính nếu có</label>
       </div>
       
       <div style="margin-bottom:16px">
@@ -431,8 +398,8 @@
           <input id="productGroupNameInput" type="text" placeholder="Nhập tên nhóm">
         </label>
         <label>
-          <span>Ghi chú</span>
-          <input id="productGroupDescInput" type="text" placeholder="Nhập ghi chú">
+          <span>Mô tả</span>
+          <input id="productGroupDescInput" type="text" placeholder="Nhập mô tả (không bắt buộc)">
         </label>
       </div>
       <div class="page-actions group-modal-footer">
@@ -465,7 +432,6 @@
   </div>
   <script id="productGroupsSeed" type="application/json"><%- JSON.stringify(groups || []) %></script>
   <script id="unitTypesSeed" type="application/json"><%- JSON.stringify(units || []) %></script>
-  <script id="productAttributeIdsSeed" type="application/json"><%- JSON.stringify(productAttributeIds || {}) %></script>
   <script src="/js/kv-inline-detail.js"></script>
 
   <script>
@@ -526,17 +492,11 @@
       var fixedPriceWrap = document.getElementById('fixedPriceWrap');
       var productManageLotCheckbox = document.getElementById('productManageLotCheckbox');
       var initialLotFields = document.getElementById('initialLotFields');
+      var hsdMacDinhInput = document.getElementById('hsdMacDinhInput');
+      var hsdMacDinhPreview = document.getElementById('hsdMacDinhPreview');
       var selectAllProducts = document.getElementById('selectAllProducts');
       var productCheckboxes = Array.prototype.slice.call(document.querySelectorAll('.product-checkbox'));
       var customerTableWrap = document.querySelector('.customer-table-wrap');
-      var productAttributeIdsSeed = document.getElementById('productAttributeIdsSeed');
-      var productAttributeIds = {};
-      try {
-        productAttributeIds = productAttributeIdsSeed ? JSON.parse(productAttributeIdsSeed.textContent || '{}') : {};
-      } catch (_error) {
-        productAttributeIds = {};
-      }
-
       function toggleFixedPrice() {
         if (!fixedPriceWrap || !productPriceType) return;
         fixedPriceWrap.style.display = productPriceType.value === 'co_dinh' ? '' : 'none';
@@ -545,6 +505,20 @@
       function toggleInitialLotFields() {
         if (!initialLotFields || !productManageLotCheckbox) return;
         initialLotFields.style.display = productManageLotCheckbox.checked ? '' : 'none';
+        if (productManageLotCheckbox.checked) updateHsdPreview();
+      }
+
+      function updateHsdPreview() {
+        if (!hsdMacDinhPreview) return;
+        var days = Number(hsdMacDinhInput && hsdMacDinhInput.value);
+        if (!Number.isFinite(days) || days < 0) days = 0;
+        var date = new Date();
+        date.setHours(0, 0, 0, 0);
+        date.setDate(date.getDate() + days);
+        var dd = String(date.getDate()).padStart(2, '0');
+        var mm = String(date.getMonth() + 1).padStart(2, '0');
+        var yyyy = date.getFullYear();
+        hsdMacDinhPreview.textContent = 'HSD dự kiến: ' + dd + '/' + mm + '/' + yyyy;
       }
 
       function setProductFormValue(name, value) {
@@ -561,16 +535,6 @@
         input.checked = !!value;
       }
 
-      function setProductAttributeValues(ids) {
-        if (!productCreateForm) return;
-        var selected = {};
-        (ids || []).forEach(function(id) { selected[String(id)] = true; });
-        var boxes = Array.prototype.slice.call(productCreateForm.querySelectorAll('.product-attribute-value'));
-        boxes.forEach(function(box) {
-          box.checked = !!selected[String(box.value)];
-        });
-      }
-
       function openAddProductModal() {
         if (!addProductModalOverlay) return;
         if (productModalTitle) productModalTitle.textContent = 'Tạo hàng hóa';
@@ -579,16 +543,13 @@
           productCreateForm.setAttribute('action', '/hang-hoa/add');
           productCreateForm.reset();
         }
-        setProductAttributeValues([]);
-        if (unitTypeSelectedLabel) unitTypeSelectedLabel.textContent = 'Chọn đơn vị tính';
-        if (unitTypeValue) unitTypeValue.value = '';
-        if (unitTypeDropdown) {
-          var unitItems = Array.prototype.slice.call(unitTypeDropdown.querySelectorAll('.address-type-item'));
-          unitItems.forEach(function(item) { item.classList.remove('is-active'); });
-        }
+        setProductFormValue('han_su_dung_mac_dinh_so_ngay', 5);
+        if (typeof refreshProductFormGroup === 'function') refreshProductFormGroup('');
+        if (typeof refreshProductFormUnit === 'function') refreshProductFormUnit('');
         addProductModalOverlay.classList.add('is-visible');
         toggleFixedPrice();
         toggleInitialLotFields();
+        updateHsdPreview();
       }
 
       function openEditProductModal(product) {
@@ -601,7 +562,6 @@
 
         setProductFormValue('ma_hang', product.ma_hang || '');
         setProductFormValue('ten_hang', product.ten_hang || '');
-        setProductFormValue('nhom_hang_id', product.nhom_hang_id || '');
         setProductFormValue('nha_cung_cap_id', product.nha_cung_cap_id || '');
         setProductFormValue('gia_von', Number(product.gia_von || 0));
         setProductFormValue('loai_gia', product.loai_gia || 'thi_truong');
@@ -612,28 +572,22 @@
         setProductFormValue('trang_thai', product.trang_thai || 'active');
         setProductCheckbox('ban_truc_tiep', !!product.ban_truc_tiep);
         setProductCheckbox('quan_ly_theo_lo', !!product.quan_ly_theo_lo);
-        setProductAttributeValues(productAttributeIds[String(product._id)] || []);
+        setProductFormValue(
+          'han_su_dung_mac_dinh_so_ngay',
+          product.han_su_dung_mac_dinh_so_ngay != null ? product.han_su_dung_mac_dinh_so_ngay : 5
+        );
 
-        var selectedUnitId = String(product.don_vi_tinh_id || '');
-        if (unitTypeValue) unitTypeValue.value = selectedUnitId;
-        if (unitTypeDropdown) {
-          var allItems = Array.prototype.slice.call(unitTypeDropdown.querySelectorAll('.address-type-item'));
-          var activeItem = null;
-          allItems.forEach(function(item) {
-            var isActive = String(item.getAttribute('data-id') || '') === selectedUnitId;
-            item.classList.toggle('is-active', isActive);
-            if (isActive) activeItem = item;
-          });
-          if (unitTypeSelectedLabel) {
-            unitTypeSelectedLabel.textContent = activeItem
-              ? (activeItem.getAttribute('data-name') || 'Chọn đơn vị tính')
-              : 'Chọn đơn vị tính';
-          }
+        if (typeof refreshProductFormGroup === 'function') {
+          refreshProductFormGroup(product.nhom_hang_id || '');
+        }
+        if (typeof refreshProductFormUnit === 'function') {
+          refreshProductFormUnit(product.don_vi_tinh_id || '');
         }
 
         addProductModalOverlay.classList.add('is-visible');
         toggleFixedPrice();
         toggleInitialLotFields();
+        updateHsdPreview();
       }
 
       function closeAddProductModal() {
@@ -643,6 +597,7 @@
 
       if (productPriceType) productPriceType.addEventListener('change', toggleFixedPrice);
       if (productManageLotCheckbox) productManageLotCheckbox.addEventListener('change', toggleInitialLotFields);
+      if (hsdMacDinhInput) hsdMacDinhInput.addEventListener('input', updateHsdPreview);
       if (openAddProductModalBtn) openAddProductModalBtn.addEventListener('click', openAddProductModal);
       if (addProductModalClose) addProductModalClose.addEventListener('click', closeAddProductModal);
       if (addProductModalCancel) addProductModalCancel.addEventListener('click', closeAddProductModal);
@@ -657,7 +612,6 @@
         if (productModalSubmitBtn) productModalSubmitBtn.textContent = 'Lưu';
         setProductFormValue('ma_hang', '');
         setProductFormValue('ten_hang', (product.ten_hang || '') + ' (bản sao)');
-        setProductFormValue('nhom_hang_id', product.nhom_hang_id || '');
         setProductFormValue('nha_cung_cap_id', product.nha_cung_cap_id || '');
         setProductFormValue('gia_von', Number(product.gia_von || 0));
         setProductFormValue('loai_gia', product.loai_gia || 'thi_truong');
@@ -668,8 +622,18 @@
         setProductFormValue('trang_thai', 'active');
         setProductCheckbox('ban_truc_tiep', !!product.ban_truc_tiep);
         setProductCheckbox('quan_ly_theo_lo', !!product.quan_ly_theo_lo);
-        setProductAttributeValues(productAttributeIds[String(product._id)] || []);
-        if (unitTypeValue) unitTypeValue.value = String(product.don_vi_tinh_id || '');
+        setProductFormValue(
+          'han_su_dung_mac_dinh_so_ngay',
+          product.han_su_dung_mac_dinh_so_ngay != null ? product.han_su_dung_mac_dinh_so_ngay : 5
+        );
+        if (typeof refreshProductFormGroup === 'function') {
+          refreshProductFormGroup(product.nhom_hang_id || '');
+        }
+        if (typeof refreshProductFormUnit === 'function') {
+          refreshProductFormUnit(product.don_vi_tinh_id || '');
+        }
+        toggleInitialLotFields();
+        updateHsdPreview();
       }
 
       function printProductLabel(product) {
@@ -714,10 +678,10 @@
         });
       }
 
-      var unitTypeTrigger = document.getElementById('unitTypeTrigger');
-      var unitTypeSelectedLabel = document.getElementById('unitTypeSelectedLabel');
-      var unitTypeValue = document.getElementById('unitTypeValue');
-      var unitTypeDropdown = document.getElementById('unitTypeDropdown');
+      var productFormUnitTrigger = document.getElementById('productFormUnitTrigger');
+      var productFormUnitLabel = document.getElementById('productFormUnitLabel');
+      var productFormUnitValue = document.getElementById('productFormUnitValue');
+      var productFormUnitDropdown = document.getElementById('productFormUnitDropdown');
       var unitTypeAddBtn = document.getElementById('unitTypeAddBtn');
       var unitTypeModalOverlay = document.getElementById('unitTypeModalOverlay');
       var unitTypeModalTitle = document.getElementById('unitTypeModalTitle');
@@ -729,187 +693,10 @@
       var unitTypeModalMode = 'add';
       var activeUnitTypeItem = null;
 
-      function bindUnitTypeItems() {
-        var unitItems = Array.prototype.slice.call(document.querySelectorAll('#unitTypeDropdown .address-type-item'));
-        unitItems.forEach(function(item) {
-          var optionBtn = item.querySelector('.address-type-option');
-          var editBtn = item.querySelector('.address-type-action-edit');
-          var deleteBtn = item.querySelector('.address-type-action-delete');
-
-          if (optionBtn) {
-            optionBtn.addEventListener('click', function() {
-              unitItems.forEach(function(node) { node.classList.remove('is-active'); });
-              item.classList.add('is-active');
-              if (unitTypeSelectedLabel) unitTypeSelectedLabel.textContent = item.getAttribute('data-name') || '';
-              if (unitTypeValue) unitTypeValue.value = item.getAttribute('data-value') || '';
-              if (unitTypeDropdown) unitTypeDropdown.classList.remove('is-open');
-            });
-          }
-
-          if (editBtn) {
-            editBtn.addEventListener('click', function(event) {
-              event.stopPropagation();
-              activeUnitTypeItem = item;
-              openUnitTypeModal('edit');
-            });
-          }
-
-          if (deleteBtn) {
-            deleteBtn.addEventListener('click', function(event) {
-              event.stopPropagation();
-              var unitId = item.getAttribute('data-id') || '';
-              if (!unitId) {
-                alert('Vui lòng chọn đơn vị tính cần xóa.');
-                return;
-              }
-              if (!confirm('Bạn có chắc muốn xóa đơn vị tính này không?')) return;
-              requestUnitTypes('/hang-hoa/units/' + unitId + '/delete', {});
-            });
-          }
-        });
-      }
-
-      function renderUnitTypeList(unitTypes, selectedId) {
-        if (!unitTypeDropdown || !unitTypeValue || !unitTypeSelectedLabel) return;
-        var selectedType = null;
-        if (selectedId) {
-          selectedType = unitTypes.find(function(item) { return String(item._id) === String(selectedId); }) || null;
-        }
-        if (!selectedType && unitTypes.length > 0) selectedType = unitTypes[0];
-
-        unitTypeDropdown.innerHTML = unitTypes.map(function(unit) {
-          var isActive = selectedType && String(selectedType._id) === String(unit._id);
-          return (
-            '<div class="address-type-item ' + (isActive ? 'is-active' : '') + '" data-id="' + String(unit._id || '') + '" data-value="' + String(unit._id || '') + '" data-name="' + String(unit.ten_don_vi || '').replace(/"/g, '&quot;') + '" data-code="' + String(unit.ma_don_vi || '').replace(/"/g, '&quot;') + '">' +
-              '<button class="address-type-option" type="button">' + (unit.ten_don_vi || '---') + '</button>' +
-              '<div class="address-type-actions">' +
-                '<button class="address-type-action-edit" type="button">Sửa</button>' +
-                '<button class="address-type-action-delete" type="button">Xóa</button>' +
-              '</div>' +
-            '</div>'
-          );
-        }).join('');
-
-        if (selectedType) {
-          unitTypeValue.value = selectedType._id || '';
-          unitTypeSelectedLabel.textContent = selectedType.ten_don_vi || 'Chọn đơn vị tính';
-        } else {
-          unitTypeValue.value = '';
-          unitTypeSelectedLabel.textContent = 'Chọn đơn vị tính';
-        }
-
-        activeUnitTypeItem = null;
-        bindUnitTypeItems();
-      }
-
-      function requestUnitTypes(url, payload, callback) {
-        var formBody = Object.keys(payload).map(function(key) {
-          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
-        }).join('&');
-
-        fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-          },
-          body: formBody
-        })
-          .then(function(response) {
-            return response.json().catch(function() {
-              return { success: false, message: 'Server không trả về JSON hợp lệ.' };
-            });
-          })
-          .then(function(data) {
-            if (!data || !data.success) {
-              alert((data && data.message) || 'Không thể xử lý đơn vị tính.');
-              return;
-            }
-            var nextUnits = Array.isArray(data.units) ? data.units : unitTypes;
-            if ((!Array.isArray(data.units) || data.units.length === 0) && data.data && data.data._id) {
-              nextUnits = (nextUnits || []).filter(function(unit) {
-                return String(unit._id) !== String(data.data._id);
-              });
-              nextUnits.push(data.data);
-            }
-            unitTypes = nextUnits || [];
-            renderUnitTypeList(unitTypes, data.selectedId || (data.data && data.data._id) || '');
-            if (typeof callback === 'function') callback();
-          })
-          .catch(function(error) {
-            alert((error && error.message) || 'Có lỗi khi xử lý đơn vị tính.');
-          });
-      }
-
-      function openUnitTypeModal(mode) {
-        unitTypeModalMode = mode;
-        if (!unitTypeModalOverlay || !unitTypeModalTitle) return;
-        if (mode === 'add') {
-          unitTypeModalTitle.textContent = 'Thêm đơn vị tính';
-          if (unitTypeNameInput) unitTypeNameInput.value = '';
-          if (unitTypeCodeInput) unitTypeCodeInput.value = '';
-          if (unitTypeCodeInput) unitTypeCodeInput.removeAttribute('disabled');
-        } else {
-          unitTypeModalTitle.textContent = 'Sửa đơn vị tính';
-          if (unitTypeNameInput) unitTypeNameInput.value = activeUnitTypeItem ? (activeUnitTypeItem.getAttribute('data-name') || '') : '';
-          if (unitTypeCodeInput) unitTypeCodeInput.value = activeUnitTypeItem ? (activeUnitTypeItem.getAttribute('data-code') || '') : '';
-          if (unitTypeCodeInput) unitTypeCodeInput.setAttribute('disabled', 'disabled');
-        }
-        unitTypeModalOverlay.classList.add('is-open');
-      }
-
-      function closeUnitTypeModal() {
-        if (!unitTypeModalOverlay) return;
-        unitTypeModalOverlay.classList.remove('is-open');
-      }
-
-      if (unitTypeAddBtn) {
-        unitTypeAddBtn.addEventListener('click', function() {
-          openUnitTypeModal('add');
-        });
-      }
-      if (unitTypeTrigger && unitTypeDropdown) {
-        unitTypeTrigger.addEventListener('click', function() {
-          unitTypeDropdown.classList.toggle('is-open');
-        });
-      }
-      if (unitTypeModalClose) unitTypeModalClose.addEventListener('click', closeUnitTypeModal);
-      if (unitTypeModalCancel) unitTypeModalCancel.addEventListener('click', closeUnitTypeModal);
-
-      if (unitTypeModalSubmit) {
-        unitTypeModalSubmit.addEventListener('click', function() {
-          if (!unitTypeNameInput || !unitTypeNameInput.value.trim()) {
-            alert('Vui lòng nhập tên đơn vị tính.');
-            return;
-          }
-          if (unitTypeModalMode === 'add') {
-            requestUnitTypes('/hang-hoa/units/add', {
-              ten_don_vi: unitTypeNameInput.value.trim(),
-              ma_don_vi: unitTypeCodeInput && unitTypeCodeInput.value ? unitTypeCodeInput.value.trim() : ''
-            }, function() {
-              closeUnitTypeModal();
-            });
-            return;
-          }
-
-          var unitId = activeUnitTypeItem ? (activeUnitTypeItem.getAttribute('data-id') || '') : '';
-          if (!unitId) {
-            alert('Vui lòng chọn đơn vị tính cần sửa.');
-            return;
-          }
-          requestUnitTypes('/hang-hoa/units/' + unitId + '/update', {
-            ten_don_vi: unitTypeNameInput.value.trim()
-          }, function() {
-            closeUnitTypeModal();
-          });
-        });
-      }
-
-      var unitTypesSeed = document.getElementById('unitTypesSeed');
-      var unitTypes = unitTypesSeed ? JSON.parse(unitTypesSeed.textContent || '[]') : [];
-      renderUnitTypeList(unitTypes, (unitTypeValue && unitTypeValue.value) || '');
-
+      var productFormGroupTrigger = document.getElementById('productFormGroupTrigger');
+      var productFormGroupLabel = document.getElementById('productFormGroupLabel');
+      var productFormGroupValue = document.getElementById('productFormGroupValue');
+      var productFormGroupDropdown = document.getElementById('productFormGroupDropdown');
       var productGroupFilterTrigger = document.getElementById('productGroupFilterTrigger');
       var productGroupFilterLabel = document.getElementById('productGroupFilterLabel');
       var productGroupFilterValue = document.getElementById('productGroupFilterValue');
@@ -925,60 +712,104 @@
       var productGroupModalMode = 'add';
       var activeProductGroupItem = null;
 
-      function bindProductGroupItems() {
-        var groupItems = Array.prototype.slice.call(document.querySelectorAll('#productGroupFilterDropdown .group-manage-item'));
-        groupItems.forEach(function(item) {
+      function escapeManageAttr(value) {
+        return String(value || '').replace(/"/g, '&quot;');
+      }
+
+      function updateManageWidget(context) {
+        if (!context || !context.dropdown) return;
+        var activeItem = context.dropdown.querySelector('.group-manage-item.is-active');
+        var fallback = context.emptyLabel || 'Chọn';
+        if (context.labelEl) {
+          context.labelEl.textContent = activeItem
+            ? (activeItem.getAttribute('data-name') || fallback)
+            : fallback;
+        }
+        if (context.valueEl) {
+          context.valueEl.value = activeItem
+            ? (activeItem.getAttribute('data-value') || context.emptyValue || '')
+            : (context.emptyValue || '');
+        }
+      }
+
+      function bindManageDropdown(context, handlers) {
+        if (!context || !context.dropdown) return;
+        var items = Array.prototype.slice.call(context.dropdown.querySelectorAll('.group-manage-item'));
+        items.forEach(function(item) {
           var optionBtn = item.querySelector('.group-manage-option');
           var editBtn = item.querySelector('.group-manage-action-edit');
           var deleteBtn = item.querySelector('.group-manage-action-delete');
 
           if (optionBtn) {
             optionBtn.addEventListener('click', function() {
-              groupItems.forEach(function(node) { node.classList.remove('is-active'); });
+              items.forEach(function(node) { node.classList.remove('is-active'); });
               item.classList.add('is-active');
-              if (productGroupFilterValue) productGroupFilterValue.value = item.getAttribute('data-value') || 'all';
-              if (productGroupFilterLabel) productGroupFilterLabel.textContent = item.getAttribute('data-name') || 'Chọn nhóm hàng';
-              if (productGroupFilterDropdown) productGroupFilterDropdown.classList.remove('is-open');
+              updateManageWidget(context);
+              context.dropdown.classList.remove('is-open');
             });
           }
 
-          if (editBtn) {
+          if (editBtn && handlers && handlers.onEdit) {
             editBtn.addEventListener('click', function(event) {
               event.stopPropagation();
-              activeProductGroupItem = item;
-              openProductGroupModal('edit');
+              handlers.onEdit(item);
             });
           }
 
-          if (deleteBtn) {
+          if (deleteBtn && handlers && handlers.onDelete) {
             deleteBtn.addEventListener('click', function(event) {
               event.stopPropagation();
-              var groupId = item.getAttribute('data-id') || '';
-              if (!groupId) {
-                alert('Vui lòng chọn nhóm cần xóa.');
-                return;
-              }
-              if (!confirm('Bạn có chắc muốn xóa nhóm hàng này không?')) return;
-              requestProductGroups('/hang-hoa/groups/' + groupId + '/delete', {}, '');
+              handlers.onDelete(item);
             });
           }
         });
       }
 
-      function renderProductGroupList(selectedValue) {
-        if (!productGroupFilterDropdown) return;
+      var productFormGroupContext = {
+        dropdown: productFormGroupDropdown,
+        trigger: productFormGroupTrigger,
+        labelEl: productFormGroupLabel,
+        valueEl: productFormGroupValue,
+        emptyValue: '',
+        emptyLabel: 'Chọn nhóm hàng'
+      };
+
+      var productGroupFilterContext = {
+        dropdown: productGroupFilterDropdown,
+        trigger: productGroupFilterTrigger,
+        labelEl: productGroupFilterLabel,
+        valueEl: productGroupFilterValue,
+        emptyValue: 'all',
+        emptyLabel: 'Chọn nhóm hàng'
+      };
+
+      var productFormUnitContext = {
+        dropdown: productFormUnitDropdown,
+        trigger: productFormUnitTrigger,
+        labelEl: productFormUnitLabel,
+        valueEl: productFormUnitValue,
+        emptyValue: '',
+        emptyLabel: 'Chọn đơn vị tính'
+      };
+
+      function renderProductGroupDropdown(context, selectedValue) {
+        if (!context || !context.dropdown) return;
         var groups = window.__productGroups || [];
+        var emptyValue = context.emptyValue;
+        var emptyLabel = context.emptyLabel;
+        var selected = selectedValue == null ? (context.valueEl ? context.valueEl.value : emptyValue) : selectedValue;
         var rows = [];
+        var isEmptyActive = String(selected || '') === String(emptyValue || '');
         rows.push(
-          '<div class="group-manage-item ' + ((selectedValue === 'all' || !selectedValue) ? 'is-active' : '') + '" data-id="" data-value="all" data-name="Chọn nhóm hàng" data-desc="">' +
-            '<button class="group-manage-option" type="button">Chọn nhóm hàng</button>' +
+          '<div class="group-manage-item ' + (isEmptyActive ? 'is-active' : '') + '" data-id="" data-value="' + escapeManageAttr(emptyValue) + '" data-name="' + escapeManageAttr(emptyLabel) + '" data-desc="">' +
+            '<button class="group-manage-option" type="button">' + emptyLabel + '</button>' +
           '</div>'
         );
         groups.forEach(function(group) {
           var id = String(group._id || '');
-          var isActive = id === String(selectedValue || '');
+          var isActive = id === String(selected || '');
           rows.push(
-            '<div class="group-manage-item ' + (isActive ? 'is-active' : '') + '" data-id="' + id + '" data-value="' + id + '" data-name="' + (group.ten_nhom_hang || '').replace(/"/g, '&quot;') + '" data-desc="' + (group.mo_ta || '').replace(/"/g, '&quot;') + '">' +
+            '<div class="group-manage-item ' + (isActive ? 'is-active' : '') + '" data-id="' + id + '" data-value="' + id + '" data-name="' + escapeManageAttr(group.ten_nhom_hang) + '" data-desc="' + escapeManageAttr(group.mo_ta) + '">' +
               '<button class="group-manage-option" type="button">' + (group.ten_nhom_hang || '') + '</button>' +
               '<div class="group-manage-actions">' +
                 '<button class="group-manage-action-edit" type="button">Sửa</button>' +
@@ -987,34 +818,51 @@
             '</div>'
           );
         });
-        productGroupFilterDropdown.innerHTML = rows.join('');
-        bindProductGroupItems();
+        context.dropdown.innerHTML = rows.join('');
+        bindManageDropdown(context, {
+          onEdit: function(item) {
+            activeProductGroupItem = item;
+            openProductGroupModal('edit');
+          },
+          onDelete: function(item) {
+            var groupId = item.getAttribute('data-id') || '';
+            if (!groupId) {
+              alert('Vui lòng chọn nhóm cần xóa.');
+              return;
+            }
+            if (!confirm('Bạn có chắc muốn xóa nhóm hàng này không?')) return;
+            var resetFilter = productGroupFilterValue && String(productGroupFilterValue.value) === groupId;
+            var resetForm = productFormGroupValue && String(productFormGroupValue.value) === groupId;
+            requestProductGroups('/hang-hoa/groups/' + groupId + '/delete', {}, {
+              filter: resetFilter ? 'all' : undefined,
+              form: resetForm ? '' : undefined
+            });
+          }
+        });
+        updateManageWidget(context);
       }
 
-      function refreshProductGroupSelect(groups, selectedId) {
-        var groupSelect = document.querySelector('select[name="nhom_hang_id"]');
-        if (!groupSelect) return;
-        var selected = selectedId || groupSelect.value || '';
-        var options = ['<option value="">Chọn nhóm hàng</option>'];
-        (groups || []).forEach(function(group) {
-          var id = String(group._id || '');
-          var name = String(group.ten_nhom_hang || '---').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          options.push('<option value="' + id + '"' + (id === String(selected) ? ' selected' : '') + '>' + name + '</option>');
-        });
-        groupSelect.innerHTML = options.join('');
+      function refreshProductFormGroup(selectedId) {
+        renderProductGroupDropdown(productFormGroupContext, selectedId == null ? '' : selectedId);
       }
 
       function refreshProductGroupWidget(selectedId) {
-        var selected = selectedId || (productGroupFilterValue ? productGroupFilterValue.value : 'all') || 'all';
-        renderProductGroupList(selected);
-        if (productGroupFilterDropdown && productGroupFilterLabel) {
-          var activeItem = productGroupFilterDropdown.querySelector('.group-manage-item.is-active');
-          productGroupFilterLabel.textContent = activeItem ? (activeItem.getAttribute('data-name') || 'Chọn nhóm hàng') : 'Chọn nhóm hàng';
-          if (productGroupFilterValue) productGroupFilterValue.value = activeItem ? (activeItem.getAttribute('data-value') || 'all') : 'all';
-        }
+        var selected = selectedId == null
+          ? ((productGroupFilterValue && productGroupFilterValue.value) || 'all')
+          : selectedId;
+        renderProductGroupDropdown(productGroupFilterContext, selected);
       }
 
-      function requestProductGroups(url, payload, selectedId) {
+      function refreshAllProductGroups(selected) {
+        var filterId = selected && selected.filter != null ? selected.filter : undefined;
+        var formId = selected && selected.form != null ? selected.form : undefined;
+        if (filterId !== undefined) refreshProductGroupWidget(filterId);
+        else refreshProductGroupWidget();
+        if (formId !== undefined) refreshProductFormGroup(formId);
+        else refreshProductFormGroup(productFormGroupValue ? productFormGroupValue.value : '');
+      }
+
+      function requestProductGroups(url, payload, selected) {
         var formBody = Object.keys(payload).map(function(key) {
           return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
         }).join('&');
@@ -1046,9 +894,17 @@
               });
               window.__productGroups.push(data.data);
             }
-            var activeGroupId = data.selectedId || (data.data && data.data._id) || selectedId || '';
-            refreshProductGroupWidget(activeGroupId);
-            refreshProductGroupSelect(window.__productGroups || [], activeGroupId);
+            var activeGroupId = data.selectedId || (data.data && data.data._id) || '';
+            var nextSelected = selected && typeof selected === 'object' ? selected : {};
+            if (activeGroupId) {
+              if (nextSelected.filter == null && productGroupFilterValue && String(productGroupFilterValue.value) === 'all') {
+                nextSelected.filter = activeGroupId;
+              }
+              if (nextSelected.form == null) {
+                nextSelected.form = activeGroupId;
+              }
+            }
+            refreshAllProductGroups(nextSelected);
             closeProductGroupModal();
           })
           .catch(function(error) {
@@ -1060,6 +916,7 @@
         productGroupModalMode = mode;
         if (!productGroupModalOverlay || !productGroupModalTitle) return;
         if (mode === 'add') {
+          activeProductGroupItem = null;
           productGroupModalTitle.textContent = 'Thêm nhóm hàng';
           if (productGroupNameInput) productGroupNameInput.value = '';
           if (productGroupDescInput) productGroupDescInput.value = '';
@@ -1076,6 +933,172 @@
         productGroupModalOverlay.classList.remove('is-open');
       }
 
+      function renderProductUnitDropdown(context, selectedValue) {
+        if (!context || !context.dropdown) return;
+        var emptyValue = context.emptyValue;
+        var emptyLabel = context.emptyLabel;
+        var selected = selectedValue == null ? (context.valueEl ? context.valueEl.value : emptyValue) : selectedValue;
+        var rows = [];
+        var isEmptyActive = String(selected || '') === String(emptyValue || '');
+        rows.push(
+          '<div class="group-manage-item ' + (isEmptyActive ? 'is-active' : '') + '" data-id="" data-value="' + escapeManageAttr(emptyValue) + '" data-name="' + escapeManageAttr(emptyLabel) + '" data-code="">' +
+            '<button class="group-manage-option" type="button">' + emptyLabel + '</button>' +
+          '</div>'
+        );
+        (unitTypes || []).forEach(function(unit) {
+          var id = String(unit._id || '');
+          var isActive = id === String(selected || '');
+          rows.push(
+            '<div class="group-manage-item ' + (isActive ? 'is-active' : '') + '" data-id="' + id + '" data-value="' + id + '" data-name="' + escapeManageAttr(unit.ten_don_vi) + '" data-code="' + escapeManageAttr(unit.ma_don_vi) + '">' +
+              '<button class="group-manage-option" type="button">' + (unit.ten_don_vi || '---') + '</button>' +
+              '<div class="group-manage-actions">' +
+                '<button class="group-manage-action-edit" type="button">Sửa</button>' +
+                '<button class="group-manage-action-delete" type="button">Xóa</button>' +
+              '</div>' +
+            '</div>'
+          );
+        });
+        context.dropdown.innerHTML = rows.join('');
+        bindManageDropdown(context, {
+          onEdit: function(item) {
+            activeUnitTypeItem = item;
+            openUnitTypeModal('edit');
+          },
+          onDelete: function(item) {
+            var unitId = item.getAttribute('data-id') || '';
+            if (!unitId) {
+              alert('Vui lòng chọn đơn vị tính cần xóa.');
+              return;
+            }
+            if (!confirm('Bạn có chắc muốn xóa đơn vị tính này không?')) return;
+            var resetForm = productFormUnitValue && String(productFormUnitValue.value) === unitId;
+            requestUnitTypes('/hang-hoa/units/' + unitId + '/delete', {}, resetForm ? '' : undefined);
+          }
+        });
+        updateManageWidget(context);
+      }
+
+      function refreshProductFormUnit(selectedId) {
+        renderProductUnitDropdown(productFormUnitContext, selectedId == null ? '' : selectedId);
+      }
+
+      function requestUnitTypes(url, payload, selectedId, callback) {
+        var formBody = Object.keys(payload).map(function(key) {
+          return encodeURIComponent(key) + '=' + encodeURIComponent(payload[key]);
+        }).join('&');
+
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: formBody
+        })
+          .then(function(response) {
+            return response.json().catch(function() {
+              return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+            });
+          })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert((data && data.message) || 'Không thể xử lý đơn vị tính.');
+              return;
+            }
+            var nextUnits = Array.isArray(data.units) ? data.units : unitTypes;
+            if ((!Array.isArray(data.units) || data.units.length === 0) && data.data && data.data._id) {
+              nextUnits = (nextUnits || []).filter(function(unit) {
+                return String(unit._id) !== String(data.data._id);
+              });
+              nextUnits.push(data.data);
+            }
+            unitTypes = nextUnits || [];
+            var nextSelected = selectedId != null
+              ? selectedId
+              : (data.selectedId || (data.data && data.data._id) || (productFormUnitValue ? productFormUnitValue.value : ''));
+            refreshProductFormUnit(nextSelected);
+            if (typeof callback === 'function') callback();
+          })
+          .catch(function(error) {
+            alert((error && error.message) || 'Có lỗi khi xử lý đơn vị tính.');
+          });
+      }
+
+      function openUnitTypeModal(mode) {
+        unitTypeModalMode = mode;
+        if (!unitTypeModalOverlay || !unitTypeModalTitle) return;
+        if (mode === 'add') {
+          activeUnitTypeItem = null;
+          unitTypeModalTitle.textContent = 'Thêm đơn vị tính';
+          if (unitTypeNameInput) unitTypeNameInput.value = '';
+          if (unitTypeCodeInput) unitTypeCodeInput.value = '';
+          if (unitTypeCodeInput) unitTypeCodeInput.removeAttribute('disabled');
+        } else {
+          unitTypeModalTitle.textContent = 'Sửa đơn vị tính';
+          if (unitTypeNameInput) unitTypeNameInput.value = activeUnitTypeItem ? (activeUnitTypeItem.getAttribute('data-name') || '') : '';
+          if (unitTypeCodeInput) unitTypeCodeInput.value = activeUnitTypeItem ? (activeUnitTypeItem.getAttribute('data-code') || '') : '';
+          if (unitTypeCodeInput) unitTypeCodeInput.setAttribute('disabled', 'disabled');
+        }
+        unitTypeModalOverlay.classList.add('is-open');
+      }
+
+      function closeUnitTypeModal() {
+        if (!unitTypeModalOverlay) return;
+        unitTypeModalOverlay.classList.remove('is-open');
+      }
+
+      if (productFormUnitTrigger && productFormUnitDropdown) {
+        productFormUnitTrigger.addEventListener('click', function() {
+          productFormUnitDropdown.classList.toggle('is-open');
+        });
+      }
+      if (unitTypeAddBtn) {
+        unitTypeAddBtn.addEventListener('click', function() {
+          openUnitTypeModal('add');
+        });
+      }
+      if (unitTypeModalOverlay) {
+        unitTypeModalOverlay.addEventListener('click', function(event) {
+          if (event.target === unitTypeModalOverlay) closeUnitTypeModal();
+        });
+      }
+      if (unitTypeModalClose) unitTypeModalClose.addEventListener('click', closeUnitTypeModal);
+      if (unitTypeModalCancel) unitTypeModalCancel.addEventListener('click', closeUnitTypeModal);
+
+      if (unitTypeModalSubmit) {
+        unitTypeModalSubmit.addEventListener('click', function() {
+          if (!unitTypeNameInput || !unitTypeNameInput.value.trim()) {
+            alert('Vui lòng nhập tên đơn vị tính.');
+            return;
+          }
+          if (unitTypeModalMode === 'add') {
+            requestUnitTypes('/hang-hoa/units/add', {
+              ten_don_vi: unitTypeNameInput.value.trim(),
+              ma_don_vi: unitTypeCodeInput && unitTypeCodeInput.value ? unitTypeCodeInput.value.trim() : ''
+            }, null, function() {
+              closeUnitTypeModal();
+            });
+            return;
+          }
+          var unitId = activeUnitTypeItem ? (activeUnitTypeItem.getAttribute('data-id') || '') : '';
+          if (!unitId) {
+            alert('Vui lòng chọn đơn vị tính cần sửa.');
+            return;
+          }
+          requestUnitTypes('/hang-hoa/units/' + unitId + '/update', {
+            ten_don_vi: unitTypeNameInput.value.trim()
+          }, unitId, function() {
+            closeUnitTypeModal();
+          });
+        });
+      }
+
+      if (productFormGroupTrigger && productFormGroupDropdown) {
+        productFormGroupTrigger.addEventListener('click', function() {
+          productFormGroupDropdown.classList.toggle('is-open');
+        });
+      }
       if (productGroupFilterTrigger && productGroupFilterDropdown) {
         productGroupFilterTrigger.addEventListener('click', function() {
           productGroupFilterDropdown.classList.toggle('is-open');
@@ -1084,6 +1107,18 @@
       if (productGroupAddBtn) {
         productGroupAddBtn.addEventListener('click', function() {
           openProductGroupModal('add');
+        });
+      }
+      var productGroupModalAddBtn = document.getElementById('productGroupModalAddBtn');
+      if (productGroupModalAddBtn) {
+        productGroupModalAddBtn.addEventListener('click', function(event) {
+          event.preventDefault();
+          openProductGroupModal('add');
+        });
+      }
+      if (productGroupModalOverlay) {
+        productGroupModalOverlay.addEventListener('click', function(event) {
+          if (event.target === productGroupModalOverlay) closeProductGroupModal();
         });
       }
       if (productGroupModalClose) productGroupModalClose.addEventListener('click', closeProductGroupModal);
@@ -1099,7 +1134,7 @@
             requestProductGroups('/hang-hoa/groups/add', {
               ten_nhom_hang: productGroupNameInput.value.trim(),
               mo_ta: productGroupDescInput ? productGroupDescInput.value.trim() : ''
-            }, '');
+            }, {});
             return;
           }
           var groupId = activeProductGroupItem ? (activeProductGroupItem.getAttribute('data-id') || '') : '';
@@ -1110,26 +1145,33 @@
           requestProductGroups('/hang-hoa/groups/' + groupId + '/update', {
             ten_nhom_hang: productGroupNameInput.value.trim(),
             mo_ta: productGroupDescInput ? productGroupDescInput.value.trim() : ''
-          }, groupId);
+          }, { form: groupId, filter: groupId });
         });
       }
 
+      var unitTypesSeed = document.getElementById('unitTypesSeed');
+      var unitTypes = unitTypesSeed ? JSON.parse(unitTypesSeed.textContent || '[]') : [];
+      refreshProductFormUnit('');
+
       var productGroupsSeed = document.getElementById('productGroupsSeed');
       window.__productGroups = productGroupsSeed ? JSON.parse(productGroupsSeed.textContent || '[]') : [];
+      refreshProductFormGroup('');
       refreshProductGroupWidget((productGroupFilterValue && productGroupFilterValue.value) || 'all');
 
-      document.addEventListener('click', function(event) {
-        if (productGroupFilterDropdown && productGroupFilterTrigger) {
-          if (!productGroupFilterDropdown.contains(event.target) && !productGroupFilterTrigger.contains(event.target)) {
-            productGroupFilterDropdown.classList.remove('is-open');
-          }
-        }
+      window.refreshProductFormGroup = refreshProductFormGroup;
+      window.refreshProductFormUnit = refreshProductFormUnit;
 
-        if (unitTypeDropdown && unitTypeTrigger) {
-          if (!unitTypeDropdown.contains(event.target) && !unitTypeTrigger.contains(event.target)) {
-            unitTypeDropdown.classList.remove('is-open');
-          }
+      function closeManageDropdownOnOutsideClick(event, context) {
+        if (!context || !context.dropdown || !context.trigger) return;
+        if (!context.dropdown.contains(event.target) && !context.trigger.contains(event.target)) {
+          context.dropdown.classList.remove('is-open');
         }
+      }
+
+      document.addEventListener('click', function(event) {
+        closeManageDropdownOnOutsideClick(event, productGroupFilterContext);
+        closeManageDropdownOnOutsideClick(event, productFormGroupContext);
+        closeManageDropdownOnOutsideClick(event, productFormUnitContext);
       });
     });
   </script>

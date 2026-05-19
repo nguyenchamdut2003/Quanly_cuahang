@@ -45,7 +45,9 @@
         <label class="config-field"><span>Trạng thái</span><select name="trang_thai"><option value="active" <%= item.trang_thai !== 'inactive' ? 'selected' : '' %>>Hoạt động</option><option value="inactive" <%= item.trang_thai === 'inactive' ? 'selected' : '' %>>Ngưng</option></select></label>
         <label class="config-field"><span>Người đại diện</span><input name="nguoi_dai_dien" value="<%= item.nguoi_dai_dien || '' %>"></label>
         <label class="config-field"><span>Chức vụ người đại diện</span><input name="chuc_vu_nguoi_dai_dien" value="<%= item.chuc_vu_nguoi_dai_dien || '' %>"></label>
-        <label class="config-field full"><span>Địa chỉ</span><textarea name="dia_chi"><%= item.dia_chi || '' %></textarea></label>
+        <label class="config-field full"><span>Địa chỉ chi tiết</span><textarea name="dia_chi_chi_tiet"><%= item.dia_chi_chi_tiet || '' %></textarea></label>
+        <label class="config-field"><span>Phường/Xã</span><input name="phuong_xa" value="<%= item.phuong_xa || '' %>"></label>
+        <label class="config-field"><span>Tỉnh/Thành</span><input name="tinh_thanh" value="<%= item.tinh_thanh || '' %>"></label>
       </div>
       <div class="config-actions">
         <button class="config-btn primary" type="submit">Lưu thông tin</button>

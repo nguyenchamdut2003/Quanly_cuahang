@@ -1,5 +1,6 @@
 var { CuaHang, Kho } = require('../models/kiot.model');
 var ExcelJS = require('exceljs');
+var { buildFullAddress, normalizeAddress } = require('../utils/address');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -184,7 +185,7 @@ function addExportSheet(workbook, name, columns, rows) {
 }
 
 function buildStoreAddress(store) {
-    return store.dia_chi || [store.phuong_xa, store.quan_huyen, store.tinh_thanh].filter(Boolean).join(', ') || store.dia_chi_gui_hang || '';
+    return store.dia_chi_day_du || buildFullAddress(store) || store.dia_chi_gui_hang_day_du || '';
 }
 
 async function seedStoresIfEmpty() {
@@ -195,11 +196,10 @@ async function seedStoresIfEmpty() {
         {
             ma_cua_hang: 'CH0001',
             ten_cua_hang: 'Cua hang trung tam',
-            dia_chi: '12 Nguyen Trai',
-            dia_chi_gui_hang: '12 Nguyen Trai',
+            dia_chi_chi_tiet: '12 Nguyen Trai',
             tinh_thanh: 'Ha Noi',
-            quan_huyen: 'Thanh Xuan',
             phuong_xa: 'Thuong Dinh',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '12 Nguyen Trai', phuong_xa: 'Thuong Dinh', tinh_thanh: 'Ha Noi' }),
             sdt: '0901000001',
             email: 'trungtam@example.com',
             trang_thai: 'active'
@@ -207,11 +207,10 @@ async function seedStoresIfEmpty() {
         {
             ma_cua_hang: 'CH0002',
             ten_cua_hang: 'Cua hang Quan 1',
-            dia_chi: '25 Le Loi',
-            dia_chi_gui_hang: '25 Le Loi',
+            dia_chi_chi_tiet: '25 Le Loi',
             tinh_thanh: 'TP Ho Chi Minh',
-            quan_huyen: 'Quan 1',
             phuong_xa: 'Ben Nghe',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '25 Le Loi', phuong_xa: 'Ben Nghe', tinh_thanh: 'TP Ho Chi Minh' }),
             sdt: '0901000002',
             email: 'quan1@example.com',
             trang_thai: 'active'
@@ -219,11 +218,10 @@ async function seedStoresIfEmpty() {
         {
             ma_cua_hang: 'CH0003',
             ten_cua_hang: 'Cua hang Da Nang',
-            dia_chi: '40 Bach Dang',
-            dia_chi_gui_hang: '40 Bach Dang',
+            dia_chi_chi_tiet: '40 Bach Dang',
             tinh_thanh: 'Da Nang',
-            quan_huyen: 'Hai Chau',
             phuong_xa: 'Thach Thang',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '40 Bach Dang', phuong_xa: 'Thach Thang', tinh_thanh: 'Da Nang' }),
             sdt: '0901000003',
             email: 'danang@example.com',
             trang_thai: 'active'
@@ -235,28 +233,40 @@ async function seedStoresIfEmpty() {
             cua_hang_id: stores[0]._id,
             ma_kho: 'KHO0001',
             ten_kho: 'Kho ban hang trung tam',
-            dia_chi: '12 Nguyen Trai, Thanh Xuan, Ha Noi',
+            dia_chi_chi_tiet: '12 Nguyen Trai',
+            phuong_xa: 'Thuong Dinh',
+            tinh_thanh: 'Ha Noi',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '12 Nguyen Trai', phuong_xa: 'Thuong Dinh', tinh_thanh: 'Ha Noi' }),
             trang_thai: 'active'
         },
         {
             cua_hang_id: stores[0]._id,
             ma_kho: 'KHO0002',
             ten_kho: 'Kho du tru trung tam',
-            dia_chi: '18 Nguyen Trai, Thanh Xuan, Ha Noi',
+            dia_chi_chi_tiet: '18 Nguyen Trai',
+            phuong_xa: 'Thuong Dinh',
+            tinh_thanh: 'Ha Noi',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '18 Nguyen Trai', phuong_xa: 'Thuong Dinh', tinh_thanh: 'Ha Noi' }),
             trang_thai: 'active'
         },
         {
             cua_hang_id: stores[1]._id,
             ma_kho: 'KHO0003',
             ten_kho: 'Kho Quan 1',
-            dia_chi: '25 Le Loi, Quan 1, TP Ho Chi Minh',
+            dia_chi_chi_tiet: '25 Le Loi',
+            phuong_xa: 'Ben Nghe',
+            tinh_thanh: 'TP Ho Chi Minh',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '25 Le Loi', phuong_xa: 'Ben Nghe', tinh_thanh: 'TP Ho Chi Minh' }),
             trang_thai: 'active'
         },
         {
             cua_hang_id: stores[2]._id,
             ma_kho: 'KHO0004',
             ten_kho: 'Kho Da Nang',
-            dia_chi: '40 Bach Dang, Hai Chau, Da Nang',
+            dia_chi_chi_tiet: '40 Bach Dang',
+            phuong_xa: 'Thach Thang',
+            tinh_thanh: 'Da Nang',
+            dia_chi_day_du: buildFullAddress({ dia_chi_chi_tiet: '40 Bach Dang', phuong_xa: 'Thach Thang', tinh_thanh: 'Da Nang' }),
             trang_thai: 'active'
         }
     ]);
@@ -264,14 +274,24 @@ async function seedStoresIfEmpty() {
 
 function normalizeStorePayload(body) {
     body = body || {};
+    var address = normalizeAddress(body);
+    var shippingAddress = normalizeAddress({
+        dia_chi_chi_tiet: body.dia_chi_gui_hang_chi_tiet,
+        phuong_xa: body.phuong_xa_gui_hang,
+        tinh_thanh: body.tinh_thanh_gui_hang,
+        dia_chi_day_du: body.dia_chi_gui_hang_day_du
+    });
     return {
         ma_cua_hang: String(body.ma_cua_hang || '').trim(),
         ten_cua_hang: String(body.ten_cua_hang || '').trim(),
-        dia_chi: String(body.dia_chi || '').trim(),
-        dia_chi_gui_hang: String(body.dia_chi_gui_hang || '').trim(),
-        tinh_thanh: String(body.tinh_thanh || '').trim(),
-        quan_huyen: String(body.quan_huyen || '').trim(),
-        phuong_xa: String(body.phuong_xa || '').trim(),
+        dia_chi_chi_tiet: address.dia_chi_chi_tiet,
+        tinh_thanh: address.tinh_thanh,
+        phuong_xa: address.phuong_xa,
+        dia_chi_day_du: address.dia_chi_day_du,
+        dia_chi_gui_hang_chi_tiet: shippingAddress.dia_chi_chi_tiet,
+        tinh_thanh_gui_hang: shippingAddress.tinh_thanh,
+        phuong_xa_gui_hang: shippingAddress.phuong_xa,
+        dia_chi_gui_hang_day_du: shippingAddress.dia_chi_day_du,
         sdt: String(body.sdt || '').trim(),
         email: String(body.email || '').trim(),
         trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
@@ -291,12 +311,34 @@ async function makeStoreCode() {
 
 function normalizeWarehousePayload(body) {
     body = body || {};
+    var address = normalizeAddress(body);
+    var diaChiDayDu = address.dia_chi_day_du || address.dia_chi_chi_tiet;
     return {
         ma_kho: String(body.ma_kho || '').trim(),
         ten_kho: String(body.ten_kho || '').trim(),
-        dia_chi: String(body.dia_chi || '').trim(),
+        dia_chi_chi_tiet: address.dia_chi_chi_tiet,
+        tinh_thanh: address.tinh_thanh,
+        phuong_xa: address.phuong_xa,
+        dia_chi_day_du: diaChiDayDu,
+        dia_chi: diaChiDayDu,
         trang_thai: body.trang_thai === 'inactive' ? 'inactive' : 'active'
     };
+}
+
+function enrichWarehouseRow(warehouse) {
+    if (!warehouse) return warehouse;
+    var row = Object.assign({}, warehouse);
+    var legacyAddress = String(row.dia_chi || '').trim();
+    if (!String(row.dia_chi_chi_tiet || '').trim() && legacyAddress) {
+        row.dia_chi_chi_tiet = legacyAddress;
+    }
+    if (!String(row.dia_chi_day_du || '').trim()) {
+        row.dia_chi_day_du = buildFullAddress(row) || legacyAddress;
+    }
+    if (!String(row.dia_chi || '').trim() && row.dia_chi_day_du) {
+        row.dia_chi = row.dia_chi_day_du;
+    }
+    return row;
 }
 
 async function makeWarehouseCode() {
@@ -344,7 +386,8 @@ exports.index = async function(req, res, next) {
             : null;
 
         var warehouses = selectedStore
-            ? await Kho.find({ cua_hang_id: selectedStore._id }).sort({ created_at: 1, ma_kho: 1 }).lean()
+            ? (await Kho.find({ cua_hang_id: selectedStore._id }).sort({ created_at: 1, ma_kho: 1 }).lean())
+                .map(enrichWarehouseRow)
             : [];
 
         var editingStore = requestQuery.edit
@@ -449,10 +492,9 @@ exports.exportSectionExcel = async function(req, res, next) {
             ], [
                 { label: 'Mã cửa hàng', value: exportText(store.ma_cua_hang) },
                 { label: 'Tên cửa hàng', value: exportText(store.ten_cua_hang) },
-                { label: 'Địa chỉ', value: exportText(store.dia_chi) },
-                { label: 'Địa chỉ gửi hàng', value: exportText(store.dia_chi_gui_hang) },
+                { label: 'Địa chỉ', value: exportText(store.dia_chi_day_du) },
+                { label: 'Địa chỉ gửi hàng', value: exportText(store.dia_chi_gui_hang_day_du) },
                 { label: 'Phường/xã', value: exportText(store.phuong_xa) },
-                { label: 'Quận/huyện', value: exportText(store.quan_huyen) },
                 { label: 'Tỉnh/thành', value: exportText(store.tinh_thanh) },
                 { label: 'Điện thoại', value: exportText(store.sdt) },
                 { label: 'Email', value: exportText(store.email) },
@@ -474,7 +516,7 @@ exports.exportSectionExcel = async function(req, res, next) {
                 return {
                     ma_kho: exportText(warehouse.ma_kho),
                     ten_kho: exportText(warehouse.ten_kho),
-                    dia_chi: exportText(warehouse.dia_chi),
+                    dia_chi: exportText(warehouse.dia_chi_day_du),
                     trang_thai: exportStatus(warehouse.trang_thai),
                     created_at: exportDate(warehouse.created_at)
                 };

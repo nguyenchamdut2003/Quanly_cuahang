@@ -274,7 +274,8 @@
                           <button type="button" class="btn btn-light btn-cancel-outline js-return-cancel" data-id="<%= r._id %>" data-status="<%= r.trang_thai || '' %>" <%= r.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
                           <a class="btn btn-light btn-copy-outline" href="/tra-hang-nhap/create?copy_from=<%= r._id %>">Sao chép</a>
                           <a class="btn btn-primary" href="/tra-hang-nhap/<%= r._id %>/export.xlsx">Xuất file</a>
-                          <a class="page-actions__link return-open-link" href="/chung-tu-kho/tra-hang-nhap/<%= r._id %>" target="_blank" rel="noopener">Mở riêng ↗</a>
+                          <a class="btn btn-light" href="/tra-hang-nhap/<%= r._id %>/in" target="_blank" rel="noopener">In phiếu</a>
+                          <a class="page-actions__link return-open-link" href="/chung-tu-kho/tra-hang-nhap/<%= r._id %>" target="_blank" rel="noopener">Chứng từ kho ↗</a>
                         </div>
                       </div>
                     </td>

@@ -10,6 +10,7 @@
     "seed:bulk": "node seed_bulk_activity.js",
     "migrate:ton-kho:kho": "node scripts/migrate-ton-kho-to-kho.js",
     "migrate:lo-hang-remove-old-fields": "node scripts/remove-lo-hang-old-date-fields.js",
+    "fix:ton-kho-lo-quy-cach": "node scripts/sync-ton-kho-lo-quy-cach.js",
     "seed:kho-flow": "node scripts/seed-kho-flow.js"
   },
   "dependencies": {

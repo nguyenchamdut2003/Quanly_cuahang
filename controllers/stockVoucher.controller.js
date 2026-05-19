@@ -70,7 +70,7 @@ async function loadBusiness(store) {
   if (store) {
     return {
       ten_doanh_nghiep: store.ten_cua_hang,
-      dia_chi: store.dia_chi || store.dia_chi_gui_hang,
+      dia_chi_day_du: store.dia_chi_day_du || store.dia_chi_gui_hang_day_du,
       sdt: store.sdt,
       email: store.email,
       ma_so_thue: store.ma_so_thue

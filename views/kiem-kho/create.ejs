@@ -193,7 +193,7 @@
       const khoSelect = document.getElementById('khoId');
 
       function rowKey(item) {
-        return String(item.hang_hoa_id || '') + '::' + String(item.lo_hang_id || '');
+        return String(item.hang_hoa_id || '') + '::' + String(item.lo_hang_id || '') + '::' + String(item.ten_quy_cach || '');
       }
 
       function formatDate(value) {
@@ -244,6 +244,7 @@
             ten_hang: row.ten_hang || '',
             don_vi_tinh: row.don_vi_tinh || '',
             ma_lo: row.ma_lo || '',
+            ten_quy_cach: row.ten_quy_cach || '',
             han_su_dung: row.han_su_dung || '',
             ton_kho_he_thong: Number(row.ton_kho_he_thong || 0),
             so_luong_thuc_te: Number(row.ton_kho_he_thong || 0),
@@ -258,7 +259,7 @@
       function overlayCopyDraftItems() {
         if (!copyDraft || !Array.isArray(copyDraft.items) || !copyDraft.items.length) return;
         const draftMap = new Map(copyDraft.items.map(row => [
-          String(row.hang_hoa_id || '') + '::' + String(row.lo_hang_id || ''),
+          String(row.hang_hoa_id || '') + '::' + String(row.lo_hang_id || '') + '::' + String(row.ten_quy_cach || ''),
           row
         ]));
         kkItems.forEach(item => {
@@ -386,6 +387,7 @@
           items: kkItems.map(item => ({
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: item.lo_hang_id || null,
+            ten_quy_cach: item.ten_quy_cach || '',
             ton_kho_he_thong: item.ton_kho_he_thong,
             so_luong_thuc_te: item.so_luong_thuc_te,
             nguyen_nhan_lech: item.nguyen_nhan_lech || ''

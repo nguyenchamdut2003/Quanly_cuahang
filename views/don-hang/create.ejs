@@ -590,9 +590,9 @@
                 <% customers.forEach(c=> {
                   const defaultAddress = (c.dia_chi_list || []).find(a => a.mac_dinh) || (c.dia_chi_list || [])[0] || {};
                   const optionPhone = c.sdt || c.sdt2 || '';
-                  const optionAddress = defaultAddress.dia_chi || defaultAddress.dia_chi_day_du || c.dia_chi_nhan || '';
+                  const optionAddress = defaultAddress.dia_chi_day_du || defaultAddress.dia_chi_chi_tiet || c.dia_chi_day_du || c.dia_chi_nhan || '';
                   const optionAddressId = defaultAddress._id || '';
-                  const optionArea = defaultAddress.quan_huyen || defaultAddress.tinh_thanh || c.quan_huyen || c.tinh_thanh || '';
+                  const optionArea = defaultAddress.tinh_thanh || c.tinh_thanh || '';
                   const optionWard = defaultAddress.phuong_xa || c.phuong_xa || '';
                 %><option value="<%= c._id %>" data-name="<%= c.ten_khach_hang || '' %>" data-phone="<%= optionPhone %>" data-address="<%= optionAddress %>" data-address-id="<%= optionAddressId %>" data-area="<%= optionArea %>" data-ward="<%= optionWard %>">
                     <%= c.ten_khach_hang %>
@@ -666,8 +666,8 @@
       let shippingFeeTimer = null;
       const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0, nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id._id || p.nha_cung_cap_id) : '', ten_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ten_ncc || p.nha_cung_cap_id.ten_cong_ty || '') : '', ma_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ma_ncc || '') : '' }))) %>;
       const priceRows = <%- JSON.stringify((priceRows || []).map(r => ({ bang_gia_id: String(r.bang_gia_id || ''), hang_hoa_id: String(r.hang_hoa_id || ''), gia_ban: Number(r.gia_ban || 0) }))) %>;
-      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi: a.dia_chi || a.dia_chi_day_du || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
-      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi || '', dia_chi_gui_hang: s.dia_chi_gui_hang || '', tinh_thanh: s.tinh_thanh || '', quan_huyen: s.quan_huyen || '', phuong_xa: s.phuong_xa || '' }))) %>;
+      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_day_du || c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi_day_du: a.dia_chi_day_du || a.dia_chi_chi_tiet || '', tinh_thanh: a.tinh_thanh || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
+      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi_day_du: s.dia_chi_day_du || s.dia_chi_chi_tiet || '', dia_chi_gui_hang: s.dia_chi_gui_hang_day_du || s.dia_chi_day_du || '', tinh_thanh: s.tinh_thanh || '', phuong_xa: s.phuong_xa || '' }))) %>;
       const sourceOrder = <%- JSON.stringify(sourceOrder || null) %>;
       const sourceOrderItems = <%- JSON.stringify((sourceOrderItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.hang_hoa_id?.ma_hang || '', ten_hang: row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong_dat || row.so_luong || 0), don_gia_ban: Number(row.don_gia_ban || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: row.kieu_chiet_khau || 'vnd' }))) %>;
       const sourceShipment = <%- JSON.stringify(sourceShipment || null) %>;
@@ -810,14 +810,13 @@
         customerSearch.addEventListener('focus', renderCustomerSuggestions);
         customerSearch.addEventListener('input', renderCustomerSuggestions);
       }
-      function addressText(a) { return [a.dia_chi, a.phuong_xa, a.quan_huyen, a.tinh_thanh].filter(Boolean).join(', ') }
+      function addressText(a) { return [a.dia_chi_day_du, a.phuong_xa, a.tinh_thanh].filter(Boolean).join(', ') }
       function getCustomerAddress(customer) {
         if (!customer) return {};
         const addresses = customer.dia_chi_list || [];
         return addresses.find(a => a.mac_dinh) || addresses[0] || {
           dia_chi: customer.dia_chi_nhan || '',
           tinh_thanh: customer.tinh_thanh || '',
-          quan_huyen: customer.quan_huyen || '',
           phuong_xa: customer.phuong_xa || ''
         };
       }
@@ -859,9 +858,9 @@
           id: customer._id,
           name: customer.ten_khach_hang || '',
           phone: customer.sdt || customer.sdt2 || '',
-          address: a.dia_chi || customer.dia_chi_nhan || '',
+          address: a.dia_chi_day_du || customer.dia_chi_nhan || '',
           addressId: a._id || '',
-          area: a.quan_huyen || a.tinh_thanh || customer.quan_huyen || customer.tinh_thanh || '',
+          area: a.tinh_thanh || customer.tinh_thanh || '',
           ward: a.phuong_xa || customer.phuong_xa || ''
         });
       }
@@ -875,9 +874,9 @@
           id: id || '',
           name: opt?.dataset?.name || c?.ten_khach_hang || '',
           phone: opt?.dataset?.phone || c?.sdt || c?.sdt2 || '',
-          address: opt?.dataset?.address || a.dia_chi || c?.dia_chi_nhan || '',
+          address: opt?.dataset?.address || a.dia_chi_day_du || c?.dia_chi_nhan || '',
           addressId: opt?.dataset?.addressId || a._id || '',
-          area: opt?.dataset?.area || a.quan_huyen || a.tinh_thanh || c?.quan_huyen || c?.tinh_thanh || '',
+          area: opt?.dataset?.area || a.tinh_thanh || c?.tinh_thanh || '',
           ward: opt?.dataset?.ward || a.phuong_xa || c?.phuong_xa || ''
         });
       }

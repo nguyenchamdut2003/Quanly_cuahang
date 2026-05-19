@@ -1,7 +1,11 @@
 <%
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const d = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
-  const supplier = ticket.nha_cung_cap_id || {};
+  const safeTicket = locals.ticket || {};
+  const safeItems = Array.isArray(locals.items) ? locals.items : [];
+  const supplier = safeTicket.nha_cung_cap_id || {};
+  const isProductList = locals.contractMode === 'product-list';
+  const totalAmount = Number(safeTicket.tong_tien || safeItems.reduce((sum, row) => sum + Number(row.thanh_tien || 0), 0));
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -28,45 +32,85 @@
 <body>
   <div class="print-actions no-print">
     <button type="button" onclick="window.print()">In</button>
-    <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf'">Tải PDF</button>
+    <button type="button" onclick="window.location.href = window.location.pathname.replace(/\/$/, '') + '/pdf' + window.location.search">Tải PDF</button>
   </div>
   <main class="page">
     <h1>Hợp đồng mua bán nguyên tắc</h1>
-    <p style="text-align:center">Căn cứ phiếu nhập hàng số <strong><%= ticket.ma_phieu_nhap || '' %></strong> ngày <%= d(ticket.ngay_nhap) %></p>
+    <% if (isProductList) { %>
+      <p style="text-align:center">Căn cứ danh sách hàng hóa ngày <%= d(new Date()) %></p>
+    <% } else { %>
+      <p style="text-align:center">Căn cứ phiếu nhập hàng số <strong><%= safeTicket.ma_phieu_nhap || '' %></strong> ngày <%= d(safeTicket.ngay_nhap) %></p>
+    <% } %>
+
     <h2>Bên mua</h2>
     <div class="info">
       Tên đơn vị: <strong><%= store ? (store.ten_cua_hang || '') : '' %></strong><br>
-      Địa chỉ: <%= store ? (store.dia_chi || '') : '' %><br>
+      Địa chỉ: <%= store ? (store.dia_chi_day_du || store.dia_chi || '') : '' %><br>
       Điện thoại: <%= store ? (store.sdt || '') : '' %>
     </div>
+
     <h2>Bên bán</h2>
     <div class="info">
-      Nhà cung cấp: <strong><%= supplier.ten_ncc || '' %></strong><br>
-      Công ty: <%= supplier.ten_cong_ty || '' %><br>
-      Mã số thuế: <%= supplier.ma_so_thue || '' %><br>
-      Điện thoại: <%= supplier.sdt || '' %> - Email: <%= supplier.email || '' %>
+      <% if (isProductList) { %>
+        Nhà cung cấp: <strong>Theo từng hàng hóa trong danh sách</strong>
+      <% } else { %>
+        Nhà cung cấp: <strong><%= supplier.ten_ncc || '' %></strong><br>
+        Công ty: <%= supplier.ten_cong_ty || '' %><br>
+        Mã số thuế: <%= supplier.ma_so_thue || '' %><br>
+        Điện thoại: <%= supplier.sdt || '' %> - Email: <%= supplier.email || '' %>
+      <% } %>
     </div>
+
     <h2>Danh sách hàng hóa</h2>
     <table>
-      <thead><tr><th>STT</th><th>Tên hàng</th><th>Lô</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr></thead>
+      <thead>
+        <% if (isProductList) { %>
+          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Nhà cung cấp</th><th>Tồn kho</th><th>Giá vốn</th><th>Thành tiền</th></tr>
+        <% } else { %>
+          <tr><th>STT</th><th>Tên hàng</th><th>Lô</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th></tr>
+        <% } %>
+      </thead>
       <tbody>
-        <% items.forEach(function(row, index){ %>
+        <% safeItems.forEach(function(row, index){ const product = row.hang_hoa_id || {}; %>
           <tr>
             <td class="num"><%= index + 1 %></td>
-            <td><%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %></td>
-            <td><%= row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '' %></td>
-            <td class="num"><%= fmt(row.so_luong) %></td>
-            <td class="num"><%= fmt(row.don_gia_nhap) %></td>
-            <td class="num"><%= fmt(row.thanh_tien) %></td>
+            <% if (isProductList) { %>
+              <td><%= product.ma_hang || '' %></td>
+              <td><%= product.ten_hang || '' %></td>
+              <td><%= product.don_vi_tinh_id ? (product.don_vi_tinh_id.ten_don_vi || product.don_vi_tinh_id.ma_don_vi || '') : '' %></td>
+              <td><%= product.nha_cung_cap_id ? (product.nha_cung_cap_id.ten_ncc || product.nha_cung_cap_id.ten_cong_ty || '') : '' %></td>
+              <td class="num"><%= fmt(row.so_luong) %></td>
+              <td class="num"><%= fmt(row.don_gia_nhap) %></td>
+              <td class="num"><%= fmt(row.thanh_tien) %></td>
+            <% } else { %>
+              <td><%= product.ten_hang || '' %></td>
+              <td><%= row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '' %></td>
+              <td class="num"><%= fmt(row.so_luong) %></td>
+              <td class="num"><%= fmt(row.don_gia_nhap) %></td>
+              <td class="num"><%= fmt(row.thanh_tien) %></td>
+            <% } %>
           </tr>
         <% }) %>
-        <tr><th colspan="5">Tổng tiền</th><th class="num"><%= fmt(ticket.tong_tien) %></th></tr>
+        <% if (isProductList) { %>
+          <tr><th colspan="7">Tổng giá trị tồn theo giá vốn</th><th class="num"><%= fmt(totalAmount) %></th></tr>
+        <% } else { %>
+          <tr><th colspan="5">Tổng tiền</th><th class="num"><%= fmt(totalAmount) %></th></tr>
+        <% } %>
       </tbody>
     </table>
-    <h2>Điều khoản thanh toán</h2>
-    <p>Bên mua cần trả nhà cung cấp <strong><%= fmt(ticket.can_tra_ncc) %> VND</strong>, đã trả <strong><%= fmt(ticket.da_tra_ncc) %> VND</strong>, còn nợ <strong><%= fmt(ticket.con_no_ncc) %> VND</strong>. Phương thức thanh toán: <%= ticket.phuong_thuc_thanh_toan || 'cong_no' %>.</p>
-    <h2>Giao nhận</h2>
-    <p>Hàng hóa được giao và nhập tại kho <strong><%= ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '' %></strong>. Hai bên xác nhận số lượng, chất lượng hàng hóa theo danh sách trên tại thời điểm giao nhận.</p>
+
+    <% if (isProductList) { %>
+      <h2>Điều khoản nguyên tắc</h2>
+      <p>Danh sách hàng hóa trên là cơ sở để hai bên thỏa thuận mua bán, giao nhận, đối soát số lượng và đơn giá theo từng lần phát sinh thực tế.</p>
+      <h2>Giao nhận</h2>
+      <p>Hàng hóa được giao nhận theo chứng từ phát sinh giữa hai bên. Hai bên xác nhận số lượng, chất lượng và giá trị theo từng lần giao nhận.</p>
+    <% } else { %>
+      <h2>Điều khoản thanh toán</h2>
+      <p>Bên mua cần trả nhà cung cấp <strong><%= fmt(safeTicket.can_tra_ncc) %> VND</strong>, đã trả <strong><%= fmt(safeTicket.da_tra_ncc) %> VND</strong>, còn nợ <strong><%= fmt(safeTicket.con_no_ncc) %> VND</strong>. Phương thức thanh toán: <%= safeTicket.phuong_thuc_thanh_toan || 'cong_no' %>.</p>
+      <h2>Giao nhận</h2>
+      <p>Hàng hóa được giao và nhập tại kho <strong><%= safeTicket.kho_id ? (safeTicket.kho_id.ten_kho || safeTicket.kho_id.ma_kho || '') : '' %></strong>. Hai bên xác nhận số lượng, chất lượng hàng hóa theo danh sách trên tại thời điểm giao nhận.</p>
+    <% } %>
+
     <section class="sign">
       <div><b>Đại diện bên mua</b>(Ký, ghi rõ họ tên)</div>
       <div><b>Đại diện bên bán</b>(Ký, ghi rõ họ tên)</div>

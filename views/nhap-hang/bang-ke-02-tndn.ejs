@@ -8,7 +8,7 @@
   const dot = '................................................................';
   const businessName = doanhNghiepInfo.ten_doanh_nghiep || cuaHang.ten_cua_hang;
   const businessTaxCode = doanhNghiepInfo.ma_so_thue || cuaHang.ma_so_thue;
-  const businessAddress = doanhNghiepInfo.dia_chi || cuaHang.dia_chi;
+  const businessAddress = doanhNghiepInfo.dia_chi_day_du || cuaHang.dia_chi_day_du;
 
   const fmtMoney = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtDate = value => {
@@ -19,7 +19,7 @@
   };
   const fill = value => value ? value : dot;
   const sellerName = nhaCungCap.ten_ncc || nhaCungCap.ten_cong_ty || '';
-  const sellerAddress = diaChiNcc.dia_chi_day_du || diaChiNcc.so_nha || nhaCungCap.dia_chi || '';
+  const sellerAddress = diaChiNcc.dia_chi_day_du || nhaCungCap.dia_chi_day_du || '';
 
   function readThreeDigits(num, full) {
     const digits = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
@@ -151,7 +151,7 @@
       <div>- Mã số thuế: <%= fill(businessTaxCode) %></div>
       <div>- Địa chỉ: <%= fill(businessAddress) %></div>
       <div>- Số điện thoại: <%= fill(cuaHang.sdt || cuaHang.email) %></div>
-      <div>- Địa chỉ nơi tổ chức thu mua: <%= fill(cuaHang.dia_chi_gui_hang) %></div>
+      <div>- Địa chỉ nơi tổ chức thu mua: <%= fill(cuaHang.dia_chi_gui_hang_day_du || cuaHang.dia_chi_day_du) %></div>
     </section>
 
     <table>

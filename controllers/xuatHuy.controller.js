@@ -12,9 +12,17 @@ const {
   PhieuNhap,
   CTPhieuNhap,
   PhieuXuatHuy,
-  CTXuatHuy
+  CTXuatHuy,
+  TonKhoLoQuyCach
 } = require('../models/kiot.model');
-const { truTonKho, congTonKho } = require('../services/kho.service');
+const {
+  normalizeTenQuyCach,
+  lotHasQuyCachStock,
+  loadQuyCachTonForLot,
+  applyXuatHuyLine,
+  reverseXuatHuyLine,
+  lotStockFilter
+} = require('../services/xuatHuyStock.service');
 
 const EXPORT_STATUS_MAP = {
   draft: 'Phiếu tạm',
@@ -37,6 +45,7 @@ const XUAT_HUY_EXPORT_COLUMNS = [
   { header: 'Thương hiệu', key: 'thuong_hieu' },
   { header: 'Đơn vị tính', key: 'don_vi_tinh' },
   { header: 'Lô hàng', key: 'lo_hang' },
+  { header: 'Quy cách', key: 'quy_cach' },
   { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
   { header: 'Giá vốn', key: 'gia_von', style: { numFmt: '#,##0' } },
   { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } }
@@ -61,6 +70,14 @@ function parseMoney(raw) {
   return Math.floor(value);
 }
 
+function parseQuyCachItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(item => ({
+    ten_quy_cach: normalizeTenQuyCach(item.ten_quy_cach || item.ten_thuoc_tinh),
+    so_luong: Math.floor(Number(item.so_luong || 0))
+  })).filter(item => item.ten_quy_cach && item.so_luong > 0);
+}
+
 function parseItems(raw) {
   let parsed = raw;
   if (typeof raw === 'string') {
@@ -70,8 +87,11 @@ function parseItems(raw) {
   return parsed.map(item => ({
     hang_hoa_id: String(item.hang_hoa_id || '').trim(),
     lo_hang_id: String(item.lo_hang_id || '').trim(),
+    ten_quy_cach: normalizeTenQuyCach(item.ten_quy_cach),
+    quy_cach_items: parseQuyCachItems(item.quy_cach_items),
     so_luong: Number(item.so_luong || 0),
-    gia_von: parseMoney(item.gia_von || 0)
+    gia_von: parseMoney(item.gia_von || 0),
+    ghi_chu: String(item.ghi_chu || '').trim()
   })).filter(item => isObjectId(item.hang_hoa_id));
 }
 
@@ -119,6 +139,7 @@ function buildExportRow(ticket, detail) {
     thuong_hieu: product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '',
     don_vi_tinh: product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi : '',
     lo_hang: getLotName(detail && detail.lo_hang_id),
+    quy_cach: detail && detail.ten_quy_cach ? detail.ten_quy_cach : '',
     so_luong: detail ? Number(detail.so_luong || 0) : 0,
     gia_von: detail ? Number(detail.gia_von || 0) : 0,
     thanh_tien: detail ? Number(detail.thanh_tien || 0) : 0
@@ -267,6 +288,33 @@ async function loadWarehousesAndUsers(storeId) {
   return { warehouses, users };
 }
 
+async function validateTonKhoTong(khoId, hangHoaId, qty) {
+  const inventory = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: hangHoaId }).lean();
+  if (!inventory || Number(inventory.so_luong || 0) < qty) {
+    throw new Error('Không cho hủy vượt tồn kho');
+  }
+}
+
+async function validateTonKhoLo(khoId, hangHoaId, lotId, qty) {
+  const lotInv = await TonKhoLo.findOne(lotStockFilter(khoId, hangHoaId, lotId)).lean();
+  const lot = await LoHang.findById(lotId).lean();
+  if (!lotInv || Number(lotInv.so_luong || 0) < qty || !lot || Number(lot.so_luong_con_lai || 0) < qty) {
+    throw new Error('Không cho hủy vượt tồn lô');
+  }
+}
+
+async function validateTonKhoQuyCach(khoId, hangHoaId, lotId, tenQuyCach, qty) {
+  const qcStock = await TonKhoLoQuyCach.findOne({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    lo_hang_id: lotId,
+    $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
+  }).lean();
+  if (!qcStock || Number(qcStock.so_luong || 0) < qty) {
+    throw new Error('Không cho hủy vượt tồn quy cách');
+  }
+}
+
 async function normalizeRows(items, khoId, skipStockCheck) {
   if (!items.length) throw new Error('Vui lòng chọn hàng cần hủy');
   if (!isObjectId(khoId)) throw new Error('Vui lòng chọn kho hủy');
@@ -279,69 +327,81 @@ async function normalizeRows(items, khoId, skipStockCheck) {
     return map;
   }, {});
   const rows = [];
+
   for (const item of items) {
     const product = productMap[item.hang_hoa_id];
     if (!product) throw new Error('Hàng hóa không hợp lệ');
-    const qty = Math.floor(Number(item.so_luong || 0));
-    if (!Number.isFinite(qty) || qty <= 0) throw new Error('Số lượng hủy phải lớn hơn 0');
+    const cost = item.gia_von || product.gia_von || 0;
+    const lineGhiChu = item.ghi_chu || '';
+    const quyCachItems = parseQuyCachItems(item.quy_cach_items);
+    const manageLots = Boolean(product.quan_ly_theo_lo);
     let lotId = isObjectId(item.lo_hang_id) ? item.lo_hang_id : '';
 
-    if (!skipStockCheck) {
-      const inventory = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id }).lean();
-      if (!inventory || Number(inventory.so_luong || 0) < qty) throw new Error('Không cho hủy vượt tồn kho');
-      if (product.quan_ly_theo_lo) {
-        if (lotId) {
-          const lotInv = await TonKhoLo.findOne({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id, lo_hang_id: lotId }).lean();
-          const lot = await LoHang.findById(lotId).lean();
-          if (!lotInv || Number(lotInv.so_luong || 0) < qty || !lot || Number(lot.so_luong_con_lai || 0) < qty) {
-            throw new Error('Không cho lô âm');
-          }
-        } else {
-          const lotRows = await TonKhoLo.find({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id, so_luong: { $gt: 0 } })
-            .populate('lo_hang_id')
-            .lean();
-          const totalLotQty = lotRows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
-          if (totalLotQty < qty) throw new Error('Tồn kho theo lô không đủ để tự chọn FEFO');
+    if (manageLots) {
+      if (!lotId) throw new Error('Hàng quản lý theo lô phải chọn lô hàng');
+      const hasQc = await lotHasQuyCachStock(khoId, item.hang_hoa_id, lotId);
 
-          lotRows.sort((a, b) => {
-            const aLot = a.lo_hang_id || {};
-            const bLot = b.lo_hang_id || {};
-            const aDate = aLot.han_su_dung ? new Date(aLot.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
-            const bDate = bLot.han_su_dung ? new Date(bLot.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
-            if (aDate !== bDate) return aDate - bDate;
-            return new Date(a.updated_at || a.created_at || 0).getTime() - new Date(b.updated_at || b.created_at || 0).getTime();
-          });
-          let remaining = qty;
-          for (const lotRow of lotRows) {
-            if (remaining <= 0) break;
-            const take = Math.min(Number(lotRow.so_luong || 0), remaining);
-            if (take <= 0) continue;
-            const cost = item.gia_von || lotRow.gia_von || product.gia_von || 0;
-            rows.push({
-              hang_hoa_id: item.hang_hoa_id,
-              lo_hang_id: lotRow.lo_hang_id && lotRow.lo_hang_id._id ? lotRow.lo_hang_id._id : lotRow.lo_hang_id,
-              so_luong: take,
-              gia_von: cost,
-              thanh_tien: take * cost
-            });
-            remaining -= take;
-          }
-          continue;
+      if (hasQc) {
+        if (!quyCachItems.length) {
+          throw new Error('Lô có quy cách, vui lòng nhập số lượng theo từng quy cách');
         }
-      } else {
-        lotId = '';
+        let lineTotal = 0;
+        for (const qc of quyCachItems) {
+          const qty = qc.so_luong;
+          lineTotal += qty;
+          if (!skipStockCheck) {
+            await validateTonKhoQuyCach(khoId, item.hang_hoa_id, lotId, qc.ten_quy_cach, qty);
+          }
+          rows.push({
+            hang_hoa_id: item.hang_hoa_id,
+            lo_hang_id: lotId,
+            ten_quy_cach: qc.ten_quy_cach,
+            so_luong: qty,
+            gia_von: cost,
+            thanh_tien: qty * cost,
+            ghi_chu: lineGhiChu
+          });
+        }
+        if (!skipStockCheck) {
+          await validateTonKhoTong(khoId, item.hang_hoa_id, lineTotal);
+          await validateTonKhoLo(khoId, item.hang_hoa_id, lotId, lineTotal);
+        }
+        continue;
       }
+
+      const qty = Math.floor(Number(item.so_luong || 0));
+      if (!Number.isFinite(qty) || qty <= 0) continue;
+      if (!skipStockCheck) {
+        await validateTonKhoTong(khoId, item.hang_hoa_id, qty);
+        await validateTonKhoLo(khoId, item.hang_hoa_id, lotId, qty);
+      }
+      rows.push({
+        hang_hoa_id: item.hang_hoa_id,
+        lo_hang_id: lotId,
+        so_luong: qty,
+        gia_von: cost,
+        thanh_tien: qty * cost,
+        ghi_chu: lineGhiChu
+      });
+      continue;
     }
 
-    const cost = item.gia_von || product.gia_von || 0;
+    lotId = '';
+    const qty = quyCachItems.length
+      ? quyCachItems.reduce((sum, qc) => sum + qc.so_luong, 0)
+      : Math.floor(Number(item.so_luong || 0));
+    if (!Number.isFinite(qty) || qty <= 0) continue;
+    if (!skipStockCheck) await validateTonKhoTong(khoId, item.hang_hoa_id, qty);
     rows.push({
       hang_hoa_id: item.hang_hoa_id,
-      lo_hang_id: lotId || undefined,
       so_luong: qty,
       gia_von: cost,
-      thanh_tien: qty * cost
+      thanh_tien: qty * cost,
+      ghi_chu: lineGhiChu
     });
   }
+
+  if (!rows.length) throw new Error('Vui lòng chọn hàng cần hủy');
   return rows;
 }
 
@@ -353,33 +413,13 @@ async function persistDetails(ticketId, rows) {
 
 async function applyInventoryOut(ticket, rows, userId) {
   for (const row of rows) {
-    await truTonKho({
-      kho_id: ticket.kho_id,
-      hang_hoa_id: row.hang_hoa_id,
-      lo_hang_id: row.lo_hang_id,
-      so_luong: row.so_luong,
-      gia_von: row.gia_von,
-      nguoi_tao_id: userId,
-      loai_phieu: 'xuat_huy',
-      ma_phieu: ticket.ma_xuat_huy,
-      ghi_chu: ticket.ly_do_huy || ticket.ghi_chu || 'Xuất hủy'
-    });
+    await applyXuatHuyLine(ticket, row, userId);
   }
 }
 
 async function reverseInventory(ticket, rows, userId) {
   for (const row of rows) {
-    await congTonKho({
-      kho_id: ticket.kho_id,
-      hang_hoa_id: row.hang_hoa_id,
-      lo_hang_id: row.lo_hang_id,
-      so_luong: row.so_luong,
-      gia_von: row.gia_von,
-      nguoi_tao_id: userId,
-      loai_phieu: 'xuat_huy',
-      ma_phieu: ticket.ma_xuat_huy,
-      ghi_chu: 'Đảo hủy phiếu xuất hủy ' + ticket.ma_xuat_huy
-    });
+    await reverseXuatHuyLine(ticket, row, userId);
   }
 }
 
@@ -489,11 +529,13 @@ async function loadDestroyCopyDraft(copyFromId) {
     items: lines.map(row => ({
       hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''),
       lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
+      ten_quy_cach: row.ten_quy_cach || '',
       ma_hang: row.hang_hoa_id?.ma_hang || '',
       ten_hang: row.hang_hoa_id?.ten_hang || '',
       ma_lo: row.lo_hang_id?.ma_lo || row.lo_hang_id?.ten_lo || '',
       so_luong: Number(row.so_luong || 0),
-      gia_von: Number(row.gia_von || 0)
+      gia_von: Number(row.gia_von || 0),
+      ghi_chu: row.ghi_chu || ''
     })).filter(row => row.hang_hoa_id && row.so_luong > 0)
   };
 }
@@ -592,8 +634,10 @@ exports.complete = async function(req, res) {
     await normalizeRows(rows.map(row => ({
       hang_hoa_id: row.hang_hoa_id,
       lo_hang_id: row.lo_hang_id,
+      ten_quy_cach: row.ten_quy_cach,
       so_luong: row.so_luong,
-      gia_von: row.gia_von
+      gia_von: row.gia_von,
+      ghi_chu: row.ghi_chu
     })), ticket.kho_id, false);
     await applyInventoryOut(ticket, rows, req.user?._id);
     ticket.trang_thai = 'completed';
@@ -631,7 +675,11 @@ exports.apiWarehouseProducts = async function(req, res) {
       map[String(unit._id)] = unit.ten_don_vi || unit.ma_don_vi || '';
       return map;
     }, {});
-    const lotInventory = await TonKhoLo.find({ kho_id: khoId, so_luong: { $gt: 0 } }).populate('lo_hang_id').lean();
+    const lotInventory = await TonKhoLo.find({
+      kho_id: khoId,
+      so_luong: { $gt: 0 },
+      $or: [{ gia_tri_thuoc_tinh_id: null }, { gia_tri_thuoc_tinh_id: { $exists: false } }]
+    }).populate('lo_hang_id').lean();
     const lotsByProduct = lotInventory.reduce((map, row) => {
       const key = String(row.hang_hoa_id);
       if (!map[key]) map[key] = [];
@@ -696,12 +744,14 @@ exports.apiPurchasesWithStock = async function(req, res) {
         const productId = row.hang_hoa_id && row.hang_hoa_id._id ? row.hang_hoa_id._id : row.hang_hoa_id;
         const manageLots = Boolean(row.hang_hoa_id && row.hang_hoa_id.quan_ly_theo_lo);
         if (manageLots && row.lo_hang_id) {
-          const lotInv = await TonKhoLo.findOne({
-            kho_id: purchase.kho_id && purchase.kho_id._id ? purchase.kho_id._id : purchase.kho_id,
-            hang_hoa_id: productId,
-            lo_hang_id: row.lo_hang_id,
-            so_luong: { $gt: 0 }
-          }).select('_id').lean();
+          const lotInv = await TonKhoLo.findOne(Object.assign(
+            lotStockFilter(
+              purchase.kho_id && purchase.kho_id._id ? purchase.kho_id._id : purchase.kho_id,
+              productId,
+              row.lo_hang_id
+            ),
+            { so_luong: { $gt: 0 } }
+          )).select('_id').lean();
           if (lotInv) { hasStock = true; break; }
         } else {
           const inv = await TonKho.findOne({
@@ -755,22 +805,56 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
       .sort({ created_at: 1 })
       .lean();
 
+    const lotInventoryAll = await TonKhoLo.find({
+      kho_id: khoId,
+      so_luong: { $gt: 0 },
+      $or: [{ gia_tri_thuoc_tinh_id: null }, { gia_tri_thuoc_tinh_id: { $exists: false } }]
+    }).populate('lo_hang_id').lean();
+    const lotsByProduct = lotInventoryAll.reduce((map, lotRow) => {
+      const key = String(lotRow.hang_hoa_id);
+      if (!map[key]) map[key] = [];
+      const lot = lotRow.lo_hang_id;
+      map[key].push({
+        _id: String(lot && lot._id ? lot._id : lotRow.lo_hang_id),
+        ma_lo: lot ? (lot.ma_lo || lot.ten_lo || '') : '',
+        ten_lo: lot ? (lot.ten_lo || '') : '',
+        so_luong: Number(lotRow.so_luong || 0),
+        gia_von: Number(lotRow.gia_von || 0)
+      });
+      return map;
+    }, {});
+
     const rows = [];
+    const seenKeys = new Set();
     for (const row of details) {
       if (!row.hang_hoa_id) continue;
       const productId = row.hang_hoa_id._id;
       const manageLots = Boolean(row.hang_hoa_id.quan_ly_theo_lo);
-      const lotId = row.lo_hang_id && row.lo_hang_id._id ? row.lo_hang_id._id : row.lo_hang_id;
+      const defaultLotId = row.lo_hang_id && row.lo_hang_id._id ? row.lo_hang_id._id : row.lo_hang_id;
+      const dedupeKey = String(productId) + ':' + String(defaultLotId || '');
+      if (seenKeys.has(dedupeKey) && manageLots) continue;
+      seenKeys.add(dedupeKey);
+
       let currentStock = 0;
+      let lotId = defaultLotId;
       if (manageLots) {
-        if (!lotId) continue;
-        const lotInv = await TonKhoLo.findOne({ kho_id: khoId, hang_hoa_id: productId, lo_hang_id: lotId }).lean();
+        const lots = lotsByProduct[String(productId)] || [];
+        if (!lots.length) continue;
+        if (!lotId || !lots.some(l => l._id === String(lotId))) {
+          lotId = lots[0]._id;
+        }
+        const lotInv = await TonKhoLo.findOne(lotStockFilter(khoId, productId, lotId)).lean();
         currentStock = Number(lotInv && lotInv.so_luong || 0);
       } else {
         const inv = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: productId }).lean();
         currentStock = Number(inv && inv.so_luong || 0);
       }
       if (currentStock <= 0) continue;
+
+      const hasQc = manageLots && lotId ? await lotHasQuyCachStock(khoId, productId, lotId) : false;
+      const quyCachItems = hasQc ? await loadQuyCachTonForLot(khoId, productId, lotId) : [];
+      const selectedLot = (lotsByProduct[String(productId)] || []).find(l => l._id === String(lotId));
+
       rows.push({
         ct_phieu_nhap_id: String(row._id),
         phieu_nhap_id: String(purchase._id),
@@ -780,10 +864,16 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
         don_vi_tinh: row.don_vi_tinh_id ? (row.don_vi_tinh_id.ten_don_vi || row.don_vi_tinh_id.ma_don_vi || '') : '',
         quan_ly_theo_lo: manageLots,
         lo_hang_id: lotId ? String(lotId) : '',
-        ma_lo: row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '',
-        ten_lo: row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : '',
+        ma_lo: selectedLot ? selectedLot.ma_lo : (row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : ''),
+        ten_lo: selectedLot ? selectedLot.ten_lo : (row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : ''),
+        lots: lotsByProduct[String(productId)] || [],
+        has_quy_cach: hasQc,
+        quy_cach_items: quyCachItems.map(qc => Object.assign({}, qc, { so_luong_huy: 0 })),
         so_luong_nhap: Number(row.so_luong || 0),
         ton_hien_tai: currentStock,
+        ton_kho_tong: manageLots
+          ? Number((await TonKho.findOne({ kho_id: khoId, hang_hoa_id: productId }).lean())?.so_luong || 0)
+          : currentStock,
         so_luong: 0,
         gia_von: Number(row.don_gia_nhap || row.don_gia || row.hang_hoa_id.gia_von || 0),
         thanh_tien: 0
@@ -811,5 +901,28 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
     });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể tải chi tiết xuất hủy' });
+  }
+};
+
+exports.apiLotQuyCachTon = async function(req, res) {
+  try {
+    const khoId = String(req.query.kho_id || '').trim();
+    const hangHoaId = String(req.query.hang_hoa_id || '').trim();
+    const loHangId = String(req.params.loHangId || '').trim();
+    if (!isObjectId(khoId) || !isObjectId(hangHoaId) || !isObjectId(loHangId)) {
+      return res.status(400).json({ success: false, message: 'Thông tin lô không hợp lệ' });
+    }
+    const lotInv = await TonKhoLo.findOne(lotStockFilter(khoId, hangHoaId, loHangId)).lean();
+    const quyCachItems = await loadQuyCachTonForLot(khoId, hangHoaId, loHangId);
+    return res.json({
+      success: true,
+      data: {
+        ton_lo: Number(lotInv && lotInv.so_luong || 0),
+        has_quy_cach: quyCachItems.length > 0,
+        quy_cach_items: quyCachItems
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Không thể tải quy cách' });
   }
 };
