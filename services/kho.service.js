@@ -212,7 +212,11 @@ async function dieuChinhTonQuyCach(params, direction) {
   }
 
   qcStock.so_luong = nextQc;
-  if (cost) qcStock.gia_von = cost;
+  if (cost) {
+    qcStock.gia_von = cost;
+    qcStock.don_gia_nhap = cost;
+  }
+  qcStock.thanh_tien = nextQc * (Number(qcStock.don_gia_nhap || qcStock.gia_von) || cost);
   if (!qcStock.ten_quy_cach && qcStock.ten_thuoc_tinh) qcStock.ten_quy_cach = qcStock.ten_thuoc_tinh;
   await qcStock.save();
 

@@ -28,6 +28,10 @@
             <input name="ten_cua_hang" required>
           </label>
           <label>
+            <span>Mã số thuế</span>
+            <input name="ma_so_thue">
+          </label>
+          <label>
             <span>Điện thoại</span>
             <input name="sdt">
           </label>
@@ -39,25 +43,21 @@
             <span>Địa chỉ chi tiết</span>
             <input name="dia_chi_chi_tiet">
           </label>
-          <label class="span-2">
-            <span>Địa chỉ gửi hàng chi tiết</span>
-            <input name="dia_chi_gui_hang_chi_tiet">
-          </label>
           <label>
             <span>Phường/xã</span>
-            <input name="phuong_xa">
+            <select class="js-ghn-ward" name="phuong_xa" data-selected-name="">
+              <option value="">Chọn phường/xã</option>
+            </select>
+            <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code">
+            <input type="hidden" name="quan_huyen" class="js-ghn-district-name">
+            <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id">
           </label>
           <label>
             <span>Tỉnh/thành</span>
-            <input name="tinh_thanh">
-          </label>
-          <label>
-            <span>Phường/xã gửi hàng</span>
-            <input name="phuong_xa_gui_hang">
-          </label>
-          <label>
-            <span>Tỉnh/thành gửi hàng</span>
-            <input name="tinh_thanh_gui_hang">
+            <select class="js-ghn-province" name="tinh_thanh" data-selected-name="">
+              <option value="">Chọn tỉnh/thành</option>
+            </select>
+            <input type="hidden" name="tinh_thanh_id" class="js-ghn-province-id">
           </label>
           <label>
             <span>Trạng thái</span>
@@ -108,6 +108,10 @@
             <input name="ten_cua_hang" value="<%= formStore.ten_cua_hang || '' %>" required>
           </label>
           <label>
+            <span>Mã số thuế</span>
+            <input name="ma_so_thue" value="<%= formStore.ma_so_thue || '' %>">
+          </label>
+          <label>
             <span>Điện thoại</span>
             <input name="sdt" value="<%= formStore.sdt || '' %>">
           </label>
@@ -119,25 +123,29 @@
             <span>Địa chỉ</span>
             <input name="dia_chi_chi_tiet" value="<%= formStore.dia_chi_chi_tiet || '' %>">
           </label>
-          <label class="span-2">
-            <span>Địa chỉ gửi hàng</span>
-            <input name="dia_chi_gui_hang_chi_tiet" value="<%= formStore.dia_chi_gui_hang_chi_tiet || '' %>">
-          </label>
           <label>
             <span>Phường/xã</span>
-            <input name="phuong_xa" value="<%= formStore.phuong_xa || '' %>">
+            <select class="js-ghn-ward" name="phuong_xa" data-selected-id="<%= formStore.phuong_xa_code || '' %>" data-selected-name="<%= formStore.phuong_xa || '' %>">
+              <% if (formStore.phuong_xa) { %>
+                <option value="<%= formStore.phuong_xa %>" selected><%= formStore.phuong_xa %></option>
+              <% } else { %>
+                <option value="">Chọn phường/xã</option>
+              <% } %>
+            </select>
+            <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= formStore.phuong_xa_code || '' %>">
+            <input type="hidden" name="quan_huyen" class="js-ghn-district-name" value="<%= formStore.quan_huyen || '' %>">
+            <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id" value="<%= formStore.quan_huyen_id || '' %>">
           </label>
           <label>
             <span>Tỉnh/thành</span>
-            <input name="tinh_thanh" value="<%= formStore.tinh_thanh || '' %>">
-          </label>
-          <label>
-            <span>Phường/xã gửi hàng</span>
-            <input name="phuong_xa_gui_hang" value="<%= formStore.phuong_xa_gui_hang || '' %>">
-          </label>
-          <label>
-            <span>Tỉnh/thành gửi hàng</span>
-            <input name="tinh_thanh_gui_hang" value="<%= formStore.tinh_thanh_gui_hang || '' %>">
+            <select class="js-ghn-province" name="tinh_thanh" data-selected-id="<%= formStore.tinh_thanh_id || '' %>" data-selected-name="<%= formStore.tinh_thanh || '' %>">
+              <% if (formStore.tinh_thanh) { %>
+                <option value="<%= formStore.tinh_thanh %>" selected><%= formStore.tinh_thanh %></option>
+              <% } else { %>
+                <option value="">Chọn tỉnh/thành</option>
+              <% } %>
+            </select>
+            <input type="hidden" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= formStore.tinh_thanh_id || '' %>">
           </label>
           <label>
             <span>Trạng thái</span>
@@ -241,9 +249,10 @@
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllStores" type="checkbox" aria-label="Chọn tất cả"></th>
-                <th>Mã cửa hàng</th>
-                <th>Tên cửa hàng</th>
-                <th>Điện thoại</th>
+                  <th>Mã cửa hàng</th>
+                  <th>Tên cửa hàng</th>
+                  <th>Mã số thuế</th>
+                  <th>Điện thoại</th>
                 <th>Email</th>
                 <th>Kho</th>
                 <th>Trạng thái</th>
@@ -253,7 +262,7 @@
             <tbody>
               <% if (stores.length === 0) { %>
                 <tr>
-                  <td colspan="8" class="empty-cell">Không có cửa hàng phù hợp với bộ lọc.</td>
+                  <td colspan="9" class="empty-cell">Không có cửa hàng phù hợp với bộ lọc.</td>
                 </tr>
               <% } %>
               <% stores.forEach(function(store) { %>
@@ -262,7 +271,8 @@
                 <tr class="<%= isSelected ? 'is-selected' : '' %>" onclick="window.location.href='<%= rowHref %>'">
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
                   <td><a class="table-code-link" href="<%= rowHref %>"><%= store.ma_cua_hang || '---' %></a></td>
-                  <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi_day_du || store.dia_chi_gui_hang_day_du || 'Chưa có địa chỉ' %></div></td>
+                  <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi_day_du || store.dia_chi || 'Chưa có địa chỉ' %></div></td>
+                  <td><%= store.ma_so_thue || '---' %></td>
                   <td><%= store.sdt || '---' %></td>
                   <td><%= store.email || '---' %></td>
                   <td><%= warehouseCountMap[String(store._id)] || 0 %></td>
@@ -276,7 +286,7 @@
 
                 <% if (isSelected) { %>
                   <tr class="store-detail-row">
-                    <td colspan="8">
+                    <td colspan="9">
                       <div class="store-detail">
                         <div class="detail-tabs">
                           <div class="detail-tab-list">
@@ -311,6 +321,10 @@
                               <input name="ten_cua_hang" value="<%= selectedStore.ten_cua_hang || '' %>" required>
                             </div>
                             <div>
+                              <span>Mã số thuế</span>
+                              <input name="ma_so_thue" value="<%= selectedStore.ma_so_thue || '' %>">
+                            </div>
+                            <div>
                               <span>Điện thoại</span>
                               <input name="sdt" value="<%= selectedStore.sdt || '' %>">
                             </div>
@@ -323,24 +337,28 @@
                               <input name="dia_chi_chi_tiet" value="<%= selectedStore.dia_chi_chi_tiet || '' %>">
                             </div>
                             <div>
-                              <span>Địa chỉ gửi hàng</span>
-                              <input name="dia_chi_gui_hang_chi_tiet" value="<%= selectedStore.dia_chi_gui_hang_chi_tiet || '' %>">
-                            </div>
-                            <div>
                               <span>Phường/xã</span>
-                              <input name="phuong_xa" value="<%= selectedStore.phuong_xa || '' %>">
+                              <select class="js-ghn-ward" name="phuong_xa" data-selected-id="<%= selectedStore.phuong_xa_code || '' %>" data-selected-name="<%= selectedStore.phuong_xa || '' %>">
+                                <% if (selectedStore.phuong_xa) { %>
+                                  <option value="<%= selectedStore.phuong_xa %>" selected><%= selectedStore.phuong_xa %></option>
+                                <% } else { %>
+                                  <option value="">Chọn phường/xã</option>
+                                <% } %>
+                              </select>
+                              <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= selectedStore.phuong_xa_code || '' %>">
+                              <input type="hidden" name="quan_huyen" class="js-ghn-district-name" value="<%= selectedStore.quan_huyen || '' %>">
+                              <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id" value="<%= selectedStore.quan_huyen_id || '' %>">
                             </div>
                             <div>
                               <span>Tỉnh/thành</span>
-                              <input name="tinh_thanh" value="<%= selectedStore.tinh_thanh || '' %>">
-                            </div>
-                            <div>
-                              <span>Phường/xã gửi hàng</span>
-                              <input name="phuong_xa_gui_hang" value="<%= selectedStore.phuong_xa_gui_hang || '' %>">
-                            </div>
-                            <div>
-                              <span>Tỉnh/thành gửi hàng</span>
-                              <input name="tinh_thanh_gui_hang" value="<%= selectedStore.tinh_thanh_gui_hang || '' %>">
+                              <select class="js-ghn-province" name="tinh_thanh" data-selected-id="<%= selectedStore.tinh_thanh_id || '' %>" data-selected-name="<%= selectedStore.tinh_thanh || '' %>">
+                                <% if (selectedStore.tinh_thanh) { %>
+                                  <option value="<%= selectedStore.tinh_thanh %>" selected><%= selectedStore.tinh_thanh %></option>
+                                <% } else { %>
+                                  <option value="">Chọn tỉnh/thành</option>
+                                <% } %>
+                              </select>
+                              <input type="hidden" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= selectedStore.tinh_thanh_id || '' %>">
                             </div>
                             <div>
                               <span>Trạng thái</span>
@@ -502,6 +520,153 @@
       var addStoreModalClose = document.getElementById('addStoreModalClose');
       var addStoreModalCancel = document.getElementById('addStoreModalCancel');
       var storeCreateForm = document.getElementById('storeCreateForm');
+      var ghnProvinceCache = null;
+      var ghnWardCache = {};
+
+      function normalizeText(value) {
+        return String(value || '').trim().toLowerCase();
+      }
+
+      function fetchAddressItems(url) {
+        return fetch(url, { headers: { Accept: 'application/json' } })
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            if (!data || !data.success) throw new Error((data && data.message) || 'Không lấy được danh mục địa chỉ.');
+            return Array.isArray(data.items) ? data.items : [];
+          });
+      }
+
+      function getGhnProvinces() {
+        if (ghnProvinceCache) return Promise.resolve(ghnProvinceCache);
+        return fetchAddressItems('/api/address/provinces').then(function(items) {
+          ghnProvinceCache = items;
+          return items;
+        });
+      }
+
+      function getGhnWardsByProvince(provinceId) {
+        if (!provinceId) return Promise.resolve([]);
+        if (ghnWardCache[provinceId]) return Promise.resolve(ghnWardCache[provinceId]);
+        return fetchAddressItems('/api/address/wards-by-province?province_id=' + encodeURIComponent(provinceId)).then(function(items) {
+          ghnWardCache[provinceId] = items;
+          return items;
+        });
+      }
+
+      function findByIdOrName(items, id, name, idKey, nameKey) {
+        var selectedId = String(id || '');
+        var selectedName = normalizeText(name);
+        return items.find(function(item) { return selectedId && String(item[idKey]) === selectedId; })
+          || items.find(function(item) { return selectedName && normalizeText(item[nameKey]) === selectedName; })
+          || null;
+      }
+
+      function syncAddressHidden(container, province, ward) {
+        var provinceIdInput = container.querySelector('.js-ghn-province-id');
+        var wardCodeInput = container.querySelector('.js-ghn-ward-code');
+        var districtNameInput = container.querySelector('.js-ghn-district-name');
+        var districtIdInput = container.querySelector('.js-ghn-district-id');
+        if (provinceIdInput) provinceIdInput.value = province ? province.province_id : '';
+        if (wardCodeInput) wardCodeInput.value = ward ? ward.ward_code : '';
+        if (districtNameInput) districtNameInput.value = ward ? (ward.district_name || '') : '';
+        if (districtIdInput) districtIdInput.value = ward ? (ward.district_id || '') : '';
+      }
+
+      function renderProvinceSelect(select, items) {
+        var selected = findByIdOrName(items, select.getAttribute('data-selected-id'), select.getAttribute('data-selected-name') || select.value, 'province_id', 'province_name');
+        var currentName = select.getAttribute('data-selected-name') || select.value || '';
+        select.innerHTML = '<option value="">Chọn tỉnh/thành</option>' + items.map(function(item) {
+          return '<option value="' + item.province_name.replace(/"/g, '&quot;') + '" data-id="' + item.province_id + '">' + item.province_name + '</option>';
+        }).join('');
+        if (selected) {
+          select.value = selected.province_name;
+          select.setAttribute('data-selected-id', selected.province_id);
+          select.setAttribute('data-selected-name', selected.province_name);
+        } else if (currentName) {
+          select.innerHTML = '<option value="' + currentName.replace(/"/g, '&quot;') + '" selected>' + currentName + '</option>' + select.innerHTML;
+          select.value = currentName;
+        }
+      }
+
+      function renderWardSelect(select, items) {
+        var selected = findByIdOrName(items, select.getAttribute('data-selected-id'), select.getAttribute('data-selected-name') || select.value, 'ward_code', 'ward_name');
+        var currentName = select.getAttribute('data-selected-name') || select.value || '';
+        select.innerHTML = '<option value="">Chọn phường/xã</option>' + items.map(function(item) {
+          var label = item.ward_name + (item.district_name ? ' - ' + item.district_name : '');
+          return '<option value="' + item.ward_name.replace(/"/g, '&quot;') + '" data-code="' + item.ward_code + '" data-district-id="' + item.district_id + '" data-district-name="' + String(item.district_name || '').replace(/"/g, '&quot;') + '">' + label + '</option>';
+        }).join('');
+        if (selected) {
+          select.value = selected.ward_name;
+          select.setAttribute('data-selected-id', selected.ward_code);
+          select.setAttribute('data-selected-name', selected.ward_name);
+        } else if (currentName) {
+          select.innerHTML = '<option value="' + currentName.replace(/"/g, '&quot;') + '" selected>' + currentName + '</option>' + select.innerHTML;
+          select.value = currentName;
+        }
+      }
+
+      function selectedProvinceFromSelect(select) {
+        var option = select.options[select.selectedIndex];
+        return option && option.getAttribute('data-id')
+          ? { province_id: option.getAttribute('data-id'), province_name: select.value }
+          : null;
+      }
+
+      function selectedWardFromSelect(select) {
+        var option = select.options[select.selectedIndex];
+        return option && option.getAttribute('data-code')
+          ? {
+            ward_code: option.getAttribute('data-code'),
+            ward_name: select.value,
+            district_id: option.getAttribute('data-district-id') || '',
+            district_name: option.getAttribute('data-district-name') || ''
+          }
+          : null;
+      }
+
+      function initGhnAddressSelects() {
+        document.querySelectorAll('.js-ghn-province').forEach(function(provinceSelect) {
+          var container = provinceSelect.closest('form') || provinceSelect.closest('.store-form-grid') || document;
+          var wardSelect = container.querySelector('.js-ghn-ward');
+
+          getGhnProvinces().then(function(provinces) {
+            renderProvinceSelect(provinceSelect, provinces);
+            var province = selectedProvinceFromSelect(provinceSelect);
+            syncAddressHidden(container, province, selectedWardFromSelect(wardSelect));
+            if (province && wardSelect) {
+              return getGhnWardsByProvince(province.province_id).then(function(wards) {
+                renderWardSelect(wardSelect, wards);
+                syncAddressHidden(container, province, selectedWardFromSelect(wardSelect));
+              });
+            }
+          }).catch(function(error) {
+            console.warn('[GHN_ADDRESS]', error && error.message ? error.message : error);
+          });
+
+          provinceSelect.addEventListener('change', function() {
+            var province = selectedProvinceFromSelect(provinceSelect);
+            if (wardSelect) {
+              wardSelect.innerHTML = '<option value="">Chọn phường/xã</option>';
+              wardSelect.value = '';
+              wardSelect.setAttribute('data-selected-id', '');
+              wardSelect.setAttribute('data-selected-name', '');
+            }
+            syncAddressHidden(container, province, null);
+            if (!province || !wardSelect) return;
+            getGhnWardsByProvince(province.province_id).then(function(wards) {
+              renderWardSelect(wardSelect, wards);
+            }).catch(function(error) {
+              console.warn('[GHN_ADDRESS]', error && error.message ? error.message : error);
+            });
+          });
+
+          if (wardSelect) {
+            wardSelect.addEventListener('change', function() {
+              syncAddressHidden(container, selectedProvinceFromSelect(provinceSelect), selectedWardFromSelect(wardSelect));
+            });
+          }
+        });
+      }
 
       function openAddStoreModal() {
         if (!addStoreModalOverlay) return;
@@ -520,11 +685,9 @@
       if (addStoreModalClose) addStoreModalClose.addEventListener('click', closeAddStoreModal);
       if (addStoreModalCancel) addStoreModalCancel.addEventListener('click', closeAddStoreModal);
       if (addStoreModalOverlay) {
-        addStoreModalOverlay.addEventListener('click', function(event) {
-          if (event.target === addStoreModalOverlay) closeAddStoreModal();
-        });
         if (addStoreModalOverlay.getAttribute('data-auto-open') === '1') openAddStoreModal();
       }
+      initGhnAddressSelects();
 
       var selectAll = document.getElementById('selectAllStores');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.store-checkbox'));

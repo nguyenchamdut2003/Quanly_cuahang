@@ -90,6 +90,19 @@
         cursor: pointer;
         margin-top: 20px;
       }
+      .btn-print-ton {
+        width: 100%;
+        padding: 12px;
+        background: #fff;
+        color: #1677ff;
+        border: 1px solid #1677ff;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 14px;
+      }
+      .btn-print-ton:hover { background: #e6f4ff; }
     </style>
   </head>
   <body>
@@ -166,6 +179,10 @@
             <span id="totalLech" style="font-weight: bold;">0</span>
           </div>
         </div>
+
+        <button type="button" class="btn-print-ton" onclick="printTonHeThong()">
+          <i class="fa-solid fa-print"></i> In phiếu số lượng hiện tại (tồn hệ thống)
+        </button>
 
         <button class="btn-finish" onclick="saveKiemKho()">
           <i class="fa-solid fa-check-double"></i> HOÀN THÀNH
@@ -371,6 +388,37 @@
         if (item) item.nguyen_nhan_lech = val || '';
       }
 
+      async function printTonHeThong() {
+        if (!khoSelect.value) return alert('Vui lòng chọn kho.');
+        if (!kkItems.length) return alert('Không có hàng để in.');
+        try {
+          const res = await fetch('/kiem-kho/preview-ton-he-thong', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              cua_hang_id: document.getElementById('storeId').value,
+              kho_id: khoSelect.value,
+              ghi_chu: document.getElementById('ghiChu').value,
+              items: kkItems.map(item => ({
+                ma_hang: item.ma_hang,
+                ten_hang: item.ten_hang,
+                don_vi_tinh: item.don_vi_tinh,
+                ma_lo: item.ma_lo,
+                han_su_dung: item.han_su_dung,
+                ten_quy_cach: item.ten_quy_cach,
+                ton_kho_he_thong: item.ton_kho_he_thong
+              }))
+            })
+          });
+          const result = await res.json().catch(() => ({}));
+          if (!result.success) return alert(result.message || 'Không tạo được phiếu in.');
+          window.open(result.url, '_blank', 'noopener');
+        } catch (err) {
+          alert('Không kết nối được máy chủ.');
+        }
+      }
+
       async function saveKiemKho() {
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
         if (kkItems.length === 0) return alert('Kho không có hàng hóa còn tồn để kiểm.');
@@ -402,6 +450,9 @@
           });
           const result = await res.json();
           if (result.success) {
+            if (result.print_url) {
+              window.open(result.print_url + '?variant=thuc-te', '_blank', 'noopener');
+            }
             alert(result.message);
             window.location.href = '/kiem-kho';
           } else {

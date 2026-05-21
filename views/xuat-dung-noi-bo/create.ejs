@@ -48,7 +48,7 @@
         <h1 class="title">Xuất dùng nội bộ</h1>
         <div class="search">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input id="searchInput" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)">
+          <input id="searchInput" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)" autocomplete="off">
           <div id="results" class="results"></div>
         </div>
         <div class="top-tools"><button class="tool" type="button"><i class="fa-solid fa-barcode"></i></button><button class="tool" type="button"><i class="fa-solid fa-print"></i></button><button class="tool" type="button"><i class="fa-solid fa-eye"></i></button><button class="tool" type="button"><i class="fa-solid fa-exclamation"></i></button></div>
@@ -99,8 +99,8 @@
         <div class="field"><label>Loại người nhận</label><select class="input" id="loaiNguoiNhan" onchange="renderReceiverOptions()"><option value="nhan_vien">Nhân viên</option><option value="khach_hang">Khách hàng</option><option value="nha_cung_cap">Nhà cung cấp</option><option value="khac">Khác</option></select></div>
         <div class="field" id="receiverSelectWrap"><label>Người nhận</label><select class="input" id="nguoiNhan"><option value="">Chọn người nhận</option></select></div>
         <div class="field" id="receiverOtherWrap" style="display:none"><label>Người nhận khác</label><input class="input" id="nguoiNhanKhac" placeholder="Nhập tên người nhận"></div>
-        <div class="field"><label>Chi nhánh</label><select class="input" id="storeId"><option value="">Chọn chi nhánh</option><% stores.forEach(s=>{ %><option value="<%= s._id %>"><%= s.ten_cua_hang %></option><% }) %></select></div>
-        <div class="field"><label>Kho</label><select class="input" id="khoId" disabled><option value="">Vui lòng chọn cửa hàng trước</option></select></div>
+        <input type="hidden" id="storeId" value="<%= currentStoreId || '' %>">
+        <div class="field"><label>Kho</label><select class="input" id="khoId"<%= (warehouses || []).length ? '' : ' disabled' %>><option value=""><%= (warehouses || []).length ? 'Chọn kho' : 'Chưa có kho cho cửa hàng đang chọn' %></option><% (warehouses || []).forEach(function(w) { %><option value="<%= w._id %>"><%= w.ten_kho %></option><% }) %></select></div>
         <div class="total"><span>Tổng giá trị <i class="fa-regular fa-circle-question"></i></span><strong id="totalValue">0</strong></div>
         <div class="field"><label><input type="checkbox" id="congDonVaoThe" disabled> Cộng dồn vào thẻ từng thành viên (chưa hỗ trợ dữ liệu nhận)</label></div>
         <div class="field"><textarea class="input textarea" id="ghiChu" placeholder="Ghi chú"></textarea></div>
@@ -122,7 +122,7 @@
   </div>
 
   <script>
-    const products = <%- JSON.stringify(products.map(p => ({_id:String(p._id),ma_hang:p.ma_hang,ten_hang:p.ten_hang,don_vi_tinh:p.don_vi_tinh || 'cái',gia_von:p.gia_von || 0,ton_kho:p.ton_kho || 0}))) %>;
+    let products = [];
     const receiverSources = {
       nhan_vien: <%- JSON.stringify(users.map(u => ({value: u.ho_ten || u.email || u.username || "", label: u.ho_ten || u.email || u.username || ""}))) %>,
       khach_hang: <%- JSON.stringify((customers || []).map(c => ({value: c.ten_khach_hang || c.ten || c.sdt || "", label: c.ten_khach_hang || c.ten || c.sdt || ""}))) %>,
@@ -132,7 +132,7 @@
     let items = [];
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
-    const storeSelect = document.getElementById('storeId');
+    const storeIdInput = document.getElementById('storeId');
     const khoSelect = document.getElementById('khoId');
     const emptyHint = document.getElementById('emptyHint');
     const loaiXuatTrigger = document.getElementById('loaiXuatTrigger');
@@ -295,47 +295,98 @@
 
     bindLoaiXuatItems();
 
-    async function loadKhoByStore(){
-      const storeId = storeSelect.value;
-      khoSelect.innerHTML = '<option value="">Chọn kho</option>';
-      khoSelect.disabled = true;
-      if(!storeId) return;
-      try{
-        const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
+    async function loadProductsByKho() {
+      const khoId = khoSelect.value;
+      products = [];
+      if (!khoId) return;
+      try {
+        const res = await fetch('/xuat-dung-noi-bo/api/san-pham?kho_id=' + encodeURIComponent(khoId));
         const result = await res.json();
-        const warehouses = result.success ? (result.data || []) : [];
-        khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${escapeHtml(k.ten_kho)}</option>`).join('');
-        khoSelect.disabled = false;
-      }catch(e){
-        khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+        if (!result.success) {
+          alert(result.message || 'Không tải được tồn kho theo kho.');
+          return;
+        }
+        products = (result.items || []).map(function(p) {
+          return {
+            _id: String(p._id),
+            ma_hang: p.ma_hang || '',
+            ten_hang: p.ten_hang || '',
+            don_vi_tinh: p.don_vi_tinh || 'cái',
+            gia_von: Number(p.gia_von || 0),
+            ton_kho: Number(p.ton_kho || 0)
+          };
+        });
+        items.forEach(function(item) {
+          const matched = products.find(function(p) { return p._id === item.hang_hoa_id; });
+          if (matched) item.ton_kho = matched.ton_kho;
+        });
+        renderItems();
+      } catch (e) {
+        products = [];
       }
     }
 
-    storeSelect.addEventListener('change', loadKhoByStore);
-    document.addEventListener('DOMContentLoaded', loadKhoByStore);
+    khoSelect.addEventListener('change', loadProductsByKho);
     document.addEventListener('DOMContentLoaded', renderReceiverOptions);
 
-    searchInput.addEventListener('input', function(){
-      const q = this.value.trim().toLowerCase();
-      if(!q){results.style.display='none';return;}
-      const matched = products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)).slice(0,20);
-      results.innerHTML = matched.map(p => `<div class="result-item" onclick="addItem('${p._id}')"><span><strong>${escapeHtml(p.ma_hang)}</strong> - ${escapeHtml(p.ten_hang)}</span><span>Tồn: ${p.ton_kho}</span></div>`).join('');
-      results.style.display = matched.length ? 'block' : 'none';
+    function renderSearchResults(matched) {
+      if (!matched.length) {
+        results.innerHTML = '<div class="result-item" style="cursor:default;color:#64748b">Không tìm thấy hàng hóa.</div>';
+        results.style.display = 'block';
+        return;
+      }
+      results.innerHTML = matched.map(function(p) {
+        return '<div class="result-item" onclick="addItem(\'' + p._id + '\')"><span><strong>' + escapeHtml(p.ma_hang) + '</strong> - ' + escapeHtml(p.ten_hang) + '</span><span>Tồn: ' + Number(p.ton_kho || 0).toLocaleString('vi-VN') + '</span></div>';
+      }).join('');
+      results.style.display = 'block';
+    }
+
+    async function openProductSearch() {
+      const khoId = khoSelect.value;
+      if (!khoId) {
+        results.innerHTML = '<div class="result-item" style="cursor:default;color:#64748b">Vui lòng chọn kho trước.</div>';
+        results.style.display = 'block';
+        return;
+      }
+      if (!products.length) await loadProductsByKho();
+      const q = searchInput.value.trim().toLowerCase();
+      const matched = products.filter(function(p) {
+        if (!q) return true;
+        return String(p.ma_hang || '').toLowerCase().includes(q) || String(p.ten_hang || '').toLowerCase().includes(q);
+      }).slice(0, 20);
+      renderSearchResults(matched);
+    }
+
+    searchInput.addEventListener('input', openProductSearch);
+    searchInput.addEventListener('focus', openProductSearch);
+    searchInput.addEventListener('click', openProductSearch);
+
+    document.addEventListener('click', function(event) {
+      const searchWrap = searchInput.closest('.search');
+      if (searchWrap && !searchWrap.contains(event.target)) {
+        results.style.display = 'none';
+      }
     });
 
     document.addEventListener('keydown', function(event) {
       if (event.key === 'F3') {
         event.preventDefault();
         searchInput.focus();
+        openProductSearch();
       }
     });
 
     function addItem(id){
       const product = products.find(p => p._id === id);
       if(!product) return;
+      if (Number(product.ton_kho || 0) <= 0) return alert('Hàng hóa không còn tồn trong kho đã chọn.');
       const existing = items.find(i => i.hang_hoa_id === id);
-      if(existing) existing.so_luong += 1;
-      else items.push({hang_hoa_id:id,ma_hang:product.ma_hang,ten_hang:product.ten_hang,don_vi_tinh:product.don_vi_tinh,so_luong:1,gia_von:product.gia_von,ton_kho:product.ton_kho});
+      if(existing) {
+        if (existing.so_luong + 1 > product.ton_kho) return alert('Số lượng vượt tồn kho trong kho.');
+        existing.so_luong += 1;
+      } else {
+        items.push({hang_hoa_id:id,ma_hang:product.ma_hang,ten_hang:product.ten_hang,don_vi_tinh:product.don_vi_tinh,so_luong:1,gia_von:product.gia_von,ton_kho:product.ton_kho});
+      }
       searchInput.value=''; results.style.display='none'; renderItems();
     }
     function renderItems(){
@@ -349,12 +400,24 @@
       if (emptyHint) emptyHint.style.display = items.length ? 'none' : 'block';
       document.getElementById('totalValue').textContent = total.toLocaleString('vi-VN');
     }
-    function updateQty(id,val){const item=items.find(i=>i.hang_hoa_id===id); if(item)item.so_luong=Math.max(1,Number(val)||1); renderItems();}
+    function updateQty(id,val){
+      const item = items.find(i => i.hang_hoa_id === id);
+      if (!item) return;
+      const qty = Math.max(1, Number(val) || 1);
+      if (qty > Number(item.ton_kho || 0)) {
+        alert('Số lượng vượt tồn kho trong kho.');
+        renderItems();
+        return;
+      }
+      item.so_luong = qty;
+      renderItems();
+    }
     function removeItem(id){items=items.filter(i=>i.hang_hoa_id!==id); renderItems();}
 
     async function saveXnb(status){
       if(!items.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
       if(!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
+      if(!(storeIdInput && storeIdInput.value)) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu trên.');
       const loaiXuat = (loaiXuatValue.value || '').trim();
       if (!loaiXuat) return alert('Vui lòng chọn loại xuất.');
       const loaiNguoiNhan = document.getElementById('loaiNguoiNhan').value;

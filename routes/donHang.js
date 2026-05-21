@@ -32,6 +32,7 @@ const { congTonKho, truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
 const { normalizeAddress } = require('../utils/address');
+const { resolveStoreId } = require('../utils/storeScope');
 
 router.use(isAuthenticated);
 
@@ -49,41 +50,112 @@ const ORDER_EXPORT_DELIVERY_STATUS_MAP = {
     giao_du: 'Giao đủ'
 };
 
-const ORDER_EXPORT_COLUMNS = [
-    { header: 'Mã đơn hàng', key: 'ma_don_hang' },
-    { header: 'Thời gian đặt', key: 'thoi_gian_dat' },
-    { header: 'Khách hàng', key: 'khach_hang' },
-    { header: 'Điện thoại', key: 'dien_thoai' },
-    { header: 'Địa chỉ', key: 'dia_chi' },
-    { header: 'Kho', key: 'kho' },
-    { header: 'Bảng giá', key: 'bang_gia' },
-    { header: 'Nhân viên bán hàng', key: 'nhan_vien_ban_hang' },
-    { header: 'Nhân viên tạo', key: 'nhan_vien_tao' },
-    { header: 'Đối tác giao hàng', key: 'doi_tac_giao_hang' },
-    { header: 'Trạng thái đơn', key: 'trang_thai_don' },
-    { header: 'Trạng thái giao hàng', key: 'trang_thai_giao_hang' },
-    { header: 'Tổng số lượng', key: 'tong_so_luong', style: { numFmt: '#,##0.##' } },
-    { header: 'Tổng tiền hàng', key: 'tong_tien_hang', style: { numFmt: '#,##0' } },
-    { header: 'Giảm giá', key: 'giam_gia', style: { numFmt: '#,##0.##' } },
-    { header: 'Phí giao hàng', key: 'phi_giao_hang', style: { numFmt: '#,##0' } },
-    { header: 'Khách cần trả', key: 'khach_can_tra', style: { numFmt: '#,##0' } },
-    { header: 'Khách đã trả', key: 'khach_da_tra', style: { numFmt: '#,##0' } },
-    { header: 'Công nợ', key: 'cong_no', style: { numFmt: '#,##0' } },
-    { header: 'COD', key: 'cod' },
-    { header: 'Ghi chú', key: 'ghi_chu' },
-    { header: 'Mã hàng', key: 'ma_hang' },
-    { header: 'Tên hàng', key: 'ten_hang' },
-    { header: 'Thương hiệu', key: 'thuong_hieu' },
-    { header: 'Nhóm hàng', key: 'nhom_hang' },
-    { header: 'Đơn vị tính', key: 'don_vi_tinh' },
-    { header: 'Lô hàng', key: 'lo_hang' },
-    { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
-    { header: 'Đơn giá', key: 'don_gia', style: { numFmt: '#,##0' } },
-    { header: 'Giảm giá dòng', key: 'giam_gia_dong', style: { numFmt: '#,##0.##' } },
-    { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } },
-    { header: 'Giá vốn', key: 'gia_von', style: { numFmt: '#,##0' } },
-    { header: 'Ghi chú dòng', key: 'ghi_chu_dong' }
+const ORDER_EXPORT_LINE_DELIVERY_STATUS_MAP = {
+    chua_giao: 'Chưa giao',
+    giao_thieu: 'Giao thiếu',
+    giao_du: 'Giao đủ'
+};
+
+// Chỉ cột thuộc don_hang, ct_don_hang, van_don (gắn đơn), khach_hang (ref đơn)
+const ORDER_EXPORT_COLUMN_DEFS = [
+    { group: 'don_hang', key: 'ma_don_hang', header: 'Mã đơn hàng', default: true },
+    { group: 'don_hang', key: 'ngay_dat', header: 'Ngày đặt', default: true },
+    { group: 'don_hang', key: 'ngay_giao_thuc_te', header: 'Ngày giao thực tế' },
+    { group: 'don_hang', key: 'cua_hang', header: 'Cửa hàng', default: true },
+    { group: 'don_hang', key: 'kho', header: 'Kho', default: true },
+    { group: 'don_hang', key: 'bang_gia', header: 'Bảng giá', default: true },
+    { group: 'don_hang', key: 'nguoi_tao', header: 'Người tạo', default: true },
+    { group: 'don_hang', key: 'trang_thai', header: 'Trạng thái đơn', default: true },
+    { group: 'don_hang', key: 'trang_thai_giao_hang', header: 'Trạng thái giao hàng', default: true },
+    { group: 'don_hang', key: 'ghi_chu', header: 'Ghi chú' },
+    { group: 'khach_nhan', key: 'ma_khach_hang', header: 'Mã khách hàng', default: true },
+    { group: 'khach_nhan', key: 'ten_khach_hang', header: 'Tên khách hàng', default: true },
+    { group: 'khach_nhan', key: 'ten_nguoi_nhan', header: 'Người nhận' },
+    { group: 'khach_nhan', key: 'sdt_nguoi_nhan', header: 'SĐT người nhận', default: true },
+    { group: 'khach_nhan', key: 'dia_chi_nhan', header: 'Địa chỉ nhận hàng', default: true },
+    { group: 'khach_nhan', key: 'doi_tac_giao_hang', header: 'Đối tác giao hàng' },
+    { group: 'khach_nhan', key: 'nguoi_tra_phi_giao_hang', header: 'Người trả phí giao hàng' },
+    { group: 'thanh_toan', key: 'tong_so_luong_dat', header: 'Tổng SL đặt', style: { numFmt: '#,##0.##' } },
+    { group: 'thanh_toan', key: 'tong_tien_hang', header: 'Tổng tiền hàng', style: { numFmt: '#,##0' }, default: true },
+    { group: 'thanh_toan', key: 'giam_gia', header: 'Giảm giá', style: { numFmt: '#,##0.##' }, default: true },
+    { group: 'thanh_toan', key: 'kieu_giam_gia', header: 'Kiểu giảm giá' },
+    { group: 'thanh_toan', key: 'phi_giao_hang', header: 'Phí giao hàng', style: { numFmt: '#,##0' } },
+    { group: 'thanh_toan', key: 'khach_can_tra', header: 'Khách cần trả', style: { numFmt: '#,##0' }, default: true },
+    { group: 'thanh_toan', key: 'khach_thanh_toan', header: 'Khách đã trả', style: { numFmt: '#,##0' }, default: true },
+    { group: 'thanh_toan', key: 'tien_thua_tra_khach', header: 'Tiền thừa trả khách', style: { numFmt: '#,##0' } },
+    { group: 'thanh_toan', key: 'cod_enabled', header: 'COD' },
+    { group: 'thanh_toan', key: 'cod_amount', header: 'Số tiền COD', style: { numFmt: '#,##0' } },
+    { group: 'chi_tiet', key: 'ma_hang', header: 'Mã hàng', default: true },
+    { group: 'chi_tiet', key: 'ten_hang', header: 'Tên hàng', default: true },
+    { group: 'chi_tiet', key: 'lo_hang', header: 'Lô hàng' },
+    { group: 'chi_tiet', key: 'so_luong_dat', header: 'SL đặt', style: { numFmt: '#,##0.##' }, default: true },
+    { group: 'chi_tiet', key: 'so_luong_xac_nhan', header: 'SL xác nhận', style: { numFmt: '#,##0.##' } },
+    { group: 'chi_tiet', key: 'so_luong_da_giao', header: 'SL đã giao', style: { numFmt: '#,##0.##' }, default: true },
+    { group: 'chi_tiet', key: 'so_luong_con_thieu', header: 'SL còn thiếu', style: { numFmt: '#,##0.##' } },
+    { group: 'chi_tiet', key: 'trang_thai_giao', header: 'Trạng thái giao dòng' },
+    { group: 'chi_tiet', key: 'don_gia_ban', header: 'Đơn giá bán', style: { numFmt: '#,##0' }, default: true },
+    { group: 'chi_tiet', key: 'chiet_khau', header: 'Chiết khấu', style: { numFmt: '#,##0.##' } },
+    { group: 'chi_tiet', key: 'kieu_chiet_khau', header: 'Kiểu chiết khấu' },
+    { group: 'chi_tiet', key: 'thanh_tien', header: 'Thành tiền', style: { numFmt: '#,##0' }, default: true }
 ];
+
+const ORDER_EXPORT_COLUMN_MAP = ORDER_EXPORT_COLUMN_DEFS.reduce((map, item) => {
+    map[item.key] = item;
+    return map;
+}, {});
+
+const ORDER_EXPORT_COLUMN_GROUPS = [
+    { id: 'don_hang', title: 'Thông tin đơn hàng' },
+    { id: 'khach_nhan', title: 'Khách hàng & nhận hàng' },
+    { id: 'thanh_toan', title: 'Thanh toán' },
+    { id: 'chi_tiet', title: 'Chi tiết đặt hàng' }
+].map(group => ({
+    ...group,
+    columns: ORDER_EXPORT_COLUMN_DEFS.filter(item => item.group === group.id)
+}));
+
+const ORDER_EXPORT_COLUMNS = ORDER_EXPORT_COLUMN_DEFS.map(item => ({
+    header: item.header,
+    key: item.key,
+    ...(item.style ? { style: item.style } : {})
+}));
+
+function getOrderExportColumnGroupsForView() {
+    return ORDER_EXPORT_COLUMN_GROUPS.map(group => ({
+        id: group.id,
+        title: group.title,
+        columns: group.columns.map(col => ({
+            key: col.key,
+            header: col.header,
+            default: !!col.default
+        }))
+    }));
+}
+
+function resolveOrderExportColumns(rawKeys) {
+    if (!rawKeys) return ORDER_EXPORT_COLUMNS;
+    const keys = Array.isArray(rawKeys) ? rawKeys : [rawKeys];
+    const selected = keys
+        .map(key => String(key || '').trim())
+        .filter(key => ORDER_EXPORT_COLUMN_MAP[key]);
+    if (!selected.length) return [];
+    return selected.map(key => {
+        const def = ORDER_EXPORT_COLUMN_MAP[key];
+        return {
+            header: def.header,
+            key: def.key,
+            ...(def.style ? { style: def.style } : {})
+        };
+    });
+}
+
+function pickOrderExportRowValues(row, columns) {
+    const picked = {};
+    columns.forEach(column => {
+        picked[column.key] = row[column.key];
+    });
+    return picked;
+}
 
 const INVOICE_EXPORT_STATUS_MAP = {
     processing: 'Đang xử lý',
@@ -317,52 +389,56 @@ function exportLotName(lot) {
 function buildOrderExportRow(order, detail, shipment) {
     const product = detail?.hang_hoa_id || {};
     const customer = order.khach_hang_id || {};
-    const orderPayable = Number(order.khach_can_tra || order.tong_thanh_toan || order.tong_tien || 0);
-    const paid = Number(order.khach_thanh_toan || 0);
     const shippingFee = Number(shipment?.phi_giao_hang || 0);
-    const totalGoods = Number(order.tong_tien_hang || order.tong_tien || 0);
-    const quantity = detail ? Number(detail.so_luong_dat || detail.so_luong || 0) : 0;
-    const unitPrice = detail ? Number(detail.don_gia_ban || 0) : 0;
-    const lineDiscount = detail ? Number(detail.chiet_khau || 0) : 0;
-    const productCost = Number(product.gia_von || 0);
+    const codOn = order.cod_enabled === true || shipment?.cod_enabled === true;
+    const codAmount = Number(order.cod_amount || shipment?.cod_amount || 0);
     return {
         ma_don_hang: order.ma_don_hang || '',
-        thoi_gian_dat: formatExportDate(order.ngay_dat || order.created_at),
-        khach_hang: exportCustomerName(customer),
-        dien_thoai: exportCustomerPhone(customer, shipment),
-        dia_chi: exportAddress(customer, shipment),
+        ngay_dat: formatExportDate(order.ngay_dat || order.ngay_tao),
+        ngay_giao_thuc_te: formatExportDate(order.ngay_giao_thuc_te),
+        cua_hang: order.cua_hang_id ? (order.cua_hang_id.ten_cua_hang || order.cua_hang_id.ma_cua_hang || '') : '',
         kho: order.kho_id ? (order.kho_id.ten_kho || order.kho_id.ma_kho || '') : '',
         bang_gia: order.bang_gia_id ? (order.bang_gia_id.ten_bang_gia || order.bang_gia_id.ma_bang_gia || '') : '',
-        nhan_vien_ban_hang: exportUserName(order.nguoi_ban_id || order.nguoi_tao_id),
-        nhan_vien_tao: exportUserName(order.nguoi_tao_id),
-        doi_tac_giao_hang: shipment?.doi_tac_giao_hang_id ? (shipment.doi_tac_giao_hang_id.ten_doi_tac || '') : '',
-        trang_thai_don: ORDER_EXPORT_STATUS_MAP[order.trang_thai] || order.trang_thai || '',
+        nguoi_tao: exportUserName(order.nguoi_tao_id),
+        trang_thai: ORDER_EXPORT_STATUS_MAP[order.trang_thai] || order.trang_thai || '',
         trang_thai_giao_hang: ORDER_EXPORT_DELIVERY_STATUS_MAP[order.trang_thai_giao_hang] || order.trang_thai_giao_hang || '',
-        tong_so_luong: Number(order.tong_so_luong || 0),
-        tong_tien_hang: totalGoods,
-        giam_gia: Number(order.giam_gia || 0),
-        phi_giao_hang: shippingFee,
-        khach_can_tra: orderPayable,
-        khach_da_tra: paid,
-        cong_no: Math.max(0, orderPayable - paid),
-        cod: order.cod_enabled || shipment?.cod_enabled ? 'Có' : 'Không',
         ghi_chu: order.ghi_chu || '',
+        ma_khach_hang: customer.ma_khach_hang || '',
+        ten_khach_hang: exportCustomerName(customer),
+        ten_nguoi_nhan: shipment?.ten_nguoi_nhan || '',
+        sdt_nguoi_nhan: shipment?.sdt_nguoi_nhan || customer.sdt || customer.sdt2 || '',
+        dia_chi_nhan: shipment?.dia_chi_nhan || '',
+        doi_tac_giao_hang: shipment?.doi_tac_giao_hang_id ? (shipment.doi_tac_giao_hang_id.ten_doi_tac || '') : '',
+        nguoi_tra_phi_giao_hang: SHIPPING_FEE_PAYER_MAP[shipment?.nguoi_tra_phi_giao_hang] || '',
+        tong_so_luong_dat: Number(order.tong_so_luong_dat || 0),
+        tong_tien_hang: Number(order.tong_tien_hang || order.tong_tien || 0),
+        giam_gia: Number(order.giam_gia || 0),
+        kieu_giam_gia: order.kieu_giam_gia === 'phan_tram' ? '%' : 'VND',
+        phi_giao_hang: shippingFee,
+        khach_can_tra: Number(order.khach_can_tra || order.tong_thanh_toan || order.tong_tien || 0),
+        khach_thanh_toan: Number(order.khach_thanh_toan || 0),
+        tien_thua_tra_khach: Number(order.tien_thua_tra_khach || 0),
+        cod_enabled: codOn ? 'Có' : 'Không',
+        cod_amount: codAmount,
         ma_hang: product.ma_hang || '',
         ten_hang: product.ten_hang || '',
-        thuong_hieu: product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu || '' : '',
-        nhom_hang: product.nhom_hang_id ? product.nhom_hang_id.ten_nhom_hang || '' : '',
-        don_vi_tinh: product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi || product.don_vi_tinh_id.ma_don_vi || '' : '',
         lo_hang: exportLotName(detail?.lo_hang_id),
-        so_luong: quantity,
-        don_gia: unitPrice,
-        giam_gia_dong: lineDiscount,
-        thanh_tien: detail ? Number(detail.thanh_tien || 0) : 0,
-        gia_von: productCost,
-        ghi_chu_dong: detail?.ghi_chu || ''
+        so_luong_dat: detail ? Number(detail.so_luong_dat || detail.so_luong || 0) : '',
+        so_luong_xac_nhan: detail ? Number(detail.so_luong_xac_nhan || 0) : '',
+        so_luong_da_giao: detail ? Number(detail.so_luong_da_giao || 0) : '',
+        so_luong_con_thieu: detail ? Number(detail.so_luong_con_thieu || 0) : '',
+        trang_thai_giao: detail
+            ? (ORDER_EXPORT_LINE_DELIVERY_STATUS_MAP[detail.trang_thai_giao] || detail.trang_thai_giao || '')
+            : '',
+        don_gia_ban: detail ? Number(detail.don_gia_ban || 0) : '',
+        chiet_khau: detail ? Number(detail.chiet_khau || 0) : '',
+        kieu_chiet_khau: detail ? (detail.kieu_chiet_khau === 'phan_tram' ? '%' : 'VND') : '',
+        thanh_tien: detail ? Number(detail.thanh_tien || 0) : ''
     };
 }
 
-function applyExportWorksheetFormat(worksheet) {
+function applyExportWorksheetFormat(worksheet, columnCount) {
+    const totalColumns = columnCount || worksheet.columnCount || ORDER_EXPORT_COLUMNS.length;
     const headerRow = worksheet.getRow(1);
     headerRow.eachCell(cell => {
         cell.font = { bold: true, color: { argb: 'FF111827' } };
@@ -377,7 +453,7 @@ function applyExportWorksheetFormat(worksheet) {
     });
     worksheet.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: 1, column: ORDER_EXPORT_COLUMNS.length }
+        to: { row: 1, column: totalColumns }
     };
     worksheet.views = [{ state: 'frozen', ySplit: 1 }];
     worksheet.eachRow((row, rowNumber) => {
@@ -610,6 +686,7 @@ async function buildFullOrderFilter(query = {}) {
 async function loadOrderExportData(filter) {
     const orders = await DonHang.find(filter)
         .populate('khach_hang_id')
+        .populate('cua_hang_id')
         .populate('kho_id')
         .populate('bang_gia_id')
         .populate('nguoi_tao_id')
@@ -619,14 +696,7 @@ async function loadOrderExportData(filter) {
     const [details, shipments] = await Promise.all([
         orderIds.length
             ? CTDonHang.find({ don_hang_id: { $in: orderIds } })
-                .populate({
-                    path: 'hang_hoa_id',
-                    populate: [
-                        { path: 'thuong_hieu_id' },
-                        { path: 'nhom_hang_id' },
-                        { path: 'don_vi_tinh_id' }
-                    ]
-                })
+                .populate('hang_hoa_id', 'ma_hang ten_hang')
                 .populate('lo_hang_id')
                 .sort({ created_at: 1 })
             : [],
@@ -651,7 +721,7 @@ async function loadOrderExportData(filter) {
 
     orders.forEach(order => {
         const orderDetails = detailMap[String(order._id)] || [];
-        order.tong_so_luong = orderDetails.reduce((sum, detail) => {
+        order.tong_so_luong_dat = orderDetails.reduce((sum, detail) => {
             return sum + Number(detail.so_luong_dat || detail.so_luong || 0);
         }, 0);
     });
@@ -659,22 +729,25 @@ async function loadOrderExportData(filter) {
     return { orders, detailMap, shipmentMap };
 }
 
-async function sendOrderWorkbook(res, filename, orders, detailMap, shipmentMap) {
+async function sendOrderWorkbook(res, filename, orders, detailMap, shipmentMap, selectedColumns) {
+    const columns = selectedColumns && selectedColumns.length ? selectedColumns : ORDER_EXPORT_COLUMNS;
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Đặt hàng');
-    worksheet.columns = ORDER_EXPORT_COLUMNS;
+    worksheet.columns = columns;
 
     orders.forEach(order => {
         const details = detailMap[String(order._id)] || [];
         const shipment = shipmentMap[String(order._id)] || null;
         if (!details.length) {
-            worksheet.addRow(buildOrderExportRow(order, null, shipment));
+            worksheet.addRow(pickOrderExportRowValues(buildOrderExportRow(order, null, shipment), columns));
             return;
         }
-        details.forEach(detail => worksheet.addRow(buildOrderExportRow(order, detail, shipment)));
+        details.forEach(detail => {
+            worksheet.addRow(pickOrderExportRowValues(buildOrderExportRow(order, detail, shipment), columns));
+        });
     });
 
-    applyExportWorksheetFormat(worksheet);
+    applyExportWorksheetFormat(worksheet, columns.length);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
     await workbook.xlsx.write(res);
@@ -1318,8 +1391,6 @@ async function seedVanDonIfEmpty(userId) {
             ten_cua_hang: 'Cua hang demo',
             dia_chi_chi_tiet: '12 Nguyen Trai',
             dia_chi_day_du: '12 Nguyen Trai, Thuong Dinh, Ha Noi',
-            dia_chi_gui_hang_chi_tiet: '12 Nguyen Trai',
-            dia_chi_gui_hang_day_du: '12 Nguyen Trai, Thuong Dinh, Ha Noi',
             tinh_thanh: 'Ha Noi',
             phuong_xa: 'Thuong Dinh',
             sdt: '0901000001',
@@ -1669,7 +1740,8 @@ router.get('/', async (req, res, next) => {
             orders,
             partners,
             users,
-            filters: req.query || {}
+            filters: req.query || {},
+            exportColumnGroups: getOrderExportColumnGroupsForView()
         });
     } catch (error) {
         next(error);
@@ -1709,6 +1781,20 @@ router.get('/export.xlsx', async (req, res, next) => {
     }
 });
 
+router.post('/export-excel', async (req, res, next) => {
+    try {
+        const columns = resolveOrderExportColumns(req.body.columns);
+        if (!columns.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 cột để xuất.' });
+        }
+        const filter = await buildFullOrderFilter(req.body || {});
+        const { orders, detailMap, shipmentMap } = await loadOrderExportData(filter);
+        await sendOrderWorkbook(res, 'don-hang.xlsx', orders, detailMap, shipmentMap, columns);
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
@@ -1730,7 +1816,13 @@ router.get('/:id/export.xlsx', async (req, res, next) => {
 
 router.get('/create', async (req, res, next) => {
     try {
-        const data = await getOrderCreateData();
+        const storeId = await resolveStoreId(req);
+        const [data, warehouses] = await Promise.all([
+            getOrderCreateData(),
+            storeId
+                ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 }).lean()
+                : []
+        ]);
         let sourceOrder = null;
         let sourceOrderItems = [];
         let sourceShipment = null;
@@ -1755,6 +1847,8 @@ router.get('/create', async (req, res, next) => {
         res.render('don-hang/create', {
             title: 'Đặt hàng',
             ...data,
+            currentStoreId: storeId || '',
+            warehouses,
             sourceOrder,
             sourceOrderItems,
             sourceShipment,
@@ -1799,6 +1893,10 @@ router.post('/add', async (req, res, next) => {
         if (!kho_id) {
             return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
         }
+        const sessionStoreId = await resolveStoreId(req);
+        if (!sessionStoreId) {
+            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở menu trên.' });
+        }
         if (!khach_hang_id) {
             return res.status(400).json({ success: false, message: 'Vui lòng chọn khách hàng.' });
         }
@@ -1811,6 +1909,9 @@ router.post('/add', async (req, res, next) => {
         const kho = await Kho.findById(kho_id).lean();
         if (!kho) {
             return res.status(400).json({ success: false, message: 'Kho không hợp lệ.' });
+        }
+        if (String(kho.cua_hang_id || '') !== sessionStoreId) {
+            return res.status(400).json({ success: false, message: 'Kho không thuộc cửa hàng đang làm việc.' });
         }
         const validBangGiaId = /^[0-9a-fA-F]{24}$/.test(String(bang_gia_id || '')) ? bang_gia_id : null;
 
@@ -1857,7 +1958,7 @@ router.post('/add', async (req, res, next) => {
             ? Math.min(Math.max(Number(chiet_khau || 0), 0), 100)
             : orderDiscount;
         const calculatedShippingFee = await tinhPhiGiaoHang({
-            cua_hang_id: cua_hang_id || kho.cua_hang_id || null,
+            cua_hang_id: sessionStoreId,
             khach_hang_id,
             dia_chi_khach_hang_id,
             doi_tac_giao_hang_id,
@@ -1878,7 +1979,7 @@ router.post('/add', async (req, res, next) => {
         const shippingFeePayer = nguoi_tra_phi_giao_hang === 'cua_hang' ? 'cua_hang' : 'khach';
         const effectiveShippingFee = shippingFeePayer === 'khach' ? 0 : shippingFee;
         await luuPhiVanChuyenKhachHang({
-            cua_hang_id: cua_hang_id || kho.cua_hang_id || null,
+            cua_hang_id: sessionStoreId,
             khach_hang_id,
             dia_chi_khach_hang_id,
             doi_tac_giao_hang_id,
@@ -1898,7 +1999,7 @@ router.post('/add', async (req, res, next) => {
             ma_don_hang,
             bang_gia_id: validBangGiaId,
             khach_hang_id: khach_hang_id || null,
-            cua_hang_id: cua_hang_id || kho.cua_hang_id || null,
+            cua_hang_id: sessionStoreId,
             kho_id: kho_id || null,
             nguoi_tao_id: req.user?._id,
             ngay_dat: new Date(),
@@ -2043,7 +2144,13 @@ router.get('/hoa-don/export.xlsx', async (req, res, next) => {
 
 router.get('/hoa-don/create', async (req, res, next) => {
     try {
-        const data = await getOrderCreateData();
+        const storeId = await resolveStoreId(req);
+        const [data, warehouses] = await Promise.all([
+            getOrderCreateData(),
+            storeId
+                ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 }).lean()
+                : []
+        ]);
         let sourceOrder = null;
         let sourceOrderItems = [];
         let sourceShipment = null;
@@ -2097,6 +2204,8 @@ router.get('/hoa-don/create', async (req, res, next) => {
         res.render('don-hang/hoa-don-create', {
             title: 'Hóa đơn',
             ...data,
+            currentStoreId: storeId || '',
+            warehouses,
             sourceOrder,
             sourceOrderItems,
             sourceShipment,
@@ -2340,19 +2449,29 @@ async function createInvoice(req, res, next) {
                     data: { invoice: existingInvoice, id: existingInvoice._id, ma_hoa_don: existingInvoice.ma_hoa_don }
                 });
             }
-            const orderDetails = await CTDonHang.find({ don_hang_id }).lean();
-            invoiceItems = orderDetails.map(row => ({
-                hang_hoa_id: row.hang_hoa_id,
-                lo_hang_id: row.lo_hang_id,
-                so_luong: row.so_luong_dat || row.so_luong || 0,
-                don_gia_ban: row.don_gia_ban || 0,
-                chiet_khau: row.chiet_khau || 0,
-                kieu_chiet_khau: row.kieu_chiet_khau || 'vnd'
-            }));
+            const parsedFromBody = parseItems(items);
+            if (Array.isArray(parsedFromBody) && parsedFromBody.length) {
+                invoiceItems = parsedFromBody;
+            } else {
+                const orderDetails = await CTDonHang.find({ don_hang_id }).lean();
+                invoiceItems = orderDetails.map(row => ({
+                    hang_hoa_id: row.hang_hoa_id,
+                    lo_hang_id: row.lo_hang_id,
+                    so_luong: row.so_luong_dat || row.so_luong || 0,
+                    don_gia_ban: row.don_gia_ban || 0,
+                    chiet_khau: row.chiet_khau || 0,
+                    kieu_chiet_khau: row.kieu_chiet_khau || 'vnd'
+                }));
+            }
         }
 
         if (!Array.isArray(invoiceItems) || !invoiceItems.length) {
             return res.status(400).json({ success: false, message: 'Hóa đơn chưa có sản phẩm' });
+        }
+
+        const sessionStoreId = await resolveStoreId(req);
+        if (!sessionStoreId) {
+            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở menu trên.' });
         }
 
         const finalKhoId = kho_id || sourceOrder?.kho_id;
@@ -2361,6 +2480,9 @@ async function createInvoice(req, res, next) {
         }
         const kho = await Kho.findById(finalKhoId).lean();
         if (!kho) return res.status(400).json({ success: false, message: 'Kho không hợp lệ.' });
+        if (String(kho.cua_hang_id || '') !== sessionStoreId) {
+            return res.status(400).json({ success: false, message: 'Kho không thuộc cửa hàng đang làm việc.' });
+        }
 
         let tong_tien_hang = 0;
         const normalizedItems = [];
@@ -2385,7 +2507,7 @@ async function createInvoice(req, res, next) {
 
         const discount = normalizeDiscount(chiet_khau ?? sourceOrder?.giam_gia, kieu_giam_gia || sourceOrder?.kieu_giam_gia, tong_tien_hang);
         const finalCustomerId = khach_hang_id || sourceOrder?.khach_hang_id || null;
-        const finalStoreId = cua_hang_id || sourceOrder?.cua_hang_id || kho.cua_hang_id || null;
+        const finalStoreId = sessionStoreId;
         const shouldShip = isEnabled(giao_hang) || Boolean(doi_tac_giao_hang_id) || isEnabled(thu_ho_cod) || isEnabled(cod_enabled) || Boolean(sourceOrder?.cod_enabled);
         let shippingFee = Number(phi_van_chuyen);
         if (shouldShip && (!Number.isFinite(shippingFee) || shippingFee < 0)) {

@@ -3,8 +3,10 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
+const { dbWriteLoggerPlugin } = require('../utils/dbWriteLogger');
 
 mongoose.set("strictQuery", true);
+mongoose.plugin(dbWriteLoggerPlugin);
 
 const uri = process.env.MONGO_URI;
 if (!uri) {

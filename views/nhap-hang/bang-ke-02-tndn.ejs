@@ -1,14 +1,14 @@
 <%
   const phieuNhap = ticket || {};
   const cuaHang = store || phieuNhap.cua_hang_id || {};
-  const doanhNghiepInfo = doanhNghiep || {};
+  const businessInfo = locals.businessInfo || {};
   const nhaCungCap = phieuNhap.nha_cung_cap_id || {};
   const diaChiNcc = supplierAddress || {};
   const ngayNhap = phieuNhap.ngay_nhap ? new Date(phieuNhap.ngay_nhap) : new Date();
   const dot = '................................................................';
-  const businessName = doanhNghiepInfo.ten_doanh_nghiep || cuaHang.ten_cua_hang;
-  const businessTaxCode = doanhNghiepInfo.ma_so_thue || cuaHang.ma_so_thue;
-  const businessAddress = doanhNghiepInfo.dia_chi_day_du || cuaHang.dia_chi_day_du;
+  const businessName = businessInfo.ten_cua_hang || cuaHang.ten_cua_hang;
+  const businessTaxCode = businessInfo.ma_so_thue || cuaHang.ma_so_thue;
+  const businessAddress = businessInfo.dia_chi_day_du || cuaHang.dia_chi_day_du;
 
   const fmtMoney = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtDate = value => {
@@ -65,7 +65,16 @@
     return sentence.charAt(0).toUpperCase() + sentence.slice(1) + ' đồng';
   }
 
+  const printBundles = (typeof printGroups !== 'undefined' && printGroups && printGroups.length) ? printGroups : null;
   let totalAmount = 0;
+  let tndnRowCount = 0;
+  if (printBundles) {
+    printBundles.forEach(function(block) {
+      tndnRowCount += (block.displayRows || []).length;
+    });
+  } else {
+    tndnRowCount = (items || []).length;
+  }
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -108,6 +117,7 @@
     .col-total{width:10%}
     .col-note{width:8%}
     .column-numbers td{height:16px;text-align:center;padding:2px;font-size:11.5px;line-height:1}
+    td.seller-merge-cell{vertical-align:middle}
     .total-line{margin:5px 0 14px;line-height:1.35}
     .signatures{display:grid;grid-template-columns:1fr 1fr;gap:20mm;margin-top:8px;text-align:center;align-items:start}
     .signature-box{min-height:35mm}
@@ -151,7 +161,7 @@
       <div>- Mã số thuế: <%= fill(businessTaxCode) %></div>
       <div>- Địa chỉ: <%= fill(businessAddress) %></div>
       <div>- Số điện thoại: <%= fill(cuaHang.sdt || cuaHang.email) %></div>
-      <div>- Địa chỉ nơi tổ chức thu mua: <%= fill(cuaHang.dia_chi_gui_hang_day_du || cuaHang.dia_chi_day_du) %></div>
+      <div>- Địa chỉ nơi tổ chức thu mua: <%= fill(cuaHang.dia_chi_day_du || cuaHang.dia_chi) %></div>
     </section>
 
     <table>
@@ -189,22 +199,51 @@
         <tr class="column-numbers">
           <td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td><td>8</td><td>9</td><td>10</td>
         </tr>
-        <% (items || []).forEach(function(row) { totalAmount += Number(row.thanh_tien || 0); %>
-          <tr>
-            <td class="date-cell"><%= fmtDate(phieuNhap.ngay_nhap) %></td>
-            <td class="text-cell"><%= sellerName %></td>
-            <td class="text-cell"><%= sellerAddress %></td>
-            <td class="center"><%= nhaCungCap.ma_so_thue || '' %></td>
-            <td class="center"><%= nhaCungCap.sdt || '' %></td>
-            <td class="text-cell"><%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %></td>
-            <td class="num-cell"><%= fmtMoney(row.so_luong) %></td>
-            <td class="num-cell"><%= fmtMoney(row.don_gia_nhap) %></td>
-            <td class="num-cell"><%= fmtMoney(row.thanh_tien) %></td>
-            <td class="note-cell"><%= row.ghi_chu || phieuNhap.ghi_chu || '' %></td>
-          </tr>
-        <% }) %>
-        <% if (!(items || []).length) { %>
-          <tr><td colspan="10" class="center">Không có dữ liệu</td></tr>
+        <% if (printBundles) { %>
+          <% var tndnRowIndex = 0; %>
+          <% printBundles.forEach(function(block) { %>
+            <% block.displayRows.forEach(function(dr, j) { totalAmount += Number(dr.thanh_tien || 0); tndnRowIndex++; %>
+              <tr>
+                <% if (tndnRowIndex === 1) { %>
+                  <td class="date-cell seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= fmtDate(phieuNhap.ngay_nhap) %></td>
+                  <td class="text-cell seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= sellerName %></td>
+                  <td class="text-cell seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= sellerAddress %></td>
+                  <td class="center seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= nhaCungCap.ma_so_thue || '' %></td>
+                  <td class="center seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= nhaCungCap.sdt || '' %></td>
+                <% } %>
+                <td class="text-cell">
+                  <%= block.product_ten %><% if (dr.ten_thuoc_tinh && dr.ten_thuoc_tinh !== '--') { %> — <%= dr.ten_thuoc_tinh %><% } %>
+                </td>
+                <td class="num-cell"><%= fmtMoney(dr.so_luong) %></td>
+                <td class="num-cell"><%= fmtMoney(dr.don_gia_nhap) %></td>
+                <td class="num-cell"><%= fmtMoney(dr.thanh_tien) %></td>
+                <td class="note-cell"><%= j === 0 ? (block.ghi_chu_line || phieuNhap.ghi_chu || '') : '' %></td>
+              </tr>
+            <% }); %>
+          <% }); %>
+          <% if (!printBundles.length) { %>
+            <tr><td colspan="10" class="center">Không có dữ liệu</td></tr>
+          <% } %>
+        <% } else { %>
+          <% (items || []).forEach(function(row, index) { totalAmount += Number(row.thanh_tien || 0); %>
+            <tr>
+              <% if (index === 0) { %>
+                <td class="date-cell seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= fmtDate(phieuNhap.ngay_nhap) %></td>
+                <td class="text-cell seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= sellerName %></td>
+                <td class="text-cell seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= sellerAddress %></td>
+                <td class="center seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= nhaCungCap.ma_so_thue || '' %></td>
+                <td class="center seller-merge-cell" rowspan="<%= tndnRowCount %>"><%= nhaCungCap.sdt || '' %></td>
+              <% } %>
+              <td class="text-cell"><%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %></td>
+              <td class="num-cell"><%= fmtMoney(row.so_luong) %></td>
+              <td class="num-cell"><%= fmtMoney(row.don_gia_nhap) %></td>
+              <td class="num-cell"><%= fmtMoney(row.thanh_tien) %></td>
+              <td class="note-cell"><%= row.ghi_chu || phieuNhap.ghi_chu || '' %></td>
+            </tr>
+          <% }) %>
+          <% if (!(items || []).length) { %>
+            <tr><td colspan="10" class="center">Không có dữ liệu</td></tr>
+          <% } %>
         <% } %>
       </tbody>
     </table>

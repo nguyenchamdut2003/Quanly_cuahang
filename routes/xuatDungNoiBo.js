@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const { isAuthenticated } = require('../middlewares/auth.middleware');
 const {
@@ -7,15 +8,66 @@ const {
     CTXuatNoiBo,
     LoaiXuatNoiBo,
     HangHoa,
-    CuaHang,
     NguoiDung,
     Kho,
     KhachHang,
-    NhaCungCap
+    NhaCungCap,
+    TonKho,
+    TonKhoLo
 } = require('../models/kiot.model');
 const { truTonKho } = require('../services/kho.service');
+const { resolveStoreId } = require('../utils/storeScope');
 
 router.use(isAuthenticated);
+
+async function loadProductsForXnbKho(khoId, keyword) {
+    const [products, tonKhoRows, tonKhoLoRows] = await Promise.all([
+        HangHoa.find({ trang_thai: { $ne: 'inactive' } })
+            .populate('don_vi_tinh_id', 'ten_don_vi')
+            .select('ma_hang ten_hang gia_von quan_ly_theo_lo don_vi_tinh_id')
+            .sort({ ten_hang: 1 })
+            .lean(),
+        TonKho.find({ kho_id: khoId }).lean(),
+        TonKhoLo.find({ kho_id: khoId, so_luong: { $gt: 0 } }).lean()
+    ]);
+
+    const stockByNormal = tonKhoRows.reduce(function(map, row) {
+        map[String(row.hang_hoa_id)] = Number(row.so_luong || 0);
+        return map;
+    }, {});
+
+    const stockByLotProduct = tonKhoLoRows.reduce(function(map, row) {
+        const key = String(row.hang_hoa_id);
+        map[key] = Number(map[key] || 0) + Number(row.so_luong || 0);
+        return map;
+    }, {});
+
+    let items = products.map(function(p) {
+        const id = String(p._id);
+        let tonKho = Number(stockByNormal[id] || 0);
+        if (p.quan_ly_theo_lo) {
+            const lotSum = Number(stockByLotProduct[id] || 0);
+            tonKho = lotSum > 0 ? lotSum : tonKho;
+        }
+        return {
+            _id: id,
+            ma_hang: p.ma_hang || '',
+            ten_hang: p.ten_hang || '',
+            don_vi_tinh: p.don_vi_tinh_id ? (p.don_vi_tinh_id.ten_don_vi || 'cái') : 'cái',
+            gia_von: Number(p.gia_von || 0),
+            ton_kho: tonKho
+        };
+    });
+
+    const q = String(keyword || '').trim().toLowerCase();
+    if (q) {
+        items = items.filter(function(p) {
+            return String(p.ma_hang || '').toLowerCase().includes(q)
+                || String(p.ten_hang || '').toLowerCase().includes(q);
+        });
+    }
+    return items;
+}
 
 const STATUS_MAP = {
     draft: 'Phiếu tạm',
@@ -277,21 +329,38 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+router.get('/api/san-pham', async (req, res, next) => {
+    try {
+        const khoId = String(req.query.kho_id || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(khoId)) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
+        }
+        const kho = await Kho.findById(khoId).lean();
+        if (!kho) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy kho.' });
+        }
+        const items = await loadProductsForXnbKho(khoId, req.query.keyword);
+        return res.json({ success: true, items: items.slice(0, 100) });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/create', async (req, res, next) => {
     try {
-        const [products, stores, users, warehouses, customers, suppliers] = await Promise.all([
-            HangHoa.find().sort({ ten_hang: 1 }),
-            CuaHang.find().sort({ ten_cua_hang: 1 }),
+        const storeId = await resolveStoreId(req);
+        const [users, warehouses, customers, suppliers] = await Promise.all([
             NguoiDung.find().sort({ ho_ten: 1 }),
-            Kho.find({ trang_thai: 'active' }).sort({ ten_kho: 1 }),
+            storeId
+                ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 })
+                : [],
             KhachHang.find().sort({ ten_khach_hang: 1 }),
             NhaCungCap.find().sort({ ten_ncc: 1 })
         ]);
         const loaiXuatList = await loadLoaiXuatList();
         res.render('xuat-dung-noi-bo/create', {
             title: 'Xuất dùng nội bộ',
-            products,
-            stores,
+            currentStoreId: storeId || '',
             users,
             warehouses,
             customers,
@@ -453,10 +522,11 @@ router.post('/add', async (req, res, next) => {
         }
 
         const ma_xuat_noi_bo = 'XNB' + Date.now();
+        const sessionStoreId = await resolveStoreId(req);
         const phieu = await PhieuXuatNoiBo.create({
             ma_xuat_noi_bo,
             loai_xuat: loai_xuat || 'xuat_dung_noi_bo',
-            cua_hang_id: cua_hang_id || kho.cua_hang_id,
+            cua_hang_id: cua_hang_id || kho.cua_hang_id || sessionStoreId,
             kho_id: kho._id,
             nguoi_tao_id: req.user?._id,
             nguoi_nhan: finalReceiverName,

@@ -32,6 +32,22 @@ function normalizeSubjectGroup(value, customerId, supplierId) {
   return 'khac';
 }
 
+function normalizeAllocations(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => {
+    const phieuNhapId = optionalId(item && item.phieu_nhap_id);
+    const amount = parseMoney(item && item.so_tien);
+    if (!phieuNhapId || amount <= 0) return null;
+    return {
+      phieu_nhap_id: phieuNhapId,
+      ma_phieu_nhap: String(item.ma_phieu_nhap || '').trim(),
+      so_tien: amount,
+      con_no_truoc: parseMoney(item.con_no_truoc),
+      con_no_sau: parseMoney(item.con_no_sau)
+    };
+  }).filter(Boolean);
+}
+
 async function ensureDefaultSoQuy(cuaHangId) {
   const query = cuaHangId && isObjectId(cuaHangId)
     ? { loai: 'cash', cua_hang_id: cuaHangId }
@@ -171,6 +187,8 @@ async function taoPhieuThuChi(data = {}) {
   const { customerId, supplierId, partnerName } = await resolvePartner(data);
   const code = String(data.ma_phieu || '').trim() || await makeReceiptCode(loaiPhieu);
   const storeId = optionalId(data.cua_hang_id) || cashBook.cua_hang_id || undefined;
+  const allocations = normalizeAllocations(data.allocations);
+  const overpaymentAmount = Math.max(0, parseMoney(data.overpayment_amount));
   const receipt = await PhieuThuChi.create({
     ma_phieu: code,
     ngay_lap: data.ngay_lap ? new Date(data.ngay_lap) : new Date(),
@@ -193,6 +211,9 @@ async function taoPhieuThuChi(data = {}) {
     phieu_tra_hang_nhap_id: optionalId(data.phieu_tra_hang_nhap_id),
     van_don_id: optionalId(data.van_don_id),
     ma_chung_tu_goc: data.ma_chung_tu_goc,
+    allocation_type: data.allocation_type,
+    overpayment_amount: overpaymentAmount,
+    allocations,
     nhom_doi_tuong: normalizeSubjectGroup(data.nhom_doi_tuong, customerId, supplierId),
     phuong_thuc_thanh_toan: normalizePaymentMethod(data.phuong_thuc_thanh_toan)
   });

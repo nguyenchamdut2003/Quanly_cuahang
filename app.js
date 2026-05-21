@@ -7,6 +7,7 @@ var logger = require('morgan');
 var session = require('express-session');
 var passport = require('./config/passport');
 var { CuaHang, LoHang } = require('./models/kiot.model');
+var { dbWriteRequestContext } = require('./utils/dbWriteLogger');
 
 var indexRouter = require('./routes/index');
 var authRouter = require('./routes/auth');
@@ -14,7 +15,6 @@ var profileRouter = require('./routes/profile');
 var cuaHangRouter = require('./routes/cuaHang');
 var hangHoaRouter = require('./routes/hangHoa');
 var nhaCungCapRouter = require('./routes/nhaCungCap');
-var cauHinhRouter = require('./routes/cauHinh');
 var { isAuthenticated } = require('./middlewares/auth.middleware');
 var nhapHangRouter = require('./routes/nhapHang');
 var nhapHangController = require('./controllers/nhapHang.controller');
@@ -31,6 +31,7 @@ var xuatHuyRouter = require('./routes/xuatHuy');
 var stockVoucherRouter = require('./routes/stockVoucher');
 var xuatHuyController = require('./controllers/xuatHuy.controller');
 var apiKhoRouter = require('./routes/apiKho');
+var apiAddressRouter = require('./routes/apiAddress');
 var traHangNhapRouter = require('./routes/traHangNhap');
 var phongBanRouter = require('./routes/phongBan');
 var apiPhongBanRouter = require('./routes/apiPhongBan');
@@ -54,6 +55,7 @@ app.use(function(req, res, next) {
 });
 
 app.use(logger('dev'));
+app.use(dbWriteRequestContext);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
@@ -161,7 +163,6 @@ app.use('/', indexRouter);
 app.use('/auth', authRouter);
 app.use('/profile', profileRouter);
 app.use('/cua-hang', cuaHangRouter);
-app.use('/cau-hinh', cauHinhRouter);
 app.use('/hang-hoa', hangHoaRouter);
 app.use('/nha-cung-cap', nhaCungCapRouter);
 app.use('/nhap-hang', nhapHangRouter);
@@ -202,6 +203,7 @@ app.put('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.qu
 app.post('/api/hang-hoa/:id/inactive', isAuthenticated, nhapHangController.inactiveProduct);
 
 app.use('/api', apiKhoRouter);
+app.use('/api/address', apiAddressRouter);
 app.use('/api/don-hang', donHangRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);

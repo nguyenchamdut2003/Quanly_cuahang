@@ -448,8 +448,7 @@
         ten_cua_hang: s.ten_cua_hang || '',
         sdt: s.sdt || '',
         email: s.email || '',
-        dia_chi_day_du: s.dia_chi_day_du || s.dia_chi_chi_tiet || '',
-        dia_chi_gui_hang: s.dia_chi_gui_hang_day_du || s.dia_chi_day_du || '',
+        dia_chi_day_du: s.dia_chi_day_du || s.dia_chi || s.dia_chi_chi_tiet || '',
         tinh_thanh: s.tinh_thanh || '',
         phuong_xa: s.phuong_xa || ''
       }))) %>;
@@ -470,7 +469,7 @@
           box.textContent = 'ChÆ°a chá»n nÆ¡i láº¥y hÃ ng';
           return;
         }
-        const address = store.dia_chi_gui_hang || formatAddress(store) || 'ChÆ°a cÃ³ Ä‘á»‹a chá»‰';
+        const address = storeAddress() || 'ChÆ°a cÃ³ Ä‘á»‹a chá»‰';
         box.innerHTML = `<strong>${store.ten_cua_hang}</strong><br>SÄT: ${store.sdt || 'ChÆ°a cÃ³'}<br>Äá»‹a chá»‰ láº¥y hÃ ng: ${address}`;
       }
 
@@ -485,7 +484,7 @@
           const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
           const result = await res.json();
           const warehouses = result.success ? (result.data || []) : [];
-          khoSelect.innerHTML = '<option value="">Chá»n kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
+          khoSelect.innerHTML = '<option value="">Chá»n kho</option>' + warehouses.map(k => `<option value="${k._id}" data-address="${escapeHtml(k.dia_chi_day_du || k.dia_chi || '')}">${k.ten_kho}</option>`).join('');
           khoSelect.disabled = false;
           if (selectedKhoId) khoSelect.value = selectedKhoId;
         } catch (error) {
@@ -600,7 +599,10 @@
 
       function storeAddress() {
         const store = storesData.find(s => s._id === document.getElementById('pickupStoreId').value);
-        return store ? (store.dia_chi_gui_hang || formatAddress(store) || store.ten_cua_hang || '') : '';
+        const warehouseSelect = document.getElementById('khoId');
+        const warehouseOption = warehouseSelect && warehouseSelect.options ? warehouseSelect.options[warehouseSelect.selectedIndex] : null;
+        const warehouseAddress = warehouseOption ? (warehouseOption.getAttribute('data-address') || '') : '';
+        return warehouseAddress || (store ? (formatAddress(store) || store.ten_cua_hang || '') : '');
       }
 
       function escapeHtml(value) {

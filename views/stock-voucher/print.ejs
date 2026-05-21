@@ -7,10 +7,11 @@
   const warehouse = v.warehouse || {};
   const creator = v.creator || {};
   const creatorName = creator.ho_ten || creator.username || creator.email || '';
-  const storeName = business.ten_doanh_nghiep || store.ten_cua_hang || 'Cửa hàng';
-  const storeAddress = business.dia_chi_day_du || store.dia_chi_day_du || store.dia_chi_gui_hang_day_du || '';
+  const storeName = business.ten_cua_hang || store.ten_cua_hang || 'Cửa hàng';
+  const storeAddress = business.dia_chi_day_du || store.dia_chi_day_du || store.dia_chi || '';
   const storePhone = business.sdt || store.sdt || business.email || store.email || '';
   const printUrl = '/chung-tu-kho/' + v.type + '/' + v.id;
+  const pdfQs = v.inventoryPrintVariant ? ('?variant=' + encodeURIComponent(v.inventoryPrintVariant)) : '';
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -42,7 +43,7 @@
   <% if (!v.embeddedPrint) { %>
     <div class="print-actions no-print">
       <button type="button" onclick="window.print()">In</button>
-      <a href="<%= printUrl %>/pdf">Tải PDF</a>
+      <a href="<%= printUrl %>/pdf<%= pdfQs %>">Tải PDF</a>
     </div>
   <% } %>
   <main class="page">
@@ -50,7 +51,7 @@
       <strong><%= storeName %></strong><br>
       <%= storeAddress %><%= storePhone ? (' - ' + storePhone) : '' %>
     </div>
-    <h1><%= v.heading || v.title || 'Chứng từ kho' %></h1>
+    <h1><%= v.isInventoryCheck && v.inventoryPrintVariant === 'thuc-te' ? 'PHIẾU KIỂM KHO — SỐ LƯỢNG THỰC TẾ' : (v.heading || v.title || 'Chứng từ kho') %></h1>
     <div class="movement"><%= v.movement || '' %></div>
     <div style="text-align:center;font-size:13px">Mã phiếu: <strong><%= v.code || '' %></strong></div>
 
@@ -71,7 +72,29 @@
       <div>Ghi chú: <strong><%= v.note || '' %></strong></div>
     </section>
 
-    <% if (v.isInventoryCheck) { %>
+    <% if (v.isInventoryCheck && v.inventoryPrintVariant === 'thuc-te') { %>
+      <table>
+        <thead>
+          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính</th><th>Lô</th><th>Số lượng thực tế</th><th>Ghi chú</th></tr>
+        </thead>
+        <tbody>
+          <% (v.items || []).forEach(function(row, index) { %>
+            <tr>
+              <td class="num"><%= index + 1 %></td>
+              <td><%= row.ma_hang || '' %></td>
+              <td><%= row.ten_hang || '' %></td>
+              <td><%= row.thuoc_tinh || '' %></td>
+              <td><%= row.lo || '' %></td>
+              <td class="num"><%= fmt(row.ton_thuc_te) %></td>
+              <td class="note-cell"><%= row.ghi_chu || '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <section class="summary">
+        <div><span>Tổng số lượng thực tế</span><strong><%= fmt(v.total_so_luong_thuc_te) %></strong></div>
+      </section>
+    <% } else if (v.isInventoryCheck) { %>
       <table>
         <thead>
           <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính/Size</th><th>Lô</th><th>Tồn hệ thống</th><th>Tồn thực tế</th><th>Chênh lệch</th><th>Giá trị lệch</th><th>Ghi chú</th></tr>

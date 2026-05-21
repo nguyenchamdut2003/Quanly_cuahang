@@ -57,6 +57,20 @@
     .status-check{display:none}
     .detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.order-detail{padding:0 18px 14px}.detail-tabs{height:40px;display:flex;align-items:flex-end;border-bottom:1px solid #e5e9ee}.detail-tab{height:40px;border:0;background:#fff;color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700;padding:0 0 8px;font-size:14px}.detail-head{display:flex;justify-content:space-between;gap:16px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 22px;margin-top:12px}.mini-field label{display:block;font-size:12px;margin-bottom:5px}.mini-input,.mini-select{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 9px;font-size:12px}.delivery-box{border:1px solid #cfd8e3;border-radius:6px;background:#fafbfc;padding:12px;margin:6px 0 14px}.delivery-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-bottom:10px}.delivery-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px 22px}.note{width:100%;height:70px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:12px;resize:vertical}.items-table{width:100%;border-collapse:collapse}.items-table th{height:32px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 8px}.items-table td{height:42px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;margin-top:14px}.totals{font-size:12px}.total-line{display:flex;justify-content:space-between;margin-bottom:10px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:10px}.detail-action-group{display:flex;gap:8px}.btn.solid{background:#0070f4;color:#fff;border-color:#0070f4}.loading-detail{height:160px;display:flex;align-items:center;justify-content:center;color:#667085}
     @media(max-width:1100px){.order-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+    .order-export-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;align-items:center;justify-content:center;padding:20px}
+    .order-export-modal{background:#fff;border-radius:10px;width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 18px 44px rgba(15,23,42,.28)}
+    .order-export-head{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 24px 12px;border-bottom:1px solid #e5e9ee}
+    .order-export-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .order-export-head p{margin:6px 0 0;font-size:13px;color:#667085}
+    .order-export-close{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:#667085}
+    .order-export-body{padding:16px 24px;overflow:auto;flex:1}
+    .order-export-group{margin-bottom:18px}
+    .order-export-group-title{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:800;color:#111827;margin-bottom:10px}
+    .order-export-group-count{font-size:12px;font-weight:700;color:#667085}
+    .order-export-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px}
+    .order-export-grid label{display:flex;align-items:center;gap:8px;font-size:13px;color:#344054;cursor:pointer}
+    .order-export-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 24px 20px;border-top:1px solid #e5e9ee}
+    .order-export-error{color:#d92d20;font-size:13px;margin:0 0 10px;display:none}
   </style>
 </head>
 <body>
@@ -94,7 +108,7 @@
           <div class="actions">
             <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Đặt hàng</a>
             <button type="button" class="btn" onclick="alert('Chọn các đơn cần gộp trước khi dùng chức năng này.')"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
-            <a class="btn" href="/don-hang/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <button type="button" class="btn" id="openOrderExportModal"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></button>
           </div>
         </div>
         <div class="table-wrap">
@@ -115,6 +129,64 @@
       </main>
     </div>
   </form>
+
+  <div id="orderExportModalOverlay" class="order-export-overlay">
+    <div class="order-export-modal" role="dialog" aria-labelledby="orderExportModalTitle">
+      <div class="order-export-head">
+        <div>
+          <h3 id="orderExportModalTitle">Tùy chọn cột hiển thị</h3>
+          <p>Chọn ít nhất 1 cột để xuất file</p>
+        </div>
+        <button type="button" class="order-export-close" id="orderExportModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="order-export-body">
+        <% (exportColumnGroups || []).forEach(function(group) { %>
+          <div class="order-export-group" data-export-group="<%= group.id %>">
+            <div class="order-export-group-title">
+              <span><%= group.title %></span>
+              <span class="order-export-group-count" data-export-group-count="<%= group.id %>">0/<%= group.columns.length %></span>
+            </div>
+            <div class="order-export-grid">
+              <% group.columns.forEach(function(col) { %>
+                <label>
+                  <input type="checkbox" class="order-export-col-cb" value="<%= col.key %>" data-export-group="<%= group.id %>"<%= col.default ? ' checked' : '' %>>
+                  <%= col.header %>
+                </label>
+              <% }) %>
+            </div>
+          </div>
+        <% }) %>
+        <p id="orderExportError" class="order-export-error">Vui lòng chọn ít nhất 1 cột.</p>
+      </div>
+      <div class="order-export-foot">
+        <button type="button" class="btn" id="orderExportDeselectAll">Bỏ chọn tất cả</button>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn" id="orderExportCancel">Bỏ qua</button>
+          <button type="button" class="btn primary" id="orderExportSubmit">Xuất file</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form id="orderExportForm" method="POST" action="/don-hang/export-excel" style="display:none">
+    <div id="orderExportFormInputs"></div>
+    <input type="hidden" name="q" value="<%= safeFilters.q || '' %>">
+    <input type="hidden" name="time_type" value="<%= safeFilters.time_type || 'this_month' %>">
+    <input type="hidden" name="date_from" value="<%= safeFilters.date_from || '' %>">
+    <input type="hidden" name="date_to" value="<%= safeFilters.date_to || '' %>">
+    <input type="hidden" name="doi_tac" value="<%= safeFilters.doi_tac || '' %>">
+    <input type="hidden" name="delivery_time_type" value="<%= safeFilters.delivery_time_type || '' %>">
+    <input type="hidden" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>">
+    <input type="hidden" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>">
+    <input type="hidden" name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>">
+    <input type="hidden" name="phuong_thuc_tt" value="<%= safeFilters.phuong_thuc_tt || '' %>">
+    <input type="hidden" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>">
+    <input type="hidden" name="nguoi_nhan" value="<%= safeFilters.nguoi_nhan || '' %>">
+    <% selectedStatuses.forEach(function(status) { %>
+      <input type="hidden" name="trang_thai" value="<%= status %>">
+    <% }) %>
+  </form>
+
   <script>
     const money = value => Number(value || 0).toLocaleString('vi-VN');
     const statusLabels = { draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
@@ -311,6 +383,79 @@
       if (!data.success) return alert(data.message || 'Không lưu được đơn hàng');
       alert(data.message || 'Đã lưu thông tin đơn hàng');
     }
+
+    (function initOrderExportModal() {
+      const overlay = document.getElementById('orderExportModalOverlay');
+      const openBtn = document.getElementById('openOrderExportModal');
+      const closeBtn = document.getElementById('orderExportModalClose');
+      const cancelBtn = document.getElementById('orderExportCancel');
+      const deselectBtn = document.getElementById('orderExportDeselectAll');
+      const submitBtn = document.getElementById('orderExportSubmit');
+      const errorEl = document.getElementById('orderExportError');
+      const form = document.getElementById('orderExportForm');
+      const formInputs = document.getElementById('orderExportFormInputs');
+
+      function updateGroupCounts() {
+        document.querySelectorAll('[data-export-group-count]').forEach(counter => {
+          const groupId = counter.getAttribute('data-export-group-count');
+          const total = document.querySelectorAll('.order-export-col-cb[data-export-group="' + groupId + '"]').length;
+          const checked = document.querySelectorAll('.order-export-col-cb[data-export-group="' + groupId + '"]:checked').length;
+          counter.textContent = checked + '/' + total;
+        });
+      }
+
+      function openModal() {
+        if (!overlay) return;
+        overlay.style.display = 'flex';
+        if (errorEl) errorEl.style.display = 'none';
+        updateGroupCounts();
+      }
+
+      function closeModal() {
+        if (overlay) overlay.style.display = 'none';
+      }
+
+      if (openBtn) openBtn.addEventListener('click', openModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (overlay) {
+        overlay.addEventListener('click', e => {
+          if (e.target === overlay) closeModal();
+        });
+      }
+      if (deselectBtn) {
+        deselectBtn.addEventListener('click', () => {
+          document.querySelectorAll('.order-export-col-cb').forEach(cb => { cb.checked = false; });
+          updateGroupCounts();
+        });
+      }
+      document.querySelectorAll('.order-export-col-cb').forEach(cb => {
+        cb.addEventListener('change', updateGroupCounts);
+      });
+      updateGroupCounts();
+
+      if (submitBtn) {
+        submitBtn.addEventListener('click', () => {
+          const selected = Array.from(document.querySelectorAll('.order-export-col-cb')).filter(cb => cb.checked);
+          if (!selected.length) {
+            if (errorEl) errorEl.style.display = 'block';
+            return;
+          }
+          if (errorEl) errorEl.style.display = 'none';
+          if (formInputs) {
+            formInputs.innerHTML = '';
+            selected.forEach(cb => {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = 'columns';
+              input.value = cb.value;
+              formInputs.appendChild(input);
+            });
+          }
+          if (form) form.submit();
+        });
+      }
+    })();
   </script>
 </body>
 </html>

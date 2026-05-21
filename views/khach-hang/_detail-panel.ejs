@@ -1,0 +1,424 @@
+<div class="kv-detail-panel product-detail customer-inline-detail">
+<%
+  var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+%>
+                        <div class="customer-detail" data-customer-detail>
+                          <div class="detail-tabs">
+                            <div class="detail-tab-list">
+                              <button class="detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
+                              <button class="detail-tab" type="button" data-tab-target="address">Danh sách địa chỉ</button>
+                              <button class="detail-tab" type="button" data-tab-target="orders">Đơn hàng</button>
+                              <button class="detail-tab" type="button" data-tab-target="invoices">Hóa đơn</button>
+                              <button class="detail-tab" type="button" data-tab-target="returns">Trả hàng</button>
+                              <button class="detail-tab" type="button" data-tab-target="debts">Công nợ</button>
+                            </div>
+                            <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
+                          </div>
+                          <div class="customer-detail-body">
+                            <div class="customer-detail-pane is-active" data-tab-pane="info">
+                                                            <% var c = selectedCustomer; %>
+                              <% var isCompany = c.loai_khach_hang === 'cong_ty'; %>
+                              <% var fbRaw = (c.facebook || '').trim(); %>
+                              <% var fbHref = fbRaw ? (fbRaw.match(/^https?:\/\//i) ? fbRaw : 'https://' + fbRaw.replace(/^\/+/, '')) : ''; %>
+                              <div class="store-fields customer-detail-fields">
+                                <div>
+                                  <span>Mã khách hàng</span>
+                                  <strong><%- refLink('customer', c, c.ma_khach_hang || '---') %></strong>
+                                </div>
+                                <div>
+                                  <span>Tên khách hàng</span>
+                                  <strong><%= formatDetailText(c.ten_khach_hang) %></strong>
+                                </div>
+                                <div>
+                                  <span>Nhóm khách hàng</span>
+                                  <strong><%= formatDetailText(c.nhom_khach_hang_ten) %></strong>
+                                </div>
+                                <div>
+                                  <span>Loại khách hàng</span>
+                                  <strong><%= isCompany ? 'Công ty' : 'Cá nhân' %></strong>
+                                </div>
+                                <div>
+                                  <span>Trạng thái</span>
+                                  <strong><%= formatCustomerStatusLabel(c.trang_thai) %></strong>
+                                </div>
+                                <div>
+                                  <span>Người tạo</span>
+                                  <strong><%= typeof formatCreatorName === 'function' ? formatCreatorName(c) : formatDetailText(c.nguoi_tao_ten) %></strong>
+                                </div>
+                                <% if (isCompany) { %>
+                                  <div>
+                                    <span>Tên công ty</span>
+                                    <strong><%= formatDetailText(c.ten_cong_ty || c.ten_khach_hang) %></strong>
+                                  </div>
+                                  <div>
+                                    <span>Mã số thuế</span>
+                                    <strong><%= formatDetailText(c.ma_so_thue) %></strong>
+                                  </div>
+                                  <div>
+                                    <span>Người đại diện</span>
+                                    <strong><%= formatDetailText(c.nguoi_dai_dien) %></strong>
+                                  </div>
+                                  <div>
+                                    <span>Chức vụ người đại diện</span>
+                                    <strong><%= formatDetailText(c.chuc_vu_nguoi_dai_dien) %></strong>
+                                  </div>
+                                <% } else { %>
+                                  <div>
+                                    <span>Tên cá nhân</span>
+                                    <strong><%= formatDetailText(c.ten_ca_nhan || c.ten_khach_hang) %></strong>
+                                  </div>
+                                  <div>
+                                    <span>CCCD</span>
+                                    <strong><%= formatDetailText(c.cccd) %></strong>
+                                  </div>
+                                  <div>
+                                    <span>Ngày sinh</span>
+                                    <strong><%= formatDateOnly(c.ngay_sinh) %></strong>
+                                  </div>
+                                  <div>
+                                    <span>Giới tính</span>
+                                    <strong><%= formatGenderLabel(c.gioi_tinh) %></strong>
+                                  </div>
+                                <% } %>
+                                <div>
+                                  <span>Điện thoại</span>
+                                  <strong><%= formatDetailText(c.sdt) %></strong>
+                                </div>
+                                <div>
+                                  <span>Điện thoại 2</span>
+                                  <strong><%= formatDetailText(c.sdt2) %></strong>
+                                </div>
+                                <div>
+                                  <span>Email</span>
+                                  <strong><%= formatDetailText(c.email) %></strong>
+                                </div>
+                                <div>
+                                  <span>Facebook</span>
+                                  <strong>
+                                    <% if (fbRaw) { %>
+                                      <a href="<%= fbHref %>" target="_blank" rel="noopener noreferrer"><%= fbRaw %></a>
+                                    <% } else { %>---<% } %>
+                                  </strong>
+                                </div>
+                                <div>
+                                  <span>Ngân hàng</span>
+                                  <strong><%= formatDetailText(c.ngan_hang) %></strong>
+                                </div>
+                                <div>
+                                  <span>Số tài khoản</span>
+                                  <strong><%= formatDetailText(c.stk_ngan_hang) %></strong>
+                                </div>
+                                <div>
+                                  <span>Chủ tài khoản</span>
+                                  <strong><%= formatDetailText(c.chu_tai_khoan) %></strong>
+                                </div>
+                                <div>
+                                  <span>Tổng bán</span>
+                                  <strong><%= Number(c.tong_ban || 0).toLocaleString('vi-VN') %></strong>
+                                </div>
+                                <div>
+                                  <span>Nợ hiện tại</span>
+                                  <strong><%= Number(c.tong_no || 0).toLocaleString('vi-VN') %></strong>
+                                </div>
+                                <div>
+                                  <span>Ngày tạo</span>
+                                  <strong><%= formatDate(c.created_at) %></strong>
+                                </div>
+                                <div>
+                                  <span>Cập nhật lúc</span>
+                                  <strong><%= formatDate(c.updated_at) %></strong>
+                                </div>
+                                <div class="customer-detail-field-full">
+                                  <span>Ghi chú</span>
+                                  <strong class="customer-detail-note"><%= formatDetailText(c.ghi_chu) %></strong>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="address">
+                              <% var returnQuery = filterQueryString || ''; %>
+                              <div class="customer-address-toolbar">
+                                <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
+                              </div>
+                              <table class="admin-table warehouse-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã địa chỉ</th>
+                                    <th>Tên người nhận</th>
+                                    <th>SĐT</th>
+                                    <th>Địa chỉ</th>
+                                    <th>Loại địa chỉ</th>
+                                    <th>Tạo lúc</th>
+                                    <th>Thao tác</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr class="warehouse-edit-row warehouse-add-row">
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ma_dia_chi" placeholder="Tự động" readonly style="background: transparent; border: none;"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                                    <td>
+                                      <input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết">
+                                    </td>
+                                    <td>
+                                      <select class="js-address-type-select" form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
+                                        <option value="khac">Khác</option>
+                                        <% (addressTypes || []).forEach(function(type) { %>
+                                          <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
+                                        <% }) %>
+                                      </select>
+                                    </td>
+                                    <td>--</td>
+                                    <td class="warehouse-action-cell">
+                                      <div class="warehouse-action-buttons">
+                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                        <button
+                                          form="addressAddForm_<%= selectedCustomer._id %>"
+                                          class="btn btn-primary btn-sm js-address-add"
+                                          data-form-id="addressAddForm_<%= selectedCustomer._id %>"
+                                          data-action="/khach-hang/<%= selectedCustomer._id %>/addresses/add"
+                                          type="submit"
+                                        >Thêm</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                    <td colspan="7">
+                                      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
+                                        <div>
+                                          <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label>
+                                          <select class="form-control js-ghn-province" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" data-selected-name="">
+                                            <option value="">Chọn Tỉnh/Thành</option>
+                                          </select>
+                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh_id" class="js-ghn-province-id">
+                                        </div>
+                                        <div>
+                                          <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label>
+                                          <select class="form-control js-ghn-ward" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" data-selected-name="">
+                                            <option value="">Chọn Phường/Xã</option>
+                                          </select>
+                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa_code" class="js-ghn-ward-code">
+                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" class="js-ghn-district-name">
+                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen_id" class="js-ghn-district-id">
+                                        </div>
+                                        <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
+                                        <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <% if (!customerAddresses || customerAddresses.length === 0) { %>
+                                    <tr>
+                                      <td colspan="7" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
+                                    </tr>
+                                  <% } %>
+                                  <% (customerAddresses || []).forEach(function(address) { %>
+                                    <% var addressFormId = 'addressForm_' + String(address._id); %>
+                                    <tr class="warehouse-edit-row">
+                                      <td><input form="<%= addressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly style="background: transparent; border: none; cursor: default;"></td>
+                                      <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
+                                      <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                                      <td>
+                                        <input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>">
+                                      </td>
+                                      <td>
+                                        <select class="js-address-type-select" form="<%= addressFormId %>" name="loai_dia_chi">
+                                          <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
+                                          <% (addressTypes || []).forEach(function(type) { %>
+                                            <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
+                                          <% }) %>
+                                        </select>
+                                      </td>
+                                      <td><%= formatDate(address.created_at) %></td>
+                                      <td class="warehouse-action-cell">
+                                        <div class="warehouse-action-buttons">
+                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                          <button
+                                            form="<%= addressFormId %>"
+                                            class="btn btn-light btn-sm"
+                                            type="submit"
+                                            onclick="return confirm('Bạn có muốn lưu chỉnh sửa địa chỉ này không?')"
+                                          >Lưu</button>
+                                          <button
+                                            form="addressDeleteForm_<%= address._id %>"
+                                            class="btn btn-danger btn-sm"
+                                            type="submit"
+                                            onclick="return confirm('Bạn có chắc muốn xóa địa chỉ này không?')"
+                                          >Xóa</button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                    <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                      <td colspan="7">
+                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
+                                          <div>
+                                            <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label>
+                                            <select class="form-control js-ghn-province" form="<%= addressFormId %>" name="tinh_thanh" data-selected-id="<%= address.tinh_thanh_id || '' %>" data-selected-name="<%= address.tinh_thanh || '' %>">
+                                              <% if (address.tinh_thanh) { %>
+                                                <option value="<%= address.tinh_thanh %>" selected><%= address.tinh_thanh %></option>
+                                              <% } else { %>
+                                                <option value="">Chọn Tỉnh/Thành</option>
+                                              <% } %>
+                                            </select>
+                                            <input type="hidden" form="<%= addressFormId %>" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= address.tinh_thanh_id || '' %>">
+                                          </div>
+                                          <div>
+                                            <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label>
+                                            <select class="form-control js-ghn-ward" form="<%= addressFormId %>" name="phuong_xa" data-selected-id="<%= address.phuong_xa_code || '' %>" data-selected-name="<%= address.phuong_xa || '' %>">
+                                              <% if (address.phuong_xa) { %>
+                                                <option value="<%= address.phuong_xa %>" selected><%= address.phuong_xa %></option>
+                                              <% } else { %>
+                                                <option value="">Chọn Phường/Xã</option>
+                                              <% } %>
+                                            </select>
+                                            <input type="hidden" form="<%= addressFormId %>" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= address.phuong_xa_code || '' %>">
+                                            <input type="hidden" form="<%= addressFormId %>" name="quan_huyen" class="js-ghn-district-name" value="<%= address.quan_huyen || '' %>">
+                                            <input type="hidden" form="<%= addressFormId %>" name="quan_huyen_id" class="js-ghn-district-id" value="<%= address.quan_huyen_id || '' %>">
+                                          </div>
+                                          <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
+                                          <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                              <form id="addressAddForm_<%= selectedCustomer._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/add">
+                                <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+                              </form>
+                              <% (customerAddresses || []).forEach(function(address) { %>
+                                <form id="addressForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/update">
+                                  <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+                                </form>
+                                <form id="addressDeleteForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/delete">
+                                  <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+                                </form>
+                              <% }) %>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="orders">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Mã đơn hàng</th><th>Ngày đặt</th><th>Tổng tiền hàng</th><th>Khách cần trả</th><th>Khách đã trả</th><th>Trạng thái đơn</th><th>Giao hàng</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyOrders.length) { %>
+                                    <tr><td colspan="8" class="empty-cell">Chưa có đơn hàng</td></tr>
+                                  <% } %>
+                                  <% historyOrders.forEach(function(order) { %>
+                                    <tr>
+                                      <td><%- refLink('order', order, order.ma_don_hang || '---') %></td>
+                                      <td><%= formatDate(order.ngay_dat || order.created_at) %></td>
+                                      <td><%= money(order.tong_tien_hang || order.tong_tien || 0) %></td>
+                                      <td><%= money(order.tong_thanh_toan || order.tong_tien || 0) %></td>
+                                      <td><%= money(order.khach_thanh_toan || order.khach_da_tra || 0) %></td>
+                                      <td><%= order.trang_thai || '---' %></td>
+                                      <td><%= order.trang_thai_giao_hang || '---' %></td>
+                                      <td><a class="btn btn-light btn-sm" href="/don-hang?order=<%= order._id %>">Xem</a></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="invoices">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Mã hóa đơn</th><th>Ngày bán</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Đơn hàng</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyInvoices.length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có hóa đơn</td></tr>
+                                  <% } %>
+                                  <% historyInvoices.forEach(function(invoice) { %>
+                                    <tr>
+                                      <td><%- refLink('invoice', invoice, invoice.ma_hoa_don || '---') %></td>
+                                      <td><%= formatDate(invoice.ngay_ban || invoice.created_at) %></td>
+                                      <td><%= money(invoice.tong_tien || 0) %></td>
+                                      <td><%= money(invoice.thanh_toan || 0) %></td>
+                                      <td><%= invoice.trang_thai || '---' %></td>
+                                      <td><%- invoice.don_hang_id ? refLink('order', invoice.don_hang_id, invoice.don_hang_id.ma_don_hang || '---') : '---' %></td>
+                                      <td>
+                                        <a class="btn btn-light btn-sm" href="/don-hang/hoa-don">Xem</a>
+                                        <a class="btn btn-light btn-sm" href="/don-hang/tra-hang/create?invoice_id=<%= invoice._id %>">Trả hàng</a>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="returns">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Mã phiếu trả</th><th>Ngày trả</th><th>Hóa đơn gốc</th><th>Tổng tiền trả</th><th>Trạng thái</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyReturns.length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có phiếu trả hàng</td></tr>
+                                  <% } %>
+                                  <% historyReturns.forEach(function(ret) { %>
+                                    <tr>
+                                      <td><%= ret.ma_phieu_tra || '---' %></td>
+                                      <td><%= formatDate(ret.ngay_tra || ret.created_at) %></td>
+                                      <td><%- ret.hoa_don_id ? refLink('invoice', ret.hoa_don_id, ret.hoa_don_id.ma_hoa_don || '---') : '---' %></td>
+                                      <td><%= money(ret.can_tra_khach || ret.tong_tien_tra || 0) %></td>
+                                      <td><%= ret.trang_thai || '---' %></td>
+                                      <td><%= ret.ghi_chu || '---' %></td>
+                                      <td><a class="btn btn-light btn-sm" href="/don-hang/tra-hang?customer=<%= selectedCustomer._id %>">Xem</a></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="debts">
+                              <table class="admin-table warehouse-table">
+                                <thead><tr><th>Ngày</th><th>Loại</th><th>Số tiền</th><th>Hóa đơn</th><th>Đơn hàng</th><th>Phiếu thu chi</th><th>Ghi chú</th></tr></thead>
+                                <tbody>
+                                  <% if (!historyDebts.length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có công nợ</td></tr>
+                                  <% } %>
+                                  <% historyDebts.forEach(function(debt) { %>
+                                    <tr>
+                                      <td><%= formatDate(debt.ngay || debt.created_at) %></td>
+                                      <td><%= debt.loai || '---' %></td>
+                                      <td><%= money(debt.so_tien || 0) %></td>
+                                      <td><%- debt.hoa_don_id ? refLink('invoice', debt.hoa_don_id, debt.hoa_don_id.ma_hoa_don || '---') : '---' %></td>
+                                      <td><%- debt.don_hang_id ? refLink('order', debt.don_hang_id, debt.don_hang_id.ma_don_hang || '---') : '---' %></td>
+                                      <td><%- debt.phieu_thu_chi_id ? refLink('receipt', debt.phieu_thu_chi_id, debt.phieu_thu_chi_id.ma_phieu || debt.phieu_thu_chi_id.ma_phieu_thu_chi || '---') : '---' %></td>
+                                      <td><%= debt.ghi_chu || '---' %></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                          <div class="customer-detail-footer">
+                            <button
+                              class="btn btn-success btn-sm btn-edit-customer"
+                              type="button"
+                              data-customer="<%= encodeURIComponent(JSON.stringify(selectedCustomer)) %>"
+                            >Chỉnh sửa</button>
+                            <button
+                              class="btn btn-danger btn-sm"
+                              type="submit"
+                              form="deleteCustomerForm_<%= selectedCustomer._id %>"
+                              onclick="return confirm('Bạn có chắc muốn xóa khách hàng này không?')"
+                            >Xóa</button>
+                            <a
+                              class="btn btn-success btn-sm customer-detail-export-action"
+                              href="/khach-hang/<%= selectedCustomer._id %>/export/info.xlsx"
+                              data-export-action
+                              data-info-url="/khach-hang/<%= selectedCustomer._id %>/export/info.xlsx"
+                              data-info-label="Xuất thông tin"
+                              data-info-disabled="0"
+                              data-address-url="/khach-hang/<%= selectedCustomer._id %>/export/address.xlsx"
+                              data-address-label="Xuất địa chỉ"
+                              data-address-disabled="<%= customerAddresses && customerAddresses.length ? '0' : '1' %>"
+                              data-orders-url="/khach-hang/<%= selectedCustomer._id %>/export/orders.xlsx"
+                              data-orders-label="Xuất đơn hàng"
+                              data-orders-disabled="<%= historyOrders.length ? '0' : '1' %>"
+                              data-invoices-url="/khach-hang/<%= selectedCustomer._id %>/export/invoices.xlsx"
+                              data-invoices-label="Xuất hóa đơn"
+                              data-invoices-disabled="<%= historyInvoices.length ? '0' : '1' %>"
+                              data-returns-url="/khach-hang/<%= selectedCustomer._id %>/export/returns.xlsx"
+                              data-returns-label="Xuất trả hàng"
+                              data-returns-disabled="<%= historyReturns.length ? '0' : '1' %>"
+                              data-debts-url="/khach-hang/<%= selectedCustomer._id %>/export/debts.xlsx"
+                              data-debts-label="Xuất công nợ"
+                              data-debts-disabled="<%= historyDebts.length ? '0' : '1' %>"
+                            >Xuất thông tin</a>
+                          </div>
+                        </div>
+</div>

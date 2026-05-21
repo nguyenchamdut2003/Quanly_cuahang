@@ -6,11 +6,16 @@ const ObjectId = Schema.Types.ObjectId;
 const CuaHangSchema = new Schema({
   ma_cua_hang: { type: String, unique: true },
   ten_cua_hang: { type: String },
+  ma_so_thue: { type: String },
   dia_chi: { type: String },
-  dia_chi_gui_hang: { type: String },
+  dia_chi_chi_tiet: { type: String },
+  dia_chi_day_du: { type: String },
   tinh_thanh: { type: String },
+  tinh_thanh_id: { type: Number },
   quan_huyen: { type: String },
+  quan_huyen_id: { type: Number },
   phuong_xa: { type: String },
+  phuong_xa_code: { type: String },
   sdt: { type: String },
   email: { type: String },
   trang_thai: {
@@ -22,27 +27,6 @@ const CuaHangSchema = new Schema({
   collection: 'cua_hang',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
-
-const DoanhNghiepSchema = new Schema({
-  ten_doanh_nghiep: { type: String },
-  ma_so_thue: { type: String },
-  dia_chi: { type: String },
-  so_dien_thoai: { type: String },
-  email: { type: String },
-  nguoi_dai_dien: { type: String },
-  chuc_vu_nguoi_dai_dien: { type: String },
-  nguoi_lap_bang_ke: { type: String },
-  dia_chi_noi_to_chuc_thu_mua: { type: String },
-  trang_thai: {
-    type: String,
-    enum: ['active', 'inactive'],
-    default: 'active'
-  }
-}, {
-  collection: 'doanh_nghiep',
-  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
-});
-
 
 const NguoiDungSchema = new Schema({
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
@@ -160,10 +144,14 @@ const DiaChiKhachHangSchema = new Schema({
   ten_nguoi_nhan: { type: String },
   sdt_nguoi_nhan: { type: String },
   so_nha: { type: String },
+  dia_chi_chi_tiet: { type: String },
   dia_chi_day_du: { type: String },
   tinh_thanh: { type: String },
+  tinh_thanh_id: { type: Number },
   quan_huyen: { type: String },
+  quan_huyen_id: { type: Number },
   phuong_xa: { type: String },
+  phuong_xa_code: { type: String },
   loai_dia_chi: { type: String, },
   ghi_chu: { type: String },
   mac_dinh: { type: Boolean, default: false }
@@ -559,6 +547,17 @@ const PhieuNhapSchema = new Schema({
     default: 'draft'
   },
 
+  /** Hạn trả hàng nhập tuyệt đối (cuối ngày được tính khi kiểm tra) */
+  han_tra_hang_nhap: {
+    type: Date
+  },
+
+  /** Số ngày được trả kể từ ngày nhập (ưu tiên thấp hơn han_tra_hang_nhap); mặc định hệ thống nếu bỏ trống */
+  so_ngay_duoc_tra_hang_nhap: {
+    type: Number,
+    min: 0
+  },
+
   ghi_chu: {
     type: String
   }
@@ -622,6 +621,9 @@ const CtPhieuNhapSchema = new Schema({
 
   ghi_chu: {
     type: String
+  },
+  lot_info: {
+    type: Schema.Types.Mixed
   }
 }, {
   collection: 'ct_phieu_nhap',
@@ -659,6 +661,9 @@ const CtPhieuTraHangNhapSchema = new Schema({
   ct_phieu_nhap_id: { type: ObjectId, ref: 'CTPhieuNhap' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa', required: true },
   lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  /** Quy cách trong lô (trùng ten_quy_cach trong TonKhoLoQuyCach / lot_info.quy_cach_items) */
+  ten_quy_cach: { type: String, trim: true },
+  ton_kho_lo_quy_cach_id: { type: ObjectId, ref: 'TonKhoLoQuyCach' },
   gia_tri_thuoc_tinh_id: { type: ObjectId, ref: 'GiaTriThuocTinh' },
   don_vi_tinh_id: { type: ObjectId, ref: 'DonViTinh' },
   so_luong: { type: Number, default: 0 },
@@ -988,11 +993,23 @@ const TonKhoLoQuyCachSchema = new Schema({
     required: true,
     trim: true
   },
+  ten_thuoc_tinh: {
+    type: String,
+    trim: true
+  },
   so_luong: {
     type: Number,
     default: 0
   },
   gia_von: {
+    type: Number,
+    default: 0
+  },
+  don_gia_nhap: {
+    type: Number,
+    default: 0
+  },
+  thanh_tien: {
     type: Number,
     default: 0
   }
@@ -1222,6 +1239,15 @@ const PhieuThuChiSchema = new Schema({
   phieu_tra_hang_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap' },
   van_don_id: { type: ObjectId, ref: 'VanDon' },
   ma_chung_tu_goc: { type: String },
+  allocation_type: { type: String },
+  overpayment_amount: { type: Number, default: 0 },
+  allocations: [{
+    phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
+    ma_phieu_nhap: { type: String },
+    so_tien: { type: Number, default: 0 },
+    con_no_truoc: { type: Number, default: 0 },
+    con_no_sau: { type: Number, default: 0 }
+  }],
   nhom_doi_tuong: {
     type: String,
     enum: ['khach_hang', 'nha_cung_cap', 'doi_tac_giao_hang', 'nhan_vien', 'khac'],
@@ -1380,7 +1406,6 @@ const CounterSchema = new Schema({
 }, { collection: "counters" });
 // Register models
 const CuaHang = mongoose.models.CuaHang || mongoose.model("CuaHang", CuaHangSchema);
-const DoanhNghiep = mongoose.models.DoanhNghiep || mongoose.model("DoanhNghiep", DoanhNghiepSchema);
 const Kho = mongoose.models.Kho || mongoose.model("Kho", KhoSchema);
 const NguoiDung = mongoose.models.NguoiDung || mongoose.model("NguoiDung", NguoiDungSchema);
 const { PhongBan, ChucDanh, NhanVien } = require('./hr.model');
@@ -1432,7 +1457,7 @@ const CTPhanBoHang = mongoose.models.CTPhanBoHang || mongoose.model("CTPhanBoHan
 const PhiVanChuyenKhachHang = mongoose.models.PhiVanChuyenKhachHang || mongoose.model("PhiVanChuyenKhachHang", PhiVanChuyenKhachHangSchema);
 const Counter = mongoose.models.Counter || mongoose.model("Counter", CounterSchema);
 module.exports = {
-  CuaHang, DoanhNghiep, Kho, NguoiDung, PhongBan, ChucDanh, NhanVien,
+  CuaHang, Kho, NguoiDung, PhongBan, ChucDanh, NhanVien,
   NhomKhachHang, KhachHang, DiaChiKhachHang, LoaiDiaChiKhachHang, 
   NhomNhaCungCap, DiaChiDoiTuong, DiaChiNcc, NhaCungCap,
   NhomHang, DonViTinh, HangHoa,

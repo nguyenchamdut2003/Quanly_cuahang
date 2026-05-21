@@ -15,6 +15,67 @@
     }
   });
   const exportQuery = exportParams.toString();
+  const formatDateOnly = value => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('vi-VN');
+  };
+  const lotLabelReturn = row => {
+    const product = row && row.hang_hoa_id ? row.hang_hoa_id : {};
+    if (!product.quan_ly_theo_lo) return 'Không theo lô';
+    const lot = row && row.lo_hang_id ? row.lo_hang_id : null;
+    if (!lot) return '--';
+    const lotName = lot.ten_lo || lot.ma_lo || '--';
+    const lotText = lot._id ? refLink('lot', lot, lotName) : lotName;
+    const expiry = formatDateOnly(lot.han_su_dung);
+    return expiry ? `${lotText} - HSD: ${expiry}` : lotText;
+  };
+  const detailGroupsReturn = rows => {
+    const groups = [];
+    const index = {};
+    (rows || []).forEach(row => {
+      const product = row && row.hang_hoa_id ? row.hang_hoa_id : {};
+      const lot = row && row.lo_hang_id ? row.lo_hang_id : null;
+      const productId = String(product._id || row.hang_hoa_id || '');
+      const lotId = product.quan_ly_theo_lo ? String(lot && lot._id ? lot._id : row.lo_hang_id || 'missing') : 'no-lot';
+      const key = productId + '::' + lotId;
+      if (!index[key]) {
+        index[key] = {
+          product,
+          lot,
+          lot_label: lotLabelReturn(row),
+          rows: [],
+          total: 0
+        };
+        groups.push(index[key]);
+      }
+      index[key].rows.push(row);
+      const qty = Number(row.so_luong || 0);
+      const giaTra = Number(row.gia_tra_lai != null ? row.gia_tra_lai : row.don_gia || 0);
+      const lineTotal = Number(row.thanh_tien);
+      index[key].total += Number.isFinite(lineTotal) ? lineTotal : Math.round(qty * giaTra);
+    });
+    return groups;
+  };
+  const detailRowsForReturnGroup = group => {
+    const result = [];
+    (group.rows || []).forEach(line => {
+      const qty = Number(line.so_luong || 0);
+      const giaNhap = Number(line.gia_nhap != null ? line.gia_nhap : line.don_gia || 0);
+      const giaTra = Number(line.gia_tra_lai != null ? line.gia_tra_lai : line.don_gia || 0);
+      const ttRaw = Number(line.thanh_tien);
+      const tt = Number.isFinite(ttRaw) ? ttRaw : Math.round(qty * giaTra);
+      result.push({
+        ten_thuoc_tinh: String(line.ten_quy_cach || '').trim() || '--',
+        so_luong: qty,
+        don_gia_nhap: giaNhap,
+        don_gia_tra: giaTra,
+        thanh_tien: tt
+      });
+    });
+    return result.length ? result : [{ ten_thuoc_tinh: '--', so_luong: 0, don_gia_nhap: 0, don_gia_tra: 0, thanh_tien: 0 }];
+  };
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -44,10 +105,11 @@
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
-    table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
-    th{min-height:32px;background:#e8f3ff;color:#111827;font-size:11px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:6px 8px;white-space:normal;word-break:break-word;line-height:1.25}
-    td{min-height:36px;border-bottom:1px solid #e5e9ee;padding:7px 8px;font-size:12px;line-height:1.35;color:#111827}
-    tbody tr:hover{background:#f7fbff}
+    /* Chỉ áp cho bảng danh sách — tránh table-layout:fixed + word-break áp vào bảng chi tiết nhóm lô */
+    .table-wrap > table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
+    .table-wrap > table > thead > tr > th{min-height:32px;background:#e8f3ff;color:#111827;font-size:11px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:6px 8px;white-space:normal;word-break:break-word;line-height:1.25}
+    .table-wrap > table > tbody > tr:not(.detail-row) > td{min-height:36px;border-bottom:1px solid #e5e9ee;padding:7px 8px;font-size:12px;line-height:1.35;color:#111827}
+    .table-wrap > table > tbody > tr.return-row:hover{background:#f7fbff}
     .num{text-align:right}
     .check-col,.star-col{width:36px;text-align:center}
     .code-col{width:150px}.time-col{width:160px}.money-col{width:125px}.status-col{width:115px}.vendor-col{width:200px}
@@ -60,7 +122,7 @@
     .detail-row td{height:auto;padding:0;background:#fff;border-bottom:2px solid #0070f4;word-break:break-word;vertical-align:top;width:100%;box-sizing:border-box}
     .detail-card{border:2px solid #0070f4;border-top:0;padding:10px 12px 12px;background:#fff;box-sizing:border-box;width:100%;max-width:100%;min-width:0}
     .return-detail-split{display:flex;flex-wrap:wrap;align-items:flex-start;gap:30px;margin-top:12px;width:100%;min-width:0;box-sizing:border-box}
-    .return-detail-main{flex:1 1 0%;min-width:0}
+    .return-detail-main{flex:1 1 0%;min-width:0;overflow-x:auto}
     .return-summary-box{flex:0 0 240px;width:240px;max-width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;background:#fafcff;align-self:flex-start;min-width:min(240px,100%)}
     .return-summary-title{font-size:12px;font-weight:800;color:#111827;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid #e2e8f0}
     .return-summary-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;line-height:1.3;margin:8px 0;color:#374151}
@@ -77,6 +139,20 @@
     .info-line input,.info-line select{height:26px;border:1px solid #cfd8e3;border-radius:5px;padding:0 6px;font-size:11px;background:#fff;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
     .info-line .info-value{display:block;min-width:0;word-break:break-word;font-weight:600;line-height:1.35;padding:5px 7px;border:1px solid #cfd8e3;border-radius:5px;background:#fff;box-sizing:border-box;font-size:11px}
     .mini-table-wrap{min-width:0;width:100%;max-width:100%;margin-top:6px}
+    .return-detail-groups-wrap{overflow-x:auto;margin-top:6px;width:100%;min-width:0}
+    .lot-group-title{font-size:13px;font-weight:800;color:#111827;margin:10px 0 6px}
+    .lot-group-title:first-child{margin-top:0}
+    .grouped-lot-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:640px}
+    .grouped-lot-table th,.grouped-lot-table td{border:1px solid #e4eaf2;padding:6px 8px;font-size:12px;word-break:normal;overflow-wrap:break-word}
+    .grouped-lot-table th{background:#f4f8fc;text-align:left;font-weight:700;white-space:normal}
+    .grouped-lot-table th.num,.grouped-lot-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .grouped-lot-table th,.grouped-lot-table td{vertical-align:top}
+    /* Cột Thuộc tính hẹp — không để nuốt không gian làm ép cột Ngày/Lô */
+    .grouped-lot-table .lot-cell{color:#111827;font-weight:700;font-size:11px;line-height:1.35}
+    .grouped-lot-table .attr-cell{font-size:12px;line-height:1.35}
+    .grouped-lot-table .lot-total-cell{font-weight:800;color:#006dff;text-align:right;vertical-align:middle}
+    .grouped-lot-table .group-total-row td{background:#ffe900;font-weight:800;color:#111827}
+    .grouped-lot-table .group-total-row .num{color:#111827}
     .mini-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
     .mini-table thead th:nth-child(1),.mini-table tbody td:nth-child(1){width:11%}
     .mini-table thead th:nth-child(2),.mini-table tbody td:nth-child(2){width:34%}
@@ -210,39 +286,60 @@
                                 <div class="info-line"><span>Ngày trả:</span><input readonly value="<%= formatDate(r.ngay_tra || r.created_at) %>"></div>
                               </div>
                             </div>
-                            <div class="mini-table-wrap">
-                              <table class="mini-table">
-                                <thead>
-                                  <tr>
-                                    <th scope="col">Mã hàng</th>
-                                    <th scope="col">Tên hàng</th>
-                                    <th scope="col" class="num">Số lượng</th>
-                                    <th scope="col" class="num">Giá nhập</th>
-                                    <th scope="col" class="num">Giá trả lại</th>
-                                    <th scope="col" class="num">Thành tiền</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <% if (!(r.detail_rows || []).length) { %>
-                                    <tr><td colspan="6">Chưa có chi tiết hàng trả.</td></tr>
-                                  <% } %>
-                                  <% (r.detail_rows || []).forEach(function(item) { %>
+                            <div class="return-detail-groups-wrap">
+                              <% if (!(r.detail_rows || []).length) { %>
+                                <table class="mini-table"><tbody><tr><td>Chưa có chi tiết hàng trả.</td></tr></tbody></table>
+                              <% } %>
+                              <% detailGroupsReturn(r.detail_rows || []).forEach(function(group) { %>
+                                <div class="lot-group-title">
+                                  <%- group.product ? (refLink('product', group.product, group.product.ma_hang || '--') + ' - ' + (group.product.ten_hang || '--')) : '--' %>
+                                </div>
+                                <table class="grouped-lot-table">
+                                  <colgroup>
+                                    <col style="width:30%">
+                                    <col style="width:11%">
+                                    <col style="width:9%">
+                                    <col style="width:12%">
+                                    <col style="width:12%">
+                                    <col style="width:13%">
+                                    <col style="width:13%">
+                                  </colgroup>
+                                  <thead>
                                     <tr>
-                                      <td class="cell-code"><%= item.hang_hoa_id ? (item.hang_hoa_id.ma_hang || '--') : '--' %></td>
-                                      <td class="cell-ten">
-                                        <%= item.hang_hoa_id ? (item.hang_hoa_id.ten_hang || '--') : '--' %>
-                                        <% if (item.lo_hang_id) { %>
-                                          <div class="mini-wrap-meta">Lô: <%= item.lo_hang_id.ma_lo || item.lo_hang_id.ten_lo || '--' %></div>
-                                        <% } %>
-                                      </td>
-                                      <td class="num"><%= fmt(item.so_luong || 0) %></td>
-                                      <td class="num"><%= fmt(item.gia_nhap || item.don_gia || 0) %></td>
-                                      <td class="num"><%= fmt(item.gia_tra_lai || item.don_gia || 0) %></td>
-                                      <td class="num"><%= fmt(item.thanh_tien || 0) %></td>
+                                      <th>Ngày / Lô</th>
+                                      <th>Thuộc tính</th>
+                                      <th class="num">Số lượng</th>
+                                      <th class="num">Giá nhập</th>
+                                      <th class="num">Giá trả lại</th>
+                                      <th class="num">Thành tiền</th>
+                                      <th class="num">Tổng theo lô</th>
                                     </tr>
-                                  <% }) %>
-                                </tbody>
-                              </table>
+                                  </thead>
+                                  <tbody>
+                                    <% var displayRows = detailRowsForReturnGroup(group); %>
+                                    <% displayRows.forEach(function(rowLine, rowIndex) { %>
+                                      <tr>
+                                        <% if (rowIndex === 0) { %>
+                                          <td class="lot-cell" rowspan="<%= displayRows.length %>"><%- group.lot_label %></td>
+                                        <% } %>
+                                        <td class="attr-cell"><div><%= rowLine.ten_thuoc_tinh || '--' %></div></td>
+                                        <td class="num"><%= fmt(rowLine.so_luong || 0) %></td>
+                                        <td class="num"><%= fmt(rowLine.don_gia_nhap || 0) %></td>
+                                        <td class="num"><%= fmt(rowLine.don_gia_tra || 0) %></td>
+                                        <td class="num"><%= fmt(rowLine.thanh_tien || 0) %></td>
+                                        <% if (rowIndex === 0) { %>
+                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmt(group.total || 0) %></td>
+                                        <% } %>
+                                      </tr>
+                                    <% }) %>
+                                    <tr class="group-total-row">
+                                      <td colspan="5" class="num">TỔNG CỘNG</td>
+                                      <td class="num"><%= fmt(group.total || 0) %></td>
+                                      <td class="num"><%= fmt(group.total || 0) %></td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              <% }) %>
                             </div>
                             <div class="detail-note"><%= r.ghi_chu ? String(r.ghi_chu) : '—' %></div>
                           </div>

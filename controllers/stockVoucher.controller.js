@@ -2,7 +2,6 @@ var path = require('path');
 var pdfService = require('../services/pdf.service');
 var {
   CuaHang,
-  DoanhNghiep,
   DonHang,
   CTDonHang,
   HoaDonBanHang,
@@ -64,13 +63,10 @@ function rowBase(row, options) {
 }
 
 async function loadBusiness(store) {
-  var business = await DoanhNghiep.findOne({ trang_thai: 'active' }).sort({ updated_at: -1, created_at: -1 }).lean();
-  if (!business) business = await DoanhNghiep.findOne({}).sort({ updated_at: -1, created_at: -1 }).lean();
-  if (business) return business;
   if (store) {
     return {
-      ten_doanh_nghiep: store.ten_cua_hang,
-      dia_chi_day_du: store.dia_chi_day_du || store.dia_chi_gui_hang_day_du,
+      ten_cua_hang: store.ten_cua_hang,
+      dia_chi_day_du: store.dia_chi_day_du || store.dia_chi || '',
       sdt: store.sdt,
       email: store.email,
       ma_so_thue: store.ma_so_thue
@@ -256,7 +252,7 @@ async function loadInventoryCheck(id) {
       return {
         ma_hang: product.ma_hang || '',
         ten_hang: product.ten_hang || '',
-        thuoc_tinh: '',
+        thuoc_tinh: row.ten_quy_cach || '',
         lo: lotName(row.lo_hang_id),
         ton_he_thong: Number(row.ton_kho_he_thong || 0),
         ton_thuc_te: Number(row.so_luong_thuc_te || 0),
@@ -264,7 +260,10 @@ async function loadInventoryCheck(id) {
         gia_tri_lech: Number(row.gia_tri_lech || 0),
         ghi_chu: row.nguyen_nhan_lech || ''
       };
-    })
+    }),
+    total_so_luong_thuc_te: Number(ticket.tong_so_luong_thuc_te || items.reduce(function(sum, row) {
+      return sum + Number(row.so_luong_thuc_te || 0);
+    }, 0))
   };
 }
 
@@ -409,6 +408,9 @@ async function buildVoucherData(req) {
   voucher.type = type;
   voucher.id = id;
   voucher.embeddedPrint = String(req.query && req.query.embed || '') === '1';
+  voucher.inventoryPrintVariant = voucher.isInventoryCheck
+    ? String(req.query && req.query.variant || '').trim()
+    : '';
   return {
     title: voucher.title,
     activeMenu: 'hang-hoa',

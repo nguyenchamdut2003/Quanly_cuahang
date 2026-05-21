@@ -1,0 +1,514 @@
+<div class="kv-detail-panel product-detail supplier-inline-detail">
+  <div class="supplier-detail" data-supplier-detail>
+    <div class="detail-tabs">
+      <div class="detail-tab-list">
+        <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin nhà cung cấp</button>
+        <button class="detail-tab" type="button" data-detail-tab="address">Danh sách địa chỉ</button>
+            <button class="detail-tab" type="button" data-detail-tab="history">Lịch sử nhập/trả hàng</button>
+            <button class="detail-tab" type="button" data-detail-tab="debt">Nợ cần trả nhà cung cấp</button>
+            <button class="detail-tab" type="button" data-detail-tab="xnb">Xuất dùng nội bộ</button>
+      </div>
+      <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
+    </div>
+
+    <div class="supplier-detail-body">
+      <div class="detail-pane is-active" data-detail-pane="info">
+        <div class="supplier-info-block">
+          <div class="supplier-info-avatar">NCC</div>
+          <div class="supplier-info-main">
+            <h2><%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %></h2>
+            <p><%- refLink('supplier', selectedSupplier, selectedSupplier.ma_ncc || '---') %></p>
+            <div class="supplier-info-tags">
+              <span class="tag">Nhà cung cấp</span>
+              <span class="tag tag-green"><%= selectedSupplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span>
+            </div>
+          </div>
+        </div>
+        <form id="supplierInlineEdit_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/update" class="supplier-inline-edit-form">
+          <div class="store-fields supplier-detail-fields">
+            <div><span>Mã NCC</span><input name="ma_ncc" value="<%= selectedSupplier.ma_ncc || '' %>"></div>
+            <div><span>Tên nhà cung cấp *</span><input name="ten_ncc" value="<%= selectedSupplier.ten_ncc || '' %>" required></div>
+            <div><span>Điện thoại</span><input name="sdt" value="<%= selectedSupplier.sdt || '' %>"></div>
+            <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
+            <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>"></div>
+            <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
+            <div><span>Tổng nợ</span>
+              <div>
+                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
+                <div class="supplier-metric-hint">Tự động tính từ phiếu nhập</div>
+              </div>
+            </div>
+            <div><span>Tổng mua</span>
+              <div>
+                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_mua || 0).toLocaleString('vi-VN') %></strong>
+                <div class="supplier-metric-hint">Tự động tính từ phiếu đã nhập hàng</div>
+              </div>
+            </div>
+            <div><span>Trạng thái</span>
+              <select name="trang_thai">
+                <option value="active" <%= selectedSupplier.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+                <option value="inactive" <%= selectedSupplier.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+              </select>
+            </div>
+            <div><span>Thời gian tạo</span><strong><%= formatDate(selectedSupplier.created_at) %></strong></div>
+            <div class="supplier-detail-field-full"><span>Ghi chú</span><input name="ghi_chu" value="<%= selectedSupplier.ghi_chu || '' %>"></div>
+          </div>
+        </form>
+        <div class="supplier-pane-actions">
+          <button class="btn btn-danger btn-sm" type="submit" form="supplierInlineDel_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
+          <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
+        </div>
+      </div>
+
+      <div class="detail-pane" data-detail-pane="address">
+        <% var supplierAddressReturnQuery = filterQueryString || ''; %>
+        <div class="supplier-pane-toolbar">
+          <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
+        </div>
+        <div class="supplier-pane-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th>Mã địa chỉ</th>
+                <th>Tên người nhận</th>
+                <th>SĐT</th>
+                <th>Địa chỉ</th>
+                <th>Loại địa chỉ</th>
+                <th>Tạo lúc</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% var supplierAddressAddFormId = 'supplierAddressAdd_' + String(selectedSupplier._id); %>
+              <tr class="warehouse-edit-row warehouse-add-row">
+                <td>
+                  <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
+                  <input data-address-form="<%= supplierAddressAddFormId %>" name="ma_dia_chi" placeholder="Tự động" readonly class="supplier-readonly-input">
+                </td>
+                <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
+                <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
+                <td>
+                  <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
+                    <option value="khac">Khác</option>
+                    <% (addressTypes || []).forEach(function(type) { %>
+                      <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
+                    <% }) %>
+                  </select>
+                </td>
+                <td>--</td>
+                <td class="warehouse-action-cell">
+                  <div class="warehouse-action-buttons">
+                    <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                    <button
+                      class="btn btn-primary btn-sm js-supplier-address-submit"
+                      type="button"
+                      data-form-id="<%= supplierAddressAddFormId %>"
+                      data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
+                      data-confirm="Bạn có muốn thêm địa chỉ mới không?"
+                    >Thêm</button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="address-detail-row supplier-address-expand" style="display: none;">
+                <td colspan="7">
+                  <div class="supplier-address-expand-grid">
+                    <div><label>Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="so_nha" placeholder="Số nhà"></div>
+                    <div><label>Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/Xã"></div>
+                    <div><label>Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="quan_huyen" placeholder="Quận/Huyện"></div>
+                    <div><label>Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
+                    <div class="span-2"><label>Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="ghi_chu" placeholder="Ghi chú"></div>
+                    <div class="span-2 supplier-address-default-check"><label><input data-address-form="<%= supplierAddressAddFormId %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
+                  </div>
+                </td>
+              </tr>
+              <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
+                <tr><td colspan="7" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
+              <% } %>
+              <% (supplierAddresses || []).forEach(function(address) { %>
+                <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
+                <tr class="warehouse-edit-row">
+                  <td>
+                    <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
+                    <input data-address-form="<%= supplierAddressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly class="supplier-readonly-input">
+                  </td>
+                  <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
+                  <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                  <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
+                  <td>
+                    <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
+                      <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
+                      <% (addressTypes || []).forEach(function(type) { %>
+                        <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
+                      <% }) %>
+                    </select>
+                  </td>
+                  <td><%= formatDate(address.created_at) %></td>
+                  <td class="warehouse-action-cell">
+                    <div class="warehouse-action-buttons">
+                      <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                      <button
+                        class="btn btn-light btn-sm js-supplier-address-submit"
+                        type="button"
+                        data-form-id="<%= supplierAddressFormId %>"
+                        data-action="/nha-cung-cap/dia-chi/<%= address._id %>/update"
+                        data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?"
+                      >Lưu</button>
+                      <button
+                        class="btn btn-danger btn-sm js-supplier-address-delete"
+                        type="button"
+                        data-return-query="<%= supplierAddressReturnQuery %>"
+                        data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
+                      >Xóa</button>
+                    </div>
+                  </td>
+                </tr>
+                <tr class="address-detail-row supplier-address-expand" style="display: none;">
+                  <td colspan="7">
+                    <div class="supplier-address-expand-grid">
+                      <div><label>Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
+                      <div><label>Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
+                      <div><label>Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="quan_huyen" value="<%= address.quan_huyen || '' %>"></div>
+                      <div><label>Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
+                      <div class="span-2"><label>Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
+                      <div class="span-2 supplier-address-default-check"><label><input data-address-form="<%= supplierAddressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="detail-pane" data-detail-pane="history">
+        <div class="supplier-pane-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th>Mã phiếu</th>
+                <th>Thời gian</th>
+                <th>Người tạo</th>
+                <th class="text-right">Tổng cộng</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if ((supplierPurchaseHistory || []).length === 0) { %>
+                <tr><td colspan="5" class="empty-cell">Chưa có lịch sử nhập/trả hàng.</td></tr>
+              <% } %>
+              <% (supplierPurchaseHistory || []).forEach(function(row) { %>
+                <tr>
+                  <td>
+                    <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
+                      <% if (row.loai === 'nhap') { %>
+                        <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
+                      <% } else { %>
+                        <i class="fa-solid fa-arrow-rotate-left history-type-icon history-type-icon--return" title="Trả hàng"></i>
+                      <% } %>
+                      <%= row.ma_phieu || '--' %>
+                    </a>
+                  </td>
+                  <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
+                  <td>
+                    <div class="history-creator">
+                      <span class="history-creator-avatar"><%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %></span>
+                      <%= row.nguoi_tao || '--' %>
+                    </div>
+                  </td>
+                  <td class="text-right">
+                    <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
+                      <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %>
+                    </span>
+                  </td>
+                  <td>
+                    <% 
+                      var statusClass = 'status-pill';
+                      var statusLabelText = row.loai === 'tra' ? mapTraHangStatus(row.trang_thai) : mapNhapHangStatus(row.trang_thai);
+                      if (row.trang_thai === 'completed') statusClass += ' is-active';
+                      else if (row.trang_thai === 'draft') statusClass += ' is-draft';
+                      else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
+                    %>
+                    <span class="<%= statusClass %>"><%= statusLabelText %></span>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="detail-pane" data-detail-pane="debt">
+        <div class="supplier-pane-toolbar supplier-debt-toolbar">
+          <div class="supplier-debt-summary">
+            <span class="supplier-debt-summary-label">Nợ hiện tại</span>
+            <strong class="supplier-debt-summary-value"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
+          </div>
+          <div class="supplier-debt-actions">
+            <button class="btn btn-light btn-sm" type="button">Điều chỉnh</button>
+            <button
+              class="btn btn-light btn-sm js-open-supplier-pay-modal"
+              type="button"
+              data-modal-id="supplierPayModal_<%= selectedSupplier._id %>"
+            >Thanh toán</button>
+            <button class="btn btn-light btn-sm" type="button">Chiết khấu thanh toán</button>
+          </div>
+        </div>
+        <div class="supplier-pane-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th>Mã phiếu</th>
+                <th>Loại chứng từ</th>
+                <th>Thời gian</th>
+                <th>Loại</th>
+                <th class="text-right">Giá trị</th>
+                <th class="text-right">Nợ cần trả</th>
+                <th>Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if ((supplierDebtHistory || []).length === 0) { %>
+                <tr><td colspan="7" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
+              <% } %>
+              <% (supplierDebtHistory || []).forEach(function(row) { %>
+                <tr>
+                  <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
+                  <td><%= row.loai_chung_tu || '--' %></td>
+                  <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
+                  <td><%= mapCongNoDirection ? mapCongNoDirection(row.loai) : mapCongNoLoai(row.loai) %></td>
+                  <td class="text-right"><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
+                  <td class="text-right"><strong><%= Number(row.no_con_lai || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td><%= row.ghi_chu || '--' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <div class="supplier-pay-modal-overlay js-supplier-pay-overlay" id="supplierPayModal_<%= selectedSupplier._id %>" aria-hidden="true">
+          <% var debtCheck = debtReconciliation || { debtByInvoices: 0, debtByLedger: Number(selectedSupplier.tong_no || 0), debtDiff: 0, hasDebtMismatch: false }; %>
+          <div class="supplier-pay-modal" role="dialog" aria-modal="true" aria-labelledby="supplierPayTitle_<%= selectedSupplier._id %>">
+            <div class="supplier-pay-header">
+              <div>
+                <h3 class="supplier-pay-title" id="supplierPayTitle_<%= selectedSupplier._id %>">Thanh toán</h3>
+                <div class="supplier-pay-subtitle">
+                  <span><%= selectedSupplier.ten_cong_ty || selectedSupplier.ten_ncc || 'Nhà cung cấp' %></span>
+                  <span>·</span>
+                  <span class="supplier-pay-debt-badge">Nợ hiện tại: <%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></span>
+                </div>
+              </div>
+              <button class="supplier-pay-close js-close-supplier-pay-modal" type="button" aria-label="Đóng">×</button>
+            </div>
+            <div class="supplier-pay-body">
+              <form id="supplierPayForm_<%= selectedSupplier._id %>" class="supplier-pay-form" data-action="/nha-cung-cap/<%= selectedSupplier._id %>/pay-debt" data-current-debt="<%= Number(selectedSupplier.tong_no || 0) %>" data-has-debt-mismatch="<%= debtCheck.hasDebtMismatch ? '1' : '0' %>">
+                <input type="hidden" name="allocations_json" class="js-supplier-pay-allocations-json" value="[]">
+                <input type="hidden" name="overpayment_amount" class="js-supplier-pay-overpayment" value="0">
+                <% if (debtCheck.hasDebtMismatch) { %>
+                  <div class="supplier-pay-mismatch-alert">
+                    <strong>Nợ theo phiếu nhập đang lệch với sổ công nợ. Nợ theo sổ công nợ là số tiền tối đa cần trả hiện tại; nợ theo phiếu nhập chỉ dùng để phân bổ vào hóa đơn.</strong>
+                    <div class="supplier-pay-mismatch-grid">
+                      <span>Nợ theo phiếu nhập</span><b><%= Number(debtCheck.debtByInvoices || 0).toLocaleString('vi-VN') %></b>
+                      <span>Nợ theo sổ công nợ</span><b><%= Number(debtCheck.debtByLedger || 0).toLocaleString('vi-VN') %></b>
+                      <span>Chênh lệch</span><b><%= Number(debtCheck.debtDiff || 0).toLocaleString('vi-VN') %></b>
+                    </div>
+                  </div>
+                <% } %>
+                <div class="supplier-pay-grid">
+                  <label class="supplier-pay-field">
+                    <span>Thời gian</span>
+                    <span class="supplier-pay-input-wrap">
+                      <input name="ngay_lap_display" type="text" value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }) %>" readonly>
+                      <span class="supplier-pay-icons"><i class="fa-regular fa-calendar"></i><i class="fa-regular fa-clock"></i></span>
+                    </span>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Người chi</span>
+                    <select name="nguoi_chi_display" disabled>
+                      <option selected><%= currentUserName || 'test' %></option>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Phương thức thanh toán</span>
+                    <select name="phuong_thuc_thanh_toan">
+                      <option value="tien_mat">Tiền mặt</option>
+                      <option value="chuyen_khoan">Chuyển khoản</option>
+                      <option value="vi_dien_tu">Ví điện tử</option>
+                      <option value="khac">Khác</option>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Sổ quỹ</span>
+                    <select name="so_quy_id" required>
+                      <% if (!(cashBooks || []).length) { %>
+                        <option value="">Chưa có sổ quỹ</option>
+                      <% } %>
+                      <% (cashBooks || []).forEach(function(cashBook) { %>
+                        <option value="<%= cashBook._id %>"><%= cashBook.ten_so_quy || cashBook.loai || 'Sổ quỹ' %></option>
+                      <% }) %>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Số tiền</span>
+                    <input class="js-supplier-pay-amount" name="gia_tri" inputmode="numeric" autocomplete="off" value="">
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Nợ còn</span>
+                    <input class="supplier-pay-readonly js-supplier-pay-remaining" type="text" value="<%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %>" readonly>
+                  </label>
+                  <label class="supplier-pay-field supplier-pay-field-full">
+                    <span>Ghi chú</span>
+                    <textarea name="ghi_chu" placeholder="Nhập ghi chú"></textarea>
+                  </label>
+                </div>
+                <label class="supplier-pay-check">
+                  <input type="checkbox" checked disabled>
+                  <span>Phân bổ vào phiếu nhập và phiếu mua dịch vụ</span>
+                </label>
+                <label class="supplier-pay-check">
+                  <input type="checkbox" name="enable_overpayment" class="js-supplier-pay-allow-overpayment">
+                  <span>Cho phép trả dư / ứng trước NCC</span>
+                </label>
+                <% var supplierUnpaidPurchaseDebtTotal = Number((supplierUnpaidPurchases || []).reduce(function(sum, p) { return sum + Number(p.con_no_ncc || 0); }, 0)); %>
+                <% if (supplierUnpaidPurchaseDebtTotal !== Number(selectedSupplier.tong_no || 0)) { %>
+                  <div class="supplier-pay-reconcile-note">
+                    Nợ theo phiếu nhập: <strong><%= supplierUnpaidPurchaseDebtTotal.toLocaleString('vi-VN') %></strong>.
+                    Nợ hiện tại theo sổ công nợ: <strong><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>.
+                  </div>
+                <% } %>
+                <div class="supplier-pay-table-wrap table-wrap">
+                  <table class="admin-table warehouse-table">
+                    <thead>
+                      <tr>
+                        <th>Mã hóa đơn</th>
+                        <th>Thời gian</th>
+                        <th class="text-right">Giá trị phiếu nhập</th>
+                        <th class="text-right">Đã trả trước</th>
+                        <th class="text-right">Còn cần trả <i class="fa-regular fa-circle-question"></i></th>
+                        <th class="text-right">Tiền trả</th>
+                        <th class="text-right">Còn nợ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% if (!(supplierUnpaidPurchases || []).length) { %>
+                        <tr>
+                          <td colspan="7">
+                            <div class="supplier-pay-empty">
+                              <span class="supplier-pay-empty-icon"><i class="fa-regular fa-inbox"></i></span>
+                              <span>Không có kết quả phù hợp</span>
+                            </div>
+                          </td>
+                        </tr>
+                      <% } %>
+                      <% (supplierUnpaidPurchases || []).forEach(function(purchase) { %>
+                        <tr class="js-supplier-pay-row" data-debt="<%= Number(purchase.con_no_ncc || 0) %>">
+                          <td><%= purchase.ma_phieu_nhap || '--' %></td>
+                          <td><%= formatDate(purchase.ngay_nhap || purchase.created_at) %></td>
+                          <td class="text-right"><%= Number(purchase.can_tra_ncc || purchase.tong_tien || 0).toLocaleString('vi-VN') %></td>
+                          <td class="text-right"><%= Number(purchase.da_tra_ncc || 0).toLocaleString('vi-VN') %></td>
+                          <td class="text-right"><%= Number(purchase.con_no_ncc || 0).toLocaleString('vi-VN') %></td>
+                          <td class="text-right">
+                            <input
+                              class="supplier-pay-row-input js-supplier-pay-row-paid-input"
+                              inputmode="numeric"
+                              autocomplete="off"
+                              value="0"
+                              data-purchase-id="<%= purchase._id %>"
+                              data-purchase-code="<%= purchase.ma_phieu_nhap || '' %>"
+                              data-debt="<%= Number(purchase.con_no_ncc || 0) %>"
+                            >
+                          </td>
+                          <td class="text-right js-supplier-pay-row-left"><%= Number(purchase.con_no_ncc || 0).toLocaleString('vi-VN') %></td>
+                        </tr>
+                      <% }) %>
+                    </tbody>
+                    <% if ((supplierUnpaidPurchases || []).length) { %>
+                      <tfoot>
+                        <tr class="supplier-pay-total-row">
+                          <td colspan="4"></td>
+                          <td class="text-right js-supplier-pay-total-debt"><%= supplierUnpaidPurchaseDebtTotal.toLocaleString('vi-VN') %></td>
+                          <td class="text-right js-supplier-pay-total-paid">0</td>
+                          <td class="text-right js-supplier-pay-total-left"><%= supplierUnpaidPurchaseDebtTotal.toLocaleString('vi-VN') %></td>
+                        </tr>
+                        <tr class="supplier-pay-unallocated-row">
+                          <td colspan="5"></td>
+                          <td class="js-supplier-pay-unallocated-label">Tiền chưa gắn phiếu nhập:</td>
+                          <td class="text-right js-supplier-pay-unallocated">0</td>
+                        </tr>
+                      </tfoot>
+                    <% } %>
+                  </table>
+                </div>
+              </form>
+            </div>
+            <div class="supplier-pay-footer">
+              <button class="btn btn-light js-close-supplier-pay-modal" type="button">Bỏ qua</button>
+              <button class="btn btn-light js-submit-supplier-pay-modal" type="button" data-print="1" data-form-id="supplierPayForm_<%= selectedSupplier._id %>">Tạo phiếu chi & In</button>
+              <button class="btn btn-primary js-submit-supplier-pay-modal" type="button" data-form-id="supplierPayForm_<%= selectedSupplier._id %>">Tạo phiếu chi</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-pane" data-detail-pane="xnb">
+        <div class="supplier-pane-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th>Mã xuất dùng nội bộ</th>
+                <th>Loại xuất</th>
+                <th>Kho</th>
+                <th class="text-right">Tổng SL</th>
+                <th class="text-right">Tổng giá trị</th>
+                <th>Thời gian</th>
+                <th>Người tạo</th>
+                <th>Trạng thái</th>
+                <th>Ghi chú</th>
+                <th>Chứng từ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if ((supplierInternalExportHistory || []).length === 0) { %>
+                <tr><td colspan="10" class="empty-cell">Chưa có phiếu xuất dùng nội bộ cho nhà cung cấp này.</td></tr>
+              <% } %>
+              <% (supplierInternalExportHistory || []).forEach(function(row) { %>
+                <% 
+                  var xnbStatusClass = 'status-pill';
+                  if (row.trang_thai === 'completed') xnbStatusClass += ' is-active';
+                  else if (row.trang_thai === 'draft') xnbStatusClass += ' is-draft';
+                  else if (row.trang_thai === 'cancelled') xnbStatusClass += ' is-cancelled';
+                %>
+                <tr>
+                  <td><strong><%= row.ma_xuat_noi_bo || '--' %></strong></td>
+                  <td><%= row.loai_xuat || '--' %></td>
+                  <td><%= row.kho || '--' %></td>
+                  <td class="text-right"><%= Number(row.tong_so_luong || 0).toLocaleString('vi-VN') %></td>
+                  <td class="text-right"><%= Number(row.tong_gia_tri || 0).toLocaleString('vi-VN') %></td>
+                  <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
+                  <td><%= row.nguoi_tao || '--' %></td>
+                  <td><span class="<%= xnbStatusClass %>"><%= mapXuatNoiBoStatus ? mapXuatNoiBoStatus(row.trang_thai) : (row.trang_thai || '--') %></span></td>
+                  <td><%= row.ghi_chu || '--' %></td>
+                  <td>
+                    <% if (row._id) { %>
+                      <a class="btn btn-light btn-sm" href="/chung-tu-kho/xuat-noi-bo/<%= row._id %>" target="_blank">Mở</a>
+                    <% } else { %>
+                      --
+                    <% } %>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <form id="supplierInlineDel_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/delete" style="display:none" aria-hidden="true"></form>
+    <div class="supplier-detail-footer">
+      <a
+        class="btn btn-primary btn-sm supplier-detail-export-link"
+        href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
+        data-supplier-id="<%= selectedSupplier._id %>"
+      >Xuất thông tin</a>
+    </div>
+  </div>
+</div>

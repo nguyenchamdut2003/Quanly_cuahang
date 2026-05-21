@@ -11,10 +11,11 @@
             const stores = Array.isArray(locals.availableStores) ? locals.availableStores : [];
             const storeName = store?.ten_cua_hang || 'Thông tin cửa hàng';
             const storeInitial = (storeName || 'C').trim().charAt(0).toUpperCase();
-            const storeAddress = store?.dia_chi_gui_hang_day_du || store?.dia_chi_day_du || [
-              store?.dia_chi_gui_hang_chi_tiet || store?.dia_chi_chi_tiet,
-              store?.phuong_xa_gui_hang || store?.phuong_xa,
-              store?.tinh_thanh_gui_hang || store?.tinh_thanh
+            const storeAddress = store?.dia_chi_day_du || [
+              store?.dia_chi_chi_tiet,
+              store?.phuong_xa,
+              store?.quan_huyen,
+              store?.tinh_thanh
             ].filter(Boolean).join(', ');
             const storeEditUrl = store?._id ? `/cua-hang?open=${store._id}` : '/cua-hang';
           %>
@@ -57,9 +58,6 @@
                 <small>Chưa có cửa hàng. Bấm bên dưới để thêm thông tin.</small>
               <% } %>
             </div>
-            <a href="/cau-hinh/doanh-nghiep" class="dropdown-item">
-              <i class="fa-solid fa-building"></i> Cấu hình doanh nghiệp
-            </a>
             <a href="<%= storeEditUrl %>" class="dropdown-item">
               <i class="fa-solid fa-store"></i> Xem và sửa cửa hàng
             </a>

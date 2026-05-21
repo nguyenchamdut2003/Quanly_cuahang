@@ -10,6 +10,7 @@ var {
     NguoiDung
 } = require('../models/kiot.model');
 var ExcelJS = require('exceljs');
+var querystring = require('querystring');
 var { buildFullAddress, normalizeAddress } = require('../utils/address');
 
 function formatDate(value) {
@@ -136,10 +137,15 @@ function finalizeCustomerPayload(payload, existing) {
     return payload;
 }
 
+function phoneDigits(value) {
+    return String(value || '').replace(/\./g, '').replace(/\s+/g, '');
+}
+
 function validateCustomerPayload(payload) {
     if (!payload.ten_khach_hang) return 'missing_name';
-    if (!payload.sdt) return 'missing_phone';
-    if (!/^0\d{9}$/.test(payload.sdt)) return 'invalid_phone';
+    var primaryPhone = phoneDigits(payload.sdt);
+    if (!primaryPhone) return 'missing_phone';
+    if (!/^0\d{9}$/.test(primaryPhone)) return 'invalid_phone';
     if (payload.loai_khach_hang === 'ca_nhan') {
         if (!payload.cccd) return 'missing_cccd';
         if (!/^\d{12}$/.test(payload.cccd)) return 'invalid_cccd';
@@ -292,10 +298,15 @@ function normalizeAddressPayload(body) {
         ma_dia_chi: String(body.ma_dia_chi || '').trim(),
         ten_nguoi_nhan: String(body.ten_nguoi_nhan || '').trim(),
         sdt_nguoi_nhan: String(body.sdt_nguoi_nhan || '').trim(),
+        so_nha: address.dia_chi_chi_tiet,
         dia_chi_chi_tiet: address.dia_chi_chi_tiet,
         dia_chi_day_du: address.dia_chi_day_du,
         tinh_thanh: address.tinh_thanh,
+        tinh_thanh_id: address.tinh_thanh_id,
+        quan_huyen: address.quan_huyen,
+        quan_huyen_id: address.quan_huyen_id,
         phuong_xa: address.phuong_xa,
+        phuong_xa_code: address.phuong_xa_code,
         loai_dia_chi: String(body.loai_dia_chi || '').trim(),
         ghi_chu: String(body.ghi_chu || body.ghi_chu_dia_chi || '').trim(),
         mac_dinh: body.mac_dinh === 'true' || body.mac_dinh === true || body.mac_dinh === 'on'
@@ -303,13 +314,12 @@ function normalizeAddressPayload(body) {
 }
 
 function buildCustomerReturnUrl(customerId, returnQueryRaw) {
-    var customer = normalizeIdParam(customerId);
+    void customerId;
     var returnQuery = String(returnQueryRaw || '').trim().replace(/^\?/, '');
     var params = returnQuery ? returnQuery.split('&').filter(Boolean) : [];
     var paramsWithoutCustomer = params.filter(function(item) {
         return item.indexOf('customer=') !== 0;
     });
-    if (customer) paramsWithoutCustomer.push('customer=' + encodeURIComponent(customer));
     return '/khach-hang' + (paramsWithoutCustomer.length ? '?' + paramsWithoutCustomer.join('&') : '');
 }
 
@@ -633,9 +643,75 @@ function buildCustomerQueryFromFilter(filter) {
     return customerQuery;
 }
 
+async function loadCustomerDetailRenderLocals(req, customerId) {
+    var cid = normalizeIdParam(customerId);
+    if (!cid || !/^[a-f0-9]{24}$/i.test(cid)) return null;
+
+    var selectedCustomer = await KhachHang.findById(cid)
+        .populate({ path: 'nguoi_tao_id', select: 'ho_ten email username' })
+        .lean();
+    if (!selectedCustomer) return null;
+
+    var customerGroups = await loadCustomerGroups();
+    var groupMap = customerGroups.reduce(function(map, group) {
+        map[String(group._id)] = group.ten_nhom || '---';
+        return map;
+    }, {});
+    selectedCustomer.nhom_khach_hang_ten = groupMap[String(selectedCustomer.nhom_khach_hang_id || '')] || '---';
+    selectedCustomer.nguoi_tao_ten = getCreatorName(selectedCustomer);
+
+    var customerAddresses = await DiaChiKhachHang.find({ khach_hang_id: selectedCustomer._id }).sort({ created_at: -1 }).lean();
+    var customerHistory = await loadCustomerHistory(selectedCustomer._id);
+    var historyOrders = Array.isArray(customerHistory.orders) ? customerHistory.orders : [];
+    var historyInvoices = Array.isArray(customerHistory.invoices) ? customerHistory.invoices : [];
+    var historyReturns = Array.isArray(customerHistory.returns) ? customerHistory.returns : [];
+    var historyDebts = Array.isArray(customerHistory.debts) ? customerHistory.debts : [];
+
+    var filter = normalizeFilterQuery(req?.query || {});
+    var filterQueryString = buildFilterQueryString(filter);
+    var addressTypes = await loadAddressTypes();
+
+    return {
+        selectedCustomer: selectedCustomer,
+        customerAddresses: customerAddresses,
+        customerHistory: customerHistory,
+        historyOrders: historyOrders,
+        historyInvoices: historyInvoices,
+        historyReturns: historyReturns,
+        historyDebts: historyDebts,
+        addressTypes: addressTypes,
+        filterQueryString: filterQueryString,
+        formatDate: formatDate,
+        formatDateOnly: formatDateOnly,
+        formatGenderLabel: formatGenderLabel,
+        formatCustomerStatusLabel: formatCustomerStatusLabel,
+        formatDetailText: formatDetailText,
+        formatCreatorName: getCreatorName
+    };
+}
+
+exports.apiCustomerDetail = async function(req, res, next) {
+    try {
+        var ctx = await loadCustomerDetailRenderLocals(req, req.params.id);
+        if (!ctx) {
+            return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tìm thấy khách hàng.</p></div>');
+        }
+        res.render('khach-hang/_detail-panel', ctx);
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.index = async function(req, res, next) {
     try {
         var requestQuery = req?.query || {};
+        if (Object.prototype.hasOwnProperty.call(requestQuery, 'customer')) {
+            var redirectQuery = Object.assign({}, requestQuery);
+            delete redirectQuery.customer;
+            var qsStr = querystring.stringify(redirectQuery);
+            return res.redirect(302, '/khach-hang' + (qsStr ? '?' + qsStr : ''));
+        }
+
         var filter = normalizeFilterQuery(requestQuery);
         var customerQuery = buildCustomerQueryFromFilter(filter);
         await applyCreatorFilter(customerQuery, filter.creatorKeyword);
@@ -668,19 +744,6 @@ exports.index = async function(req, res, next) {
             customer.nguoi_tao_ten = getCreatorName(customer);
             return customer;
         });
-        var hasCustomerQuery = Object.prototype.hasOwnProperty.call(requestQuery, 'customer');
-        var selectedCustomerId = hasCustomerQuery ? String(requestQuery.customer || '') : '';
-        var selectedCustomer = selectedCustomerId
-            ? customers.find(function(customer) {
-                return String(customer._id) === selectedCustomerId;
-            }) || null
-            : null;
-        var customerAddresses = selectedCustomer
-            ? await DiaChiKhachHang.find({ khach_hang_id: selectedCustomer._id }).sort({ created_at: -1 }).lean()
-            : [];
-        var customerHistory = selectedCustomer
-            ? await loadCustomerHistory(selectedCustomer._id)
-            : { orders: [], invoices: [], returns: [], debts: [] };
 
         res.render('khach-hang/index', {
             title: 'Khách hàng',
@@ -689,9 +752,6 @@ exports.index = async function(req, res, next) {
             user: req.user,
             flash: requestQuery,
             customers: customers,
-            selectedCustomer: selectedCustomer,
-            customerAddresses: customerAddresses,
-            customerHistory: customerHistory,
             customerGroups: customerGroups,
             addressTypes: addressTypes,
             summaryTotals: summaryTotals,
@@ -1179,7 +1239,7 @@ exports.add = async function(req, res, next) {
             await DiaChiKhachHang.create(addressPayload);
         }
 
-        res.redirect('/khach-hang?customer=' + customer._id + '&success=created');
+        res.redirect('/khach-hang?success=created#c-' + String(customer._id));
     } catch (error) {
         console.error("LỖI KHI TẠO KHÁCH HÀNG:", error);
         if (error && error.code === 11000) {
@@ -1199,7 +1259,7 @@ exports.update = async function(req, res, next) {
         var validationError = validateCustomerPayload(payload);
 
         if (validationError) {
-            return res.redirect('/khach-hang?customer=' + customerId + '&error=' + validationError);
+            return res.redirect('/khach-hang?error=' + encodeURIComponent(validationError) + '#c-' + customerId);
         }
 
         if (payload.loai_khach_hang === 'ca_nhan') {
@@ -1256,7 +1316,7 @@ exports.update = async function(req, res, next) {
             }
         }
 
-        res.redirect('/khach-hang?customer=' + customerId + '&success=updated');
+        res.redirect('/khach-hang?success=updated#c-' + customerId);
     } catch (error) {
         if (error && error.code === 11000) {
             return res.redirect('/khach-hang?error=duplicate_code');

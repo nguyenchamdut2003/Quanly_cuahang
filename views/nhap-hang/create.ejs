@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -90,7 +90,7 @@
     .lot-qty-summary .danger{color:#d92d20}
     .lot-qty-summary .ok{color:#027a48}
     .lot-qc-list{display:flex;flex-direction:column;gap:6px}
-    .lot-qc-head,.lot-qc-row{display:grid;grid-template-columns:minmax(150px,1.2fr) 110px minmax(150px,1fr) 34px;gap:8px;align-items:center}
+    .lot-qc-head,.lot-qc-row{display:grid;grid-template-columns:minmax(140px,1.2fr) 96px 120px 130px 34px;gap:8px;align-items:center}
     .lot-qc-head{font-size:12px;color:#667085}
     .lot-qc-row .lot-input{height:32px}
     .lot-qc-delete{width:32px;height:32px;border:1px solid #fda29b;background:#fff;color:#d92d20;border-radius:6px;display:flex;align-items:center;justify-content:center;cursor:pointer}
@@ -295,9 +295,23 @@
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Đơn vị tính</div>
           <input id="lotUnitName" class="lot-input lot-readonly" readonly>
         </label>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Số lượng lô</div>
+          <input id="lotTotalQtyInput" class="lot-input" inputmode="numeric" placeholder="Nhập nếu không chia thuộc tính">
+        </label>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Đơn giá lô</div>
+          <input id="lotUnitCostInput" class="lot-input" inputmode="numeric" placeholder="Nhập nếu không chia thuộc tính">
+        </label>
         <select id="lotExistingId" class="lot-input full" style="display:none"></select>
-        <input id="lotMaLo" class="lot-input" placeholder="Mã lô (để trống tự động)">
-        <input id="lotTenLo" class="lot-input" placeholder="Tên lô">
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Mã lô (để trống tự động)</div>
+          <input id="lotMaLo" class="lot-input" placeholder="Mã lô (để trống tự động)">
+        </label>
+        <label>
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Tên lô</div>
+          <input id="lotTenLo" class="lot-input" placeholder="VD: Lô 20/5/2026">
+        </label>
         <label>
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Ngày nhập</div>
           <input id="lotNgayNhap" type="date" class="lot-input">
@@ -306,18 +320,22 @@
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Hạn sử dụng</div>
           <input id="lotHanSuDung" type="date" class="lot-input">
         </label>
-        <textarea id="lotGhiChu" class="lot-note full" placeholder="Ghi chú lô"></textarea>
+        <label class="full">
+          <div style="font-size:12px;margin-bottom:4px;color:#475467">Ghi chú lô</div>
+          <textarea id="lotGhiChu" class="lot-note" style="width:100%" placeholder="Ghi chú lô"></textarea>
+        </label>
       </div>
       <div class="lot-section">
         <div class="lot-total-text" id="lotTotalQtyText">Tổng số lượng lô: 0</div>
         <div class="lot-section-head">
-          <div class="lot-section-title">Thuộc tính / Quy cách trong lô</div>
+          <div class="lot-section-title">Thuộc tính trong lô</div>
           <button type="button" class="btn-row primary" id="addLotQcBtn">+ Thêm thuộc tính</button>
         </div>
         <div class="lot-qc-head">
-          <span>Tên thuộc tính/quy cách</span>
+          <span>Tên thuộc tính</span>
           <span>Số lượng</span>
-          <span>Ghi chú</span>
+          <span>Đơn giá nhập</span>
+          <span>Thành tiền</span>
           <span></span>
         </div>
         <div id="lotQcRows" class="lot-qc-list"></div>
@@ -390,6 +408,8 @@
     const lotModeExisting = document.getElementById('lotModeExisting');
     const lotExistingId = document.getElementById('lotExistingId');
     const lotTotalQtyText = document.getElementById('lotTotalQtyText');
+    const lotTotalQtyInput = document.getElementById('lotTotalQtyInput');
+    const lotUnitCostInput = document.getElementById('lotUnitCostInput');
     const lotUnitNameInput = document.getElementById('lotUnitName');
     const lotQcRows = document.getElementById('lotQcRows');
     const lotQcAllocated = document.getElementById('lotQcAllocated');
@@ -452,6 +472,10 @@
     }
 
     function calcLineTotal(item) {
+      const qcTotal = item && item.lot_info && Array.isArray(item.lot_info.quy_cach_items)
+        ? cleanQuyCachItems(item.lot_info.quy_cach_items).reduce((sum, row) => sum + numeric(row.thanh_tien), 0)
+        : 0;
+      if (qcTotal > 0) return qcTotal;
       const qty = numeric(item.so_luong);
       const price = numeric(item.don_gia_nhap);
       const base = qty * price;
@@ -488,22 +512,24 @@
     function normalizeQuyCachItems(items) {
       return (Array.isArray(items) ? items : [])
         .map(row => ({
-          ten_thuoc_tinh: String(row && row.ten_thuoc_tinh || '').trim(),
+          ten_quy_cach: String(row && (row.ten_quy_cach || row.ten_thuoc_tinh) || '').trim(),
           so_luong: numeric(row && row.so_luong),
-          ghi_chu: String(row && row.ghi_chu || '').trim()
+          don_gia_nhap: numeric(row && row.don_gia_nhap),
+          thanh_tien: numeric(row && row.thanh_tien)
         }));
     }
 
     function cleanQuyCachItems(items) {
       return normalizeQuyCachItems(items)
-        .filter(row => row.ten_thuoc_tinh || row.so_luong > 0 || row.ghi_chu);
+        .map(row => Object.assign({}, row, { thanh_tien: numeric(row.so_luong) * numeric(row.don_gia_nhap) }))
+        .filter(row => row.ten_quy_cach || row.so_luong > 0 || row.don_gia_nhap > 0);
     }
 
     function getLotDraftItems() {
       return normalizeQuyCachItems(Array.from(lotQcRows ? lotQcRows.querySelectorAll('.lot-qc-row') : []).map(row => ({
-        ten_thuoc_tinh: row.querySelector('[data-field="ten_thuoc_tinh"]')?.value || '',
+        ten_quy_cach: row.querySelector('[data-field="ten_quy_cach"]')?.value || '',
         so_luong: row.querySelector('[data-field="so_luong"]')?.value || '',
-        ghi_chu: row.querySelector('[data-field="ghi_chu"]')?.value || ''
+        don_gia_nhap: row.querySelector('[data-field="don_gia_nhap"]')?.value || ''
       })));
     }
 
@@ -512,9 +538,10 @@
       const rows = normalizeQuyCachItems(items);
       lotQcRows.innerHTML = rows.map((row, index) => `
         <div class="lot-qc-row" data-index="${index}">
-          <input class="lot-input" data-field="ten_thuoc_tinh" value="${escapeHtml(row.ten_thuoc_tinh)}" placeholder="VD: Nhỏ, To, Loại 1">
+          <input class="lot-input" data-field="ten_quy_cach" value="${escapeHtml(row.ten_quy_cach)}" placeholder="VD: Nhỏ, To, Loại 1">
           <input class="lot-input" data-field="so_luong" value="${row.so_luong || ''}" inputmode="numeric" placeholder="0">
-          <input class="lot-input" data-field="ghi_chu" value="${escapeHtml(row.ghi_chu)}" placeholder="Ghi chú">
+          <input class="lot-input" data-field="don_gia_nhap" value="${row.don_gia_nhap || ''}" inputmode="numeric" placeholder="0">
+          <input class="lot-input lot-readonly" data-field="thanh_tien" value="${fmt(numeric(row.so_luong) * numeric(row.don_gia_nhap))}" readonly>
           <button type="button" class="lot-qc-delete" data-action="delete-qc" title="Xóa dòng"><i class="fa-solid fa-xmark"></i></button>
         </div>
       `).join('');
@@ -524,9 +551,23 @@
     function updateLotQuyCachSummary() {
       const item = selectedItems.find(i => String(i.row_id) === String(lotEditItemId));
       const unit = getItemUnit(item);
-      const allocated = getLotDraftItems().reduce((sum, row) => sum + numeric(row.so_luong), 0);
+      const rows = cleanQuyCachItems(getLotDraftItems());
+      const allocated = rows.reduce((sum, row) => sum + numeric(row.so_luong), 0);
+      const amount = rows.reduce((sum, row) => sum + numeric(row.thanh_tien), 0);
       if (lotQcAllocated) lotQcAllocated.textContent = `${fmt(allocated)} ${unit}`;
-      if (lotTotalQtyText) lotTotalQtyText.textContent = `Tổng số lượng lô: ${fmt(allocated)} ${unit}`;
+      if (lotTotalQtyText) {
+        const plainQty = numeric(lotTotalQtyInput ? lotTotalQtyInput.value : item && item.so_luong || 0);
+        const plainCost = numeric(lotUnitCostInput ? lotUnitCostInput.value : item && item.don_gia_nhap || 0);
+        lotTotalQtyText.textContent = rows.length
+          ? `Tổng thuộc tính: ${fmt(allocated)} ${unit} / ${fmt(amount)}`
+          : `Tổng số lượng lô: ${fmt(plainQty)} ${unit} / ${fmt(plainQty * plainCost)}`;
+      }
+      Array.from(lotQcRows ? lotQcRows.querySelectorAll('.lot-qc-row') : []).forEach(row => {
+        const qty = numeric(row.querySelector('[data-field="so_luong"]')?.value || 0);
+        const price = numeric(row.querySelector('[data-field="don_gia_nhap"]')?.value || 0);
+        const amountInput = row.querySelector('[data-field="thanh_tien"]');
+        if (amountInput) amountInput.value = fmt(qty * price);
+      });
     }
 
     function makeLotSummary(item) {
@@ -545,7 +586,7 @@
       const rows = cleanQuyCachItems(item && item.lot_info ? item.lot_info.quy_cach_items : []);
       if (!rows.length) return '';
       const unit = getItemUnit(item);
-      return rows.map(row => `${escapeHtml(row.ten_thuoc_tinh || '---')} ${fmt(row.so_luong)}${escapeHtml(unit)}`).join(', ');
+      return rows.map(row => `${escapeHtml(row.ten_quy_cach || '---')} ${fmt(row.so_luong)}${escapeHtml(unit)} x ${fmt(row.don_gia_nhap)}`).join(', ');
     }
 
     function makeRowId() {
@@ -859,13 +900,20 @@
         goodsTotal += lineTotal;
         const lineDiscountType = item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd';
         const lineDiscountValue = clampDiscountValue(item.giam_gia || 0, lineDiscountType);
+        const hasQuyCach = item.quan_ly_theo_lo && cleanQuyCachItems(item.lot_info ? item.lot_info.quy_cach_items : []).length > 0;
+        const qtyInput = item.quan_ly_theo_lo
+          ? `<input class="input-small qty-input" value="${fmt(item.so_luong)}" readonly disabled>`
+          : `<input class="input-small qty-input" value="${fmt(item.so_luong)}" onchange="updateQty('${item.row_id}', this.value)">`;
+        const priceInput = hasQuyCach
+          ? `<input class="input-small lot-readonly" value="${fmt(item.don_gia_nhap)}" readonly disabled>`
+          : `<input class="input-small" value="${fmt(item.don_gia_nhap)}" onchange="updatePrice('${item.row_id}', this.value)">`;
         return `<tr>
           <td style="text-align:center"><div class="row-index-cell"><span>${index + 1}</span><button type="button" class="row-delete-btn" title="Xóa dòng" onclick="removeProductFromImport('${item.row_id}')"><i class="fa-regular fa-trash-can"></i></button></div></td>
           <td>${item.ma_hang}</td>
           <td>${item.ten_hang}</td>
           <td class="unit-cell">${item.dvt || item.don_vi_tinh || '---'}</td>
-          <td class="num"><input class="input-small qty-input" value="${fmt(item.so_luong)}" readonly disabled></td>
-          <td class="num"><input class="input-small" value="${fmt(item.don_gia_nhap)}" onchange="updatePrice('${item.row_id}', this.value)"></td>
+          <td class="num">${qtyInput}</td>
+          <td class="num">${priceInput}</td>
           <td class="num">
             <div class="line-discount-wrap">
               <input class="input-small" value="${fmt(lineDiscountValue)}" onchange="updateLineDiscount('${item.row_id}', this.value)">
@@ -883,7 +931,7 @@
               <span>Nhập lô, hạn sử dụng</span>
               <a class="lot-link" onclick="openLotModal('${item.row_id}')">Chọn lô</a>
               <span>${makeLotSummary(item)}</span>
-              ${makeQuyCachSummary(item) ? `<span>Quy cách: ${makeQuyCachSummary(item)}</span>` : ''}
+              ${makeQuyCachSummary(item) ? `<span>Thuộc tính: ${makeQuyCachSummary(item)}</span>` : ''}
             </div>
           </td>
         </tr>` : '');
@@ -939,7 +987,7 @@
         don_gia: numeric(item.don_gia_nhap),
         giam_gia_dong: clampDiscountValue(item.giam_gia, item.kieu_giam_gia_dong),
         kieu_giam_gia_dong: item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd',
-        lot_info: item.lot_info ? {
+        lo_info: item.quan_ly_theo_lo && item.lot_info ? {
           lo_hang_id: String(item.lot_info.lo_hang_id || '').trim(),
           ma_lo: String(item.lot_info.ma_lo || '').trim(),
           ten_lo: String(item.lot_info.ten_lo || '').trim(),
@@ -947,6 +995,7 @@
           han_su_dung: String(item.lot_info.han_su_dung || '').trim(),
           ghi_chu: String(item.lot_info.ghi_chu || '').trim(),
           so_luong_tong: numeric(item.lot_info.so_luong_tong || item.so_luong),
+          don_gia_nhap: numeric(item.lot_info.don_gia_nhap || item.don_gia_nhap),
           quy_cach_items: cleanQuyCachItems(item.lot_info.quy_cach_items)
         } : null
       })));
@@ -1015,6 +1064,8 @@
       if (lotModeNew) lotModeNew.checked = !Boolean(lo.lo_hang_id);
       await loadLotsForItem(item.hang_hoa_id, lo.lo_hang_id);
       if (lotUnitNameInput) lotUnitNameInput.value = getItemUnit(item);
+      if (lotTotalQtyInput) lotTotalQtyInput.value = numeric(lo.so_luong_tong || item.so_luong) || '';
+      if (lotUnitCostInput) lotUnitCostInput.value = numeric(lo.don_gia_nhap || item.don_gia_nhap) || '';
       const lotNgayNhapValue = lo.ngay_nhap || today;
       document.getElementById('lotMaLo').value = lo.ma_lo || '';
       document.getElementById('lotTenLo').value = lo.ten_lo || `Lô ${formatDateVi(lotNgayNhapValue)}`;
@@ -1029,18 +1080,28 @@
     function saveLotInfo() {
       const item = selectedItems.find(i => i.row_id === lotEditItemId);
       if (!item) return;
-      const quyCachItems = getLotDraftItems();
-      const validQuyCachItems = quyCachItems.filter(row => numeric(row.so_luong) > 0);
+      const quyCachItems = cleanQuyCachItems(getLotDraftItems());
+      const validQuyCachItems = quyCachItems.filter(row => numeric(row.so_luong) > 0 || row.ten_quy_cach || numeric(row.don_gia_nhap) > 0);
       const totalQty = validQuyCachItems.reduce((sum, row) => sum + numeric(row.so_luong), 0);
-      const invalidName = validQuyCachItems.find(row => !row.ten_thuoc_tinh);
-      if (!validQuyCachItems.length || totalQty <= 0) {
-        alert('Lô hàng cần ít nhất 1 quy cách có số lượng lớn hơn 0.');
+      const totalAmount = validQuyCachItems.reduce((sum, row) => sum + numeric(row.thanh_tien), 0);
+      const invalidName = validQuyCachItems.find(row => !row.ten_quy_cach);
+      const invalidQty = validQuyCachItems.find(row => numeric(row.so_luong) <= 0);
+      const plainQty = numeric(lotTotalQtyInput ? lotTotalQtyInput.value : item.so_luong);
+      const plainCost = numeric(lotUnitCostInput ? lotUnitCostInput.value : item.don_gia_nhap);
+      if (validQuyCachItems.length && invalidName) {
+        alert('Tên thuộc tính không được để trống nếu dòng đó có số lượng hoặc đơn giá.');
         return;
       }
-      if (invalidName) {
-        alert('Tên quy cách không được để trống nếu dòng đó có số lượng.');
+      if (validQuyCachItems.length && invalidQty) {
+        alert('Số lượng thuộc tính phải lớn hơn 0.');
         return;
       }
+      if (!validQuyCachItems.length && plainQty <= 0) {
+        alert('Vui lòng nhập số lượng lô hoặc chia thuộc tính.');
+        return;
+      }
+      const finalQty = validQuyCachItems.length ? totalQty : plainQty;
+      const finalCost = validQuyCachItems.length && totalQty > 0 ? Math.round(totalAmount / totalQty) : plainCost;
       if (lotModeExisting && lotModeExisting.checked) {
         if (!lotExistingId.value) {
           alert('Vui lòng chọn lô có sẵn hoặc chuyển sang tạo lô mới');
@@ -1054,10 +1115,12 @@
           ten_lo: selectedOption ? (selectedOption.dataset.ten || selectedOption.dataset.ma || text) : text,
           han_su_dung: selectedOption ? (selectedOption.dataset.hsd || '') : '',
           ghi_chu: '',
-          so_luong_tong: totalQty,
+          so_luong_tong: finalQty,
+          don_gia_nhap: finalCost,
           quy_cach_items: validQuyCachItems
         };
-        item.so_luong = totalQty;
+        item.so_luong = finalQty;
+        item.don_gia_nhap = finalCost;
         lotModal.classList.remove('open');
         renderItems();
         return;
@@ -1068,10 +1131,12 @@
         ngay_nhap: document.getElementById('lotNgayNhap').value,
         han_su_dung: document.getElementById('lotHanSuDung').value,
         ghi_chu: document.getElementById('lotGhiChu').value.trim(),
-        so_luong_tong: totalQty,
+        so_luong_tong: finalQty,
+        don_gia_nhap: finalCost,
         quy_cach_items: validQuyCachItems
       };
-      item.so_luong = totalQty;
+      item.so_luong = finalQty;
+      item.don_gia_nhap = finalCost;
       lotModal.classList.remove('open');
       renderItems();
     }
@@ -1115,10 +1180,12 @@
         document.getElementById('lotHanSuDung').value = addDaysToDate(this.value, 5);
       });
     }
+    if (lotTotalQtyInput) lotTotalQtyInput.addEventListener('input', updateLotQuyCachSummary);
+    if (lotUnitCostInput) lotUnitCostInput.addEventListener('input', updateLotQuyCachSummary);
     if (addLotQcBtn) {
       addLotQcBtn.addEventListener('click', function() {
         const rows = getLotDraftItems();
-        rows.push({ ten_thuoc_tinh: '', so_luong: 0, ghi_chu: '' });
+        rows.push({ ten_quy_cach: '', so_luong: 0, don_gia_nhap: numeric(lotUnitCostInput ? lotUnitCostInput.value : 0), thanh_tien: 0 });
         renderLotQuyCachRows(rows);
       });
     }

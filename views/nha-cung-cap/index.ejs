@@ -8,7 +8,7 @@
   <style>
     .detail-pane{display:none}
     .detail-pane.is-active{display:block}
-    .store-table tr[data-href]{cursor:pointer}
+    .text-right { text-align: right; }
     .status-pill {
       display: inline-flex;
       align-items: center;
@@ -31,34 +31,320 @@
       gap: 5px;
     }
     .table-code-link:hover { text-decoration: underline; }
-    .history-type-icon { font-size: 14px; width: 16px; text-align: center; }
+    .history-type-icon { font-size: 14px; width: 16px; text-align: center; color: #2563eb; }
+    .history-type-icon--return { color: #ef4444; }
     .history-amount { font-weight: 700; font-size: 14px; }
     .history-amount.is-return { color: #ef4444; }
-    .supplier-detail-footer {
-      display: flex;
-      flex-wrap: wrap;
+    .history-creator { display: flex; align-items: center; gap: 6px; }
+    .history-creator-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #f1f5f9;
+      display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding-top: 14px;
-      margin-top: 12px;
-      border-top: 1px solid #e2e8f0;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: #64748b;
+      flex-shrink: 0;
     }
     .supplier-metric-readonly { font-size: 14px; font-weight: 700; color: #111827; }
     .supplier-metric-hint { font-size: 11px; color: #64748b; margin-top: 2px; font-weight: 400; }
     .supplier-create-modal { max-width: 760px; }
     .supplier-create-form.modal-body { max-height: 70vh; overflow: auto; padding: 20px 24px; }
-    .supplier-address-toolbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px}
+    .supplier-readonly-input { background: transparent !important; border: none !important; cursor: default; }
+
+    .supplier-page .product-detail-row > td {
+      padding: 0 !important;
+      background: #f8fbff !important;
+      border: 1px solid #dbeafe !important;
+    }
+    .supplier-page tr.is-selected > td { background: #eff6ff; }
+
+    .supplier-detail {
+      border: 1px solid #dbeafe;
+      border-radius: 8px;
+      margin: 10px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .supplier-detail-body { padding: 14px 16px 16px; }
+    .supplier-detail.is-collapsed .supplier-detail-body { display: none; }
+
+    .supplier-detail .detail-tabs {
+      padding: 0 14px;
+      min-height: 44px;
+      height: auto;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .supplier-detail .detail-tab-list { gap: 18px; flex-wrap: wrap; }
+    .supplier-detail .detail-tab {
+      height: 44px;
+      border: 0;
+      border-bottom: 2px solid transparent;
+      border-radius: 0;
+      background: transparent;
+      color: #64748b;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .supplier-detail .detail-tab.is-active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+      background: transparent;
+      box-shadow: none;
+    }
+    .supplier-detail .detail-tab:hover:not(.is-active) {
+      color: #2563eb;
+      background: transparent;
+    }
+    .supplier-detail .detail-collapse-btn {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .supplier-info-block {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .supplier-info-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #eff6ff, #dbeafe);
+      color: #2563eb;
+      font-weight: 800;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .supplier-info-main h2 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      color: #0f172a;
+    }
+    .supplier-info-main p { margin: 0 0 8px; font-size: 13px; }
+    .supplier-info-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    .supplier-detail-fields {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px 20px;
+      margin: 0;
+    }
+    .supplier-detail-field-full { grid-column: 1 / -1; }
+
+    .supplier-pane-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .supplier-debt-toolbar { margin-bottom: 14px; }
+    .supplier-debt-summary {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .supplier-debt-summary-label {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .supplier-debt-summary-value {
+      font-size: 18px;
+      color: #dc2626;
+      font-weight: 800;
+    }
+    .supplier-debt-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .supplier-pane-table-wrap {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: auto;
+      background: #fff;
+    }
+    .supplier-pane-table-wrap .admin-table { margin-bottom: 0; }
+    .supplier-pane-table-wrap thead th {
+      background: #f8fafc;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .supplier-pane-table-wrap .empty-cell {
+      padding: 32px 16px !important;
+      text-align: center;
+      color: #64748b;
+    }
+    .supplier-muted-cell { color: #475569; }
+
+    .supplier-address-expand { background: #f8fafc !important; }
+    .supplier-address-expand-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px 16px;
+      padding: 14px 16px;
+    }
+    .supplier-address-expand-grid label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+    }
+    .supplier-address-expand-grid .span-2 { grid-column: span 2; }
+    .supplier-address-default-check {
+      display: flex;
+      align-items: center;
+    }
+    .supplier-address-default-check label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .supplier-detail-footer {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 18px;
+      border-top: 1px solid #e2e8f0;
+      background: #fbfdff;
+    }
+    .supplier-pane-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid #e2e8f0;
+    }
+
     .address-type-list{display:grid;gap:8px;max-height:280px;overflow:auto}
     .address-type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:6px;padding:8px}
     .address-type-name{font-weight:700;color:#111827}
     .address-type-code{font-size:11px;color:#64748b;margin-top:2px}
     .address-type-actions{display:flex;gap:6px}
+
+    .supplier-pay-modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(17, 24, 39, .54);
+    }
+    .supplier-pay-modal-overlay.is-open { display: flex; }
+    .supplier-pay-modal {
+      width: min(900px, calc(100vw - 48px));
+      max-height: calc(100vh - 48px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, .28);
+    }
+    .supplier-pay-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px 10px;
+    }
+    .supplier-pay-title { margin: 0 0 4px; font-size: 18px; color: #111827; }
+    .supplier-pay-subtitle { display: flex; gap: 8px; align-items: center; color: #64748b; font-size: 12px; }
+    .supplier-pay-debt-badge { padding: 2px 7px; border-radius: 4px; background: #f1f5f9; color: #334155; font-weight: 700; }
+    .supplier-pay-close { border: 0; background: transparent; color: #4b5563; font-size: 30px; line-height: 1; cursor: pointer; }
+    .supplier-pay-body { padding: 0 24px 12px; overflow: auto; }
+    .supplier-pay-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 22px; }
+    .supplier-pay-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #374151; }
+    .supplier-pay-field-full { grid-column: 1 / -1; }
+    .supplier-pay-input-wrap { position: relative; }
+    .supplier-pay-field input,
+    .supplier-pay-field select,
+    .supplier-pay-field textarea {
+      width: 100%;
+      min-height: 30px;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 13px;
+      background: #fff;
+      outline: none;
+    }
+    .supplier-pay-field textarea { min-height: 48px; resize: vertical; }
+    .supplier-pay-field input:focus,
+    .supplier-pay-field select:focus,
+    .supplier-pay-field textarea:focus { border-color: #0070f4; box-shadow: 0 0 0 1px #0070f4; }
+    .supplier-pay-mismatch-alert { border: 1px solid #fde68a; background: #fffbeb; color: #92400e; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
+    .supplier-pay-mismatch-grid { display: grid; grid-template-columns: 160px 1fr; gap: 4px 12px; margin-top: 8px; color: #334155; }
+    .supplier-pay-mismatch-grid b { color: #111827; }
+    .supplier-pay-readonly { background: #f1f5f9 !important; text-align: right; color: #111827; }
+    .supplier-pay-icons { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; gap: 10px; color: #4b5563; }
+    .supplier-pay-check { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 6px; font-weight: 500; color: #1f2937; font-size: 13px; }
+    .supplier-pay-check input { width: 14px; height: 14px; accent-color: #0070f4; }
+    .supplier-pay-reconcile-note { margin: 0 0 8px; color: #64748b; font-size: 12px; }
+    .supplier-pay-reconcile-note strong { color: #111827; }
+    .supplier-pay-table-wrap { border-top: 0; min-height: 150px; background: #fff; }
+    .supplier-pay-table-wrap table { min-width: 820px; }
+    .supplier-pay-table-wrap th { background: #f1f3f5 !important; height: 38px; color: #374151; font-size: 12px; }
+    .supplier-pay-table-wrap td { height: 40px; font-size: 13px; }
+    .supplier-pay-row-input { width: 88px; height: 22px; border: 1px solid #cfd8e3; border-radius: 6px; text-align: right; padding: 2px 8px; font-size: 13px; outline: none; }
+    .supplier-pay-row-input:focus { border-color: #0070f4; box-shadow: 0 0 0 1px #0070f4; }
+    .supplier-pay-total-row td { font-weight: 800; border-top: 1px solid #e5e7eb; }
+    .supplier-pay-unallocated-row td { border-bottom: 0; font-size: 13px; }
+    .supplier-pay-empty { display: grid; place-items: center; gap: 14px; min-height: 210px; color: #1f2937; font-weight: 700; }
+    .supplier-pay-empty-icon { width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; background: #eff6ff; color: #1d7ff5; font-size: 42px; }
+    .supplier-pay-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 24px;
+      border-top: 1px solid #e5e7eb;
+      background: #fff;
+    }
+    .supplier-pay-footer button:disabled { opacity: .5; cursor: not-allowed; }
+
+    @media (max-width: 1100px) {
+      .supplier-detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .supplier-address-expand-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
   </style>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-  <main class="admin-shell store-page">
+  <main class="admin-shell store-page supplier-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
     <% filterQueryString = filterQueryString || ''; %>
 
@@ -109,7 +395,6 @@
       </div>
     </div>
 
-    <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
     <div class="store-layout">
       <aside class="store-filter-panel">
         <form method="get" action="/nha-cung-cap" class="store-filter-form">
@@ -182,8 +467,8 @@
 
       <section class="store-table-panel">
         <div class="table-wrap">
-          <form id="bulkDeleteSuppliersForm" method="post" action="/nha-cung-cap/delete-selected">
-          <table class="admin-table store-table">
+          <form id="bulkDeleteSuppliersForm" method="post" action="/nha-cung-cap/delete-selected"></form>
+          <table class="admin-table store-table" data-kv-master="nha-cung-cap">
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllSuppliers" type="checkbox" aria-label="Chọn tất cả"></th>
@@ -193,310 +478,20 @@
             <tbody>
               <% if (suppliers.length === 0) { %><tr><td colspan="8" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr><% } %>
               <% suppliers.forEach(function(supplier) { %>
-                <% var isSelected = selectedSupplier && String(selectedSupplier._id) === String(supplier._id); %>
-                <% var rowHref = isSelected ? ('/nha-cung-cap' + (filterQueryString ? '?' + filterQueryString : '')) : ('/nha-cung-cap?' + filterQueryPrefix + 'supplier=' + supplier._id); %>
-                <tr class="<%= isSelected ? 'is-selected' : '' %>" data-href="<%= rowHref %>">
-                  <td class="check-cell" onclick="event.stopPropagation()"><input class="supplier-checkbox" type="checkbox" name="ids" value="<%= supplier._id %>" aria-label="Chọn nhà cung cấp"></td>
-                  <td><a class="table-code-link" href="<%= rowHref %>"><%= supplier.ma_ncc || '---' %></a></td>
-                  <td><strong><a class="table-code-link" href="<%= rowHref %>"><%= supplier.ten_ncc || '---' %></a></strong></td>
+                <% var listBase = '/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
+                <tr data-kv-detail-id="<%= supplier._id %>">
+                  <td class="check-cell" onclick="event.stopPropagation()"><input class="supplier-checkbox" type="checkbox" name="ids" value="<%= supplier._id %>" form="bulkDeleteSuppliersForm" aria-label="Chọn nhà cung cấp"></td>
+                  <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= supplier.ma_ncc || '---' %></a></td>
+                  <td><strong><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= supplier.ten_ncc || '---' %></a></strong></td>
                   <td><%= supplier.sdt || '---' %></td>
                   <td><%= supplier.email || '---' %></td>
                   <td><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></td>
                   <td><%= Number(supplier.tong_mua || 0).toLocaleString('vi-VN') %></td>
                   <td><span class="status-pill <%= supplier.trang_thai === 'active' ? 'is-active' : '' %>"><%= supplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></td>
                 </tr>
-                <% if (isSelected) { %>
-                  <tr class="store-detail-row">
-                    <td colspan="8">
-                      <div class="store-detail">
-                        <div class="detail-tabs">
-                          <div class="detail-tab-list">
-                            <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin nhà cung cấp</button>
-                            <button class="detail-tab" type="button" data-detail-tab="address">Danh sách địa chỉ</button>
-                            <button class="detail-tab" type="button" data-detail-tab="history">Lịch sử nhập/trả hàng</button>
-                            <button class="detail-tab" type="button" data-detail-tab="debt">Nợ cần trả nhà cung cấp</button>
-                          </div>
-                          <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
-                        </div>
-                        <div class="store-detail-body">
-                          <div class="detail-pane is-active" data-detail-pane="info">
-                          <div class="store-info-block">
-                            <div class="store-image-placeholder">NCC</div>
-                            <div>
-                              <h2><%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %></h2>
-                              <p><%- refLink('supplier', selectedSupplier, selectedSupplier.ma_ncc || '---') %></p>
-                              <div class="tag-row"><span class="tag">Nhà cung cấp</span><span class="tag tag-green"><%= selectedSupplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></div>
-                            </div>
-                          </div>
-                          <div class="store-fields">
-                            <div><span>Mã NCC</span><input name="ma_ncc" value="<%= selectedSupplier.ma_ncc || '' %>"></div>
-                            <div><span>Tên nhà cung cấp *</span><input name="ten_ncc" value="<%= selectedSupplier.ten_ncc || '' %>" required></div>
-                            <div><span>Điện thoại</span><input name="sdt" value="<%= selectedSupplier.sdt || '' %>"></div>
-                            <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
-                            <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>"></div>
-                            <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
-                            <div><span>Tổng nợ</span>
-                              <div>
-                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
-                                <div class="supplier-metric-hint">Tự động tính từ phiếu nhập</div>
-                              </div>
-                            </div>
-                            <div><span>Tổng mua</span>
-                              <div>
-                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_mua || 0).toLocaleString('vi-VN') %></strong>
-                                <div class="supplier-metric-hint">Tự động tính từ phiếu đã nhập hàng</div>
-                              </div>
-                            </div>
-                            <div><span>Trạng thái</span>
-                              <select name="trang_thai">
-                                <option value="active" <%= selectedSupplier.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
-                                <option value="inactive" <%= selectedSupplier.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
-                              </select>
-                            </div>
-                            <div><span>Thời gian tạo</span><strong><%= formatDate(selectedSupplier.created_at) %></strong></div>
-                            <div class="span-2"><span>Ghi chú</span><input name="ghi_chu" value="<%= selectedSupplier.ghi_chu || '' %>"></div>
-                          </div>
-                          </div>
-                          <div class="detail-pane" data-detail-pane="address">
-                            <% var supplierAddressReturnQuery = filterQueryString ? (filterQueryString + '&supplier=' + selectedSupplier._id) : ('supplier=' + selectedSupplier._id); %>
-                            <div class="supplier-address-toolbar">
-                              <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
-                            </div>
-                            <div class="table-wrap">
-                              <table class="admin-table warehouse-table">
-                                <thead>
-                                  <tr>
-                                    <th>Mã địa chỉ</th>
-                                    <th>Tên người nhận</th>
-                                    <th>SĐT</th>
-                                    <th>Địa chỉ</th>
-                                    <th>Loại địa chỉ</th>
-                                    <th>Tạo lúc</th>
-                                    <th>Thao tác</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <% var supplierAddressAddFormId = 'supplierAddressAdd_' + String(selectedSupplier._id); %>
-                                  <tr class="warehouse-edit-row warehouse-add-row">
-                                    <td>
-                                      <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
-                                      <input data-address-form="<%= supplierAddressAddFormId %>" name="ma_dia_chi" placeholder="Tự động" readonly style="background: transparent; border: none;">
-                                    </td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
-                                    <td>
-                                      <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
-                                        <option value="khac">Khác</option>
-                                        <% if ((addressTypes || []).length === 0) { %>
-                                          <option value="khac">Khác</option>
-                                        <% } %>
-                                        <% (addressTypes || []).forEach(function(type) { %>
-                                          <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
-                                        <% }) %>
-                                      </select>
-                                    </td>
-                                    <td>--</td>
-                                    <td class="warehouse-action-cell">
-                                      <div class="warehouse-action-buttons">
-                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
-                                        <button
-                                          class="btn btn-primary btn-sm js-supplier-address-submit"
-                                          type="button"
-                                          data-form-id="<%= supplierAddressAddFormId %>"
-                                          data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
-                                          data-confirm="Bạn có muốn thêm địa chỉ mới không?"
-                                        >Thêm</button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                  <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
-                                    <td colspan="7">
-                                      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="so_nha" placeholder="Số nhà"></div>
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/Xã"></div>
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="quan_huyen" placeholder="Quận/Huyện"></div>
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
-                                        <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="ghi_chu" placeholder="Ghi chú"></div>
-                                        <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input data-address-form="<%= supplierAddressAddFormId %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                  <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
-                                    <tr><td colspan="7" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
-                                  <% } %>
-                                  <% (supplierAddresses || []).forEach(function(address) { %>
-                                    <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
-                                    <tr class="warehouse-edit-row">
-                                      <td>
-                                        <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
-                                        <input data-address-form="<%= supplierAddressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly style="background: transparent; border: none; cursor: default;">
-                                      </td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
-                                      <td>
-                                        <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
-                                          <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
-                                          <% if ((addressTypes || []).length === 0) { %>
-                                            <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
-                                          <% } %>
-                                          <% (addressTypes || []).forEach(function(type) { %>
-                                            <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
-                                          <% }) %>
-                                        </select>
-                                      </td>
-                                      <td><%= formatDate(address.created_at) %></td>
-                                      <td class="warehouse-action-cell">
-                                        <div class="warehouse-action-buttons">
-                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
-                                          <button
-                                            class="btn btn-light btn-sm js-supplier-address-submit"
-                                            type="button"
-                                            data-form-id="<%= supplierAddressFormId %>"
-                                            data-action="/nha-cung-cap/dia-chi/<%= address._id %>/update"
-                                            data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?"
-                                          >Lưu</button>
-                                          <button
-                                            class="btn btn-danger btn-sm js-supplier-address-delete"
-                                            type="button"
-                                            data-return-query="<%= supplierAddressReturnQuery %>"
-                                            data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
-                                          >Xóa</button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                    <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
-                                      <td colspan="7">
-                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="quan_huyen" value="<%= address.quan_huyen || '' %>"></div>
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
-                                          <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
-                                          <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input data-address-form="<%= supplierAddressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  <% }) %>
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                          <div class="detail-pane" data-detail-pane="history">
-                            <div class="table-wrap" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-                              <table class="admin-table store-table" style="margin-bottom: 0;">
-                                <thead style="background: #f8fafc;">
-                                  <tr>
-                                    <th style="width: 180px;">Mã phiếu</th>
-                                    <th>Thời gian</th>
-                                    <th>Người tạo</th>
-                                    <th class="text-right">Tổng cộng</th>
-                                    <th style="width: 140px;">Trạng thái</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <% if ((supplierPurchaseHistory || []).length === 0) { %>
-                                    <tr><td colspan="5" class="empty-cell" style="padding: 40px;">Chưa có lịch sử nhập/trả hàng.</td></tr>
-                                  <% } %>
-                                  <% (supplierPurchaseHistory || []).forEach(function(row) { %>
-                                    <tr>
-                                      <td>
-                                        <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
-                                          <% if (row.loai === 'nhap') { %>
-                                            <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
-                                          <% } else { %>
-                                            <i class="fa-solid fa-arrow-rotate-left history-type-icon" title="Trả hàng" style="color:#ef4444"></i>
-                                          <% } %>
-                                          <%= row.ma_phieu || '--' %>
-                                        </a>
-                                      </td>
-                                      <td style="color: #475569;"><%= formatDate(row.thoi_gian) %></td>
-                                      <td>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                          <div style="width: 24px; height: 24px; border-radius: 50%; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #64748b;">
-                                            <%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %>
-                                          </div>
-                                          <%= row.nguoi_tao || '--' %>
-                                        </div>
-                                      </td>
-                                      <td class="text-right">
-                                        <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
-                                          <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %>
-                                        </span>
-                                      </td>
-                                      <td>
-                                        <% 
-                                          let statusClass = 'status-pill';
-                                          let statusLabelText = mapNhapHangStatus(row.trang_thai);
-                                          if (row.trang_thai === 'completed') statusClass += ' is-active';
-                                          else if (row.trang_thai === 'draft') statusClass += ' is-draft';
-                                          else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
-                                        %>
-                                        <span class="<%= statusClass %>"><%= statusLabelText %></span>
-                                      </td>
-                                    </tr>
-                                  <% }) %>
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                          <div class="detail-pane" data-detail-pane="debt">
-                            <div class="table-wrap">
-                              <table class="admin-table store-table">
-                                <thead>
-                                  <tr>
-                                    <th>Mã phiếu</th>
-                                    <th>Loại chứng từ</th>
-                                    <th>Thời gian</th>
-                                    <th>Loại</th>
-                                    <th>Giá trị</th>
-                                    <th>Nợ cần trả nhà cung cấp</th>
-                                    <th>Ghi chú</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  <% if ((supplierDebtHistory || []).length === 0) { %>
-                                    <tr><td colspan="7" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
-                                  <% } %>
-                                  <% (supplierDebtHistory || []).forEach(function(row) { %>
-                                    <tr>
-                                      <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
-                                      <td><%= row.loai_chung_tu || '--' %></td>
-                                      <td><%= formatDate(row.thoi_gian) %></td>
-                                      <td><%= mapCongNoDirection ? mapCongNoDirection(row.loai) : mapCongNoLoai(row.loai) %></td>
-                                      <td><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
-                                      <td><%= Number(row.no_con_lai || 0).toLocaleString('vi-VN') %></td>
-                                      <td><%= row.ghi_chu || '--' %></td>
-                                    </tr>
-                                  <% }) %>
-                                </tbody>
-                              </table>
-                            </div>
-                            <div class="detail-actions" style="margin-top:12px">
-                              <button class="btn btn-light" type="button">Điều chỉnh</button>
-                              <button class="btn btn-light" type="button">Thanh toán</button>
-                              <button class="btn btn-light" type="button">Chiết khấu thanh toán</button>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="page-actions detail-panel-footer supplier-detail-footer page-actions--sm">
-                          <button class="btn btn-danger btn-sm" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/delete" formmethod="post" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
-                          <button class="btn btn-success btn-sm" type="submit" formaction="/nha-cung-cap/<%= selectedSupplier._id %>/update" formmethod="post" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
-                          <a
-                            class="btn btn-primary btn-sm supplier-detail-export-link"
-                            href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
-                            data-supplier-id="<%= selectedSupplier._id %>"
-                          >Xuất thông tin</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                <% } %>
               <% }) %>
             </tbody>
           </table>
-          </form>
         </div>
       </section>
     </div>
@@ -544,6 +539,7 @@
   </div>
   <script id="supplierGroupsSeed" type="application/json"><%- JSON.stringify(supplierGroups || []) %></script>
   <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
+  <script src="/js/kv-inline-detail.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var openAddSupplierModalBtn = document.getElementById('openAddSupplierModal');
@@ -590,6 +586,281 @@
           if (!selectAll) return;
           selectAll.checked = checkboxes.length > 0 && checkboxes.every(function (item) { return item.checked; });
         });
+      });
+
+      var kvSupplierTable = document.querySelector('table[data-kv-master="nha-cung-cap"]');
+      var kvSupplier = null;
+      var exportLabels = { info: 'Xuất thông tin', address: 'Xuất địa chỉ', history: 'Xuất lịch sử', debt: 'Xuất công nợ', xnb: 'Xuất xuất dùng nội bộ' };
+      function getActiveSupplierTab(detailBlock) {
+        var activeBtn = detailBlock.querySelector('.detail-tab.is-active[data-detail-tab]');
+        return activeBtn ? activeBtn.getAttribute('data-detail-tab') : 'info';
+      }
+      function syncSupplierExportLink(detailBlock) {
+        var link = detailBlock.querySelector('.supplier-detail-export-link');
+        if (!link) return;
+        var id = link.getAttribute('data-supplier-id');
+        if (!id) return;
+        var tab = getActiveSupplierTab(detailBlock);
+        link.href = '/nha-cung-cap/' + id + '/export/' + tab;
+        link.textContent = exportLabels[tab] || 'Xuất';
+      }
+      function bindSupplierInlinePanel(rootEl) {
+        var wrap = rootEl.classList.contains('supplier-inline-detail') ? rootEl : rootEl.querySelector('.supplier-inline-detail');
+        if (!wrap) return;
+        var detailBlock = wrap.querySelector('[data-supplier-detail]');
+        if (!detailBlock) return;
+        syncSupplierExportLink(detailBlock);
+        var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
+        if (collapseBtn && !collapseBtn.getAttribute('data-kv-collapse-bound')) {
+          collapseBtn.setAttribute('data-kv-collapse-bound', '1');
+          collapseBtn.addEventListener('click', function () {
+            var isCollapsed = detailBlock.classList.toggle('is-collapsed');
+            collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
+            collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+          });
+        }
+      }
+      if (kvSupplierTable && typeof KvInlineDetail !== 'undefined') {
+        kvSupplier = new KvInlineDetail({
+          table: kvSupplierTable,
+          colspan: 8,
+          buildUrl: function(id) {
+            return '/nha-cung-cap/api/' + encodeURIComponent(id) + '/detail';
+          },
+          onOpen: function(id, root) {
+            bindSupplierInlinePanel(root);
+          }
+        });
+        if (/^#s-/.test(location.hash)) {
+          var sid = decodeURIComponent(location.hash.slice(3));
+          if (sid) {
+            kvSupplier.openById(sid);
+            var clean = location.pathname + (location.search || '');
+            history.replaceState(null, '', clean);
+          }
+        }
+      }
+
+      var supplierTablePanel = document.querySelector('.store-table-panel');
+      if (supplierTablePanel) {
+        supplierTablePanel.addEventListener('click', function(ev) {
+          var tabBtn = ev.target.closest('.supplier-inline-detail .detail-tab[data-detail-tab]');
+          if (!tabBtn) return;
+          var panel = tabBtn.closest('.supplier-inline-detail');
+          if (!panel) return;
+          var detailBlock = panel.querySelector('[data-supplier-detail]');
+          if (!detailBlock) return;
+          window.setTimeout(function() { syncSupplierExportLink(detailBlock); }, 0);
+        });
+      }
+
+      function parseSupplierMoney(value) {
+        var normalized = String(value || '').replace(/\./g, '').replace(/,/g, '').trim();
+        var number = Number(normalized);
+        return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
+      }
+      function formatSupplierMoney(value) {
+        return Math.max(0, Math.floor(Number(value || 0))).toLocaleString('vi-VN');
+      }
+      function formatSupplierSignedMoney(value) {
+        var number = Math.floor(Number(value || 0));
+        return number.toLocaleString('vi-VN');
+      }
+      function setSupplierPayInputValue(input, value) {
+        if (input) input.value = formatSupplierMoney(value);
+      }
+      function getSupplierPayRowAllocations(form) {
+        var rows = [];
+        Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
+          var paid = parseSupplierMoney(input.value);
+          if (paid <= 0) return;
+          rows.push({
+            phieu_nhap_id: input.getAttribute('data-purchase-id') || '',
+            ma_phieu_nhap: input.getAttribute('data-purchase-code') || '',
+            so_tien: paid
+          });
+        });
+        return rows;
+      }
+      function syncSupplierPayAllocationJson(form) {
+        var hidden = form ? form.querySelector('.js-supplier-pay-allocations-json') : null;
+        if (hidden) hidden.value = JSON.stringify(getSupplierPayRowAllocations(form));
+        var amountInput = form ? form.querySelector('.js-supplier-pay-amount') : null;
+        var overpaymentInput = form ? form.querySelector('.js-supplier-pay-overpayment') : null;
+        if (overpaymentInput) {
+          var amount = parseSupplierMoney(amountInput ? amountInput.value : 0);
+          var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
+          overpaymentInput.value = String(Math.max(0, amount - payableDebt));
+        }
+      }
+      function updateSupplierPayAllocation(form, source) {
+        if (!form) return;
+        var debt = Number(form.getAttribute('data-current-debt') || 0);
+        var payableDebt = Math.max(0, debt);
+        var allowOverpayment = !!form.querySelector('.js-supplier-pay-allow-overpayment:checked');
+        var amountInput = form.querySelector('.js-supplier-pay-amount');
+        var amount = parseSupplierMoney(amountInput ? amountInput.value : 0);
+        if (!allowOverpayment) amount = Math.min(amount, payableDebt);
+        if (source === 'amount') {
+          if (amountInput) amountInput.value = amount ? formatSupplierMoney(amount) : '';
+          var rest = Math.min(amount, payableDebt);
+          Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row')).forEach(function(row) {
+            var rowDebt = Number(row.getAttribute('data-debt') || 0);
+            var paid = Math.min(rest, rowDebt);
+            rest -= paid;
+            setSupplierPayInputValue(row.querySelector('.js-supplier-pay-row-paid-input'), paid);
+          });
+        } else {
+          amount = 0;
+          var rowBudget = payableDebt;
+          Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
+            var rowDebt = Number(input.getAttribute('data-debt') || 0);
+            var paid = Math.min(parseSupplierMoney(input.value), rowDebt, Math.max(0, rowBudget - amount));
+            amount += paid;
+            setSupplierPayInputValue(input, paid);
+          });
+          if (amountInput) amountInput.value = amount ? formatSupplierMoney(amount) : '';
+        }
+        var totalPaid = 0;
+        var totalRowDebt = 0;
+        var totalRowLeft = 0;
+        Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row')).forEach(function(row) {
+          var rowDebt = Number(row.getAttribute('data-debt') || 0);
+          var input = row.querySelector('.js-supplier-pay-row-paid-input');
+          var paid = Math.min(parseSupplierMoney(input ? input.value : 0), rowDebt);
+          totalPaid += paid;
+          totalRowDebt += rowDebt;
+          totalRowLeft += Math.max(0, rowDebt - paid);
+          var leftCell = row.querySelector('.js-supplier-pay-row-left');
+          if (leftCell) leftCell.textContent = formatSupplierMoney(rowDebt - paid);
+        });
+        var remainingInput = form.querySelector('.js-supplier-pay-remaining');
+        if (remainingInput) remainingInput.value = formatSupplierSignedMoney(debt - amount);
+        var totalPaidCell = form.querySelector('.js-supplier-pay-total-paid');
+        var totalDebtCell = form.querySelector('.js-supplier-pay-total-debt');
+        var totalLeftCell = form.querySelector('.js-supplier-pay-total-left');
+        var unallocatedCell = form.querySelector('.js-supplier-pay-unallocated');
+        var unallocatedLabel = form.querySelector('.js-supplier-pay-unallocated-label');
+        if (totalDebtCell) totalDebtCell.textContent = formatSupplierMoney(totalRowDebt);
+        if (totalPaidCell) totalPaidCell.textContent = formatSupplierMoney(totalPaid);
+        if (totalLeftCell) totalLeftCell.textContent = formatSupplierMoney(totalRowLeft);
+        if (unallocatedCell) unallocatedCell.textContent = formatSupplierMoney(Math.max(0, amount - totalPaid));
+        if (unallocatedLabel) unallocatedLabel.textContent = amount > payableDebt ? 'Trả dư / ứng trước NCC:' : 'Tiền chưa gắn phiếu nhập:';
+        syncSupplierPayAllocationJson(form);
+      }
+      function openSupplierPayModal(modal) {
+        if (!modal) return;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        var form = modal.querySelector('.supplier-pay-form');
+        var amountInput = form ? form.querySelector('.js-supplier-pay-amount') : null;
+        if (amountInput) {
+          amountInput.value = '';
+          amountInput.focus();
+        }
+        Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
+          input.value = '0';
+        });
+        updateSupplierPayAllocation(form, 'row');
+      }
+      function closeSupplierPayModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      document.addEventListener('click', function(event) {
+        var openBtn = event.target.closest('.js-open-supplier-pay-modal');
+        if (openBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          openSupplierPayModal(document.getElementById(openBtn.getAttribute('data-modal-id')));
+          return;
+        }
+        var closeBtn = event.target.closest('.js-close-supplier-pay-modal');
+        if (closeBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeSupplierPayModal(closeBtn.closest('.js-supplier-pay-overlay'));
+          return;
+        }
+        var submitBtn = event.target.closest('.js-submit-supplier-pay-modal');
+        if (!submitBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        var form = document.getElementById(submitBtn.getAttribute('data-form-id'));
+        if (!form || submitBtn.disabled) return;
+        var amount = parseSupplierMoney((form.querySelector('[name="gia_tri"]') || {}).value);
+        var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
+        var allowOverpayment = !!form.querySelector('.js-supplier-pay-allow-overpayment:checked');
+        if (amount <= 0) return alert('Vui lòng nhập số tiền thanh toán.');
+        if (!allowOverpayment && amount > payableDebt) return alert('Số tiền trả không được vượt quá nợ theo sổ công nợ. Bật trả dư / ứng trước NCC nếu muốn chi vượt.');
+        var cashBook = form.querySelector('[name="so_quy_id"]');
+        if (!cashBook || !cashBook.value) return alert('Vui lòng chọn sổ quỹ.');
+
+        syncSupplierPayAllocationJson(form);
+        var allocations = getSupplierPayRowAllocations(form);
+        var allocatedTotal = allocations.reduce(function(sum, row) { return sum + Number(row.so_tien || 0); }, 0);
+        if (allocatedTotal > Math.min(amount, payableDebt)) return alert('Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ.');
+        var payload = new URLSearchParams(new FormData(form));
+        submitBtn.disabled = true;
+        fetch(form.getAttribute('data-action'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: payload.toString()
+        })
+          .then(function(response) {
+            return response.json().catch(function() {
+              return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+            });
+          })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert((data && data.message) || 'Không tạo được phiếu chi.');
+              return;
+            }
+            if (submitBtn.getAttribute('data-print') === '1' && data.data && data.data.receipt && data.data.receipt._id) {
+              window.open('/so-quy/phieu-thu-chi/' + data.data.receipt._id, '_blank');
+            }
+            window.location.reload();
+          })
+          .catch(function(error) {
+            alert((error && error.message) || 'Có lỗi khi tạo phiếu chi.');
+          })
+          .finally(function() {
+            submitBtn.disabled = false;
+          });
+      });
+
+      document.addEventListener('input', function(event) {
+        var amountInput = event.target.closest('.js-supplier-pay-amount');
+        if (amountInput) {
+          var form = amountInput.closest('.supplier-pay-form');
+          updateSupplierPayAllocation(form, 'amount');
+          return;
+        }
+        var rowInput = event.target.closest('.js-supplier-pay-row-paid-input');
+        if (!rowInput) return;
+        updateSupplierPayAllocation(rowInput.closest('.supplier-pay-form'), 'row');
+      });
+      document.addEventListener('change', function(event) {
+        var overpaymentToggle = event.target.closest('.js-supplier-pay-allow-overpayment');
+        if (!overpaymentToggle) return;
+        updateSupplierPayAllocation(overpaymentToggle.closest('.supplier-pay-form'), 'amount');
+      });
+
+      document.addEventListener('click', function(e) {
+        var refA = e.target.closest('a.ref-link[href^="/nha-cung-cap/"]');
+        if (!refA || (window.location.pathname || '') !== '/nha-cung-cap') return;
+        var href = refA.getAttribute('href') || '';
+        var m = href.match(/^\/nha-cung-cap\/([a-f0-9]{24})\/?$/i);
+        if (!m || !kvSupplier) return;
+        e.preventDefault();
+        kvSupplier.openById(m[1]);
       });
 
       var createdFilterRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="created"]'));
@@ -940,8 +1211,10 @@
           });
       }
 
-      document.querySelectorAll('.js-open-address-type-modal').forEach(function(button) {
-        button.addEventListener('click', openAddressTypeModal);
+      document.addEventListener('click', function(ev) {
+        if (!ev.target.closest('.js-open-address-type-modal')) return;
+        ev.preventDefault();
+        openAddressTypeModal();
       });
       if (addressTypeModalClose) addressTypeModalClose.addEventListener('click', closeAddressTypeModal);
       if (addressTypeModalCancel) addressTypeModalCancel.addEventListener('click', closeAddressTypeModal);
@@ -965,45 +1238,6 @@
         });
       }
       renderAddressTypeSelects();
-
-      var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.store-detail'));
-      var exportLabels = { info: 'Xuất thông tin', address: 'Xuất địa chỉ', history: 'Xuất lịch sử', debt: 'Xuất công nợ' };
-      function syncSupplierExportLink(detailBlock) {
-        var link = detailBlock.querySelector('.supplier-detail-export-link');
-        if (!link) return;
-        var id = link.getAttribute('data-supplier-id');
-        if (!id) return;
-        var activeBtn = detailBlock.querySelector('.detail-tab.is-active[data-detail-tab]');
-        var tab = activeBtn ? activeBtn.getAttribute('data-detail-tab') : 'info';
-        link.href = '/nha-cung-cap/' + id + '/export/' + tab;
-        link.textContent = exportLabels[tab] || 'Xuất';
-      }
-      detailBlocks.forEach(function (detailBlock) {
-        var tabButtons = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab[data-detail-tab]'));
-        var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-pane[data-detail-pane]'));
-        tabButtons.forEach(function(btn) {
-          btn.addEventListener('click', function() {
-            var target = btn.getAttribute('data-detail-tab');
-            tabButtons.forEach(function(node) { node.classList.remove('is-active'); });
-            panes.forEach(function(pane) { pane.classList.remove('is-active'); });
-            btn.classList.add('is-active');
-            var activePane = detailBlock.querySelector('.detail-pane[data-detail-pane="' + target + '"]');
-            if (activePane) activePane.classList.add('is-active');
-            syncSupplierExportLink(detailBlock);
-          });
-        });
-        syncSupplierExportLink(detailBlock);
-
-        var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
-        var detailBody = detailBlock.querySelector('.store-detail-body');
-        if (collapseBtn && detailBody) {
-          collapseBtn.addEventListener('click', function () {
-            var isCollapsed = detailBlock.classList.toggle('is-collapsed');
-            collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
-            collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-          });
-        }
-      });
 
       function submitSupplierAddressForm(action, formId, confirmMessage) {
         if (!action || !formId) return;
@@ -1029,49 +1263,38 @@
         tempForm.submit();
       }
 
-      document.querySelectorAll('.js-supplier-address-submit').forEach(function(button) {
-        button.addEventListener('click', function(event) {
+      document.addEventListener('click', function(event) {
+        var submitBtn = event.target.closest('.js-supplier-address-submit');
+        if (submitBtn) {
           event.preventDefault();
           event.stopPropagation();
           submitSupplierAddressForm(
-            button.getAttribute('data-action'),
-            button.getAttribute('data-form-id'),
-            button.getAttribute('data-confirm')
+            submitBtn.getAttribute('data-action'),
+            submitBtn.getAttribute('data-form-id'),
+            submitBtn.getAttribute('data-confirm')
           );
-        });
-      });
-
-      document.querySelectorAll('.js-supplier-address-delete').forEach(function(button) {
-        button.addEventListener('click', function(event) {
+          return;
+        }
+        var delBtn = event.target.closest('.js-supplier-address-delete');
+        if (delBtn) {
           event.preventDefault();
           event.stopPropagation();
           if (!confirm('Bạn có chắc muốn xóa địa chỉ này không?')) return;
 
           var tempForm = document.createElement('form');
           tempForm.method = 'post';
-          tempForm.action = button.getAttribute('data-action');
+          tempForm.action = delBtn.getAttribute('data-action');
           tempForm.style.display = 'none';
 
           var returnQuery = document.createElement('input');
           returnQuery.type = 'hidden';
           returnQuery.name = 'returnQuery';
-          returnQuery.value = button.getAttribute('data-return-query') || '';
+          returnQuery.value = delBtn.getAttribute('data-return-query') || '';
           tempForm.appendChild(returnQuery);
 
           document.body.appendChild(tempForm);
           tempForm.submit();
-        });
-      });
-
-      var clickableRows = Array.prototype.slice.call(document.querySelectorAll('.store-table tr[data-href]'));
-      clickableRows.forEach(function(row) {
-        row.addEventListener('click', function(event) {
-          if (event.defaultPrevented) return;
-          var t = event.target;
-          if (t && t.closest && t.closest('a,button,input,select,textarea,label')) return;
-          var href = row.getAttribute('data-href');
-          if (href) window.location.href = href;
-        });
+        }
       });
 
       document.addEventListener('click', function(event) {

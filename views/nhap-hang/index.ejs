@@ -20,14 +20,14 @@
     const expiry = formatDateOnly(lot.han_su_dung);
     return expiry ? `${lotText} - HSD: ${expiry}` : lotText;
   };
-  const quyCachSummary = row => {
+  const thuocTinhSummary = row => {
     const info = row && row.lot_info ? row.lot_info : null;
     const items = info && Array.isArray(info.quy_cach_items) ? info.quy_cach_items : [];
     if (!items.length) return '--';
     const unit = row?.don_vi_tinh_id?.ten_don_vi || '';
     return items
       .filter(item => Number(item.so_luong || 0) > 0)
-      .map(item => `${item.ten_thuoc_tinh || '--'} ${fmt(item.so_luong || 0)}${unit}`)
+      .map(item => `${item.ten_quy_cach || item.ten_thuoc_tinh || '--'} ${fmt(item.so_luong || 0)}${unit}`)
       .join(', ');
   };
   const detailGroups = rows => {
@@ -53,6 +53,35 @@
       index[key].total += Number(row.thanh_tien || 0);
     });
     return groups;
+  };
+  const detailRowsForGroup = group => {
+    const result = [];
+    (group.rows || []).forEach(row => {
+      const info = row && row.lot_info ? row.lot_info : null;
+      const attrs = info && Array.isArray(info.quy_cach_items)
+        ? info.quy_cach_items.filter(item => Number(item.so_luong || 0) > 0 || item.ten_quy_cach || item.ten_thuoc_tinh)
+        : [];
+      if (!attrs.length) {
+        result.push({
+          ten_thuoc_tinh: '--',
+          so_luong: Number(row.so_luong || 0),
+          don_gia_nhap: Number(row.don_gia_nhap || 0),
+          thanh_tien: Number(row.thanh_tien || 0)
+        });
+        return;
+      }
+      attrs.forEach(item => {
+        const qty = Number(item.so_luong || 0);
+        const price = Number(item.don_gia_nhap || item.gia_von || row.don_gia_nhap || 0);
+        result.push({
+          ten_thuoc_tinh: item.ten_quy_cach || item.ten_thuoc_tinh || '--',
+          so_luong: qty,
+          don_gia_nhap: price,
+          thanh_tien: Number(item.thanh_tien || (qty * price))
+        });
+      });
+    });
+    return result.length ? result : [{ ten_thuoc_tinh: '--', so_luong: 0, don_gia_nhap: 0, thanh_tien: 0 }];
   };
 %>
 <!DOCTYPE html>
@@ -130,6 +159,8 @@
     .grouped-lot-table .lot-cell{width:170px;max-width:170px;color:#111827;font-weight:700}
     .grouped-lot-table .attr-cell{min-width:170px}
     .grouped-lot-table .lot-total-cell{width:120px;font-weight:800;color:#006dff;text-align:right;vertical-align:middle}
+    .grouped-lot-table .group-total-row td{background:#ffe900;font-weight:800;color:#111827}
+    .grouped-lot-table .group-total-row .num{color:#111827}
     .lot-note{font-size:11px;color:#667085}
     .summary-card{border:1px solid #e4eaf2;border-radius:6px;padding:10px}
     .summary-line{display:flex;justify-content:space-between;font-size:12px;margin:6px 0}
@@ -216,7 +247,6 @@
             <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
             <button class="kv-btn" type="button">Xuất file ▾</button>
             <button type="button" class="tool-icon">☰</button>
-            <a href="/cau-hinh/doanh-nghiep" class="tool-icon" title="Cấu hình doanh nghiệp">⚙</a>
             <button type="button" class="tool-icon">?</button>
           </div>
         </div>
@@ -297,7 +327,7 @@
                                   <thead>
                                     <tr>
                                       <th>Ngày / Lô</th>
-                                      <th>Quy cách</th>
+                                      <th>Thuộc tính</th>
                                       <th class="num">Số Kg</th>
                                       <th class="num">Đơn giá</th>
                                       <th class="num">Thành tiền</th>
@@ -305,22 +335,28 @@
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    <% group.rows.forEach(function(r, rowIndex) { %>
+                                    <% var displayRows = detailRowsForGroup(group); %>
+                                    <% displayRows.forEach(function(r, rowIndex) { %>
                                       <tr>
                                         <% if (rowIndex === 0) { %>
-                                          <td class="lot-cell" rowspan="<%= group.rows.length %>"><%- group.lot_label %></td>
+                                          <td class="lot-cell" rowspan="<%= displayRows.length %>"><%- group.lot_label %></td>
                                         <% } %>
                                         <td class="attr-cell">
-                                          <div><%= quyCachSummary(r) %></div>
+                                          <div><%= r.ten_thuoc_tinh || '--' %></div>
                                         </td>
                                         <td class="num"><%= fmt(r.so_luong || 0) %></td>
                                         <td class="num"><%= fmt(r.don_gia_nhap || 0) %></td>
                                         <td class="num"><%= fmt(r.thanh_tien || 0) %></td>
                                         <% if (rowIndex === 0) { %>
-                                          <td class="lot-total-cell" rowspan="<%= group.rows.length %>"><%= fmt(group.total || 0) %></td>
+                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmt(group.total || 0) %></td>
                                         <% } %>
                                       </tr>
                                     <% }) %>
+                                    <tr class="group-total-row">
+                                      <td colspan="4" class="num">TỔNG CỘNG</td>
+                                      <td class="num"><%= fmt(group.total || 0) %></td>
+                                      <td class="num"><%= fmt(group.total || 0) %></td>
+                                    </tr>
                                   </tbody>
                                 </table>
                               <% }) %>

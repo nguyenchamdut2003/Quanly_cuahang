@@ -1,6 +1,8 @@
 ﻿const express = require('express');
 const router = express.Router();
+const path = require('path');
 const { isAuthenticated } = require('../middlewares/auth.middleware');
+const pdfService = require('../services/pdf.service');
 const {
     PhieuKiemKho,
     CTPhieuKiemKho,
@@ -85,6 +87,129 @@ function parseItems(rawItems) {
 function normalizeTenQuyCach(value) {
     return String(value || '').trim();
 }
+
+const SESSION_TON_PREVIEW = 'kiemKhoTonPreview';
+const TON_PREVIEW_MAX_MS = 60 * 60 * 1000;
+const TON_PREVIEW_MAX_ROWS = 2500;
+
+function isObjectId(value) {
+    return /^[0-9a-fA-F]{24}$/.test(String(value || '').trim());
+}
+
+function sanitizeTonPreviewRows(rawItems) {
+    const list = parseItems(rawItems);
+    const out = [];
+    for (const row of list.slice(0, TON_PREVIEW_MAX_ROWS)) {
+        out.push({
+            ma_hang: String(row.ma_hang || '').slice(0, 120),
+            ten_hang: String(row.ten_hang || '').slice(0, 400),
+            don_vi_tinh: String(row.don_vi_tinh || '').slice(0, 60),
+            ma_lo: String(row.ma_lo || '').slice(0, 200),
+            han_su_dung: row.han_su_dung || null,
+            ten_quy_cach: String(row.ten_quy_cach || '').slice(0, 200),
+            ton_kho_he_thong: Number(row.ton_kho_he_thong || 0)
+        });
+    }
+    return out;
+}
+
+async function loadTonPreviewFromSession(req) {
+    const raw = req.session && req.session[SESSION_TON_PREVIEW];
+    if (!raw || typeof raw.savedAt !== 'number' || Date.now() - raw.savedAt > TON_PREVIEW_MAX_MS) {
+        return null;
+    }
+    const kho = raw.kho_id && isObjectId(raw.kho_id) ? await Kho.findById(raw.kho_id).lean() : null;
+    if (!kho) return null;
+    let store = null;
+    if (raw.cua_hang_id && isObjectId(raw.cua_hang_id)) {
+        store = await CuaHang.findById(raw.cua_hang_id).lean();
+    }
+    if (!store && kho.cua_hang_id) {
+        store = await CuaHang.findById(kho.cua_hang_id).lean();
+    }
+    const items = Array.isArray(raw.items) ? raw.items : [];
+    const totalTon = items.reduce((s, r) => s + Number(r.ton_kho_he_thong || 0), 0);
+    return {
+        store: store || {},
+        warehouse: kho,
+        creator: req.user || {},
+        ghi_chu: String(raw.ghi_chu || ''),
+        items,
+        totalTon,
+        printedAt: raw.savedAt
+    };
+}
+
+router.post('/preview-ton-he-thong', async (req, res, next) => {
+    try {
+        const body = req.body || {};
+        const kho_id = String(body.kho_id || '').trim();
+        if (!isObjectId(kho_id)) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho hợp lệ.' });
+        }
+        const kho = await Kho.findById(kho_id).lean();
+        if (!kho) {
+            return res.status(400).json({ success: false, message: 'Không tìm thấy kho.' });
+        }
+        const items = sanitizeTonPreviewRows(body.items);
+        if (!items.length) {
+            return res.status(400).json({ success: false, message: 'Không có hàng để in.' });
+        }
+        req.session[SESSION_TON_PREVIEW] = {
+            cua_hang_id: body.cua_hang_id ? String(body.cua_hang_id).trim() : '',
+            kho_id,
+            ghi_chu: String(body.ghi_chu || ''),
+            items,
+            savedAt: Date.now()
+        };
+        res.json({ success: true, url: '/kiem-kho/in-ton-he-thong-preview' });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/in-ton-he-thong-preview/pdf', async (req, res, next) => {
+    try {
+        const data = await loadTonPreviewFromSession(req);
+        if (!data) {
+            return res.status(410).send('Phiếu xem trước đã hết hạn. Quay lại màn Kiểm kho và bấm in lại.');
+        }
+        const viewPath = path.join(__dirname, '..', 'views', 'kiem-kho', 'print-ton-he-thong.ejs');
+        const locals = {
+            title: 'Phiếu số lượng tồn hiện tại',
+            embeddedPrint: false,
+            ...data
+        };
+        const html = await pdfService.renderViewToHtml(viewPath, locals);
+        const buffer = await pdfService.generatePdfFromHtml(html, {
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+        });
+        const fname = 'kiem-kho-ton-he-thong.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + fname + '"');
+        return res.send(Buffer.from(buffer));
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/in-ton-he-thong-preview', async (req, res, next) => {
+    try {
+        const data = await loadTonPreviewFromSession(req);
+        if (!data) {
+            return res.status(410).send('Phiếu xem trước đã hết hạn. Quay lại màn Kiểm kho và bấm in lại.');
+        }
+        res.render('kiem-kho/print-ton-he-thong', {
+            title: 'Phiếu số lượng tồn hiện tại',
+            embeddedPrint: String(req.query.embed || '') === '1',
+            ...data
+        });
+    } catch (error) {
+        next(error);
+    }
+});
 
 router.get('/', async (req, res, next) => {
     try {

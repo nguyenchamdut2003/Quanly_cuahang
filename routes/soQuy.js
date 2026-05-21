@@ -230,6 +230,7 @@ router.get('/:id/detail', async (req, res, next) => {
             .populate('khach_hang_id')
             .populate('so_quy_id')
             .populate('phieu_nhap_id')
+            .populate('allocations.phieu_nhap_id')
             .lean();
         if (!receipt) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu thu chi' });
         const items = receipt.phieu_nhap_id

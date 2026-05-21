@@ -7,8 +7,10 @@ router.use(isAuthenticated);
 
 router.get('/', nhaCungCapController.index);
 router.get('/export.xlsx', nhaCungCapController.exportExcel);
+router.get('/api/:id/detail', nhaCungCapController.apiSupplierDetail);
 router.get('/:id/export/:section', nhaCungCapController.exportSupplierDetail);
 router.post('/add', nhaCungCapController.add);
+router.post('/:id/pay-debt', nhaCungCapController.payDebt);
 router.post('/:id/update', nhaCungCapController.update);
 router.post('/:id/delete', nhaCungCapController.remove);
 router.post('/delete-selected', nhaCungCapController.removeSelected);
@@ -23,7 +25,7 @@ router.post('/:id/dia-chi', nhaCungCapController.addAddress);
 router.post('/dia-chi/:addressId/update', nhaCungCapController.updateAddress);
 router.post('/dia-chi/:addressId/delete', nhaCungCapController.removeAddress);
 router.get('/:id', function(req, res) {
-  res.redirect('/nha-cung-cap?supplier=' + encodeURIComponent(req.params.id));
+  res.redirect('/nha-cung-cap#s-' + encodeURIComponent(req.params.id));
 });
 
 module.exports = router;

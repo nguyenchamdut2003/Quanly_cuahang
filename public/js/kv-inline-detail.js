@@ -10,12 +10,16 @@
     if (root.querySelector('[data-tab-target]')) {
       var tabs = root.querySelectorAll('.detail-tab');
       var panels = root.querySelectorAll('.detail-pane');
+      if (!panels.length) {
+        panels = root.querySelectorAll('.customer-detail-pane[data-tab-pane]');
+      }
       tabs.forEach(function(tab) {
         tab.addEventListener('click', function() {
           var target = tab.getAttribute('data-tab-target');
           tabs.forEach(function(t) { t.classList.toggle('is-active', t === tab); });
           panels.forEach(function(p) {
-            p.classList.toggle('is-active', p.getAttribute('data-tab-panel') === target);
+            var paneKey = p.getAttribute('data-tab-panel') || p.getAttribute('data-tab-pane');
+            p.classList.toggle('is-active', paneKey === target);
           });
         });
       });

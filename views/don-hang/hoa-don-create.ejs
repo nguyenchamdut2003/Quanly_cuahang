@@ -568,22 +568,21 @@
         </div>
       </section>
       <section class="middle">
-        <div class="mid-head"><strong id="storeName">Cửa hàng</strong><span>
+        <div class="mid-head"><strong id="storeName"><%= currentStore?.ten_cua_hang || 'Cửa hàng' %></strong><span>
             <%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit',
               minute:'2-digit' }) %>
           </span></div>
         <input type="hidden" id="customerId">
+        <input type="hidden" id="storeId" value="<%= currentStoreId || '' %>">
         <div class="section-line">
           <div class="marker"><i class="fa-solid fa-circle-dot"></i></div>
-          <div><select id="pickupStoreId" class="line-input" onchange="handlePickupStoreChange()" style="width:100%">
-              <% stores.forEach(s=> { %><option value="<%= s._id %>">
-                  <%= s.ten_cua_hang %> - <%= s.sdt || 'Chưa có SĐT' %>
-                </option>
-                <% }) %>
-            </select>
-            <div class="muted-red" id="pickupInfo"></div>
-            <select id="khoId" class="line-input" style="width:100%;margin-top:12px" disabled>
-              <option value="">Vui lòng chọn cửa hàng trước</option>
+          <div>
+            <div class="muted-red" id="pickupInfo"><% if (!currentStoreId) { %>Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.<% } %></div>
+            <select id="khoId" class="line-input" style="width:100%;margin-top:12px"<%= !currentStoreId ? ' disabled' : '' %>>
+              <option value=""><%= (warehouses || []).length ? 'Chọn kho' : (currentStoreId ? 'Chưa có kho cho cửa hàng này' : 'Chưa chọn cửa hàng') %></option>
+              <% (warehouses || []).forEach(function(w) { %>
+                <option value="<%= w._id %>" data-address="<%= (w.dia_chi_day_du || w.dia_chi || '').replace(/"/g, '&quot;') %>"><%= w.ten_kho %></option>
+              <% }) %>
             </select>
             <select id="priceBookId" class="line-input" onchange="handlePriceBookChange()" style="width:100%;margin-top:12px">
               <option value="">Bảng giá chung</option>
@@ -648,10 +647,6 @@
             </div>
           </div>
           <div class="delivery-row" style="margin-top:16px">
-            <label>Khoảng cách (km)</label>
-            <input id="shippingDistance" class="delivery-input" value="0" inputmode="decimal" oninput="scheduleShippingFee()">
-          </div>
-          <div class="delivery-row" style="margin-top:16px">
             <label>Người trả phí giao hàng</label>
             <select id="shippingFeePayer" class="delivery-input" onchange="renderCart()">
               <option value="khach">Khách trả</option>
@@ -661,7 +656,7 @@
           <div class="delivery-row" style="margin-top:16px">
             <label>Phí giao hàng</label>
             <input id="shippingFee" class="delivery-input" value="0" inputmode="numeric" oninput="handleManualShippingFee()">
-            <div class="delivery-help" id="shippingFeeHelp">Có thể nhập tay nếu chưa có bảng giá.</div>
+            <div class="delivery-help" id="shippingFeeHelp">Nhập trực tiếp phí giao hàng.</div>
           </div>
         </div>
         <div class="place-order"><button onclick="saveOrder()" type="button">THANH TOÁN</button></div>
@@ -681,13 +676,13 @@
       const sourceInvoiceItems = <%- JSON.stringify((sourceInvoiceItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.hang_hoa_id?.ma_hang || '', ten_hang: row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '' }))) %>;
       const sourceInvoiceShipment = <%- JSON.stringify(sourceInvoiceShipment || null) %>;
       const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
-      let shippingFeeManuallyEdited = false;
       let customerPaidTouched = false;
-      let shippingFeeTimer = null;
       const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0, nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id._id || p.nha_cung_cap_id) : '', ten_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ten_ncc || p.nha_cung_cap_id.ten_cong_ty || '') : '', ma_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ma_ncc || '') : '' }))) %>;
       const priceRows = <%- JSON.stringify((priceRows || []).map(r => ({ bang_gia_id: String(r.bang_gia_id || ''), hang_hoa_id: String(r.hang_hoa_id || ''), gia_ban: Number(r.gia_ban || 0) }))) %>;
       const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi: a.dia_chi || a.dia_chi_day_du || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
-      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi || '', dia_chi_gui_hang: s.dia_chi_gui_hang || '', tinh_thanh: s.tinh_thanh || '', quan_huyen: s.quan_huyen || '', phuong_xa: s.phuong_xa || '' }))) %>;
+      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi_day_du || s.dia_chi || '', tinh_thanh: s.tinh_thanh || '', quan_huyen: s.quan_huyen || '', phuong_xa: s.phuong_xa || '' }))) %>;
+      const initialWarehouses = <%- JSON.stringify((warehouses || []).map(w => ({ _id: String(w._id), ten_kho: w.ten_kho || '', dia_chi_day_du: w.dia_chi_day_du || w.dia_chi || '' }))) %>;
+      const getStoreId = () => String(document.getElementById('storeId')?.value || '').trim();
       const fmt = n => Number(n || 0).toLocaleString('vi-VN');
       const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
       const stockByProduct = new Map();
@@ -723,7 +718,6 @@
           discount.value = 0;
           orderDiscountType.value = 'vnd';
           shippingFee.value = 0;
-          shippingFeeManuallyEdited = false;
           codEnabled = false;
         }
         renderCart();
@@ -735,6 +729,7 @@
         return Math.min(amount, base);
       }
       function handlePriceBookChange() {
+        if (sourceOrder) return;
         cart.forEach(item => { item.don_gia_ban = priceFor(item.hang_hoa_id); });
         if (productResults.style.display === 'block') renderProductSuggestions();
         renderCart();
@@ -781,7 +776,13 @@
           const lineDiscount = discountAmount(i.chiet_khau, i.kieu_chiet_khau, lineBase);
           const line = Math.max(lineBase - lineDiscount, 0);
           subtotal += line;
-          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(i.ton_kho)}</span></td><td>${i.ten_hang}</td><td class="num"><input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)"></td><td class="num">${fmt(i.ton_kho)}</td><td class="num">${fmt(i.don_gia_ban)}</td><td class="num"><span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td><td class="num">${fmt(line)}</td><td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td></tr>`;
+          const qtyInput = sourceOrder
+            ? `<span>${i.so_luong}</span>`
+            : `<input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)">`;
+          const deleteCell = sourceOrder
+            ? '<td></td>'
+            : `<td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td>`;
+          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(i.ton_kho)}</span></td><td>${i.ten_hang}</td><td class="num">${qtyInput}</td><td class="num">${fmt(i.ton_kho)}</td><td class="num"><input class="small" value="${fmt(i.don_gia_ban)}" onchange="updUnitPrice('${i.hang_hoa_id}',this.value)"></td><td class="num"><span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td><td class="num">${fmt(line)}</td>${deleteCell}</tr>`;
         }).join('');
         const orderDiscount = discountAmount(num(discount.value), orderDiscountType.value, subtotal);
         const shippingFeeValue = num(shippingFee.value);
@@ -819,6 +820,12 @@
         const nextQty = Math.max(1, num(v));
         if (nextQty > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
         i.so_luong = nextQty;
+        renderCart();
+      }
+      function updUnitPrice(id, v) {
+        const i = cart.find(x => x.hang_hoa_id === id);
+        if (!i) return;
+        i.don_gia_ban = Math.max(0, num(v));
         renderCart();
       }
       function updLineDiscount(id, v) { if (sourceOrder) return renderCart(); const i = cart.find(x => x.hang_hoa_id === id); if (i) i.chiet_khau = num(v); renderCart(); }
@@ -913,10 +920,27 @@
         const el = document.getElementById(id);
         if (el) el.addEventListener('input', scheduleShippingFee);
       });
-      function renderPickupStore() { const s = stores.find(x => x._id === pickupStoreId.value); if (!s) return; storeName.textContent = s.ten_cua_hang; const addr = s.dia_chi_gui_hang || addressText(s) || 'Chưa có địa chỉ lấy hàng'; pickupInfo.textContent = `${s.sdt || 'Chưa có SĐT'} - ${addr}`; }
+      function renderCurrentStore() {
+        const storeId = getStoreId();
+        const s = stores.find(x => x._id === storeId);
+        if (!s) {
+          storeName.textContent = 'Chưa chọn cửa hàng';
+          pickupInfo.textContent = 'Vui lòng chọn cửa hàng ở menu góc trên phải.';
+          return;
+        }
+        storeName.textContent = s.ten_cua_hang;
+        const warehouseSelect = document.getElementById('khoId');
+        const warehouseOption = warehouseSelect && warehouseSelect.options ? warehouseSelect.options[warehouseSelect.selectedIndex] : null;
+        const warehouseAddress = warehouseOption ? (warehouseOption.getAttribute('data-address') || '') : '';
+        const addr = warehouseAddress || addressText(s) || 'Chưa có địa chỉ lấy hàng';
+        pickupInfo.textContent = `${s.sdt || 'Chưa có SĐT'} - ${addr}`;
+      }
       function getShippingStartPoint() {
-        const store = stores.find(x => x._id === pickupStoreId.value);
-        return store ? (store.dia_chi_gui_hang || addressText(store) || store.ten_cua_hang || '') : '';
+        const store = stores.find(x => x._id === getStoreId());
+        const warehouseSelect = document.getElementById('khoId');
+        const warehouseOption = warehouseSelect && warehouseSelect.options ? warehouseSelect.options[warehouseSelect.selectedIndex] : null;
+        const warehouseAddress = warehouseOption ? (warehouseOption.getAttribute('data-address') || '') : '';
+        return warehouseAddress || (store ? (addressText(store) || store.ten_cua_hang || '') : '');
       }
       function getShippingEndPoint() {
         return [recipientAddress.value, recipientWard.value, recipientArea.value].filter(Boolean).join(', ');
@@ -927,65 +951,53 @@
         return opt?.dataset?.addressId || '';
       }
       function scheduleShippingFee() {
-        clearTimeout(shippingFeeTimer);
-        shippingFeeTimer = setTimeout(calculateShippingFee, 350);
+        shippingFeeHelp.textContent = 'Nhập trực tiếp phí giao hàng.';
+        renderCart();
       }
       function handleManualShippingFee() {
-        shippingFeeManuallyEdited = true;
+        shippingFee.value = num(shippingFee.value) ? fmt(num(shippingFee.value)) : '0';
         renderCart();
       }
       async function calculateShippingFee() {
-        if (!partnerId.value || !pickupStoreId.value) return;
-        const endPoint = getShippingEndPoint();
-        const addressId = getRecipientAddressId();
-        if (!customerId.value || !addressId || !endPoint) return;
-        try {
-          const res = await fetch('/api/giao-hang/tinh-phi', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              cua_hang_id: pickupStoreId.value,
-              khach_hang_id: customerId.value,
-              dia_chi_khach_hang_id: addressId,
-              doi_tac_giao_hang_id: partnerId.value,
-              diem_di: getShippingStartPoint(),
-              diem_den: endPoint,
-              khoang_cach_km: num(shippingDistance.value)
-            })
-          });
-          const text = await res.text();
-          let result = {};
-          try {
-            result = text ? JSON.parse(text) : {};
-          } catch (_) {
-            throw new Error(text || 'Backend trả về phản hồi không hợp lệ');
-          }
-          if (!result.success) throw new Error(result.message || 'Không tính được phí giao hàng');
-          if (!shippingFeeManuallyEdited) shippingFee.value = fmt(result.phi_giao_hang || 0);
-          shippingFeeHelp.textContent = result.nguon_phi
-            ? 'Đã lấy phí giao hàng từ lịch sử/bảng phí. Có thể sửa tay.'
-            : 'Chưa có bảng giá phù hợp, có thể nhập tay.';
-          renderCart();
-        } catch (error) {
-          shippingFeeHelp.textContent = error.message || 'Không tính được phí giao hàng, có thể nhập tay.';
+        scheduleShippingFee();
+      }
+      function fillKhoOptions(warehouseList) {
+        const khoSelect = document.getElementById('khoId');
+        const list = Array.isArray(warehouseList) ? warehouseList : [];
+        if (!list.length) {
+          khoSelect.innerHTML = '<option value="">Chưa có kho cho cửa hàng này</option>';
+          khoSelect.disabled = true;
+          return;
         }
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>' + list.map(k => `<option value="${k._id}" data-address="${escapeHtml(k.dia_chi_day_du || k.dia_chi || '')}">${escapeHtml(k.ten_kho || '')}</option>`).join('');
+        if (!sourceOrder) khoSelect.disabled = false;
       }
       async function loadKhoByStore() {
-        const khoSelect = document.getElementById('khoId');
-        khoSelect.innerHTML = '<option value="">Chọn kho</option>';
-        khoSelect.disabled = true;
+        if (sourceOrder) return;
         previousKhoId = '';
         clearProductState();
-        if (!pickupStoreId.value) return;
+        const storeId = getStoreId();
+        const khoSelect = document.getElementById('khoId');
+        if (!storeId) {
+          khoSelect.innerHTML = '<option value="">Chưa chọn cửa hàng ở menu trên</option>';
+          khoSelect.disabled = true;
+          renderCurrentStore();
+          return;
+        }
+        if (initialWarehouses.length) {
+          fillKhoOptions(initialWarehouses);
+          renderCurrentStore();
+          return;
+        }
         try {
-          const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(pickupStoreId.value));
+          const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
           const result = await res.json();
-          const warehouses = result.success ? (result.data || []) : [];
-          khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}">${k.ten_kho}</option>`).join('');
-          khoSelect.disabled = false;
+          fillKhoOptions(result.success ? (result.data || []) : []);
         } catch (error) {
           khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
+          khoSelect.disabled = true;
         }
+        renderCurrentStore();
       }
       async function loadStockByWarehouse() {
         const khoId = document.getElementById('khoId').value;
@@ -1033,11 +1045,11 @@
         }
         clearProductState();
         await loadStockByWarehouse();
+        renderCurrentStore();
         scheduleShippingFee();
       }
-      function handlePickupStoreChange() { renderPickupStore(); loadKhoByStore(); scheduleShippingFee(); }
       function togglePartnerMenu() { partnerPicker.classList.toggle('open'); }
-      function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); shippingFeeManuallyEdited = false; scheduleShippingFee(); }
+      function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); scheduleShippingFee(); }
       function selectPartnerIfExists(id) {
         if (!id) return;
         const option = document.querySelector(`.partner-option[data-partner-id="${id}"]`);
@@ -1046,12 +1058,9 @@
       async function prefillFromCopyInvoice() {
         if (!sourceInvoice || sourceOrder) return;
         if (!sourceInvoiceItems.length) return;
-        const storeId = String(sourceInvoice.cua_hang_id?._id || sourceInvoice.cua_hang_id || '');
         const khoId = String(sourceInvoice.kho_id?._id || sourceInvoice.kho_id || '');
-        if (storeId) pickupStoreId.value = storeId;
-        renderPickupStore();
-        await loadKhoByStore();
-        if (khoId) {
+        renderCurrentStore();
+        if (khoId && document.querySelector(`#khoId option[value="${khoId}"]`)) {
           document.getElementById('khoId').value = khoId;
           await loadStockByWarehouse();
           previousKhoId = khoId;
@@ -1087,20 +1096,18 @@
         if (!sourceOrder) return;
         if (existingInvoice) alert('Đơn hàng này đã có hóa đơn ' + (existingInvoice.ma_hoa_don || ''));
         productSearch.disabled = true;
-        pickupStoreId.disabled = true;
         priceBookId.disabled = true;
         discount.disabled = true;
         orderDiscountType.disabled = true;
-        const storeId = String(sourceOrder.cua_hang_id?._id || sourceOrder.cua_hang_id || '');
         const khoId = String(sourceOrder.kho_id?._id || sourceOrder.kho_id || '');
-        if (storeId) pickupStoreId.value = storeId;
-        renderPickupStore();
-        await loadKhoByStore();
-        if (khoId) {
+        renderCurrentStore();
+        if (khoId && document.querySelector(`#khoId option[value="${khoId}"]`)) {
           document.getElementById('khoId').value = khoId;
           await loadStockByWarehouse();
           previousKhoId = khoId;
           document.getElementById('khoId').disabled = true;
+        } else if (khoId) {
+          alert('Kho của đơn hàng không thuộc cửa hàng đang làm việc. Vui lòng chọn cửa hàng phù hợp ở menu trên.');
         }
         if (sourceOrder.bang_gia_id) priceBookId.value = String(sourceOrder.bang_gia_id);
         const customerIdValue = String(sourceOrder.khach_hang_id?._id || sourceOrder.khach_hang_id || '');
@@ -1136,6 +1143,7 @@
       async function saveOrder() {
         if (existingInvoice) return alert('Đơn hàng này đã có hóa đơn ' + (existingInvoice.ma_hoa_don || ''));
         if (!cart.length) return alert('Hóa đơn chưa có sản phẩm');
+        if (!getStoreId()) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.');
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
         if (!customerId.value) return alert('Vui lòng chọn khách hàng.');
         const wantsShipping = codEnabled || Boolean(partnerId.value) || num(shippingFee.value) > 0;
@@ -1149,7 +1157,7 @@
         const shippingAddress = getShippingEndPoint();
         const data = {
           khach_hang_id: customerId.value,
-          cua_hang_id: pickupStoreId.value,
+          cua_hang_id: getStoreId(),
           kho_id: document.getElementById('khoId').value,
           bang_gia_id: selectedPriceBookId(),
           don_hang_id: sourceOrder ? sourceOrder._id : undefined,
@@ -1165,7 +1173,7 @@
           phi_van_chuyen: num(shippingFee.value),
           diem_di: getShippingStartPoint(),
           diem_den: shippingAddress,
-          khoang_cach_km: num(shippingDistance.value),
+          khoang_cach_km: 0,
           ghi_chu: '',
           doi_tac_giao_hang_id: partnerId.value,
           dia_chi_khach_hang_id: getRecipientAddressId(),
@@ -1192,13 +1200,14 @@
       }
       document.addEventListener('DOMContentLoaded', () => {
         if (copyFromError) alert(copyFromError);
-        renderPickupStore();
-        loadKhoByStore().then(async () => {
+        renderCurrentStore();
+        document.getElementById('khoId').addEventListener('change', handleWarehouseChange);
+        (async () => {
+          if (!sourceOrder) await loadKhoByStore();
           await prefillFromSourceOrder();
           await prefillFromCopyInvoice();
-        });
+        })();
         renderCod();
-        document.getElementById('khoId').addEventListener('change', handleWarehouseChange);
       });
       document.addEventListener('click', e => { if (!partnerPicker.contains(e.target)) partnerPicker.classList.remove('open'); });
     </script>

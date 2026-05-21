@@ -7,6 +7,7 @@ router.use(isAuthenticated);
 
 router.get('/', khachHangController.index);
 router.get('/export.xlsx', khachHangController.exportExcel);
+router.get('/api/:id/detail', khachHangController.apiCustomerDetail);
 router.post('/add', khachHangController.add);
 router.post('/:id/update', khachHangController.update);
 router.post('/:id/delete', khachHangController.remove);
@@ -23,7 +24,7 @@ router.post('/:id/addresses/add', khachHangController.addAddress);
 router.post('/:id/addresses/:addressId/update', khachHangController.updateAddress);
 router.post('/:id/addresses/:addressId/delete', khachHangController.removeAddress);
 router.get('/:id', function(req, res) {
-  res.redirect('/khach-hang?customer=' + encodeURIComponent(req.params.id));
+  res.redirect('/khach-hang#c-' + encodeURIComponent(req.params.id));
 });
 
 module.exports = router;
