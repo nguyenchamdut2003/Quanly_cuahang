@@ -1233,11 +1233,14 @@ const PhieuThuChiSchema = new Schema({
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
   nha_cung_cap_id: { type: ObjectId, ref: 'NhaCungCap' },
+  nhan_vien_id: { type: ObjectId, ref: 'NhanVien' },
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
   phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
   phieu_tra_hang_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap' },
   van_don_id: { type: ObjectId, ref: 'VanDon' },
+  bang_luong_id: { type: ObjectId, ref: 'BangLuong' },
+  ct_bang_luong_id: { type: ObjectId, ref: 'ChiTietBangLuong' },
   ma_chung_tu_goc: { type: String },
   allocation_type: { type: String },
   overpayment_amount: { type: Number, default: 0 },
@@ -1257,8 +1260,15 @@ const PhieuThuChiSchema = new Schema({
     type: String,
     enum: ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'],
     default: 'tien_mat'
-  }
+  },
+  nguoi_huy_id: { type: ObjectId, ref: 'NguoiDung' },
+  ngay_huy: { type: Date },
+  ly_do_huy: { type: String }
 }, { collection: "phieu_thu_chi", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
+
+PhieuThuChiSchema.index({ cua_hang_id: 1, nhan_vien_id: 1, ngay_lap: -1 });
+PhieuThuChiSchema.index({ cua_hang_id: 1, bang_luong_id: 1 });
+PhieuThuChiSchema.index({ cua_hang_id: 1, ct_bang_luong_id: 1 });
 
 // CONG_NO_KHACH_HANG
 const CongNoKhachHangSchema = new Schema({

@@ -40,11 +40,11 @@
     <%- include('../partials/flash-message', { flash: flash }) %>
     <div class="hr-toolbar">
       <h1>Phòng ban</h1>
+      <button type="button" class="btn btn-primary" id="pbAddBtn">+ Phòng ban</button>
       <div class="hr-search">
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="search" id="pbKeyword" placeholder="Tìm kiếm phòng ban" value="<%= filter.keyword || '' %>">
       </div>
-      <button type="button" class="btn btn-primary" id="pbAddBtn">+ Phòng ban</button>
     </div>
 
     <section class="hr-table-panel">
@@ -102,7 +102,7 @@
       </form>
       <div class="modal-foot">
         <button type="button" class="btn btn-light" id="pbCancelBtn">Bỏ qua</button>
-        <button type="button" class="btn btn-primary" id="pbSaveBtn">Lưu</button>
+        <button type="submit" class="btn btn-primary" form="pbForm" id="pbSaveBtn">Lưu</button>
       </div>
     </div>
   </div>
@@ -164,7 +164,8 @@
       });
     });
 
-    document.getElementById('pbSaveBtn').addEventListener('click', async function() {
+    pbForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
       const payload = {
         ma_phong_ban: document.getElementById('pbMa').value.trim(),
         ten_phong_ban: document.getElementById('pbTen').value.trim(),

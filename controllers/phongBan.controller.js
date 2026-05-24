@@ -17,6 +17,35 @@ function normalizePayload(body) {
   };
 }
 
+function isDuplicateKeyError(error) {
+  return error && error.code === 11000;
+}
+
+async function createPhongBan(storeId, payload, options) {
+  options = options || {};
+  var autoCode = !payload.ma_phong_ban;
+  var lastError = null;
+  var attempts = autoCode ? 5 : 1;
+
+  for (var i = 0; i < attempts; i += 1) {
+    var code = autoCode ? await makePhongBanCode(storeId) : payload.ma_phong_ban;
+    try {
+      return await PhongBan.create({
+        cua_hang_id: storeId,
+        ma_phong_ban: code,
+        ten_phong_ban: payload.ten_phong_ban,
+        mo_ta: payload.mo_ta || undefined,
+        trang_thai: options.forceActive ? 'active' : payload.trang_thai
+      });
+    } catch (error) {
+      if (!autoCode || !isDuplicateKeyError(error)) throw error;
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 function buildListQuery(storeId, query) {
   var filter = { cua_hang_id: storeId };
   var keyword = String(query.keyword || '').trim();
@@ -70,17 +99,10 @@ exports.apiCreate = async function(req, res, next) {
     if (!storeId) return jsonError(res, 400, 'Chưa chọn cửa hàng');
     var payload = normalizePayload(req.body);
     if (!payload.ten_phong_ban) return jsonError(res, 400, 'Tên phòng ban là bắt buộc');
-    if (!payload.ma_phong_ban) payload.ma_phong_ban = await makePhongBanCode(storeId);
-    var doc = await PhongBan.create({
-      cua_hang_id: storeId,
-      ma_phong_ban: payload.ma_phong_ban,
-      ten_phong_ban: payload.ten_phong_ban,
-      mo_ta: payload.mo_ta || undefined,
-      trang_thai: payload.trang_thai
-    });
+    var doc = await createPhongBan(storeId, payload);
     return res.json({ success: true, item: doc });
   } catch (error) {
-    if (error && error.code === 11000) return jsonError(res, 400, 'Mã phòng ban đã tồn tại');
+    if (isDuplicateKeyError(error)) return jsonError(res, 400, 'Mã phòng ban đã tồn tại');
     next(error);
   }
 };
@@ -108,7 +130,7 @@ exports.apiUpdate = async function(req, res, next) {
     if (!doc) return jsonError(res, 404, 'Không tìm thấy phòng ban');
     return res.json({ success: true, item: doc });
   } catch (error) {
-    if (error && error.code === 11000) return jsonError(res, 400, 'Mã phòng ban đã tồn tại');
+    if (isDuplicateKeyError(error)) return jsonError(res, 400, 'Mã phòng ban đã tồn tại');
     next(error);
   }
 };
@@ -129,14 +151,7 @@ exports.ajaxAdd = async function(req, res, next) {
     if (!storeId) return jsonError(res, 400, 'Chưa chọn cửa hàng');
     var payload = normalizePayload(req.body);
     if (!payload.ten_phong_ban) return jsonError(res, 400, 'Tên phòng ban là bắt buộc');
-    if (!payload.ma_phong_ban) payload.ma_phong_ban = await makePhongBanCode(storeId);
-    var doc = await PhongBan.create({
-      cua_hang_id: storeId,
-      ma_phong_ban: payload.ma_phong_ban,
-      ten_phong_ban: payload.ten_phong_ban,
-      mo_ta: payload.mo_ta || undefined,
-      trang_thai: 'active'
-    });
+    var doc = await createPhongBan(storeId, payload);
     return ajaxJson(res, {
       message: 'Đã thêm phòng ban.',
       data: doc,
@@ -144,7 +159,7 @@ exports.ajaxAdd = async function(req, res, next) {
       items: await loadActivePhongBans(storeId)
     });
   } catch (error) {
-    if (error && error.code === 11000) return jsonError(res, 400, 'Mã phòng ban đã tồn tại');
+    if (isDuplicateKeyError(error)) return jsonError(res, 400, 'Mã phòng ban đã tồn tại');
     next(error);
   }
 };
@@ -159,7 +174,13 @@ exports.ajaxUpdate = async function(req, res, next) {
     if (!payload.ten_phong_ban) return jsonError(res, 400, 'Tên phòng ban là bắt buộc');
     var doc = await PhongBan.findOneAndUpdate(
       { _id: id, cua_hang_id: storeId },
-      { $set: { ten_phong_ban: payload.ten_phong_ban, mo_ta: payload.mo_ta || undefined } },
+      {
+        $set: {
+          ten_phong_ban: payload.ten_phong_ban,
+          mo_ta: payload.mo_ta || undefined,
+          trang_thai: payload.trang_thai
+        }
+      },
       { new: true }
     );
     if (!doc) return jsonError(res, 404, 'Không tìm thấy phòng ban');

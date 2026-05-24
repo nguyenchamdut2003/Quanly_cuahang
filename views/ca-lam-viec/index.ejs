@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .admin-body .admin-shell{width:auto;max-width:none;margin:0;padding:30px}
+    .hr-setup-shell{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;padding:0}
+    .hr-setup-main{background:#fff;border:1px solid #d7dde5;border-radius:8px;padding:14px 16px 16px;min-height:calc(100vh - 140px)}
+    .hr-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+    .hr-toolbar h1{margin:0;font-size:22px;font-weight:700;color:#111827;flex:1}
+    .hr-search{flex:1;min-width:220px;max-width:420px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px;height:36px}
+    .hr-search input{border:0;outline:0;flex:1;font-size:13px}
+    .hr-table-panel{border:1px solid #e5e9ee;border-radius:8px;overflow:auto}
+    .hr-table{width:100%;border-collapse:collapse;min-width:980px}
+    .hr-table thead th{background:#e8f3ff;color:#111827;font-size:13px;font-weight:700;height:38px;padding:0 12px;text-align:left;border-bottom:1px solid #bcd9ff;white-space:nowrap}
+    .hr-table tbody td{padding:10px 12px;border-bottom:1px solid #e5e9ee;font-size:13px;color:#111827}
+    .hr-table tbody tr:hover{background:#f8fbff}
+    .hr-empty{padding:48px 20px;text-align:center;color:#475467}
+    .hr-empty a{color:#0070f4;cursor:pointer;font-weight:600}
+    .status-pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:5px;font-size:11px;font-weight:700}
+    .status-pill.is-active{background:#dcfce7;color:#166534}
+    .status-pill.is-inactive{background:#fee2e2;color:#991b1b}
+    .hr-actions{display:flex;gap:6px}
+    .hr-btn-icon{border:1px solid #cfd8e3;background:#fff;border-radius:6px;width:30px;height:28px;cursor:pointer;color:#344054}
+    .modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:3000;padding:20px;opacity:0;visibility:hidden}
+    .modal-overlay.is-open{display:flex;opacity:1;visibility:visible}
+    .modal-card{background:#fff;border-radius:10px;width:min(560px,100%);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.18)}
+    .modal-head{padding:16px 20px;border-bottom:1px solid #e5e9ee;font-size:18px;font-weight:700}
+    .modal-body{padding:16px 20px;display:grid;gap:12px;overflow:auto}
+    .modal-body label{display:grid;gap:4px;font-size:12px;color:#475467}
+    .modal-body input,.modal-body select,.modal-body textarea{height:34px;border:1px solid #cfd8e3;border-radius:7px;padding:0 10px;font-size:13px}
+    .modal-body textarea{height:72px;padding:8px 10px;resize:vertical}
+    .modal-grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .modal-check-row{display:flex;align-items:center;gap:8px;font-size:13px;color:#344054}
+    .modal-check-row input{width:16px;height:16px}
+    .modal-foot{padding:12px 20px 16px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #e5e9ee}
+    .shift-create-card{width:min(668px,100%)}
+    .shift-create-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;font-size:16px;font-weight:800;color:#111827}
+    .shift-create-close{border:0;background:transparent;font-size:18px;line-height:1;color:#111827;cursor:pointer;width:28px;height:28px}
+    .shift-create-body{padding:14px 20px 16px}
+    .shift-create-note{font-size:13px;color:#344054;margin-bottom:12px}
+    .shift-create-note a{color:#0070f4;text-decoration:none}
+    .shift-create-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .shift-create-table th{height:32px;background:#f0f1f3;color:#111827;font-size:12px;text-align:left;padding:0 8px;border-bottom:1px solid #d8dde5}
+    .shift-create-table td{height:44px;border-bottom:1px solid #e1e6ee;padding:6px 8px;font-size:13px;color:#111827}
+    .shift-create-table th:nth-child(1){width:45%}
+    .shift-create-table th:nth-child(2),.shift-create-table th:nth-child(3){width:100px}
+    .shift-create-table th:nth-child(4){width:95px}
+    .shift-create-table th:nth-child(5){width:38px}
+    .shift-create-table input{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px;font-size:13px}
+    .shift-time-picker{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+    .shift-time-picker select{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:6px;padding:0 6px;font-size:13px;background:#fff}
+    .shift-create-delete{border:0;background:transparent;color:#344054;cursor:pointer;width:26px;height:26px}
+    .shift-create-add{border:0;background:transparent;color:#0070f4;font-size:13px;padding:12px 0 0;cursor:pointer}
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="admin-shell">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+    <div class="hr-setup-shell">
+      <%- include('../partials/hr-setup-nav', { activeHrPage: activeHrPage }) %>
+      <section class="hr-setup-main">
+        <div class="hr-toolbar">
+          <h1>Ca làm việc</h1>
+          <div class="hr-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" id="caKeyword" placeholder="Tìm theo mã, tên ca" value="<%= filter.keyword || '' %>">
+          </div>
+          <button type="button" class="btn btn-primary" id="caAddBtn" data-open-shift-create onclick="window.openShiftCreateModal ? window.openShiftCreateModal() : document.getElementById('shiftCreateModal').classList.add('is-open')">+ Ca làm việc</button>
+        </div>
+
+        <div class="hr-table-panel">
+          <table class="hr-table">
+            <thead>
+              <tr>
+                <th>Mã ca</th>
+                <th>Tên ca</th>
+                <th>Giờ bắt đầu</th>
+                <th>Giờ kết thúc</th>
+                <th>Nghỉ giữa ca</th>
+                <th>Cho phép đi muộn</th>
+                <th>Cho phép về sớm</th>
+                <th>Trạng thái</th>
+                <th style="width:100px">Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="caTableBody">
+              <% if (!(caLamViecs || []).length) { %>
+                <tr><td colspan="9" class="hr-empty">Chưa có ca làm việc. <a id="caEmptyAdd">Nhấn vào đây để thêm ca</a>.</td></tr>
+              <% } %>
+              <% (caLamViecs || []).forEach(function(ca) { %>
+                <tr
+                  data-id="<%= ca._id %>"
+                  data-ma="<%= ca.ma_ca || '' %>"
+                  data-ten="<%= ca.ten_ca || '' %>"
+                  data-gio-bat-dau="<%= ca.gio_bat_dau || '' %>"
+                  data-gio-ket-thuc="<%= ca.gio_ket_thuc || '' %>"
+                  data-nghi="<%= ca.nghi_giua_ca_phut || 0 %>"
+                  data-di-muon="<%= ca.cho_phep_di_muon_phut || 0 %>"
+                  data-ve-som="<%= ca.cho_phep_ve_som_phut || 0 %>"
+                  data-ot-truoc="<%= ca.tinh_lam_them_truoc_ca ? '1' : '0' %>"
+                  data-ot-sau="<%= ca.tinh_lam_them_sau_ca ? '1' : '0' %>"
+                  data-ghi-chu="<%= (ca.ghi_chu || '').replace(/"/g, '&quot;') %>"
+                  data-trang-thai="<%= ca.trang_thai || 'active' %>"
+                >
+                  <td><%= ca.ma_ca || '---' %></td>
+                  <td><strong><%= ca.ten_ca || '---' %></strong></td>
+                  <td><%= ca.gio_bat_dau || '---' %></td>
+                  <td><%= ca.gio_ket_thuc || '---' %></td>
+                  <td><%= Number(ca.nghi_giua_ca_phut || 0) %> phút</td>
+                  <td><%= Number(ca.cho_phep_di_muon_phut || 0) %> phút</td>
+                  <td><%= Number(ca.cho_phep_ve_som_phut || 0) %> phút</td>
+                  <td>
+                    <span class="status-pill <%= ca.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+                      <%= ca.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
+                    </span>
+                  </td>
+                  <td>
+                    <div class="hr-actions">
+                      <button type="button" class="hr-btn-icon ca-edit" title="Sửa"><i class="fa-regular fa-pen-to-square"></i></button>
+                      <button type="button" class="hr-btn-icon ca-delete" title="Ngừng hoạt động"><i class="fa-regular fa-trash-can"></i></button>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="modal-overlay" id="shiftCreateModal">
+    <div class="modal-card shift-create-card">
+      <div class="shift-create-head">
+        <span>Tạo ca làm việc</span>
+        <button type="button" class="shift-create-close" id="shiftCreateClose">×</button>
+      </div>
+      <div class="shift-create-body">
+        <div class="shift-create-note">Đã có <%= (caLamViecs || []).length %> ca làm việc. <a href="/ca-lam-viec">Xem danh sách ca</a></div>
+        <table class="shift-create-table">
+          <thead>
+            <tr>
+              <th>Tên ca</th>
+              <th>Giờ vào</th>
+              <th>Giờ ra</th>
+              <th>Tổng giờ làm</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="shiftCreateRows"></tbody>
+        </table>
+        <button type="button" class="shift-create-add" id="shiftCreateAdd">+ Thêm ca</button>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-primary" id="shiftCreateSave">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="caModal">
+    <div class="modal-card">
+      <div class="modal-head" id="caModalTitle">Thêm ca làm việc</div>
+      <form id="caForm" class="modal-body">
+        <input type="hidden" id="caId">
+        <label>Mã ca<input id="caMa" placeholder="Để trống tự động (CA000001)"></label>
+        <label>Tên ca *<input id="caTen" required></label>
+        <div class="modal-grid-2">
+          <label>Giờ bắt đầu *<input id="caGioBatDau" type="time" required></label>
+          <label>Giờ kết thúc *<input id="caGioKetThuc" type="time" required></label>
+        </div>
+        <div class="modal-grid-2">
+          <label>Nghỉ giữa ca (phút)<input id="caNghiGiua" type="number" min="0" value="0"></label>
+          <label>Cho phép đi muộn (phút)<input id="caDiMuon" type="number" min="0" value="0"></label>
+        </div>
+        <div class="modal-grid-2">
+          <label>Cho phép về sớm (phút)<input id="caVeSom" type="number" min="0" value="0"></label>
+          <label>Trạng thái
+            <select id="caTrangThai">
+              <option value="active">Đang hoạt động</option>
+              <option value="inactive">Ngừng hoạt động</option>
+            </select>
+          </label>
+        </div>
+        <label class="modal-check-row">
+          <input type="checkbox" id="caOtTruoc">
+          <span>Tính làm thêm trước ca</span>
+        </label>
+        <label class="modal-check-row">
+          <input type="checkbox" id="caOtSau" checked>
+          <span>Tính làm thêm sau ca</span>
+        </label>
+        <label>Ghi chú<textarea id="caGhiChu"></textarea></label>
+      </form>
+      <div class="modal-foot">
+        <button type="button" class="btn btn-light" id="caCancelBtn">Bỏ qua</button>
+        <button type="submit" class="btn btn-primary" form="caForm" id="caSaveBtn">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const caModal = document.getElementById('caModal');
+    const shiftCreateModal = document.getElementById('shiftCreateModal');
+    const shiftCreateRows = document.getElementById('shiftCreateRows');
+    const caKeyword = document.getElementById('caKeyword');
+    let caEditId = '';
+
+    function minutesFromTime(value) {
+      const parts = String(value || '').split(':').map(Number);
+      if (parts.length !== 2 || parts.some(Number.isNaN)) return null;
+      return parts[0] * 60 + parts[1];
+    }
+
+    function durationText(start, end) {
+      const s = minutesFromTime(start);
+      const e = minutesFromTime(end);
+      if (s == null || e == null) return '---';
+      let diff = e - s;
+      if (diff <= 0) diff += 24 * 60;
+      const hours = Math.floor(diff / 60);
+      const minutes = diff % 60;
+      return hours + 'h' + (minutes ? (' ' + minutes + 'm') : '');
+    }
+
+    function pad2(value) {
+      return String(value).padStart(2, '0');
+    }
+
+    function timePickerHtml(prefix, value) {
+      const parts = String(value || '07:00').split(':');
+      const selectedHour = Number(parts[0]);
+      const selectedMinute = Number(parts[1]);
+      let hourOptions = '';
+      let minuteOptions = '';
+      for (let hour = 0; hour < 24; hour += 1) {
+        hourOptions += '<option value="' + pad2(hour) + '"' + (hour === selectedHour ? ' selected' : '') + '>' + pad2(hour) + '</option>';
+      }
+      for (let minute = 0; minute < 60; minute += 1) {
+        minuteOptions += '<option value="' + pad2(minute) + '"' + (minute === selectedMinute ? ' selected' : '') + '>' + pad2(minute) + '</option>';
+      }
+      return '<div class="shift-time-picker" data-time-picker="' + prefix + '">' +
+        '<select class="shift-create-' + prefix + '-hour" aria-label="Giờ">' + hourOptions + '</select>' +
+        '<select class="shift-create-' + prefix + '-minute" aria-label="Phút">' + minuteOptions + '</select>' +
+      '</div>';
+    }
+
+    function shiftPickerValue(row, prefix) {
+      const hour = row.querySelector('.shift-create-' + prefix + '-hour')?.value || '00';
+      const minute = row.querySelector('.shift-create-' + prefix + '-minute')?.value || '00';
+      return hour + ':' + minute;
+    }
+
+    function updateShiftCreateDurations() {
+      shiftCreateRows.querySelectorAll('tr').forEach(row => {
+        const start = shiftPickerValue(row, 'start');
+        const end = shiftPickerValue(row, 'end');
+        const duration = row.querySelector('.shift-create-duration');
+        if (duration) duration.textContent = durationText(start, end);
+      });
+    }
+
+    function addShiftCreateRow(data) {
+      data = data || {};
+      const row = document.createElement('tr');
+      row.innerHTML =
+        '<td><input class="shift-create-name" type="text" value="' + String(data.ten_ca || '').replace(/"/g, '&quot;') + '"></td>' +
+        '<td>' + timePickerHtml('start', data.gio_bat_dau || '07:00') + '</td>' +
+        '<td>' + timePickerHtml('end', data.gio_ket_thuc || '11:00') + '</td>' +
+        '<td class="shift-create-duration">4h</td>' +
+        '<td><button type="button" class="shift-create-delete" title="Xóa"><i class="fa-regular fa-trash-can"></i></button></td>';
+      shiftCreateRows.appendChild(row);
+      updateShiftCreateDurations();
+    }
+
+    function openShiftCreateModal() {
+      shiftCreateRows.innerHTML = '';
+      addShiftCreateRow();
+      addShiftCreateRow();
+      shiftCreateModal.classList.add('is-open');
+    }
+
+    function closeShiftCreateModal() {
+      shiftCreateModal.classList.remove('is-open');
+    }
+
+    window.openShiftCreateModal = openShiftCreateModal;
+
+    function openCaModal(item) {
+      item = item || {};
+      caEditId = item._id ? String(item._id) : '';
+      document.getElementById('caModalTitle').textContent = caEditId ? 'Sửa ca làm việc' : 'Thêm ca làm việc';
+      document.getElementById('caId').value = caEditId;
+      document.getElementById('caMa').value = item.ma_ca || '';
+      document.getElementById('caTen').value = item.ten_ca || '';
+      document.getElementById('caGioBatDau').value = item.gio_bat_dau || '';
+      document.getElementById('caGioKetThuc').value = item.gio_ket_thuc || '';
+      document.getElementById('caNghiGiua').value = Number(item.nghi_giua_ca_phut || 0);
+      document.getElementById('caDiMuon').value = Number(item.cho_phep_di_muon_phut || 0);
+      document.getElementById('caVeSom').value = Number(item.cho_phep_ve_som_phut || 0);
+      document.getElementById('caOtTruoc').checked = !!item.tinh_lam_them_truoc_ca;
+      document.getElementById('caOtSau').checked = item.tinh_lam_them_sau_ca !== false && item.tinh_lam_them_sau_ca !== '0';
+      document.getElementById('caGhiChu').value = item.ghi_chu || '';
+      document.getElementById('caTrangThai').value = item.trang_thai === 'inactive' ? 'inactive' : 'active';
+      caModal.classList.add('is-open');
+    }
+
+    function closeCaModal() {
+      caModal.classList.remove('is-open');
+    }
+
+    function rowToItem(row) {
+      if (!row) return null;
+      return {
+        _id: row.dataset.id,
+        ma_ca: row.dataset.ma || '',
+        ten_ca: row.dataset.ten || '',
+        gio_bat_dau: row.dataset.gioBatDau || '',
+        gio_ket_thuc: row.dataset.gioKetThuc || '',
+        nghi_giua_ca_phut: Number(row.dataset.nghi || 0),
+        cho_phep_di_muon_phut: Number(row.dataset.diMuon || 0),
+        cho_phep_ve_som_phut: Number(row.dataset.veSom || 0),
+        tinh_lam_them_truoc_ca: row.dataset.otTruoc === '1',
+        tinh_lam_them_sau_ca: row.dataset.otSau !== '0',
+        ghi_chu: row.dataset.ghiChu || '',
+        trang_thai: row.dataset.trangThai || 'active'
+      };
+    }
+
+    function collectPayload() {
+      return {
+        ma_ca: document.getElementById('caMa').value.trim(),
+        ten_ca: document.getElementById('caTen').value.trim(),
+        gio_bat_dau: document.getElementById('caGioBatDau').value,
+        gio_ket_thuc: document.getElementById('caGioKetThuc').value,
+        nghi_giua_ca_phut: Number(document.getElementById('caNghiGiua').value || 0),
+        cho_phep_di_muon_phut: Number(document.getElementById('caDiMuon').value || 0),
+        cho_phep_ve_som_phut: Number(document.getElementById('caVeSom').value || 0),
+        tinh_lam_them_truoc_ca: document.getElementById('caOtTruoc').checked,
+        tinh_lam_them_sau_ca: document.getElementById('caOtSau').checked,
+        ghi_chu: document.getElementById('caGhiChu').value.trim(),
+        trang_thai: document.getElementById('caTrangThai').value
+      };
+    }
+
+    function reloadWithKeyword() {
+      const params = new URLSearchParams();
+      const kw = caKeyword.value.trim();
+      if (kw) params.set('keyword', kw);
+      window.location.href = '/ca-lam-viec' + (params.toString() ? '?' + params.toString() : '');
+    }
+
+    document.addEventListener('click', function(e) {
+      const trigger = e.target.closest('[data-open-shift-create]');
+      if (!trigger) return;
+      e.preventDefault();
+      openShiftCreateModal();
+    });
+    document.getElementById('caEmptyAdd')?.addEventListener('click', (e) => { e.preventDefault(); openShiftCreateModal(); });
+    document.getElementById('shiftCreateClose').addEventListener('click', closeShiftCreateModal);
+    document.getElementById('shiftCreateAdd').addEventListener('click', () => addShiftCreateRow());
+    shiftCreateRows.addEventListener('input', updateShiftCreateDurations);
+    shiftCreateRows.addEventListener('change', updateShiftCreateDurations);
+    shiftCreateRows.addEventListener('click', function(e) {
+      const deleteBtn = e.target.closest('.shift-create-delete');
+      if (!deleteBtn) return;
+      if (shiftCreateRows.querySelectorAll('tr').length <= 1) return;
+      deleteBtn.closest('tr').remove();
+    });
+    document.getElementById('shiftCreateSave').addEventListener('click', async function() {
+      const rows = Array.from(shiftCreateRows.querySelectorAll('tr')).map(row => ({
+        ten_ca: row.querySelector('.shift-create-name').value.trim(),
+        gio_bat_dau: shiftPickerValue(row, 'start'),
+        gio_ket_thuc: shiftPickerValue(row, 'end')
+      })).filter(item => item.ten_ca || item.gio_bat_dau || item.gio_ket_thuc);
+      if (!rows.length) return alert('Vui lòng nhập ít nhất một ca làm việc');
+      const invalid = rows.find(item => !item.ten_ca || !item.gio_bat_dau || !item.gio_ket_thuc);
+      if (invalid) return alert('Mỗi dòng cần có tên ca, giờ vào và giờ ra');
+      for (const item of rows) {
+        const res = await fetch('/api/ca-lam-viec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({
+            ten_ca: item.ten_ca,
+            gio_bat_dau: item.gio_bat_dau,
+            gio_ket_thuc: item.gio_ket_thuc,
+            nghi_giua_ca_phut: 0,
+            cho_phep_di_muon_phut: 0,
+            cho_phep_ve_som_phut: 0,
+            tinh_lam_them_truoc_ca: false,
+            tinh_lam_them_sau_ca: true,
+            trang_thai: 'active'
+          })
+        });
+        const json = await res.json();
+        if (!json.success) return alert(json.message || 'Lỗi lưu ca làm việc');
+      }
+      location.reload();
+    });
+    document.getElementById('caCancelBtn').addEventListener('click', closeCaModal);
+    caKeyword.addEventListener('keydown', (e) => { if (e.key === 'Enter') reloadWithKeyword(); });
+
+    document.querySelectorAll('.ca-edit').forEach(btn => {
+      btn.addEventListener('click', function() {
+        openCaModal(rowToItem(this.closest('tr')));
+      });
+    });
+
+    document.querySelectorAll('.ca-delete').forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const id = this.closest('tr').dataset.id;
+        if (!confirm('Ngừng hoạt động ca làm việc này?')) return;
+        const res = await fetch('/api/ca-lam-viec/' + id, { method: 'DELETE' });
+        const json = await res.json();
+        if (!json.success) return alert(json.message || 'Lỗi');
+        alert(json.message || 'Đã xử lý');
+        location.reload();
+      });
+    });
+
+    document.getElementById('caForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const payload = collectPayload();
+      if (!payload.ten_ca) return alert('Vui lòng nhập tên ca');
+      if (!payload.gio_bat_dau || !payload.gio_ket_thuc) return alert('Vui lòng nhập giờ bắt đầu và giờ kết thúc');
+      const url = caEditId ? ('/api/ca-lam-viec/' + caEditId) : '/api/ca-lam-viec';
+      const method = caEditId ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!json.success) return alert(json.message || 'Lỗi lưu ca làm việc');
+      location.reload();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-05-22T08:09:59.480Z",
+  "baseUrl": "http://127.0.0.1:3000",
+  "authOk": false,
+  "consoleErrors": [
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "url": "http://127.0.0.1:3000/?error=unauthorized"
+    }
+  ],
+  "networkIssues": [],
+  "rows": [
+    {
+      "screen": "/bang-luong",
+      "action": "Đăng nhập admin",
+      "expected": "Truy cập được khi đã login Google",
+      "actual": "Redirect/login — chưa có session",
+      "status": "Blocked",
+      "note": "Mở Chrome với --remote-debugging-port=9222 và profile đã login, hoặc đăng nhập trong scripts/.chrome-ui-profile"
+    }
+  ],
+  "summary": {
+    "pass": 0,
+    "fail": 0,
+    "blocked": 1
+  }
+}

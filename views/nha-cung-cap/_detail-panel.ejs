@@ -1,117 +1,117 @@
 <div class="kv-detail-panel product-detail supplier-inline-detail">
   <div class="supplier-detail" data-supplier-detail>
-    <div class="detail-tabs">
-      <div class="detail-tab-list">
-        <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin nhà cung cấp</button>
-        <button class="detail-tab" type="button" data-detail-tab="address">Danh sách địa chỉ</button>
-            <button class="detail-tab" type="button" data-detail-tab="history">Lịch sử nhập/trả hàng</button>
-            <button class="detail-tab" type="button" data-detail-tab="debt">Nợ cần trả nhà cung cấp</button>
+                        <div class="detail-tabs">
+                          <div class="detail-tab-list">
+                            <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin nhà cung cấp</button>
+                            <button class="detail-tab" type="button" data-detail-tab="address">Danh sách địa chỉ</button>
+                            <button class="detail-tab" type="button" data-detail-tab="history">Lịch sử nhập/trả hàng</button>
+                            <button class="detail-tab" type="button" data-detail-tab="debt">Nợ cần trả nhà cung cấp</button>
             <button class="detail-tab" type="button" data-detail-tab="xnb">Xuất dùng nội bộ</button>
-      </div>
-      <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
-    </div>
+                          </div>
+                          <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
+                        </div>
 
     <div class="supplier-detail-body">
-      <div class="detail-pane is-active" data-detail-pane="info">
+                          <div class="detail-pane is-active" data-detail-pane="info">
         <div class="supplier-info-block">
           <div class="supplier-info-avatar">NCC</div>
           <div class="supplier-info-main">
-            <h2><%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %></h2>
-            <p><%- refLink('supplier', selectedSupplier, selectedSupplier.ma_ncc || '---') %></p>
+                              <h2><%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %></h2>
+                              <p><%- refLink('supplier', selectedSupplier, selectedSupplier.ma_ncc || '---') %></p>
             <div class="supplier-info-tags">
               <span class="tag">Nhà cung cấp</span>
               <span class="tag tag-green"><%= selectedSupplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span>
             </div>
-          </div>
-        </div>
-        <form id="supplierInlineEdit_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/update" class="supplier-inline-edit-form">
+                            </div>
+                          </div>
+                          <form id="supplierInlineEdit_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/update" class="supplier-inline-edit-form">
           <div class="store-fields supplier-detail-fields">
-            <div><span>Mã NCC</span><input name="ma_ncc" value="<%= selectedSupplier.ma_ncc || '' %>"></div>
-            <div><span>Tên nhà cung cấp *</span><input name="ten_ncc" value="<%= selectedSupplier.ten_ncc || '' %>" required></div>
-            <div><span>Điện thoại</span><input name="sdt" value="<%= selectedSupplier.sdt || '' %>"></div>
-            <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
-            <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>"></div>
-            <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
-            <div><span>Tổng nợ</span>
-              <div>
-                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
-                <div class="supplier-metric-hint">Tự động tính từ phiếu nhập</div>
-              </div>
-            </div>
-            <div><span>Tổng mua</span>
-              <div>
-                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_mua || 0).toLocaleString('vi-VN') %></strong>
-                <div class="supplier-metric-hint">Tự động tính từ phiếu đã nhập hàng</div>
-              </div>
-            </div>
-            <div><span>Trạng thái</span>
-              <select name="trang_thai">
-                <option value="active" <%= selectedSupplier.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
-                <option value="inactive" <%= selectedSupplier.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
-              </select>
-            </div>
-            <div><span>Thời gian tạo</span><strong><%= formatDate(selectedSupplier.created_at) %></strong></div>
+                            <div><span>Mã NCC</span><input name="ma_ncc" value="<%= selectedSupplier.ma_ncc || '' %>"></div>
+                            <div><span>Tên nhà cung cấp *</span><input name="ten_ncc" value="<%= selectedSupplier.ten_ncc || '' %>" required></div>
+                            <div><span>Điện thoại</span><input name="sdt" value="<%= selectedSupplier.sdt || '' %>"></div>
+                            <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
+                            <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>"></div>
+                            <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
+                            <div><span>Tổng nợ</span>
+                              <div>
+                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
+                                <div class="supplier-metric-hint">Tự động tính từ phiếu nhập</div>
+                              </div>
+                            </div>
+                            <div><span>Tổng mua</span>
+                              <div>
+                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_mua || 0).toLocaleString('vi-VN') %></strong>
+                                <div class="supplier-metric-hint">Tự động tính từ phiếu đã nhập hàng</div>
+                              </div>
+                            </div>
+                            <div><span>Trạng thái</span>
+                              <select name="trang_thai">
+                                <option value="active" <%= selectedSupplier.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+                                <option value="inactive" <%= selectedSupplier.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+                              </select>
+                            </div>
+                            <div><span>Thời gian tạo</span><strong><%= formatDate(selectedSupplier.created_at) %></strong></div>
             <div class="supplier-detail-field-full"><span>Ghi chú</span><input name="ghi_chu" value="<%= selectedSupplier.ghi_chu || '' %>"></div>
-          </div>
-        </form>
+                          </div>
+                          </form>
         <div class="supplier-pane-actions">
           <button class="btn btn-danger btn-sm" type="submit" form="supplierInlineDel_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
           <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
         </div>
-      </div>
+                          </div>
 
-      <div class="detail-pane" data-detail-pane="address">
-        <% var supplierAddressReturnQuery = filterQueryString || ''; %>
+                          <div class="detail-pane" data-detail-pane="address">
+                            <% var supplierAddressReturnQuery = filterQueryString || ''; %>
         <div class="supplier-pane-toolbar">
-          <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
-        </div>
+                              <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
+                            </div>
         <div class="supplier-pane-table-wrap table-wrap">
-          <table class="admin-table warehouse-table">
-            <thead>
-              <tr>
-                <th>Mã địa chỉ</th>
-                <th>Tên người nhận</th>
-                <th>SĐT</th>
-                <th>Địa chỉ</th>
-                <th>Loại địa chỉ</th>
-                <th>Tạo lúc</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% var supplierAddressAddFormId = 'supplierAddressAdd_' + String(selectedSupplier._id); %>
-              <tr class="warehouse-edit-row warehouse-add-row">
-                <td>
-                  <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
+                              <table class="admin-table warehouse-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã địa chỉ</th>
+                                    <th>Tên người nhận</th>
+                                    <th>SĐT</th>
+                                    <th>Địa chỉ</th>
+                                    <th>Loại địa chỉ</th>
+                                    <th>Tạo lúc</th>
+                                    <th>Thao tác</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% var supplierAddressAddFormId = 'supplierAddressAdd_' + String(selectedSupplier._id); %>
+                                  <tr class="warehouse-edit-row warehouse-add-row">
+                                    <td>
+                                      <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
                   <input data-address-form="<%= supplierAddressAddFormId %>" name="ma_dia_chi" placeholder="Tự động" readonly class="supplier-readonly-input">
-                </td>
-                <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
-                <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
-                <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
-                <td>
-                  <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
-                    <option value="khac">Khác</option>
-                    <% (addressTypes || []).forEach(function(type) { %>
-                      <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
-                    <% }) %>
-                  </select>
-                </td>
-                <td>--</td>
-                <td class="warehouse-action-cell">
-                  <div class="warehouse-action-buttons">
-                    <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
-                    <button
-                      class="btn btn-primary btn-sm js-supplier-address-submit"
-                      type="button"
-                      data-form-id="<%= supplierAddressAddFormId %>"
-                      data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
-                      data-confirm="Bạn có muốn thêm địa chỉ mới không?"
-                    >Thêm</button>
-                  </div>
-                </td>
-              </tr>
+                                    </td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
+                                    <td>
+                                      <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
+                                        <option value="khac">Khác</option>
+                                        <% (addressTypes || []).forEach(function(type) { %>
+                                          <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
+                                        <% }) %>
+                                      </select>
+                                    </td>
+                                    <td>--</td>
+                                    <td class="warehouse-action-cell">
+                                      <div class="warehouse-action-buttons">
+                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                        <button
+                                          class="btn btn-primary btn-sm js-supplier-address-submit"
+                                          type="button"
+                                          data-form-id="<%= supplierAddressAddFormId %>"
+                                          data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
+                                          data-confirm="Bạn có muốn thêm địa chỉ mới không?"
+                                        >Thêm</button>
+                                      </div>
+                                    </td>
+                                  </tr>
               <tr class="address-detail-row supplier-address-expand" style="display: none;">
-                <td colspan="7">
+                                    <td colspan="7">
                   <div class="supplier-address-expand-grid">
                     <div><label>Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="so_nha" placeholder="Số nhà"></div>
                     <div><label>Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/Xã"></div>
@@ -119,52 +119,52 @@
                     <div><label>Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
                     <div class="span-2"><label>Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="ghi_chu" placeholder="Ghi chú"></div>
                     <div class="span-2 supplier-address-default-check"><label><input data-address-form="<%= supplierAddressAddFormId %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
-                  </div>
-                </td>
-              </tr>
-              <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
-                <tr><td colspan="7" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
-              <% } %>
-              <% (supplierAddresses || []).forEach(function(address) { %>
-                <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
-                <tr class="warehouse-edit-row">
-                  <td>
-                    <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
+                                    <tr><td colspan="7" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
+                                  <% } %>
+                                  <% (supplierAddresses || []).forEach(function(address) { %>
+                                    <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
+                                    <tr class="warehouse-edit-row">
+                                      <td>
+                                        <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
                     <input data-address-form="<%= supplierAddressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly class="supplier-readonly-input">
-                  </td>
-                  <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
-                  <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
-                  <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
-                  <td>
-                    <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
-                      <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
-                      <% (addressTypes || []).forEach(function(type) { %>
-                        <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
-                      <% }) %>
-                    </select>
-                  </td>
-                  <td><%= formatDate(address.created_at) %></td>
-                  <td class="warehouse-action-cell">
-                    <div class="warehouse-action-buttons">
-                      <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
-                      <button
-                        class="btn btn-light btn-sm js-supplier-address-submit"
-                        type="button"
-                        data-form-id="<%= supplierAddressFormId %>"
-                        data-action="/nha-cung-cap/dia-chi/<%= address._id %>/update"
-                        data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?"
-                      >Lưu</button>
-                      <button
-                        class="btn btn-danger btn-sm js-supplier-address-delete"
-                        type="button"
-                        data-return-query="<%= supplierAddressReturnQuery %>"
-                        data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
-                      >Xóa</button>
-                    </div>
-                  </td>
-                </tr>
+                                      </td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
+                                      <td>
+                                        <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
+                                          <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
+                                          <% (addressTypes || []).forEach(function(type) { %>
+                                            <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
+                                          <% }) %>
+                                        </select>
+                                      </td>
+                                      <td><%= formatDate(address.created_at) %></td>
+                                      <td class="warehouse-action-cell">
+                                        <div class="warehouse-action-buttons">
+                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
+                                          <button
+                                            class="btn btn-light btn-sm js-supplier-address-submit"
+                                            type="button"
+                                            data-form-id="<%= supplierAddressFormId %>"
+                                            data-action="/nha-cung-cap/dia-chi/<%= address._id %>/update"
+                                            data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?"
+                                          >Lưu</button>
+                                          <button
+                                            class="btn btn-danger btn-sm js-supplier-address-delete"
+                                            type="button"
+                                            data-return-query="<%= supplierAddressReturnQuery %>"
+                                            data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
+                                          >Xóa</button>
+                                        </div>
+                                      </td>
+                                    </tr>
                 <tr class="address-detail-row supplier-address-expand" style="display: none;">
-                  <td colspan="7">
+                                      <td colspan="7">
                     <div class="supplier-address-expand-grid">
                       <div><label>Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
                       <div><label>Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
@@ -172,73 +172,73 @@
                       <div><label>Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
                       <div class="span-2"><label>Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
                       <div class="span-2 supplier-address-default-check"><label><input data-address-form="<%= supplierAddressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
-                    </div>
-                  </td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
 
-      <div class="detail-pane" data-detail-pane="history">
+                          <div class="detail-pane" data-detail-pane="history">
         <div class="supplier-pane-table-wrap table-wrap">
           <table class="admin-table warehouse-table">
             <thead>
               <tr>
                 <th>Mã phiếu</th>
-                <th>Thời gian</th>
-                <th>Người tạo</th>
-                <th class="text-right">Tổng cộng</th>
+                                    <th>Thời gian</th>
+                                    <th>Người tạo</th>
+                                    <th class="text-right">Tổng cộng</th>
                 <th>Trạng thái</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if ((supplierPurchaseHistory || []).length === 0) { %>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if ((supplierPurchaseHistory || []).length === 0) { %>
                 <tr><td colspan="5" class="empty-cell">Chưa có lịch sử nhập/trả hàng.</td></tr>
-              <% } %>
-              <% (supplierPurchaseHistory || []).forEach(function(row) { %>
-                <tr>
-                  <td>
-                    <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
-                      <% if (row.loai === 'nhap') { %>
-                        <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
-                      <% } else { %>
+                                  <% } %>
+                                  <% (supplierPurchaseHistory || []).forEach(function(row) { %>
+                                    <tr>
+                                      <td>
+                                        <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
+                                          <% if (row.loai === 'nhap') { %>
+                                            <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
+                                          <% } else { %>
                         <i class="fa-solid fa-arrow-rotate-left history-type-icon history-type-icon--return" title="Trả hàng"></i>
-                      <% } %>
-                      <%= row.ma_phieu || '--' %>
-                    </a>
-                  </td>
+                                          <% } %>
+                                          <%= row.ma_phieu || '--' %>
+                                        </a>
+                                      </td>
                   <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
                   <td>
                     <div class="history-creator">
                       <span class="history-creator-avatar"><%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %></span>
-                      <%= row.nguoi_tao || '--' %>
-                    </div>
-                  </td>
-                  <td class="text-right">
-                    <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
-                      <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %>
-                    </span>
-                  </td>
-                  <td>
-                    <% 
+                                          <%= row.nguoi_tao || '--' %>
+                                        </div>
+                                      </td>
+                                      <td class="text-right">
+                                        <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
+                                          <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %>
+                                        </span>
+                                      </td>
+                                      <td>
+                                        <% 
                       var statusClass = 'status-pill';
                       var statusLabelText = row.loai === 'tra' ? mapTraHangStatus(row.trang_thai) : mapNhapHangStatus(row.trang_thai);
-                      if (row.trang_thai === 'completed') statusClass += ' is-active';
-                      else if (row.trang_thai === 'draft') statusClass += ' is-draft';
-                      else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
-                    %>
-                    <span class="<%= statusClass %>"><%= statusLabelText %></span>
-                  </td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                                          if (row.trang_thai === 'completed') statusClass += ' is-active';
+                                          else if (row.trang_thai === 'draft') statusClass += ' is-draft';
+                                          else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
+                                        %>
+                                        <span class="<%= statusClass %>"><%= statusLabelText %></span>
+                                      </td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
 
-      <div class="detail-pane" data-detail-pane="debt">
+                          <div class="detail-pane" data-detail-pane="debt">
         <div class="supplier-pane-toolbar supplier-debt-toolbar">
           <div class="supplier-debt-summary">
             <span class="supplier-debt-summary-label">Nợ hiện tại</span>
@@ -256,35 +256,35 @@
         </div>
         <div class="supplier-pane-table-wrap table-wrap">
           <table class="admin-table warehouse-table">
-            <thead>
-              <tr>
-                <th>Mã phiếu</th>
-                <th>Loại chứng từ</th>
-                <th>Thời gian</th>
-                <th>Loại</th>
+                                <thead>
+                                  <tr>
+                                    <th>Mã phiếu</th>
+                                    <th>Loại chứng từ</th>
+                                    <th>Thời gian</th>
+                                    <th>Loại</th>
                 <th class="text-right">Giá trị</th>
                 <th class="text-right">Nợ cần trả</th>
-                <th>Ghi chú</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if ((supplierDebtHistory || []).length === 0) { %>
-                <tr><td colspan="7" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
-              <% } %>
-              <% (supplierDebtHistory || []).forEach(function(row) { %>
-                <tr>
-                  <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
-                  <td><%= row.loai_chung_tu || '--' %></td>
+                                    <th>Ghi chú</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if ((supplierDebtHistory || []).length === 0) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có lịch sử công nợ.</td></tr>
+                                  <% } %>
+                                  <% (supplierDebtHistory || []).forEach(function(row) { %>
+                                    <tr>
+                                      <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
+                                      <td><%= row.loai_chung_tu || '--' %></td>
                   <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
-                  <td><%= mapCongNoDirection ? mapCongNoDirection(row.loai) : mapCongNoLoai(row.loai) %></td>
+                                      <td><%= mapCongNoDirection ? mapCongNoDirection(row.loai) : mapCongNoLoai(row.loai) %></td>
                   <td class="text-right"><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
                   <td class="text-right"><strong><%= Number(row.no_con_lai || 0).toLocaleString('vi-VN') %></strong></td>
-                  <td><%= row.ghi_chu || '--' %></td>
-                </tr>
-              <% }) %>
-            </tbody>
-          </table>
-        </div>
+                                      <td><%= row.ghi_chu || '--' %></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
         <div class="supplier-pay-modal-overlay js-supplier-pay-overlay" id="supplierPayModal_<%= selectedSupplier._id %>" aria-hidden="true">
           <% var debtCheck = debtReconciliation || { debtByInvoices: 0, debtByLedger: Number(selectedSupplier.tong_no || 0), debtDiff: 0, hasDebtMismatch: false }; %>
           <div class="supplier-pay-modal" role="dialog" aria-modal="true" aria-labelledby="supplierPayTitle_<%= selectedSupplier._id %>">
@@ -498,17 +498,17 @@
               <% }) %>
             </tbody>
           </table>
-        </div>
-      </div>
-    </div>
+                            </div>
+                          </div>
+                        </div>
 
-    <form id="supplierInlineDel_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/delete" style="display:none" aria-hidden="true"></form>
+                        <form id="supplierInlineDel_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/delete" style="display:none" aria-hidden="true"></form>
     <div class="supplier-detail-footer">
-      <a
-        class="btn btn-primary btn-sm supplier-detail-export-link"
-        href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
-        data-supplier-id="<%= selectedSupplier._id %>"
-      >Xuất thông tin</a>
-    </div>
-  </div>
+                          <a
+                            class="btn btn-primary btn-sm supplier-detail-export-link"
+                            href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
+                            data-supplier-id="<%= selectedSupplier._id %>"
+                          >Xuất thông tin</a>
+                        </div>
+                      </div>
 </div>

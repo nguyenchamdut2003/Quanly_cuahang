@@ -3,3 +3,6 @@ node_modules
 dist
 build
 .DS_Store
+
+# Chrome temporary UI profile
+scripts/.chrome-ui-profile/

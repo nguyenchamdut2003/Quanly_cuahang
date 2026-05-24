@@ -15,6 +15,7 @@ const {
     VanDon
 } = require('../models/kiot.model');
 const { taoPhieuThuChi, ensureDefaultSoQuy, parseMoney } = require('../services/soQuy.service');
+const hrLog = require('../utils/hrPayrollLogger');
 
 router.use(isAuthenticated);
 
@@ -26,7 +27,6 @@ function buildFilter(query = {}) {
     const filter = {};
     if (query.q && query.q.trim() !== '') filter.ma_phieu = { $regex: query.q.trim(), $options: 'i' };
     if (query.loai_phieu && ['thu', 'chi'].includes(query.loai_phieu)) filter.loai_phieu = query.loai_phieu;
-    if (query.so_quy_id && query.so_quy_id !== 'all' && isObjectId(query.so_quy_id)) filter.so_quy_id = query.so_quy_id;
     if (query.doi_tuong_search && query.doi_tuong_search.trim() !== '') filter.doi_tuong = { $regex: query.doi_tuong_search.trim(), $options: 'i' };
     if (query.loai_thu_chi && query.loai_thu_chi.trim() !== '') filter.loai_thu_chi = { $regex: query.loai_thu_chi.trim(), $options: 'i' };
     if (query.trang_thai && query.trang_thai !== 'all') filter.trang_thai = query.trang_thai;
@@ -97,9 +97,7 @@ function relatedCode(item) {
 router.get('/', async (req, res, next) => {
     try {
         const cashBook = await ensureCashBook();
-        const selectedCashBook = req.query.so_quy_id && req.query.so_quy_id !== 'all' && isObjectId(req.query.so_quy_id)
-            ? (await SoQuy.findById(req.query.so_quy_id)) || cashBook
-            : cashBook;
+        const selectedCashBook = cashBook;
         const filter = buildFilter(req.query);
 
         if (req.query?.nguoi_tao && req.query.nguoi_tao.trim() !== '' && !filter.nguoi_tao_id) {
@@ -123,7 +121,19 @@ router.get('/', async (req, res, next) => {
                 { nha_cung_cap_id: { $in: phoneSuppliers.map(item => item._id) } }
             ];
         }
-        filter.so_quy_id = selectedCashBook._id;
+        hrLog.logPayrollInfo('cashbook.page.list.start', {
+            method: req.method,
+            path: req.originalUrl || req.url,
+            cua_hang_id: cashBook && String(cashBook.cua_hang_id || ''),
+            so_quy_id: 'all',
+            q: req.query.q || '',
+            nhom_doi_tuong: req.query.nhom_doi_tuong || '',
+            loai_phieu: req.query.loai_phieu || '',
+            loai_thu_chi: req.query.loai_thu_chi || '',
+            trang_thai: req.query.trang_thai || '',
+            date_from: req.query.date_from || '',
+            date_to: req.query.date_to || ''
+        });
 
         const [list, cashBooks, customers, suppliers, users, relatedDocuments] = await Promise.all([
             PhieuThuChi.find(filter)
@@ -146,7 +156,7 @@ router.get('/', async (req, res, next) => {
         ]);
 
         const periodStart = getPeriodStart(req.query);
-        const openingFilter = { so_quy_id: selectedCashBook._id };
+        const openingFilter = {};
         if (periodStart) openingFilter.ngay_lap = { $lt: periodStart };
         const [openingRows, periodTotals] = await Promise.all([
             periodStart
@@ -172,6 +182,14 @@ router.get('/', async (req, res, next) => {
             balance: opening + totalThu - totalChi
         };
 
+        hrLog.logPayrollInfo('cashbook.page.list.success', {
+            so_quy_id: 'all',
+            result_count: list.length,
+            nhom_doi_tuong: req.query.nhom_doi_tuong || 'all',
+            loai_phieu: req.query.loai_phieu || 'all',
+            q: req.query.q || ''
+        });
+
         res.render('so-quy/index', {
             title: 'Sổ quỹ tiền mặt',
             list,
@@ -186,6 +204,10 @@ router.get('/', async (req, res, next) => {
             relatedCode
         });
     } catch (error) {
+        hrLog.logPayrollError('cashbook.page.list.error', error, {
+            path: req.originalUrl || req.url,
+            query: req.query || {}
+        });
         next(error);
     }
 });

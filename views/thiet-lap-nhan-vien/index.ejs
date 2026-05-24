@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .employee-setup-page{background:#f4f6f8;min-height:calc(100vh - 98px)}
+    .employee-setup-page .admin-shell{width:auto;max-width:none;margin:0;padding:30px}
+    .hr-setup-shell{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;padding:0}
+    .employee-setup-main{min-width:0;background:transparent}
+    .employee-setup-card{background:#fff;border-radius:6px;overflow:hidden}
+    .employee-setup-head{padding:18px 20px 10px}
+    .employee-setup-head h2{margin:0 0 4px;font-size:14px;color:#111827}
+    .employee-setup-head p{margin:0;color:#667085;font-size:13px}
+    .setup-step{display:grid;grid-template-columns:32px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:53px;padding:0 20px;border-top:1px solid #edf0f3}
+    .setup-step.is-blocked{opacity:.42}
+    .setup-step-icon{width:20px;height:20px;border-radius:50%;border:1px solid #b8c2cf;display:flex;align-items:center;justify-content:center;color:#111827;font-size:11px;background:#fff}
+    .setup-step.is-done .setup-step-icon{color:#111827}
+    .setup-step.is-blocked .setup-step-icon{background:#f2f4f7;color:#98a2b3}
+    .setup-step-title{font-size:13px;font-weight:800;color:#111827;margin-bottom:2px}
+    .setup-step-desc{font-size:12px;color:#667085}
+    .setup-step-desc a{color:#0070f4;text-decoration:none}
+    .setup-step-action{min-width:112px;height:28px;border:1px solid #344054;border-radius:6px;background:#fff;color:#111827;font-size:13px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 12px}
+    .setup-step.is-blocked .setup-step-action{border-color:#d0d5dd;color:#98a2b3;pointer-events:none}
+    @media (max-width: 800px){
+      .employee-setup-page .admin-shell{padding:16px}
+      .hr-setup-shell{grid-template-columns:1fr}
+      .setup-step{grid-template-columns:28px minmax(0,1fr);padding:12px 14px}
+      .setup-step-action{grid-column:2;margin-top:6px;justify-self:start}
+    }
+  </style>
+</head>
+<body class="admin-body employee-setup-page">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="admin-shell">
+    <%- include('../partials/flash-message', { flash: flash }) %>
+    <div class="hr-setup-shell">
+      <%- include('../partials/hr-setup-nav', { activeHrPage: activeHrPage }) %>
+      <section class="employee-setup-main">
+        <div class="employee-setup-card">
+          <header class="employee-setup-head">
+            <h2>Thiết lập nhanh</h2>
+            <p>Chỉ vài bước cài đặt để quản lý nhân viên hiệu quả, tối ưu vận hành và tính lương chính xác</p>
+          </header>
+          <% (quickSteps || []).forEach(function(step) { %>
+            <div class="setup-step <%= step.done ? 'is-done' : '' %> <%= step.blocked ? 'is-blocked' : '' %>">
+              <div class="setup-step-icon"><i class="fa-solid <%= step.done ? 'fa-check' : (step.blocked ? 'fa-lock' : 'fa-arrow-right') %>"></i></div>
+              <div>
+                <div class="setup-step-title"><%= step.title %></div>
+                <div class="setup-step-desc">
+                  <%= step.description %>
+                  <% if (!step.blocked && step.detailHref) { %>
+                    <a href="<%= step.detailHref %>"><%= step.done ? 'Xem danh sách' : 'Xem chi tiết' %></a>
+                  <% } %>
+                </div>
+              </div>
+              <% if (step.action) { %>
+                <a class="setup-step-action" href="<%= step.blocked ? '#' : step.action.href %>"><%= step.action.label %></a>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>

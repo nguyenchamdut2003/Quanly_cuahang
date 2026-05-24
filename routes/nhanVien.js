@@ -8,7 +8,6 @@ var chucDanhController = require('../controllers/chucDanh.controller');
 router.use(isAuthenticated);
 
 router.get('/', nhanVienController.index);
-router.get('/chuc-danh', nhanVienController.chucDanhPlaceholder);
 
 router.post('/groups/phong-ban/add', phongBanController.ajaxAdd);
 router.post('/groups/phong-ban/:id/update', phongBanController.ajaxUpdate);
