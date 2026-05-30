@@ -74,7 +74,8 @@ function parseQuyCachItems(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.map(item => ({
     ten_quy_cach: normalizeTenQuyCach(item.ten_quy_cach || item.ten_thuoc_tinh),
-    so_luong: Math.floor(Number(item.so_luong || 0))
+    so_luong: Math.floor(Number(item.so_luong || 0)),
+    gia_von: parseMoney(item.gia_von || 0)
   })).filter(item => item.ten_quy_cach && item.so_luong > 0);
 }
 
@@ -313,6 +314,14 @@ async function validateTonKhoQuyCach(khoId, hangHoaId, lotId, tenQuyCach, qty) {
   if (!qcStock || Number(qcStock.so_luong || 0) < qty) {
     throw new Error('Không cho hủy vượt tồn quy cách');
   }
+  return qcStock;
+}
+
+function quyCachStockCost(qcStock) {
+  if (!qcStock) return 0;
+  const giaVon = Number(qcStock.gia_von || 0);
+  const value = giaVon > 0 ? giaVon : Number(qcStock.don_gia_nhap || 0);
+  return Number.isFinite(value) ? value : 0;
 }
 
 async function normalizeRows(items, khoId, skipStockCheck) {
@@ -333,7 +342,14 @@ async function normalizeRows(items, khoId, skipStockCheck) {
     if (!product) throw new Error('Hàng hóa không hợp lệ');
     const cost = item.gia_von || product.gia_von || 0;
     const lineGhiChu = item.ghi_chu || '';
-    const quyCachItems = parseQuyCachItems(item.quy_cach_items);
+    let quyCachItems = parseQuyCachItems(item.quy_cach_items);
+    if (!quyCachItems.length && item.ten_quy_cach && Number(item.so_luong || 0) > 0) {
+      quyCachItems = [{
+        ten_quy_cach: normalizeTenQuyCach(item.ten_quy_cach),
+        so_luong: Math.floor(Number(item.so_luong || 0)),
+        gia_von: parseMoney(item.gia_von || 0)
+      }];
+    }
     const manageLots = Boolean(product.quan_ly_theo_lo);
     let lotId = isObjectId(item.lo_hang_id) ? item.lo_hang_id : '';
 
@@ -349,16 +365,18 @@ async function normalizeRows(items, khoId, skipStockCheck) {
         for (const qc of quyCachItems) {
           const qty = qc.so_luong;
           lineTotal += qty;
+          let qcStock = null;
           if (!skipStockCheck) {
-            await validateTonKhoQuyCach(khoId, item.hang_hoa_id, lotId, qc.ten_quy_cach, qty);
+            qcStock = await validateTonKhoQuyCach(khoId, item.hang_hoa_id, lotId, qc.ten_quy_cach, qty);
           }
+          const qcCost = qcStock ? quyCachStockCost(qcStock) : Number(qc.gia_von || 0);
           rows.push({
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: lotId,
             ten_quy_cach: qc.ten_quy_cach,
             so_luong: qty,
-            gia_von: cost,
-            thanh_tien: qty * cost,
+            gia_von: qcCost,
+            thanh_tien: qty * qcCost,
             ghi_chu: lineGhiChu
           });
         }
@@ -631,7 +649,7 @@ exports.complete = async function(req, res) {
     if (ticket.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (ticket.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
     const rows = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id }).lean();
-    await normalizeRows(rows.map(row => ({
+    const normalizedRows = await normalizeRows(rows.map(row => ({
       hang_hoa_id: row.hang_hoa_id,
       lo_hang_id: row.lo_hang_id,
       ten_quy_cach: row.ten_quy_cach,
@@ -639,7 +657,8 @@ exports.complete = async function(req, res) {
       gia_von: row.gia_von,
       ghi_chu: row.ghi_chu
     })), ticket.kho_id, false);
-    await applyInventoryOut(ticket, rows, req.user?._id);
+    await persistDetails(ticket._id, normalizedRows);
+    await applyInventoryOut(ticket, normalizedRows, req.user?._id);
     ticket.trang_thai = 'completed';
     await ticket.save();
     return res.json({ success: true, message: 'Đã hoàn thành phiếu xuất hủy' });

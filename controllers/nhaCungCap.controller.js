@@ -1,7 +1,7 @@
 ﻿var mongoose = require('mongoose');
 var querystring = require('querystring');
 var ExcelJS = require('exceljs');
-var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang, PhieuXuatNoiBo, SoQuy } = require('../models/kiot.model');
+var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang, PhieuXuatNoiBo, CTXuatNoiBo, SoQuy, Counter } = require('../models/kiot.model');
 var { taoPhieuThuChi, parseMoney } = require('../services/soQuy.service');
 var { normalizeAddress } = require('../utils/address');
 var DiaChiNhaCungCap = DiaChiNcc || DiaChiDoiTuong;
@@ -66,10 +66,15 @@ async function aggregateSupplierPurchaseTotals(storeId) {
     var debtMatch = {
         nha_cung_cap_id: { $exists: true, $ne: null }
     };
+    var debtTransactionMatch = {
+        nha_cung_cap_id: { $exists: true, $ne: null },
+        trang_thai: 'active'
+    };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         var storeObjectId = new mongoose.Types.ObjectId(String(storeId));
         purchaseMatch.cua_hang_id = storeObjectId;
         debtMatch.cua_hang_id = storeObjectId;
+        debtTransactionMatch.cua_hang_id = storeObjectId;
     }
     var purchaseRows = await PhieuNhap.aggregate([
         { $match: purchaseMatch },
@@ -98,6 +103,20 @@ async function aggregateSupplierPurchaseTotals(storeId) {
             }
         }
     ]);
+    var debtTransactionRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.aggregate([
+        { $match: debtTransactionMatch },
+        {
+            $group: {
+                _id: '$nha_cung_cap_id',
+                tang_no: {
+                    $sum: { $cond: [{ $eq: ['$huong_cong_no', 'tang_no'] }, { $ifNull: ['$gia_tri', 0] }, 0] }
+                },
+                giam_no: {
+                    $sum: { $cond: [{ $eq: ['$huong_cong_no', 'giam_no'] }, { $ifNull: ['$gia_tri', 0] }, 0] }
+                }
+            }
+        }
+    ]) : [];
     var map = {};
     purchaseRows.forEach(function(r) {
         if (!r._id) return;
@@ -113,6 +132,12 @@ async function aggregateSupplierPurchaseTotals(storeId) {
         if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0 };
         map[key].tong_no = Number(r.tang_no || 0) - Number(r.giam_no || 0);
         map[key].da_tra_tong = Number(r.thanh_toan || 0);
+    });
+    debtTransactionRows.forEach(function(r) {
+        if (!r._id) return;
+        var key = String(r._id);
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0 };
+        map[key].tong_no += Number(r.tang_no || 0) - Number(r.giam_no || 0);
     });
     return map;
 }
@@ -143,6 +168,43 @@ function getDebtDocumentInfo(row) {
         };
     }
     return { type: '', label: 'Khác', doc: null, code: '--' };
+}
+
+function getSupplierDebtAmountInfo(row, amount, runningDebt) {
+    var docInfo = getDebtDocumentInfo(row);
+    var doc = docInfo.doc || {};
+    var value = Number(amount || 0);
+    var paid = 0;
+    var remaining = Math.max(0, Number(runningDebt || 0));
+
+    if (docInfo.type === 'phieu_nhap') {
+        value = Number(doc.can_tra_ncc || doc.tong_tien || amount || 0);
+        paid = Number(doc.da_tra_ncc || 0);
+        remaining = Number(doc.con_no_ncc || Math.max(0, value - paid));
+    } else if (docInfo.type === 'tra_hang_nhap') {
+        value = Number(doc.ncc_can_tra || doc.tong_tien_tra || amount || 0);
+        paid = Number(doc.ncc_da_tra || 0);
+        remaining = Math.max(0, value - paid);
+    } else if (row.loai === 'giam_no' || row.loai === 'thanh_toan') {
+        paid = value;
+    }
+
+    return {
+        gia_tri: value,
+        da_thanh_toan: paid,
+        con_lai: remaining,
+        tong_no: Number(runningDebt || 0)
+    };
+}
+
+function mapSupplierDebtTransactionLabel(value) {
+    if (value === 'nhap_hang') return 'Phiếu nhập';
+    if (value === 'tra_hang_nhap') return 'Trả hàng nhập';
+    if (value === 'thanh_toan') return 'Thanh toán';
+    if (value === 'chiet_khau_thanh_toan') return 'Chiết khấu thanh toán';
+    if (value === 'dieu_chinh_tang') return 'Điều chỉnh tăng';
+    if (value === 'dieu_chinh_giam') return 'Điều chỉnh giảm';
+    return 'Khác';
 }
 
 function applySupplierTotalsFromMap(supplier, totalsMap) {
@@ -483,6 +545,17 @@ async function makeSupplierAddressCode() {
     return 'DCNCC' + String(maxNumber + 1).padStart(4, '0');
 }
 
+async function makeSupplierDebtTransactionCode(storeId) {
+    var counterKey = 'giao_dich_cong_no_nha_cung_cap';
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) counterKey += ':' + String(storeId);
+    var counter = await Counter.findOneAndUpdate(
+        { _id: counterKey },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    ).lean();
+    return 'GDNCC' + String(Number(counter?.seq || 1)).padStart(6, '0');
+}
+
 function mapXuatNoiBoStatus(status) {
     if (status === 'completed') return 'Hoàn thành';
     if (status === 'draft') return 'Phiếu tạm';
@@ -521,11 +594,29 @@ async function loadSupplierInternalExportHistory(supplier, storeId) {
         .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang' })
         .sort({ ngay_xuat: -1, created_at: -1 })
         .lean();
+    var ticketIds = rows.map(function(row) { return row._id; });
+    var detailRows = ticketIds.length ? await CTXuatNoiBo.find({ phieu_xuat_id: { $in: ticketIds } })
+        .populate({
+            path: 'hang_hoa_id',
+            select: 'ten_hang'
+        })
+        .lean() : [];
+    var itemNamesByTicket = detailRows.reduce(function(map, detail) {
+        var key = String(detail.phieu_xuat_id || '');
+        var product = detail.hang_hoa_id || {};
+        var name = String(product.ten_hang || '').trim();
+        if (!key) return map;
+        if (!map[key]) map[key] = [];
+        if (name && map[key].indexOf(name) < 0) map[key].push(name);
+        return map;
+    }, {});
     return rows.map(function(row) {
+        var itemNames = itemNamesByTicket[String(row._id)] || [];
         return {
             _id: row._id,
             ma_xuat_noi_bo: row.ma_xuat_noi_bo || '--',
             loai_xuat: row.loai_xuat || '--',
+            ten_hang_hoa: itemNames.length ? itemNames.join(', ') : 'Không có',
             kho: row?.kho_id?.ten_kho || row?.kho_id?.ma_kho || '--',
             cua_hang: row?.cua_hang_id?.ten_cua_hang || '--',
             tong_so_luong: Number(row.tong_so_luong || 0),
@@ -679,29 +770,65 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         debtQuery.cua_hang_id = storeId;
     }
     var debtRows = await CongNoNhaCungCap.find(debtQuery)
-        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
-        .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap' })
+        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc' })
+        .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap tong_tien_tra ncc_can_tra ncc_da_tra' })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
+    var debtTransactionRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.find({
+        nha_cung_cap_id: selectedSupplier._id,
+        ...(storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId } : {}),
+        trang_thai: 'active'
+    }).sort({ ngay_giao_dich: -1, created_at: -1 }).lean() : [];
     var runningDebt = 0;
-    var debtAsc = debtRows.slice().reverse();
+    var debtAsc = debtRows.map(function(row) {
+        return { source: 'legacy', row: row, date: row.ngay || row.created_at };
+    }).concat(debtTransactionRows.map(function(row) {
+        return { source: 'giao_dich', row: row, date: row.ngay_giao_dich || row.created_at };
+    })).sort(function(a, b) {
+        return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+    });
     var mappedDebtAsc = debtAsc.map(function(row) {
-        var soTien = Number(row.so_tien || 0);
-        if (row.loai === 'tang_no') runningDebt += soTien;
-        if (row.loai === 'giam_no' || row.loai === 'thanh_toan') runningDebt -= soTien;
-        var docInfo = getDebtDocumentInfo(row);
+        var sourceRow = row.row || {};
+        if (row.source === 'giao_dich') {
+            var txAmount = Number(sourceRow.gia_tri || 0);
+            if (sourceRow.huong_cong_no === 'tang_no') runningDebt += txAmount;
+            if (sourceRow.huong_cong_no === 'giam_no') runningDebt -= txAmount;
+            return {
+                phieu_nhap_id: sourceRow.phieu_nhap_id,
+                phieu_tra_nhap_id: sourceRow.phieu_tra_hang_nhap_id,
+                phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
+                ma_phieu: sourceRow.ma_giao_dich || '--',
+                loai_chung_tu: mapSupplierDebtTransactionLabel(sourceRow.loai_giao_dich),
+                thoi_gian: sourceRow.ngay_giao_dich || sourceRow.created_at,
+                loai: sourceRow.huong_cong_no === 'tang_no' ? 'tang_no' : 'giam_no',
+                gia_tri: txAmount,
+                da_thanh_toan: sourceRow.loai_giao_dich === 'thanh_toan' ? txAmount : 0,
+                con_lai: Math.max(0, Number(sourceRow.no_sau || runningDebt || 0)),
+                tong_no: Number(sourceRow.no_sau != null ? sourceRow.no_sau : runningDebt),
+                no_con_lai: runningDebt,
+                ghi_chu: sourceRow.ghi_chu || ''
+            };
+        }
+        var soTien = Number(sourceRow.so_tien || 0);
+        if (sourceRow.loai === 'tang_no') runningDebt += soTien;
+        if (sourceRow.loai === 'giam_no' || sourceRow.loai === 'thanh_toan') runningDebt -= soTien;
+        var docInfo = getDebtDocumentInfo(sourceRow);
+        var amountInfo = getSupplierDebtAmountInfo(sourceRow, soTien, runningDebt);
         return {
-            phieu_nhap_id: row.phieu_nhap_id,
-            phieu_tra_nhap_id: row.phieu_tra_nhap_id,
-            phieu_thu_chi_id: row.phieu_thu_chi_id,
+            phieu_nhap_id: sourceRow.phieu_nhap_id,
+            phieu_tra_nhap_id: sourceRow.phieu_tra_nhap_id,
+            phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
             ma_phieu: docInfo.code,
             loai_chung_tu: docInfo.label,
-            thoi_gian: row.ngay || row.created_at,
-            loai: row.loai || 'tang_no',
-            gia_tri: soTien,
+            thoi_gian: sourceRow.ngay || sourceRow.created_at,
+            loai: sourceRow.loai || 'tang_no',
+            gia_tri: amountInfo.gia_tri,
+            da_thanh_toan: amountInfo.da_thanh_toan,
+            con_lai: amountInfo.con_lai,
+            tong_no: amountInfo.tong_no,
             no_con_lai: runningDebt,
-            ghi_chu: row.ghi_chu || ''
+            ghi_chu: sourceRow.ghi_chu || ''
         };
     });
     var supplierDebtHistory = mappedDebtAsc.reverse();
@@ -1218,6 +1345,67 @@ exports.payDebt = async function(req, res, next) {
         });
     } catch (error) {
         return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu chi' });
+    }
+};
+
+exports.discountDebt = async function(req, res) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var supplierId = normalizeIdParam(req?.params?.id);
+        if (!supplierId || !mongoose.Types.ObjectId.isValid(supplierId)) {
+            return res.status(400).json({ success: false, message: 'Nhà cung cấp không hợp lệ' });
+        }
+
+        var supplier = await NhaCungCap.findById(supplierId).lean();
+        if (!supplier) return res.status(404).json({ success: false, message: 'Không tìm thấy nhà cung cấp' });
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId) && supplier.cua_hang_id && String(supplier.cua_hang_id) !== String(storeId)) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy nhà cung cấp' });
+        }
+
+        var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
+        applySupplierTotalsFromMap(supplier, totalsMap);
+        var debt = Math.max(0, Number(supplier.tong_no || 0));
+        var amount = parseMoney(req?.body?.gia_tri);
+        if (amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền chiết khấu phải lớn hơn 0' });
+        if (amount > debt) {
+            return res.status(400).json({ success: false, message: 'Số tiền chiết khấu không được vượt quá nợ hiện tại' });
+        }
+
+        var storeForTransaction = storeId && mongoose.Types.ObjectId.isValid(storeId) ? storeId : supplier.cua_hang_id;
+        if (!storeForTransaction || !mongoose.Types.ObjectId.isValid(String(storeForTransaction))) {
+            return res.status(400).json({ success: false, message: 'Không xác định được cửa hàng' });
+        }
+        var note = String(req?.body?.ghi_chu || '').trim() || ('Chiết khấu thanh toán nhà cung cấp ' + (supplier.ten_ncc || supplier.ma_ncc || ''));
+        var transaction = await GiaoDichCongNoNhaCungCap.create({
+            cua_hang_id: storeForTransaction,
+            nha_cung_cap_id: supplier._id,
+            ma_giao_dich: await makeSupplierDebtTransactionCode(storeForTransaction),
+            loai_giao_dich: 'chiet_khau_thanh_toan',
+            huong_cong_no: 'giam_no',
+            gia_tri: amount,
+            no_truoc: debt,
+            no_sau: Math.max(0, debt - amount),
+            ngay_giao_dich: new Date(),
+            anh_huong_so_quy: false,
+            ghi_chu: note,
+            nguoi_tao_id: req.user && req.user._id
+        });
+        await NhaCungCap.updateOne(
+            { _id: supplier._id },
+            { $inc: { tong_no: -amount } }
+        );
+
+        return res.json({
+            success: true,
+            message: 'Đã tạo chiết khấu thanh toán nhà cung cấp',
+            data: {
+                transaction: transaction,
+                discount: amount,
+                debt: debt - amount
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({ success: false, message: error.message || 'Không tạo được chiết khấu thanh toán' });
     }
 };
 

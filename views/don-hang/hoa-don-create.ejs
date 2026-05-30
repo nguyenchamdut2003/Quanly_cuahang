@@ -28,7 +28,7 @@
     .order-create {
       height: calc(100vh - 98px);
       display: grid;
-      grid-template-columns: minmax(0, 45fr) minmax(360px, 30fr) minmax(320px, 25fr);
+      grid-template-columns: minmax(0, 48.2fr) minmax(360px, 30fr) minmax(260px, 21.8fr);
       gap: 10px;
       padding: 12px 10px 0
     }
@@ -229,6 +229,41 @@
       font-size: 12px;
     }
 
+    .qc-row td {
+      height: auto;
+      padding: 0 10px 10px 86px;
+      background: #fbfdff;
+    }
+
+    .qc-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #dbe7f5;
+      background: #fff;
+    }
+
+    .qc-table th,
+    .qc-table td {
+      height: 32px;
+      padding: 0 8px;
+      border-bottom: 1px solid #edf2f7;
+      font-size: 13px;
+    }
+
+    .qc-table th {
+      background: #f2f8ff;
+      font-weight: 700;
+    }
+
+    .qc-input {
+      width: 74px;
+      height: 26px;
+      border: 1px solid #cfd8e3;
+      border-radius: 5px;
+      text-align: right;
+      padding: 0 6px;
+    }
+
     .middle {
       padding: 14px 24px
     }
@@ -278,7 +313,7 @@
       display: grid;
       grid-template-columns: 22px 1fr;
       gap: 10px;
-      margin-bottom: 14px
+      margin-bottom: 12px
     }
 
     .marker {
@@ -294,11 +329,13 @@
 
     .line-input {
       height: 38px;
-      border: 0;
-      border-bottom: 1px solid #c2cad3;
-      padding: 0;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      background: #fff;
+      padding: 0 12px;
       font-size: 16px;
-      outline: none
+      outline: none;
+      width: 100%;
     }
 
     .two {
@@ -307,10 +344,42 @@
       gap: 12px
     }
 
+    .middle .section-line>div:last-child {
+      display: grid;
+      gap: 10px;
+    }
+
+    .middle .line-input {
+      margin-top: 0 !important;
+    }
+
+    .middle select.line-input {
+      appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, #475467 50%), linear-gradient(135deg, #475467 50%, transparent 50%);
+      background-position: calc(100% - 18px) 16px, calc(100% - 12px) 16px;
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+      padding-right: 34px;
+    }
+
     .muted-red {
-      color: red;
       font-size: 12px;
-      margin-top: -8px
+      color: #344054;
+    }
+
+    #pickupInfo {
+      min-height: 38px;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      background: #fff;
+      padding: 9px 12px;
+      display: flex;
+      align-items: center;
+      line-height: 1.25;
+    }
+
+    #pickupInfo:empty {
+      display: none;
     }
 
     .package {
@@ -659,7 +728,7 @@
             <div class="delivery-help" id="shippingFeeHelp">Nhập trực tiếp phí giao hàng.</div>
           </div>
         </div>
-        <div class="place-order"><button onclick="saveOrder()" type="button">THANH TOÁN</button></div>
+        <div class="place-order"><button id="payButton" onclick="saveOrder()" type="button">THANH TOÁN</button></div>
       </section>
     </main>
     <script>
@@ -669,11 +738,11 @@
       let availableProducts = [];
       let previousKhoId = '';
       const sourceOrder = <%- JSON.stringify(sourceOrder || null) %>;
-      const sourceOrderItems = <%- JSON.stringify((sourceOrderItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.hang_hoa_id?.ma_hang || '', ten_hang: row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong_dat || row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia_ban || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: row.kieu_chiet_khau || 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id) : '' }))) %>;
+      const sourceOrderItems = <%- JSON.stringify((sourceOrderItems || []).map(row => ({ ct_don_hang_id: String(row._id || ''), hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong_dat || row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia_ban || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: row.kieu_chiet_khau || 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id) : '', gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id ? String(row.gia_tri_thuoc_tinh_id) : '', ten_quy_cach: row.ten_quy_cach || '', ten_thuoc_tinh: row.ten_thuoc_tinh || '', don_vi_tinh_id: row.don_vi_tinh_id ? String(row.don_vi_tinh_id) : '', ma_hang_snapshot: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang_snapshot: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', don_vi_tinh_snapshot: row.don_vi_tinh_snapshot || '', ghi_chu: row.ghi_chu || '' }))) %>;
       const sourceShipment = <%- JSON.stringify(sourceShipment || null) %>;
       const existingInvoice = <%- JSON.stringify(existingInvoice || null) %>;
       const sourceInvoice = <%- JSON.stringify(sourceInvoice || null) %>;
-      const sourceInvoiceItems = <%- JSON.stringify((sourceInvoiceItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.hang_hoa_id?.ma_hang || '', ten_hang: row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '' }))) %>;
+      const sourceInvoiceItems = <%- JSON.stringify((sourceInvoiceItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '', gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id ? String(row.gia_tri_thuoc_tinh_id) : '', ten_quy_cach: row.ten_quy_cach || '', ten_thuoc_tinh: row.ten_thuoc_tinh || '', don_vi_tinh_id: row.don_vi_tinh_id ? String(row.don_vi_tinh_id) : '', ma_hang_snapshot: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang_snapshot: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', don_vi_tinh_snapshot: row.don_vi_tinh_snapshot || '', ghi_chu: row.ghi_chu || '' }))) %>;
       const sourceInvoiceShipment = <%- JSON.stringify(sourceInvoiceShipment || null) %>;
       const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
       let customerPaidTouched = false;
@@ -730,9 +799,31 @@
       }
       function handlePriceBookChange() {
         if (sourceOrder) return;
-        cart.forEach(item => { item.don_gia_ban = priceFor(item.hang_hoa_id); });
+        cart.forEach(item => {
+          const price = priceFor(item.hang_hoa_id);
+          item.don_gia_ban = price;
+          if (item.has_quy_cach) {
+            (item.quy_cach_items || []).forEach(qc => { qc.don_gia_ban = attributePriceFor(item.hang_hoa_id, qc); });
+          }
+        });
         if (productResults.style.display === 'block') renderProductSuggestions();
         renderCart();
+      }
+      function attributePriceFor(productId, qc) {
+        const attrPrice = Number(qc?.don_gia_nhap || qc?.gia_von || qc?.don_gia_ban || 0);
+        return attrPrice > 0 ? attrPrice : priceFor(productId);
+      }
+      function lineQty(item) {
+        if (item.has_quy_cach && Array.isArray(item.quy_cach_items)) {
+          return item.quy_cach_items.reduce((sum, qc) => sum + Number(qc.so_luong_dat || qc.so_luong || 0), 0);
+        }
+        return Number(item.so_luong || 0);
+      }
+      function lineStock(item) {
+        if (item.has_quy_cach && Array.isArray(item.quy_cach_items)) {
+          return item.quy_cach_items.reduce((sum, qc) => sum + Number(qc.ton_hien_tai || qc.ton_kho || 0), 0);
+        }
+        return stockFor(item.hang_hoa_id);
       }
       function renderProductSuggestions() {
         if (!document.getElementById('khoId').value) {
@@ -744,7 +835,8 @@
         const rows = (q ? availableProducts.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : availableProducts).slice(0, 30);
         productResults.innerHTML = rows.map(p => {
           const stock = stockFor(p._id);
-          return `<div class="search-item product-search-item" onclick="addProduct('${p._id}')"><span class="search-item-info"><span class="search-item-main"><b>${escapeHtml(p.ma_hang || '')}</b> - ${escapeHtml(p.ten_hang || '')}</span><span class="search-item-meta">NCC: ${escapeHtml(supplierName(p))} - Tồn: ${fmt(stock)}</span></span><b class="search-item-price">${fmt(priceFor(p._id))}</b></div>`;
+          const qcText = p.has_quy_cach ? ` - Thuộc tính: ${(p.quy_cach_items || []).length}` : '';
+          return `<div class="search-item product-search-item" onclick="addProduct('${p._id}')"><span class="search-item-info"><span class="search-item-main"><b>${escapeHtml(p.ma_hang || '')}</b> - ${escapeHtml(p.ten_hang || '')}</span><span class="search-item-meta">NCC: ${escapeHtml(supplierName(p))} - Tồn: ${fmt(stock)}${qcText}</span></span><b class="search-item-price">${fmt(priceFor(p._id))}</b></div>`;
         }).join('') || '<div class="search-item"><span>Không có hàng hóa phù hợp</span></div>';
         productResults.style.display = 'block';
       }
@@ -758,31 +850,87 @@
         const stock = stockFor(id);
         const ex = cart.find(i => i.hang_hoa_id === id);
         if (ex) {
-          ex.so_luong += 1;
-          if (ex.so_luong > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
+          if (ex.has_quy_cach) {
+            alert('Hàng hóa có thuộc tính, vui lòng nhập số lượng theo thuộc tính bên dưới.');
+          } else {
+            ex.so_luong += 1;
+            if (ex.so_luong > stock) alert('Hóa đơn này đang bán vượt tồn hiện có.');
+          }
         } else {
-          cart.push({ hang_hoa_id: id, ma_hang: p.ma_hang, ten_hang: p.ten_hang, so_luong: 1, ton_kho: stock, don_gia_ban: priceFor(id), chiet_khau: 0, kieu_chiet_khau: 'vnd' });
-          if (stock < 1) alert('Đơn này đang đặt vượt tồn hiện có.');
+          const hasQuyCach = Boolean(p.has_quy_cach && (p.quy_cach_items || []).length);
+          cart.push({
+            hang_hoa_id: id,
+            ma_hang: p.ma_hang,
+            ten_hang: p.ten_hang,
+            so_luong: hasQuyCach ? 0 : 1,
+            ton_kho: stock,
+            don_gia_ban: priceFor(id),
+            chiet_khau: 0,
+            kieu_chiet_khau: 'vnd',
+            has_quy_cach: hasQuyCach,
+            quy_cach_items: hasQuyCach ? (p.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_dat: '', don_gia_ban: attributePriceFor(id, qc), chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : []
+          });
+          if (!hasQuyCach && stock < 1) alert('Hóa đơn này đang bán vượt tồn hiện có.');
         }
         productSearch.value = '';
         productResults.style.display = 'none';
         renderCart();
       }
+      function renderQuyCachBlock(item, idx) {
+        if (!item.has_quy_cach || !(item.quy_cach_items || []).length) return '';
+        const rows = item.quy_cach_items.map((qc, qcIdx) => {
+          const qty = Number(qc.so_luong_dat || qc.so_luong || 0);
+          const stock = Number(qc.ton_hien_tai || qc.ton_kho || 0);
+          const unitPrice = Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
+          const base = qty * unitPrice;
+          const discount = discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', base);
+          const total = Math.max(base - discount, 0);
+          const disabled = sourceOrder ? ' disabled' : '';
+          return `<tr>
+            <th>${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '--')}</th>
+            <td class="num">${fmt(stock)}</td>
+            <td class="num"><input class="qc-input" type="number" min="0" max="${stock}" value="${qty || ''}" onchange="updQuyCachQty(${idx}, ${qcIdx}, this.value)"${disabled}></td>
+            <td class="num"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}" onchange="updQuyCachPrice(${idx}, ${qcIdx}, this.value)"></td>
+            <td class="num"><span class="discount-pair"><input class="qc-input" value="${qc.chiet_khau || 0}" onchange="updQuyCachDiscount(${idx}, ${qcIdx}, this.value)"${disabled}><select onchange="updQuyCachDiscountType(${idx}, ${qcIdx}, this.value)"${disabled}><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
+            <td class="num"><b>${fmt(total)}</b></td>
+          </tr>`;
+        }).join('');
+        return `<tr class="qc-row"><td colspan="9">
+          <table class="qc-table">
+            <thead><tr><th>Thuộc tính</th><th class="num">Tồn</th><th class="num">SL bán</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </td></tr>`;
+      }
       function renderCart() {
         let subtotal = 0;
         cartBody.innerHTML = cart.map((i, idx) => {
-          i.ton_kho = stockFor(i.hang_hoa_id);
-          const lineBase = Number(i.so_luong || 0) * Number(i.don_gia_ban || 0);
-          const lineDiscount = discountAmount(i.chiet_khau, i.kieu_chiet_khau, lineBase);
+          i.ton_kho = lineStock(i);
+          i.so_luong = lineQty(i);
+          const lineBase = i.has_quy_cach
+            ? (i.quy_cach_items || []).reduce((sum, qc) => sum + Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? i.don_gia_ban ?? 0), 0)
+            : Number(i.so_luong || 0) * Number(i.don_gia_ban || 0);
+          const lineDiscount = i.has_quy_cach
+            ? (i.quy_cach_items || []).reduce((sum, qc) => {
+                const qcBase = Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? i.don_gia_ban ?? 0);
+                return sum + discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', qcBase);
+              }, 0)
+            : discountAmount(i.chiet_khau, i.kieu_chiet_khau, lineBase);
           const line = Math.max(lineBase - lineDiscount, 0);
           subtotal += line;
-          const qtyInput = sourceOrder
-            ? `<span>${i.so_luong}</span>`
+          const qtyInput = sourceOrder || i.has_quy_cach
+            ? `<span>${fmt(lineQty(i))}</span>`
             : `<input class="small" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)">`;
+          const priceCell = i.has_quy_cach
+            ? '<span class="stock-text">Nhập theo thuộc tính</span>'
+            : `<input class="small" value="${fmt(i.don_gia_ban)}" onchange="updUnitPrice('${i.hang_hoa_id}',this.value)">`;
+          const discountCell = i.has_quy_cach
+            ? `<span>${fmt(lineDiscount)}</span>`
+            : `<span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
           const deleteCell = sourceOrder
             ? '<td></td>'
             : `<td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td>`;
-          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(i.ton_kho)}</span></td><td>${i.ten_hang}</td><td class="num">${qtyInput}</td><td class="num">${fmt(i.ton_kho)}</td><td class="num"><input class="small" value="${fmt(i.don_gia_ban)}" onchange="updUnitPrice('${i.hang_hoa_id}',this.value)"></td><td class="num"><span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VND</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td><td class="num">${fmt(line)}</td>${deleteCell}</tr>`;
+          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(i.ton_kho)}</span></td><td>${i.ten_hang}</td><td class="num">${qtyInput}</td><td class="num">${fmt(i.ton_kho)}</td><td class="num">${priceCell}</td><td class="num">${discountCell}</td><td class="num">${fmt(line)}</td>${deleteCell}</tr>${renderQuyCachBlock(i, idx)}`;
         }).join('');
         const orderDiscount = discountAmount(num(discount.value), orderDiscountType.value, subtotal);
         const shippingFeeValue = num(shippingFee.value);
@@ -816,10 +964,40 @@
         if (sourceOrder) return renderCart();
         const i = cart.find(x => x.hang_hoa_id === id);
         if (!i) return;
+        if (i.has_quy_cach) return alert('Hàng hóa có thuộc tính, vui lòng nhập số lượng theo thuộc tính bên dưới.');
         const stock = stockFor(id);
         const nextQty = Math.max(1, num(v));
-        if (nextQty > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
+        if (nextQty > stock) alert('Hóa đơn này đang bán vượt tồn hiện có.');
         i.so_luong = nextQty;
+        renderCart();
+      }
+      function updQuyCachQty(itemIdx, qcIdx, value) {
+        if (sourceOrder) return renderCart();
+        const item = cart[itemIdx];
+        if (!item || !item.quy_cach_items || !item.quy_cach_items[qcIdx]) return;
+        const qc = item.quy_cach_items[qcIdx];
+        const max = Number(qc.ton_hien_tai || qc.ton_kho || 0);
+        qc.so_luong_dat = Math.max(0, Math.min(num(value), max));
+        renderCart();
+      }
+      function updQuyCachPrice(itemIdx, qcIdx, value) {
+        const item = cart[itemIdx];
+        if (!item || !item.quy_cach_items || !item.quy_cach_items[qcIdx]) return;
+        item.quy_cach_items[qcIdx].don_gia_ban = Math.max(0, num(value));
+        renderCart();
+      }
+      function updQuyCachDiscount(itemIdx, qcIdx, value) {
+        if (sourceOrder) return renderCart();
+        const item = cart[itemIdx];
+        if (!item || !item.quy_cach_items || !item.quy_cach_items[qcIdx]) return;
+        item.quy_cach_items[qcIdx].chiet_khau = num(value);
+        renderCart();
+      }
+      function updQuyCachDiscountType(itemIdx, qcIdx, value) {
+        if (sourceOrder) return renderCart();
+        const item = cart[itemIdx];
+        if (!item || !item.quy_cach_items || !item.quy_cach_items[qcIdx]) return;
+        item.quy_cach_items[qcIdx].kieu_chiet_khau = value === 'phan_tram' ? 'phan_tram' : 'vnd';
         renderCart();
       }
       function updUnitPrice(id, v) {
@@ -1017,6 +1195,15 @@
             gia_co_dinh: Number(row.gia_co_dinh || 0),
             quan_ly_theo_lo: !!row.quan_ly_theo_lo,
             ton_kho: Number(row.ton_kho || 0),
+            has_quy_cach: Boolean(row.has_quy_cach && (row.quy_cach_items || []).length),
+            quy_cach_items: (row.quy_cach_items || []).map(qc => ({
+              gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
+              ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+              ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+              ton_hien_tai: Number(qc.ton_hien_tai || qc.ton_kho || 0),
+              gia_von: Number(qc.gia_von || 0),
+              don_gia_nhap: Number(qc.don_gia_nhap || 0)
+            })),
             nha_cung_cap_id: row.nha_cung_cap_id || '',
             ten_ncc: row.ten_ncc || '',
             ma_ncc: row.ma_ncc || ''
@@ -1141,32 +1328,59 @@
         renderCart();
       }
       async function saveOrder() {
+        const payButton = document.getElementById('payButton');
+        if (payButton && payButton.disabled) return;
         if (existingInvoice) return alert('Đơn hàng này đã có hóa đơn ' + (existingInvoice.ma_hoa_don || ''));
         if (!cart.length) return alert('Hóa đơn chưa có sản phẩm');
         if (!getStoreId()) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.');
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
-        if (!customerId.value) return alert('Vui lòng chọn khách hàng.');
+        const customerIdValue = document.getElementById('customerId').value;
+        if (!customerIdValue) return alert('Vui lòng chọn khách hàng.');
         const wantsShipping = codEnabled || Boolean(partnerId.value) || num(shippingFee.value) > 0;
         if (wantsShipping && !partnerId.value) return alert('Vui lòng chọn đối tác giao hàng');
-        if (wantsShipping && !getRecipientAddressId()) return alert('Vui lòng chọn địa chỉ nhận hàng của khách.');
+        const shippingAddress = getShippingEndPoint();
+        if (wantsShipping && !shippingAddress) return alert('Vui lòng nhập địa chỉ nhận hàng của khách.');
         if (num(shippingFee.value) < 0) return alert('Phí giao hàng không được âm.');
-        if (!sourceOrder && cart.some(item => Number(item.so_luong || 0) > stockFor(item.hang_hoa_id))) alert('Hóa đơn này đang vượt tồn hiện có. Hóa đơn không trừ kho trong flow này.');
+        if (!sourceOrder && cart.some(item => lineQty(item) <= 0)) return alert('Vui lòng nhập số lượng bán cho từng hàng.');
+        if (!sourceOrder && cart.some(item => lineQty(item) > lineStock(item))) alert('Hóa đơn này đang vượt tồn hiện có. Hóa đơn không trừ kho trong flow này.');
         const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value);
         const noteInput = document.getElementById('deliveryNote');
         const payable = lastTotals.khachCanTra;
-        const shippingAddress = getShippingEndPoint();
         const data = {
-          khach_hang_id: customerId.value,
+          khach_hang_id: customerIdValue,
           cua_hang_id: getStoreId(),
           kho_id: document.getElementById('khoId').value,
           bang_gia_id: selectedPriceBookId(),
           don_hang_id: sourceOrder ? sourceOrder._id : undefined,
           items: cart.map(item => ({
             hang_hoa_id: item.hang_hoa_id,
-            so_luong: item.so_luong,
+            ct_don_hang_id: item.ct_don_hang_id || '',
+            lo_hang_id: item.lo_hang_id || '',
+            gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || '',
+            ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh || '',
+            ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
+            don_vi_tinh_id: item.don_vi_tinh_id || '',
+            so_luong: lineQty(item),
             don_gia_ban: item.don_gia_ban,
             chiet_khau: item.chiet_khau || 0,
-            kieu_chiet_khau: item.kieu_chiet_khau || 'vnd'
+            kieu_chiet_khau: item.kieu_chiet_khau || 'vnd',
+            ma_hang_snapshot: item.ma_hang_snapshot || item.ma_hang || '',
+            ten_hang_snapshot: item.ten_hang_snapshot || item.ten_hang || '',
+            don_vi_tinh_snapshot: item.don_vi_tinh_snapshot || '',
+            ghi_chu: item.ghi_chu || '',
+            quy_cach_items: item.has_quy_cach
+              ? (item.quy_cach_items || [])
+                  .filter(qc => Number(qc.so_luong_dat || qc.so_luong || 0) > 0)
+                  .map(qc => ({
+                    gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
+                    ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                    ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+                    so_luong: Number(qc.so_luong_dat || qc.so_luong || 0),
+                    don_gia_ban: Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0),
+                    chiet_khau: Number(qc.chiet_khau || 0),
+                    kieu_chiet_khau: qc.kieu_chiet_khau || 'vnd'
+                  }))
+              : []
           })),
           chiet_khau: num(discount.value),
           kieu_giam_gia: orderDiscountType.value,
@@ -1190,12 +1404,27 @@
           tien_thua_tra_khach: lastTotals.tienThuaTraKhach
         };
         try {
+          if (payButton) {
+            payButton.disabled = true;
+            payButton.textContent = 'ĐANG TẠO...';
+          }
           const res = await fetch('/don-hang/hoa-don/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          const result = await res.json();
+          const text = await res.text();
+          let result = {};
+          try {
+            result = text ? JSON.parse(text) : {};
+          } catch (_) {
+            result = { success: false, message: text || 'Máy chủ trả về dữ liệu không hợp lệ' };
+          }
           if (!result.success) return alert(result.message || 'Không tạo được hóa đơn');
           window.location.href = '/don-hang/hoa-don';
         } catch (err) {
           alert(err.message || 'Lỗi khi tạo hóa đơn');
+        } finally {
+          if (payButton) {
+            payButton.disabled = false;
+            payButton.textContent = 'THANH TOÁN';
+          }
         }
       }
       document.addEventListener('DOMContentLoaded', () => {

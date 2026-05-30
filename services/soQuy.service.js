@@ -69,6 +69,10 @@ async function ensureDefaultSoQuy(cuaHangId) {
   return cashBook;
 }
 
+function withSession(options, session) {
+  return session ? Object.assign({}, options, { session }) : options;
+}
+
 async function makeReceiptCode(loaiPhieu) {
   const count = await PhieuThuChi.countDocuments({ loai_phieu: loaiPhieu });
   return (loaiPhieu === 'thu' ? 'PT' : 'PC') + String(count + 1).padStart(6, '0');
@@ -178,7 +182,8 @@ async function taoPhieuThuChi(data = {}) {
   if (amount <= 0) throw new Error('gia_tri phai lon hon 0');
 
   if (!data.so_quy_id || !isObjectId(data.so_quy_id)) throw new Error('Bat buoc so_quy_id');
-  const cashBook = await SoQuy.findById(data.so_quy_id);
+  const session = data.session;
+  const cashBook = await SoQuy.findById(data.so_quy_id).session(session || null);
   if (!cashBook) throw new Error('Khong tim thay so quy');
   if (loaiPhieu === 'chi' && cashBook.cho_phep_am === false && Number(cashBook.so_du || 0) < amount) {
     throw new Error('So quy khong du so du de chi');
@@ -189,7 +194,7 @@ async function taoPhieuThuChi(data = {}) {
   const storeId = optionalId(data.cua_hang_id) || cashBook.cua_hang_id || undefined;
   const allocations = normalizeAllocations(data.allocations);
   const overpaymentAmount = Math.max(0, parseMoney(data.overpayment_amount));
-  const receipt = await PhieuThuChi.create({
+  const receiptRows = await PhieuThuChi.create([{
     ma_phieu: code,
     ngay_lap: data.ngay_lap ? new Date(data.ngay_lap) : new Date(),
     loai_phieu: loaiPhieu,
@@ -216,9 +221,14 @@ async function taoPhieuThuChi(data = {}) {
     allocations,
     nhom_doi_tuong: normalizeSubjectGroup(data.nhom_doi_tuong, customerId, supplierId),
     phuong_thuc_thanh_toan: normalizePaymentMethod(data.phuong_thuc_thanh_toan)
-  });
+  }], withSession({}, session));
+  const receipt = receiptRows[0];
 
-  await SoQuy.findByIdAndUpdate(cashBook._id, { $inc: { so_du: loaiPhieu === 'thu' ? amount : -amount } });
+  await SoQuy.findByIdAndUpdate(
+    cashBook._id,
+    { $inc: { so_du: loaiPhieu === 'thu' ? amount : -amount } },
+    withSession({}, session)
+  );
 
   if (receipt.hach_toan) {
     if (customerId) await ghiCongNoKhachHang(receipt, amount, data);

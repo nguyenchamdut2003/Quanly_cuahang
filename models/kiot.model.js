@@ -1054,6 +1054,36 @@ const DonHangSchema = new Schema({
   trang_thai: { type: String },
   trang_thai_giao_hang: { type: String, enum: ['chua_giao', 'giao_mot_phan', 'giao_thieu', 'giao_du'], default: 'chua_giao' },
   ngay_giao_thuc_te: { type: Date },
+  is_merged_order: {
+    type: Boolean,
+    default: false
+  },
+  merged_to_don_hang_id: {
+    type: ObjectId,
+    ref: 'DonHang',
+    default: null
+  },
+  merged_to_ma_don_hang: {
+    type: String,
+    default: ''
+  },
+  merged_from_don_hang_ids: [{
+    type: ObjectId,
+    ref: 'DonHang'
+  }],
+  merged_from_ma_don_hangs: [{
+    type: String
+  }],
+  merged_at: {
+    type: Date
+  },
+  merged_by: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+  merge_note: {
+    type: String
+  },
   ghi_chu: { type: String },
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' },
@@ -1066,21 +1096,64 @@ const DonHangSchema = new Schema({
 const CTDonHangSchema = new Schema({
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
+  gia_tri_thuoc_tinh_id: {
+    type: ObjectId,
+    ref: 'GiaTriThuocTinh',
+    default: null
+  },
+  ten_quy_cach: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  ten_thuoc_tinh: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  don_vi_tinh_id: {
+    type: ObjectId,
+    ref: 'DonViTinh',
+    default: null
+  },
   so_luong: { type: Number },
   so_luong_dat: { type: Number, default: 0 },
   so_luong_xac_nhan: { type: Number, default: 0 },
   so_luong_da_giao: { type: Number, default: 0 },
   so_luong_con_thieu: { type: Number, default: 0 },
   trang_thai_giao: { type: String, enum: ['chua_giao', 'giao_thieu', 'giao_du'], default: 'chua_giao' },
-  lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  lo_hang_id: {
+    type: ObjectId,
+    ref: 'LoHang',
+    default: null
+  },
   don_gia_ban: { type: Number },
+  ma_hang_snapshot: {
+    type: String
+  },
+  ten_hang_snapshot: {
+    type: String
+  },
+  don_vi_tinh_snapshot: {
+    type: String
+  },
+  gia_goc: {
+    type: Number,
+    default: 0
+  },
   chiet_khau: { type: Number },
   kieu_chiet_khau: { type: String, enum: ['vnd', 'phan_tram'], default: 'vnd' },
-  thanh_tien: { type: Number }
+  thanh_tien: { type: Number },
+  ghi_chu: {
+    type: String
+  }
 }, { collection: "ct_don_hang" });
-CTDonHangSchema.index(
-  { don_hang_id: 1, hang_hoa_id: 1 }
-);
+CTDonHangSchema.index({
+  don_hang_id: 1,
+  hang_hoa_id: 1,
+  gia_tri_thuoc_tinh_id: 1,
+  ten_quy_cach: 1
+});
 
 // HOA_DON_BAN_HANG
 const HoaDonBanHangSchema = new Schema({
@@ -1107,19 +1180,67 @@ HoaDonBanHangSchema.index(
 // CT_HOA_DON_BAN_HANG
 const CTHoaDonBanHangSchema = new Schema({
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
+  ct_don_hang_id: {
+    type: ObjectId,
+    ref: 'CTDonHang',
+    default: null
+  },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
   lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  gia_tri_thuoc_tinh_id: {
+    type: ObjectId,
+    ref: 'GiaTriThuocTinh',
+    default: null
+  },
+  ten_quy_cach: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  ten_thuoc_tinh: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  don_vi_tinh_id: {
+    type: ObjectId,
+    ref: 'DonViTinh',
+    default: null
+  },
+  ma_hang_snapshot: {
+    type: String
+  },
+  ten_hang_snapshot: {
+    type: String
+  },
+  don_vi_tinh_snapshot: {
+    type: String
+  },
   so_luong: { type: Number },
   don_gia: { type: Number },
   chiet_khau: { type: Number },
-  thanh_tien: { type: Number }
+  thanh_tien: { type: Number },
+  ghi_chu: {
+    type: String
+  }
 }, { collection: "ct_hoa_don_ban_hang" });
+CTHoaDonBanHangSchema.index({ hoa_don_id: 1, ct_don_hang_id: 1 });
 
 // VAN_DON
 const VanDonSchema = new Schema({
   ma_van_don: { type: String, unique: true },
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
+  phieu_tra_hang_id: {
+    type: ObjectId,
+    ref: 'PhieuTraHang',
+    default: null
+  },
+  loai_van_don: {
+    type: String,
+    enum: ['giao_hang', 'lay_hang_tra', 'doi_hang'],
+    default: 'giao_hang'
+  },
   doi_tac_giao_hang_id: { type: ObjectId, ref: 'DoiTacGiaoHang' },
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
@@ -1145,6 +1266,97 @@ VanDonSchema.index(
   { doi_tac_giao_hang_id: 1, trang_thai: 1 }
 );
 
+const GopDonHangSchema = new Schema({
+  ma_gop_don: {
+    type: String,
+    unique: true
+  },
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true,
+    index: true
+  },
+  don_nhan_id: {
+    type: ObjectId,
+    ref: 'DonHang',
+    required: true,
+    index: true
+  },
+  ma_don_nhan: {
+    type: String
+  },
+  khach_hang_id: {
+    type: ObjectId,
+    ref: 'KhachHang',
+    index: true
+  },
+  sdt_khach_hang: {
+    type: String
+  },
+  don_nguon_ids: [{
+    type: ObjectId,
+    ref: 'DonHang'
+  }],
+  ma_don_nguon: [{
+    type: String
+  }],
+  tong_tien_hang_truoc_gop: {
+    type: Number,
+    default: 0
+  },
+  tong_khach_da_tra_truoc_gop: {
+    type: Number,
+    default: 0
+  },
+  tong_tien_hang_sau_gop: {
+    type: Number,
+    default: 0
+  },
+  tong_khach_da_tra_sau_gop: {
+    type: Number,
+    default: 0
+  },
+  so_luong_don_gop: {
+    type: Number,
+    default: 0
+  },
+  ghi_chu: {
+    type: String
+  },
+  trang_thai: {
+    type: String,
+    enum: ['active', 'cancelled'],
+    default: 'active',
+    index: true
+  },
+  nguoi_tao_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+  ngay_gop: {
+    type: Date,
+    default: Date.now
+  },
+  nguoi_huy_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+  ngay_huy: {
+    type: Date
+  },
+  ly_do_huy: {
+    type: String
+  }
+}, {
+  collection: 'gop_don_hang',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+GopDonHangSchema.index({ cua_hang_id: 1, ma_gop_don: 1 }, { unique: true });
+GopDonHangSchema.index({ cua_hang_id: 1, khach_hang_id: 1, ngay_gop: -1 });
+GopDonHangSchema.index({ don_nhan_id: 1 });
+GopDonHangSchema.index({ don_nguon_ids: 1 });
+
 // PHIEU_TRA_HANG
 const PhieuTraHangSchema = new Schema({
   ma_phieu_tra: { type: String, unique: true },
@@ -1153,11 +1365,58 @@ const PhieuTraHangSchema = new Schema({
   tong_tien_hang_tra: { type: Number, default: 0 },
   tong_tien_hang_doi: { type: Number, default: 0 },
   chenh_lech: { type: Number, default: 0 },
+  giam_gia: { type: Number, default: 0 },
+  kieu_giam_gia: { type: String, enum: ['vnd'], default: 'vnd' },
+  phi_tra_hang: { type: Number, default: 0 },
   khach_can_tra_them: { type: Number, default: 0 },
   can_tra_khach: { type: Number, default: 0 },
   ly_do: { type: String },
   trang_thai: { type: String },
   ghi_chu: { type: String },
+  hinh_thuc_nhan_hang_tra: {
+    type: String,
+    enum: ['tai_quay', 'lay_tai_nha', 'khach_gui_ve'],
+    default: 'tai_quay'
+  },
+  van_don_id: {
+    type: ObjectId,
+    ref: 'VanDon',
+    default: null
+  },
+  doi_tac_giao_hang_id: {
+    type: ObjectId,
+    ref: 'DoiTacGiaoHang',
+    default: null
+  },
+  dia_chi_lay_hang: {
+    type: String,
+    default: ''
+  },
+  ten_nguoi_gui_tra: {
+    type: String,
+    default: ''
+  },
+  sdt_nguoi_gui_tra: {
+    type: String,
+    default: ''
+  },
+  phi_lay_hang_tra: {
+    type: Number,
+    default: 0
+  },
+  nguoi_tra_phi_lay_hang: {
+    type: String,
+    enum: ['khach', 'cua_hang'],
+    default: 'cua_hang'
+  },
+  ma_van_don_tra_hang: {
+    type: String,
+    default: ''
+  },
+  ghi_chu_van_chuyen_tra: {
+    type: String,
+    default: ''
+  },
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' },
   kho_id: { type: ObjectId, ref: 'Kho' },
@@ -1169,13 +1428,51 @@ const PhieuTraHangSchema = new Schema({
 // CT_PHIEU_TRA_HANG
 const CTPhieuTraHangSchema = new Schema({
   phieu_tra_hang_id: { type: ObjectId, ref: 'PhieuTraHang' },
+  ct_hoa_don_id: {
+    type: ObjectId,
+    ref: 'CTHoaDonBanHang',
+    default: null
+  },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
   lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  gia_tri_thuoc_tinh_id: {
+    type: ObjectId,
+    ref: 'GiaTriThuocTinh',
+    default: null
+  },
+  ten_quy_cach: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  ten_thuoc_tinh: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  don_vi_tinh_id: {
+    type: ObjectId,
+    ref: 'DonViTinh',
+    default: null
+  },
+  ma_hang_snapshot: {
+    type: String
+  },
+  ten_hang_snapshot: {
+    type: String
+  },
+  don_vi_tinh_snapshot: {
+    type: String
+  },
   loai_dong: { type: String, enum: ['hang_tra', 'hang_doi'], default: 'hang_tra' },
   so_luong: { type: Number },
   don_gia: { type: Number },
-  thanh_tien: { type: Number }
+  thanh_tien: { type: Number },
+  ghi_chu: {
+    type: String
+  }
 }, { collection: "ct_phieu_tra_hang" });
+CTPhieuTraHangSchema.index({ phieu_tra_hang_id: 1, ct_hoa_don_id: 1 });
 
 // PHIEU_KIEM_KHO
 const PhieuKiemKhoSchema = new Schema({
@@ -1303,6 +1600,7 @@ const CTXuatNoiBoSchema = new Schema({
   phieu_xuat_id: { type: ObjectId, ref: 'PhieuXuatNoiBo' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
   lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  ten_quy_cach: { type: String },
   so_luong: { type: Number },
   gia_von: { type: Number },
   thanh_tien: { type: Number }
@@ -1370,6 +1668,40 @@ const CTPhanBoHangSchema = new Schema({
   ct_don_hang_id: { type: ObjectId, ref: 'CTDonHang' },
   hang_hoa_id: { type: ObjectId, ref: 'HangHoa' },
   lo_hang_id: { type: ObjectId, ref: 'LoHang' },
+  ton_kho_lo_quy_cach_id: {
+    type: ObjectId,
+    ref: 'TonKhoLoQuyCach',
+    default: null
+  },
+  gia_tri_thuoc_tinh_id: {
+    type: ObjectId,
+    ref: 'GiaTriThuocTinh',
+    default: null
+  },
+  ten_quy_cach: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  ten_thuoc_tinh: {
+    type: String,
+    default: '',
+    trim: true
+  },
+  don_vi_tinh_id: {
+    type: ObjectId,
+    ref: 'DonViTinh',
+    default: null
+  },
+  ma_hang_snapshot: {
+    type: String
+  },
+  ten_hang_snapshot: {
+    type: String
+  },
+  don_vi_tinh_snapshot: {
+    type: String
+  },
   so_luong: { type: Number, default: 0 },
   don_gia_ban: { type: Number, default: 0 },
   chiet_khau: { type: Number, default: 0 },
@@ -1414,6 +1746,354 @@ const CounterSchema = new Schema({
   _id: { type: String },
   seq: { type: Number, default: 0 }
 }, { collection: "counters" });
+const GiaoDichCongNoNhaCungCapSchema = new Schema({
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true,
+    index: true
+  },
+
+  nha_cung_cap_id: {
+    type: ObjectId,
+    ref: 'NhaCungCap',
+    required: true,
+    index: true
+  },
+
+  ma_giao_dich: {
+    type: String,
+    required: true
+  },
+
+  loai_giao_dich: {
+    type: String,
+    enum: [
+      'nhap_hang',
+      'tra_hang_nhap',
+      'thanh_toan',
+      'chiet_khau_thanh_toan',
+      'dieu_chinh_tang',
+      'dieu_chinh_giam'
+    ],
+    required: true
+  },
+
+  huong_cong_no: {
+    type: String,
+    enum: ['tang_no', 'giam_no'],
+    required: true
+  },
+
+  gia_tri: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0
+  },
+
+  no_truoc: {
+    type: Number,
+    default: 0
+  },
+
+  no_sau: {
+    type: Number,
+    default: 0
+  },
+
+  ngay_giao_dich: {
+    type: Date,
+    default: Date.now
+  },
+
+  // Có phát sinh tiền thật trong sổ quỹ không?
+  // Chiết khấu thanh toán: false
+  // Thanh toán tiền mặt/chuyển khoản: true
+  anh_huong_so_quy: {
+    type: Boolean,
+    default: false
+  },
+
+  // Nếu giao dịch này có phiếu thu/chi tiền thật thì link vào đây
+  phieu_thu_chi_id: {
+    type: ObjectId,
+    ref: 'PhieuThuChi',
+    default: null
+  },
+
+  // Nếu phát sinh từ phiếu nhập
+  phieu_nhap_id: {
+    type: ObjectId,
+    ref: 'PhieuNhap',
+    default: null
+  },
+
+  // Nếu phát sinh từ phiếu trả hàng nhập
+  phieu_tra_hang_nhap_id: {
+    type: ObjectId,
+    ref: 'PhieuTraHangNhap',
+    default: null
+  },
+
+  // Nếu sau này muốn phân bổ chiết khấu vào nhiều phiếu nhập
+  phan_bo_phieu_nhap: {
+    type: [
+      {
+        phieu_nhap_id: {
+          type: ObjectId,
+          ref: 'PhieuNhap'
+        },
+        so_tien_phan_bo: {
+          type: Number,
+          default: 0,
+          min: 0
+        },
+        ghi_chu: {
+          type: String
+        }
+      }
+    ],
+    default: []
+  },
+
+  ghi_chu: {
+    type: String
+  },
+
+  trang_thai: {
+    type: String,
+    enum: ['active', 'cancelled'],
+    default: 'active',
+    index: true
+  },
+
+  nguoi_tao_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+
+  nguoi_cap_nhat_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+
+  nguoi_huy_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+
+  ngay_huy: {
+    type: Date
+  },
+
+  ly_do_huy: {
+    type: String
+  }
+}, {
+  collection: 'giao_dich_cong_no_nha_cung_cap',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+
+GiaoDichCongNoNhaCungCapSchema.index(
+  { cua_hang_id: 1, ma_giao_dich: 1 },
+  { unique: true }
+);
+
+GiaoDichCongNoNhaCungCapSchema.index({
+  cua_hang_id: 1,
+  nha_cung_cap_id: 1,
+  ngay_giao_dich: -1
+});
+
+GiaoDichCongNoNhaCungCapSchema.index({
+  cua_hang_id: 1,
+  nha_cung_cap_id: 1,
+  loai_giao_dich: 1
+});
+
+GiaoDichCongNoNhaCungCapSchema.index({
+  phieu_nhap_id: 1
+});
+
+GiaoDichCongNoNhaCungCapSchema.index({
+  phieu_thu_chi_id: 1
+});
+
+const GiaoDichCongNoKhachHangSchema = new Schema({
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true,
+    index: true
+  },
+
+  khach_hang_id: {
+    type: ObjectId,
+    ref: 'KhachHang',
+    required: true,
+    index: true
+  },
+
+  ma_giao_dich: {
+    type: String,
+    required: true
+  },
+
+  loai_giao_dich: {
+    type: String,
+    enum: [
+      'hoa_don_ban_hang',
+      'thanh_toan',
+      'thu_cod',
+      'tra_hang',
+      'dieu_chinh_tang',
+      'dieu_chinh_giam',
+      'huy_hoa_don',
+      'huy_phieu_thu',
+      'huy_phieu_tra'
+    ],
+    required: true
+  },
+
+  huong_cong_no: {
+    type: String,
+    enum: ['tang_no', 'giam_no'],
+    required: true
+  },
+
+  gia_tri: {
+    type: Number,
+    required: true,
+    min: 0,
+    default: 0
+  },
+
+  no_truoc: {
+    type: Number,
+    default: 0
+  },
+
+  no_sau: {
+    type: Number,
+    default: 0
+  },
+
+  ngay_giao_dich: {
+    type: Date,
+    default: Date.now
+  },
+
+  anh_huong_so_quy: {
+    type: Boolean,
+    default: false
+  },
+
+  don_hang_id: {
+    type: ObjectId,
+    ref: 'DonHang',
+    default: null
+  },
+
+  hoa_don_id: {
+    type: ObjectId,
+    ref: 'HoaDonBanHang',
+    default: null
+  },
+
+  phieu_thu_chi_id: {
+    type: ObjectId,
+    ref: 'PhieuThuChi',
+    default: null
+  },
+
+  phieu_tra_hang_id: {
+    type: ObjectId,
+    ref: 'PhieuTraHang',
+    default: null
+  },
+
+  van_don_id: {
+    type: ObjectId,
+    ref: 'VanDon',
+    default: null
+  },
+
+  ma_chung_tu_goc: {
+    type: String,
+    default: ''
+  },
+
+  ghi_chu: {
+    type: String
+  },
+
+  trang_thai: {
+    type: String,
+    enum: ['active', 'cancelled'],
+    default: 'active',
+    index: true
+  },
+
+  nguoi_tao_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+
+  nguoi_cap_nhat_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+
+  nguoi_huy_id: {
+    type: ObjectId,
+    ref: 'NguoiDung'
+  },
+
+  ngay_huy: {
+    type: Date
+  },
+
+  ly_do_huy: {
+    type: String
+  }
+}, {
+  collection: 'giao_dich_cong_no_khach_hang',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+
+GiaoDichCongNoKhachHangSchema.index(
+  { cua_hang_id: 1, ma_giao_dich: 1 },
+  { unique: true }
+);
+
+GiaoDichCongNoKhachHangSchema.index({
+  cua_hang_id: 1,
+  khach_hang_id: 1,
+  ngay_giao_dich: -1
+});
+
+GiaoDichCongNoKhachHangSchema.index({
+  cua_hang_id: 1,
+  khach_hang_id: 1,
+  loai_giao_dich: 1
+});
+
+GiaoDichCongNoKhachHangSchema.index({
+  hoa_don_id: 1
+});
+
+GiaoDichCongNoKhachHangSchema.index({
+  phieu_thu_chi_id: 1
+});
+
+GiaoDichCongNoKhachHangSchema.index({
+  phieu_tra_hang_id: 1
+});
+
+GiaoDichCongNoKhachHangSchema.index({
+  van_don_id: 1
+});
 // Register models
 const CuaHang = mongoose.models.CuaHang || mongoose.model("CuaHang", CuaHangSchema);
 const Kho = mongoose.models.Kho || mongoose.model("Kho", KhoSchema);
@@ -1448,6 +2128,7 @@ const CTHoaDonBanHang = mongoose.models.CTHoaDonBanHang || mongoose.model("CTHoa
 const DoiTacGiaoHang = mongoose.models.DoiTacGiaoHang || mongoose.model("DoiTacGiaoHang", DoiTacGiaoHangSchema);
 const BangGiaVanChuyen = mongoose.models.BangGiaVanChuyen || mongoose.model("BangGiaVanChuyen", BangGiaVanChuyenSchema);
 const VanDon = mongoose.models.VanDon || mongoose.model("VanDon", VanDonSchema);
+const GopDonHang = mongoose.models.GopDonHang || mongoose.model("GopDonHang", GopDonHangSchema);
 const PhieuTraHang = mongoose.models.PhieuTraHang || mongoose.model("PhieuTraHang", PhieuTraHangSchema);
 const CTPhieuTraHang = mongoose.models.CTPhieuTraHang || mongoose.model("CTPhieuTraHang", CTPhieuTraHangSchema);
 const PhieuKiemKho = mongoose.models.PhieuKiemKho || mongoose.model("PhieuKiemKho", PhieuKiemKhoSchema);
@@ -1466,6 +2147,14 @@ const PhanBoHang = mongoose.models.PhanBoHang || mongoose.model("PhanBoHang", Ph
 const CTPhanBoHang = mongoose.models.CTPhanBoHang || mongoose.model("CTPhanBoHang", CTPhanBoHangSchema);
 const PhiVanChuyenKhachHang = mongoose.models.PhiVanChuyenKhachHang || mongoose.model("PhiVanChuyenKhachHang", PhiVanChuyenKhachHangSchema);
 const Counter = mongoose.models.Counter || mongoose.model("Counter", CounterSchema);
+const GiaoDichCongNoNhaCungCap = mongoose.models.GiaoDichCongNoNhaCungCap || mongoose.model(
+  'GiaoDichCongNoNhaCungCap',
+  GiaoDichCongNoNhaCungCapSchema
+);
+const GiaoDichCongNoKhachHang = mongoose.models.GiaoDichCongNoKhachHang || mongoose.model(
+  'GiaoDichCongNoKhachHang',
+  GiaoDichCongNoKhachHangSchema
+);
 module.exports = {
   CuaHang, Kho, NguoiDung, PhongBan, ChucDanh, NhanVien,
   NhomKhachHang, KhachHang, DiaChiKhachHang, LoaiDiaChiKhachHang, 
@@ -1474,7 +2163,7 @@ module.exports = {
   BangGia, CTBangGia, TonKho, LoHang, TonKhoLo, TonKhoLoQuyCach,
   PhieuNhap, CTPhieuNhap, HoaDonDauVao, PhieuTraHangNhap, CTPhieuTraHangNhap,
   DonHang, CTDonHang,
-  HoaDonBanHang, CTHoaDonBanHang, DoiTacGiaoHang, BangGiaVanChuyen, VanDon,
+  HoaDonBanHang, CTHoaDonBanHang, DoiTacGiaoHang, BangGiaVanChuyen, VanDon, GopDonHang,
   PhieuTraHang, CTPhieuTraHang,
   PhieuKiemKho, CTPhieuKiemKho,
   SoQuy, PhieuThuChi,
@@ -1482,5 +2171,7 @@ module.exports = {
   PhieuXuatNoiBo, CTXuatNoiBo, LoaiXuatNoiBo, PhieuXuatHuy, CTXuatHuy,
   PhanBoHang, CTPhanBoHang,
   PhiVanChuyenKhachHang,
-  Counter
+  Counter,
+  GiaoDichCongNoNhaCungCap,
+  GiaoDichCongNoKhachHang
 };

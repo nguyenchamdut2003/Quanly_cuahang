@@ -3,6 +3,7 @@
   const safeFilters = locals.filter || {};
   const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const statusBadge = status => status === 'draft' ? 'draft' : '';
   const formatDateOnly = value => {
     if (!value) return '';
@@ -93,7 +94,7 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     .po-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
-    .po-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 0}
+    .po-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 30px 0}
     .po-sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
     .po-title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
     .filter-block{margin-bottom:22px}
@@ -116,7 +117,6 @@
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .supplier-code-link{color:#0070f4;text-decoration:none;font-weight:700}
     .supplier-code-link:hover{text-decoration:underline}
-    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;text-decoration:none}
     .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:hidden}
     .po-table{width:100%;table-layout:fixed;border-collapse:collapse}
     .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
@@ -246,8 +246,6 @@
           <div class="toolbar-actions">
             <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
             <button class="kv-btn" type="button">Xuất file ▾</button>
-            <button type="button" class="tool-icon">☰</button>
-            <button type="button" class="tool-icon">?</button>
           </div>
         </div>
 
@@ -281,7 +279,7 @@
                       <% } %>
                     </td>
                     <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
-                    <td class="num"><%= fmt((t.con_no_ncc ?? 0)) %></td>
+                    <td class="num"><%= fmtMoney((t.con_no_ncc ?? 0)) %></td>
                     <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
                   <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
@@ -345,17 +343,17 @@
                                           <div><%= r.ten_thuoc_tinh || '--' %></div>
                                         </td>
                                         <td class="num"><%= fmt(r.so_luong || 0) %></td>
-                                        <td class="num"><%= fmt(r.don_gia_nhap || 0) %></td>
-                                        <td class="num"><%= fmt(r.thanh_tien || 0) %></td>
+                                        <td class="num"><%= fmtMoney(r.don_gia_nhap || 0) %></td>
+                                        <td class="num"><%= fmtMoney(r.thanh_tien || 0) %></td>
                                         <% if (rowIndex === 0) { %>
-                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmt(group.total || 0) %></td>
+                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmtMoney(group.total || 0) %></td>
                                         <% } %>
                                       </tr>
                                     <% }) %>
                                     <tr class="group-total-row">
                                       <td colspan="4" class="num">TỔNG CỘNG</td>
-                                      <td class="num"><%= fmt(group.total || 0) %></td>
-                                      <td class="num"><%= fmt(group.total || 0) %></td>
+                                      <td class="num"><%= fmtMoney(group.total || 0) %></td>
+                                      <td class="num"><%= fmtMoney(group.total || 0) %></td>
                                     </tr>
                                   </tbody>
                                 </table>
@@ -363,11 +361,11 @@
                             </div>
                             <div class="summary-card">
                               <div class="summary-line"><span>Số lượng mặt hàng</span><b><%= fmt(t?.detail_summary?.tong_mat_hang || 0) %></b></div>
-                              <div class="summary-line"><span>Tổng tiền hàng</span><b><%= fmt(t.tong_tien_hang || 0) %></b></div>
-                              <div class="summary-line"><span>Giảm giá</span><b><%= (t.kieu_giam_gia === 'percent' ? ((t.giam_gia || 0) + '%') : fmt(t.giam_gia || 0)) %></b></div>
-                              <div class="summary-line"><span>Tổng cộng / Cần trả NCC</span><b><%= fmt(t.can_tra_ncc || t.tong_tien || 0) %></b></div>
-                              <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmt(t.da_tra_ncc || 0) %></b></div>
-                              <div class="summary-line"><span>Nợ NCC</span><b><%= fmt(t.con_no_ncc || 0) %></b></div>
+                              <div class="summary-line"><span>Tổng tiền hàng</span><b><%= fmtMoney(t.tong_tien_hang || 0) %></b></div>
+                              <div class="summary-line"><span>Giảm giá</span><b><%= (t.kieu_giam_gia === 'percent' ? ((t.giam_gia || 0) + '%') : fmtMoney(t.giam_gia || 0)) %></b></div>
+                              <div class="summary-line"><span>Tổng cộng / Cần trả NCC</span><b><%= fmtMoney(t.can_tra_ncc || t.tong_tien || 0) %></b></div>
+                              <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmtMoney(t.da_tra_ncc || 0) %></b></div>
+                              <div class="summary-line"><span>Nợ NCC</span><b><%= fmtMoney(t.con_no_ncc || 0) %></b></div>
                               <% if (Number(t.con_no_ncc || 0) > 0) { %>
                                 <button type="button" class="kv-btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="openPaySupplierModal('<%= t._id %>')">Trả NCC</button>
                               <% } %>
@@ -396,7 +394,7 @@
                                 <tr>
                                   <td><%= formatDate(p.thoi_gian) %></td>
                                   <td><%- p._id ? refLink('receipt', p._id, p.ma_phieu || '--') : (p.ma_phieu || '--') %></td>
-                                  <td><%= fmt(p.tien_chi || 0) %></td>
+                                  <td><%= fmtMoney(p.tien_chi || 0) %></td>
                                   <td><%= p.phuong_thuc || '--' %></td>
                                   <td><%= p.so_quy || '--' %></td>
                                   <td><%= p.nguoi_tao || '--' %></td>
@@ -480,6 +478,7 @@
     let currentPurchaseId = '';
     let currentPurchaseEdit = null;
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
+    function moneyText(value){ return money(value) + ' VNĐ'; }
     function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '')) || 0; }
     function toDateInput(value){
       if (!value) return '';
@@ -554,7 +553,7 @@
               <td><input data-edit-field="don_gia_nhap" inputmode="numeric" value="${money(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><input data-edit-field="giam_gia_dong" inputmode="numeric" value="${money(row.giam_gia_dong || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><select data-edit-field="kieu_giam_gia_dong" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${discountType === 'vnd' ? 'selected' : ''}>VND</option><option value="percent" ${discountType === 'percent' ? 'selected' : ''}>%</option></select></td>
-              <td class="num" data-edit-total>${money(row.thanh_tien || 0)}</td>
+              <td class="num" data-edit-total>${moneyText(row.thanh_tien || 0)}</td>
               <td><input data-edit-field="ghi_chu" value="${escapeHtml(row.ghi_chu || '')}" ${readonly ? 'disabled' : ''}></td>
             </tr>`;
         }).join('');
@@ -563,7 +562,7 @@
             <div class="item">Nhà cung cấp<b>${ticket.nha_cung_cap_id?.ten_ncc || '--'}</b></div>
             <div class="item">Kho<b>${ticket.kho_id?.ten_kho || ticket.kho_id?.ma_kho || '--'}</b></div>
             <div class="item">Trạng thái<b>${ticket.trang_thai || '--'}</b></div>
-            <div class="item">Cần trả NCC<b>${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}</b></div>
+            <div class="item">Cần trả NCC<b>${moneyText(ticket.can_tra_ncc || ticket.tong_tien || 0)}</b></div>
           </div>
           <div class="edit-form-grid">
             <div class="edit-field"><label>Nhà cung cấp</label><select id="editSupplier" ${readonly ? 'disabled' : ''}>${supplierOptions}</select></div>
@@ -583,9 +582,9 @@
             </table>
           </div>
           <div class="edit-total-box">
-            <span>Tổng tiền hàng</span><b id="editGoodsTotal">0</b>
-            <span>Tổng cộng / Cần trả NCC</span><b id="editTotal">0</b>
-            <span>Nợ NCC</span><b id="editDebt">0</b>
+            <span>Tổng tiền hàng</span><b id="editGoodsTotal">0 VNĐ</b>
+            <span>Tổng cộng / Cần trả NCC</span><b id="editTotal">0 VNĐ</b>
+            <span>Nợ NCC</span><b id="editDebt">0 VNĐ</b>
           </div>
           <p class="lot-note">${readonly ? 'Phiếu đã hủy: không thể chỉnh sửa.' : 'Phiếu đã nhập hàng: khi đổi số lượng hoặc kho, hệ thống sẽ điều chỉnh tồn kho theo chênh lệch.'}</p>
         `;
@@ -610,7 +609,7 @@
         const line = calcEditLineTotal(rowEl);
         goodsTotal += line;
         const totalCell = rowEl.querySelector('[data-edit-total]');
-        if (totalCell) totalCell.textContent = money(line);
+        if (totalCell) totalCell.textContent = moneyText(line);
       });
       const discount = numberValue(document.getElementById('editDiscount')?.value || 0);
       const discountType = document.getElementById('editDiscountType')?.value || 'vnd';
@@ -623,9 +622,9 @@
       const goodsEl = document.getElementById('editGoodsTotal');
       const totalEl = document.getElementById('editTotal');
       const debtEl = document.getElementById('editDebt');
-      if (goodsEl) goodsEl.textContent = money(goodsTotal);
-      if (totalEl) totalEl.textContent = money(total);
-      if (debtEl) debtEl.textContent = money(Math.max(0, payable - paid));
+      if (goodsEl) goodsEl.textContent = moneyText(goodsTotal);
+      if (totalEl) totalEl.textContent = moneyText(total);
+      if (debtEl) debtEl.textContent = moneyText(Math.max(0, payable - paid));
     }
     async function savePurchaseNote(){
       if (!currentPurchaseId) return;
@@ -726,7 +725,7 @@
       (p.detail_rows || []).forEach(row => {
         const qty = qtyByRow[String(row._id)] || 0;
         for (let i = 0; i < qty; i++) {
-          labels.push(`<div class="label-item"><div class="label-code">${row.hang_hoa_id?.ma_hang || ''}</div><div>${row.hang_hoa_id?.ten_hang || ''}</div><div>Giá nhập: ${money(row.don_gia_nhap || 0)}</div><div class="label-bar">|||| ${row.hang_hoa_id?.ma_hang || ''} ||||</div></div>`);
+          labels.push(`<div class="label-item"><div class="label-code">${row.hang_hoa_id?.ma_hang || ''}</div><div>${row.hang_hoa_id?.ten_hang || ''}</div><div>Giá nhập: ${moneyText(row.don_gia_nhap || 0)}</div><div class="label-bar">|||| ${row.hang_hoa_id?.ma_hang || ''} ||||</div></div>`);
         }
       });
       if (!labels.length) return alert('Chưa chọn số lượng tem');

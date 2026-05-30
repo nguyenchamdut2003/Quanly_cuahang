@@ -190,6 +190,9 @@
       font-size: 12px;
       white-space: nowrap;
     }
+    .supplier-pane-table-wrap .text-center {
+      text-align: center;
+    }
     .supplier-pane-table-wrap .empty-cell {
       padding: 32px 16px !important;
       text-align: center;
@@ -603,6 +606,7 @@
         var tab = getActiveSupplierTab(detailBlock);
         link.href = '/nha-cung-cap/' + id + '/export/' + tab;
         link.textContent = exportLabels[tab] || 'Xuất';
+        link.style.display = tab === 'debt' ? 'none' : '';
       }
       function bindSupplierInlinePanel(rootEl) {
         var wrap = rootEl.classList.contains('supplier-inline-detail') ? rootEl : rootEl.querySelector('.supplier-inline-detail');
@@ -768,6 +772,32 @@
         modal.classList.remove('is-open');
         modal.setAttribute('aria-hidden', 'true');
       }
+      function updateSupplierDiscountRemaining(form) {
+        if (!form) return;
+        var debt = Number(form.getAttribute('data-current-debt') || 0);
+        var amountInput = form.querySelector('.js-supplier-discount-amount');
+        var amount = parseSupplierMoney(amountInput ? amountInput.value : 0);
+        if (amountInput && amount) amountInput.value = formatSupplierMoney(amount);
+        var remaining = form.querySelector('.js-supplier-discount-remaining');
+        if (remaining) remaining.textContent = formatSupplierMoney(Math.max(0, debt - amount));
+      }
+      function openSupplierDiscountModal(modal) {
+        if (!modal) return;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        var form = modal.querySelector('.supplier-discount-form');
+        var amountInput = form ? form.querySelector('.js-supplier-discount-amount') : null;
+        if (amountInput) {
+          amountInput.value = '';
+          amountInput.focus();
+        }
+        updateSupplierDiscountRemaining(form);
+      }
+      function closeSupplierDiscountModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      }
 
       document.addEventListener('click', function(event) {
         var openBtn = event.target.closest('.js-open-supplier-pay-modal');
@@ -777,11 +807,66 @@
           openSupplierPayModal(document.getElementById(openBtn.getAttribute('data-modal-id')));
           return;
         }
+        var openDiscountBtn = event.target.closest('.js-open-supplier-discount-modal');
+        if (openDiscountBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          openSupplierDiscountModal(document.getElementById(openDiscountBtn.getAttribute('data-modal-id')));
+          return;
+        }
         var closeBtn = event.target.closest('.js-close-supplier-pay-modal');
         if (closeBtn) {
           event.preventDefault();
           event.stopPropagation();
           closeSupplierPayModal(closeBtn.closest('.js-supplier-pay-overlay'));
+          return;
+        }
+        var closeDiscountBtn = event.target.closest('.js-close-supplier-discount-modal');
+        if (closeDiscountBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          closeSupplierDiscountModal(closeDiscountBtn.closest('.js-supplier-discount-overlay'));
+          return;
+        }
+        var discountSubmitBtn = event.target.closest('.js-submit-supplier-discount-modal');
+        if (discountSubmitBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          var discountForm = document.getElementById(discountSubmitBtn.getAttribute('data-form-id'));
+          if (!discountForm || discountSubmitBtn.disabled) return;
+          var discountAmount = parseSupplierMoney((discountForm.querySelector('[name="gia_tri"]') || {}).value);
+          var discountDebt = Math.max(0, Number(discountForm.getAttribute('data-current-debt') || 0));
+          if (discountAmount <= 0) return alert('Vui lòng nhập số tiền chiết khấu.');
+          if (discountAmount > discountDebt) return alert('Số tiền chiết khấu không được vượt quá nợ hiện tại.');
+          var discountPayload = new URLSearchParams(new FormData(discountForm));
+          discountSubmitBtn.disabled = true;
+          fetch(discountForm.getAttribute('data-action'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            },
+            body: discountPayload.toString()
+          })
+            .then(function(response) {
+              return response.json().catch(function() {
+                return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+              });
+            })
+            .then(function(data) {
+              if (!data || !data.success) {
+                alert((data && data.message) || 'Không tạo được chiết khấu thanh toán.');
+                return;
+              }
+              window.location.reload();
+            })
+            .catch(function(error) {
+              alert((error && error.message) || 'Có lỗi khi tạo chiết khấu thanh toán.');
+            })
+            .finally(function() {
+              discountSubmitBtn.disabled = false;
+            });
           return;
         }
         var submitBtn = event.target.closest('.js-submit-supplier-pay-modal');
@@ -837,6 +922,11 @@
       });
 
       document.addEventListener('input', function(event) {
+        var discountAmountInput = event.target.closest('.js-supplier-discount-amount');
+        if (discountAmountInput) {
+          updateSupplierDiscountRemaining(discountAmountInput.closest('.supplier-discount-form'));
+          return;
+        }
         var amountInput = event.target.closest('.js-supplier-pay-amount');
         if (amountInput) {
           var form = amountInput.closest('.supplier-pay-form');

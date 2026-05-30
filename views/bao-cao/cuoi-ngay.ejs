@@ -7,6 +7,7 @@
   const qtyByInvoice = safeReport.qtyByInvoice || new Map();
   const filters = safeReport.filters || {};
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const dateValue = safeReport.date || new Date().toISOString().slice(0, 10);
   const displayDate = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
   const displayDateTime = value => value ? new Date(value).toLocaleString('vi-VN') : '';
@@ -129,7 +130,7 @@
         <div class="doc-sub">
           <div>Ngày bán: <%= displayDate(dateValue) %></div>
           <div>Ngày thanh toán: <%= displayDate(dateValue) %></div>
-          <div>Chi nhánh: <%= safeReport.branchName || 'Chi nhánh trung tâm' %></div>
+          <div>Cửa hàng: <%= safeReport.branchName || 'Cửa hàng trung tâm' %></div>
         </div>
 
         <table class="report-table">
@@ -163,12 +164,12 @@
                 <td class="left"><%= item.ma_hoa_don %> - <%= item.khach_hang_id?.ten_khach_hang || 'Khách lẻ' %></td>
                 <td><%= displayDateTime(item.ngay_ban) %></td>
                 <td><%= fmt(qtyByInvoice.get(String(item._id)) || 0) %></td>
-                <td><%= fmt(item.tong_tien) %></td>
+                <td><%= fmtMoney(item.tong_tien) %></td>
                 <td>0</td>
                 <td>0</td>
                 <td>0</td>
                 <td>0</td>
-                <td><%= fmt(item.thanh_toan) %></td>
+                <td><%= fmtMoney(item.thanh_toan) %></td>
               </tr>
             <% }) %>
 
@@ -188,12 +189,12 @@
                 <td class="left"><%= item.ma_phieu_tra %> - <%= item.khach_hang_id?.ten_khach_hang || 'Khách lẻ' %></td>
                 <td><%= displayDateTime(item.ngay_tra) %></td>
                 <td>0</td>
-                <td class="negative">-<%= fmt(item.tong_tien_tra) %></td>
+                <td class="negative">-<%= fmtMoney(item.tong_tien_tra) %></td>
                 <td>0</td>
                 <td>0</td>
                 <td>0</td>
                 <td>0</td>
-                <td class="negative">-<%= fmt(item.tong_tien_tra) %></td>
+                <td class="negative">-<%= fmtMoney(item.tong_tien_tra) %></td>
               </tr>
             <% }) %>
           </tbody>

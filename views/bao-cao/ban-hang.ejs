@@ -7,6 +7,7 @@
   const filters = safeReport.filters || {};
   const viewMode = safeReport.viewMode || 'chart';
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const generatedAt = safeReport.generatedAt ? new Date(safeReport.generatedAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN');
   const reportUrl = `/bao-cao/ban-hang?view=report&from=${range.from || ''}&to=${range.to || ''}`;
   const chartUrl = `/bao-cao/ban-hang?view=chart&from=${range.from || ''}&to=${range.to || ''}`;
@@ -133,7 +134,7 @@
             <div class="doc-title">Báo cáo bán hàng theo thời gian</div>
             <div class="doc-sub">
               <div>Từ ngày <%= rows.length ? rows[rows.length - 1].label : '' %> đến ngày <%= rows.length ? rows[0].label : '' %></div>
-              <div>Chi nhánh: <%= safeReport.branchName || 'Chi nhánh trung tâm' %></div>
+              <div>Cửa hàng: <%= safeReport.branchName || 'Cửa hàng trung tâm' %></div>
               <div>Bảng giá: Tất cả</div>
             </div>
             <table class="report-table">
@@ -145,15 +146,15 @@
                 <% rows.forEach(row => { %>
                   <tr>
                     <td><span class="toggle" onclick="toggleDetail('<%= row.key %>', this)">+</span><a class="date-link" href="#"><%= row.label %></a></td>
-                    <td class="num"><%= fmt(row.revenue) %></td>
-                    <td class="num"><%= fmt(row.returned) %></td>
-                    <td class="num"><%= fmt(row.netRevenue) %></td>
+                    <td class="num"><%= fmtMoney(row.revenue) %></td>
+                    <td class="num"><%= fmtMoney(row.returned) %></td>
+                    <td class="num"><%= fmtMoney(row.netRevenue) %></td>
                   </tr>
                   <tr class="detail-row detail-<%= row.key %>" hidden>
                     <td>Hóa đơn: <%= row.invoiceCount %> | Trả hàng: <%= row.returnCount %></td>
-                    <td class="num"><%= fmt(row.revenue) %></td>
-                    <td class="num negative">-<%= fmt(row.returned) %></td>
-                    <td class="num"><%= fmt(row.netRevenue) %></td>
+                    <td class="num"><%= fmtMoney(row.revenue) %></td>
+                    <td class="num negative">-<%= fmtMoney(row.returned) %></td>
+                    <td class="num"><%= fmtMoney(row.netRevenue) %></td>
                   </tr>
                 <% }) %>
               </tbody>

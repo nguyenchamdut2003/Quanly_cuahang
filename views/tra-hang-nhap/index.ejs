@@ -4,6 +4,7 @@
   const safeFilters = locals.filters || {};
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(function(key) {
@@ -86,6 +87,7 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     .return-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column;width:100%;min-width:0;box-sizing:border-box}
+    .btn-ban-hang{display:none}
     .return-shell{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(0,1fr);gap:12px;padding:12px 30px 16px;box-sizing:border-box;width:100%}
     .sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
     .title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
@@ -103,7 +105,8 @@
     .actions{display:flex;align-items:center;gap:8px}
     .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
-    .tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;color:#374151;display:inline-flex;align-items:center;justify-content:center}
+    .return-open-link{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#0070f4;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;white-space:nowrap}
+    .return-open-link:hover{border-color:#0070f4;background:#f7fbff;text-decoration:none}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
     /* Chỉ áp cho bảng danh sách — tránh table-layout:fixed + word-break áp vào bảng chi tiết nhóm lô */
     .table-wrap > table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
@@ -225,7 +228,6 @@
           <div class="actions">
             <a class="kv-btn primary" href="/tra-hang-nhap/create">+ Trả hàng nhập</a>
             <a class="kv-btn" href="/tra-hang-nhap/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
-            <span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
           </div>
         </div>
         <div class="table-wrap">
@@ -253,10 +255,10 @@
                     <td class="ellipsis"><%= r.ma_phieu_tra_nhap || '' %></td>
                     <td class="ellipsis"><%= formatDate(r.ngay_tra || r.created_at) %></td>
                     <td class="ellipsis"><%= r.nha_cung_cap_id ? (r.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
-                    <td class="num"><%= fmt(r.tong_tien_hang || r.tong_tien_tra || 0) %></td>
-                    <td class="num"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmt(r.giam_gia || 0) %></td>
-                    <td class="num"><%= fmt(r.ncc_can_tra || r.tong_tien_tra || 0) %></td>
-                    <td class="num"><%= fmt(r.ncc_da_tra || 0) %></td>
+                    <td class="num"><%= fmtMoney(r.tong_tien_hang || r.tong_tien_tra || 0) %></td>
+                    <td class="num"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmtMoney(r.giam_gia || 0) %></td>
+                    <td class="num"><%= fmtMoney(r.ncc_can_tra || r.tong_tien_tra || 0) %></td>
+                    <td class="num"><%= fmtMoney(r.ncc_da_tra || 0) %></td>
                     <td><span class="status-badge <%= badgeClass(r.trang_thai) %>"><%= statusLabel(r.trang_thai) %></span></td>
                   </tr>
                   <tr class="detail-row" id="detail-<%= r._id %>" style="display:none">
@@ -270,7 +272,7 @@
                               <div class="detail-branch">Phiếu nhập gốc: <%= r.phieu_nhap_id.ma_phieu_nhap || '--' %></div>
                             <% } %>
                           </div>
-                          <div class="detail-branch"><%= r.kho_id ? (r.kho_id.ten_kho || r.kho_id.ma_kho || 'Chi nhánh trung tâm') : 'Chi nhánh trung tâm' %></div>
+                          <div class="detail-branch"><%= r.kho_id ? (r.kho_id.ten_kho || r.kho_id.ma_kho || 'Cửa hàng trung tâm') : 'Cửa hàng trung tâm' %></div>
                         </div>
                         <div class="return-detail-split">
                           <div class="return-detail-main">
@@ -324,18 +326,18 @@
                                         <% } %>
                                         <td class="attr-cell"><div><%= rowLine.ten_thuoc_tinh || '--' %></div></td>
                                         <td class="num"><%= fmt(rowLine.so_luong || 0) %></td>
-                                        <td class="num"><%= fmt(rowLine.don_gia_nhap || 0) %></td>
-                                        <td class="num"><%= fmt(rowLine.don_gia_tra || 0) %></td>
-                                        <td class="num"><%= fmt(rowLine.thanh_tien || 0) %></td>
+                                        <td class="num"><%= fmtMoney(rowLine.don_gia_nhap || 0) %></td>
+                                        <td class="num"><%= fmtMoney(rowLine.don_gia_tra || 0) %></td>
+                                        <td class="num"><%= fmtMoney(rowLine.thanh_tien || 0) %></td>
                                         <% if (rowIndex === 0) { %>
-                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmt(group.total || 0) %></td>
+                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmtMoney(group.total || 0) %></td>
                                         <% } %>
                                       </tr>
                                     <% }) %>
                                     <tr class="group-total-row">
                                       <td colspan="5" class="num">TỔNG CỘNG</td>
-                                      <td class="num"><%= fmt(group.total || 0) %></td>
-                                      <td class="num"><%= fmt(group.total || 0) %></td>
+                                      <td class="num"><%= fmtMoney(group.total || 0) %></td>
+                                      <td class="num"><%= fmtMoney(group.total || 0) %></td>
                                     </tr>
                                   </tbody>
                                 </table>
@@ -351,19 +353,19 @@
                             </div>
                             <div class="return-summary-row">
                               <span>Tổng tiền hàng trả</span>
-                              <span class="summary-val"><%= fmt(r.tong_tien_hang || r.tong_tien_tra || 0) %></span>
+                              <span class="summary-val"><%= fmtMoney(r.tong_tien_hang || r.tong_tien_tra || 0) %></span>
                             </div>
                             <div class="return-summary-row">
                               <span>Giảm giá</span>
-                              <span class="summary-val"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmt(r.giam_gia || 0) %></span>
+                              <span class="summary-val"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmtMoney(r.giam_gia || 0) %></span>
                             </div>
                             <div class="return-summary-row">
                               <span>NCC cần trả</span>
-                              <span class="summary-val"><%= fmt(r.ncc_can_tra != null ? r.ncc_can_tra : (r.tong_tien_tra || 0)) %></span>
+                              <span class="summary-val"><%= fmtMoney(r.ncc_can_tra != null ? r.ncc_can_tra : (r.tong_tien_tra || 0)) %></span>
                             </div>
                             <div class="return-summary-row">
                               <span>NCC đã trả</span>
-                              <span class="summary-val"><%= fmt(r.ncc_da_tra || 0) %></span>
+                              <span class="summary-val"><%= fmtMoney(r.ncc_da_tra || 0) %></span>
                             </div>
                           </aside>
                         </div>

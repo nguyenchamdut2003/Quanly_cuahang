@@ -7,6 +7,7 @@
 
   function bindDetailTabs(root) {
     if (!root) return;
+    bindLotStatusFilters(root);
     if (root.querySelector('[data-tab-target]')) {
       var tabs = root.querySelectorAll('.detail-tab');
       var panels = root.querySelectorAll('.detail-pane');
@@ -38,6 +39,46 @@
           p.classList.toggle('is-active', p.getAttribute('data-detail-pane') === target);
         });
       });
+    });
+  }
+
+  function bindLotStatusFilters(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-lot-filter]').forEach(function(filterRoot) {
+      if (filterRoot._lotFilterBound) return;
+      filterRoot._lotFilterBound = true;
+      var pane = filterRoot.closest('[data-tab-panel="product-lots"]') || root;
+      var buttons = filterRoot.querySelectorAll('[data-lot-filter-value]');
+      var rows = pane.querySelectorAll('.lot-data-row');
+      var emptyRow = pane.querySelector('.lot-filter-empty-row');
+
+      function applyFilter(value) {
+        var visibleCount = 0;
+        rows.forEach(function(row) {
+          var status = row.getAttribute('data-lot-status') || '';
+          var qty = Number(row.getAttribute('data-lot-qty') || 0);
+          var show = value === 'all';
+          if (value === 'available') {
+            show = status === 'active' && qty > 0;
+          } else if (value === 'empty') {
+            show = status === 'het_hang' || (status !== 'huy' && qty <= 0);
+          }
+          row.style.display = show ? '' : 'none';
+          if (show) visibleCount += 1;
+        });
+        if (emptyRow) emptyRow.style.display = visibleCount === 0 ? '' : 'none';
+      }
+
+      buttons.forEach(function(button) {
+        button.addEventListener('click', function() {
+          var value = button.getAttribute('data-lot-filter-value') || 'all';
+          buttons.forEach(function(btn) {
+            btn.classList.toggle('is-active', btn === button);
+          });
+          applyFilter(value);
+        });
+      });
+      applyFilter('all');
     });
   }
 

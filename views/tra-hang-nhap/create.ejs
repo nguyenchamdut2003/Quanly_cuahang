@@ -25,12 +25,12 @@
     .product-row:hover{background:#f0f7ff}
     .grid-wrap{flex:1;min-height:0;background:#fff;border:1px solid #cfd8e3;overflow:auto}
     /* Tránh cột Tên hàng / ĐVT bị ép chồng khi table-layout:fixed + nhiều cột */
-    .return-import-grid table{width:max(100%,1280px);min-width:1280px;table-layout:auto;border-collapse:collapse;border-spacing:0}
+    .return-import-grid table{width:max(100%,1120px);min-width:1120px;table-layout:auto;border-collapse:collapse;border-spacing:0}
     .return-import-grid th{height:auto;min-height:34px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:12px;font-weight:800;padding:8px;text-align:left;vertical-align:top;box-sizing:border-box}
     .return-import-grid td{min-height:40px;height:auto;border-bottom:1px solid #edf1f5;padding:8px;font-size:13px;color:#111827;vertical-align:top;box-sizing:border-box;word-wrap:break-word}
     .return-import-grid .col-name{min-width:168px;max-width:260px}
     .return-import-grid .col-unit{min-width:52px;width:1%;white-space:nowrap;color:#111827}
-    .num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.attr{width:92px}.lot{width:118px}.smallqty{width:118px}.qty{width:105px}.money{width:122px}.remove{width:42px}
+    .num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.attr{width:92px}.lot{width:118px}.smallqty{width:104px}.qty{width:105px}.money{width:122px}.remove{width:42px}
     .cell-input { width: 100%; height: 28px; border: 1px solid #cfd8e3; border-radius: 4px; padding: 0 6px; font-size: 13px; outline: none; text-align: right; box-sizing: border-box; transition: border-color 0.15s; }
     .cell-input:focus { border-color: #0070f4; box-shadow: 0 0 0 2px rgba(0,112,244,0.1); }
     .cell-input.cell-input-left{text-align:left;font-size:12px}
@@ -78,9 +78,7 @@
               <th class="unit col-unit">ĐVT</th>
               <th class="attr">Thuộc tính</th>
               <th class="lot">Lô hàng</th>
-              <th class="smallqty num">SL đã nhập</th>
-              <th class="smallqty num">SL đã trả</th>
-              <th class="smallqty num" title="Theo phiếu nhập (đã nhập − đã trả). Giới hạn nhập liệu còn phụ thuộc tồn kho.">Còn có thể trả</th>
+              <th class="smallqty num" title="Tồn kho hiện tại theo lô/thuộc tính đang chọn.">Tồn</th>
               <th class="qty num">Số lượng trả</th>
               <th class="money num">Giá nhập</th>
               <th class="money num">Giá trả lại</th>
@@ -90,7 +88,7 @@
             </tr>
           </thead>
           <tbody id="itemsBody">
-            <tr><td colspan="15"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>
+            <tr><td colspan="13"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>
           </tbody>
         </table>
       </div>
@@ -300,9 +298,15 @@
       return '<option value="">Tự chọn FEFO</option>' + lots.map(l => `<option value="${l._id}" ${item.lo_hang_id === l._id ? 'selected' : ''}>${l.ma_lo || l.ten_lo} - SL ${fmt(l.so_luong)}</option>`).join('');
     }
 
+    function maxReturnQty(item) {
+      if (!item) return 0;
+      if (item.so_luong_toi_da_tra != null) return Number(item.so_luong_toi_da_tra || 0);
+      return Math.min(Number(item.so_luong_con_co_the_tra || 0), Number(item.ton_kho_hien_tai || 0));
+    }
+
     function renderItems() {
       if (!items.length) {
-        body.innerHTML = '<tr><td colspan="15"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>';
+        body.innerHTML = '<tr><td colspan="13"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>';
         renderTotals();
         return;
       }
@@ -311,6 +315,8 @@
         const ghiChuVal = String(it.ghi_chu || '').replace(/"/g, '&quot;');
         const attrLabel = it.thuoc_tinh_label || it.ten_quy_cach || it.ten_thuoc_tinh || '--';
         const loCell = (it.ma_lo || '') + (it.han_su_dung ? `<div style="font-size:11px;color:#667085;margin-top:2px">HSD ${formatDateOnly(it.han_su_dung)}</div>` : '');
+        const tonHienTai = Number(it.ton_kho_hien_tai || 0);
+        const toiDaTra = maxReturnQty(it);
         return `<tr>
           <td class="center">${idx + 1}</td>
           <td>${it.ma_hang || ''}</td>
@@ -318,10 +324,8 @@
           <td class="col-unit">${it.don_vi_tinh || ''}</td>
           <td>${attrLabel}</td>
           <td>${loCell}</td>
-          <td class="num">${fmt(it.so_luong_nhap || 0)}</td>
-          <td class="num">${fmt(it.tong_so_luong_da_tra || 0)}</td>
-          <td class="num" title="Còn trả theo phiếu: ${fmt(it.so_luong_con_co_the_tra || 0)} — Tồn kho hiện tại: ${fmt(it.ton_kho_hien_tai || 0)} — Tối đa nhập: ${fmt(it.so_luong_toi_da_tra != null ? it.so_luong_toi_da_tra : Math.min(it.so_luong_con_co_the_tra || 0, it.ton_kho_hien_tai || 0))}">${fmt(it.so_luong_con_co_the_tra || 0)}</td>
-          <td><input class="cell-input" type="number" min="0" max="${it.so_luong_toi_da_tra != null ? it.so_luong_toi_da_tra : ''}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
+          <td class="num" title="Tồn hiện tại theo lô/thuộc tính: ${fmt(tonHienTai)}">${fmt(tonHienTai)}</td>
+          <td><input class="cell-input" type="number" min="0" max="${toiDaTra}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
           <td><input class="cell-input" inputmode="numeric" value="${it.gia_nhap}" onchange="updateItem(${idx}, 'gia_nhap', this.value)" ${it.ct_phieu_nhap_id ? 'readonly' : ''}></td>
           <td><input class="cell-input" inputmode="numeric" value="${it.gia_tra_lai}" onchange="updateItem(${idx}, 'gia_tra_lai', this.value)"></td>
           <td class="num"><b>${fmt(line)}</b></td>
@@ -335,8 +339,10 @@
     function updateItem(idx, field, value) {
       if (!items[idx]) return;
       if (field === 'so_luong') {
-        const maxQty = Number(items[idx].so_luong_toi_da_tra != null ? items[idx].so_luong_toi_da_tra : items[idx].so_luong_con_co_the_tra || 0);
-        items[idx][field] = Math.min(money(value), Math.max(0, maxQty));
+        const maxQty = Math.max(0, maxReturnQty(items[idx]));
+        const nextQty = money(value);
+        if (nextQty > maxQty) showError('Số lượng trả không được vượt quá số tối đa trả.');
+        items[idx][field] = Math.min(nextQty, maxQty);
       } else if (['gia_nhap', 'gia_tra_lai'].includes(field)) items[idx][field] = money(value);
       else if (field === 'ghi_chu') items[idx][field] = String(value || '').trim();
       else items[idx][field] = value;

@@ -186,11 +186,11 @@
           <table class="admin-table warehouse-table">
             <thead>
               <tr>
-                <th>Mã phiếu</th>
-                                    <th>Thời gian</th>
-                                    <th>Người tạo</th>
-                                    <th class="text-right">Tổng cộng</th>
-                <th>Trạng thái</th>
+                <th class="text-center">Mã phiếu</th>
+                                    <th class="text-center">Thời gian</th>
+                                    <th class="text-center">Người tạo</th>
+                                    <th class="text-center">Tổng cộng</th>
+                <th class="text-center">Trạng thái</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -199,7 +199,7 @@
                                   <% } %>
                                   <% (supplierPurchaseHistory || []).forEach(function(row) { %>
                                     <tr>
-                                      <td>
+                                      <td class="text-center">
                                         <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
                                           <% if (row.loai === 'nhap') { %>
                                             <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
@@ -209,19 +209,19 @@
                                           <%= row.ma_phieu || '--' %>
                                         </a>
                                       </td>
-                  <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
-                  <td>
+                  <td class="supplier-muted-cell text-center"><%= formatDate(row.thoi_gian) %></td>
+                  <td class="text-center">
                     <div class="history-creator">
                       <span class="history-creator-avatar"><%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %></span>
                                           <%= row.nguoi_tao || '--' %>
                                         </div>
                                       </td>
-                                      <td class="text-right">
+                                      <td class="text-center">
                                         <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
-                                          <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %>
+                                          <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ
                                         </span>
                                       </td>
-                                      <td>
+                                      <td class="text-center">
                                         <% 
                       var statusClass = 'status-pill';
                       var statusLabelText = row.loai === 'tra' ? mapTraHangStatus(row.trang_thai) : mapNhapHangStatus(row.trang_thai);
@@ -242,7 +242,7 @@
         <div class="supplier-pane-toolbar supplier-debt-toolbar">
           <div class="supplier-debt-summary">
             <span class="supplier-debt-summary-label">Nợ hiện tại</span>
-            <strong class="supplier-debt-summary-value"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
+            <strong class="supplier-debt-summary-value"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</strong>
           </div>
           <div class="supplier-debt-actions">
             <button class="btn btn-light btn-sm" type="button">Điều chỉnh</button>
@@ -251,20 +251,28 @@
               type="button"
               data-modal-id="supplierPayModal_<%= selectedSupplier._id %>"
             >Thanh toán</button>
-            <button class="btn btn-light btn-sm" type="button">Chiết khấu thanh toán</button>
+            <button
+              class="btn btn-light btn-sm js-open-supplier-discount-modal"
+              type="button"
+              data-modal-id="supplierDiscountModal_<%= selectedSupplier._id %>"
+            >Chiết khấu thanh toán</button>
+            <a
+              class="btn btn-primary btn-sm"
+              href="/nha-cung-cap/<%= selectedSupplier._id %>/export/debt"
+            >Xuất công nợ</a>
           </div>
         </div>
         <div class="supplier-pane-table-wrap table-wrap">
           <table class="admin-table warehouse-table">
                                 <thead>
                                   <tr>
-                                    <th>Mã phiếu</th>
-                                    <th>Loại chứng từ</th>
-                                    <th>Thời gian</th>
-                                    <th>Loại</th>
-                <th class="text-right">Giá trị</th>
-                <th class="text-right">Nợ cần trả</th>
-                                    <th>Ghi chú</th>
+                                    <th class="text-center">Mã phiếu</th>
+                                    <th class="text-center">Thời gian</th>
+                                    <th class="text-center">Loại chứng từ</th>
+                <th class="text-center">Giá trị</th>
+                <th class="text-center">Đã thanh toán</th>
+                <th class="text-center">Còn lại</th>
+                <th class="text-center">Tổng nợ</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -273,13 +281,13 @@
                                   <% } %>
                                   <% (supplierDebtHistory || []).forEach(function(row) { %>
                                     <tr>
-                                      <td><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
-                                      <td><%= row.loai_chung_tu || '--' %></td>
-                  <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
-                                      <td><%= mapCongNoDirection ? mapCongNoDirection(row.loai) : mapCongNoLoai(row.loai) %></td>
-                  <td class="text-right"><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %></td>
-                  <td class="text-right"><strong><%= Number(row.no_con_lai || 0).toLocaleString('vi-VN') %></strong></td>
-                                      <td><%= row.ghi_chu || '--' %></td>
+                                      <td class="text-center"><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
+                  <td class="supplier-muted-cell text-center"><%= formatDate(row.thoi_gian) %></td>
+                                      <td class="text-center"><%= row.loai_chung_tu || '--' %></td>
+                  <td class="text-center"><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                  <td class="text-center"><%= Number(row.da_thanh_toan || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                  <td class="text-center"><%= Number(row.con_lai || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                  <td class="text-center"><strong><%= Number(row.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</strong></td>
                                     </tr>
                                   <% }) %>
                                 </tbody>
@@ -294,7 +302,7 @@
                 <div class="supplier-pay-subtitle">
                   <span><%= selectedSupplier.ten_cong_ty || selectedSupplier.ten_ncc || 'Nhà cung cấp' %></span>
                   <span>·</span>
-                  <span class="supplier-pay-debt-badge">Nợ hiện tại: <%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></span>
+                  <span class="supplier-pay-debt-badge">Nợ hiện tại: <%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</span>
                 </div>
               </div>
               <button class="supplier-pay-close js-close-supplier-pay-modal" type="button" aria-label="Đóng">×</button>
@@ -372,7 +380,7 @@
                 <% if (supplierUnpaidPurchaseDebtTotal !== Number(selectedSupplier.tong_no || 0)) { %>
                   <div class="supplier-pay-reconcile-note">
                     Nợ theo phiếu nhập: <strong><%= supplierUnpaidPurchaseDebtTotal.toLocaleString('vi-VN') %></strong>.
-                    Nợ hiện tại theo sổ công nợ: <strong><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>.
+                    Nợ hiện tại theo sổ công nợ: <strong><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</strong>.
                   </div>
                 <% } %>
                 <div class="supplier-pay-table-wrap table-wrap">
@@ -447,6 +455,57 @@
             </div>
           </div>
         </div>
+        <div class="supplier-pay-modal-overlay js-supplier-discount-overlay" id="supplierDiscountModal_<%= selectedSupplier._id %>" aria-hidden="true">
+          <div class="supplier-pay-modal" role="dialog" aria-modal="true" aria-labelledby="supplierDiscountTitle_<%= selectedSupplier._id %>">
+            <div class="supplier-pay-header">
+              <div>
+                <h3 class="supplier-pay-title" id="supplierDiscountTitle_<%= selectedSupplier._id %>">Chiết khấu thanh toán</h3>
+                <div class="supplier-pay-subtitle">
+                  <span><%= selectedSupplier.ten_cong_ty || selectedSupplier.ten_ncc || 'Nhà cung cấp' %></span>
+                  <span>·</span>
+                  <span class="supplier-pay-debt-badge">Nợ hiện tại: <%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</span>
+                </div>
+              </div>
+              <button class="supplier-pay-close js-close-supplier-discount-modal" type="button" aria-label="Đóng">×</button>
+            </div>
+            <div class="supplier-pay-body">
+              <form id="supplierDiscountForm_<%= selectedSupplier._id %>" class="supplier-discount-form" data-action="/nha-cung-cap/<%= selectedSupplier._id %>/discount-debt" data-current-debt="<%= Number(selectedSupplier.tong_no || 0) %>">
+                <div class="supplier-pay-grid">
+                  <label class="supplier-pay-field">
+                    <span>Thời gian</span>
+                    <span class="supplier-pay-input-wrap">
+                      <input name="ngay_giao_dich_display" type="text" value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }) %>" readonly>
+                      <span class="supplier-pay-icons"><i class="fa-regular fa-calendar"></i><i class="fa-regular fa-clock"></i></span>
+                    </span>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Người thực hiện</span>
+                    <select name="nguoi_thuc_hien_display" disabled>
+                      <option selected><%= currentUserName || 'test' %></option>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field supplier-pay-field-full">
+                    <span>Chiết khấu từ nhà cung cấp</span>
+                    <input class="js-supplier-discount-amount" name="gia_tri" inputmode="numeric" autocomplete="off" value="">
+                    <small class="supplier-pay-remaining-hint">Còn nợ: <span class="js-supplier-discount-remaining"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></span></small>
+                  </label>
+                  <label class="supplier-pay-field supplier-pay-field-full">
+                    <span>Ghi chú</span>
+                    <textarea name="ghi_chu" placeholder="Nhập ghi chú"></textarea>
+                  </label>
+                </div>
+                <label class="supplier-pay-check" style="display: none;">
+                  <input type="checkbox" name="phan_bo_phieu_nhap" value="1">
+                  <span>Phân bổ vào phiếu nhập hàng</span>
+                </label>
+              </form>
+            </div>
+            <div class="supplier-pay-footer">
+              <button class="btn btn-light js-close-supplier-discount-modal" type="button">Bỏ qua</button>
+              <button class="btn btn-primary js-submit-supplier-discount-modal" type="button" data-form-id="supplierDiscountForm_<%= selectedSupplier._id %>">Tạo phiếu</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="detail-pane" data-detail-pane="xnb">
@@ -454,16 +513,16 @@
           <table class="admin-table warehouse-table">
             <thead>
               <tr>
-                <th>Mã xuất dùng nội bộ</th>
-                <th>Loại xuất</th>
-                <th>Kho</th>
-                <th class="text-right">Tổng SL</th>
-                <th class="text-right">Tổng giá trị</th>
-                <th>Thời gian</th>
-                <th>Người tạo</th>
-                <th>Trạng thái</th>
-                <th>Ghi chú</th>
-                <th>Chứng từ</th>
+                <th class="text-center">Mã xuất dùng nội bộ</th>
+                <th class="text-center">Loại xuất</th>
+                <th class="text-center">Kho</th>
+                <th class="text-center">Tên hàng hóa</th>
+                <th class="text-center">Tổng SL</th>
+                <th class="text-center">Tổng giá trị</th>
+                <th class="text-center">Thời gian</th>
+                <th class="text-center">Người tạo</th>
+                <th class="text-center">Trạng thái</th>
+                <th class="text-center">Chứng từ</th>
               </tr>
             </thead>
             <tbody>
@@ -478,16 +537,22 @@
                   else if (row.trang_thai === 'cancelled') xnbStatusClass += ' is-cancelled';
                 %>
                 <tr>
-                  <td><strong><%= row.ma_xuat_noi_bo || '--' %></strong></td>
-                  <td><%= row.loai_xuat || '--' %></td>
-                  <td><%= row.kho || '--' %></td>
-                  <td class="text-right"><%= Number(row.tong_so_luong || 0).toLocaleString('vi-VN') %></td>
-                  <td class="text-right"><%= Number(row.tong_gia_tri || 0).toLocaleString('vi-VN') %></td>
-                  <td class="supplier-muted-cell"><%= formatDate(row.thoi_gian) %></td>
-                  <td><%= row.nguoi_tao || '--' %></td>
-                  <td><span class="<%= xnbStatusClass %>"><%= mapXuatNoiBoStatus ? mapXuatNoiBoStatus(row.trang_thai) : (row.trang_thai || '--') %></span></td>
-                  <td><%= row.ghi_chu || '--' %></td>
-                  <td>
+                  <td class="text-center">
+                    <% if (row._id) { %>
+                      <a class="table-code-link ref-link" href="/xuat-dung-noi-bo?open=<%= row._id %>"><%= row.ma_xuat_noi_bo || '--' %></a>
+                    <% } else { %>
+                      <strong><%= row.ma_xuat_noi_bo || '--' %></strong>
+                    <% } %>
+                  </td>
+                  <td class="text-center"><%= row.loai_xuat || '--' %></td>
+                  <td class="text-center"><%= row.kho || '--' %></td>
+                  <td class="text-center"><%= row.ten_hang_hoa || 'Không có' %></td>
+                  <td class="text-center"><%= Number(row.tong_so_luong || 0).toLocaleString('vi-VN') %></td>
+                  <td class="text-center"><%= Number(row.tong_gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                  <td class="supplier-muted-cell text-center"><%= formatDate(row.thoi_gian) %></td>
+                  <td class="text-center"><%= row.nguoi_tao || '--' %></td>
+                  <td class="text-center"><span class="<%= xnbStatusClass %>"><%= mapXuatNoiBoStatus ? mapXuatNoiBoStatus(row.trang_thai) : (row.trang_thai || '--') %></span></td>
+                  <td class="text-center">
                     <% if (row._id) { %>
                       <a class="btn btn-light btn-sm" href="/chung-tu-kho/xuat-noi-bo/<%= row._id %>" target="_blank">Mở</a>
                     <% } else { %>

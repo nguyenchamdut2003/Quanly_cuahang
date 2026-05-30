@@ -129,7 +129,7 @@ async function buildSalesReport(query = {}) {
 
     return {
         generatedAt: new Date(),
-        branchName: 'Chi nhánh trung tâm',
+        branchName: 'Cửa hàng trung tâm',
         range,
         rows,
         chartRows,
@@ -231,7 +231,7 @@ async function buildOrderReport(query = {}) {
 
     return {
         generatedAt: new Date(),
-        branchName: 'Chi nhánh trung tâm',
+        branchName: 'Cửa hàng trung tâm',
         range,
         orders,
         productRows,
@@ -320,7 +320,7 @@ async function buildCustomerReport(query = {}) {
 
     return {
         generatedAt: new Date(),
-        branchName: 'Chi nhánh trung tâm',
+        branchName: 'Cửa hàng trung tâm',
         range,
         rows,
         topCustomers: rows.slice(0, 10),
@@ -410,7 +410,7 @@ async function buildSupplierReport(query = {}) {
 
     return {
         generatedAt: new Date(),
-        branchName: 'Chi nhánh trung tâm',
+        branchName: 'Cửa hàng trung tâm',
         range,
         rows,
         topSuppliers: rows.slice(0, 10),
@@ -591,7 +591,7 @@ async function buildEndOfDayReport(query = {}) {
     return {
         date: day,
         generatedAt: new Date(),
-        branchName: 'Chi nhánh trung tâm',
+        branchName: 'Cửa hàng trung tâm',
         invoices,
         returns,
         receipts,

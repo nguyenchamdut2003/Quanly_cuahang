@@ -50,10 +50,11 @@ function rowBase(row, options) {
   var qty = Number(options.qty != null ? options.qty : row.so_luong || 0);
   var price = Number(options.price != null ? options.price : row.don_gia || row.don_gia_ban || row.gia_tra_lai || row.gia_von || 0);
   var total = Number(options.total != null ? options.total : row.thanh_tien || (qty * price) || 0);
+  var attribute = String(row.ten_thuoc_tinh || row.ten_quy_cach || attrName(row.gia_tri_thuoc_tinh_id) || '').trim();
   return {
     ma_hang: product.ma_hang || '',
     ten_hang: product.ten_hang || '',
-    thuoc_tinh: attrName(row.gia_tri_thuoc_tinh_id),
+    thuoc_tinh: attribute || 'Không có',
     lo: lotName(row.lo_hang_id),
     so_luong: qty,
     don_gia: price,

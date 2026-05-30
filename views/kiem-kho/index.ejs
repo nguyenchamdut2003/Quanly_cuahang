@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/stylesheets/style.css">
     <style>
       body{background:#f2f4f7}
-      .kk-page{height:calc(100vh - 98px);display:grid;grid-template-columns:302px minmax(0,1fr);gap:14px;padding:10px 8px 0}
+      .kk-page{height:calc(100vh - 98px);display:grid;grid-template-columns:302px minmax(0,1fr);gap:14px;padding:10px 30px 0}
       .kk-sidebar{background:#fff;border-radius:8px;padding:18px 14px;overflow:auto;border:1px solid #edf0f5}
       .kk-main{min-width:0;display:flex;flex-direction:column}
       .kk-top{min-height:44px;display:grid;grid-template-columns:240px minmax(320px,590px) 1fr auto;align-items:center;gap:10px;margin-bottom:6px}
@@ -18,7 +18,6 @@
       .kk-actions{display:flex;align-items:center;gap:8px}
       .kk-btn{height:36px;border:1px solid #c7d0dc;background:#fff;border-radius:8px;color:#1f2937;padding:0 13px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
       .kk-btn.primary{border-color:#006dff;color:#006dff}
-      .kk-icon{width:36px;height:36px;border:1px solid #c7d0dc;border-radius:8px;background:#fff;display:inline-flex;align-items:center;justify-content:center;color:#344054}
       .filter-title{font-size:14px;font-weight:800;margin:0 0 10px;color:#050505}
       .filter-block{margin-bottom:20px}
       .radio-row,.check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px;color:#111827}
@@ -136,9 +135,6 @@
           <div class="kk-actions">
             <a class="kk-btn primary" href="/kiem-kho/create"><i class="fa-solid fa-plus"></i> Kiểm kho</a>
             <a class="kk-btn" href="/kiem-kho/export.csv<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
-            <span class="kk-icon"><i class="fa-solid fa-list"></i></span>
-            <span class="kk-icon"><i class="fa-solid fa-gear"></i></span>
-            <span class="kk-icon"><i class="fa-regular fa-circle-question"></i></span>
           </div>
         </div>
 

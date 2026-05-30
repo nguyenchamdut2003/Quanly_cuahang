@@ -1,7 +1,39 @@
 var mongoose = require('mongoose');
 var querystring = require('querystring');
 var path = require('path');
-var { HangHoa, NhomHang, DonViTinh, NhaCungCap, TonKho, Kho, BangGia, CTBangGia, CuaHang, LoHang, TonKhoLo, LichSuKho, ThuocTinhHang, GiaTriThuocTinh, HangHoaThuocTinh } = require('../models/kiot.model');
+var {
+    HangHoa,
+    NhomHang,
+    DonViTinh,
+    NhaCungCap,
+    TonKho,
+    Kho,
+    BangGia,
+    CTBangGia,
+    CuaHang,
+    LoHang,
+    TonKhoLo,
+    LichSuKho,
+    ThuocTinhHang,
+    GiaTriThuocTinh,
+    HangHoaThuocTinh,
+    PhieuNhap,
+    CTPhieuNhap,
+    PhieuTraHangNhap,
+    CTPhieuTraHangNhap,
+    DonHang,
+    CTDonHang,
+    HoaDonBanHang,
+    CTHoaDonBanHang,
+    PhieuTraHang,
+    CTPhieuTraHang,
+    PhieuKiemKho,
+    CTPhieuKiemKho,
+    PhieuXuatHuy,
+    CTXuatHuy,
+    PhieuXuatNoiBo,
+    CTXuatNoiBo
+} = require('../models/kiot.model');
 var pdfService = require('../services/pdf.service');
 
 function formatDate(value) {
@@ -332,6 +364,206 @@ async function createDefaultLotFromInventory(product, inventoryRows, req, option
     return createdLots;
 }
 
+function uniqueValues(rows, key) {
+    var seen = {};
+    return (rows || []).map(function(row) { return String(row && row[key] || '').trim(); })
+        .filter(function(value) {
+            if (!value || seen[value]) return false;
+            seen[value] = true;
+            return true;
+        });
+}
+
+function mapBy(rows, key) {
+    return (rows || []).reduce(function(map, row) {
+        var value = String(row && row[key] || '').trim();
+        if (value) map[value] = row;
+        return map;
+    }, {});
+}
+
+function labelStockTransactionType(type, quantity) {
+    var labels = {
+        nhap_hang: 'Nhập hàng',
+        tra_hang_nhap: 'Trả hàng nhà cung cấp',
+        tra_hang: 'Trả hàng',
+        kiem_kho: 'Kiểm hàng',
+        ban_hang: 'Bán hàng',
+        xuat_huy: 'Xuất hủy',
+        xuat_noi_bo: 'Xuất dùng nội bộ',
+        dieu_chinh: Number(quantity || 0) === 0 ? 'Cập nhật giá vốn' : 'Điều chỉnh tồn'
+    };
+    return labels[type] || type || '---';
+}
+
+function partnerName(doc, fallback) {
+    if (!doc) return fallback || '';
+    if (doc.nha_cung_cap_id) return doc.nha_cung_cap_id.ten_ncc || doc.nha_cung_cap_id.ten_nha_cung_cap || doc.nha_cung_cap_id.ten_cong_ty || doc.nha_cung_cap_id.ma_ncc || fallback || '';
+    if (doc.khach_hang_id) return doc.khach_hang_id.ten_khach_hang || doc.khach_hang_id.ten_cong_ty || doc.khach_hang_id.ma_khach_hang || fallback || '';
+    return doc.nguoi_nhan || fallback || '';
+}
+
+function unitPriceFromValue(value, quantity) {
+    var qty = Math.abs(Number(quantity || 0));
+    if (!qty) return 0;
+    return Math.abs(Number(value || 0) / qty);
+}
+
+async function enrichStockCardRows(rows, productId) {
+    rows = rows || [];
+    var codes = uniqueValues(rows, 'ma_phieu');
+    if (!codes.length) return rows.map(function(row) { return Object.assign({}, row, { loai_giao_dich: labelStockTransactionType(row.loai_phieu, row.so_luong_thay_doi) }); });
+
+    var productObjectId = productId instanceof mongoose.Types.ObjectId
+        ? productId
+        : (mongoose.Types.ObjectId.isValid(productId) ? new mongoose.Types.ObjectId(productId) : productId);
+    var purchases = await PhieuNhap.find({ ma_phieu_nhap: { $in: codes } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean();
+    var purchaseMap = mapBy(purchases, 'ma_phieu_nhap');
+    var purchaseIds = purchases.map(function(doc) { return doc._id; });
+    var purchaseDetails = purchaseIds.length ? await CTPhieuNhap.find({ phieu_nhap_id: { $in: purchaseIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var purchaseDetailMap = purchaseDetails.reduce(function(map, row) {
+        map[String(row.phieu_nhap_id)] = row;
+        return map;
+    }, {});
+
+    var supplierReturns = await PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: codes } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean();
+    var supplierReturnMap = mapBy(supplierReturns, 'ma_phieu_tra_nhap');
+    var supplierReturnIds = supplierReturns.map(function(doc) { return doc._id; });
+    var supplierReturnDetails = supplierReturnIds.length ? await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: { $in: supplierReturnIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var supplierReturnDetailMap = supplierReturnDetails.reduce(function(map, row) {
+        map[String(row.phieu_tra_nhap_id)] = row;
+        return map;
+    }, {});
+
+    var orders = await DonHang.find({ ma_don_hang: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
+    var orderMap = mapBy(orders, 'ma_don_hang');
+    var orderIds = orders.map(function(doc) { return doc._id; });
+    var orderDetails = orderIds.length ? await CTDonHang.find({ don_hang_id: { $in: orderIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var orderDetailMap = orderDetails.reduce(function(map, row) {
+        map[String(row.don_hang_id)] = row;
+        return map;
+    }, {});
+
+    var invoices = await HoaDonBanHang.find({ ma_hoa_don: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
+    var invoiceMap = mapBy(invoices, 'ma_hoa_don');
+    var invoiceIds = invoices.map(function(doc) { return doc._id; });
+    var invoiceDetails = invoiceIds.length ? await CTHoaDonBanHang.find({ hoa_don_id: { $in: invoiceIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var invoiceDetailMap = invoiceDetails.reduce(function(map, row) {
+        map[String(row.hoa_don_id)] = row;
+        return map;
+    }, {});
+
+    var returns = await PhieuTraHang.find({ ma_phieu_tra: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
+    var returnMap = mapBy(returns, 'ma_phieu_tra');
+    var returnIds = returns.map(function(doc) { return doc._id; });
+    var returnDetails = returnIds.length ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var returnDetailMap = returnDetails.reduce(function(map, row) {
+        map[String(row.phieu_tra_hang_id)] = row;
+        return map;
+    }, {});
+
+    var checks = await PhieuKiemKho.find({ ma_kiem_kho: { $in: codes } }).lean();
+    var checkMap = mapBy(checks, 'ma_kiem_kho');
+    var checkIds = checks.map(function(doc) { return doc._id; });
+    var checkDetails = checkIds.length ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: checkIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var checkDetailMap = checkDetails.reduce(function(map, row) {
+        map[String(row.phieu_kiem_kho_id)] = row;
+        return map;
+    }, {});
+
+    var disposals = await PhieuXuatHuy.find({ ma_xuat_huy: { $in: codes } }).lean();
+    var disposalMap = mapBy(disposals, 'ma_xuat_huy');
+    var disposalIds = disposals.map(function(doc) { return doc._id; });
+    var disposalDetails = disposalIds.length ? await CTXuatHuy.find({ phieu_xuat_huy_id: { $in: disposalIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var disposalDetailMap = disposalDetails.reduce(function(map, row) {
+        map[String(row.phieu_xuat_huy_id)] = row;
+        return map;
+    }, {});
+
+    var internalIssues = await PhieuXuatNoiBo.find({ ma_xuat_noi_bo: { $in: codes } }).lean();
+    var internalIssueMap = mapBy(internalIssues, 'ma_xuat_noi_bo');
+    var internalIssueIds = internalIssues.map(function(doc) { return doc._id; });
+    var internalIssueDetails = internalIssueIds.length ? await CTXuatNoiBo.find({ phieu_xuat_id: { $in: internalIssueIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var internalIssueDetailMap = internalIssueDetails.reduce(function(map, row) {
+        map[String(row.phieu_xuat_id)] = row;
+        return map;
+    }, {});
+
+    return rows.map(function(row) {
+        var code = String(row.ma_phieu || '').trim();
+        var qty = Number(row.so_luong_thay_doi || 0);
+        var card = Object.assign({}, row, {
+            loai_giao_dich: labelStockTransactionType(row.loai_phieu, qty),
+            doi_tac: '',
+            gia_giao_dich: unitPriceFromValue(row.gia_tri_thay_doi, qty),
+            gia_von_the_kho: unitPriceFromValue(row.gia_tri_thay_doi, qty),
+            chung_tu_type: '',
+            chung_tu_doc: null
+        });
+        var doc;
+        var detail;
+
+        if (row.loai_phieu === 'nhap_hang') {
+            doc = purchaseMap[code];
+            detail = doc ? purchaseDetailMap[String(doc._id)] : null;
+            card.doi_tac = partnerName(doc, '');
+            card.gia_giao_dich = Number(detail && detail.don_gia_nhap || card.gia_giao_dich || 0);
+            card.gia_von_the_kho = card.gia_giao_dich;
+            card.chung_tu_type = 'purchase';
+            card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'tra_hang_nhap') {
+            doc = supplierReturnMap[code];
+            detail = doc ? supplierReturnDetailMap[String(doc._id)] : null;
+            card.doi_tac = partnerName(doc, '');
+            card.gia_giao_dich = Number(detail && (detail.gia_tra_lai || detail.gia_nhap) || card.gia_giao_dich || 0);
+            card.gia_von_the_kho = Number(detail && detail.gia_nhap || card.gia_giao_dich || 0);
+            card.chung_tu_type = 'supplier_return';
+            card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'ban_hang') {
+            doc = orderMap[code] || invoiceMap[code];
+            detail = orderMap[code] ? orderDetailMap[String(doc && doc._id)] : invoiceDetailMap[String(doc && doc._id)];
+            card.doi_tac = partnerName(doc, 'Khách lẻ');
+            card.gia_giao_dich = Number(detail && (detail.don_gia_ban || detail.don_gia) || 0);
+            card.gia_von_the_kho = unitPriceFromValue(row.gia_tri_thay_doi, qty);
+            card.chung_tu_type = orderMap[code] ? 'order' : 'invoice';
+            card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'tra_hang') {
+            doc = returnMap[code];
+            detail = doc ? returnDetailMap[String(doc._id)] : null;
+            card.doi_tac = partnerName(doc, 'Khách lẻ');
+            card.gia_giao_dich = Number(detail && detail.don_gia || card.gia_giao_dich || 0);
+            card.gia_von_the_kho = unitPriceFromValue(row.gia_tri_thay_doi, qty);
+            card.chung_tu_type = 'customer_return';
+            card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'kiem_kho') {
+            doc = checkMap[code];
+            detail = doc ? checkDetailMap[String(doc._id)] : null;
+            card.gia_giao_dich = 0;
+            card.gia_von_the_kho = unitPriceFromValue(row.gia_tri_thay_doi || (detail && detail.gia_tri_lech), qty);
+            card.chung_tu_type = 'stock_check';
+            card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'xuat_huy') {
+            doc = disposalMap[code];
+            detail = doc ? disposalDetailMap[String(doc._id)] : null;
+            card.doi_tac = doc && doc.ly_do_huy ? doc.ly_do_huy : '';
+            card.gia_giao_dich = 0;
+            card.gia_von_the_kho = Number(detail && detail.gia_von || card.gia_von_the_kho || 0);
+            card.chung_tu_type = 'stock_disposal';
+            card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'xuat_noi_bo') {
+            doc = internalIssueMap[code];
+            detail = doc ? internalIssueDetailMap[String(doc._id)] : null;
+            card.doi_tac = partnerName(doc, '');
+            card.gia_giao_dich = 0;
+            card.gia_von_the_kho = Number(detail && detail.gia_von || card.gia_von_the_kho || 0);
+            card.chung_tu_type = 'internal_issue';
+            card.chung_tu_doc = doc;
+        }
+
+        return card;
+    });
+}
+
 function makeRangeFilter(minRaw, maxRaw) {
     var hasMinValue = String(minRaw || '').trim() !== '';
     var hasMaxValue = String(maxRaw || '').trim() !== '';
@@ -611,21 +843,32 @@ async function seedProductsIfEmpty() {
     }));
 }
 
-async function loadProductDetailById(productId) {
+async function loadProductDetailById(productId, req) {
     if (!mongoose.Types.ObjectId.isValid(productId)) return null;
-    var item = await HangHoa.findById(productId).lean();
+    var storeId = await resolveStoreId(req);
+    var hasStoreScope = storeId && mongoose.Types.ObjectId.isValid(storeId);
+    var productQuery = { _id: productId };
+    if (hasStoreScope) {
+        productQuery.$or = [
+            { cua_hang_id: storeId },
+            { cua_hang_id: null },
+            { cua_hang_id: { $exists: false } }
+        ];
+    }
+    var item = await HangHoa.findOne(productQuery).lean();
     if (!item) return null;
 
-    var groups = await loadProductGroups();
-    var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
+    var scopedQuery = hasStoreScope ? { cua_hang_id: storeId } : {};
+    var groups = await loadProductGroups(storeId);
+    var suppliers = await NhaCungCap.find(scopedQuery).sort({ ten_ncc: 1, ten_nha_cung_cap: 1 }).lean();
     var units = await loadUnitOptions();
-    var warehouses = await Kho.find({}).sort({ ten_kho: 1, ma_kho: 1 }).lean();
+    var warehouses = await Kho.find(scopedQuery).sort({ ten_kho: 1, ma_kho: 1 }).lean();
     var groupMap = groups.reduce(function(map, group) {
         map[String(group._id)] = group.ten_nhom_hang || '---';
         return map;
     }, {});
     var supplierMap = suppliers.reduce(function(map, supplier) {
-        map[String(supplier._id)] = supplier.ten_ncc || '---';
+        map[String(supplier._id)] = supplier.ten_ncc || supplier.ten_nha_cung_cap || supplier.ten_cong_ty || supplier.ma_ncc || '---';
         return map;
     }, {});
     var unitMap = units.reduce(function(map, unit) {
@@ -636,9 +879,16 @@ async function loadProductDetailById(productId) {
         map[String(warehouse._id)] = warehouse.ten_kho || warehouse.ma_kho || '---';
         return map;
     }, {});
+    var warehouseStatusMap = warehouses.reduce(function(map, warehouse) {
+        map[String(warehouse._id)] = warehouse.trang_thai || '---';
+        return map;
+    }, {});
 
+    var productObjectId = new mongoose.Types.ObjectId(productId);
+    var inventoryMatch = { hang_hoa_id: productObjectId };
+    if (hasStoreScope) inventoryMatch.cua_hang_id = new mongoose.Types.ObjectId(storeId);
     var inventoryRows = await TonKho.aggregate([
-        { $match: { hang_hoa_id: new mongoose.Types.ObjectId(productId) } },
+        { $match: inventoryMatch },
         { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
     ]);
     item.ton_kho = inventoryRows[0] ? Number(inventoryRows[0].total || 0) : 0;
@@ -647,24 +897,90 @@ async function loadProductDetailById(productId) {
     item.don_vi_tinh_ten = unitMap[String(item.don_vi_tinh_id || '')] || '---';
     item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
 
-    var selectedProductInventory = await TonKho.find({ hang_hoa_id: item._id }).sort({ updated_at: -1 }).lean();
+    var stockQuery = { hang_hoa_id: item._id };
+    if (hasStoreScope) stockQuery.cua_hang_id = storeId;
+    var selectedProductInventory = await TonKho.find(stockQuery).sort({ updated_at: -1 }).lean();
+
+    var openOrderQuery = {
+        trang_thai_giao_hang: { $ne: 'giao_du' },
+        trang_thai: { $ne: 'cancelled' }
+    };
+    if (hasStoreScope) openOrderQuery.cua_hang_id = storeId;
+    var openOrders = await DonHang.find(openOrderQuery).select('_id kho_id').lean();
+    var orderWarehouseMap = openOrders.reduce(function(map, order) {
+        map[String(order._id)] = order.kho_id;
+        return map;
+    }, {});
+    var orderDetails = openOrders.length
+        ? await CTDonHang.find({ don_hang_id: { $in: openOrders.map(function(order) { return order._id; }) }, hang_hoa_id: item._id }).lean()
+        : [];
+    var orderedQtyMap = orderDetails.reduce(function(map, row) {
+        var missingQty = Number(row.so_luong_con_thieu || 0);
+        if (missingQty <= 0) {
+            missingQty = Math.max(Number(row.so_luong_dat || row.so_luong || 0) - Number(row.so_luong_da_giao || 0), 0);
+        }
+        if (missingQty <= 0) return map;
+        var warehouseId = String(orderWarehouseMap[String(row.don_hang_id)] || '');
+        map[warehouseId] = Number(map[warehouseId] || 0) + missingQty;
+        return map;
+    }, {});
+
+    var expiryRows = item.quan_ly_theo_lo
+        ? await LoHang.aggregate([
+            {
+                $match: Object.assign({
+                    hang_hoa_id: item._id,
+                    han_su_dung: { $ne: null },
+                    trang_thai: { $ne: 'huy' }
+                }, hasStoreScope ? { cua_hang_id: new mongoose.Types.ObjectId(storeId) } : {})
+            },
+            { $group: { _id: '$kho_id', latestExpiry: { $max: '$han_su_dung' } } }
+        ])
+        : [];
+    var expiryMap = expiryRows.reduce(function(map, row) {
+        map[String(row._id || '')] = row.latestExpiry;
+        return map;
+    }, {});
+    var productDefaultExpiry = null;
+    if (item.han_su_dung) {
+        productDefaultExpiry = item.han_su_dung;
+    } else if (item.han_su_dung_mac_dinh_so_ngay) {
+        var baseDate = item.created_at || item.ngay_tao || new Date();
+        productDefaultExpiry = new Date(new Date(baseDate).getTime() + Number(item.han_su_dung_mac_dinh_so_ngay || 0) * 86400000);
+    }
+
     selectedProductInventory = selectedProductInventory.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+        row.khach_dat = orderedQtyMap[String(row.kho_id || '')] || 0;
+        row.du_kien_het_hang = expiryMap[String(row.kho_id || '')] || productDefaultExpiry || null;
+        row.trang_thai_kho = warehouseStatusMap[String(row.kho_id || '')] || '---';
         return row;
     });
 
-    var selectedProductHistories = await LichSuKho.find({ hang_hoa_id: item._id })
+    var historyQuery = { hang_hoa_id: item._id };
+    if (hasStoreScope) historyQuery.cua_hang_id = storeId;
+    var selectedProductHistories = await LichSuKho.find(historyQuery)
         .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
+    selectedProductHistories = await enrichStockCardRows(selectedProductHistories, item._id);
     selectedProductHistories = selectedProductHistories.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
         return row;
     });
 
+    var lotStockQuery = { hang_hoa_id: item._id };
+    if (hasStoreScope) lotStockQuery.cua_hang_id = storeId;
     var selectedProductLots = item.quan_ly_theo_lo
-        ? await TonKhoLo.find({ hang_hoa_id: item._id })
-            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung ngay_nhap so_luong_ban_dau so_luong_con_lai trang_thai' })
+        ? await TonKhoLo.find(lotStockQuery)
+            .populate({
+                path: 'lo_hang_id',
+                select: 'ma_lo ten_lo ngay_nhap han_su_dung so_luong_ban_dau so_luong_con_lai don_gia_nhap gia_von trang_thai phieu_nhap_id ct_phieu_nhap_id nha_cung_cap_id',
+                populate: [
+                    { path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap' },
+                    { path: 'nha_cung_cap_id', select: 'ten_ncc ten_nha_cung_cap ten_cong_ty ma_ncc' }
+                ]
+            })
             .sort({ updated_at: -1, created_at: -1 })
             .lean()
         : [];
@@ -684,7 +1000,7 @@ async function loadProductDetailById(productId) {
 
 exports.apiProductDetail = async function(req, res, next) {
     try {
-        var ctx = await loadProductDetailById(req.params.id);
+        var ctx = await loadProductDetailById(req.params.id, req);
         if (!ctx) {
             return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tìm thấy hàng hóa.</p></div>');
         }
@@ -1986,5 +2302,3 @@ exports.exportExcel = async function(req, res, next) {
         next(error);
     }
 };
-
-

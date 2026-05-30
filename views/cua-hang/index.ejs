@@ -527,6 +527,128 @@
         return String(value || '').trim().toLowerCase();
       }
 
+      function getFieldBlock(container, selector) {
+        var field = container.querySelector(selector);
+        if (!field) return null;
+        return field.closest('label') || field.closest('div');
+      }
+
+      function orderAddressFields(container) {
+        var provinceBlock = getFieldBlock(container, '.js-ghn-province');
+        var wardBlock = getFieldBlock(container, '.js-ghn-ward');
+        var detailBlock = getFieldBlock(container, '[name="dia_chi_chi_tiet"]');
+        var statusBlock = getFieldBlock(container, '[name="trang_thai"]');
+        if (!provinceBlock || !wardBlock || !detailBlock) return;
+        container.insertBefore(provinceBlock, statusBlock || null);
+        container.insertBefore(wardBlock, statusBlock || null);
+        container.insertBefore(detailBlock, statusBlock || null);
+      }
+
+      function orderStoreAddressFields() {
+        document.querySelectorAll('.store-form-grid, .store-fields').forEach(orderAddressFields);
+      }
+
+      function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, function(ch) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+      }
+
+      function enhanceAddressSelect(select, placeholder) {
+        if (!select || select.getAttribute('data-combobox-bound') === '1') return;
+        select.setAttribute('data-combobox-bound', '1');
+        select.classList.add('address-native-select');
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'address-combobox';
+        wrapper.innerHTML =
+          '<input class="address-combobox-input" type="text" autocomplete="off">' +
+          '<button class="address-combobox-toggle" type="button" aria-label="Mở danh sách">▾</button>' +
+          '<div class="address-combobox-menu"></div>';
+        select.parentNode.insertBefore(wrapper, select.nextSibling);
+
+        var input = wrapper.querySelector('.address-combobox-input');
+        var toggle = wrapper.querySelector('.address-combobox-toggle');
+        var menu = wrapper.querySelector('.address-combobox-menu');
+        input.placeholder = placeholder || '';
+
+        function options() {
+          return Array.prototype.slice.call(select.options).filter(function(option) { return option.value !== ''; });
+        }
+
+        function selectedOption() {
+          return select.options[select.selectedIndex] || null;
+        }
+
+        function syncInput() {
+          var option = selectedOption();
+          input.value = option && option.value ? option.textContent : '';
+        }
+
+        function renderMenu() {
+          var term = normalizeText(input.value);
+          var rows = options().filter(function(option) {
+            return !term || normalizeText(option.textContent).indexOf(term) !== -1 || normalizeText(option.value).indexOf(term) !== -1;
+          }).slice(0, 80);
+          menu.innerHTML = rows.length
+            ? rows.map(function(option) {
+              return '<button type="button" class="address-combobox-option" data-value="' + escapeHtml(option.value) + '">' + escapeHtml(option.textContent) + '</button>';
+            }).join('')
+            : '<div class="address-combobox-empty">Không có dữ liệu phù hợp</div>';
+        }
+
+        function openMenu() {
+          renderMenu();
+          wrapper.classList.add('is-open');
+        }
+
+        function closeMenu() {
+          wrapper.classList.remove('is-open');
+        }
+
+        function choose(value) {
+          select.value = value;
+          syncInput();
+          closeMenu();
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        input.addEventListener('focus', openMenu);
+        input.addEventListener('input', openMenu);
+        input.addEventListener('keydown', function(event) {
+          if (event.key !== 'Enter') return;
+          var firstOption = menu.querySelector('.address-combobox-option');
+          if (!firstOption) return;
+          event.preventDefault();
+          choose(firstOption.getAttribute('data-value') || '');
+        });
+        toggle.addEventListener('click', function() {
+          input.focus();
+          wrapper.classList.toggle('is-open');
+          if (wrapper.classList.contains('is-open')) renderMenu();
+        });
+        menu.addEventListener('mousedown', function(event) {
+          event.preventDefault();
+          var option = event.target.closest('.address-combobox-option');
+          if (option) choose(option.getAttribute('data-value') || '');
+        });
+        document.addEventListener('click', function(event) {
+          if (!wrapper.contains(event.target)) closeMenu();
+        });
+
+        select._addressComboboxRefresh = function() {
+          syncInput();
+          renderMenu();
+        };
+        syncInput();
+      }
+
+      function refreshAddressSelect(select) {
+        if (select && typeof select._addressComboboxRefresh === 'function') {
+          select._addressComboboxRefresh();
+        }
+      }
+
       function fetchAddressItems(url) {
         return fetch(url, { headers: { Accept: 'application/json' } })
           .then(function(response) { return response.json(); })
@@ -586,6 +708,7 @@
           select.innerHTML = '<option value="' + currentName.replace(/"/g, '&quot;') + '" selected>' + currentName + '</option>' + select.innerHTML;
           select.value = currentName;
         }
+        refreshAddressSelect(select);
       }
 
       function renderWardSelect(select, items) {
@@ -603,6 +726,7 @@
           select.innerHTML = '<option value="' + currentName.replace(/"/g, '&quot;') + '" selected>' + currentName + '</option>' + select.innerHTML;
           select.value = currentName;
         }
+        refreshAddressSelect(select);
       }
 
       function selectedProvinceFromSelect(select) {
@@ -613,6 +737,7 @@
       }
 
       function selectedWardFromSelect(select) {
+        if (!select) return null;
         var option = select.options[select.selectedIndex];
         return option && option.getAttribute('data-code')
           ? {
@@ -628,6 +753,8 @@
         document.querySelectorAll('.js-ghn-province').forEach(function(provinceSelect) {
           var container = provinceSelect.closest('form') || provinceSelect.closest('.store-form-grid') || document;
           var wardSelect = container.querySelector('.js-ghn-ward');
+          enhanceAddressSelect(provinceSelect, 'Tìm hoặc chọn tỉnh/thành');
+          enhanceAddressSelect(wardSelect, 'Tìm hoặc chọn phường/xã');
 
           getGhnProvinces().then(function(provinces) {
             renderProvinceSelect(provinceSelect, provinces);
@@ -650,6 +777,7 @@
               wardSelect.value = '';
               wardSelect.setAttribute('data-selected-id', '');
               wardSelect.setAttribute('data-selected-name', '');
+              refreshAddressSelect(wardSelect);
             }
             syncAddressHidden(container, province, null);
             if (!province || !wardSelect) return;
@@ -670,7 +798,15 @@
 
       function openAddStoreModal() {
         if (!addStoreModalOverlay) return;
-        if (storeCreateForm) storeCreateForm.reset();
+        if (storeCreateForm) {
+          storeCreateForm.reset();
+          var createWardSelect = storeCreateForm.querySelector('.js-ghn-ward');
+          if (createWardSelect) {
+            createWardSelect.innerHTML = '<option value="">Chá»n phÆ°á»ng/xÃ£</option>';
+            createWardSelect.value = '';
+          }
+          storeCreateForm.querySelectorAll('.js-ghn-province, .js-ghn-ward').forEach(refreshAddressSelect);
+        }
         addStoreModalOverlay.classList.add('is-visible');
         var nameInput = storeCreateForm ? storeCreateForm.querySelector('[name="ten_cua_hang"]') : null;
         if (nameInput) setTimeout(function() { nameInput.focus(); }, 50);
@@ -687,6 +823,7 @@
       if (addStoreModalOverlay) {
         if (addStoreModalOverlay.getAttribute('data-auto-open') === '1') openAddStoreModal();
       }
+      orderStoreAddressFields();
       initGhnAddressSelects();
 
       var selectAll = document.getElementById('selectAllStores');

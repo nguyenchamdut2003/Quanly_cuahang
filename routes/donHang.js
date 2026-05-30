@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const { isAuthenticated } = require('../middlewares/auth.middleware');
 const {
@@ -17,6 +18,7 @@ const {
     DoiTacGiaoHang,
     BangGiaVanChuyen,
     VanDon,
+    GopDonHang,
     PhieuThuChi,
     CongNoKhachHang,
     SoQuy,
@@ -25,78 +27,87 @@ const {
     CTBangGia,
     TonKho,
     TonKhoLo,
+    TonKhoLoQuyCach,
     LoHang,
     Counter
 } = require('../models/kiot.model');
 const { congTonKho, truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
 const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
+const { createCustomerDebtTransaction } = require('../services/customerDebt.service');
+const {
+    buildVariantKey,
+    getReservedQuantitiesByOrder
+} = require('../services/availability.service');
 const { normalizeAddress } = require('../utils/address');
 const { resolveStoreId } = require('../utils/storeScope');
 
 router.use(isAuthenticated);
 
+const CHO_PHEP_DAT_AM_KHO = true;
+
 const ORDER_EXPORT_STATUS_MAP = {
-    draft: 'Phiếu tạm',
-    shipping: 'Đang giao hàng',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy'
+    draft: 'PhiÃ¡ÂºÂ¿u tÃ¡ÂºÂ¡m',
+    shipping: 'Ã„Âang giao hÃƒÂ ng',
+    completed: 'HoÃƒÂ n thÃƒÂ nh',
+    cancelled: 'Ã„ÂÃƒÂ£ hÃ¡Â»Â§y',
+    merged: 'Ã„ÂÃƒÂ£ gÃ¡Â»â„¢p'
 };
 
 const ORDER_EXPORT_DELIVERY_STATUS_MAP = {
-    chua_giao: 'Chưa giao',
-    giao_mot_phan: 'Giao một phần',
-    giao_thieu: 'Giao thiếu',
-    giao_du: 'Giao đủ'
+    chua_giao: 'ChÃ†Â°a giao',
+    giao_mot_phan: 'Giao mÃ¡Â»â„¢t phÃ¡ÂºÂ§n',
+    giao_thieu: 'Giao thiÃ¡ÂºÂ¿u',
+    giao_du: 'Giao Ã„â€˜Ã¡Â»Â§'
 };
 
 const ORDER_EXPORT_LINE_DELIVERY_STATUS_MAP = {
-    chua_giao: 'Chưa giao',
-    giao_thieu: 'Giao thiếu',
-    giao_du: 'Giao đủ'
+    chua_giao: 'ChÃ†Â°a giao',
+    giao_thieu: 'Giao thiÃ¡ÂºÂ¿u',
+    giao_du: 'Giao Ã„â€˜Ã¡Â»Â§'
 };
 
-// Chỉ cột thuộc don_hang, ct_don_hang, van_don (gắn đơn), khach_hang (ref đơn)
+// ChÃ¡Â»â€° cÃ¡Â»â„¢t thuÃ¡Â»â„¢c don_hang, ct_don_hang, van_don (gÃ¡ÂºÂ¯n Ã„â€˜Ã†Â¡n), khach_hang (ref Ã„â€˜Ã†Â¡n)
 const ORDER_EXPORT_COLUMN_DEFS = [
-    { group: 'don_hang', key: 'ma_don_hang', header: 'Mã đơn hàng', default: true },
-    { group: 'don_hang', key: 'ngay_dat', header: 'Ngày đặt', default: true },
-    { group: 'don_hang', key: 'ngay_giao_thuc_te', header: 'Ngày giao thực tế' },
-    { group: 'don_hang', key: 'cua_hang', header: 'Cửa hàng', default: true },
+    { group: 'don_hang', key: 'ma_don_hang', header: 'MÃƒÂ£ Ã„â€˜Ã†Â¡n hÃƒÂ ng', default: true },
+    { group: 'don_hang', key: 'ngay_dat', header: 'NgÃƒÂ y Ã„â€˜Ã¡ÂºÂ·t', default: true },
+    { group: 'don_hang', key: 'ngay_giao_thuc_te', header: 'NgÃƒÂ y giao thÃ¡Â»Â±c tÃ¡ÂºÂ¿' },
+    { group: 'don_hang', key: 'cua_hang', header: 'CÃ¡Â»Â­a hÃƒÂ ng', default: true },
     { group: 'don_hang', key: 'kho', header: 'Kho', default: true },
-    { group: 'don_hang', key: 'bang_gia', header: 'Bảng giá', default: true },
-    { group: 'don_hang', key: 'nguoi_tao', header: 'Người tạo', default: true },
-    { group: 'don_hang', key: 'trang_thai', header: 'Trạng thái đơn', default: true },
-    { group: 'don_hang', key: 'trang_thai_giao_hang', header: 'Trạng thái giao hàng', default: true },
-    { group: 'don_hang', key: 'ghi_chu', header: 'Ghi chú' },
-    { group: 'khach_nhan', key: 'ma_khach_hang', header: 'Mã khách hàng', default: true },
-    { group: 'khach_nhan', key: 'ten_khach_hang', header: 'Tên khách hàng', default: true },
-    { group: 'khach_nhan', key: 'ten_nguoi_nhan', header: 'Người nhận' },
-    { group: 'khach_nhan', key: 'sdt_nguoi_nhan', header: 'SĐT người nhận', default: true },
-    { group: 'khach_nhan', key: 'dia_chi_nhan', header: 'Địa chỉ nhận hàng', default: true },
-    { group: 'khach_nhan', key: 'doi_tac_giao_hang', header: 'Đối tác giao hàng' },
-    { group: 'khach_nhan', key: 'nguoi_tra_phi_giao_hang', header: 'Người trả phí giao hàng' },
-    { group: 'thanh_toan', key: 'tong_so_luong_dat', header: 'Tổng SL đặt', style: { numFmt: '#,##0.##' } },
-    { group: 'thanh_toan', key: 'tong_tien_hang', header: 'Tổng tiền hàng', style: { numFmt: '#,##0' }, default: true },
-    { group: 'thanh_toan', key: 'giam_gia', header: 'Giảm giá', style: { numFmt: '#,##0.##' }, default: true },
-    { group: 'thanh_toan', key: 'kieu_giam_gia', header: 'Kiểu giảm giá' },
-    { group: 'thanh_toan', key: 'phi_giao_hang', header: 'Phí giao hàng', style: { numFmt: '#,##0' } },
-    { group: 'thanh_toan', key: 'khach_can_tra', header: 'Khách cần trả', style: { numFmt: '#,##0' }, default: true },
-    { group: 'thanh_toan', key: 'khach_thanh_toan', header: 'Khách đã trả', style: { numFmt: '#,##0' }, default: true },
-    { group: 'thanh_toan', key: 'tien_thua_tra_khach', header: 'Tiền thừa trả khách', style: { numFmt: '#,##0' } },
+    { group: 'don_hang', key: 'bang_gia', header: 'BÃ¡ÂºÂ£ng giÃƒÂ¡', default: true },
+    { group: 'don_hang', key: 'nguoi_tao', header: 'NgÃ†Â°Ã¡Â»Âi tÃ¡ÂºÂ¡o', default: true },
+    { group: 'don_hang', key: 'trang_thai', header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i Ã„â€˜Ã†Â¡n', default: true },
+    { group: 'don_hang', key: 'trang_thai_giao_hang', header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i giao hÃƒÂ ng', default: true },
+    { group: 'don_hang', key: 'ghi_chu', header: 'Ghi chÃƒÂº' },
+    { group: 'khach_nhan', key: 'ma_khach_hang', header: 'MÃƒÂ£ khÃƒÂ¡ch hÃƒÂ ng', default: true },
+    { group: 'khach_nhan', key: 'ten_khach_hang', header: 'TÃƒÂªn khÃƒÂ¡ch hÃƒÂ ng', default: true },
+    { group: 'khach_nhan', key: 'ten_nguoi_nhan', header: 'NgÃ†Â°Ã¡Â»Âi nhÃ¡ÂºÂ­n' },
+    { group: 'khach_nhan', key: 'sdt_nguoi_nhan', header: 'SÃ„ÂT ngÃ†Â°Ã¡Â»Âi nhÃ¡ÂºÂ­n', default: true },
+    { group: 'khach_nhan', key: 'dia_chi_nhan', header: 'Ã„ÂÃ¡Â»â€¹a chÃ¡Â»â€° nhÃ¡ÂºÂ­n hÃƒÂ ng', default: true },
+    { group: 'khach_nhan', key: 'doi_tac_giao_hang', header: 'Ã„ÂÃ¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng' },
+    { group: 'khach_nhan', key: 'nguoi_tra_phi_giao_hang', header: 'NgÃ†Â°Ã¡Â»Âi trÃ¡ÂºÂ£ phÃƒÂ­ giao hÃƒÂ ng' },
+    { group: 'thanh_toan', key: 'tong_so_luong_dat', header: 'TÃ¡Â»â€¢ng SL Ã„â€˜Ã¡ÂºÂ·t', style: { numFmt: '#,##0.##' } },
+    { group: 'thanh_toan', key: 'tong_tien_hang', header: 'TÃ¡Â»â€¢ng tiÃ¡Â»Ân hÃƒÂ ng', style: { numFmt: '#,##0' }, default: true },
+    { group: 'thanh_toan', key: 'giam_gia', header: 'GiÃ¡ÂºÂ£m giÃƒÂ¡', style: { numFmt: '#,##0.##' }, default: true },
+    { group: 'thanh_toan', key: 'kieu_giam_gia', header: 'KiÃ¡Â»Æ’u giÃ¡ÂºÂ£m giÃƒÂ¡' },
+    { group: 'thanh_toan', key: 'phi_giao_hang', header: 'PhÃƒÂ­ giao hÃƒÂ ng', style: { numFmt: '#,##0' } },
+    { group: 'thanh_toan', key: 'khach_can_tra', header: 'KhÃƒÂ¡ch cÃ¡ÂºÂ§n trÃ¡ÂºÂ£', style: { numFmt: '#,##0' }, default: true },
+    { group: 'thanh_toan', key: 'khach_thanh_toan', header: 'KhÃƒÂ¡ch Ã„â€˜ÃƒÂ£ trÃ¡ÂºÂ£', style: { numFmt: '#,##0' }, default: true },
+    { group: 'thanh_toan', key: 'tien_thua_tra_khach', header: 'TiÃ¡Â»Ân thÃ¡Â»Â«a trÃ¡ÂºÂ£ khÃƒÂ¡ch', style: { numFmt: '#,##0' } },
     { group: 'thanh_toan', key: 'cod_enabled', header: 'COD' },
-    { group: 'thanh_toan', key: 'cod_amount', header: 'Số tiền COD', style: { numFmt: '#,##0' } },
-    { group: 'chi_tiet', key: 'ma_hang', header: 'Mã hàng', default: true },
-    { group: 'chi_tiet', key: 'ten_hang', header: 'Tên hàng', default: true },
-    { group: 'chi_tiet', key: 'lo_hang', header: 'Lô hàng' },
-    { group: 'chi_tiet', key: 'so_luong_dat', header: 'SL đặt', style: { numFmt: '#,##0.##' }, default: true },
-    { group: 'chi_tiet', key: 'so_luong_xac_nhan', header: 'SL xác nhận', style: { numFmt: '#,##0.##' } },
-    { group: 'chi_tiet', key: 'so_luong_da_giao', header: 'SL đã giao', style: { numFmt: '#,##0.##' }, default: true },
-    { group: 'chi_tiet', key: 'so_luong_con_thieu', header: 'SL còn thiếu', style: { numFmt: '#,##0.##' } },
-    { group: 'chi_tiet', key: 'trang_thai_giao', header: 'Trạng thái giao dòng' },
-    { group: 'chi_tiet', key: 'don_gia_ban', header: 'Đơn giá bán', style: { numFmt: '#,##0' }, default: true },
-    { group: 'chi_tiet', key: 'chiet_khau', header: 'Chiết khấu', style: { numFmt: '#,##0.##' } },
-    { group: 'chi_tiet', key: 'kieu_chiet_khau', header: 'Kiểu chiết khấu' },
-    { group: 'chi_tiet', key: 'thanh_tien', header: 'Thành tiền', style: { numFmt: '#,##0' }, default: true }
+    { group: 'thanh_toan', key: 'cod_amount', header: 'SÃ¡Â»â€˜ tiÃ¡Â»Ân COD', style: { numFmt: '#,##0' } },
+    { group: 'chi_tiet', key: 'ma_hang', header: 'MÃƒÂ£ hÃƒÂ ng', default: true },
+    { group: 'chi_tiet', key: 'ten_hang', header: 'TÃƒÂªn hÃƒÂ ng', default: true },
+    { group: 'chi_tiet', key: 'lo_hang', header: 'LÃƒÂ´ hÃƒÂ ng' },
+    { group: 'chi_tiet', key: 'so_luong_dat', header: 'SL Ã„â€˜Ã¡ÂºÂ·t', style: { numFmt: '#,##0.##' }, default: true },
+    { group: 'chi_tiet', key: 'so_luong_xac_nhan', header: 'SL xÃƒÂ¡c nhÃ¡ÂºÂ­n', style: { numFmt: '#,##0.##' } },
+    { group: 'chi_tiet', key: 'so_luong_da_giao', header: 'SL Ã„â€˜ÃƒÂ£ giao', style: { numFmt: '#,##0.##' }, default: true },
+    { group: 'chi_tiet', key: 'so_luong_con_thieu', header: 'SL cÃƒÂ²n thiÃ¡ÂºÂ¿u', style: { numFmt: '#,##0.##' } },
+    { group: 'chi_tiet', key: 'trang_thai_giao', header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i giao dÃƒÂ²ng' },
+    { group: 'chi_tiet', key: 'don_gia_ban', header: 'Ã„ÂÃ†Â¡n giÃƒÂ¡ bÃƒÂ¡n', style: { numFmt: '#,##0' }, default: true },
+    { group: 'chi_tiet', key: 'chiet_khau', header: 'ChiÃ¡ÂºÂ¿t khÃ¡ÂºÂ¥u', style: { numFmt: '#,##0.##' } },
+    { group: 'chi_tiet', key: 'kieu_chiet_khau', header: 'KiÃ¡Â»Æ’u chiÃ¡ÂºÂ¿t khÃ¡ÂºÂ¥u' },
+    { group: 'chi_tiet', key: 'thanh_tien', header: 'ThÃƒÂ nh tiÃ¡Â»Ân', style: { numFmt: '#,##0' }, default: true }
 ];
 
 const ORDER_EXPORT_COLUMN_MAP = ORDER_EXPORT_COLUMN_DEFS.reduce((map, item) => {
@@ -105,10 +116,10 @@ const ORDER_EXPORT_COLUMN_MAP = ORDER_EXPORT_COLUMN_DEFS.reduce((map, item) => {
 }, {});
 
 const ORDER_EXPORT_COLUMN_GROUPS = [
-    { id: 'don_hang', title: 'Thông tin đơn hàng' },
-    { id: 'khach_nhan', title: 'Khách hàng & nhận hàng' },
-    { id: 'thanh_toan', title: 'Thanh toán' },
-    { id: 'chi_tiet', title: 'Chi tiết đặt hàng' }
+    { id: 'don_hang', title: 'ThÃƒÂ´ng tin Ã„â€˜Ã†Â¡n hÃƒÂ ng' },
+    { id: 'khach_nhan', title: 'KhÃƒÂ¡ch hÃƒÂ ng & nhÃ¡ÂºÂ­n hÃƒÂ ng' },
+    { id: 'thanh_toan', title: 'Thanh toÃƒÂ¡n' },
+    { id: 'chi_tiet', title: 'Chi tiÃ¡ÂºÂ¿t Ã„â€˜Ã¡ÂºÂ·t hÃƒÂ ng' }
 ].map(group => ({
     ...group,
     columns: ORDER_EXPORT_COLUMN_DEFS.filter(item => item.group === group.id)
@@ -158,161 +169,161 @@ function pickOrderExportRowValues(row, columns) {
 }
 
 const INVOICE_EXPORT_STATUS_MAP = {
-    processing: 'Đang xử lý',
-    completed: 'Hoàn thành',
-    failed: 'Không giao được',
-    cancelled: 'Đã hủy',
-    paid: 'Đã thanh toán',
-    partial: 'Thanh toán một phần',
-    unpaid: 'Chưa thanh toán',
-    draft: 'Đang xử lý',
-    shipping: 'Đang xử lý',
-    done: 'Hoàn thành'
+    processing: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½',
+    completed: 'HoÃƒÂ n thÃƒÂ nh',
+    failed: 'KhÃƒÂ´ng giao Ã„â€˜Ã†Â°Ã¡Â»Â£c',
+    cancelled: 'Ã„ÂÃƒÂ£ hÃ¡Â»Â§y',
+    paid: 'Ã„ÂÃƒÂ£ thanh toÃƒÂ¡n',
+    partial: 'Thanh toÃƒÂ¡n mÃ¡Â»â„¢t phÃ¡ÂºÂ§n',
+    unpaid: 'ChÃ†Â°a thanh toÃƒÂ¡n',
+    draft: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½',
+    shipping: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½',
+    done: 'HoÃƒÂ n thÃƒÂ nh'
 };
 
 const INVOICE_EXPORT_COLUMNS = [
-    { header: 'Mã hóa đơn', key: 'ma_hoa_don' },
-    { header: 'Thời gian bán', key: 'thoi_gian_ban' },
-    { header: 'Mã đơn hàng', key: 'ma_don_hang' },
-    { header: 'Khách hàng', key: 'khach_hang' },
-    { header: 'Điện thoại', key: 'dien_thoai' },
-    { header: 'Địa chỉ', key: 'dia_chi' },
+    { header: 'MÃƒÂ£ hÃƒÂ³a Ã„â€˜Ã†Â¡n', key: 'ma_hoa_don' },
+    { header: 'ThÃ¡Â»Âi gian bÃƒÂ¡n', key: 'thoi_gian_ban' },
+    { header: 'MÃƒÂ£ Ã„â€˜Ã†Â¡n hÃƒÂ ng', key: 'ma_don_hang' },
+    { header: 'KhÃƒÂ¡ch hÃƒÂ ng', key: 'khach_hang' },
+    { header: 'Ã„ÂiÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i', key: 'dien_thoai' },
+    { header: 'Ã„ÂÃ¡Â»â€¹a chÃ¡Â»â€°', key: 'dia_chi' },
     { header: 'Kho', key: 'kho' },
-    { header: 'Bảng giá', key: 'bang_gia' },
-    { header: 'Nhân viên bán hàng', key: 'nhan_vien_ban_hang' },
-    { header: 'Tổng tiền hàng', key: 'tong_tien_hang', style: { numFmt: '#,##0' } },
-    { header: 'Giảm giá', key: 'giam_gia', style: { numFmt: '#,##0.##' } },
-    { header: 'Phí giao hàng', key: 'phi_giao_hang', style: { numFmt: '#,##0' } },
-    { header: 'Khách cần trả', key: 'khach_can_tra', style: { numFmt: '#,##0' } },
-    { header: 'Khách đã trả', key: 'khach_da_tra', style: { numFmt: '#,##0' } },
-    { header: 'Tiền thừa trả khách', key: 'tien_thua_tra_khach', style: { numFmt: '#,##0' } },
-    { header: 'Công nợ', key: 'cong_no', style: { numFmt: '#,##0' } },
-    { header: 'Phương thức thanh toán', key: 'phuong_thuc_thanh_toan' },
+    { header: 'BÃ¡ÂºÂ£ng giÃƒÂ¡', key: 'bang_gia' },
+    { header: 'NhÃƒÂ¢n viÃƒÂªn bÃƒÂ¡n hÃƒÂ ng', key: 'nhan_vien_ban_hang' },
+    { header: 'TÃ¡Â»â€¢ng tiÃ¡Â»Ân hÃƒÂ ng', key: 'tong_tien_hang', style: { numFmt: '#,##0' } },
+    { header: 'GiÃ¡ÂºÂ£m giÃƒÂ¡', key: 'giam_gia', style: { numFmt: '#,##0.##' } },
+    { header: 'PhÃƒÂ­ giao hÃƒÂ ng', key: 'phi_giao_hang', style: { numFmt: '#,##0' } },
+    { header: 'KhÃƒÂ¡ch cÃ¡ÂºÂ§n trÃ¡ÂºÂ£', key: 'khach_can_tra', style: { numFmt: '#,##0' } },
+    { header: 'KhÃƒÂ¡ch Ã„â€˜ÃƒÂ£ trÃ¡ÂºÂ£', key: 'khach_da_tra', style: { numFmt: '#,##0' } },
+    { header: 'TiÃ¡Â»Ân thÃ¡Â»Â«a trÃ¡ÂºÂ£ khÃƒÂ¡ch', key: 'tien_thua_tra_khach', style: { numFmt: '#,##0' } },
+    { header: 'CÃƒÂ´ng nÃ¡Â»Â£', key: 'cong_no', style: { numFmt: '#,##0' } },
+    { header: 'PhÃ†Â°Ã†Â¡ng thÃ¡Â»Â©c thanh toÃƒÂ¡n', key: 'phuong_thuc_thanh_toan' },
     { header: 'COD', key: 'cod' },
-    { header: 'Trạng thái hóa đơn', key: 'trang_thai_hoa_don' },
-    { header: 'Ghi chú', key: 'ghi_chu' },
-    { header: 'Mã hàng', key: 'ma_hang' },
-    { header: 'Tên hàng', key: 'ten_hang' },
-    { header: 'Thương hiệu', key: 'thuong_hieu' },
-    { header: 'Nhóm hàng', key: 'nhom_hang' },
-    { header: 'Đơn vị tính', key: 'don_vi_tinh' },
-    { header: 'Lô hàng', key: 'lo_hang' },
-    { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
-    { header: 'Đơn giá', key: 'don_gia', style: { numFmt: '#,##0' } },
-    { header: 'Chiết khấu', key: 'chiet_khau', style: { numFmt: '#,##0.##' } },
-    { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } },
-    { header: 'Giá vốn', key: 'gia_von', style: { numFmt: '#,##0' } }
+    { header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i hÃƒÂ³a Ã„â€˜Ã†Â¡n', key: 'trang_thai_hoa_don' },
+    { header: 'Ghi chÃƒÂº', key: 'ghi_chu' },
+    { header: 'MÃƒÂ£ hÃƒÂ ng', key: 'ma_hang' },
+    { header: 'TÃƒÂªn hÃƒÂ ng', key: 'ten_hang' },
+    { header: 'ThÃ†Â°Ã†Â¡ng hiÃ¡Â»â€¡u', key: 'thuong_hieu' },
+    { header: 'NhÃƒÂ³m hÃƒÂ ng', key: 'nhom_hang' },
+    { header: 'Ã„ÂÃ†Â¡n vÃ¡Â»â€¹ tÃƒÂ­nh', key: 'don_vi_tinh' },
+    { header: 'LÃƒÂ´ hÃƒÂ ng', key: 'lo_hang' },
+    { header: 'SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
+    { header: 'Ã„ÂÃ†Â¡n giÃƒÂ¡', key: 'don_gia', style: { numFmt: '#,##0' } },
+    { header: 'ChiÃ¡ÂºÂ¿t khÃ¡ÂºÂ¥u', key: 'chiet_khau', style: { numFmt: '#,##0.##' } },
+    { header: 'ThÃƒÂ nh tiÃ¡Â»Ân', key: 'thanh_tien', style: { numFmt: '#,##0' } },
+    { header: 'GiÃƒÂ¡ vÃ¡Â»â€˜n', key: 'gia_von', style: { numFmt: '#,##0' } }
 ];
 
 const RETURN_EXPORT_STATUS_MAP = {
-    completed: 'Đã trả',
-    cancelled: 'Đã hủy',
-    draft: 'Phiếu tạm',
-    pending: 'Đang xử lý'
+    completed: 'Ã„ÂÃƒÂ£ trÃ¡ÂºÂ£',
+    cancelled: 'Ã„ÂÃƒÂ£ hÃ¡Â»Â§y',
+    draft: 'PhiÃ¡ÂºÂ¿u tÃ¡ÂºÂ¡m',
+    pending: 'Ã„Âang xÃ¡Â»Â­ lÃƒÂ½'
 };
 
 const RETURN_EXPORT_LINE_TYPE_MAP = {
-    hang_tra: 'Hàng trả',
-    hang_doi: 'Hàng đổi'
+    hang_tra: 'HÃƒÂ ng trÃ¡ÂºÂ£',
+    hang_doi: 'HÃƒÂ ng Ã„â€˜Ã¡Â»â€¢i'
 };
 
 const RETURN_EXPORT_COLUMNS = [
-    { header: 'Mã phiếu trả', key: 'ma_phieu_tra' },
-    { header: 'Thời gian trả', key: 'thoi_gian_tra' },
-    { header: 'Mã hóa đơn', key: 'ma_hoa_don' },
-    { header: 'Mã đơn hàng', key: 'ma_don_hang' },
-    { header: 'Khách hàng', key: 'khach_hang' },
-    { header: 'Điện thoại', key: 'dien_thoai' },
-    { header: 'Địa chỉ', key: 'dia_chi' },
+    { header: 'MÃƒÂ£ phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£', key: 'ma_phieu_tra' },
+    { header: 'ThÃ¡Â»Âi gian trÃ¡ÂºÂ£', key: 'thoi_gian_tra' },
+    { header: 'MÃƒÂ£ hÃƒÂ³a Ã„â€˜Ã†Â¡n', key: 'ma_hoa_don' },
+    { header: 'MÃƒÂ£ Ã„â€˜Ã†Â¡n hÃƒÂ ng', key: 'ma_don_hang' },
+    { header: 'KhÃƒÂ¡ch hÃƒÂ ng', key: 'khach_hang' },
+    { header: 'Ã„ÂiÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i', key: 'dien_thoai' },
+    { header: 'Ã„ÂÃ¡Â»â€¹a chÃ¡Â»â€°', key: 'dia_chi' },
     { header: 'Kho', key: 'kho' },
-    { header: 'Người tạo', key: 'nguoi_tao' },
-    { header: 'Tổng tiền hàng trả', key: 'tong_tien_hang_tra', style: { numFmt: '#,##0' } },
-    { header: 'Tổng tiền hàng đổi', key: 'tong_tien_hang_doi', style: { numFmt: '#,##0' } },
-    { header: 'Chênh lệch', key: 'chenh_lech', style: { numFmt: '#,##0' } },
-    { header: 'Giảm giá', key: 'giam_gia', style: { numFmt: '#,##0' } },
-    { header: 'Phí trả hàng', key: 'phi_tra_hang', style: { numFmt: '#,##0' } },
-    { header: 'Cần trả khách', key: 'can_tra_khach', style: { numFmt: '#,##0' } },
-    { header: 'Khách cần trả thêm', key: 'khach_can_tra_them', style: { numFmt: '#,##0' } },
-    { header: 'Lý do', key: 'ly_do' },
-    { header: 'Ghi chú', key: 'ghi_chu' },
-    { header: 'Trạng thái', key: 'trang_thai' },
-    { header: 'Loại dòng', key: 'loai_dong' },
-    { header: 'Mã hàng', key: 'ma_hang' },
-    { header: 'Tên hàng', key: 'ten_hang' },
-    { header: 'Thương hiệu', key: 'thuong_hieu' },
-    { header: 'Nhóm hàng', key: 'nhom_hang' },
-    { header: 'Đơn vị tính', key: 'don_vi_tinh' },
-    { header: 'Lô hàng', key: 'lo_hang' },
-    { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
-    { header: 'Đơn giá', key: 'don_gia', style: { numFmt: '#,##0' } },
-    { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } }
+    { header: 'NgÃ†Â°Ã¡Â»Âi tÃ¡ÂºÂ¡o', key: 'nguoi_tao' },
+    { header: 'TÃ¡Â»â€¢ng tiÃ¡Â»Ân hÃƒÂ ng trÃ¡ÂºÂ£', key: 'tong_tien_hang_tra', style: { numFmt: '#,##0' } },
+    { header: 'TÃ¡Â»â€¢ng tiÃ¡Â»Ân hÃƒÂ ng Ã„â€˜Ã¡Â»â€¢i', key: 'tong_tien_hang_doi', style: { numFmt: '#,##0' } },
+    { header: 'ChÃƒÂªnh lÃ¡Â»â€¡ch', key: 'chenh_lech', style: { numFmt: '#,##0' } },
+    { header: 'GiÃ¡ÂºÂ£m giÃƒÂ¡', key: 'giam_gia', style: { numFmt: '#,##0' } },
+    { header: 'PhÃƒÂ­ trÃ¡ÂºÂ£ hÃƒÂ ng', key: 'phi_tra_hang', style: { numFmt: '#,##0' } },
+    { header: 'CÃ¡ÂºÂ§n trÃ¡ÂºÂ£ khÃƒÂ¡ch', key: 'can_tra_khach', style: { numFmt: '#,##0' } },
+    { header: 'KhÃƒÂ¡ch cÃ¡ÂºÂ§n trÃ¡ÂºÂ£ thÃƒÂªm', key: 'khach_can_tra_them', style: { numFmt: '#,##0' } },
+    { header: 'LÃƒÂ½ do', key: 'ly_do' },
+    { header: 'Ghi chÃƒÂº', key: 'ghi_chu' },
+    { header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i', key: 'trang_thai' },
+    { header: 'LoÃ¡ÂºÂ¡i dÃƒÂ²ng', key: 'loai_dong' },
+    { header: 'MÃƒÂ£ hÃƒÂ ng', key: 'ma_hang' },
+    { header: 'TÃƒÂªn hÃƒÂ ng', key: 'ten_hang' },
+    { header: 'ThÃ†Â°Ã†Â¡ng hiÃ¡Â»â€¡u', key: 'thuong_hieu' },
+    { header: 'NhÃƒÂ³m hÃƒÂ ng', key: 'nhom_hang' },
+    { header: 'Ã„ÂÃ†Â¡n vÃ¡Â»â€¹ tÃƒÂ­nh', key: 'don_vi_tinh' },
+    { header: 'LÃƒÂ´ hÃƒÂ ng', key: 'lo_hang' },
+    { header: 'SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
+    { header: 'Ã„ÂÃ†Â¡n giÃƒÂ¡', key: 'don_gia', style: { numFmt: '#,##0' } },
+    { header: 'ThÃƒÂ nh tiÃ¡Â»Ân', key: 'thanh_tien', style: { numFmt: '#,##0' } }
 ];
 
 const DELIVERY_PARTNER_STATUS_MAP = {
-    active: 'Đang hoạt động',
-    inactive: 'Ngừng hoạt động'
+    active: 'Ã„Âang hoÃ¡ÂºÂ¡t Ã„â€˜Ã¡Â»â„¢ng',
+    inactive: 'NgÃ¡Â»Â«ng hoÃ¡ÂºÂ¡t Ã„â€˜Ã¡Â»â„¢ng'
 };
 
 const SHIPPING_PRICE_TYPE_MAP = {
     theo_km: 'Theo km',
-    co_dinh: 'Cố định',
-    theo_tuyen: 'Theo tuyến'
+    co_dinh: 'CÃ¡Â»â€˜ Ã„â€˜Ã¡Â»â€¹nh',
+    theo_tuyen: 'Theo tuyÃ¡ÂºÂ¿n'
 };
 
 const DELIVERY_PARTNER_EXPORT_COLUMNS = [
-    { header: 'Mã đối tác', key: 'ma_doi_tac' },
-    { header: 'Tên đối tác', key: 'ten_doi_tac' },
-    { header: 'Điện thoại', key: 'dien_thoai' },
+    { header: 'MÃƒÂ£ Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c', key: 'ma_doi_tac' },
+    { header: 'TÃƒÂªn Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c', key: 'ten_doi_tac' },
+    { header: 'Ã„ÂiÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i', key: 'dien_thoai' },
     { header: 'Email', key: 'email' },
-    { header: 'Địa chỉ', key: 'dia_chi' },
-    { header: 'Ghi chú', key: 'ghi_chu' },
-    { header: 'Trạng thái', key: 'trang_thai' },
-    { header: 'Ngày tạo', key: 'ngay_tao' },
-    { header: 'Ngày cập nhật', key: 'ngay_cap_nhat' },
-    { header: 'Tên bảng giá', key: 'ten_bang_gia' },
-    { header: 'Loại tính phí', key: 'loai_tinh_phi' },
-    { header: 'Điểm đi', key: 'diem_di' },
-    { header: 'Điểm đến', key: 'diem_den' },
-    { header: 'Khoảng cách km', key: 'khoang_cach_km', style: { numFmt: '#,##0.##' } },
-    { header: 'Đơn giá/km', key: 'don_gia_km', style: { numFmt: '#,##0' } },
-    { header: 'Phí cố định', key: 'phi_co_dinh', style: { numFmt: '#,##0' } },
-    { header: 'Phí tối thiểu', key: 'phi_toi_thieu', style: { numFmt: '#,##0' } },
-    { header: 'Trạng thái bảng giá', key: 'trang_thai_bang_gia' }
+    { header: 'Ã„ÂÃ¡Â»â€¹a chÃ¡Â»â€°', key: 'dia_chi' },
+    { header: 'Ghi chÃƒÂº', key: 'ghi_chu' },
+    { header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i', key: 'trang_thai' },
+    { header: 'NgÃƒÂ y tÃ¡ÂºÂ¡o', key: 'ngay_tao' },
+    { header: 'NgÃƒÂ y cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t', key: 'ngay_cap_nhat' },
+    { header: 'TÃƒÂªn bÃ¡ÂºÂ£ng giÃƒÂ¡', key: 'ten_bang_gia' },
+    { header: 'LoÃ¡ÂºÂ¡i tÃƒÂ­nh phÃƒÂ­', key: 'loai_tinh_phi' },
+    { header: 'Ã„ÂiÃ¡Â»Æ’m Ã„â€˜i', key: 'diem_di' },
+    { header: 'Ã„ÂiÃ¡Â»Æ’m Ã„â€˜Ã¡ÂºÂ¿n', key: 'diem_den' },
+    { header: 'KhoÃ¡ÂºÂ£ng cÃƒÂ¡ch km', key: 'khoang_cach_km', style: { numFmt: '#,##0.##' } },
+    { header: 'Ã„ÂÃ†Â¡n giÃƒÂ¡/km', key: 'don_gia_km', style: { numFmt: '#,##0' } },
+    { header: 'PhÃƒÂ­ cÃ¡Â»â€˜ Ã„â€˜Ã¡Â»â€¹nh', key: 'phi_co_dinh', style: { numFmt: '#,##0' } },
+    { header: 'PhÃƒÂ­ tÃ¡Â»â€˜i thiÃ¡Â»Æ’u', key: 'phi_toi_thieu', style: { numFmt: '#,##0' } },
+    { header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i bÃ¡ÂºÂ£ng giÃƒÂ¡', key: 'trang_thai_bang_gia' }
 ];
 
 const SHIPMENT_COD_STATUS_MAP = {
-    khong_cod: 'Không COD',
-    chua_thu: 'Chưa thu',
-    da_thu: 'Đã thu',
-    da_doi_soat: 'Đã đối soát'
+    khong_cod: 'KhÃƒÂ´ng COD',
+    chua_thu: 'ChÃ†Â°a thu',
+    da_thu: 'Ã„ÂÃƒÂ£ thu',
+    da_doi_soat: 'Ã„ÂÃƒÂ£ Ã„â€˜Ã¡Â»â€˜i soÃƒÂ¡t'
 };
 
 const SHIPPING_FEE_PAYER_MAP = {
-    khach: 'Khách hàng',
-    cua_hang: 'Cửa hàng'
+    khach: 'KhÃƒÂ¡ch hÃƒÂ ng',
+    cua_hang: 'CÃ¡Â»Â­a hÃƒÂ ng'
 };
 
 const SHIPMENT_EXPORT_COLUMNS = [
-    { header: 'Mã vận đơn', key: 'ma_van_don' },
-    { header: 'Mã đơn hàng', key: 'ma_don_hang' },
-    { header: 'Mã hóa đơn', key: 'ma_hoa_don' },
-    { header: 'Khách hàng', key: 'khach_hang' },
-    { header: 'Người nhận', key: 'nguoi_nhan' },
-    { header: 'Điện thoại người nhận', key: 'dien_thoai_nguoi_nhan' },
-    { header: 'Địa chỉ nhận', key: 'dia_chi_nhan' },
-    { header: 'Đối tác giao hàng', key: 'doi_tac_giao_hang' },
-    { header: 'Phí giao hàng', key: 'phi_giao_hang', style: { numFmt: '#,##0' } },
-    { header: 'Đơn giá vận chuyển áp dụng', key: 'don_gia_van_chuyen_ap_dung', style: { numFmt: '#,##0' } },
-    { header: 'Số lượng tính phí', key: 'so_luong_tinh_phi', style: { numFmt: '#,##0.##' } },
-    { header: 'Thành tiền vận chuyển', key: 'thanh_tien_van_chuyen', style: { numFmt: '#,##0' } },
-    { header: 'Người trả phí giao hàng', key: 'nguoi_tra_phi_giao_hang' },
+    { header: 'MÃƒÂ£ vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n', key: 'ma_van_don' },
+    { header: 'MÃƒÂ£ Ã„â€˜Ã†Â¡n hÃƒÂ ng', key: 'ma_don_hang' },
+    { header: 'MÃƒÂ£ hÃƒÂ³a Ã„â€˜Ã†Â¡n', key: 'ma_hoa_don' },
+    { header: 'KhÃƒÂ¡ch hÃƒÂ ng', key: 'khach_hang' },
+    { header: 'NgÃ†Â°Ã¡Â»Âi nhÃ¡ÂºÂ­n', key: 'nguoi_nhan' },
+    { header: 'Ã„ÂiÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i ngÃ†Â°Ã¡Â»Âi nhÃ¡ÂºÂ­n', key: 'dien_thoai_nguoi_nhan' },
+    { header: 'Ã„ÂÃ¡Â»â€¹a chÃ¡Â»â€° nhÃ¡ÂºÂ­n', key: 'dia_chi_nhan' },
+    { header: 'Ã„ÂÃ¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng', key: 'doi_tac_giao_hang' },
+    { header: 'PhÃƒÂ­ giao hÃƒÂ ng', key: 'phi_giao_hang', style: { numFmt: '#,##0' } },
+    { header: 'Ã„ÂÃ†Â¡n giÃƒÂ¡ vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n ÃƒÂ¡p dÃ¡Â»Â¥ng', key: 'don_gia_van_chuyen_ap_dung', style: { numFmt: '#,##0' } },
+    { header: 'SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng tÃƒÂ­nh phÃƒÂ­', key: 'so_luong_tinh_phi', style: { numFmt: '#,##0.##' } },
+    { header: 'ThÃƒÂ nh tiÃ¡Â»Ân vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n', key: 'thanh_tien_van_chuyen', style: { numFmt: '#,##0' } },
+    { header: 'NgÃ†Â°Ã¡Â»Âi trÃ¡ÂºÂ£ phÃƒÂ­ giao hÃƒÂ ng', key: 'nguoi_tra_phi_giao_hang' },
     { header: 'COD', key: 'cod' },
-    { header: 'Số tiền COD', key: 'so_tien_cod', style: { numFmt: '#,##0' } },
-    { header: 'Trạng thái COD', key: 'trang_thai_cod' },
-    { header: 'Trạng thái vận đơn', key: 'trang_thai_van_don' },
-    { header: 'Ghi chú', key: 'ghi_chu' },
-    { header: 'Ngày tạo', key: 'ngay_tao' },
-    { header: 'Ngày cập nhật', key: 'ngay_cap_nhat' }
+    { header: 'SÃ¡Â»â€˜ tiÃ¡Â»Ân COD', key: 'so_tien_cod', style: { numFmt: '#,##0' } },
+    { header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i COD', key: 'trang_thai_cod' },
+    { header: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n', key: 'trang_thai_van_don' },
+    { header: 'Ghi chÃƒÂº', key: 'ghi_chu' },
+    { header: 'NgÃƒÂ y tÃ¡ÂºÂ¡o', key: 'ngay_tao' },
+    { header: 'NgÃƒÂ y cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t', key: 'ngay_cap_nhat' }
 ];
 
 function parseItems(rawItems) {
@@ -328,6 +339,30 @@ function parseItems(rawItems) {
     return [];
 }
 
+function optionalLineObjectId(value) {
+    const id = String(value?._id || value || '').trim();
+    return /^[0-9a-fA-F]{24}$/.test(id) ? id : null;
+}
+
+function copyLineMetadata(row = {}) {
+    return {
+        gia_tri_thuoc_tinh_id: optionalLineObjectId(row.gia_tri_thuoc_tinh_id),
+        ten_quy_cach: String(row.ten_quy_cach || '').trim(),
+        ten_thuoc_tinh: String(row.ten_thuoc_tinh || '').trim(),
+        don_vi_tinh_id: optionalLineObjectId(row.don_vi_tinh_id),
+        ma_hang_snapshot: String(row.ma_hang_snapshot || ''),
+        ten_hang_snapshot: String(row.ten_hang_snapshot || ''),
+        don_vi_tinh_snapshot: String(row.don_vi_tinh_snapshot || ''),
+        ghi_chu: String(row.ghi_chu || '')
+    };
+}
+
+function legacyReturnLineKey(row = {}) {
+    const productId = String(row.hang_hoa_id?._id || row.hang_hoa_id || '');
+    const lotId = String(row.lo_hang_id?._id || row.lo_hang_id || '');
+    return `${productId}::${lotId}`;
+}
+
 function buildOrderFilter(query = {}) {
     const filter = {};
     if (query.q && query.q.trim() !== '') {
@@ -337,6 +372,8 @@ function buildOrderFilter(query = {}) {
     const cleanStatuses = statuses.filter(item => item && item !== 'all');
     if (cleanStatuses.length) {
         filter.trang_thai = { $in: cleanStatuses };
+    } else {
+        filter.trang_thai = { $ne: 'merged' };
     }
     const dateFrom = query.date_from ? new Date(query.date_from + 'T00:00:00') : null;
     const dateTo = query.date_to ? new Date(query.date_to + 'T23:59:59') : null;
@@ -371,7 +408,7 @@ function exportUserName(user) {
 }
 
 function exportCustomerName(customer) {
-    return customer ? (customer.ten_khach_hang || customer.ten_ca_nhan || customer.ten_cong_ty || customer.ma_khach_hang || '') : 'Khách lẻ';
+    return customer ? (customer.ten_khach_hang || customer.ten_ca_nhan || customer.ten_cong_ty || customer.ma_khach_hang || '') : 'KhÃƒÂ¡ch lÃ¡ÂºÂ»';
 }
 
 function exportCustomerPhone(customer, shipment) {
@@ -418,7 +455,7 @@ function buildOrderExportRow(order, detail, shipment) {
         khach_can_tra: Number(order.khach_can_tra || order.tong_thanh_toan || order.tong_tien || 0),
         khach_thanh_toan: Number(order.khach_thanh_toan || 0),
         tien_thua_tra_khach: Number(order.tien_thua_tra_khach || 0),
-        cod_enabled: codOn ? 'Có' : 'Không',
+        cod_enabled: codOn ? 'CÃƒÂ³' : 'KhÃƒÂ´ng',
         cod_amount: codAmount,
         ma_hang: product.ma_hang || '',
         ten_hang: product.ten_hang || '',
@@ -732,7 +769,7 @@ async function loadOrderExportData(filter) {
 async function sendOrderWorkbook(res, filename, orders, detailMap, shipmentMap, selectedColumns) {
     const columns = selectedColumns && selectedColumns.length ? selectedColumns : ORDER_EXPORT_COLUMNS;
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Đặt hàng');
+    const worksheet = workbook.addWorksheet('Ã„ÂÃ¡ÂºÂ·t hÃƒÂ ng');
     worksheet.columns = columns;
 
     orders.forEach(order => {
@@ -779,7 +816,7 @@ function buildInvoiceExportRow(invoice, detail, shipment, paidAmount, debtAmount
         tien_thua_tra_khach: Math.max(0, Number(paidAmount || 0) - payable),
         cong_no: Number(debtAmount || 0),
         phuong_thuc_thanh_toan: invoice.phuong_thuc_tt || '',
-        cod: invoice.phuong_thuc_tt === 'COD' || order.cod_enabled || shipment?.cod_enabled ? 'Có' : 'Không',
+        cod: invoice.phuong_thuc_tt === 'COD' || order.cod_enabled || shipment?.cod_enabled ? 'CÃƒÂ³' : 'KhÃƒÂ´ng',
         trang_thai_hoa_don: INVOICE_EXPORT_STATUS_MAP[normalizeInvoiceStatus(invoice.trang_thai)] || INVOICE_EXPORT_STATUS_MAP[invoice.trang_thai] || invoice.trang_thai || '',
         ghi_chu: invoice.ghi_chu || '',
         ma_hang: product.ma_hang || '',
@@ -830,8 +867,15 @@ async function loadInvoiceExportData(filter) {
                 ]
             }).populate('doi_tac_giao_hang_id').lean()
             : [],
-        invoiceIds.length
-            ? PhieuThuChi.find({ hoa_don_id: { $in: invoiceIds }, loai_phieu: 'thu', trang_thai: { $ne: 'cancelled' } }).lean()
+        (invoiceIds.length || orderIds.length)
+            ? PhieuThuChi.find({
+                loai_phieu: 'thu',
+                trang_thai: { $ne: 'cancelled' },
+                $or: [
+                    { hoa_don_id: { $in: invoiceIds } },
+                    { don_hang_id: { $in: orderIds } }
+                ]
+            }).lean()
             : [],
         invoiceIds.length
             ? CongNoKhachHang.find({ hoa_don_id: { $in: invoiceIds } }).lean()
@@ -853,8 +897,16 @@ async function loadInvoiceExportData(filter) {
         const invoice = invoices.find(row => String(row.don_hang_id?._id || row.don_hang_id || '') === String(shipment.don_hang_id));
         if (invoice && !shipmentMap[String(invoice._id)]) shipmentMap[String(invoice._id)] = shipment;
     });
+    const orderToInvoiceId = invoices.reduce((map, invoice) => {
+        const orderId = String(invoice.don_hang_id?._id || invoice.don_hang_id || '');
+        if (orderId) map[orderId] = String(invoice._id);
+        return map;
+    }, {});
     const paidMap = receipts.reduce((map, row) => {
-        const key = String(row.hoa_don_id || '');
+        const key = row.hoa_don_id
+            ? String(row.hoa_don_id)
+            : orderToInvoiceId[String(row.don_hang_id || '')];
+        if (!key) return map;
         map[key] = (map[key] || 0) + Number(row.gia_tri || 0);
         return map;
     }, {});
@@ -869,7 +921,7 @@ async function loadInvoiceExportData(filter) {
 
 async function sendInvoiceWorkbook(res, filename, invoices, detailMap, shipmentMap, paidMap, debtMap) {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Hóa đơn bán hàng');
+    const worksheet = workbook.addWorksheet('HÃƒÂ³a Ã„â€˜Ã†Â¡n bÃƒÂ¡n hÃƒÂ ng');
     worksheet.columns = INVOICE_EXPORT_COLUMNS;
 
     invoices.forEach(invoice => {
@@ -900,8 +952,8 @@ function resolveReturnTotals(returnSlip, detailRows = []) {
     const difference = Number(returnSlip.chenh_lech ?? (exchangeGoodsTotal - returnGoodsTotal));
     const needRefund = Math.max(Number(returnSlip.can_tra_khach || 0), -difference, 0);
     const needCollect = Math.max(Number(returnSlip.khach_can_tra_them || 0), difference, 0);
-    const fee = Number(returnSlip.phi_tra_hang ?? Math.max(returnGoodsTotal - exchangeGoodsTotal - needRefund, 0));
-    const discount = Number(returnSlip.giam_gia ?? Math.max(exchangeGoodsTotal - returnGoodsTotal - needCollect, 0));
+    const fee = Number(returnSlip.phi_tra_hang || 0);
+    const discount = Number(returnSlip.giam_gia || 0);
     return { returnGoodsTotal, exchangeGoodsTotal, difference, needRefund, needCollect, fee, discount };
 }
 
@@ -985,7 +1037,7 @@ async function loadReturnExportData(filter) {
 
 async function sendReturnWorkbook(res, filename, returns, detailMap) {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Trả hàng bán');
+    const worksheet = workbook.addWorksheet('TrÃ¡ÂºÂ£ hÃƒÂ ng bÃƒÂ¡n');
     worksheet.columns = RETURN_EXPORT_COLUMNS;
 
     returns.forEach(returnSlip => {
@@ -1047,7 +1099,7 @@ async function loadDeliveryPartnerExportData(filter = {}) {
 
 async function sendDeliveryPartnerWorkbook(res, filename, partners, priceMap) {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Đối tác giao hàng');
+    const worksheet = workbook.addWorksheet('Ã„ÂÃ¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng');
     worksheet.columns = DELIVERY_PARTNER_EXPORT_COLUMNS;
 
     partners.forEach(partner => {
@@ -1105,13 +1157,13 @@ function buildShipmentExportRow(shipment) {
         nguoi_nhan: shipment.ten_nguoi_nhan || '',
         dien_thoai_nguoi_nhan: shipment.sdt_nguoi_nhan || '',
         dia_chi_nhan: shipment.dia_chi_nhan || '',
-        doi_tac_giao_hang: shipment.doi_tac_giao_hang_id ? (shipment.doi_tac_giao_hang_id.ten_doi_tac || '') : 'Tự giao hàng',
+        doi_tac_giao_hang: shipment.doi_tac_giao_hang_id ? (shipment.doi_tac_giao_hang_id.ten_doi_tac || '') : 'TÃ¡Â»Â± giao hÃƒÂ ng',
         phi_giao_hang: Number(shipment.phi_giao_hang || 0),
         don_gia_van_chuyen_ap_dung: Number(shipment.don_gia_van_chuyen_ap_dung || 0),
         so_luong_tinh_phi: Number(shipment.so_luong_tinh_phi || 0),
         thanh_tien_van_chuyen: Number(shipment.thanh_tien_van_chuyen || shipment.phi_giao_hang || 0),
         nguoi_tra_phi_giao_hang: SHIPPING_FEE_PAYER_MAP[shipment.nguoi_tra_phi_giao_hang] || shipment.nguoi_tra_phi_giao_hang || '',
-        cod: shipment.cod_enabled ? 'Có' : 'Không',
+        cod: shipment.cod_enabled ? 'CÃƒÂ³' : 'KhÃƒÂ´ng',
         so_tien_cod: Number(shipment.cod_amount || 0),
         trang_thai_cod: SHIPMENT_COD_STATUS_MAP[shipment.trang_thai_cod] || shipment.trang_thai_cod || '',
         trang_thai_van_don: ORDER_EXPORT_STATUS_MAP[shipment.trang_thai] || shipment.trang_thai || '',
@@ -1139,7 +1191,7 @@ async function loadShipmentExportData(filter = {}) {
 
 async function sendShipmentWorkbook(res, filename, shipments) {
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Vận đơn');
+    const worksheet = workbook.addWorksheet('VÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n');
     worksheet.columns = SHIPMENT_EXPORT_COLUMNS;
 
     shipments.forEach(shipment => worksheet.addRow(buildShipmentExportRow(shipment)));
@@ -1210,6 +1262,86 @@ async function getSellableStock(khoId, product) {
     }, 0);
 }
 
+async function getOrderLineActualStock(khoId, item) {
+    const tenQuyCach = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
+    if (tenQuyCach) {
+        const filter = {
+            kho_id: khoId,
+            hang_hoa_id: item.hang_hoa_id,
+            $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
+        };
+        if (item.lo_hang_id) filter.lo_hang_id = item.lo_hang_id;
+        const rows = await TonKhoLoQuyCach.find(filter).lean();
+        return rows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
+    }
+
+    if (item.lo_hang_id) {
+        const lotStock = await TonKhoLo.findOne({
+            kho_id: khoId,
+            hang_hoa_id: item.hang_hoa_id,
+            lo_hang_id: item.lo_hang_id
+        }).lean();
+        return Number(lotStock?.so_luong || 0);
+    }
+
+    return getSellableStock(khoId, item.product);
+}
+
+async function validateOrderAvailability({ khoId, normalizedItems }) {
+    const reserved = await getReservedQuantitiesByOrder({
+        kho_id: khoId,
+        hang_hoa_ids: normalizedItems.map(item => item.hang_hoa_id)
+    });
+    const warnings = [];
+
+    for (const item of normalizedItems) {
+        const tenQuyCach = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
+        const reservedKey = tenQuyCach
+            ? buildVariantKey({
+                hang_hoa_id: item.hang_hoa_id,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || '',
+                ten_quy_cach: tenQuyCach
+            })
+            : null;
+        const fallbackReservedKey = tenQuyCach
+            ? buildVariantKey({
+                hang_hoa_id: item.hang_hoa_id,
+                gia_tri_thuoc_tinh_id: '',
+                ten_quy_cach: tenQuyCach
+            })
+            : null;
+        const soLuongKhachDat = reservedKey
+            ? Number((reserved.byVariant[reservedKey] || reserved.byVariant[fallbackReservedKey])?.so_luong_khach_dat || 0)
+            : Number(reserved.byProduct[String(item.hang_hoa_id)]?.so_luong_khach_dat || 0);
+        const tonThucTe = await getOrderLineActualStock(khoId, item);
+        const khaDung = tonThucTe - soLuongKhachDat;
+        const soLuongDat = Number(item.so_luong || 0);
+        const label = [
+            item.ma_hang_snapshot || item.product?.ma_hang,
+            item.ten_hang_snapshot || item.product?.ten_hang,
+            tenQuyCach
+        ].filter(Boolean).join(' - ');
+
+        if (tenQuyCach && !item.gia_tri_thuoc_tinh_id && !item.ten_quy_cach) {
+            warnings.push(`DÃƒÂ²ng hÃƒÂ ng quy cÃƒÂ¡ch ${label} thiÃ¡ÂºÂ¿u gia_tri_thuoc_tinh_id vÃƒÂ  ten_quy_cach, chÃ¡Â»â€° cÃƒÂ³ thÃ¡Â»Æ’ Ã„â€˜Ã¡Â»â€˜i chiÃ¡ÂºÂ¿u tÃ¡Â»â€œn theo dÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃƒÂ²n lÃ¡ÂºÂ¡i.`);
+        }
+        if (soLuongDat > tonThucTe) {
+            const message = `SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng Ã„â€˜Ã¡ÂºÂ·t vÃ†Â°Ã¡Â»Â£t tÃ¡Â»â€œn thÃ¡Â»Â±c tÃ¡ÂºÂ¿. Khi giao cÃƒÂ³ thÃ¡Â»Æ’ thiÃ¡ÂºÂ¿u hÃƒÂ ng. DÃƒÂ²ng [${label}] tÃ¡Â»â€œn ${tonThucTe}, khÃƒÂ¡ch Ã„â€˜Ã¡ÂºÂ·t ${soLuongDat}.`;
+            if (!CHO_PHEP_DAT_AM_KHO) return { valid: false, message };
+            warnings.push(message);
+            continue;
+        }
+        if (soLuongDat > khaDung) {
+            const message = `SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng Ã„â€˜Ã¡ÂºÂ·t cÃ¡Â»Â§a [${label}] vÃ†Â°Ã¡Â»Â£t khÃ¡ÂºÂ£ dÃ¡Â»Â¥ng. KhÃ¡ÂºÂ£ dÃ¡Â»Â¥ng cÃƒÂ²n ${khaDung}, khÃƒÂ¡ch Ã„â€˜Ã¡ÂºÂ·t ${soLuongDat}.`;
+            if (!CHO_PHEP_DAT_AM_KHO) return { valid: false, message };
+            warnings.push(message);
+        }
+    }
+
+    warnings.forEach(message => console.warn('[dat-hang][availability]', message));
+    return { valid: true, warnings };
+}
+
 async function findReturnLotId(khoId, productId) {
     const stockLot = await TonKhoLo.findOne({
         kho_id: khoId,
@@ -1255,14 +1387,25 @@ function normalizeInvoiceStatus(value) {
 function normalizePaymentMethodValue(value) {
     const method = String(value || '').trim();
     if (['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(method)) return method;
-    if (/chuyển|chuyen|bank/i.test(method)) return 'chuyen_khoan';
-    if (/ví|vi/i.test(method)) return 'vi_dien_tu';
+    if (/chuyÃ¡Â»Æ’n|chuyen|bank/i.test(method)) return 'chuyen_khoan';
+    if (/vÃƒÂ­|vi/i.test(method)) return 'vi_dien_tu';
     if (/cod/i.test(method)) return 'khac';
     return 'tien_mat';
 }
 
 function isEnabled(value) {
     return value === true || value === 'true' || value === 'on' || value === '1';
+}
+
+async function getOrderPaidAmount(orderId, extraFilter = {}) {
+    if (!orderId) return 0;
+    const receipts = await PhieuThuChi.find({
+        don_hang_id: orderId,
+        loai_phieu: 'thu',
+        trang_thai: { $ne: 'cancelled' },
+        ...extraFilter
+    }).select('gia_tri').lean();
+    return receipts.reduce((sum, row) => sum + Number(row.gia_tri || 0), 0);
 }
 
 async function generateInvoiceCode() {
@@ -1320,6 +1463,113 @@ async function generateShipmentCode() {
         { new: true, upsert: true }
     ).lean();
     return 'VD' + String(counter.seq).padStart(6, '0');
+}
+
+async function generateMergeOrderCode(session = null) {
+    const lastMerge = await GopDonHang.findOne({ ma_gop_don: /^GDH\d+$/ })
+        .sort({ ma_gop_don: -1 })
+        .select('ma_gop_don')
+        .session(session)
+        .lean();
+    const currentMax = Number(String(lastMerge?.ma_gop_don || '').replace(/^GDH/, '')) || 0;
+    await Counter.updateOne(
+        { _id: 'gop_don_hang' },
+        { $max: { seq: currentMax } },
+        { upsert: true, session }
+    );
+    const counter = await Counter.findOneAndUpdate(
+        { _id: 'gop_don_hang' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, session }
+    ).lean();
+    return 'GDH' + String(counter.seq).padStart(6, '0');
+}
+
+function normalizePhone(value) {
+    return String(value || '').replace(/\D/g, '');
+}
+
+function sameObjectIdValue(a, b) {
+    return String(a || '') === String(b || '');
+}
+
+function orderCustomerPhone(order) {
+    return normalizePhone(order?.khach_hang_id?.sdt || order?.khach_hang_id?.dien_thoai || order?.khach_hang_id?.sdt2 || '');
+}
+
+function mergeLineKey(row = {}) {
+    return [
+        String(row.hang_hoa_id || ''),
+        String(row.lo_hang_id || ''),
+        String(row.gia_tri_thuoc_tinh_id || ''),
+        String(row.ten_quy_cach || '').trim(),
+        Number(row.don_gia_ban || 0),
+        Number(row.chiet_khau || 0),
+        String(row.kieu_chiet_khau || 'vnd')
+    ].join('|');
+}
+
+function calcLineTotal(line) {
+    const quantity = Number(line.so_luong_dat || line.so_luong || 0);
+    const unitPrice = Number(line.don_gia_ban || 0);
+    const base = quantity * unitPrice;
+    const discount = line.kieu_chiet_khau === 'phan_tram'
+        ? base * Math.max(0, Number(line.chiet_khau || 0)) / 100
+        : Math.max(0, Number(line.chiet_khau || 0));
+    return Math.max(base - discount, 0);
+}
+
+function cloneMergedLine(line, receivingOrderId) {
+    const quantity = Number(line.so_luong_dat || line.so_luong || 0);
+    return {
+        don_hang_id: receivingOrderId,
+        hang_hoa_id: line.hang_hoa_id,
+        gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id || null,
+        ten_quy_cach: String(line.ten_quy_cach || '').trim(),
+        ten_thuoc_tinh: String(line.ten_thuoc_tinh || '').trim(),
+        don_vi_tinh_id: line.don_vi_tinh_id || null,
+        so_luong: quantity,
+        so_luong_dat: quantity,
+        so_luong_xac_nhan: 0,
+        so_luong_da_giao: 0,
+        so_luong_con_thieu: quantity,
+        trang_thai_giao: 'chua_giao',
+        lo_hang_id: line.lo_hang_id || null,
+        don_gia_ban: Number(line.don_gia_ban || 0),
+        ma_hang_snapshot: String(line.ma_hang_snapshot || ''),
+        ten_hang_snapshot: String(line.ten_hang_snapshot || ''),
+        don_vi_tinh_snapshot: String(line.don_vi_tinh_snapshot || ''),
+        gia_goc: Number(line.gia_goc || 0),
+        chiet_khau: Number(line.chiet_khau || 0),
+        kieu_chiet_khau: line.kieu_chiet_khau === 'phan_tram' ? 'phan_tram' : 'vnd',
+        thanh_tien: calcLineTotal(line),
+        ghi_chu: String(line.ghi_chu || '')
+    };
+}
+
+function applyOrderTotals(order, lines, paidAmount) {
+    const goodsTotal = lines.reduce((sum, line) => sum + Number(line.thanh_tien || 0), 0);
+    const orderDiscount = order.kieu_giam_gia === 'phan_tram'
+        ? goodsTotal * Math.max(0, Number(order.giam_gia || 0)) / 100
+        : Math.max(0, Number(order.giam_gia || 0));
+    const payable = Math.max(goodsTotal - orderDiscount, 0);
+    const paid = Math.max(0, Number(paidAmount || 0));
+    order.tong_tien_hang = goodsTotal;
+    order.tong_tien = payable;
+    order.tong_thanh_toan = payable;
+    order.khach_thanh_toan = paid;
+    order.tien_thua_tra_khach = Math.max(paid - payable, 0);
+    order.khach_can_tra = Math.max(payable - paid, 0);
+}
+
+function uniqueObjectIds(values) {
+    const seen = new Set();
+    return (values || []).filter(value => {
+        const key = String(value || '');
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 
 function resolveInvoiceStatus(payable, paid) {
@@ -1606,7 +1856,14 @@ async function decorateInvoices(invoices) {
                 { don_hang_id: { $in: orderIds } }
             ]
         }).populate('doi_tac_giao_hang_id').lean(),
-        PhieuThuChi.find({ hoa_don_id: { $in: invoiceIds }, loai_phieu: 'thu', trang_thai: { $ne: 'cancelled' } }).lean(),
+        PhieuThuChi.find({
+            loai_phieu: 'thu',
+            trang_thai: { $ne: 'cancelled' },
+            $or: [
+                { hoa_don_id: { $in: invoiceIds } },
+                { don_hang_id: { $in: orderIds } }
+            ]
+        }).lean(),
         PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' } }).lean(),
         CongNoKhachHang.find({ hoa_don_id: { $in: invoiceIds } }).lean()
     ]);
@@ -1621,8 +1878,16 @@ async function decorateInvoices(invoices) {
         if (invoice && !shipmentByInvoice[String(invoice._id)]) shipmentByInvoice[String(invoice._id)] = row;
     });
 
+    const orderToInvoiceId = invoices.reduce((map, invoice) => {
+        const orderId = String(invoice.don_hang_id?._id || invoice.don_hang_id || '');
+        if (orderId) map[orderId] = String(invoice._id);
+        return map;
+    }, {});
     const paidByInvoice = receipts.reduce((map, row) => {
-        const key = String(row.hoa_don_id || '');
+        const key = row.hoa_don_id
+            ? String(row.hoa_don_id)
+            : orderToInvoiceId[String(row.don_hang_id || '')];
+        if (!key) return map;
         map[key] = (map[key] || 0) + Number(row.gia_tri || 0);
         return map;
     }, {});
@@ -1703,6 +1968,290 @@ async function getOrderCreateData() {
 
     return { customers, products, stores, partners, priceBooks, priceRows };
 }
+
+router.get('/gop-don/candidates', async (req, res, next) => {
+    try {
+        const days = Math.max(1, Math.min(90, Number(req.query.days || 7)));
+        const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const filter = {
+            ngay_dat: { $gte: fromDate },
+            trang_thai: { $nin: ['cancelled', 'completed', 'merged'] },
+            trang_thai_giao_hang: 'chua_giao'
+        };
+        if (req.query.khach_hang_id && mongoose.Types.ObjectId.isValid(String(req.query.khach_hang_id))) {
+            filter.khach_hang_id = req.query.khach_hang_id;
+        }
+
+        let orders = await DonHang.find(filter)
+            .populate('khach_hang_id')
+            .sort({ ngay_dat: -1 })
+            .lean();
+
+        const normalizedPhone = normalizePhone(req.query.sdt);
+        if (normalizedPhone) {
+            orders = orders.filter(order => orderCustomerPhone(order) === normalizedPhone);
+        }
+
+        const orderIds = orders.map(order => order._id);
+        const [invoices, deliveredRows] = await Promise.all([
+            HoaDonBanHang.find({
+                don_hang_id: { $in: orderIds },
+                trang_thai: { $ne: 'cancelled' }
+            }).select('don_hang_id').lean(),
+            CTDonHang.find({
+                don_hang_id: { $in: orderIds },
+                so_luong_da_giao: { $gt: 0 }
+            }).select('don_hang_id').lean()
+        ]);
+        const blockedOrderIds = new Set([
+            ...invoices.map(item => String(item.don_hang_id || '')),
+            ...deliveredRows.map(item => String(item.don_hang_id || ''))
+        ]);
+
+        const data = orders
+            .filter(order => !blockedOrderIds.has(String(order._id)))
+            .map(order => ({
+                _id: order._id,
+                ma_don_hang: order.ma_don_hang,
+                ngay_dat: order.ngay_dat,
+                khach_can_tra: Number(order.khach_can_tra || order.tong_thanh_toan || order.tong_tien || 0),
+                khach_thanh_toan: Number(order.khach_thanh_toan || 0),
+                ma_khach_hang: order.khach_hang_id?.ma_khach_hang || '',
+                ten_khach_hang: order.khach_hang_id?.ten_khach_hang || '',
+                sdt: order.khach_hang_id?.sdt || order.khach_hang_id?.sdt2 || '',
+                trang_thai: order.trang_thai,
+                trang_thai_giao_hang: order.trang_thai_giao_hang
+            }));
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+async function mergeOrdersInSession(req, session) {
+    const body = req.body || {};
+    const orderIds = uniqueObjectIds(Array.isArray(body.don_hang_ids) ? body.don_hang_ids : [])
+        .map(id => String(id));
+    if (orderIds.length < 2) {
+        const error = new Error('Vui lÃƒÂ²ng chÃ¡Â»Ân ÃƒÂ­t nhÃ¡ÂºÂ¥t 2 Ã„â€˜Ã†Â¡n Ã„â€˜Ã¡Â»Æ’ gÃ¡Â»â„¢p.');
+        error.status = 400;
+        throw error;
+    }
+    const receivingOrderId = body.don_nhan_id && orderIds.includes(String(body.don_nhan_id))
+        ? String(body.don_nhan_id)
+        : orderIds[0];
+    const sourceOrderIds = orderIds.filter(id => id !== receivingOrderId);
+    const note = String(body.ghi_chu || '').trim();
+
+    const orders = await DonHang.find({ _id: { $in: orderIds } })
+        .populate('khach_hang_id')
+        .session(session);
+    if (orders.length !== orderIds.length) {
+        const error = new Error('MÃ¡Â»â„¢t hoÃ¡ÂºÂ·c nhiÃ¡Â»Âu Ã„â€˜Ã†Â¡n hÃƒÂ ng khÃƒÂ´ng tÃ¡Â»â€œn tÃ¡ÂºÂ¡i.');
+        error.status = 400;
+        throw error;
+    }
+    const orderById = new Map(orders.map(order => [String(order._id), order]));
+    const receivingOrder = orderById.get(receivingOrderId);
+    const sourceOrders = sourceOrderIds.map(id => orderById.get(id));
+
+    const storeIds = new Set(orders.map(order => String(order.cua_hang_id || '')).filter(Boolean));
+    if (storeIds.size !== 1) {
+        const error = new Error('KhÃƒÂ´ng thÃ¡Â»Æ’ gÃ¡Â»â„¢p cÃƒÂ¡c Ã„â€˜Ã†Â¡n khÃƒÂ¡c cÃ¡Â»Â­a hÃƒÂ ng.');
+        error.status = 400;
+        throw error;
+    }
+
+    const warehouseIds = new Set(orders.map(order => String(order.kho_id || '')).filter(Boolean));
+    if (warehouseIds.size > 1) {
+        const error = new Error('KhÃƒÂ´ng thÃ¡Â»Æ’ gÃ¡Â»â„¢p cÃƒÂ¡c Ã„â€˜Ã†Â¡n khÃƒÂ¡c kho trong phase nÃƒÂ y.');
+        error.status = 400;
+        throw error;
+    }
+
+    const shipments = await VanDon.find({ don_hang_id: { $in: orderIds } }).session(session);
+    const shipmentByOrder = shipments.reduce((map, shipment) => {
+        map[String(shipment.don_hang_id || '')] = shipment;
+        return map;
+    }, {});
+
+    const customerIds = new Set(orders.map(order => String(order.khach_hang_id?._id || order.khach_hang_id || '')).filter(Boolean));
+    const phones = new Set(orders.map(order => {
+        const shipment = shipmentByOrder[String(order._id)];
+        return orderCustomerPhone(order) || normalizePhone(shipment?.sdt_nguoi_nhan);
+    }).filter(Boolean));
+    if (customerIds.size !== 1 && phones.size !== 1) {
+        const error = new Error('KhÃƒÂ´ng thÃ¡Â»Æ’ gÃ¡Â»â„¢p cÃƒÂ¡c Ã„â€˜Ã†Â¡n khÃƒÂ¡c khÃƒÂ¡ch hÃƒÂ ng hoÃ¡ÂºÂ·c khÃƒÂ¡c sÃ¡Â»â€˜ Ã„â€˜iÃ¡Â»â€¡n thoÃ¡ÂºÂ¡i.');
+        error.status = 400;
+        throw error;
+    }
+
+    const invoices = await HoaDonBanHang.find({
+        don_hang_id: { $in: orderIds },
+        trang_thai: { $ne: 'cancelled' }
+    }).session(session);
+    if (invoices.length) {
+        const invoiceOrder = orderById.get(String(invoices[0].don_hang_id));
+        const error = new Error(`KhÃƒÂ´ng thÃ¡Â»Æ’ gÃ¡Â»â„¢p Ã„â€˜Ã†Â¡n ${invoiceOrder?.ma_don_hang || ''} vÃƒÂ¬ Ã„â€˜ÃƒÂ£ tÃ¡ÂºÂ¡o hÃƒÂ³a Ã„â€˜Ã†Â¡n.`);
+        error.status = 400;
+        throw error;
+    }
+
+    const details = await CTDonHang.find({ don_hang_id: { $in: orderIds } }).session(session);
+    const detailMap = details.reduce((map, detail) => {
+        const key = String(detail.don_hang_id || '');
+        if (!map[key]) map[key] = [];
+        map[key].push(detail);
+        return map;
+    }, {});
+
+    for (const order of orders) {
+        if (['cancelled', 'completed', 'merged'].includes(order.trang_thai)) {
+            const message = order.trang_thai === 'merged'
+                ? `Ã„ÂÃ†Â¡n ${order.ma_don_hang} Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c gÃ¡Â»â„¢p vÃƒÂ o ${order.merged_to_ma_don_hang || 'Ã„â€˜Ã†Â¡n khÃƒÂ¡c'}.`
+                : `KhÃƒÂ´ng thÃ¡Â»Æ’ gÃ¡Â»â„¢p Ã„â€˜Ã†Â¡n ${order.ma_don_hang} Ã¡Â»Å¸ trÃ¡ÂºÂ¡ng thÃƒÂ¡i hiÃ¡Â»â€¡n tÃ¡ÂºÂ¡i.`;
+            const error = new Error(message);
+            error.status = 400;
+            throw error;
+        }
+        if (order.trang_thai_giao_hang !== 'chua_giao') {
+            const error = new Error(`ChÃ¡Â»â€° cÃƒÂ³ thÃ¡Â»Æ’ gÃ¡Â»â„¢p cÃƒÂ¡c Ã„â€˜Ã†Â¡n chÃ†Â°a giao. Ã„ÂÃ†Â¡n ${order.ma_don_hang} Ã„â€˜ÃƒÂ£ phÃƒÂ¡t sinh giao hÃƒÂ ng.`);
+            error.status = 400;
+            throw error;
+        }
+        const deliveredDetail = (detailMap[String(order._id)] || []).find(detail => Number(detail.so_luong_da_giao || 0) > 0);
+        if (deliveredDetail) {
+            const error = new Error(`ChÃ¡Â»â€° cÃƒÂ³ thÃ¡Â»Æ’ gÃ¡Â»â„¢p cÃƒÂ¡c Ã„â€˜Ã†Â¡n chÃ†Â°a giao. Ã„ÂÃ†Â¡n ${order.ma_don_hang} Ã„â€˜ÃƒÂ£ phÃƒÂ¡t sinh giao hÃƒÂ ng.`);
+            error.status = 400;
+            throw error;
+        }
+    }
+
+    const allPaidBefore = orders.reduce((sum, order) => sum + Number(order.khach_thanh_toan || 0), 0);
+    const allGoodsBefore = orders.reduce((sum, order) => sum + Number(order.tong_tien_hang || order.tong_thanh_toan || order.tong_tien || 0), 0);
+    const receivingLines = detailMap[receivingOrderId] || [];
+    const receivingLineByKey = new Map(receivingLines.map(line => [mergeLineKey(line), line]));
+
+    for (const sourceOrder of sourceOrders) {
+        const sourceLines = detailMap[String(sourceOrder._id)] || [];
+        for (const sourceLine of sourceLines) {
+            const key = mergeLineKey(sourceLine);
+            const sourceQuantity = Number(sourceLine.so_luong_dat || sourceLine.so_luong || 0);
+            const targetLine = receivingLineByKey.get(key);
+            if (targetLine) {
+                const targetQuantity = Number(targetLine.so_luong_dat || targetLine.so_luong || 0) + sourceQuantity;
+                targetLine.so_luong = targetQuantity;
+                targetLine.so_luong_dat = targetQuantity;
+                targetLine.so_luong_xac_nhan = 0;
+                targetLine.so_luong_da_giao = 0;
+                targetLine.so_luong_con_thieu = targetQuantity;
+                targetLine.trang_thai_giao = 'chua_giao';
+                targetLine.thanh_tien = calcLineTotal(targetLine);
+                await targetLine.save({ session });
+            } else {
+                const clonedLine = await CTDonHang.create([cloneMergedLine(sourceLine, receivingOrder._id)], { session });
+                receivingLines.push(clonedLine[0]);
+                receivingLineByKey.set(key, clonedLine[0]);
+            }
+        }
+    }
+
+    const updatedReceivingLines = await CTDonHang.find({ don_hang_id: receivingOrder._id }).session(session);
+    applyOrderTotals(receivingOrder, updatedReceivingLines, allPaidBefore);
+    receivingOrder.is_merged_order = true;
+    receivingOrder.merged_from_don_hang_ids = uniqueObjectIds([
+        ...(receivingOrder.merged_from_don_hang_ids || []),
+        ...sourceOrders.map(order => order._id)
+    ]);
+    receivingOrder.merged_from_ma_don_hangs = Array.from(new Set([
+        ...(receivingOrder.merged_from_ma_don_hangs || []),
+        ...sourceOrders.map(order => order.ma_don_hang).filter(Boolean)
+    ]));
+    receivingOrder.merged_at = new Date();
+    receivingOrder.merged_by = req.user?._id;
+    receivingOrder.merge_note = note;
+    await receivingOrder.save({ session });
+
+    await DonHang.updateMany(
+        { _id: { $in: sourceOrders.map(order => order._id) } },
+        {
+            $set: {
+                trang_thai: 'merged',
+                merged_to_don_hang_id: receivingOrder._id,
+                merged_to_ma_don_hang: receivingOrder.ma_don_hang,
+                merged_at: receivingOrder.merged_at,
+                merged_by: req.user?._id,
+                merge_note: note
+            }
+        },
+        { session }
+    );
+
+    await VanDon.updateMany(
+        { don_hang_id: { $in: sourceOrders.map(order => order._id) }, trang_thai: { $ne: 'cancelled' } },
+        {
+            $set: {
+                trang_thai: 'cancelled',
+                ghi_chu: `VÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n bÃ¡Â»â€¹ ngÃ†Â°ng do Ã„â€˜Ã†Â¡n hÃƒÂ ng Ã„â€˜ÃƒÂ£ gÃ¡Â»â„¢p vÃƒÂ o ${receivingOrder.ma_don_hang}`
+            }
+        },
+        { session }
+    );
+
+    const maGopDon = await generateMergeOrderCode(session);
+    const mergeRecord = await GopDonHang.create([{
+        ma_gop_don: maGopDon,
+        cua_hang_id: receivingOrder.cua_hang_id,
+        don_nhan_id: receivingOrder._id,
+        ma_don_nhan: receivingOrder.ma_don_hang,
+        khach_hang_id: receivingOrder.khach_hang_id?._id || receivingOrder.khach_hang_id || null,
+        sdt_khach_hang: orderCustomerPhone(receivingOrder) || normalizePhone(shipmentByOrder[receivingOrderId]?.sdt_nguoi_nhan),
+        don_nguon_ids: sourceOrders.map(order => order._id),
+        ma_don_nguon: sourceOrders.map(order => order.ma_don_hang),
+        tong_tien_hang_truoc_gop: allGoodsBefore,
+        tong_khach_da_tra_truoc_gop: allPaidBefore,
+        tong_tien_hang_sau_gop: Number(receivingOrder.tong_tien_hang || 0),
+        tong_khach_da_tra_sau_gop: Number(receivingOrder.khach_thanh_toan || 0),
+        so_luong_don_gop: orders.length,
+        ghi_chu: note,
+        trang_thai: 'active',
+        nguoi_tao_id: req.user?._id,
+        ngay_gop: receivingOrder.merged_at
+    }], { session });
+
+    return {
+        gop_don_hang_id: mergeRecord[0]._id,
+        ma_gop_don: mergeRecord[0].ma_gop_don,
+        don_nhan_id: receivingOrder._id,
+        ma_don_nhan: receivingOrder.ma_don_hang,
+        don_nguon_ids: sourceOrders.map(order => order._id),
+        ma_don_nguon: sourceOrders.map(order => order.ma_don_hang),
+        tong_tien_hang_sau_gop: Number(receivingOrder.tong_tien_hang || 0),
+        tong_khach_da_tra_sau_gop: Number(receivingOrder.khach_thanh_toan || 0)
+    };
+}
+
+router.post('/gop-don', async (req, res, next) => {
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            result = await mergeOrdersInSession(req, session);
+        });
+        res.json({
+            success: true,
+            message: 'GÃ¡Â»â„¢p Ã„â€˜Ã†Â¡n thÃƒÂ nh cÃƒÂ´ng',
+            data: result
+        });
+    } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ success: false, message: error.message });
+        }
+        next(error);
+    } finally {
+        await session.endSession();
+    }
+});
 
 router.get('/', async (req, res, next) => {
     try {
@@ -1785,7 +2334,7 @@ router.post('/export-excel', async (req, res, next) => {
     try {
         const columns = resolveOrderExportColumns(req.body.columns);
         if (!columns.length) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 cột để xuất.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân ÃƒÂ­t nhÃ¡ÂºÂ¥t 1 cÃ¡Â»â„¢t Ã„â€˜Ã¡Â»Æ’ xuÃ¡ÂºÂ¥t.' });
         }
         const filter = await buildFullOrderFilter(req.body || {});
         const { orders, detailMap, shipmentMap } = await loadOrderExportData(filter);
@@ -1801,7 +2350,7 @@ router.get('/:id/export.xlsx', async (req, res, next) => {
             return next();
         }
         const { orders, detailMap, shipmentMap } = await loadOrderExportData({ _id: req.params.id });
-        if (!orders.length) return res.status(404).send('Không tìm thấy đơn hàng');
+        if (!orders.length) return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng');
         await sendOrderWorkbook(
             res,
             'don-hang-' + (orders[0].ma_don_hang || 'unknown') + '.xlsx',
@@ -1817,11 +2366,15 @@ router.get('/:id/export.xlsx', async (req, res, next) => {
 router.get('/create', async (req, res, next) => {
     try {
         const storeId = await resolveStoreId(req);
-        const [data, warehouses] = await Promise.all([
+        const cashBookQuery = storeId
+            ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
+            : { trang_thai: 'active' };
+        const [data, warehouses, cashBooks] = await Promise.all([
             getOrderCreateData(),
             storeId
                 ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 }).lean()
-                : []
+                : [],
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1, loai: 1 }).lean()
         ]);
         let sourceOrder = null;
         let sourceOrderItems = [];
@@ -1835,20 +2388,26 @@ router.get('/create', async (req, res, next) => {
                 .populate('kho_id')
                 .lean();
             if (!sourceOrder) {
-                copyFromError = 'Không tìm thấy đơn hàng để sao chép.';
+                copyFromError = 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p.';
+            } else if (sourceOrder.trang_thai === 'merged') {
+                copyFromError = `Đơn hàng ${sourceOrder.ma_don_hang} đã được gộp vào ${sourceOrder.merged_to_ma_don_hang || 'đơn khác'}, không thể sao chép riêng.`;
+                sourceOrder = null;
+                sourceOrderItems = [];
+                sourceShipment = null;
             } else {
                 sourceOrderItems = await CTDonHang.find({ don_hang_id: sourceOrder._id }).populate('hang_hoa_id').lean();
                 if (!sourceOrderItems.length) {
-                    copyFromError = 'Đơn hàng chưa có sản phẩm để sao chép.';
+                    copyFromError = 'Ã„ÂÃ†Â¡n hÃƒÂ ng chÃ†Â°a cÃƒÂ³ sÃ¡ÂºÂ£n phÃ¡ÂºÂ©m Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p.';
                 }
                 sourceShipment = await VanDon.findOne({ don_hang_id: sourceOrder._id }).lean();
             }
         }
         res.render('don-hang/create', {
-            title: 'Đặt hàng',
+            title: 'Ã„ÂÃ¡ÂºÂ·t hÃƒÂ ng',
             ...data,
             currentStoreId: storeId || '',
             warehouses,
+            cashBooks,
             sourceOrder,
             sourceOrderItems,
             sourceShipment,
@@ -1883,53 +2442,73 @@ router.post('/add', async (req, res, next) => {
             ghi_chu_giao_hang,
             thu_ho_cod,
             cod_enabled,
-            nguoi_tra_phi_giao_hang
+            nguoi_tra_phi_giao_hang,
+            khach_thanh_toan,
+            phuong_thuc_thanh_toan,
+            so_quy_id
         } = req.body || {};
 
         const orderItems = parseItems(items);
         if (!Array.isArray(orderItems) || !orderItems.length) {
-            return res.status(400).json({ success: false, message: 'Đơn hàng chưa có sản phẩm' });
+            return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n hÃƒÂ ng chÃ†Â°a cÃƒÂ³ sÃ¡ÂºÂ£n phÃ¡ÂºÂ©m' });
         }
         if (!kho_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân kho.' });
         }
         const sessionStoreId = await resolveStoreId(req);
         if (!sessionStoreId) {
-            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở menu trên.' });
+            return res.status(400).json({ success: false, message: 'ChÃ†Â°a chÃ¡Â»Ân cÃ¡Â»Â­a hÃƒÂ ng lÃƒÂ m viÃ¡Â»â€¡c. Vui lÃƒÂ²ng chÃ¡Â»Ân cÃ¡Â»Â­a hÃƒÂ ng Ã¡Â»Å¸ menu trÃƒÂªn.' });
         }
         if (!khach_hang_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn khách hàng.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân khÃƒÂ¡ch hÃƒÂ ng.' });
         }
         if (!dia_chi_khach_hang_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn địa chỉ nhận hàng.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân Ã„â€˜Ã¡Â»â€¹a chÃ¡Â»â€° nhÃ¡ÂºÂ­n hÃƒÂ ng.' });
         }
         if (!doi_tac_giao_hang_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn đối tác giao hàng.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng.' });
         }
         const kho = await Kho.findById(kho_id).lean();
         if (!kho) {
-            return res.status(400).json({ success: false, message: 'Kho không hợp lệ.' });
+            return res.status(400).json({ success: false, message: 'Kho khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡.' });
         }
         if (String(kho.cua_hang_id || '') !== sessionStoreId) {
-            return res.status(400).json({ success: false, message: 'Kho không thuộc cửa hàng đang làm việc.' });
+            return res.status(400).json({ success: false, message: 'Kho khÃƒÂ´ng thuÃ¡Â»â„¢c cÃ¡Â»Â­a hÃƒÂ ng Ã„â€˜ang lÃƒÂ m viÃ¡Â»â€¡c.' });
         }
         const validBangGiaId = /^[0-9a-fA-F]{24}$/.test(String(bang_gia_id || '')) ? bang_gia_id : null;
 
         let tong_tien_hang = 0;
         const normalizedItems = [];
-        for (const item of orderItems) {
+        for (const sourceItem of orderItems) {
+            const sourceQuyCachItems = Array.isArray(sourceItem.quy_cach_items) ? sourceItem.quy_cach_items : [];
+            const expandedItems = sourceQuyCachItems.length
+                ? sourceQuyCachItems
+                    .filter(qc => Number(qc.so_luong_dat ?? qc.so_luong) > 0)
+                    .map(qc => Object.assign({}, sourceItem, {
+                        so_luong: Number(qc.so_luong_dat ?? qc.so_luong),
+                        so_luong_dat: Number(qc.so_luong_dat ?? qc.so_luong),
+                        gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || sourceItem.gia_tri_thuoc_tinh_id || null,
+                        ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                        ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+                        don_gia_ban: qc.don_gia_ban ?? sourceItem.don_gia_ban,
+                        don_gia: qc.don_gia_ban ?? sourceItem.don_gia_ban ?? sourceItem.don_gia,
+                        chiet_khau: qc.chiet_khau ?? 0,
+                        kieu_chiet_khau: qc.kieu_chiet_khau || 'vnd'
+                    }))
+                : [sourceItem];
+            for (const item of expandedItems) {
             const productId = String(item.hang_hoa_id || '').trim();
             const quantity = Number(item.so_luong_dat ?? item.so_luong) || 0;
             if (!productId || quantity <= 0) {
-                return res.status(400).json({ success: false, message: 'Dòng hàng không hợp lệ.' });
+                return res.status(400).json({ success: false, message: 'DÃƒÂ²ng hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡.' });
             }
             const product = await HangHoa.findById(productId).lean();
             if (!product) {
-                return res.status(400).json({ success: false, message: 'Không tìm thấy hàng hóa.' });
+                return res.status(400).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ ng hÃƒÂ³a.' });
             }
             const manualUnitPrice = Number(item.don_gia_ban ?? item.don_gia);
             if (Number.isFinite(manualUnitPrice) && manualUnitPrice < 0) {
-                return res.status(400).json({ success: false, message: 'Đơn giá không được âm.' });
+                return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n giÃƒÂ¡ khÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c ÃƒÂ¢m.' });
             }
             const unitPrice = Number.isFinite(manualUnitPrice) && manualUnitPrice >= 0
                 ? manualUnitPrice
@@ -1945,12 +2524,32 @@ router.post('/add', async (req, res, next) => {
                 product,
                 hang_hoa_id: productId,
                 lo_hang_id: item.lo_hang_id || null,
+                gia_tri_thuoc_tinh_id: optionalLineObjectId(item.gia_tri_thuoc_tinh_id),
+                ten_quy_cach: String(item.ten_quy_cach || '').trim(),
+                ten_thuoc_tinh: String(item.ten_thuoc_tinh || item.ten_quy_cach || '').trim(),
+                don_vi_tinh_id: optionalLineObjectId(item.don_vi_tinh_id || product.don_vi_tinh_id),
+                ma_hang_snapshot: String(item.ma_hang_snapshot || product.ma_hang || ''),
+                ten_hang_snapshot: String(item.ten_hang_snapshot || product.ten_hang || ''),
+                don_vi_tinh_snapshot: String(item.don_vi_tinh_snapshot || ''),
+                gia_goc: Number(item.gia_goc || product.gia_co_dinh || 0),
+                ghi_chu: String(item.ghi_chu || ''),
                 so_luong: quantity,
                 don_gia_ban: unitPrice,
                 chiet_khau: lineDiscountValue,
                 kieu_chiet_khau: item.kieu_chiet_khau === 'phan_tram' ? 'phan_tram' : 'vnd',
                 thanh_tien: lineTotal
             });
+            }
+        }
+        if (!normalizedItems.length) {
+            return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n hÃƒÂ ng chÃ†Â°a cÃƒÂ³ dÃƒÂ²ng hÃƒÂ ng hÃ¡Â»Â£p lÃ¡Â»â€¡.' });
+        }
+        const availabilityValidation = await validateOrderAvailability({
+            khoId: kho_id,
+            normalizedItems
+        });
+        if (!availabilityValidation.valid) {
+            return res.status(400).json({ success: false, message: availabilityValidation.message });
         }
 
         const orderDiscount = normalizeDiscount(chiet_khau, kieu_giam_gia, tong_tien_hang);
@@ -1968,13 +2567,13 @@ router.post('/add', async (req, res, next) => {
         });
         const manualShippingFee = Number(phi_van_chuyen);
         if (Number.isFinite(manualShippingFee) && manualShippingFee < 0) {
-            return res.status(400).json({ success: false, message: 'Phí giao hàng không được âm.' });
+            return res.status(400).json({ success: false, message: 'PhÃƒÂ­ giao hÃƒÂ ng khÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c ÃƒÂ¢m.' });
         }
         const shippingFee = Number.isFinite(manualShippingFee) && manualShippingFee >= 0
             ? manualShippingFee
             : Number(calculatedShippingFee.phi_giao_hang || 0);
         if (shippingFee < 0) {
-            return res.status(400).json({ success: false, message: 'Phí giao hàng không được âm.' });
+            return res.status(400).json({ success: false, message: 'PhÃƒÂ­ giao hÃƒÂ ng khÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c ÃƒÂ¢m.' });
         }
         const shippingFeePayer = nguoi_tra_phi_giao_hang === 'cua_hang' ? 'cua_hang' : 'khach';
         const effectiveShippingFee = shippingFeePayer === 'khach' ? 0 : shippingFee;
@@ -1988,12 +2587,24 @@ router.post('/add', async (req, res, next) => {
         });
         const shippingFeeForCustomer = 0;
         const tong_thanh_toan = Math.max(tong_tien_hang - orderDiscount + shippingFeeForCustomer, 0);
-        const codEnabled = thu_ho_cod === true || thu_ho_cod === 'true' || cod_enabled === true || cod_enabled === 'true';
+        const codEnabled = false;
         const khachCanTra = tong_thanh_toan;
-        const khachThanhToan = codEnabled ? 0 : khachCanTra;
-        const codAmount = codEnabled ? khachCanTra : 0;
-        const tienThuaTraKhach = khachThanhToan - khachCanTra;
+        const requestedPrepaid = Number(khach_thanh_toan ?? req.body?.khach_da_tra ?? 0);
+        const khachThanhToan = Math.min(Math.max(Number.isFinite(requestedPrepaid) ? requestedPrepaid : 0, 0), khachCanTra);
+        const codAmount = 0;
+        const tienThuaTraKhach = 0;
         const ma_don_hang = await generateOrderCode();
+        let receiptCashBook = null;
+        if (khachThanhToan > 0) {
+            const requestedCashBookId = /^[0-9a-fA-F]{24}$/.test(String(so_quy_id || '')) ? so_quy_id : null;
+            receiptCashBook = requestedCashBookId ? await SoQuy.findById(requestedCashBookId).lean() : await ensureDefaultSoQuy(sessionStoreId);
+            if (!receiptCashBook) {
+                return res.status(400).json({ success: false, message: 'SÃ¡Â»â€¢ quÃ¡Â»Â¹ khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡.' });
+            }
+            if (receiptCashBook.cua_hang_id && String(receiptCashBook.cua_hang_id) !== sessionStoreId) {
+                return res.status(400).json({ success: false, message: 'SÃ¡Â»â€¢ quÃ¡Â»Â¹ khÃƒÂ´ng thuÃ¡Â»â„¢c cÃ¡Â»Â­a hÃƒÂ ng Ã„â€˜ang lÃƒÂ m viÃ¡Â»â€¡c.' });
+            }
+        }
 
         const order = await DonHang.create({
             ma_don_hang,
@@ -2023,6 +2634,10 @@ router.post('/add', async (req, res, next) => {
             await CTDonHang.create({
                 don_hang_id: order._id,
                 hang_hoa_id: item.hang_hoa_id,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+                ten_quy_cach: item.ten_quy_cach,
+                ten_thuoc_tinh: item.ten_thuoc_tinh,
+                don_vi_tinh_id: item.don_vi_tinh_id,
                 so_luong: item.so_luong,
                 so_luong_dat: item.so_luong,
                 so_luong_xac_nhan: 0,
@@ -2031,9 +2646,14 @@ router.post('/add', async (req, res, next) => {
                 trang_thai_giao: 'chua_giao',
                 lo_hang_id: item.lo_hang_id || null,
                 don_gia_ban: item.don_gia_ban,
+                ma_hang_snapshot: item.ma_hang_snapshot,
+                ten_hang_snapshot: item.ten_hang_snapshot,
+                don_vi_tinh_snapshot: item.don_vi_tinh_snapshot,
+                gia_goc: item.gia_goc,
                 chiet_khau: item.chiet_khau,
                 kieu_chiet_khau: item.kieu_chiet_khau,
-                thanh_tien: item.thanh_tien
+                thanh_tien: item.thanh_tien,
+                ghi_chu: item.ghi_chu
             });
         }
 
@@ -2056,13 +2676,12 @@ router.post('/add', async (req, res, next) => {
             trang_thai: 'draft'
         });
 
-        if (!codEnabled && khachThanhToan > 0) {
-            const cashBook = await ensureDefaultSoQuy(order.cua_hang_id);
+        if (khachThanhToan > 0) {
             await taoPhieuThuChi({
                 loai_phieu: 'thu',
                 loai_thu_chi: 'Thu tien don hang',
                 gia_tri: khachThanhToan,
-                so_quy_id: cashBook._id,
+                so_quy_id: receiptCashBook._id,
                 cua_hang_id: order.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id,
@@ -2071,14 +2690,14 @@ router.post('/add', async (req, res, next) => {
                 ma_chung_tu_goc: ma_don_hang,
                 doi_tuong: order.khach_hang_id ? undefined : ten_nguoi_nhan,
                 nhom_doi_tuong: 'khach_hang',
-                phuong_thuc_thanh_toan: 'tien_mat',
+                phuong_thuc_thanh_toan: phuong_thuc_thanh_toan || 'tien_mat',
                 hach_toan: false
             });
         }
 
-        res.json({ success: true, message: 'Đã tạo đơn đặt hàng', ma_don_hang });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o Ã„â€˜Ã†Â¡n Ã„â€˜Ã¡ÂºÂ·t hÃƒÂ ng', ma_don_hang });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message || 'Không tạo được đơn hàng' });
+        res.status(500).json({ success: false, message: error.message || 'KhÃƒÂ´ng tÃ¡ÂºÂ¡o Ã„â€˜Ã†Â°Ã¡Â»Â£c Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
     }
 });
 
@@ -2097,7 +2716,7 @@ router.get('/hoa-don', async (req, res, next) => {
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
             BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 })
         ]);
-        res.render('don-hang/hoa-don', { title: 'Hóa đơn', invoices, partners, users, priceBooks, filters: req.query || {} });
+        res.render('don-hang/hoa-don', { title: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n', invoices, partners, users, priceBooks, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -2168,11 +2787,19 @@ router.get('/hoa-don/create', async (req, res, next) => {
                 .populate('kho_id')
                 .lean();
             if (sourceOrder) {
-                [sourceOrderItems, sourceShipment, existingInvoice] = await Promise.all([
-                    CTDonHang.find({ don_hang_id: sourceOrder._id }).populate('hang_hoa_id').lean(),
-                    VanDon.findOne({ don_hang_id: sourceOrder._id }).lean(),
-                    HoaDonBanHang.findOne({ don_hang_id: sourceOrder._id }).lean()
-                ]);
+                if (sourceOrder.trang_thai === 'merged') {
+                    copyFromError = `Đơn hàng ${sourceOrder.ma_don_hang} đã được gộp vào ${sourceOrder.merged_to_ma_don_hang || 'đơn khác'}, không thể tạo hóa đơn riêng.`;
+                    sourceOrder = null;
+                    sourceOrderItems = [];
+                    sourceShipment = null;
+                    existingInvoice = null;
+                } else {
+                    [sourceOrderItems, sourceShipment, existingInvoice] = await Promise.all([
+                        CTDonHang.find({ don_hang_id: sourceOrder._id }).populate('hang_hoa_id').lean(),
+                        VanDon.findOne({ don_hang_id: sourceOrder._id }).lean(),
+                        HoaDonBanHang.findOne({ don_hang_id: sourceOrder._id }).lean()
+                    ]);
+                }
             }
         }
 
@@ -2184,13 +2811,13 @@ router.get('/hoa-don/create', async (req, res, next) => {
                 .populate('kho_id')
                 .lean();
             if (!sourceInvoice) {
-                copyFromError = 'Không tìm thấy hóa đơn để sao chép.';
+                copyFromError = 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p.';
             } else {
                 sourceInvoiceItems = await CTHoaDonBanHang.find({ hoa_don_id: sourceInvoice._id })
                     .populate('hang_hoa_id')
                     .lean();
                 if (!sourceInvoiceItems.length) {
-                    copyFromError = 'Hóa đơn chưa có hàng hóa để sao chép.';
+                    copyFromError = 'HÃƒÂ³a Ã„â€˜Ã†Â¡n chÃ†Â°a cÃƒÂ³ hÃƒÂ ng hÃƒÂ³a Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p.';
                 }
                 sourceInvoiceShipment = await VanDon.findOne({
                     $or: [
@@ -2202,7 +2829,7 @@ router.get('/hoa-don/create', async (req, res, next) => {
         }
 
         res.render('don-hang/hoa-don-create', {
-            title: 'Hóa đơn',
+            title: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n',
             ...data,
             currentStoreId: storeId || '',
             warehouses,
@@ -2223,10 +2850,10 @@ router.get('/hoa-don/create', async (req, res, next) => {
 router.get('/hoa-don/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
-            return res.status(404).send('Không tìm thấy hóa đơn');
+            return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n');
         }
         const { invoices, detailMap, shipmentMap, paidMap, debtMap } = await loadInvoiceExportData({ _id: req.params.id });
-        if (!invoices.length) return res.status(404).send('Không tìm thấy hóa đơn');
+        if (!invoices.length) return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n');
         await sendInvoiceWorkbook(
             res,
             'hoa-don-' + (invoices[0].ma_hoa_don || 'unknown') + '.xlsx',
@@ -2249,7 +2876,7 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
             .populate('kho_id')
             .populate('don_hang_id')
             .populate('nguoi_ban_id');
-        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        if (!invoice) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
 
         const [items, shipment, debtHistory, receipts] = await Promise.all([
             CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id'),
@@ -2262,7 +2889,13 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
             CongNoKhachHang.find({ hoa_don_id: invoice._id })
                 .populate('phieu_thu_chi_id')
                 .sort({ ngay: -1, created_at: -1 }),
-            PhieuThuChi.find({ hoa_don_id: invoice._id, trang_thai: { $ne: 'cancelled' } })
+            PhieuThuChi.find({
+                trang_thai: { $ne: 'cancelled' },
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id._id || invoice.don_hang_id }] : [])
+                ]
+            })
                 .populate('nguoi_tao_id')
                 .sort({ ngay_lap: -1, created_at: -1 })
                 .limit(20)
@@ -2279,6 +2912,96 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
     }
 });
 
+router.post('/hoa-don/:id/phieu-thu', async (req, res, next) => {
+    try {
+        const invoice = await HoaDonBanHang.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        if (invoice.trang_thai === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể thu tiền' });
+        }
+
+        const [receipts, shipment] = await Promise.all([
+            PhieuThuChi.find({
+                loai_phieu: 'thu',
+                trang_thai: { $ne: 'cancelled' },
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                ]
+            }).lean(),
+            VanDon.findOne({
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                ]
+            }).lean()
+        ]);
+        const payable = Number(invoice.thanh_toan || 0);
+        const paidBefore = receipts.reduce((sum, row) => sum + Number(row.gia_tri || 0), 0);
+        const remaining = Math.max(payable - paidBefore, 0);
+        const amount = Math.max(0, Number(req.body?.gia_tri || req.body?.khach_thanh_toan || 0));
+        if (amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền thu không hợp lệ' });
+        if (amount > remaining) {
+            return res.status(400).json({
+                success: false,
+                message: `Khách chỉ còn nợ ${remaining.toLocaleString('vi-VN')} VNĐ`
+            });
+        }
+
+        const cashBook = await ensureDefaultSoQuy(invoice.cua_hang_id);
+        const receipt = await taoPhieuThuChi({
+            loai_phieu: 'thu',
+            loai_thu_chi: 'Thu tien hoa don',
+            gia_tri: amount,
+            so_quy_id: cashBook._id,
+            cua_hang_id: invoice.cua_hang_id,
+            nguoi_tao_id: req.user?._id,
+            khach_hang_id: invoice.khach_hang_id,
+            don_hang_id: invoice.don_hang_id || undefined,
+            hoa_don_id: invoice._id,
+            van_don_id: shipment?._id,
+            ma_chung_tu_goc: invoice.ma_hoa_don,
+            nhom_doi_tuong: 'khach_hang',
+            phuong_thuc_thanh_toan: normalizePaymentMethodValue(req.body?.phuong_thuc_thanh_toan),
+            hach_toan: false
+        });
+
+        const paidAfter = paidBefore + amount;
+        invoice.trang_thai = resolveInvoiceStatus(payable, paidAfter);
+        await invoice.save();
+        if (invoice.don_hang_id) {
+            await DonHang.updateOne(
+                { _id: invoice.don_hang_id },
+                { $set: { khach_thanh_toan: paidAfter } }
+            );
+        }
+        if (invoice.khach_hang_id) {
+            await CongNoKhachHang.create({
+                khach_hang_id: invoice.khach_hang_id,
+                don_hang_id: invoice.don_hang_id || undefined,
+                hoa_don_id: invoice._id,
+                phieu_thu_chi_id: receipt._id,
+                so_tien: amount,
+                loai: 'giam_no',
+                ghi_chu: `Thu tiền hóa đơn ${invoice.ma_hoa_don}`,
+                ngay: new Date()
+            });
+            const customer = await KhachHang.findById(invoice.khach_hang_id).select('tong_no').lean();
+            if (customer && typeof customer.tong_no === 'number') {
+                await KhachHang.updateOne({ _id: invoice.khach_hang_id }, { $inc: { tong_no: -amount } });
+            }
+        }
+
+        res.json({
+            success: true,
+            message: 'Đã tạo phiếu thu',
+            data: { receipt, paid: paidAfter, remaining: Math.max(payable - paidAfter, 0) }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/hoa-don/:id', async (req, res, next) => {
     try {
         const invoice = await HoaDonBanHang.findById(req.params.id)
@@ -2286,7 +3009,7 @@ router.get('/hoa-don/:id', async (req, res, next) => {
             .populate('don_hang_id')
             .populate('kho_id')
             .populate('nguoi_ban_id');
-        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        if (!invoice) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
         const [decorated] = await decorateInvoices([invoice]);
         const items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id');
         res.json({ success: true, data: { invoice: decorated, items } });
@@ -2299,12 +3022,12 @@ router.post('/hoa-don/:id/duplicate', async (req, res, next) => {
     try {
         const sourceInvoice = await HoaDonBanHang.findById(req.params.id).lean();
         if (!sourceInvoice) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+            return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
         }
 
         const sourceItems = await CTHoaDonBanHang.find({ hoa_don_id: sourceInvoice._id }).lean();
         if (!sourceItems.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có hàng hóa để sao chép' });
+            return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n chÃ†Â°a cÃƒÂ³ hÃƒÂ ng hÃƒÂ³a Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p' });
         }
 
         const newInvoice = await HoaDonBanHang.create({
@@ -2335,7 +3058,7 @@ router.post('/hoa-don/:id/duplicate', async (req, res, next) => {
 
         res.json({
             success: true,
-            message: 'Đã sao chép hóa đơn',
+            message: 'Ã„ÂÃƒÂ£ sao chÃƒÂ©p hÃƒÂ³a Ã„â€˜Ã†Â¡n',
             invoice_id: String(newInvoice._id),
             ma_hoa_don: newInvoice.ma_hoa_don
         });
@@ -2347,9 +3070,9 @@ router.post('/hoa-don/:id/duplicate', async (req, res, next) => {
 router.post('/hoa-don/:id/cancel', async (req, res, next) => {
     try {
         const invoice = await HoaDonBanHang.findById(req.params.id);
-        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        if (!invoice) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
         if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
-            return res.json({ success: true, message: 'Hóa đơn đã hủy' });
+            return res.json({ success: true, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y' });
         }
 
         const [receipts, debts, shipment] = await Promise.all([
@@ -2388,7 +3111,7 @@ router.post('/hoa-don/:id/cancel', async (req, res, next) => {
                 hoa_don_id: invoice._id,
                 so_tien: debtIncrease,
                 loai: 'giam_no',
-                ghi_chu: `Đảo công nợ hủy hóa đơn ${invoice.ma_hoa_don}`,
+                ghi_chu: `Ã„ÂÃ¡ÂºÂ£o cÃƒÂ´ng nÃ¡Â»Â£ hÃ¡Â»Â§y hÃƒÂ³a Ã„â€˜Ã†Â¡n ${invoice.ma_hoa_don}`,
                 ngay: new Date()
             });
         }
@@ -2401,7 +3124,7 @@ router.post('/hoa-don/:id/cancel', async (req, res, next) => {
 
         invoice.trang_thai = 'cancelled';
         await invoice.save();
-        res.json({ success: true, message: 'Đã hủy hóa đơn' });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ hÃ¡Â»Â§y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
     } catch (error) {
         next(error);
     }
@@ -2440,69 +3163,138 @@ async function createInvoice(req, res, next) {
         let invoiceItems = parseItems(items);
         if (don_hang_id && /^[0-9a-fA-F]{24}$/.test(String(don_hang_id))) {
             sourceOrder = await DonHang.findById(don_hang_id).lean();
-            if (!sourceOrder) return res.status(400).json({ success: false, message: 'Đơn hàng gốc không hợp lệ' });
+            if (!sourceOrder) return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n hÃƒÂ ng gÃ¡Â»â€˜c khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
+            if (sourceOrder.trang_thai === 'merged') {
+                return res.status(400).json({
+                    success: false,
+                    message: `Đơn hàng ${sourceOrder.ma_don_hang} đã được gộp vào ${sourceOrder.merged_to_ma_don_hang || 'đơn khác'}, không thể tạo hóa đơn riêng.`
+                });
+            }
             const existingInvoice = await HoaDonBanHang.findOne({ don_hang_id: sourceOrder._id }).lean();
             if (existingInvoice) {
                 return res.status(409).json({
                     success: false,
-                    message: `Đơn hàng này đã có hóa đơn ${existingInvoice.ma_hoa_don}`,
+                    message: `Ã„ÂÃ†Â¡n hÃƒÂ ng nÃƒÂ y Ã„â€˜ÃƒÂ£ cÃƒÂ³ hÃƒÂ³a Ã„â€˜Ã†Â¡n ${existingInvoice.ma_hoa_don}`,
                     data: { invoice: existingInvoice, id: existingInvoice._id, ma_hoa_don: existingInvoice.ma_hoa_don }
                 });
             }
             const parsedFromBody = parseItems(items);
+            const orderDetails = await CTDonHang.find({ don_hang_id }).lean();
+            const hasDeliveredQuantity = orderDetails.some(row => Number(row.so_luong_da_giao || 0) > 0);
+            const orderDetailById = orderDetails.reduce((map, row) => {
+                map[String(row._id)] = row;
+                return map;
+            }, {});
+            const orderDetailsByLegacyKey = orderDetails.reduce((map, row) => {
+                const key = legacyReturnLineKey(row);
+                if (!map[key]) map[key] = [];
+                map[key].push(row);
+                return map;
+            }, {});
             if (Array.isArray(parsedFromBody) && parsedFromBody.length) {
-                invoiceItems = parsedFromBody;
+                invoiceItems = parsedFromBody.map(item => {
+                    const detailId = optionalLineObjectId(item.ct_don_hang_id);
+                    const sourceDetail = detailId
+                        ? orderDetailById[detailId]
+                        : ((orderDetailsByLegacyKey[legacyReturnLineKey(item)] || []).length === 1
+                            ? orderDetailsByLegacyKey[legacyReturnLineKey(item)][0]
+                            : null);
+                    return sourceDetail
+                        ? Object.assign({}, item, {
+                            ct_don_hang_id: sourceDetail._id,
+                            so_luong: hasDeliveredQuantity
+                                ? Number(sourceDetail.so_luong_da_giao || 0)
+                                : Number(item.so_luong_dat ?? item.so_luong ?? sourceDetail.so_luong_dat ?? sourceDetail.so_luong ?? 0),
+                            so_luong_dat: hasDeliveredQuantity
+                                ? Number(sourceDetail.so_luong_da_giao || 0)
+                                : Number(item.so_luong_dat ?? item.so_luong ?? sourceDetail.so_luong_dat ?? sourceDetail.so_luong ?? 0),
+                            ...copyLineMetadata(sourceDetail)
+                        })
+                        : item;
+                });
             } else {
-                const orderDetails = await CTDonHang.find({ don_hang_id }).lean();
                 invoiceItems = orderDetails.map(row => ({
+                    ct_don_hang_id: row._id,
                     hang_hoa_id: row.hang_hoa_id,
                     lo_hang_id: row.lo_hang_id,
-                    so_luong: row.so_luong_dat || row.so_luong || 0,
+                    so_luong: hasDeliveredQuantity
+                        ? Number(row.so_luong_da_giao || 0)
+                        : Number(row.so_luong_dat || row.so_luong || 0),
                     don_gia_ban: row.don_gia_ban || 0,
                     chiet_khau: row.chiet_khau || 0,
-                    kieu_chiet_khau: row.kieu_chiet_khau || 'vnd'
+                    kieu_chiet_khau: row.kieu_chiet_khau || 'vnd',
+                    ...copyLineMetadata(row)
                 }));
             }
         }
 
         if (!Array.isArray(invoiceItems) || !invoiceItems.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có sản phẩm' });
+            return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n chÃ†Â°a cÃƒÂ³ sÃ¡ÂºÂ£n phÃ¡ÂºÂ©m' });
         }
 
         const sessionStoreId = await resolveStoreId(req);
         if (!sessionStoreId) {
-            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở menu trên.' });
+            return res.status(400).json({ success: false, message: 'ChÃ†Â°a chÃ¡Â»Ân cÃ¡Â»Â­a hÃƒÂ ng lÃƒÂ m viÃ¡Â»â€¡c. Vui lÃƒÂ²ng chÃ¡Â»Ân cÃ¡Â»Â­a hÃƒÂ ng Ã¡Â»Å¸ menu trÃƒÂªn.' });
         }
 
         const finalKhoId = kho_id || sourceOrder?.kho_id;
         if (!finalKhoId) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân kho.' });
         }
         const kho = await Kho.findById(finalKhoId).lean();
-        if (!kho) return res.status(400).json({ success: false, message: 'Kho không hợp lệ.' });
+        if (!kho) return res.status(400).json({ success: false, message: 'Kho khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡.' });
         if (String(kho.cua_hang_id || '') !== sessionStoreId) {
-            return res.status(400).json({ success: false, message: 'Kho không thuộc cửa hàng đang làm việc.' });
+            return res.status(400).json({ success: false, message: 'Kho khÃƒÂ´ng thuÃ¡Â»â„¢c cÃ¡Â»Â­a hÃƒÂ ng Ã„â€˜ang lÃƒÂ m viÃ¡Â»â€¡c.' });
         }
 
         let tong_tien_hang = 0;
         const normalizedItems = [];
-        for (const item of invoiceItems) {
+        const expandedInvoiceItems = [];
+        for (const sourceItem of invoiceItems) {
+            const sourceQuyCachItems = Array.isArray(sourceItem.quy_cach_items) ? sourceItem.quy_cach_items : [];
+            if (sourceQuyCachItems.length) {
+                sourceQuyCachItems
+                    .filter(qc => Number(qc.so_luong_dat ?? qc.so_luong) > 0)
+                    .forEach(qc => {
+                        expandedInvoiceItems.push(Object.assign({}, sourceItem, {
+                            so_luong: Number(qc.so_luong_dat ?? qc.so_luong),
+                            so_luong_dat: Number(qc.so_luong_dat ?? qc.so_luong),
+                            gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || sourceItem.gia_tri_thuoc_tinh_id || null,
+                            ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                            ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+                            don_gia_ban: qc.don_gia_ban ?? sourceItem.don_gia_ban,
+                            don_gia: qc.don_gia_ban ?? sourceItem.don_gia_ban ?? sourceItem.don_gia,
+                            chiet_khau: qc.chiet_khau ?? 0,
+                            kieu_chiet_khau: qc.kieu_chiet_khau || 'vnd'
+                        }));
+                    });
+            } else {
+                expandedInvoiceItems.push(sourceItem);
+            }
+        }
+        for (const item of expandedInvoiceItems) {
             const productId = String(item.hang_hoa_id || '').trim();
             const quantity = Number(item.so_luong_dat ?? item.so_luong ?? 0);
-            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'Dòng hàng không hợp lệ' });
+            if (sourceOrder && quantity <= 0) continue;
+            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'DÃƒÂ²ng hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
             const unitPrice = Number(item.don_gia_ban ?? item.don_gia ?? 0);
             const lineBase = quantity * unitPrice;
             const lineDiscount = normalizeDiscount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
             const lineTotal = Math.max(lineBase - lineDiscount, 0);
             tong_tien_hang += lineTotal;
             normalizedItems.push({
+                ct_don_hang_id: optionalLineObjectId(item.ct_don_hang_id),
                 hang_hoa_id: productId,
                 lo_hang_id: item.lo_hang_id || null,
                 so_luong: quantity,
                 don_gia: unitPrice,
                 chiet_khau: lineDiscount,
-                thanh_tien: lineTotal
+                thanh_tien: lineTotal,
+                ...copyLineMetadata(item)
             });
+        }
+        if (!normalizedItems.length) {
+            return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n chÃ†Â°a cÃƒÂ³ dÃƒÂ²ng hÃƒÂ ng giao thÃ¡Â»Â±c tÃ¡ÂºÂ¿' });
         }
 
         const discount = normalizeDiscount(chiet_khau ?? sourceOrder?.giam_gia, kieu_giam_gia || sourceOrder?.kieu_giam_gia, tong_tien_hang);
@@ -2537,7 +3329,10 @@ async function createInvoice(req, res, next) {
         }
         const shippingFeeForCustomer = shouldShip && shippingFeePayer === 'khach' ? shippingFee : 0;
         const payable = Math.max(tong_tien_hang - discount + shippingFeeForCustomer, 0);
-        const rawPaid = codEnabled ? 0 : (khach_thanh_toan ?? req.body?.khach_da_tra ?? sourceOrder?.khach_thanh_toan ?? payable);
+        const orderPaidBeforeInvoice = sourceOrder ? await getOrderPaidAmount(sourceOrder._id) : 0;
+        const rawPaid = sourceOrder
+            ? orderPaidBeforeInvoice
+            : (codEnabled ? 0 : (khach_thanh_toan ?? req.body?.khach_da_tra ?? 0));
         const paid = Math.min(Math.max(Number(rawPaid) || 0, 0), payable);
         const debt = Math.max(payable - paid, 0);
         const ma_hoa_don = String(req.body?.ma_hoa_don || '').trim() || await generateInvoiceCode();
@@ -2549,7 +3344,7 @@ async function createInvoice(req, res, next) {
             tong_tien: tong_tien_hang,
             giam_gia: discount,
             thanh_toan: payable,
-            phuong_thuc_tt: codEnabled ? 'COD' : (phuong_thuc_thanh_toan || 'Tiền mặt'),
+            phuong_thuc_tt: codEnabled ? 'COD' : (phuong_thuc_thanh_toan || 'TiÃ¡Â»Ân mÃ¡ÂºÂ·t'),
             trang_thai: invoiceStatus,
             ghi_chu,
             cua_hang_id: finalStoreId,
@@ -2562,12 +3357,21 @@ async function createInvoice(req, res, next) {
         for (const item of normalizedItems) {
             await CTHoaDonBanHang.create({
                 hoa_don_id: invoice._id,
+                ct_don_hang_id: item.ct_don_hang_id,
                 hang_hoa_id: item.hang_hoa_id,
                 lo_hang_id: item.lo_hang_id || undefined,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+                ten_quy_cach: item.ten_quy_cach,
+                ten_thuoc_tinh: item.ten_thuoc_tinh,
+                don_vi_tinh_id: item.don_vi_tinh_id,
+                ma_hang_snapshot: item.ma_hang_snapshot,
+                ten_hang_snapshot: item.ten_hang_snapshot,
+                don_vi_tinh_snapshot: item.don_vi_tinh_snapshot,
                 so_luong: Number(item.so_luong),
                 don_gia: Number(item.don_gia),
                 chiet_khau: Number(item.chiet_khau || 0),
-                thanh_tien: Number(item.thanh_tien || 0)
+                thanh_tien: Number(item.thanh_tien || 0),
+                ghi_chu: item.ghi_chu
             });
         }
 
@@ -2625,7 +3429,7 @@ async function createInvoice(req, res, next) {
                 { _id: sourceOrder._id },
                 {
                     $set: {
-                        khach_thanh_toan: paid,
+                        khach_thanh_toan: orderPaidBeforeInvoice,
                         trang_thai: invoiceStatus === 'paid' ? 'completed' : sourceOrder.trang_thai
                     }
                 }
@@ -2639,7 +3443,7 @@ async function createInvoice(req, res, next) {
                 hoa_don_id: invoice._id,
                 so_tien: debt,
                 loai: 'tang_no',
-                ghi_chu: `Công nợ hóa đơn ${ma_hoa_don}`,
+                ghi_chu: `CÃƒÂ´ng nÃ¡Â»Â£ hÃƒÂ³a Ã„â€˜Ã†Â¡n ${ma_hoa_don}`,
                 ngay: invoice.ngay_ban
             });
             const customer = await KhachHang.findById(finalCustomerId).select('tong_no').lean();
@@ -2648,7 +3452,7 @@ async function createInvoice(req, res, next) {
             }
         }
 
-        if (!codEnabled && paid > 0) {
+        if (!sourceOrder && !codEnabled && paid > 0) {
             const cashBook = await ensureDefaultSoQuy(invoice.cua_hang_id);
             await taoPhieuThuChi({
                 loai_phieu: 'thu',
@@ -2668,14 +3472,14 @@ async function createInvoice(req, res, next) {
             });
         }
 
-        res.json({ success: true, message: 'Đã tạo hóa đơn', ma_hoa_don, id: invoice._id, data: { invoice, shipment } });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o hÃƒÂ³a Ã„â€˜Ã†Â¡n', ma_hoa_don, id: invoice._id, data: { invoice, shipment } });
     } catch (error) {
         if (error?.code === 11000 && error?.keyPattern?.don_hang_id && req.body?.don_hang_id) {
             const existingInvoice = await HoaDonBanHang.findOne({ don_hang_id: req.body.don_hang_id }).lean();
             if (existingInvoice) {
                 return res.status(409).json({
                     success: false,
-                    message: `Đơn hàng này đã có hóa đơn ${existingInvoice.ma_hoa_don}`,
+                    message: `Ã„ÂÃ†Â¡n hÃƒÂ ng nÃƒÂ y Ã„â€˜ÃƒÂ£ cÃƒÂ³ hÃƒÂ³a Ã„â€˜Ã†Â¡n ${existingInvoice.ma_hoa_don}`,
                     data: { invoice: existingInvoice, id: existingInvoice._id, ma_hoa_don: existingInvoice.ma_hoa_don }
                 });
             }
@@ -2683,16 +3487,16 @@ async function createInvoice(req, res, next) {
         if (error?.code === 11000 && error?.keyPattern?.don_hang_id) {
             return res.status(409).json({
                 success: false,
-                message: 'Dữ liệu cũ đang có hóa đơn bán trực tiếp với don_hang_id = null. Hệ thống đã bỏ ghi null cho hóa đơn mới; vui lòng xóa field don_hang_id:null ở các hóa đơn cũ hoặc rebuild index nếu cần.'
+                message: 'DÃ¡Â»Â¯ liÃ¡Â»â€¡u cÃ…Â© Ã„â€˜ang cÃƒÂ³ hÃƒÂ³a Ã„â€˜Ã†Â¡n bÃƒÂ¡n trÃ¡Â»Â±c tiÃ¡ÂºÂ¿p vÃ¡Â»â€ºi don_hang_id = null. HÃ¡Â»â€¡ thÃ¡Â»â€˜ng Ã„â€˜ÃƒÂ£ bÃ¡Â»Â ghi null cho hÃƒÂ³a Ã„â€˜Ã†Â¡n mÃ¡Â»â€ºi; vui lÃƒÂ²ng xÃƒÂ³a field don_hang_id:null Ã¡Â»Å¸ cÃƒÂ¡c hÃƒÂ³a Ã„â€˜Ã†Â¡n cÃ…Â© hoÃ¡ÂºÂ·c rebuild index nÃ¡ÂºÂ¿u cÃ¡ÂºÂ§n.'
             });
         }
         if (error?.code === 11000 && error?.keyPattern?.ma_hoa_don) {
             return res.status(409).json({
                 success: false,
-                message: 'Mã hóa đơn bị trùng. Vui lòng bấm thanh toán lại để hệ thống sinh mã mới.'
+                message: 'MÃƒÂ£ hÃƒÂ³a Ã„â€˜Ã†Â¡n bÃ¡Â»â€¹ trÃƒÂ¹ng. Vui lÃƒÂ²ng bÃ¡ÂºÂ¥m thanh toÃƒÂ¡n lÃ¡ÂºÂ¡i Ã„â€˜Ã¡Â»Æ’ hÃ¡Â»â€¡ thÃ¡Â»â€˜ng sinh mÃƒÂ£ mÃ¡Â»â€ºi.'
             });
         }
-        res.status(500).json({ success: false, message: error.message || 'Không tạo được hóa đơn' });
+        res.status(500).json({ success: false, message: error.message || 'KhÃƒÂ´ng tÃ¡ÂºÂ¡o Ã„â€˜Ã†Â°Ã¡Â»Â£c hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
     }
 }
 
@@ -2709,7 +3513,7 @@ router.get('/tra-hang', async (req, res, next) => {
             .populate('nguoi_tao_id')
             .sort({ created_at: -1 });
         const users = await NguoiDung.find().sort({ ho_ten: 1, username: 1 });
-        res.render('don-hang/tra-hang', { title: 'Trả hàng', returns, users, filters: req.query || {} });
+        res.render('don-hang/tra-hang', { title: 'TrÃ¡ÂºÂ£ hÃƒÂ ng', returns, users, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -2762,7 +3566,20 @@ async function loadSalesReturnCopyDraft(copyFromId) {
         hoa_don_id: slip.hoa_don_id ? String(slip.hoa_don_id) : '',
         khach_hang_id: slip.khach_hang_id ? String(slip.khach_hang_id) : '',
         kho_id: slip.kho_id ? String(slip.kho_id) : '',
+        ly_do: slip.ly_do || '',
         ghi_chu: slip.ghi_chu || '',
+        giam_gia: Number(slip.giam_gia || 0),
+        kieu_giam_gia: slip.kieu_giam_gia || 'vnd',
+        phi_tra_hang: Number(slip.phi_tra_hang || 0),
+        hinh_thuc_nhan_hang_tra: slip.hinh_thuc_nhan_hang_tra || 'tai_quay',
+        doi_tac_giao_hang_id: slip.doi_tac_giao_hang_id ? String(slip.doi_tac_giao_hang_id) : '',
+        dia_chi_lay_hang: slip.dia_chi_lay_hang || '',
+        ten_nguoi_gui_tra: slip.ten_nguoi_gui_tra || '',
+        sdt_nguoi_gui_tra: slip.sdt_nguoi_gui_tra || '',
+        phi_lay_hang_tra: Number(slip.phi_lay_hang_tra || 0),
+        nguoi_tra_phi_lay_hang: slip.nguoi_tra_phi_lay_hang || 'cua_hang',
+        ma_van_don_tra_hang: slip.ma_van_don_tra_hang || '',
+        ghi_chu_van_chuyen_tra: slip.ghi_chu_van_chuyen_tra || '',
         return_items: lines
             .filter(row => row.loai_dong !== 'hang_doi')
             .map(row => ({
@@ -2787,20 +3604,24 @@ async function loadSalesReturnCopyDraft(copyFromId) {
 
 router.get('/tra-hang/create', async (req, res, next) => {
     try {
-        const products = await HangHoa.find({ trang_thai: 'active' }).sort({ ten_hang: 1 });
+        const [products, partners] = await Promise.all([
+            HangHoa.find({ trang_thai: 'active' }).sort({ ten_hang: 1 }),
+            DoiTacGiaoHang.find({}).sort({ ten_doi_tac: 1, ten: 1, created_at: -1 })
+        ]);
         const invoices = [];
         let copyDraft = null;
         let copyFromError = '';
         const copyFromId = String(req.query?.copy_from || '').trim();
         if (copyFromId) {
             copyDraft = await loadSalesReturnCopyDraft(copyFromId);
-            if (!copyDraft) copyFromError = 'Không tải được phiếu trả hàng để sao chép.';
+            if (!copyDraft) copyFromError = 'KhÃƒÂ´ng tÃ¡ÂºÂ£i Ã„â€˜Ã†Â°Ã¡Â»Â£c phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p.';
         }
         const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
         res.render('don-hang/tra-hang-create', {
-            title: 'Trả hàng',
+            title: 'TrÃ¡ÂºÂ£ hÃƒÂ ng',
             invoices,
             products,
+            partners,
             copyDraftJson,
             copyFromError
         });
@@ -2969,7 +3790,7 @@ router.get('/tra-hang/invoices/search', async (req, res, next) => {
                 tong_tien: i.tong_tien || 0,
                 thanh_toan: i.thanh_toan || 0,
                 nguoi_ban: i.nguoi_ban_id?.ho_ten || i.nguoi_ban_id?.username || 'Admin',
-                khach_hang: i.khach_hang_id?.ten_khach_hang || 'Khách lẻ',
+                khach_hang: i.khach_hang_id?.ten_khach_hang || 'KhÃƒÂ¡ch lÃ¡ÂºÂ»',
                 khach_hang_id: i.khach_hang_id ? String(i.khach_hang_id._id) : ''
             })),
             pagination: {
@@ -2987,10 +3808,10 @@ router.get('/tra-hang/invoices/search', async (req, res, next) => {
 router.get('/tra-hang/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
-            return res.status(404).send('Không tìm thấy phiếu trả hàng');
+            return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng');
         }
         const { returns, detailMap } = await loadReturnExportData({ _id: req.params.id });
-        if (!returns.length) return res.status(404).send('Không tìm thấy phiếu trả hàng');
+        if (!returns.length) return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng');
         await sendReturnWorkbook(
             res,
             'tra-hang-' + (returns[0].ma_phieu_tra || 'unknown') + '.xlsx',
@@ -3005,9 +3826,9 @@ router.get('/tra-hang/:id/export.xlsx', async (req, res, next) => {
 router.post('/tra-hang/:id/cancel', async (req, res, next) => {
     try {
         const slip = await PhieuTraHang.findById(req.params.id);
-        if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
+        if (!slip) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng' });
         if (slip.trang_thai === 'cancelled') {
-            return res.json({ success: true, message: 'Phiếu đã hủy' });
+            return res.json({ success: true, message: 'PhiÃ¡ÂºÂ¿u Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y' });
         }
 
         const items = await CTPhieuTraHang.find({ phieu_tra_hang_id: slip._id }).lean();
@@ -3072,7 +3893,7 @@ router.post('/tra-hang/:id/cancel', async (req, res, next) => {
 
         slip.trang_thai = 'cancelled';
         await slip.save();
-        res.json({ success: true, message: 'Đã hủy phiếu trả hàng' });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ hÃ¡Â»Â§y phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng' });
     } catch (error) {
         next(error);
     }
@@ -3081,13 +3902,13 @@ router.post('/tra-hang/:id/cancel', async (req, res, next) => {
 router.patch('/tra-hang/:id', async (req, res, next) => {
     try {
         const slip = await PhieuTraHang.findById(req.params.id);
-        if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
+        if (!slip) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng' });
         if (slip.trang_thai === 'cancelled') {
-            return res.status(400).json({ success: false, message: 'Phiếu đã hủy, không thể sửa' });
+            return res.status(400).json({ success: false, message: 'PhiÃ¡ÂºÂ¿u Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y, khÃƒÂ´ng thÃ¡Â»Æ’ sÃ¡Â»Â­a' });
         }
         if (req.body?.ghi_chu !== undefined) slip.ghi_chu = String(req.body.ghi_chu || '').trim();
         await slip.save();
-        res.json({ success: true, message: 'Đã lưu phiếu trả hàng' });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ lÃ†Â°u phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng' });
     } catch (error) {
         next(error);
     }
@@ -3098,8 +3919,9 @@ router.get('/tra-hang/:id/detail', async (req, res, next) => {
         const returnSlip = await PhieuTraHang.findById(req.params.id)
             .populate('hoa_don_id')
             .populate('khach_hang_id')
-            .populate('nguoi_tao_id');
-        if (!returnSlip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
+            .populate('nguoi_tao_id')
+            .populate('doi_tac_giao_hang_id');
+        if (!returnSlip) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng' });
 
         const items = await CTPhieuTraHang.find({ phieu_tra_hang_id: returnSlip._id }).populate('hang_hoa_id');
         const invoice = returnSlip.hoa_don_id?._id
@@ -3121,16 +3943,16 @@ router.get('/tra-hang/invoice/:id', async (req, res, next) => {
             .populate('don_hang_id')
             .populate('nguoi_ban_id');
         if (!invoice) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+            return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
         }
         if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
-            return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể trả hàng' });
+            return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y, khÃƒÂ´ng thÃ¡Â»Æ’ trÃ¡ÂºÂ£ hÃƒÂ ng' });
         }
         const items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id })
             .populate('hang_hoa_id')
             .populate('lo_hang_id');
         if (!items.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có chi tiết hàng hóa' });
+            return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n chÃ†Â°a cÃƒÂ³ chi tiÃ¡ÂºÂ¿t hÃƒÂ ng hÃƒÂ³a' });
         }
 
         const returns = await PhieuTraHang.find({
@@ -3139,20 +3961,23 @@ router.get('/tra-hang/invoice/:id', async (req, res, next) => {
         }).select('_id').lean();
         const returnedItems = returns.length
             ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } })
-                .select('hang_hoa_id lo_hang_id so_luong')
+                .select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong')
                 .lean()
             : [];
-        const returnedByLine = returnedItems.reduce((map, row) => {
-            const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
+        const returnedByInvoiceLine = {};
+        const returnedByLegacyLine = {};
+        returnedItems.forEach(row => {
+            const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
+            const map = invoiceLineId ? returnedByInvoiceLine : returnedByLegacyLine;
+            const key = invoiceLineId || legacyReturnLineKey(row);
             map[key] = (map[key] || 0) + Number(row.so_luong || 0);
-            return map;
-        }, {});
+        });
         const returnableItems = items
             .map(item => {
                 const object = item.toObject();
-                const productId = String(object.hang_hoa_id?._id || object.hang_hoa_id);
-                const key = productId + '::' + String(object.lo_hang_id?._id || object.lo_hang_id || '');
-                const returnedQty = Number(returnedByLine[key] || 0);
+                const invoiceLineId = String(object._id);
+                const legacyKey = legacyReturnLineKey(object);
+                const returnedQty = Number(returnedByInvoiceLine[invoiceLineId] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
                 const remainingQty = Math.max(Number(object.so_luong || 0) - returnedQty, 0);
                 object.so_luong_da_tra = returnedQty;
                 object.so_luong_con_lai = remainingQty;
@@ -3161,29 +3986,63 @@ router.get('/tra-hang/invoice/:id', async (req, res, next) => {
             })
             .filter(item => Number(item.so_luong_con_lai || 0) > 0);
         if (!returnableItems.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn đã được trả hết hàng' });
+            return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c trÃ¡ÂºÂ£ hÃ¡ÂºÂ¿t hÃƒÂ ng' });
         }
         res.json({ success: true, data: { invoice, items: returnableItems } });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message || 'Không tải được hóa đơn trả hàng' });
+        res.status(500).json({ success: false, message: error.message || 'KhÃƒÂ´ng tÃ¡ÂºÂ£i Ã„â€˜Ã†Â°Ã¡Â»Â£c hÃƒÂ³a Ã„â€˜Ã†Â¡n trÃ¡ÂºÂ£ hÃƒÂ ng' });
     }
 });
 
 router.post('/tra-hang/add', async (req, res, next) => {
     try {
-        const { hoa_don_id, khach_hang_id, kho_id, items, exchangeItems, khach_thanh_toan_them, ghi_chu } = req.body || {};
+        const {
+            hoa_don_id,
+            khach_hang_id,
+            kho_id,
+            items,
+            exchangeItems,
+            khach_thanh_toan_them,
+            ghi_chu,
+            ly_do,
+            giam_gia,
+            kieu_giam_gia,
+            phi_tra_hang,
+            hinh_thuc_nhan_hang_tra,
+            doi_tac_giao_hang_id,
+            dia_chi_lay_hang,
+            ten_nguoi_gui_tra,
+            sdt_nguoi_gui_tra,
+            phi_lay_hang_tra,
+            nguoi_tra_phi_lay_hang,
+            ma_van_don_tra_hang,
+            ghi_chu_van_chuyen_tra
+        } = req.body || {};
+        const receiveMethods = ['tai_quay', 'lay_tai_nha', 'khach_gui_ve'];
+        const receiveMethod = receiveMethods.includes(hinh_thuc_nhan_hang_tra) ? hinh_thuc_nhan_hang_tra : 'tai_quay';
+        const cleanPickupAddress = receiveMethod === 'lay_tai_nha' ? String(dia_chi_lay_hang || '').trim() : '';
+        let cleanSenderName = receiveMethod === 'tai_quay' ? '' : String(ten_nguoi_gui_tra || '').trim();
+        const cleanSenderPhone = receiveMethod === 'tai_quay' ? '' : String(sdt_nguoi_gui_tra || '').trim();
+        const cleanPickupFee = receiveMethod === 'tai_quay' ? 0 : Math.max(Number(phi_lay_hang_tra || 0), 0);
+        const pickupFeePayer = nguoi_tra_phi_lay_hang === 'khach' ? 'khach' : 'cua_hang';
+        const cleanReturnTrackingCode = receiveMethod === 'tai_quay' ? '' : String(ma_van_don_tra_hang || '').trim();
+        const cleanReturnShippingNote = receiveMethod === 'tai_quay' ? '' : String(ghi_chu_van_chuyen_tra || '').trim();
+        if (receiveMethod === 'lay_tai_nha' && !cleanPickupAddress) {
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng nhÃ¡ÂºÂ­p Ã„â€˜Ã¡Â»â€¹a chÃ¡Â»â€° lÃ¡ÂºÂ¥y hÃƒÂ ng trÃ¡ÂºÂ£' });
+        }
         if (!Array.isArray(items) || !items.length) {
-            return res.status(400).json({ success: false, message: 'Phiếu trả hàng chưa có sản phẩm' });
+            return res.status(400).json({ success: false, message: 'PhiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng chÃ†Â°a cÃƒÂ³ sÃ¡ÂºÂ£n phÃ¡ÂºÂ©m' });
         }
 
         const cleanItems = items
             .map(item => ({
+                ct_hoa_don_id: optionalLineObjectId(item.ct_hoa_don_id),
                 hang_hoa_id: item.hang_hoa_id,
                 lo_hang_id: item.lo_hang_id || null,
                 so_luong: Number(item.so_luong || 0),
                 don_gia: Number(item.don_gia || 0)
             }))
-            .filter(item => item.hang_hoa_id && item.so_luong > 0);
+            .filter(item => (item.ct_hoa_don_id || item.hang_hoa_id) && item.so_luong > 0);
         const cleanExchangeItems = (Array.isArray(exchangeItems) ? exchangeItems : [])
             .map(item => ({
                 hang_hoa_id: item.hang_hoa_id,
@@ -3194,58 +4053,99 @@ router.post('/tra-hang/add', async (req, res, next) => {
             .filter(item => item.hang_hoa_id && item.so_luong > 0);
 
         if (!cleanItems.length) {
-            return res.status(400).json({ success: false, message: 'Vui lòng nhập số lượng hàng trả' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng nhÃ¡ÂºÂ­p sÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng hÃƒÂ ng trÃ¡ÂºÂ£' });
         }
 
         let invoice = null;
         if (hoa_don_id) {
             invoice = await HoaDonBanHang.findById(hoa_don_id).lean();
-            if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+            if (!invoice) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
             if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
-                return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể trả hàng' });
+                return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y, khÃƒÂ´ng thÃ¡Â»Æ’ trÃ¡ÂºÂ£ hÃƒÂ ng' });
             }
-            const invoiceItems = await CTHoaDonBanHang.find({ hoa_don_id }).select('hang_hoa_id lo_hang_id so_luong').lean();
+            const invoiceItems = await CTHoaDonBanHang.find({ hoa_don_id }).lean();
             const returns = await PhieuTraHang.find({ hoa_don_id, trang_thai: { $ne: 'cancelled' } }).select('_id').lean();
             const returnedItems = returns.length
-                ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } }).select('hang_hoa_id lo_hang_id so_luong').lean()
+                ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } }).select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong').lean()
                 : [];
+            const invoiceLineById = invoiceItems.reduce((map, row) => {
+                map[String(row._id)] = row;
+                return map;
+            }, {});
+            const invoiceLinesByLegacyKey = invoiceItems.reduce((map, row) => {
+                const key = legacyReturnLineKey(row);
+                if (!map[key]) map[key] = [];
+                map[key].push(row);
+                return map;
+            }, {});
             const soldByLine = invoiceItems.reduce((map, row) => {
-                const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
+                const key = legacyReturnLineKey(row);
                 map[key] = (map[key] || 0) + Number(row.so_luong || 0);
                 return map;
             }, {});
-            const returnedByLine = returnedItems.reduce((map, row) => {
-                const key = String(row.hang_hoa_id) + '::' + String(row.lo_hang_id || '');
-                map[key] = (map[key] || 0) + Number(row.so_luong || 0);
+            const soldByInvoiceLine = invoiceItems.reduce((map, row) => {
+                map[String(row._id)] = Number(row.so_luong || 0);
                 return map;
             }, {});
+            const returnedByInvoiceLine = {};
+            const returnedByLegacyLine = {};
+            returnedItems.forEach(row => {
+                const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
+                const map = invoiceLineId ? returnedByInvoiceLine : returnedByLegacyLine;
+                const key = invoiceLineId || legacyReturnLineKey(row);
+                map[key] = (map[key] || 0) + Number(row.so_luong || 0);
+            });
             for (const item of cleanItems) {
-                const key = String(item.hang_hoa_id) + '::' + String(item.lo_hang_id || '');
-                const remainingQty = Math.max(Number(soldByLine[key] || 0) - Number(returnedByLine[key] || 0), 0);
+                if (item.ct_hoa_don_id) {
+                    const invoiceLine = invoiceLineById[item.ct_hoa_don_id];
+                    if (!invoiceLine) {
+                        return res.status(400).json({ success: false, message: 'Dong hoa don tra khong hop le' });
+                    }
+                    item.invoiceLine = invoiceLine;
+                    item.hang_hoa_id = item.hang_hoa_id || invoiceLine.hang_hoa_id;
+                    item.lo_hang_id = item.lo_hang_id || invoiceLine.lo_hang_id || null;
+                    const legacyKey = legacyReturnLineKey(invoiceLine);
+                    const returnedQty = Number(returnedByInvoiceLine[item.ct_hoa_don_id] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
+                    const remainingQty = Math.max(Number(soldByInvoiceLine[item.ct_hoa_don_id] || 0) - returnedQty, 0);
+                    if (item.so_luong > remainingQty) {
+                        return res.status(400).json({ success: false, message: 'So luong tra vuot qua so luong con co the tra' });
+                    }
+                    continue;
+                }
+                const key = legacyReturnLineKey(item);
+                const matchingInvoiceLines = invoiceLinesByLegacyKey[key] || [];
+                if (matchingInvoiceLines.length === 1) {
+                    item.invoiceLine = matchingInvoiceLines[0];
+                }
+                const returnedByMatchedInvoiceLines = matchingInvoiceLines.reduce((sum, row) => {
+                    return sum + Number(returnedByInvoiceLine[String(row._id)] || 0);
+                }, 0);
+                const returnedQty = Number(returnedByLegacyLine[key] || 0) + returnedByMatchedInvoiceLines;
+                const remainingQty = Math.max(Number(soldByLine[key] || 0) - returnedQty, 0);
                 if (item.so_luong > remainingQty) {
-                    return res.status(400).json({ success: false, message: 'Số lượng trả vượt quá số lượng còn có thể trả' });
+                    return res.status(400).json({ success: false, message: 'SÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng trÃ¡ÂºÂ£ vÃ†Â°Ã¡Â»Â£t quÃƒÂ¡ sÃ¡Â»â€˜ lÃ†Â°Ã¡Â»Â£ng cÃƒÂ²n cÃƒÂ³ thÃ¡Â»Æ’ trÃ¡ÂºÂ£' });
                 }
             }
         }
 
         const warehouseId = kho_id || invoice?.kho_id;
         if (!warehouseId) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho xử lý trả/đổi hàng' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân kho xÃ¡Â»Â­ lÃƒÂ½ trÃ¡ÂºÂ£/Ã„â€˜Ã¡Â»â€¢i hÃƒÂ ng' });
         }
         const warehouse = await Kho.findById(warehouseId).lean();
         if (!warehouse) {
-            return res.status(400).json({ success: false, message: 'Kho xử lý trả/đổi hàng không hợp lệ' });
+            return res.status(400).json({ success: false, message: 'Kho xÃ¡Â»Â­ lÃƒÂ½ trÃ¡ÂºÂ£/Ã„â€˜Ã¡Â»â€¢i hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
         }
 
         for (const item of cleanItems) {
             const product = await HangHoa.findById(item.hang_hoa_id).select('_id ten_hang quan_ly_theo_lo').lean();
-            if (!product) return res.status(400).json({ success: false, message: 'Hàng trả không tồn tại' });
+            if (!product) return res.status(400).json({ success: false, message: 'HÃƒÂ ng trÃ¡ÂºÂ£ khÃƒÂ´ng tÃ¡Â»â€œn tÃ¡ÂºÂ¡i' });
             if (product.quan_ly_theo_lo && !item.lo_hang_id) {
                 const fallbackLotId = await findReturnLotId(warehouseId, item.hang_hoa_id);
                 if (!fallbackLotId) {
                     return res.status(400).json({
                         success: false,
-                        message: `Hàng trả ${product.ten_hang || item.hang_hoa_id} quản lý theo lô nhưng hóa đơn không lưu lô. Vui lòng nhập/tạo lô hàng trước khi trả.`
+                        message: `HÃƒÂ ng trÃ¡ÂºÂ£ ${product.ten_hang || item.hang_hoa_id} quÃ¡ÂºÂ£n lÃƒÂ½ theo lÃƒÂ´ nhÃ†Â°ng hÃƒÂ³a Ã„â€˜Ã†Â¡n khÃƒÂ´ng lÃ†Â°u lÃƒÂ´. Vui lÃƒÂ²ng nhÃ¡ÂºÂ­p/tÃ¡ÂºÂ¡o lÃƒÂ´ hÃƒÂ ng trÃ†Â°Ã¡Â»â€ºc khi trÃ¡ÂºÂ£.`
                     });
                 }
                 item.lo_hang_id = fallbackLotId;
@@ -3254,20 +4154,31 @@ router.post('/tra-hang/add', async (req, res, next) => {
 
         for (const item of cleanExchangeItems) {
             const product = await HangHoa.findById(item.hang_hoa_id).select('_id ten_hang quan_ly_theo_lo').lean();
-            if (!product) return res.status(400).json({ success: false, message: 'Hàng đổi không tồn tại' });
+            if (!product) return res.status(400).json({ success: false, message: 'HÃƒÂ ng Ã„â€˜Ã¡Â»â€¢i khÃƒÂ´ng tÃ¡Â»â€œn tÃ¡ÂºÂ¡i' });
             const stock = await getSellableStock(warehouseId, product);
             if (stock < item.so_luong) {
-                return res.status(400).json({ success: false, message: `Tồn kho hàng đổi không đủ: ${product.ten_hang || item.hang_hoa_id}` });
+                return res.status(400).json({ success: false, message: `TÃ¡Â»â€œn kho hÃƒÂ ng Ã„â€˜Ã¡Â»â€¢i khÃƒÂ´ng Ã„â€˜Ã¡Â»Â§: ${product.ten_hang || item.hang_hoa_id}` });
             }
         }
 
         const tongTienHangTra = cleanItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
         const tongTienHangDoi = cleanExchangeItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
-        const chenhLech = tongTienHangDoi - tongTienHangTra;
+        const discountType = kieu_giam_gia === 'vnd' ? 'vnd' : 'vnd';
+        const discountValue = Math.max(Number(giam_gia || 0), 0);
+        const returnFeeValue = Math.max(Number(phi_tra_hang || 0), 0);
+        const pickupFeeCustomerPays = pickupFeePayer === 'khach' ? cleanPickupFee : 0;
+        const chenhLech = tongTienHangDoi + discountValue + returnFeeValue + pickupFeeCustomerPays - tongTienHangTra;
         const khachCanTraThem = Math.max(chenhLech, 0);
         const canTraKhach = Math.max(-chenhLech, 0);
         const count = await PhieuTraHang.countDocuments();
         const ma_phieu_tra = 'TH' + String(count + 1).padStart(6, '0');
+        if (receiveMethod === 'lay_tai_nha' && !cleanSenderName) {
+            const customer = await KhachHang.findById(khach_hang_id || invoice?.khach_hang_id).select('ten_khach_hang').lean();
+            cleanSenderName = customer?.ten_khach_hang || '';
+            if (!cleanSenderName) {
+                return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng nhÃ¡ÂºÂ­p tÃƒÂªn ngÃ†Â°Ã¡Â»Âi gÃ¡Â»Â­i trÃ¡ÂºÂ£' });
+            }
+        }
 
         const returnSlip = await PhieuTraHang.create({
             ma_phieu_tra,
@@ -3276,11 +4187,24 @@ router.post('/tra-hang/add', async (req, res, next) => {
             tong_tien_hang_tra: tongTienHangTra,
             tong_tien_hang_doi: tongTienHangDoi,
             chenh_lech: chenhLech,
+            giam_gia: discountValue,
+            kieu_giam_gia: discountType,
+            phi_tra_hang: returnFeeValue,
             khach_can_tra_them: khachCanTraThem,
             can_tra_khach: canTraKhach,
-            ly_do: cleanExchangeItems.length ? 'Khách đổi hàng' : 'Khách trả hàng',
+            ly_do: String(ly_do || '').trim() || (cleanExchangeItems.length ? 'KhÃƒÂ¡ch Ã„â€˜Ã¡Â»â€¢i hÃƒÂ ng' : 'KhÃƒÂ¡ch trÃ¡ÂºÂ£ hÃƒÂ ng'),
             trang_thai: 'completed',
             ghi_chu,
+            hinh_thuc_nhan_hang_tra: receiveMethod,
+            van_don_id: null,
+            doi_tac_giao_hang_id: receiveMethod === 'tai_quay' ? null : (doi_tac_giao_hang_id || null),
+            dia_chi_lay_hang: cleanPickupAddress,
+            ten_nguoi_gui_tra: cleanSenderName,
+            sdt_nguoi_gui_tra: cleanSenderPhone,
+            phi_lay_hang_tra: cleanPickupFee,
+            nguoi_tra_phi_lay_hang: pickupFeePayer,
+            ma_van_don_tra_hang: cleanReturnTrackingCode,
+            ghi_chu_van_chuyen_tra: cleanReturnShippingNote,
             cua_hang_id: invoice?.cua_hang_id || warehouse.cua_hang_id || null,
             kho_id: warehouseId,
             hoa_don_id: hoa_don_id || null,
@@ -3289,14 +4213,24 @@ router.post('/tra-hang/add', async (req, res, next) => {
         });
 
         for (const item of cleanItems) {
+            const invoiceLineMeta = item.invoiceLine ? copyLineMetadata(item.invoiceLine) : copyLineMetadata(item);
             await CTPhieuTraHang.create({
                 phieu_tra_hang_id: returnSlip._id,
+                ct_hoa_don_id: item.ct_hoa_don_id || optionalLineObjectId(item.invoiceLine?._id),
                 hang_hoa_id: item.hang_hoa_id,
                 lo_hang_id: item.lo_hang_id || undefined,
+                gia_tri_thuoc_tinh_id: invoiceLineMeta.gia_tri_thuoc_tinh_id,
+                ten_quy_cach: invoiceLineMeta.ten_quy_cach,
+                ten_thuoc_tinh: invoiceLineMeta.ten_thuoc_tinh,
+                don_vi_tinh_id: invoiceLineMeta.don_vi_tinh_id,
+                ma_hang_snapshot: invoiceLineMeta.ma_hang_snapshot,
+                ten_hang_snapshot: invoiceLineMeta.ten_hang_snapshot,
+                don_vi_tinh_snapshot: invoiceLineMeta.don_vi_tinh_snapshot,
                 loai_dong: 'hang_tra',
                 so_luong: item.so_luong,
                 don_gia: item.don_gia,
-                thanh_tien: item.so_luong * item.don_gia
+                thanh_tien: item.so_luong * item.don_gia,
+                ghi_chu: invoiceLineMeta.ghi_chu
             });
             await congTonKho({
                 kho_id: warehouseId,
@@ -3349,7 +4283,7 @@ router.post('/tra-hang/add', async (req, res, next) => {
                     khach_hang_id: customerId || undefined,
                     hoa_don_id: hoa_don_id || undefined,
                     ma_chung_tu_goc: ma_phieu_tra,
-                    doi_tuong: customerId ? undefined : 'Khách lẻ',
+                    doi_tuong: customerId ? undefined : 'KhÃƒÂ¡ch lÃ¡ÂºÂ»',
                     nhom_doi_tuong: 'khach_hang',
                     hach_toan: false
                 });
@@ -3360,7 +4294,7 @@ router.post('/tra-hang/add', async (req, res, next) => {
                     hoa_don_id: hoa_don_id || undefined,
                     so_tien: debt,
                     loai: 'tang_no',
-                    ghi_chu: `Công nợ đổi hàng ${ma_phieu_tra}`,
+                    ghi_chu: `CÃƒÂ´ng nÃ¡Â»Â£ Ã„â€˜Ã¡Â»â€¢i hÃƒÂ ng ${ma_phieu_tra}`,
                     ngay: new Date()
                 });
                 const customer = await KhachHang.findById(customerId).select('tong_no').lean();
@@ -3383,7 +4317,7 @@ router.post('/tra-hang/add', async (req, res, next) => {
                     hoa_don_id: hoa_don_id || undefined,
                     so_tien: debtReduction,
                     loai: 'giam_no',
-                    ghi_chu: `Giảm công nợ trả/đổi hàng ${ma_phieu_tra}`,
+                    ghi_chu: `GiÃ¡ÂºÂ£m cÃƒÂ´ng nÃ¡Â»Â£ trÃ¡ÂºÂ£/Ã„â€˜Ã¡Â»â€¢i hÃƒÂ ng ${ma_phieu_tra}`,
                     ngay: new Date()
                 });
                 refund -= debtReduction;
@@ -3400,16 +4334,16 @@ router.post('/tra-hang/add', async (req, res, next) => {
                     khach_hang_id: customerId || undefined,
                     hoa_don_id: hoa_don_id || undefined,
                     ma_chung_tu_goc: ma_phieu_tra,
-                    doi_tuong: customerId ? undefined : 'Khách lẻ',
+                    doi_tuong: customerId ? undefined : 'KhÃƒÂ¡ch lÃ¡ÂºÂ»',
                     nhom_doi_tuong: 'khach_hang',
                     hach_toan: false
                 });
             }
         }
 
-        res.json({ success: true, message: 'Đã tạo phiếu trả hàng', ma_phieu_tra, id: returnSlip._id, print_url: '/chung-tu-kho/tra-hang-ban/' + returnSlip._id });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng', ma_phieu_tra, id: returnSlip._id, print_url: '/chung-tu-kho/tra-hang-ban/' + returnSlip._id });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message || 'Không tạo được phiếu trả hàng' });
+        res.status(500).json({ success: false, message: error.message || 'KhÃƒÂ´ng tÃ¡ÂºÂ¡o Ã„â€˜Ã†Â°Ã¡Â»Â£c phiÃ¡ÂºÂ¿u trÃ¡ÂºÂ£ hÃƒÂ ng' });
     }
 });
 
@@ -3428,7 +4362,7 @@ router.get('/doi-tac-giao-hang', async (req, res, next) => {
             const key = String(item.doi_tac_giao_hang_id || '');
             if (shipmentMap[key]) shipmentMap[key].push(item);
         });
-        res.render('don-hang/doi-tac-giao-hang', { title: 'Đối tác giao hàng', partners, shipmentMap });
+        res.render('don-hang/doi-tac-giao-hang', { title: 'Ã„ÂÃ¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng', partners, shipmentMap });
     } catch (error) {
         next(error);
     }
@@ -3446,10 +4380,10 @@ router.get('/doi-tac-giao-hang/export.xlsx', async (req, res, next) => {
 router.get('/doi-tac-giao-hang/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
-            return res.status(404).send('Không tìm thấy đối tác giao hàng');
+            return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng');
         }
         const { partners, priceMap } = await loadDeliveryPartnerExportData({ _id: req.params.id });
-        if (!partners.length) return res.status(404).send('Không tìm thấy đối tác giao hàng');
+        if (!partners.length) return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng');
         await sendDeliveryPartnerWorkbook(
             res,
             'doi-tac-giao-hang-' + (partners[0].ma_doi_tac || 'unknown') + '.xlsx',
@@ -3465,7 +4399,7 @@ router.post('/doi-tac-giao-hang/add', async (req, res, next) => {
     try {
         const { ma_doi_tac, ten_doi_tac, sdt, email, ghi_chu } = req.body || {};
         if (!ten_doi_tac || ten_doi_tac.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Tên đối tác là bắt buộc' });
+            return res.status(400).json({ success: false, message: 'TÃƒÂªn Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c lÃƒÂ  bÃ¡ÂºÂ¯t buÃ¡Â»â„¢c' });
         }
         const count = await DoiTacGiaoHang.countDocuments();
         const code = ma_doi_tac && ma_doi_tac.trim() !== '' ? ma_doi_tac.trim() : 'DTGH' + String(count + 1).padStart(4, '0');
@@ -3482,7 +4416,7 @@ router.post('/doi-tac-giao-hang/add', async (req, res, next) => {
             ghi_chu: ghi_chu?.trim(),
             trang_thai: 'active'
         });
-        res.json({ success: true, message: 'Đã thêm đối tác giao hàng' });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ thÃƒÂªm Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng' });
     } catch (error) {
         next(error);
     }
@@ -3492,14 +4426,14 @@ router.post('/doi-tac-giao-hang/:id/update', async (req, res, next) => {
     try {
         const { ma_doi_tac, ten_doi_tac, sdt, email, ghi_chu, trang_thai } = req.body || {};
         if (!ten_doi_tac || ten_doi_tac.trim() === '') {
-            return res.status(400).json({ success: false, message: 'Tên đối tác là bắt buộc' });
+            return res.status(400).json({ success: false, message: 'TÃƒÂªn Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c lÃƒÂ  bÃ¡ÂºÂ¯t buÃ¡Â»â„¢c' });
         }
         const partner = await DoiTacGiaoHang.findById(req.params.id);
-        if (!partner) return res.status(404).json({ success: false, message: 'Không tìm thấy đối tác giao hàng' });
+        if (!partner) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng' });
 
         if (ma_doi_tac && ma_doi_tac.trim() !== '' && ma_doi_tac.trim() !== partner.ma_doi_tac) {
             const exists = await DoiTacGiaoHang.findOne({ ma_doi_tac: ma_doi_tac.trim(), _id: { $ne: partner._id } });
-            if (exists) return res.status(400).json({ success: false, message: 'Mã đối tác đã tồn tại' });
+            if (exists) return res.status(400).json({ success: false, message: 'MÃƒÂ£ Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c Ã„â€˜ÃƒÂ£ tÃ¡Â»â€œn tÃ¡ÂºÂ¡i' });
             partner.ma_doi_tac = ma_doi_tac.trim();
         }
         partner.ten_doi_tac = ten_doi_tac.trim();
@@ -3513,7 +4447,7 @@ router.post('/doi-tac-giao-hang/:id/update', async (req, res, next) => {
         partner.ghi_chu = ghi_chu?.trim();
         if (trang_thai === 'active' || trang_thai === 'inactive') partner.trang_thai = trang_thai;
         await partner.save();
-        res.json({ success: true, message: 'Đã cập nhật đối tác giao hàng', data: partner });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t Ã„â€˜Ã¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng', data: partner });
     } catch (error) {
         next(error);
     }
@@ -3536,7 +4470,7 @@ router.get('/van-don/export.csv', async (req, res, next) => {
                 item.hoa_don_id?.ma_hoa_don || item.don_hang_id?.ma_don_hang || '',
                 item.khach_hang_id?.ma_khach_hang || '',
                 item.khach_hang_id?.ten_khach_hang || item.ten_nguoi_nhan || '',
-                item.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng',
+                item.doi_tac_giao_hang_id?.ten_doi_tac || 'TÃ¡Â»Â± giao hÃƒÂ ng',
                 item.trang_thai || '',
                 item.phi_giao_hang || 0
             ])
@@ -3562,10 +4496,10 @@ router.get('/van-don/export.xlsx', async (req, res, next) => {
 router.get('/van-don/:id/export.xlsx', async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
-            return res.status(404).send('Không tìm thấy vận đơn');
+            return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n');
         }
         const shipments = await loadShipmentExportData({ _id: req.params.id });
-        if (!shipments.length) return res.status(404).send('Không tìm thấy vận đơn');
+        if (!shipments.length) return res.status(404).send('KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n');
         await sendShipmentWorkbook(
             res,
             'van-don-' + (shipments[0].ma_van_don || 'unknown') + '.xlsx',
@@ -3581,29 +4515,171 @@ router.post('/van-don/:id/status', async (req, res, next) => {
         const allowed = ['draft', 'shipping', 'completed', 'cancelled'];
         const { trang_thai } = req.body || {};
         if (!allowed.includes(trang_thai)) {
-            return res.status(400).json({ success: false, message: 'Trạng thái vận đơn không hợp lệ' });
+            return res.status(400).json({ success: false, message: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
         }
         const shipment = await VanDon.findByIdAndUpdate(req.params.id, { trang_thai }, { new: true });
         if (!shipment) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy vận đơn' });
+            return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n' });
         }
-        res.json({ success: true, message: 'Đã cập nhật trạng thái vận đơn', data: shipment });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t trÃ¡ÂºÂ¡ng thÃƒÂ¡i vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n', data: shipment });
     } catch (error) {
         next(error);
     }
 });
 
 router.post('/van-don/:id/thu-cod', async (req, res, next) => {
+    const session = await mongoose.startSession();
     try {
+        let responseData = null;
+        await session.withTransaction(async () => {
+            const shipment = await VanDon.findById(req.params.id)
+                .populate('khach_hang_id')
+                .populate('hoa_don_id')
+                .populate('don_hang_id')
+                .session(session);
+            if (!shipment) {
+                const error = new Error('Khong tim thay van don');
+                error.statusCode = 404;
+                throw error;
+            }
+            if (shipment.trang_thai_cod === 'da_thu') {
+                const error = new Error('Van don nay da thu COD, khong the thu lai lan nua.');
+                error.statusCode = 400;
+                throw error;
+            }
+            if (shipment.cod_enabled !== true) {
+                const error = new Error('Van don khong bat COD, khong the thu COD.');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const codAmount = Number(shipment.cod_amount || 0);
+            if (!Number.isFinite(codAmount) || codAmount <= 0) {
+                const error = new Error('So tien COD khong hop le');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const customerId = shipment.khach_hang_id?._id || shipment.khach_hang_id;
+            const invoiceId = shipment.hoa_don_id?._id || shipment.hoa_don_id;
+            const orderId = shipment.don_hang_id?._id || shipment.don_hang_id;
+            if (!customerId) {
+                const error = new Error('Van don COD chua gan khach hang.');
+                error.statusCode = 400;
+                throw error;
+            }
+            if (!invoiceId) {
+                const error = new Error('Van don COD chua gan hoa don.');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const cashBookId = req.body?.so_quy_id;
+            if (!cashBookId || !/^[0-9a-fA-F]{24}$/.test(String(cashBookId))) {
+                const error = new Error('Vui long chon so quy de thu COD.');
+                error.statusCode = 400;
+                throw error;
+            }
+            const cashBook = await SoQuy.findById(cashBookId).session(session).lean();
+            if (!cashBook) {
+                const error = new Error('So quy thu COD khong hop le.');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const exists = await PhieuThuChi.findOne({
+                van_don_id: shipment._id,
+                loai_phieu: 'thu',
+                loai_thu_chi: { $in: ['thu_cod', 'Thu COD'] },
+                trang_thai: { $ne: 'cancelled' }
+            }).session(session);
+            if (exists) {
+                const error = new Error('Van don nay da thu COD, khong the thu lai lan nua.');
+                error.statusCode = 400;
+                throw error;
+            }
+
+            const note = `Thu COD van don ${shipment.ma_van_don || ''}`.trim();
+            const receipt = await taoPhieuThuChi({
+                loai_phieu: 'thu',
+                loai_thu_chi: 'thu_cod',
+                gia_tri: codAmount,
+                so_quy_id: cashBook._id,
+                cua_hang_id: shipment.cua_hang_id,
+                nguoi_tao_id: req.user?._id,
+                khach_hang_id: customerId,
+                don_hang_id: orderId,
+                hoa_don_id: invoiceId,
+                van_don_id: shipment._id,
+                ma_chung_tu_goc: shipment.ma_van_don,
+                doi_tuong: shipment.khach_hang_id?.ten_khach_hang || shipment.ten_nguoi_nhan || 'COD',
+                ghi_chu: note,
+                nhom_doi_tuong: 'khach_hang',
+                phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
+                hach_toan: false,
+                session
+            });
+
+            let debtTransaction = null;
+            try {
+                debtTransaction = await createCustomerDebtTransaction({
+                    cua_hang_id: shipment.cua_hang_id,
+                    khach_hang_id: customerId,
+                    loai_giao_dich: 'thu_cod',
+                    huong_cong_no: 'giam_no',
+                    gia_tri: codAmount,
+                    anh_huong_so_quy: true,
+                    hoa_don_id: invoiceId,
+                    don_hang_id: orderId,
+                    van_don_id: shipment._id,
+                    phieu_thu_chi_id: receipt._id,
+                    ma_chung_tu_goc: shipment.ma_van_don,
+                    ghi_chu: note,
+                    nguoi_tao_id: req.user?._id,
+                    session
+                });
+            } catch (error) {
+                if (/lon hon no hien tai/i.test(error.message || '')) {
+                    throw new Error('So tien COD lon hon cong no hien tai cua khach hang. Vui long kiem tra lai cong no truoc khi thu COD.');
+                }
+                throw error;
+            }
+
+            await CongNoKhachHang.create([{
+                khach_hang_id: customerId,
+                don_hang_id: orderId || undefined,
+                hoa_don_id: invoiceId,
+                phieu_thu_chi_id: receipt._id,
+                so_tien: codAmount,
+                loai: 'thanh_toan',
+                ghi_chu: note,
+                ngay: new Date()
+            }], { session });
+
+            shipment.trang_thai_cod = 'da_thu';
+            await shipment.save({ session });
+            responseData = { receipt, debtTransaction, shipment };
+        });
+        res.json({ success: true, message: 'Da thu COD va giam cong no khach hang', data: responseData });
+    } catch (error) {
+        return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Khong thu duoc COD' });
+    } finally {
+        session.endSession();
+    }
+});
+
+router.post('/van-don/:id/thu-cod-legacy', async (req, res, next) => {
+    try {
+        return res.status(410).json({ success: false, message: 'Legacy COD collection endpoint is disabled.' });
         const shipment = await VanDon.findById(req.params.id)
             .populate('khach_hang_id')
             .populate('hoa_don_id')
             .populate('don_hang_id');
-        if (!shipment) return res.status(404).json({ success: false, message: 'Không tìm thấy vận đơn' });
+        if (!shipment) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n' });
         const amount = Number(req.body?.gia_tri || shipment.cod_amount || shipment.hoa_don_id?.thanh_toan || shipment.don_hang_id?.tong_thanh_toan || 0);
-        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền COD không hợp lệ' });
+        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'SÃ¡Â»â€˜ tiÃ¡Â»Ân COD khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
         const exists = await PhieuThuChi.findOne({ van_don_id: shipment._id, loai_phieu: 'thu', loai_thu_chi: 'Thu COD' });
-        if (exists) return res.json({ success: true, message: 'Vận đơn đã có phiếu thu COD', data: exists });
+        if (exists) return res.json({ success: true, message: 'VÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ cÃƒÂ³ phiÃ¡ÂºÂ¿u thu COD', data: exists });
         const cashBook = await ensureDefaultSoQuy(shipment.cua_hang_id);
         const receipt = await taoPhieuThuChi({
             loai_phieu: 'thu',
@@ -3624,18 +4700,18 @@ router.post('/van-don/:id/thu-cod', async (req, res, next) => {
         });
         shipment.trang_thai_cod = 'da_thu';
         await shipment.save();
-        res.json({ success: true, message: 'Đã tạo phiếu thu COD', data: receipt });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u thu COD', data: receipt });
     } catch (error) {
-        return res.status(400).json({ success: false, message: error.message || 'Không thu được COD' });
+        return res.status(400).json({ success: false, message: error.message || 'KhÃƒÂ´ng thu Ã„â€˜Ã†Â°Ã¡Â»Â£c COD' });
     }
 });
 
 router.post('/van-don/:id/chi-phi-van-chuyen', async (req, res, next) => {
     try {
         const shipment = await VanDon.findById(req.params.id).populate('doi_tac_giao_hang_id');
-        if (!shipment) return res.status(404).json({ success: false, message: 'Không tìm thấy vận đơn' });
+        if (!shipment) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n' });
         const amount = Number(req.body?.gia_tri || shipment.phi_giao_hang || 0);
-        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'Phí vận chuyển không hợp lệ' });
+        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'PhÃƒÂ­ vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
         const cashBook = await ensureDefaultSoQuy(shipment.cua_hang_id);
         const receipt = await taoPhieuThuChi({
             loai_phieu: 'chi',
@@ -3648,14 +4724,14 @@ router.post('/van-don/:id/chi-phi-van-chuyen', async (req, res, next) => {
             hoa_don_id: shipment.hoa_don_id,
             van_don_id: shipment._id,
             ma_chung_tu_goc: shipment.ma_van_don,
-            doi_tuong: shipment.doi_tac_giao_hang_id?.ten_doi_tac || 'Đối tác giao hàng',
+            doi_tuong: shipment.doi_tac_giao_hang_id?.ten_doi_tac || 'Ã„ÂÃ¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng',
             nhom_doi_tuong: 'doi_tac_giao_hang',
             phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
             hach_toan: false
         });
-        res.json({ success: true, message: 'Đã tạo phiếu chi phí vận chuyển', data: receipt });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u chi phÃƒÂ­ vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n', data: receipt });
     } catch (error) {
-        return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu chi vận chuyển' });
+        return res.status(400).json({ success: false, message: error.message || 'KhÃƒÂ´ng tÃ¡ÂºÂ¡o Ã„â€˜Ã†Â°Ã¡Â»Â£c phiÃ¡ÂºÂ¿u chi vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n' });
     }
 });
 
@@ -3683,7 +4759,11 @@ router.get('/van-don', async (req, res, next) => {
             ).select('_id');
             filter.hoa_don_id = { $in: invoices.map(item => item._id) };
         }
-        const [shipments, partners] = await Promise.all([
+        const sessionStoreId = await resolveStoreId(req);
+        const cashBookQuery = sessionStoreId
+            ? { trang_thai: 'active', cua_hang_id: sessionStoreId }
+            : { trang_thai: 'active' };
+        const [shipments, partners, cashBooks] = await Promise.all([
             VanDon.find(filter)
                 .populate('don_hang_id')
                 .populate('hoa_don_id')
@@ -3691,9 +4771,11 @@ router.get('/van-don', async (req, res, next) => {
                 .populate('cua_hang_id')
                 .populate('khach_hang_id')
                 .sort({ created_at: -1 }),
-            DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 })
+            DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1, loai: 1 }).lean()
         ]);
-        res.render('don-hang/van-don', { title: 'Vận đơn', shipments, partners, filters: req.query || {} });
+        res.locals.cashBooks = cashBooks;
+        res.render('don-hang/van-don', { title: 'VÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n', shipments, partners, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -3707,12 +4789,19 @@ router.post('/:id/duplicate', async (req, res, next) => {
     try {
         const sourceOrder = await DonHang.findById(req.params.id).lean();
         if (!sourceOrder) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn đặt hàng' });
+            return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n Ã„â€˜Ã¡ÂºÂ·t hÃƒÂ ng' });
+        }
+
+        if (sourceOrder.trang_thai === 'merged') {
+            return res.status(400).json({
+                success: false,
+                message: `Đơn hàng này đã được gộp vào ${sourceOrder.merged_to_ma_don_hang || 'đơn khác'}, không thể thao tác riêng.`
+            });
         }
 
         const sourceItems = await CTDonHang.find({ don_hang_id: sourceOrder._id }).lean();
         if (!sourceItems.length) {
-            return res.status(400).json({ success: false, message: 'Đơn đặt hàng chưa có sản phẩm để sao chép' });
+            return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n Ã„â€˜Ã¡ÂºÂ·t hÃƒÂ ng chÃ†Â°a cÃƒÂ³ sÃ¡ÂºÂ£n phÃ¡ÂºÂ©m Ã„â€˜Ã¡Â»Æ’ sao chÃƒÂ©p' });
         }
 
         const sourceShipment = await VanDon.findOne({ don_hang_id: sourceOrder._id }).lean();
@@ -3790,7 +4879,7 @@ router.post('/:id/duplicate', async (req, res, next) => {
 
         res.json({
             success: true,
-            message: 'Đã sao chép đơn đặt hàng',
+            message: 'Ã„ÂÃƒÂ£ sao chÃƒÂ©p Ã„â€˜Ã†Â¡n Ã„â€˜Ã¡ÂºÂ·t hÃƒÂ ng',
             order_id: String(newOrder._id),
             ma_don_hang: newOrder.ma_don_hang
         });
@@ -3809,10 +4898,11 @@ router.get('/:id/detail', async (req, res, next) => {
             .populate('khach_hang_id')
             .populate('cua_hang_id')
             .populate('nguoi_tao_id');
-        if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+        if (!order) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
         const items = await CTDonHang.find({ don_hang_id: order._id }).populate('hang_hoa_id');
         const shipment = await VanDon.findOne({ don_hang_id: order._id }).populate('doi_tac_giao_hang_id').populate('cua_hang_id');
         const invoice = await HoaDonBanHang.findOne({ don_hang_id: order._id }).select('_id ma_hoa_don trang_thai');
+        order.khach_thanh_toan = await getOrderPaidAmount(order._id);
         res.json({ success: true, data: { order, items, shipment, invoice } });
     } catch (error) {
         next(error);
@@ -3822,14 +4912,14 @@ router.get('/:id/detail', async (req, res, next) => {
 router.put('/:id/detail', async (req, res, next) => {
     try {
         const order = await DonHang.findById(req.params.id);
-        if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
-        if (order.trang_thai === 'cancelled') {
-            return res.status(400).json({ success: false, message: 'Đơn đã hủy, không thể sửa' });
+        if (!order) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
+        if (order.trang_thai === 'cancelled' || order.trang_thai === 'merged') {
+            return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y, khÃƒÂ´ng thÃ¡Â»Æ’ sÃ¡Â»Â­a' });
         }
 
         const body = req.body || {};
         if (body.ghi_chu !== undefined) order.ghi_chu = String(body.ghi_chu || '').trim();
-        if (body.trang_thai && ['draft', 'shipping', 'completed', 'cancelled'].includes(body.trang_thai)) {
+        if (body.trang_thai && ['draft', 'shipping', 'completed', 'cancelled', 'merged'].includes(body.trang_thai)) {
             order.trang_thai = body.trang_thai;
         }
         await order.save();
@@ -3845,7 +4935,7 @@ router.put('/:id/detail', async (req, res, next) => {
             await shipment.save();
         }
 
-        res.json({ success: true, message: 'Đã lưu thông tin đơn hàng' });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ lÃ†Â°u thÃƒÂ´ng tin Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
     } catch (error) {
         next(error);
     }
@@ -3853,28 +4943,31 @@ router.put('/:id/detail', async (req, res, next) => {
 
 async function confirmOrderDelivery(req, res, next) {
     try {
-        const { kho_id, items } = req.body || {};
+        const { kho_id, items, khach_thanh_toan, phuong_thuc_thanh_toan } = req.body || {};
         const deliveryItems = parseItems(items);
 
         if (!kho_id) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân kho.' });
         }
 
         const warehouse = await Kho.findById(kho_id);
         if (!warehouse) {
-            return res.status(400).json({ success: false, message: 'Kho giao hàng không hợp lệ' });
+            return res.status(400).json({ success: false, message: 'Kho giao hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
         }
 
         if (!deliveryItems.length) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn hàng cần giao' });
+            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân hÃƒÂ ng cÃ¡ÂºÂ§n giao' });
         }
 
         const order = await DonHang.findById(req.params.id);
         if (!order) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+            return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
         }
 
         let hasDelivered = false;
+        if (order.trang_thai === 'merged') {
+            return res.status(400).json({ success: false, message: `Ãon nÃ y dÃ£ du?c g?p vÃ o ${order.merged_to_ma_don_hang || 'don khÃ¡c'}, khÃ´ng th? xÃ¡c nh?n giao.` });
+        }
         for (const item of deliveryItems) {
             const quantity = Number(item.so_luong_giao);
             if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -3886,7 +4979,7 @@ async function confirmOrderDelivery(req, res, next) {
                 : await CTDonHang.findOne({ don_hang_id: order._id, hang_hoa_id: item.hang_hoa_id });
 
             if (!detail) {
-                return res.status(400).json({ success: false, message: 'Dòng hàng giao không hợp lệ' });
+                return res.status(400).json({ success: false, message: 'DÃƒÂ²ng hÃƒÂ ng giao khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
             }
 
             const orderedQuantity = Number(detail.so_luong_dat || detail.so_luong || 0);
@@ -3908,8 +5001,8 @@ async function confirmOrderDelivery(req, res, next) {
                     ghi_chu: `Giao hang don ${order.ma_don_hang}`
                 });
             } catch (error) {
-                if (/tồn kho|ton kho|Tồn kho|lo/i.test(error.message || '')) {
-                    return res.status(400).json({ success: false, message: 'Không đủ tồn kho để giao hàng' });
+                if (/tÃ¡Â»â€œn kho|ton kho|TÃ¡Â»â€œn kho|lo/i.test(error.message || '')) {
+                    return res.status(400).json({ success: false, message: 'KhÃƒÂ´ng Ã„â€˜Ã¡Â»Â§ tÃ¡Â»â€œn kho Ã„â€˜Ã¡Â»Æ’ giao hÃƒÂ ng' });
                 }
                 throw error;
             }
@@ -3945,6 +5038,40 @@ async function confirmOrderDelivery(req, res, next) {
                 order.trang_thai = 'completed';
             }
         }
+        const paidBeforeDelivery = await getOrderPaidAmount(order._id);
+        const remainingPayment = Math.max(Number(order.tong_thanh_toan || order.tong_tien || 0) - paidBeforeDelivery, 0);
+        const extraPaid = Math.max(0, Number(khach_thanh_toan || 0));
+        if (extraPaid > remainingPayment) {
+            return res.status(400).json({
+                success: false,
+                message: `KhÃƒÂ¡ch chÃ¡Â»â€° cÃƒÂ²n cÃ¡ÂºÂ§n thanh toÃƒÂ¡n ${remainingPayment.toLocaleString('vi-VN')} VNÃ„Â`
+            });
+        }
+        let receipt = null;
+        if (extraPaid > 0) {
+            const cashBook = await ensureDefaultSoQuy(order.cua_hang_id);
+            const shipment = await VanDon.findOne({ don_hang_id: order._id }).lean();
+            const invoice = await HoaDonBanHang.findOne({ don_hang_id: order._id }).lean();
+            receipt = await taoPhieuThuChi({
+                loai_phieu: 'thu',
+                loai_thu_chi: 'Thu tien khi giao hang',
+                gia_tri: extraPaid,
+                so_quy_id: cashBook._id,
+                cua_hang_id: order.cua_hang_id,
+                nguoi_tao_id: req.user?._id,
+                khach_hang_id: order.khach_hang_id,
+                don_hang_id: order._id,
+                hoa_don_id: invoice?._id,
+                van_don_id: shipment?._id,
+                ma_chung_tu_goc: order.ma_don_hang,
+                nhom_doi_tuong: 'khach_hang',
+                phuong_thuc_thanh_toan: normalizePaymentMethodValue(phuong_thuc_thanh_toan),
+                hach_toan: false
+            });
+            order.khach_thanh_toan = paidBeforeDelivery + extraPaid;
+        } else {
+            order.khach_thanh_toan = paidBeforeDelivery;
+        }
         await order.save();
 
         return res.json({
@@ -3953,7 +5080,9 @@ async function confirmOrderDelivery(req, res, next) {
             data: {
                 don_hang_id: order._id,
                 trang_thai_giao_hang: order.trang_thai_giao_hang,
-                ngay_giao_thuc_te: order.ngay_giao_thuc_te
+                ngay_giao_thuc_te: order.ngay_giao_thuc_te,
+                khach_thanh_toan: order.khach_thanh_toan,
+                phieu_thu_id: receipt?._id
             },
             print_url: '/chung-tu-kho/ban-hang/' + order._id
         });
@@ -3964,28 +5093,105 @@ async function confirmOrderDelivery(req, res, next) {
 
 router.put('/:id/xac-nhan-giao', confirmOrderDelivery);
 
+router.post('/:id/phieu-thu', async (req, res, next) => {
+    try {
+        const order = await DonHang.findById(req.params.id);
+        if (!order) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
+        if (order.trang_thai === 'cancelled' || order.trang_thai === 'merged') {
+            return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y, khÃƒÂ´ng thÃ¡Â»Æ’ thu tiÃ¡Â»Ân' });
+        }
+
+        const invoice = await HoaDonBanHang.findOne({ don_hang_id: order._id });
+        const payable = Number(invoice?.thanh_toan || order.tong_thanh_toan || order.tong_tien || 0);
+        const paidBefore = await getOrderPaidAmount(order._id);
+        const remaining = Math.max(payable - paidBefore, 0);
+        const amount = Math.max(0, Number(req.body?.gia_tri || req.body?.khach_thanh_toan || 0));
+        if (amount <= 0) return res.status(400).json({ success: false, message: 'SÃ¡Â»â€˜ tiÃ¡Â»Ân thu khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
+        if (amount > remaining) {
+            return res.status(400).json({
+                success: false,
+                message: `KhÃƒÂ¡ch chÃ¡Â»â€° cÃƒÂ²n nÃ¡Â»Â£ ${remaining.toLocaleString('vi-VN')} VNÃ„Â`
+            });
+        }
+
+        const [cashBook, shipment] = await Promise.all([
+            ensureDefaultSoQuy(order.cua_hang_id),
+            VanDon.findOne({ don_hang_id: order._id }).lean()
+        ]);
+        const receipt = await taoPhieuThuChi({
+            loai_phieu: 'thu',
+            loai_thu_chi: 'Thu tien don hang',
+            gia_tri: amount,
+            so_quy_id: cashBook._id,
+            cua_hang_id: order.cua_hang_id,
+            nguoi_tao_id: req.user?._id,
+            khach_hang_id: order.khach_hang_id,
+            don_hang_id: order._id,
+            hoa_don_id: invoice?._id,
+            van_don_id: shipment?._id,
+            ma_chung_tu_goc: order.ma_don_hang,
+            nhom_doi_tuong: 'khach_hang',
+            phuong_thuc_thanh_toan: normalizePaymentMethodValue(req.body?.phuong_thuc_thanh_toan),
+            hach_toan: false
+        });
+
+        const paidAfter = paidBefore + amount;
+        order.khach_thanh_toan = paidAfter;
+        await order.save();
+
+        if (invoice) {
+            invoice.trang_thai = resolveInvoiceStatus(payable, paidAfter);
+            await invoice.save();
+            if (order.khach_hang_id) {
+                await CongNoKhachHang.create({
+                    khach_hang_id: order.khach_hang_id,
+                    don_hang_id: order._id,
+                    hoa_don_id: invoice._id,
+                    phieu_thu_chi_id: receipt._id,
+                    so_tien: amount,
+                    loai: 'giam_no',
+                    ghi_chu: `Thu tiÃ¡Â»Ân Ã„â€˜Ã†Â¡n hÃƒÂ ng ${order.ma_don_hang}`,
+                    ngay: new Date()
+                });
+                const customer = await KhachHang.findById(order.khach_hang_id).select('tong_no').lean();
+                if (customer && typeof customer.tong_no === 'number') {
+                    await KhachHang.updateOne({ _id: order.khach_hang_id }, { $inc: { tong_no: -amount } });
+                }
+            }
+        }
+
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u thu', data: { receipt, paid: paidAfter, remaining: Math.max(payable - paidAfter, 0) } });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/:id/status', async (req, res, next) => {
     try {
         const { trang_thai, force_complete_short } = req.body || {};
         const allowed = ['draft', 'shipping', 'completed', 'cancelled'];
         if (!allowed.includes(trang_thai)) {
-            return res.status(400).json({ success: false, message: 'Trạng thái đơn hàng không hợp lệ' });
+            return res.status(400).json({ success: false, message: 'TrÃ¡ÂºÂ¡ng thÃƒÂ¡i Ã„â€˜Ã†Â¡n hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
         }
         const order = await DonHang.findById(req.params.id);
-        if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
+        if (!order) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
+        if (order.trang_thai === 'merged') {
+            return res.status(400).json({ success: false, message: `ÄÆ¡n nÃ y Ä‘Ã£ Ä‘Æ°á»£c gá»™p vÃ o ${order.merged_to_ma_don_hang || 'Ä‘Æ¡n khÃ¡c'}, khÃ´ng thá»ƒ cáº­p nháº­t tráº¡ng thÃ¡i.` });
+        }
         if (trang_thai === 'completed' && order.trang_thai_giao_hang !== 'giao_du' && !force_complete_short) {
             return res.status(400).json({
                 success: false,
                 code: 'NEED_CONFIRM_SHORT',
-                message: 'Đơn chưa giao đủ. Cần xác nhận kết thúc thiếu.'
+                message: 'Ã„ÂÃ†Â¡n chÃ†Â°a giao Ã„â€˜Ã¡Â»Â§. CÃ¡ÂºÂ§n xÃƒÂ¡c nhÃ¡ÂºÂ­n kÃ¡ÂºÂ¿t thÃƒÂºc thiÃ¡ÂºÂ¿u.'
             });
         }
         order.trang_thai = trang_thai;
         await order.save();
-        res.json({ success: true, message: 'Đã cập nhật trạng thái đơn hàng' });
+        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ cÃ¡ÂºÂ­p nhÃ¡ÂºÂ­t trÃ¡ÂºÂ¡ng thÃƒÂ¡i Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
     } catch (error) {
         next(error);
     }
 });
 
 module.exports = router;
+

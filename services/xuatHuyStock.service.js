@@ -20,6 +20,13 @@ function normalizeTenQuyCach(value) {
   return String(value || '').trim();
 }
 
+function stockCost(row) {
+  if (!row) return 0;
+  const giaVon = Number(row.gia_von || 0);
+  const value = giaVon > 0 ? giaVon : Number(row.don_gia_nhap || 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
 function lotStockFilter(khoId, hangHoaId, loHangId) {
   return {
     kho_id: khoId,
@@ -163,6 +170,7 @@ async function applyXuatHuyLine(ticket, row, userId) {
       throw new Error('Không cho hủy vượt tồn quy cách');
     }
     const tonTruocQc = Number(qcStock.so_luong || 0);
+    const qcCost = stockCost(qcStock);
     qcStock.so_luong -= quantity;
     await qcStock.save();
 
@@ -172,7 +180,7 @@ async function applyXuatHuyLine(ticket, row, userId) {
       so_luong_thay_doi: -quantity,
       ton_kho_truoc: tonTruocQc,
       ton_kho_sau: qcStock.so_luong,
-      gia_tri_thay_doi: -(quantity * (Number(qcStock.gia_von) || cost))
+      gia_tri_thay_doi: -(quantity * qcCost)
     }));
 
     await syncTonKhoLoFromQuyCach(khoId, hangHoaId, loHangId, warehouse);
@@ -285,7 +293,7 @@ async function reverseXuatHuyLine(ticket, row, userId) {
       so_luong_thay_doi: quantity,
       ton_kho_truoc: tonTruocQc,
       ton_kho_sau: qcStock.so_luong,
-      gia_tri_thay_doi: quantity * (Number(qcStock.gia_von) || cost)
+      gia_tri_thay_doi: quantity * stockCost(qcStock)
     }));
     await syncTonKhoLoFromQuyCach(khoId, hangHoaId, loHangId, warehouse);
   } else {

@@ -7,6 +7,7 @@
   const filters = safeReport.filters || {};
   const viewMode = safeReport.viewMode || 'chart';
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const generatedAt = safeReport.generatedAt ? new Date(safeReport.generatedAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN');
   const reportUrl = `/bao-cao/dat-hang?view=report&from=${range.from || ''}&to=${range.to || ''}`;
   const chartUrl = `/bao-cao/dat-hang?view=chart&from=${range.from || ''}&to=${range.to || ''}`;
@@ -117,7 +118,7 @@
             <div class="doc-title">Báo cáo đặt hàng theo hàng hóa</div>
             <div class="doc-sub">
               <div>Từ ngày <%= range.from ? new Date(range.from + 'T00:00:00').toLocaleDateString('vi-VN') : '' %> đến ngày <%= range.to ? new Date(range.to + 'T00:00:00').toLocaleDateString('vi-VN') : '' %></div>
-              <div>Chi nhánh: <%= safeReport.branchName || 'Chi nhánh trung tâm' %></div>
+              <div>Cửa hàng: <%= safeReport.branchName || 'Cửa hàng trung tâm' %></div>
             </div>
 
             <table class="report-table">
@@ -126,7 +127,7 @@
                 <% if (productRows.length) { %>
                   <tr class="total-row"><td></td><td>Tổng cộng: <%= fmt(totals.productCount) %> hàng hóa / <%= fmt(totals.orderCount) %> đơn</td><td class="num"><%= fmt(totals.quantity) %></td><td class="num"><%= fmt(totals.value) %></td></tr>
                   <% productRows.forEach(item => { %>
-                    <tr><td class="code"><%= item.code || '---' %></td><td><%= item.name %></td><td class="num"><%= fmt(item.quantity) %></td><td class="num"><%= fmt(item.value) %></td></tr>
+                    <tr><td class="code"><%= item.code || '---' %></td><td><%= item.name %></td><td class="num"><%= fmt(item.quantity) %></td><td class="num"><%= fmtMoney(item.value) %></td></tr>
                   <% }) %>
                 <% } else { %>
                   <tr class="empty-row"><td colspan="4">Báo cáo không có dữ liệu</td></tr>

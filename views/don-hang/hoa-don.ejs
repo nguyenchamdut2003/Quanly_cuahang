@@ -17,6 +17,7 @@
   });
   const exportQuery = exportParams.toString();
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const statusText = value => ({
     processing: 'Đang xử lý',
     completed: 'Hoàn thành',
@@ -41,10 +42,10 @@
   const invoiceStatus = item => item.trang_thai_chuan || item.trang_thai || 'processing';
   const totalRow = safeInvoices.reduce((sum, item) => {
     sum.goods += Number(item.tong_tien || 0);
-    sum.discount += Number(item.giam_gia || 0);
+    sum.debt += Number(item.con_no || 0);
     sum.paid += Number(item.khach_da_tra || 0);
     return sum;
-  }, { goods: 0, discount: 0, paid: 0 });
+  }, { goods: 0, debt: 0, paid: 0 });
 %>
 <!DOCTYPE html>
 <html>
@@ -54,7 +55,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    *{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#111827;overflow:hidden}.page{height:calc(100vh - 98px);display:flex;flex-direction:column}.shell{flex:1;min-height:0;display:grid;grid-template-columns:206px minmax(0,1fr);gap:8px;padding:8px 8px 0}.sidebar{background:#fff;border-radius:4px;padding:10px 8px;overflow:auto}.title{font-size:18px;font-weight:800;margin:0 0 12px}.filter{margin-bottom:18px}.filter-title{font-size:12px;font-weight:800;margin-bottom:8px}.check,.radio{display:flex;align-items:center;gap:7px;margin:8px 0;font-size:12px}.check input,.radio input{accent-color:#0070f4}.pill{height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;flex:1}.control{width:100%;height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;color:#667085;padding:0 8px;font-size:12px;margin-bottom:6px}.small-link{float:right;color:#0070f4;text-decoration:none;font-size:11px;font-weight:700}.main{min-width:0;display:flex;flex-direction:column;gap:8px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.search{position:relative;width:390px;max-width:100%}.search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#6b7280}.search input{width:100%;height:30px;border:1px solid #c8d1dc;border-radius:5px;padding:0 34px 0 30px;font-size:13px}.search button{position:absolute;right:4px;top:4px;width:22px;height:22px;border:0;background:#fff;color:#475467}.actions{display:flex;align-items:center;gap:7px}.btn{height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;padding:0 10px;color:#111827;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;text-decoration:none;cursor:pointer}.btn.primary{background:#fff;border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.btn:disabled,.dropdown-item.disabled{opacity:.48;cursor:not-allowed}.icon{width:30px;height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;display:inline-flex;align-items:center;justify-content:center}.dropdown{position:relative}.dropdown-menu{display:none;position:absolute;top:34px;right:0;width:190px;background:#fff;border:1px solid #d7dde5;border-radius:5px;box-shadow:0 12px 28px rgba(15,23,42,.18);z-index:20;padding:6px 0}.dropdown.open .dropdown-menu{display:block}.dropdown-item{height:34px;padding:0 12px;display:flex;align-items:center;color:#111827;text-decoration:none;font-size:13px}.dropdown-item:hover{background:#f2f7ff}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:5px;overflow:auto}.table{width:100%;min-width:1140px;border-collapse:collapse}.table th{height:32px;background:#e8f3ff;border-bottom:1px solid #b7d8ff;text-align:left;padding:0 8px;font-size:11px}.table td{height:39px;border-bottom:1px solid #e5e9ee;padding:0 8px;font-size:12px}.table tbody tr.invoice-row{cursor:pointer}.table tbody tr.invoice-row:hover td{background:#f8fbff}.invoice-row.active td{background:#f0f8ff;border-top:2px solid #0070f4}.check-col,.star-col{width:30px;text-align:center}.num{text-align:left}.link{color:#006dff;text-decoration:none;font-weight:700}.status{display:inline-flex;align-items:center;height:22px;border-radius:4px;padding:0 7px;font-weight:700;font-size:11px}.status.processing{background:#e8f3ff;color:#0058d4}.status.completed{background:#dcfce7;color:#15803d}.status.partial{background:#fff4d6;color:#9a6700}.status.unpaid{background:#e8f3ff;color:#0058d4}.status.failed{background:#fff1d6;color:#b45309}.status.cancelled{background:#fee2e2;color:#b91c1c}.empty{height:560px;text-align:center;color:#667085}.detail-row{display:none}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.invoice-detail{padding:0 16px 14px;min-height:230px}.tabs{height:40px;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid #e5e9ee}.tab{height:40px;border:0;background:#fff;padding:0 0 8px;cursor:pointer}.tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:800}.panel{display:none}.panel.active{display:block}.detail-head{display:flex;justify-content:space-between;gap:20px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px 20px;margin-top:12px}.mini-field label{display:block;color:#667085;font-size:11px;margin-bottom:4px}.mini-field span{font-size:12px}.items-table{width:100%;border-collapse:collapse;margin-top:10px}.items-table th{height:30px;background:#f3f4f6;border-bottom:1px solid #d4d9e0;font-size:11px;text-align:left;padding:0 8px}.items-table td{height:36px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;margin-top:12px}.note{height:74px;border:1px solid #cfd8e3;border-radius:5px;padding:8px;color:#667085}.total-line{display:flex;justify-content:flex-start;align-items:baseline;gap:12px;margin-bottom:8px;font-size:12px;flex-wrap:wrap}.total-line strong,.total-line span:last-child{font-size:13px;font-weight:700}.ship-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-top:12px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px}.pager{height:32px;display:flex;align-items:center;gap:8px;font-size:12px}.pager select{height:26px;border:1px solid #c8d1dc;border-radius:5px;background:#fff}
+    *{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#111827;overflow:auto}.page{min-height:calc(100vh - 98px);height:auto;display:flex;flex-direction:column}.shell{flex:1;min-height:calc(100vh - 98px);display:grid;grid-template-columns:206px minmax(0,1fr);gap:8px;padding:8px 30px 0}.sidebar{background:#fff;border-radius:4px;padding:10px 8px;overflow:auto;max-height:calc(100vh - 106px)}.title{font-size:18px;font-weight:800;margin:0 0 12px}.filter{margin-bottom:18px}.filter-title{font-size:12px;font-weight:800;margin-bottom:8px}.check,.radio{display:flex;align-items:center;gap:7px;margin:8px 0;font-size:12px}.check input,.radio input{accent-color:#0070f4}.pill{height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;flex:1}.control{width:100%;height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;color:#667085;padding:0 8px;font-size:12px;margin-bottom:6px}.small-link{float:right;color:#0070f4;text-decoration:none;font-size:11px;font-weight:700}.main{min-width:0;display:flex;flex-direction:column;gap:8px;min-height:0}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.search{position:relative;width:390px;max-width:100%}.search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#6b7280}.search input{width:100%;height:30px;border:1px solid #c8d1dc;border-radius:5px;padding:0 34px 0 30px;font-size:13px}.search button{position:absolute;right:4px;top:4px;width:22px;height:22px;border:0;background:#fff;color:#475467}.actions{display:flex;align-items:center;gap:7px}.btn{height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;padding:0 10px;color:#111827;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;text-decoration:none;cursor:pointer}.btn.primary{background:#fff;border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.btn:disabled,.dropdown-item.disabled{opacity:.48;cursor:not-allowed}.icon{width:30px;height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;display:inline-flex;align-items:center;justify-content:center}.dropdown{position:relative}.dropdown-menu{display:none;position:absolute;top:34px;right:0;width:190px;background:#fff;border:1px solid #d7dde5;border-radius:5px;box-shadow:0 12px 28px rgba(15,23,42,.18);z-index:20;padding:6px 0}.dropdown.open .dropdown-menu{display:block}.dropdown-item{height:34px;padding:0 12px;display:flex;align-items:center;color:#111827;text-decoration:none;font-size:13px}.dropdown-item:hover{background:#f2f7ff}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:5px;overflow:auto;max-height:none}.table{width:100%;min-width:1140px;border-collapse:collapse}.table th{height:32px;background:#e8f3ff;border-bottom:1px solid #b7d8ff;text-align:left;padding:0 8px;font-size:11px}.table td{height:39px;border-bottom:1px solid #e5e9ee;padding:0 8px;font-size:12px}.table tbody tr.invoice-row{cursor:pointer}.table tbody tr.invoice-row:hover td{background:#f8fbff}.invoice-row.active td{background:#f0f8ff;border-top:2px solid #0070f4}.check-col,.star-col{width:30px;text-align:center}.num{text-align:left}.link{color:#006dff;text-decoration:none;font-weight:700}.status{display:inline-flex;align-items:center;height:22px;border-radius:4px;padding:0 7px;font-weight:700;font-size:11px}.status.processing{background:#e8f3ff;color:#0058d4}.status.completed{background:#dcfce7;color:#15803d}.status.partial{background:#fff4d6;color:#9a6700}.status.unpaid{background:#e8f3ff;color:#0058d4}.status.failed{background:#fff1d6;color:#b45309}.status.cancelled{background:#fee2e2;color:#b91c1c}.empty{height:560px;text-align:center;color:#667085}.detail-row{display:none}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff;overflow:visible}.invoice-detail{padding:0 16px 14px;min-height:230px;max-height:none;overflow:visible}.tabs{height:40px;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid #e5e9ee}.tab{height:40px;border:0;background:#fff;padding:0 0 8px;cursor:pointer}.tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:800}.panel{display:none}.panel.active{display:block}.detail-head{display:flex;justify-content:space-between;gap:20px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px 20px;margin-top:12px}.mini-field label{display:block;color:#667085;font-size:11px;margin-bottom:4px}.mini-field span{font-size:12px}.items-table{width:100%;border-collapse:collapse;margin-top:10px}.items-table th{height:30px;background:#f3f4f6;border-bottom:1px solid #d4d9e0;font-size:11px;text-align:left;padding:0 8px}.items-table td{height:36px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;margin-top:12px}.note{height:74px;border:1px solid #cfd8e3;border-radius:5px;padding:8px;color:#667085}.total-line{display:flex;justify-content:flex-start;align-items:baseline;gap:12px;margin-bottom:8px;font-size:12px;flex-wrap:wrap}.total-line strong,.total-line span:last-child{font-size:13px;font-weight:700}.totals-receipt-action{display:flex;justify-content:flex-end;margin-top:8px}.ship-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-top:12px}.detail-actions{min-height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px;flex-wrap:wrap}.pager{height:32px;display:flex;align-items:center;gap:8px;font-size:12px}.pager select{height:26px;border:1px solid #c8d1dc;border-radius:5px;background:#fff}.receipt-pay-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1350;align-items:center;justify-content:center;padding:20px}.receipt-pay-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);overflow:hidden}.receipt-pay-head,.receipt-pay-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}.receipt-pay-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}.receipt-pay-body{padding:18px 20px}.receipt-pay-due{padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;font-weight:800;margin-bottom:14px}.receipt-pay-grid{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center}.receipt-pay-grid label{font-weight:800}.receipt-pay-grid input,.receipt-pay-grid select{height:34px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px}.receipt-pay-grid input{text-align:right}.order-export-close{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:#667085}
   </style>
 </head>
 <body>
@@ -93,12 +94,12 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th>Tổng tiền hàng</th><th>Giảm giá</th><th>Khách đã trả</th><th>Trạng thái</th></tr></thead>
+            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th>Tổng tiền hàng</th><th>Nợ còn lại</th><th>Khách đã trả</th><th>Trạng thái</th></tr></thead>
             <tbody>
-              <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><strong><%= fmt(totalRow.goods) %></strong></td><td><strong><%= fmt(totalRow.discount) %></strong></td><td><strong><%= fmt(totalRow.paid) %></strong></td><td></td></tr>
+              <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><strong><%= fmtMoney(totalRow.goods) %></strong></td><td><strong><%= fmtMoney(totalRow.debt) %></strong></td><td><strong><%= fmtMoney(totalRow.paid) %></strong></td><td></td></tr>
               <% if (safeInvoices.length) { %>
                 <% safeInvoices.forEach(i => { const st = invoiceStatus(i); %>
-                  <tr class="invoice-row" data-invoice-row="<%= i._id %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('invoice', i, i.ma_hoa_don || '', 'onclick="event.stopPropagation()"') %></td><td><%= i.ngay_ban ? new Date(i.ngay_ban).toLocaleString('vi-VN') : '' %></td><td><%= i.phieu_tra_hang?.ma_phieu_tra || '' %></td><td><%- i.khach_hang_id ? refLink('customer', i.khach_hang_id, i.khach_hang_id.ma_khach_hang || '', 'onclick="event.stopPropagation()"') : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td><%= fmt(i.tong_tien) %></td><td><%= fmt(i.giam_gia) %></td><td><%= fmt(i.khach_da_tra) %></td><td><span class="status <%= statusClass(st) %>"><%= statusText(st) %></span></td></tr>
+                  <tr class="invoice-row" data-invoice-row="<%= i._id %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('invoice', i, i.ma_hoa_don || '', 'onclick="event.stopPropagation()"') %></td><td><%= i.ngay_ban ? new Date(i.ngay_ban).toLocaleString('vi-VN') : '' %></td><td><%= i.phieu_tra_hang?.ma_phieu_tra || '' %></td><td><%- i.khach_hang_id ? refLink('customer', i.khach_hang_id, i.khach_hang_id.ma_khach_hang || '', 'onclick="event.stopPropagation()"') : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td><%= fmtMoney(i.tong_tien) %></td><td><%= fmtMoney(i.con_no) %></td><td><%= fmtMoney(i.khach_da_tra) %></td><td><span class="status <%= statusClass(st) %>"><%= statusText(st) %></span></td></tr>
                   <tr class="detail-row" data-invoice-detail="<%= i._id %>"><td class="detail-cell" colspan="11"><div class="invoice-detail"><div class="loading-detail">Đang tải thông tin hóa đơn...</div></div></td></tr>
                 <% }) %>
               <% } else { %>
@@ -111,8 +112,38 @@
       </main>
     </div>
   </form>
+  <div id="invoiceReceiptPayOverlay" class="receipt-pay-overlay">
+    <div class="receipt-pay-modal" role="dialog" aria-labelledby="invoiceReceiptPayTitle">
+      <div class="receipt-pay-head">
+        <h3 id="invoiceReceiptPayTitle">Tạo phiếu thu</h3>
+        <button type="button" class="order-export-close" onclick="closeInvoiceReceiptPayModal()">&times;</button>
+      </div>
+      <div class="receipt-pay-body">
+        <div id="invoiceReceiptPayDue" class="receipt-pay-due"></div>
+        <div class="receipt-pay-grid">
+          <label>Số tiền thu</label>
+          <input id="invoiceReceiptPayAmount" value="0" inputmode="numeric" oninput="handleInvoiceReceiptPayAmountInput(this)">
+          <label>Phương thức</label>
+          <select id="invoiceReceiptPayMethod">
+            <option value="tien_mat">Tiền mặt</option>
+            <option value="chuyen_khoan">Chuyển khoản</option>
+            <option value="vi_dien_tu">Ví điện tử</option>
+            <option value="khac">Khác</option>
+          </select>
+        </div>
+      </div>
+      <div class="receipt-pay-foot">
+        <button type="button" class="btn" onclick="closeInvoiceReceiptPayModal()">Bỏ qua</button>
+        <button type="button" class="btn solid" onclick="submitInvoiceReceiptPayModal()">Tạo phiếu thu</button>
+      </div>
+    </div>
+  </div>
   <script>
     const money = value => Number(value || 0).toLocaleString('vi-VN');
+    const moneyText = value => money(value) + ' VNĐ';
+    const num = value => Number(String(value || '').replace(/\./g, '').replace(/,/g, '')) || 0;
+    let pendingInvoiceReceiptId = '';
+    let pendingInvoiceReceiptDue = 0;
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const refAnchor = (href, text) => href ? `<a class="ref-link" href="${escapeHtml(href)}" onclick="event.stopPropagation()">${escapeHtml(text || '--')}</a>` : escapeHtml(text || '--');
     const invoiceStatusText = value => ({
@@ -177,11 +208,15 @@
       const paid = Number(data.paid || 0);
       const payable = Number(invoice.thanh_toan || 0);
       const debt = Number(data.debt || Math.max(payable - paid, 0));
+      const receiptAction = debt > 0
+        ? `<div class="totals-receipt-action"><button type="button" class="btn solid" onclick="openInvoiceReceiptPayModal('${invoice._id}', ${debt})"><i class="fa-solid fa-money-bill-wave"></i> Tạo phiếu thu</button></div>`
+        : '';
       const status = invoice.trang_thai_chuan || invoice.trang_thai || 'processing';
       const itemRows = items.map(item => {
         const product = item.hang_hoa_id || {};
-        return `<tr><td>${refAnchor(product._id ? '/hang-hoa/' + product._id : '', product.ma_hang || '')}</td><td>${escapeHtml(product.ten_hang || '')}</td><td>${money(item.so_luong)}</td><td>${money(item.don_gia)}</td><td>${money(item.chiet_khau)}</td><td><strong>${money(item.thanh_tien)}</strong></td></tr>`;
-      }).join('') || '<tr><td colspan="6" class="loading-detail">Hóa đơn chưa có hàng hóa</td></tr>';
+        const attributeName = item.ten_thuoc_tinh || item.ten_quy_cach || '';
+        return `<tr><td>${refAnchor(product._id ? '/hang-hoa/' + product._id : '', product.ma_hang || '')}</td><td>${escapeHtml(product.ten_hang || '')}</td><td>${escapeHtml(attributeName || 'Không có')}</td><td>${money(item.so_luong)}</td><td>${moneyText(item.don_gia)}</td><td>${moneyText(item.chiet_khau)}</td><td><strong>${moneyText(item.thanh_tien)}</strong></td></tr>`;
+      }).join('') || '<tr><td colspan="7" class="loading-detail">Hóa đơn chưa có hàng hóa</td></tr>';
       const historyRows = histories.map(item => {
         const receipt = item.phieu_thu_chi_id || item;
         const code = receipt.ma_phieu || 'Công nợ';
@@ -189,13 +224,13 @@
         const date = new Date(item.ngay || receipt.ngay_lap || receipt.created_at || invoice.ngay_ban).toLocaleString('vi-VN');
         const amount = Math.abs(Number(item.so_tien || receipt.gia_tri || 0));
         const type = receipt.loai_phieu ? (receipt.loai_phieu === 'chi' ? 'Chi' : 'Thu') : (item.loai || '');
-        return `<tr><td>${refAnchor(receiptHref, code)}</td><td>${escapeHtml(date)}</td><td>${escapeHtml(receipt.nguoi_tao_id?.ho_ten || '')}</td><td>${money(amount)}</td><td>${escapeHtml(receipt.loai_thu_chi || receipt.phuong_thuc_tt || receipt.phuong_thuc_thanh_toan || '')}</td><td><span class="status completed">${escapeHtml(type)}</span></td><td>${money(amount)}</td></tr>`;
+        return `<tr><td>${refAnchor(receiptHref, code)}</td><td>${escapeHtml(date)}</td><td>${escapeHtml(receipt.nguoi_tao_id?.ho_ten || '')}</td><td>${moneyText(amount)}</td><td>${escapeHtml(receipt.loai_thu_chi || receipt.phuong_thuc_tt || receipt.phuong_thuc_thanh_toan || '')}</td><td><span class="status completed">${escapeHtml(type)}</span></td><td>${moneyText(amount)}</td></tr>`;
       }).join('') || '<tr><td colspan="7" class="loading-detail">Chưa có lịch sử thanh toán hoặc công nợ</td></tr>';
       const shipmentPanel = shipment._id ? `
         <div class="panel" data-panel="shipping">
           <div class="ship-grid">
             <div class="mini-field"><label>Đối tác giao hàng</label><span>${escapeHtml(shipment.doi_tac_giao_hang_id?.ten_doi_tac || 'Tự giao hàng')}</span></div>
-            <div class="mini-field"><label>Phí giao hàng</label><span>${money(shipment.phi_giao_hang)}</span></div>
+            <div class="mini-field"><label>Phí giao hàng</label><span>${moneyText(shipment.phi_giao_hang)}</span></div>
             <div class="mini-field"><label>Trạng thái giao hàng</label><span>${escapeHtml(shipmentStatusText(shipment.trang_thai))}</span></div>
             <div class="mini-field"><label>Ngày giao</label><span>${shipment.updated_at ? escapeHtml(new Date(shipment.updated_at).toLocaleString('vi-VN')) : ''}</span></div>
           </div>
@@ -220,17 +255,18 @@
                 <div class="mini-field"><label>Kênh bán</label><span>Bán trực tiếp</span></div>
               </div>
             </div>
-            <div>${escapeHtml(invoice.cua_hang_id?.ten_cua_hang || 'Chi nhánh trung tâm')}</div>
+            <div>${escapeHtml(invoice.cua_hang_id?.ten_cua_hang || 'Cửa hàng trung tâm')}</div>
           </div>
-          <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>Số lượng</th><th>Đơn giá</th><th>Giảm giá</th><th>Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+          <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Giảm giá</th><th>Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
           <div class="detail-bottom">
             <div class="note">${escapeHtml(invoice.ghi_chu || 'Ghi chú')}</div>
             <div>
-              <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${money(invoice.tong_tien)}</strong></div>
-              <div class="total-line"><span>Giảm giá hóa đơn</span><span>${money(invoice.giam_gia)}</span></div>
-              <div class="total-line"><span>Khách cần trả</span><strong>${money(payable)}</strong></div>
-              <div class="total-line"><span>Khách đã trả</span><strong>${money(paid)}</strong></div>
-              <div class="total-line"><span>Còn nợ</span><strong>${money(debt)}</strong></div>
+              <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${moneyText(invoice.tong_tien)}</strong></div>
+              <div class="total-line"><span>Giảm giá hóa đơn</span><span>${moneyText(invoice.giam_gia)}</span></div>
+              <div class="total-line"><span>Khách cần trả</span><strong>${moneyText(payable)}</strong></div>
+              <div class="total-line"><span>Khách đã trả</span><strong>${moneyText(paid)}</strong></div>
+              <div class="total-line"><span>Còn nợ</span><strong>${moneyText(debt)}</strong></div>
+              ${receiptAction}
             </div>
           </div>
           <div class="page-actions page-actions--split page-actions--bordered detail-actions">
@@ -240,6 +276,42 @@
         </div>
         <div class="panel" data-panel="payment"><table class="items-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th>Giá trị</th><th>Phương thức</th><th>Loại</th><th>Tiền thu/chi</th></tr></thead><tbody>${historyRows}</tbody></table></div>
         ${shipmentPanel}`;
+    }
+
+    function openInvoiceReceiptPayModal(invoiceId, dueAmount) {
+      pendingInvoiceReceiptId = invoiceId;
+      pendingInvoiceReceiptDue = Math.max(0, Number(dueAmount || 0));
+      document.getElementById('invoiceReceiptPayDue').textContent = 'Khách còn nợ hóa đơn này: ' + moneyText(pendingInvoiceReceiptDue);
+      document.getElementById('invoiceReceiptPayAmount').value = money(pendingInvoiceReceiptDue);
+      document.getElementById('invoiceReceiptPayMethod').value = 'tien_mat';
+      document.getElementById('invoiceReceiptPayOverlay').style.display = 'flex';
+    }
+
+    function closeInvoiceReceiptPayModal() {
+      pendingInvoiceReceiptId = '';
+      pendingInvoiceReceiptDue = 0;
+      document.getElementById('invoiceReceiptPayOverlay').style.display = 'none';
+    }
+
+    function handleInvoiceReceiptPayAmountInput(input) {
+      input.value = money(num(input.value));
+    }
+
+    async function submitInvoiceReceiptPayModal() {
+      const amount = num(document.getElementById('invoiceReceiptPayAmount')?.value);
+      if (!pendingInvoiceReceiptId || amount <= 0) return alert('Vui lòng nhập số tiền thu.');
+      if (amount > pendingInvoiceReceiptDue) return alert('Khách chỉ còn nợ ' + moneyText(pendingInvoiceReceiptDue));
+      const res = await fetch('/don-hang/hoa-don/' + pendingInvoiceReceiptId + '/phieu-thu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gia_tri: amount,
+          phuong_thuc_thanh_toan: document.getElementById('invoiceReceiptPayMethod')?.value || 'tien_mat'
+        })
+      });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không tạo được phiếu thu');
+      location.reload();
     }
 
     async function cancelInvoice(id) {

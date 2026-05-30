@@ -2,8 +2,26 @@ const BASE_URL = String(process.env.GHN_BASE_URL || '').replace(/\/+$/, '');
 const TOKEN = String(process.env.GHN_TOKEN || '').trim();
 const MOCK_MODE = String(process.env.GHN_MOCK_MODE || '').toLowerCase() === 'true';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const VN_UNITS = require('../data/vn_units_2026_minified.json');
 
 const cache = new Map();
+
+function normalizeLocalProvince(item) {
+  return {
+    province_id: String(item.Code || '').trim(),
+    province_name: String(item.FullName || '').trim()
+  };
+}
+
+function normalizeLocalWard(item, province) {
+  return {
+    ward_code: String(item.Code || '').trim(),
+    ward_name: String(item.FullName || '').trim(),
+    district_id: '',
+    district_name: '',
+    province_id: String((province && province.Code) || item.ProvinceCode || '').trim()
+  };
+}
 
 const mockProvinces = [
   { province_id: 201, province_name: 'Hà Nội' },
@@ -127,6 +145,12 @@ function normalizeWard(item, district) {
 async function getProvinces() {
   const cached = getCached('provinces');
   if (cached) return cached;
+  if (Array.isArray(VN_UNITS) && VN_UNITS.length) {
+    const items = VN_UNITS.map(normalizeLocalProvince)
+      .filter(function(item) { return item.province_id && item.province_name; })
+      .sort(function(a, b) { return sortVi(a, b, 'province_name'); });
+    return setCached('provinces', items);
+  }
   if (MOCK_MODE) return setCached('provinces', mockProvinces.slice().sort(function(a, b) { return sortVi(a, b, 'province_name'); }));
 
   const rows = await requestGhn('/master-data/province');
@@ -139,6 +163,7 @@ async function getProvinces() {
 async function getDistricts(provinceId) {
   provinceId = Number(provinceId || 0);
   if (!provinceId) throw new Error('Thiếu province_id.');
+  if (Array.isArray(VN_UNITS) && VN_UNITS.length) return [];
 
   const cacheKey = 'districts:' + provinceId;
   const cached = getCached(cacheKey);
@@ -169,12 +194,25 @@ async function getWards(districtId) {
 }
 
 async function getWardsByProvince(provinceId) {
+  const rawProvinceId = String(provinceId || '').trim();
   provinceId = Number(provinceId || 0);
-  if (!provinceId) throw new Error('Thiếu province_id.');
+  if (!rawProvinceId) throw new Error('Thiếu province_id.');
 
-  const cacheKey = 'wardsByProvince:' + provinceId;
+  const cacheKey = 'wardsByProvince:' + rawProvinceId;
   const cached = getCached(cacheKey);
   if (cached) return cached;
+
+  if (Array.isArray(VN_UNITS) && VN_UNITS.length) {
+    const province = VN_UNITS.find(function(item) {
+      return String(item.Code || '').trim() === rawProvinceId;
+    });
+    const items = province && Array.isArray(province.Wards)
+      ? province.Wards.map(function(ward) { return normalizeLocalWard(ward, province); })
+        .filter(function(item) { return item.ward_code && item.ward_name; })
+        .sort(function(a, b) { return sortVi(a, b, 'ward_name'); })
+      : [];
+    return setCached(cacheKey, items);
+  }
 
   const districts = await getDistricts(provinceId);
   const wardGroups = await Promise.all(districts.map(async function(district) {

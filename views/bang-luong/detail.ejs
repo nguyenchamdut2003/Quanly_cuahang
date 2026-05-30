@@ -208,6 +208,9 @@
     function formatMoney(value) {
       return new Intl.NumberFormat('vi-VN').format(Number(value || 0));
     }
+    function formatMoneyText(value) {
+      return formatMoney(value) + ' VNĐ';
+    }
     function formatDateDisplay(value) {
       if (!value) return '---';
       const d = new Date(value);
@@ -270,7 +273,7 @@
       select.innerHTML =
         '<option value="">Khong chon so quy</option>' +
         cashBooks.map(book => '<option value="' + escapeHtml(book._id) + '">' +
-          escapeHtml((book.ten_so_quy || book.loai || 'So quy') + ' - SD: ' + formatMoney(book.so_du)) +
+          escapeHtml((book.ten_so_quy || book.loai || 'So quy') + ' - SD: ' + formatMoneyText(book.so_du)) +
           '</option>').join('');
       select.value = '';
       help.className = 'pay-help';
@@ -308,7 +311,7 @@
         return '<tr>' +
           '<td><strong>' + escapeHtml(item.ma_phieu || '---') + '</strong></td>' +
           '<td>' + escapeHtml(employeeCode) + ' - ' + escapeHtml(employeeName) + '</td>' +
-          '<td>' + formatMoney(item.gia_tri) + '</td>' +
+          '<td>' + formatMoneyText(item.gia_tri) + '</td>' +
           '<td>' + escapeHtml(cashBookName) + '</td>' +
           '<td>' + escapeHtml(paymentMethodLabel(item.phuong_thuc_thanh_toan)) + '</td>' +
           '<td>' + formatDateDisplay(item.ngay_lap) + '</td>' +
@@ -364,13 +367,13 @@
         ['Tổng công', Number(item.tong_cong || 0)],
         ['Phút làm việc', Number(item.tong_phut_lam_viec || 0)],
         ['Phút OT', Number(item.tong_phut_tang_ca || 0)],
-        ['Tiền OT', formatMoney(item.tong_tien_tang_ca) + ' (Phase 1 chưa tính tiền OT)'],
-        ['Lương chính', formatMoney(item.tong_luong_chinh)],
-        ['Phụ cấp', formatMoney(item.tong_phu_cap)],
-        ['Giảm trừ', formatMoney(item.tong_giam_tru)],
-        ['Tổng lương', formatMoney(item.tong_luong)],
-        ['Đã trả NV', formatMoney(item.da_tra_nhan_vien)],
-        ['Còn cần trả', formatMoney(item.con_can_tra)],
+        ['Tiền OT', formatMoneyText(item.tong_tien_tang_ca) + ' (Phase 1 chưa tính tiền OT)'],
+        ['Lương chính', formatMoneyText(item.tong_luong_chinh)],
+        ['Phụ cấp', formatMoneyText(item.tong_phu_cap)],
+        ['Giảm trừ', formatMoneyText(item.tong_giam_tru)],
+        ['Tổng lương', formatMoneyText(item.tong_luong)],
+        ['Đã trả NV', formatMoneyText(item.da_tra_nhan_vien)],
+        ['Còn cần trả', formatMoneyText(item.con_can_tra)],
         ['Người chốt', userName(item.nguoi_chot_id)],
         ['Ngày chốt', formatDateDisplay(item.ngay_chot)]
       ].map(row => '<div class="summary-item"><div class="summary-label">' + escapeHtml(row[0]) + '</div><div class="summary-value">' + escapeHtml(row[1]) + '</div></div>').join('');
@@ -413,15 +416,15 @@
         '<td>' + Number(item.so_lan_nghi_lam || 0) + '</td>' +
         '<td>' + Number(item.tong_phut_lam_viec || 0) + '</td>' +
         '<td>' + Number(item.tong_phut_tang_ca || 0) + '</td>' +
-        '<td>' + formatMoney(item.luong_chinh) + '</td>' +
-        '<td title="Phase 1 chua tinh tien OT">' + formatMoney(item.tien_tang_ca) + '</td>' +
-        '<td>' + formatMoney(item.tien_thuong) + '</td>' +
-        '<td>' + formatMoney(item.tien_hoa_hong) + '</td>' +
-        '<td>' + formatMoney(item.tien_phu_cap) + '</td>' +
-        '<td>' + formatMoney(item.tien_giam_tru) + '</td>' +
-        '<td>' + formatMoney(item.tong_luong) + '</td>' +
-        '<td>' + formatMoney(item.da_tra) + '</td>' +
-        '<td>' + formatMoney(item.con_can_tra) + '</td>' +
+        '<td>' + formatMoneyText(item.luong_chinh) + '</td>' +
+        '<td title="Phase 1 chua tinh tien OT">' + formatMoneyText(item.tien_tang_ca) + '</td>' +
+        '<td>' + formatMoneyText(item.tien_thuong) + '</td>' +
+        '<td>' + formatMoneyText(item.tien_hoa_hong) + '</td>' +
+        '<td>' + formatMoneyText(item.tien_phu_cap) + '</td>' +
+        '<td>' + formatMoneyText(item.tien_giam_tru) + '</td>' +
+        '<td>' + formatMoneyText(item.tong_luong) + '</td>' +
+        '<td>' + formatMoneyText(item.da_tra) + '</td>' +
+        '<td>' + formatMoneyText(item.con_can_tra) + '</td>' +
         '<td class="pay-action">' + actionHtml + '</td>' +
       '</tr>';
       }).join('');
@@ -457,9 +460,9 @@
         con_can_tra: remaining
       });
       document.getElementById('payEmployee').textContent = selectedPayDetail.ten_nhan_vien || selectedPayDetail.ma_nhan_vien || '---';
-      document.getElementById('payTotal').textContent = formatMoney(selectedPayDetail.tong_luong);
-      document.getElementById('payPaid').textContent = formatMoney(selectedPayDetail.da_tra);
-      document.getElementById('payRemaining').textContent = formatMoney(remaining);
+      document.getElementById('payTotal').textContent = formatMoneyText(selectedPayDetail.tong_luong);
+      document.getElementById('payPaid').textContent = formatMoneyText(selectedPayDetail.da_tra);
+      document.getElementById('payRemaining').textContent = formatMoneyText(remaining);
       document.getElementById('payAmount').value = formatMoney(remaining);
       document.getElementById('payNote').value = '';
       updateCashBookSelectForMethod();

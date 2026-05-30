@@ -3,6 +3,7 @@
   const safeFilters = locals.filters || {};
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const statusLabel = status => status === 'draft' ? 'Phiếu tạm' : status === 'cancelled' ? 'Đã hủy' : 'Đã nhập hàng';
 %>
 <!DOCTYPE html>
@@ -114,7 +115,7 @@
             <tbody>
               <tr>
                 <td></td><td></td><td></td><td></td><td></td><td></td>
-                <td class="num"><strong>0</strong></td><td></td>
+                <td class="num"><strong>0 VNĐ</strong></td><td></td>
               </tr>
               <% if (safeTickets.length) { %>
                 <% safeTickets.forEach(t => { %>
@@ -125,7 +126,7 @@
                     <td><%= new Date(t.ngay_nhap || t.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) %></td>
                     <td><%- t.nha_cung_cap_id ? refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '', 'onclick="event.stopPropagation()"') : '' %></td>
                     <td><%= t.nha_cung_cap_id ? t.nha_cung_cap_id.ten_ncc : '' %></td>
-                    <td class="num"><%= fmt(t.tong_tien) %></td>
+                    <td class="num"><%= fmtMoney(t.tong_tien) %></td>
                     <td><span class="status-badge <%= t.trang_thai === 'draft' ? 'draft' : '' %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
                 <% }) %>
@@ -155,6 +156,7 @@
   <script>
     let currentTicketId = '';
     function fmtMoney(value) { return Number(value || 0).toLocaleString('vi-VN'); }
+    function fmtCurrency(value) { return fmtMoney(value) + ' VNĐ'; }
     function closeTicketDetail() { document.getElementById('ticketModal').style.display = 'none'; }
     async function openTicketDetail(id) {
       currentTicketId = id;
@@ -171,11 +173,11 @@
           <div><strong>Nhà cung cấp:</strong> ${ticket.nha_cung_cap_id?.ten_ncc || ''}</div>
           <div><strong>Trạng thái:</strong> ${ticket.trang_thai}</div>
           <div><strong>Thời gian:</strong> ${new Date(ticket.ngay_nhap || ticket.created_at).toLocaleString('vi-VN')}</div>
-          <div><strong>Tổng tiền:</strong> ${fmtMoney(ticket.tong_tien)}</div>
+          <div><strong>Tổng tiền:</strong> ${fmtCurrency(ticket.tong_tien)}</div>
         </div>
         <table class="po-table" style="min-width:0">
           <thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">SL</th><th class="num">Đơn giá</th><th class="num">Thành tiền</th></tr></thead>
-          <tbody>${items.map(i => `<tr><td>${i.hang_hoa_id?.ma_hang || ''}</td><td>${i.hang_hoa_id?.ten_hang || ''}</td><td class="num">${fmtMoney(i.so_luong)}</td><td class="num">${fmtMoney(i.don_gia_nhap)}</td><td class="num">${fmtMoney(i.thanh_tien)}</td></tr>`).join('')}</tbody>
+          <tbody>${items.map(i => `<tr><td>${i.hang_hoa_id?.ma_hang || ''}</td><td>${i.hang_hoa_id?.ten_hang || ''}</td><td class="num">${fmtMoney(i.so_luong)}</td><td class="num">${fmtCurrency(i.don_gia_nhap)}</td><td class="num">${fmtCurrency(i.thanh_tien)}</td></tr>`).join('')}</tbody>
         </table>`;
       document.getElementById('ticketModal').style.display = 'flex';
     }

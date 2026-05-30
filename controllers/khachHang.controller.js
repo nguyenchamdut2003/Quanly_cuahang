@@ -7,7 +7,8 @@ var {
     HoaDonBanHang,
     PhieuTraHang,
     CongNoKhachHang,
-    NguoiDung
+    NguoiDung,
+    Counter
 } = require('../models/kiot.model');
 var ExcelJS = require('exceljs');
 var querystring = require('querystring');
@@ -264,31 +265,33 @@ function buildFilterQueryString(filter) {
 }
 
 async function makeCustomerCode() {
-    var customers = await KhachHang.find({ ma_khach_hang: /^KH\d+$/ }).select('ma_khach_hang').lean();
-    var maxNumber = 0;
-    
-    for (var c of customers) {
-        if (c.ma_khach_hang) {
-            var num = Number(c.ma_khach_hang.replace(/\D/g, ''));
-            if (num > maxNumber) maxNumber = num;
-        }
+    for (var i = 0; i < 20; i += 1) {
+        var counter = await Counter.findOneAndUpdate(
+            { _id: 'khach_hang' },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        ).lean();
+        var code = 'KH' + String(counter.seq || 1).padStart(4, '0');
+        var existed = await KhachHang.exists({ ma_khach_hang: code });
+        if (!existed) return code;
     }
 
-    return 'KH' + String(maxNumber + 1).padStart(4, '0');
+    return 'KH' + String(Date.now()).slice(-10);
 }
 
 async function makeAddressCode() {
-    var addresses = await DiaChiKhachHang.find({ ma_dia_chi: /^DCKH\d+$/ }).select('ma_dia_chi').lean();
-    var maxNumber = 0;
-
-    for (var a of addresses) {
-        if (a.ma_dia_chi) {
-            var num = Number(a.ma_dia_chi.replace(/\D/g, ''));
-            if (num > maxNumber) maxNumber = num;
-        }
+    for (var i = 0; i < 20; i += 1) {
+        var counter = await Counter.findOneAndUpdate(
+            { _id: 'dia_chi_khach_hang' },
+            { $inc: { seq: 1 } },
+            { upsert: true, returnDocument: 'after' }
+        ).lean();
+        var code = 'DCKH' + String(counter.seq || 1).padStart(4, '0');
+        var existed = await DiaChiKhachHang.exists({ ma_dia_chi: code });
+        if (!existed) return code;
     }
 
-    return 'DCKH' + String(maxNumber + 1).padStart(4, '0');
+    return 'DCKH' + String(Date.now()).slice(-10);
 }
 
 function normalizeAddressPayload(body) {
@@ -321,6 +324,11 @@ function buildCustomerReturnUrl(customerId, returnQueryRaw) {
         return item.indexOf('customer=') !== 0;
     });
     return '/khach-hang' + (paramsWithoutCustomer.length ? '?' + paramsWithoutCustomer.join('&') : '');
+}
+
+function appendQueryParam(url, key, value) {
+    var separator = url.indexOf('?') === -1 ? '?' : '&';
+    return url + separator + encodeURIComponent(key) + '=' + encodeURIComponent(value);
 }
 
 async function seedCustomersIfEmpty() {
@@ -606,6 +614,61 @@ function makeRangeFilter(minRaw, maxRaw) {
     return range;
 }
 
+async function loadCustomerFinancialMetrics(customerIds) {
+    var ids = Array.isArray(customerIds) ? customerIds.filter(Boolean) : [];
+    if (!ids.length) return {};
+
+    var salesRows = await HoaDonBanHang.aggregate([
+        { $match: { khach_hang_id: { $in: ids }, trang_thai: { $ne: 'cancelled' } } },
+        { $group: { _id: '$khach_hang_id', tong_ban: { $sum: { $ifNull: ['$tong_tien', 0] } } } }
+    ]);
+    var returnRows = await PhieuTraHang.aggregate([
+        { $match: { khach_hang_id: { $in: ids }, trang_thai: { $ne: 'cancelled' } } },
+        { $group: { _id: '$khach_hang_id', tong_tra_hang: { $sum: { $ifNull: ['$tong_tien_tra', 0] } } } }
+    ]);
+    var debtRows = await CongNoKhachHang.aggregate([
+        { $match: { khach_hang_id: { $in: ids } } },
+        {
+            $group: {
+                _id: '$khach_hang_id',
+                tang_no: {
+                    $sum: { $cond: [{ $eq: ['$loai', 'tang_no'] }, { $ifNull: ['$so_tien', 0] }, 0] }
+                },
+                giam_no: {
+                    $sum: { $cond: [{ $in: ['$loai', ['giam_no', 'thanh_toan']] }, { $ifNull: ['$so_tien', 0] }, 0] }
+                }
+            }
+        }
+    ]);
+
+    var map = {};
+    ids.forEach(function(id) {
+        map[String(id)] = { tong_ban: 0, tong_tra_hang: 0, tong_ban_tru_tra_hang: 0, tong_no: 0 };
+    });
+    salesRows.forEach(function(row) {
+        if (!row || !row._id) return;
+        var key = String(row._id);
+        if (!map[key]) map[key] = { tong_ban: 0, tong_tra_hang: 0, tong_ban_tru_tra_hang: 0, tong_no: 0 };
+        map[key].tong_ban = Number(row.tong_ban || 0);
+    });
+    returnRows.forEach(function(row) {
+        if (!row || !row._id) return;
+        var key = String(row._id);
+        if (!map[key]) map[key] = { tong_ban: 0, tong_tra_hang: 0, tong_ban_tru_tra_hang: 0, tong_no: 0 };
+        map[key].tong_tra_hang = Number(row.tong_tra_hang || 0);
+    });
+    debtRows.forEach(function(row) {
+        if (!row || !row._id) return;
+        var key = String(row._id);
+        if (!map[key]) map[key] = { tong_ban: 0, tong_tra_hang: 0, tong_ban_tru_tra_hang: 0, tong_no: 0 };
+        map[key].tong_no = Number(row.tang_no || 0) - Number(row.giam_no || 0);
+    });
+    Object.keys(map).forEach(function(key) {
+        map[key].tong_ban_tru_tra_hang = Number(map[key].tong_ban || 0) - Number(map[key].tong_tra_hang || 0);
+    });
+    return map;
+}
+
 function buildCustomerQueryFromFilter(filter) {
     var dateRange = getDateRange(filter);
     var customerQuery = {};
@@ -627,12 +690,6 @@ function buildCustomerQueryFromFilter(filter) {
     if (filter.shippingArea) {
         customerQuery.khu_vuc_giao_hang = { $regex: filter.shippingArea, $options: 'i' };
     }
-
-    var totalSalesRange = makeRangeFilter(filter.totalSalesFrom, filter.totalSalesTo);
-    if (totalSalesRange) customerQuery.tong_ban = totalSalesRange;
-
-    var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
-    if (currentDebtRange) customerQuery.tong_no = currentDebtRange;
 
     if (dateRange.start || dateRange.end) {
         customerQuery.created_at = {};
@@ -715,6 +772,8 @@ exports.index = async function(req, res, next) {
         var filter = normalizeFilterQuery(requestQuery);
         var customerQuery = buildCustomerQueryFromFilter(filter);
         await applyCreatorFilter(customerQuery, filter.creatorKeyword);
+        var totalSalesRange = makeRangeFilter(filter.totalSalesFrom, filter.totalSalesTo);
+        var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
 
         var customerGroups = await loadCustomerGroups();
         var addressTypes = await loadAddressTypes();
@@ -723,27 +782,42 @@ exports.index = async function(req, res, next) {
             return map;
         }, {});
 
-        var overallTotals = await KhachHang.aggregate([
-            { $match: customerQuery },
-            {
-                $group: {
-                    _id: null,
-                    totalDebt: { $sum: { $ifNull: ['$tong_no', 0] } },
-                    totalSales: { $sum: { $ifNull: ['$tong_ban', 0] } }
-                }
-            }
-        ]);
-        var summaryTotals = overallTotals[0] || { totalDebt: 0, totalSales: 0 };
-
         var customers = await KhachHang.find(customerQuery)
             .populate({ path: 'nguoi_tao_id', select: 'ho_ten email username' })
             .sort({ created_at: -1, ma_khach_hang: 1 })
             .lean();
+        var financialMap = await loadCustomerFinancialMetrics(customers.map(function(customer) { return customer._id; }));
         customers = customers.map(function(customer) {
+            var metric = financialMap[String(customer._id)] || {};
+            customer.tong_ban = Number(metric.tong_ban || 0);
+            customer.tong_no = Number(metric.tong_no || 0);
+            customer.tong_ban_tru_tra_hang = Number(metric.tong_ban_tru_tra_hang || 0);
             customer.nhom_khach_hang_ten = groupMap[String(customer.nhom_khach_hang_id || '')] || '---';
             customer.nguoi_tao_ten = getCreatorName(customer);
             return customer;
         });
+        if (totalSalesRange) {
+            customers = customers.filter(function(customer) {
+                var value = Number(customer.tong_ban || 0);
+                if (totalSalesRange.$gte !== undefined && value < totalSalesRange.$gte) return false;
+                if (totalSalesRange.$lte !== undefined && value > totalSalesRange.$lte) return false;
+                return true;
+            });
+        }
+        if (currentDebtRange) {
+            customers = customers.filter(function(customer) {
+                var value = Number(customer.tong_no || 0);
+                if (currentDebtRange.$gte !== undefined && value < currentDebtRange.$gte) return false;
+                if (currentDebtRange.$lte !== undefined && value > currentDebtRange.$lte) return false;
+                return true;
+            });
+        }
+        var summaryTotals = customers.reduce(function(sum, customer) {
+            sum.totalDebt += Number(customer.tong_no || 0);
+            sum.totalSales += Number(customer.tong_ban || 0);
+            sum.totalNetSales += Number(customer.tong_ban_tru_tra_hang || 0);
+            return sum;
+        }, { totalDebt: 0, totalSales: 0, totalNetSales: 0 });
 
         res.render('khach-hang/index', {
             title: 'Khách hàng',
@@ -775,6 +849,8 @@ exports.exportExcel = async function(req, res, next) {
         var filter = normalizeFilterQuery(req?.query || {});
         var customerQuery = buildCustomerQueryFromFilter(filter);
         await applyCreatorFilter(customerQuery, filter.creatorKeyword);
+        var totalSalesRange = makeRangeFilter(filter.totalSalesFrom, filter.totalSalesTo);
+        var currentDebtRange = makeRangeFilter(filter.currentDebtFrom, filter.currentDebtTo);
         var customerGroups = await loadCustomerGroups();
         var groupMap = customerGroups.reduce(function(map, group) {
             map[String(group._id)] = group.ten_nhom || '---';
@@ -789,6 +865,30 @@ exports.exportExcel = async function(req, res, next) {
             customer.nguoi_tao_ten = getCreatorName(customer);
             return customer;
         });
+        var financialMap = await loadCustomerFinancialMetrics(customers.map(function(customer) { return customer._id; }));
+        customers = customers.map(function(customer) {
+            var metric = financialMap[String(customer._id)] || {};
+            customer.tong_ban = Number(metric.tong_ban || 0);
+            customer.tong_no = Number(metric.tong_no || 0);
+            customer.tong_ban_tru_tra_hang = Number(metric.tong_ban_tru_tra_hang || 0);
+            return customer;
+        });
+        if (totalSalesRange) {
+            customers = customers.filter(function(customer) {
+                var value = Number(customer.tong_ban || 0);
+                if (totalSalesRange.$gte !== undefined && value < totalSalesRange.$gte) return false;
+                if (totalSalesRange.$lte !== undefined && value > totalSalesRange.$lte) return false;
+                return true;
+            });
+        }
+        if (currentDebtRange) {
+            customers = customers.filter(function(customer) {
+                var value = Number(customer.tong_no || 0);
+                if (currentDebtRange.$gte !== undefined && value < currentDebtRange.$gte) return false;
+                if (currentDebtRange.$lte !== undefined && value > currentDebtRange.$lte) return false;
+                return true;
+            });
+        }
         var customerIds = customers.map(function(customer) { return customer._id; });
         var addresses = customerIds.length
             ? await DiaChiKhachHang.find({ khach_hang_id: { $in: customerIds } }).sort({ mac_dinh: -1, created_at: -1 }).lean()
@@ -836,7 +936,7 @@ exports.exportExcel = async function(req, res, next) {
                 cccd: exportText(customer.cccd),
                 tong_no: exportMoney(customer.tong_no),
                 tong_ban: exportMoney(customer.tong_ban),
-                tong_ban_tru_tra_hang: exportMoney(customer.tong_ban),
+                tong_ban_tru_tra_hang: exportMoney(customer.tong_ban_tru_tra_hang),
                 khu_vuc_giao_hang: exportText(customer.khu_vuc_giao_hang),
                 dia_chi_mac_dinh: address ? exportAddress(address) : '---',
                 nguoi_tao_ten: exportText(customer.nguoi_tao_ten),
@@ -1217,9 +1317,7 @@ exports.add = async function(req, res, next) {
             payload.ngay_sinh = null;
         }
 
-        if (!payload.ma_khach_hang) {
-            payload.ma_khach_hang = await makeCustomerCode();
-        }
+        payload.ma_khach_hang = await makeCustomerCode();
 
         if (!payload.nhom_khach_hang_id) delete payload.nhom_khach_hang_id;
         if (req.user && req.user._id) {
@@ -1233,7 +1331,7 @@ exports.add = async function(req, res, next) {
         var addressPayload = normalizeAddressPayload(req?.body);
         var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.dia_chi_chi_tiet || addressPayload.tinh_thanh || addressPayload.phuong_xa;
         if (hasAddressData) {
-            if (!addressPayload.ma_dia_chi) addressPayload.ma_dia_chi = await makeAddressCode();
+            addressPayload.ma_dia_chi = await makeAddressCode();
             if (!addressPayload.loai_dia_chi) addressPayload.loai_dia_chi = 'khac';
             addressPayload.khach_hang_id = customer._id;
             await DiaChiKhachHang.create(addressPayload);
@@ -1273,9 +1371,7 @@ exports.update = async function(req, res, next) {
             payload.ngay_sinh = null;
         }
 
-        if (!payload.ma_khach_hang) {
-            delete payload.ma_khach_hang;
-        }
+        delete payload.ma_khach_hang;
         if (!payload.nhom_khach_hang_id) delete payload.nhom_khach_hang_id;
 
         var existingCustomer = await KhachHang.findById(customerId).lean();
@@ -1521,7 +1617,7 @@ exports.addAddress = async function(req, res, next) {
 
         var payload = normalizeAddressPayload(req?.body);
         if (!payload.ten_nguoi_nhan && !payload.sdt_nguoi_nhan && !payload.dia_chi_day_du) {
-            return res.redirect(buildCustomerReturnUrl(customerId, req?.body?.returnQuery) + '&error=missing_address_data');
+            return res.redirect(appendQueryParam(buildCustomerReturnUrl(customerId, req?.body?.returnQuery), 'error', 'missing_address_data'));
         }
 
         if (!payload.ma_dia_chi) payload.ma_dia_chi = await makeAddressCode();
@@ -1533,7 +1629,7 @@ exports.addAddress = async function(req, res, next) {
         }
 
         await DiaChiKhachHang.create(payload);
-        res.redirect(buildCustomerReturnUrl(customerId, req?.body?.returnQuery) + '&success=created');
+        res.redirect(appendQueryParam(buildCustomerReturnUrl(customerId, req?.body?.returnQuery), 'success', 'created'));
     } catch (error) {
         if (error && error.code === 11000) {
             return res.redirect('/khach-hang?error=duplicate_address_code');
@@ -1550,7 +1646,7 @@ exports.updateAddress = async function(req, res, next) {
 
         var payload = normalizeAddressPayload(req?.body);
         if (!payload.ten_nguoi_nhan && !payload.sdt_nguoi_nhan && !payload.dia_chi_day_du) {
-            return res.redirect(buildCustomerReturnUrl(customerId, req?.body?.returnQuery) + '&error=missing_address_data');
+            return res.redirect(appendQueryParam(buildCustomerReturnUrl(customerId, req?.body?.returnQuery), 'error', 'missing_address_data'));
         }
 
         if (!payload.ma_dia_chi) delete payload.ma_dia_chi;
@@ -1569,7 +1665,7 @@ exports.updateAddress = async function(req, res, next) {
             { runValidators: true }
         );
 
-        res.redirect(buildCustomerReturnUrl(customerId, req?.body?.returnQuery) + '&success=updated');
+        res.redirect(appendQueryParam(buildCustomerReturnUrl(customerId, req?.body?.returnQuery), 'success', 'updated'));
     } catch (error) {
         if (error && error.code === 11000) {
             return res.redirect('/khach-hang?error=duplicate_address_code');
@@ -1585,7 +1681,7 @@ exports.removeAddress = async function(req, res, next) {
         if (!customerId || !addressId) return res.redirect('/khach-hang?error=invalid_address');
 
         await DiaChiKhachHang.findOneAndDelete({ _id: addressId, khach_hang_id: customerId });
-        res.redirect(buildCustomerReturnUrl(customerId, req?.body?.returnQuery) + '&success=deleted');
+        res.redirect(appendQueryParam(buildCustomerReturnUrl(customerId, req?.body?.returnQuery), 'success', 'deleted'));
     } catch (error) {
         next(error);
     }

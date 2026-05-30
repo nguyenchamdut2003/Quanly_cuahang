@@ -785,7 +785,7 @@
                     <select class="nv-salary-select" id="nvBonusType">
                       <option value="">Chọn loại thưởng</option>
                       <option value="doanh_thu_ca_nhan">Theo doanh thu cá nhân</option>
-                      <option value="doanh_thu_cua_hang">Theo doanh thu chi nhánh/Cửa hàng</option>
+                      <option value="doanh_thu_cua_hang">Theo doanh thu cửa hàng</option>
                       <option value="doanh_thu_phong_ban">Theo lợi nhuận gộp cá nhân</option>
                     </select>
                   </div>
@@ -1103,9 +1103,9 @@
                 <div></div>
               </div>
               <div class="commission-option-line">
-                <label><input type="radio" name="nvCommissionScope" value="branch"> Chi nhánh</label>
+                <label><input type="radio" name="nvCommissionScope" value="branch"> Cửa hàng</label>
                 <select class="commission-branch-select" id="nvCommissionBranchSelect" disabled>
-                  <option>Chọn chi nhánh áp dụng</option>
+                  <option>Chọn cửa hàng áp dụng</option>
                 </select>
               </div>
             </div>
@@ -1300,8 +1300,8 @@
         detailField('Chức danh:', detailRefName(item.chuc_danh_id, 'ten_chuc_danh')) +
         '<div></div>' +
         detailField('Ngày bắt đầu làm việc', detailDate(item.ngay_bat_dau_lam_viec)) +
-        detailField('Chi nhánh trả lương:', 'Chi nhánh trung tâm') +
-        detailField('Chi nhánh làm việc:', 'Chi nhánh trung tâm') +
+        detailField('Cửa hàng trả lương:', 'Cửa hàng trung tâm') +
+        detailField('Cửa hàng làm việc:', 'Cửa hàng trung tâm') +
         detailField('Tài khoản KiotViet:', item.sdt, item.sdt ? 'is-link' : '') +
         '<div></div>' +
         detailField('Số điện thoại:', item.sdt) +

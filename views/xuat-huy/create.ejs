@@ -57,6 +57,7 @@
     let items = [];
     let allItems = [];
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const fmtMoney = n => fmt(n) + ' VNĐ';
     const money = raw => Math.max(0, Math.floor(Number(String(raw || '').replace(/\./g, '').replace(/,/g, '')) || 0));
     const body = document.getElementById('itemsBody');
     const search = document.getElementById('itemSearch');
@@ -66,6 +67,15 @@
         return it.quy_cach_items.reduce((sum, qc) => sum + Number(qc.so_luong_huy || 0), 0);
       }
       return Number(it.so_luong || 0);
+    }
+
+    function lineValue(it) {
+      if (it.has_quy_cach && Array.isArray(it.quy_cach_items)) {
+        return it.quy_cach_items.reduce((sum, qc) => {
+          return sum + Number(qc.so_luong_huy || 0) * Number(qc.gia_von || 0);
+        }, 0);
+      }
+      return Number(it.so_luong || 0) * Number(it.gia_von || 0);
     }
 
     function showError(msg) {
@@ -109,11 +119,13 @@
           <th>${qc.ten_quy_cach}</th>
           <td class="num">${fmt(qc.ton_hien_tai || 0)}</td>
           <td><input class="cell-input" type="number" min="0" max="${qc.ton_hien_tai || 0}" value="${qc.so_luong_huy || ''}" onchange="updateQuyCach(${realIndex}, ${qcIdx}, this.value)"></td>
+          <td class="num">${fmtMoney(qc.gia_von || 0)}</td>
+          <td class="num"><b>${fmtMoney(Number(qc.so_luong_huy || 0) * Number(qc.gia_von || 0))}</b></td>
         </tr>
       `).join('');
       return `<tr class="qc-row"><td colspan="10">
         <table class="qc-table">
-          <thead><tr><th>Quy cách</th><th class="num">Tồn</th><th class="num">SL hủy</th></tr></thead>
+          <thead><tr><th>Quy cách</th><th class="num">Tồn</th><th class="num">SL hủy</th><th class="num">Giá vốn</th><th class="num">Thành tiền</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </td></tr>`;
@@ -198,10 +210,13 @@
       items.forEach((it, idx) => {
         const realIndex = allItems.indexOf(it);
         const qty = lineQty(it);
-        const line = qty * Number(it.gia_von || 0);
+        const line = lineValue(it);
         const qtyCell = it.has_quy_cach
           ? `<span class="num">${fmt(qty)}</span>`
           : `<input class="cell-input" type="number" min="0" max="${it.ton_hien_tai || 0}" value="${it.so_luong || ''}" onchange="updateItem(${realIndex},'so_luong',this.value)">`;
+        const costCell = it.has_quy_cach
+          ? '<span>Theo thuộc tính</span>'
+          : `<input class="cell-input" inputmode="numeric" value="${it.gia_von}" onchange="updateItem(${realIndex},'gia_von',this.value)">`;
         html += `<tr>
           <td class="center">${idx + 1}</td>
           <td>${it.ma_hang}</td>
@@ -211,8 +226,8 @@
           <td class="num">${fmt(it.ton_hien_tai || 0)}</td>
           <td class="num">${fmt(it.ton_kho_tong || it.ton_hien_tai || 0)}</td>
           <td>${qtyCell}</td>
-          <td><input class="cell-input" inputmode="numeric" value="${it.gia_von}" onchange="updateItem(${realIndex},'gia_von',this.value)"></td>
-          <td class="num"><b>${fmt(line)}</b></td>
+          <td>${costCell}</td>
+          <td class="num"><b>${fmtMoney(line)}</b></td>
         </tr>`;
         html += renderQuyCachBlock(it, realIndex);
       });
@@ -256,11 +271,11 @@
       const totals = allItems.reduce((sum, it) => {
         const qty = lineQty(it);
         sum.qty += qty;
-        sum.value += qty * Number(it.gia_von || 0);
+        sum.value += lineValue(it);
         return sum;
       }, { qty: 0, value: 0 });
       document.getElementById('tongSoLuong').textContent = fmt(totals.qty);
-      document.getElementById('tongGiaTri').textContent = fmt(totals.value);
+      document.getElementById('tongGiaTri').textContent = fmtMoney(totals.value);
     }
 
     function buildPayloadItem(x) {
@@ -273,7 +288,7 @@
       if (x.has_quy_cach && (x.quy_cach_items || []).length) {
         const quy_cach_items = x.quy_cach_items
           .filter(qc => Number(qc.so_luong_huy || 0) > 0)
-          .map(qc => ({ ten_quy_cach: qc.ten_quy_cach, so_luong: Number(qc.so_luong_huy || 0) }));
+          .map(qc => ({ ten_quy_cach: qc.ten_quy_cach, so_luong: Number(qc.so_luong_huy || 0), gia_von: Number(qc.gia_von || 0) }));
         const so_luong = quy_cach_items.reduce((s, qc) => s + qc.so_luong, 0);
         return Object.assign({}, base, { quy_cach_items, so_luong });
       }

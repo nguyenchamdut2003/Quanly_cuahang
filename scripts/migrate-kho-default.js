@@ -102,14 +102,14 @@ async function createDefaultWarehouses(tonKhoCollection) {
     skippedMissingBranch: 0
   };
 
-  console.log(`[Kho] Tổng số chi nhánh có tồn kho: ${branchIds.length}`);
+  console.log(`[Kho] Tổng số cửa hàng có tồn kho: ${branchIds.length}`);
 
   for (const branchId of branchIds) {
     const branch = await ChiNhanh.findById(branchId);
 
     if (!branch) {
       stats.skippedMissingBranch += 1;
-      console.warn(`[Kho] Bỏ qua chi_nhanh_id=${branchId}: không tìm thấy chi nhánh`);
+      console.warn(`[Kho] Bỏ qua chi_nhanh_id=${branchId}: không tìm thấy cửa hàng`);
       continue;
     }
 

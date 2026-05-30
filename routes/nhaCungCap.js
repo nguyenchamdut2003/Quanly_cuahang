@@ -11,6 +11,7 @@ router.get('/api/:id/detail', nhaCungCapController.apiSupplierDetail);
 router.get('/:id/export/:section', nhaCungCapController.exportSupplierDetail);
 router.post('/add', nhaCungCapController.add);
 router.post('/:id/pay-debt', nhaCungCapController.payDebt);
+router.post('/:id/discount-debt', nhaCungCapController.discountDebt);
 router.post('/:id/update', nhaCungCapController.update);
 router.post('/:id/delete', nhaCungCapController.remove);
 router.post('/delete-selected', nhaCungCapController.removeSelected);

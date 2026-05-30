@@ -5,6 +5,7 @@
   const safeFilters = locals.filters || {};
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(function(key) {
@@ -21,7 +22,7 @@
       return t.cua_hang_id.ten_cua_hang || t.cua_hang_id.ma_cua_hang;
     }
     if (t.kho_id && (t.kho_id.ten_kho || t.kho_id.ma_kho)) return t.kho_id.ten_kho || t.kho_id.ma_kho;
-    return 'Chi nhánh trung tâm';
+    return 'Cửa hàng trung tâm';
   }
   function detailNote(t) {
     const parts = [];
@@ -39,7 +40,7 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     .xh-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column;width:100%;min-width:0;box-sizing:border-box}
-    .xh-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 10% 16px;box-sizing:border-box;width:100%}
+    .xh-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 30px 16px;box-sizing:border-box;width:100%}
     .sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
     .title{font-size:20px;font-weight:800;color:#111827;margin:0 0 16px}
     .filter-block{margin-bottom:22px}.filter-title{font-size:13px;font-weight:800;margin-bottom:10px}
@@ -48,7 +49,7 @@
     .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 10px;font-size:13px;outline:none;margin-top:6px}
     .main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .search{flex:1;max-width:470px}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 12px;font-size:13px;outline:none}
-    .actions{display:flex;align-items:center;gap:8px}.kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.kv-btn.primary{border-color:#0070f4;color:#0070f4}.tool-icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
+    .actions{display:flex;align-items:center;gap:8px}.kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
     table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
     th{min-height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:6px 10px;white-space:normal;word-break:break-word;line-height:1.25}
@@ -78,14 +79,15 @@
     .info-line input,.info-line select{height:26px;border:1px solid #cfd8e3;border-radius:5px;padding:0 6px;font-size:11px;background:#fff;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
     .info-line .info-value{display:block;min-width:0;word-break:break-word;font-weight:600;line-height:1.35;padding:5px 7px;border:1px solid #cfd8e3;border-radius:5px;background:#fff;box-sizing:border-box;font-size:11px}
     .mini-table-wrap{min-width:0;width:100%;max-width:100%;margin-top:6px}
-    .mini-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
+    .mini-table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:680px}
     .mini-table thead th:nth-child(1),.mini-table tbody td:nth-child(1){width:14%}
-    .mini-table thead th:nth-child(2),.mini-table tbody td:nth-child(2){width:40%}
-    .mini-table thead th:nth-child(3),.mini-table tbody td:nth-child(3){width:12%}
-    .mini-table thead th:nth-child(4),.mini-table tbody td:nth-child(4){width:17%}
-    .mini-table thead th:nth-child(5),.mini-table tbody td:nth-child(5){width:17%}
-    .mini-table th{font-size:10px;font-weight:700;background:#f0f2f4;border-bottom:1px solid #cfd8e3;white-space:normal;word-break:break-word;line-height:1.2;padding:6px 5px}
-    .mini-table td{font-size:11px;padding:7px 5px;line-height:1.35;vertical-align:top;word-break:break-word;border-bottom:1px solid #eef2f6}
+    .mini-table thead th:nth-child(2),.mini-table tbody td:nth-child(2){width:28%}
+    .mini-table thead th:nth-child(3),.mini-table tbody td:nth-child(3){width:16%}
+    .mini-table thead th:nth-child(4),.mini-table tbody td:nth-child(4){width:12%}
+    .mini-table thead th:nth-child(5),.mini-table tbody td:nth-child(5){width:14%}
+    .mini-table thead th:nth-child(6),.mini-table tbody td:nth-child(6){width:16%}
+    .mini-table th{font-size:11px;font-weight:700;background:#f0f2f4;border-bottom:1px solid #cfd8e3;white-space:nowrap;word-break:normal;line-height:1.2;padding:8px 8px}
+    .mini-table td{font-size:11px;padding:8px 8px;line-height:1.35;vertical-align:top;word-break:normal;border-bottom:1px solid #eef2f6}
     .mini-table td.num{font-size:11px;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;word-break:normal}
     .mini-table td.cell-code{color:#0070f4;font-size:11px;font-weight:600}
     .mini-table td.cell-code a{color:inherit;text-decoration:none}
@@ -97,7 +99,7 @@
     .empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}
     .empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
     .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
-    @media(max-width:1100px){.xh-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
+    @media(max-width:1100px){.xh-shell{padding:12px 30px;grid-template-columns:220px minmax(0,1fr)}}
     @media(max-width:1024px){.xh-detail-split{flex-direction:column;align-items:stretch;gap:20px}.xh-summary-box{flex:none;width:100%;max-width:100%;min-width:0}}
   </style>
 </head>
@@ -145,7 +147,6 @@
           <div class="actions">
             <a class="kv-btn primary" href="/xuat-huy/create">+ Xuất hủy</a>
             <a class="kv-btn" href="/xuat-huy/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
-            <span class="tool-icon">☰</span><span class="tool-icon">⚙</span><span class="tool-icon">?</span>
           </div>
         </div>
         <div class="table-wrap">
@@ -173,7 +174,7 @@
                     <td><%= formatDate(t.ngay_xuat || t.created_at) %></td>
                     <td class="ellipsis"><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></td>
                     <td class="num"><%= fmt(t.tong_so_luong || 0) %></td>
-                    <td class="num"><%= fmt(t.tong_gia_tri || 0) %></td>
+                    <td class="num"><%= fmtMoney(t.tong_gia_tri || 0) %></td>
                     <td class="ellipsis"><%= t.ly_do_huy || '--' %></td>
                     <td><span class="status-badge <%= badgeClass(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
@@ -209,6 +210,7 @@
                                   <tr>
                                     <th scope="col">Mã hàng</th>
                                     <th scope="col">Tên hàng</th>
+                                    <th scope="col">Thuộc tính</th>
                                     <th scope="col" class="num">SL hủy</th>
                                     <th scope="col" class="num">Giá vốn</th>
                                     <th scope="col" class="num">Giá trị hủy</th>
@@ -216,7 +218,7 @@
                                 </thead>
                                 <tbody>
                                   <% if (!(t.detail_rows || []).length) { %>
-                                    <tr><td colspan="5">Chưa có chi tiết hàng hủy.</td></tr>
+                                    <tr><td colspan="6">Chưa có chi tiết hàng hủy.</td></tr>
                                   <% } %>
                                   <% (t.detail_rows || []).forEach(function(item) { %>
                                     <% const hh = item.hang_hoa_id; const hhId = hh && hh._id ? String(hh._id) : ''; const lineVal = Number(item.thanh_tien || (Number(item.so_luong || 0) * Number(item.gia_von || 0))); %>
@@ -231,13 +233,11 @@
                                         <% if (item.lo_hang_id) { %>
                                           <div class="mini-wrap-meta">Lô: <%= item.lo_hang_id.ma_lo || item.lo_hang_id.ten_lo || '--' %></div>
                                         <% } %>
-                                        <% if (item.ten_quy_cach) { %>
-                                          <div class="mini-wrap-meta">QC: <%= item.ten_quy_cach %></div>
-                                        <% } %>
                                       </td>
+                                      <td><%= item.ten_quy_cach || 'Không có' %></td>
                                       <td class="num"><%= fmt(item.so_luong || 0) %></td>
-                                      <td class="num"><%= fmt(item.gia_von || 0) %></td>
-                                      <td class="num"><%= fmt(lineVal) %></td>
+                                      <td class="num"><%= fmtMoney(item.gia_von || 0) %></td>
+                                      <td class="num"><%= fmtMoney(lineVal) %></td>
                                     </tr>
                                   <% }) %>
                                 </tbody>
@@ -253,7 +253,7 @@
                             </div>
                             <div class="xh-summary-row">
                               <span>Tổng giá trị hủy</span>
-                              <span class="summary-val"><%= fmt(t.detail_summary ? t.detail_summary.tong_gia_tri : (t.tong_gia_tri || 0)) %></span>
+                              <span class="summary-val"><%= fmtMoney(t.detail_summary ? t.detail_summary.tong_gia_tri : (t.tong_gia_tri || 0)) %></span>
                             </div>
                           </aside>
                         </div>

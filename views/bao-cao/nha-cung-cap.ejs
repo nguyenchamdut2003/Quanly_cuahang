@@ -8,6 +8,7 @@
   const viewMode = safeReport.viewMode || 'chart';
   const focus = safeReport.focus || 'nhap-hang';
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const generatedAt = safeReport.generatedAt ? new Date(safeReport.generatedAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN');
   const baseParams = `from=${range.from || ''}&to=${range.to || ''}&supplier=${encodeURIComponent(filters.supplier || '')}&focus=${encodeURIComponent(focus)}`;
   const reportUrl = `/bao-cao/nha-cung-cap?view=report&${baseParams}`;
@@ -88,12 +89,12 @@
           <div class="viewer-page">
             <div class="doc-meta">Ngày lập: <%= generatedAt %></div>
             <div class="doc-title">Báo cáo nhập hàng theo nhà cung cấp</div>
-            <div class="doc-sub"><div>Từ ngày <%= range.from ? new Date(range.from + 'T00:00:00').toLocaleDateString('vi-VN') : '' %> đến ngày <%= range.to ? new Date(range.to + 'T00:00:00').toLocaleDateString('vi-VN') : '' %></div><div>Chi nhánh: <%= safeReport.branchName || 'Chi nhánh trung tâm' %></div></div>
+            <div class="doc-sub"><div>Từ ngày <%= range.from ? new Date(range.from + 'T00:00:00').toLocaleDateString('vi-VN') : '' %> đến ngày <%= range.to ? new Date(range.to + 'T00:00:00').toLocaleDateString('vi-VN') : '' %></div><div>Cửa hàng: <%= safeReport.branchName || 'Cửa hàng trung tâm' %></div></div>
             <table class="report-table">
               <thead><tr><th>Mã nhà cung cấp</th><th>Tên nhà cung cấp</th><th class="num">Giá trị nhập</th><th class="num">Giá trị trả</th><th class="num">Giá trị (thuần)</th></tr></thead>
               <tbody>
                 <tr class="total-row"><td colspan="2">SL NCC: <%= fmt(totals.supplierCount) %></td><td class="num"><%= fmt(totals.importValue) %></td><td class="num"><%= fmt(totals.returnValue) %></td><td class="num" style="color:#006dff"><%= fmt(totals.netValue) %></td></tr>
-                <% rows.forEach(item => { %><tr><td class="code"><span class="toggle">+</span><%= item.code || '---' %></td><td><%= item.name %></td><td class="num"><%= fmt(item.importValue) %></td><td class="num"><%= fmt(item.returnValue) %></td><td class="num"><%= fmt(item.netValue) %></td></tr><% }) %>
+                <% rows.forEach(item => { %><tr><td class="code"><span class="toggle">+</span><%= item.code || '---' %></td><td><%= item.name %></td><td class="num"><%= fmtMoney(item.importValue) %></td><td class="num"><%= fmtMoney(item.returnValue) %></td><td class="num"><%= fmtMoney(item.netValue) %></td></tr><% }) %>
               </tbody>
             </table>
           </div>

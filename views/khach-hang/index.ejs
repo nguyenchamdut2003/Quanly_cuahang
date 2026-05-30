@@ -53,7 +53,7 @@
       
                 <div class="customer-form-field">
                   <label>Mã khách hàng</label>
-                  <input name="ma_khach_hang" placeholder="Tự động">
+                  <div class="auto-code-preview">Tự động</div>
                 </div>
       
                 <div class="customer-form-field form-row-full">
@@ -120,7 +120,7 @@
               <div class="collapsible-content customer-form-main">
                 <div class="customer-form-field">
                   <label>Mã địa chỉ</label>
-                  <input name="ma_dia_chi" placeholder="Tự động">
+                  <div class="auto-code-preview">Tự động</div>
                 </div>
       
                 <div class="customer-form-field">
@@ -416,7 +416,7 @@
                   <td colspan="3" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
                   <td><strong><%= Number(summaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
                   <td><strong><%= Number(summaryTotals.totalSales || 0).toLocaleString('vi-VN') %></strong></td>
-                  <td><strong><%= Number(summaryTotals.totalSales || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td><strong><%= Number(summaryTotals.totalNetSales || 0).toLocaleString('vi-VN') %></strong></td>
                 </tr>
                 <% if (customers.length === 0) { %>
                   <tr>
@@ -433,7 +433,7 @@
                     <td><%= customer.sdt || '---' %></td>
                     <td><%= Number(customer.tong_no || 0).toLocaleString('vi-VN') %></td>
                     <td><%= Number(customer.tong_ban || 0).toLocaleString('vi-VN') %></td>
-                    <td><%= Number(customer.tong_ban || 0).toLocaleString('vi-VN') %></td>
+                    <td><%= Number(customer.tong_ban_tru_tra_hang || 0).toLocaleString('vi-VN') %></td>
                   </tr>
                 <% }) %>
               </tbody>

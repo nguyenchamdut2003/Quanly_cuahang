@@ -19,6 +19,8 @@
     .item-table-wrap{flex:1;overflow:auto}.item-table{width:100%;min-width:850px;border-collapse:collapse}
     .item-table th{height:38px;background:#f1f4ff;color:#374151;font-size:13px;text-align:left;padding:0 12px}.item-table td{height:46px;border-bottom:1px solid #edf0f3;color:#374151;font-size:13px;padding:0 12px}
     .num{text-align:right}.qty-input{width:78px;height:30px;border:1px solid #d5dde7;border-radius:4px;text-align:right;padding:0 8px}.remove{border:none;background:transparent;color:#9ca3af;cursor:pointer}
+    .qc-row td{height:auto;background:#f8fafc;padding:8px 14px 12px}.qc-table{width:100%;border-collapse:collapse}.qc-table th{height:30px;background:#eaf3ff;font-size:12px}.qc-table td{height:34px;background:#fff;font-size:12px}.qc-table .qty-input{width:96px}
+    .muted{color:#667085;font-size:12px}
     .empty-hint{padding:48px 24px;text-align:center;color:#64748b;font-size:14px}
     .side-head{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;border-bottom:1px solid #e8edf3;color:#6b7280;font-size:13px}
     .side-body{padding:18px;flex:1;overflow:auto}.field{margin-bottom:16px}.field label{display:block;color:#374151;font-size:13px;font-weight:700;margin-bottom:7px}
@@ -55,7 +57,7 @@
       </div>
       <div class="item-table-wrap">
         <table class="item-table">
-          <thead><tr><th style="width:60px">STT</th><th>Mã hàng hóa</th><th>Tên hàng hóa</th><th>Đơn vị tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th><th></th></tr></thead>
+          <thead><tr><th style="width:60px">STT</th><th>Mã hàng hóa</th><th>Tên hàng hóa</th><th>Đơn vị tính</th><th>Thuộc tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th><th></th></tr></thead>
           <tbody id="itemBody"></tbody>
         </table>
         <div class="empty-hint" id="emptyHint">Tìm và chọn hàng hóa bằng ô tìm kiếm phía trên.</div>
@@ -313,12 +315,29 @@
             ten_hang: p.ten_hang || '',
             don_vi_tinh: p.don_vi_tinh || 'cái',
             gia_von: Number(p.gia_von || 0),
+            quan_ly_theo_lo: Boolean(p.quan_ly_theo_lo),
+            has_quy_cach: Boolean(p.has_quy_cach),
+            quy_cach_items: (p.quy_cach_items || []).map(function(qc) {
+              return {
+                lo_hang_id: qc.lo_hang_id || '',
+                ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+                lot_label: qc.lot_label || '',
+                ton_hien_tai: Number(qc.ton_hien_tai || 0),
+                gia_von: Number(qc.gia_von || p.gia_von || 0),
+                so_luong_xuat: ''
+              };
+            }),
             ton_kho: Number(p.ton_kho || 0)
           };
         });
         items.forEach(function(item) {
           const matched = products.find(function(p) { return p._id === item.hang_hoa_id; });
-          if (matched) item.ton_kho = matched.ton_kho;
+          if (matched) {
+            item.ton_kho = matched.ton_kho;
+            item.has_quy_cach = Boolean(matched.has_quy_cach);
+            item.quy_cach_items = (matched.quy_cach_items || []).map(qc => Object.assign({}, qc));
+          }
         });
         renderItems();
       } catch (e) {
@@ -382,20 +401,85 @@
       if (Number(product.ton_kho || 0) <= 0) return alert('Hàng hóa không còn tồn trong kho đã chọn.');
       const existing = items.find(i => i.hang_hoa_id === id);
       if(existing) {
+        if (existing.has_quy_cach) return alert('Hàng hóa có quy cách, vui lòng nhập số lượng theo từng thuộc tính ở bảng bên dưới.');
         if (existing.so_luong + 1 > product.ton_kho) return alert('Số lượng vượt tồn kho trong kho.');
         existing.so_luong += 1;
       } else {
-        items.push({hang_hoa_id:id,ma_hang:product.ma_hang,ten_hang:product.ten_hang,don_vi_tinh:product.don_vi_tinh,so_luong:1,gia_von:product.gia_von,ton_kho:product.ton_kho});
+        items.push({
+          hang_hoa_id:id,
+          ma_hang:product.ma_hang,
+          ten_hang:product.ten_hang,
+          don_vi_tinh:product.don_vi_tinh,
+          so_luong:product.has_quy_cach ? 0 : 1,
+          gia_von:product.gia_von,
+          ton_kho:product.ton_kho,
+          has_quy_cach:Boolean(product.has_quy_cach),
+          quy_cach_items:(product.quy_cach_items || []).map(qc => Object.assign({}, qc))
+        });
       }
       searchInput.value=''; results.style.display='none'; renderItems();
     }
+
+    function itemQty(item) {
+      if (item.has_quy_cach) {
+        return (item.quy_cach_items || []).reduce((sum, qc) => sum + Number(qc.so_luong_xuat || 0), 0);
+      }
+      return Number(item.so_luong || 0);
+    }
+
+    function itemCost(item) {
+      if (item.has_quy_cach) {
+        const qty = itemQty(item);
+        const value = (item.quy_cach_items || []).reduce((sum, qc) => {
+          return sum + Number(qc.so_luong_xuat || 0) * Number(qc.gia_von || item.gia_von || 0);
+        }, 0);
+        return qty > 0 ? Math.round(value / qty) : Number(item.gia_von || 0);
+      }
+      return Number(item.gia_von || 0);
+    }
+
+    function itemValue(item) {
+      if (item.has_quy_cach) {
+        return (item.quy_cach_items || []).reduce((sum, qc) => {
+          return sum + Number(qc.so_luong_xuat || 0) * Number(qc.gia_von || item.gia_von || 0);
+        }, 0);
+      }
+      return Number(item.so_luong || 0) * Number(item.gia_von || 0);
+    }
+
+    function renderQuyCachRows(item) {
+      if (!item.has_quy_cach || !(item.quy_cach_items || []).length) return '';
+      const rows = item.quy_cach_items.map(function(qc, qcIdx) {
+        const label = [qc.lot_label, qc.ten_quy_cach || qc.ten_thuoc_tinh].filter(Boolean).join(' - ');
+        const value = Number(qc.so_luong_xuat || 0) * Number(qc.gia_von || item.gia_von || 0);
+        return `<tr>
+          <td>${escapeHtml(label)}</td>
+          <td class="num">${Number(qc.ton_hien_tai || 0).toLocaleString('vi-VN')}</td>
+          <td class="num"><input class="qty-input" type="number" min="0" max="${qc.ton_hien_tai || 0}" value="${qc.so_luong_xuat || ''}" onchange="updateQuyCachQty('${item.hang_hoa_id}',${qcIdx},this.value)"></td>
+          <td class="num">${Number(qc.gia_von || item.gia_von || 0).toLocaleString('vi-VN')}</td>
+          <td class="num">${value.toLocaleString('vi-VN')}</td>
+        </tr>`;
+      }).join('');
+      return `<tr class="qc-row"><td colspan="9">
+        <table class="qc-table">
+          <thead><tr><th>Thuộc tính / Lô</th><th class="num">Tồn thuộc tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td></tr>`;
+    }
+
     function renderItems(){
       const body = document.getElementById('itemBody');
       let total = 0;
       body.innerHTML = items.map((item,index)=>{
-        const value = Number(item.so_luong) * Number(item.gia_von);
+        const qty = itemQty(item);
+        const value = itemValue(item);
         total += value;
-        return `<tr><td>${index+1}</td><td>${escapeHtml(item.ma_hang)}</td><td>${escapeHtml(item.ten_hang)}</td><td>${escapeHtml(item.don_vi_tinh)}</td><td class="num"><input class="qty-input" type="number" min="1" max="${item.ton_kho}" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}',this.value)"></td><td class="num">${Number(item.gia_von).toLocaleString('vi-VN')}</td><td class="num">${value.toLocaleString('vi-VN')}</td><td><button class="remove" type="button" onclick="removeItem('${item.hang_hoa_id}')"><i class="fa-solid fa-xmark"></i></button></td></tr>`;
+        const qtyCell = item.has_quy_cach
+          ? `<span>${qty.toLocaleString('vi-VN')}</span>`
+          : `<input class="qty-input" type="number" min="1" max="${item.ton_kho}" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}',this.value)">`;
+        const attrCell = item.has_quy_cach ? '<span class="muted">Nhập theo thuộc tính bên dưới</span>' : '';
+        return `<tr><td>${index+1}</td><td>${escapeHtml(item.ma_hang)}</td><td>${escapeHtml(item.ten_hang)}</td><td>${escapeHtml(item.don_vi_tinh)}</td><td>${attrCell}</td><td class="num">${qtyCell}</td><td class="num">${Number(itemCost(item)).toLocaleString('vi-VN')}</td><td class="num">${value.toLocaleString('vi-VN')}</td><td><button class="remove" type="button" onclick="removeItem('${item.hang_hoa_id}')"><i class="fa-solid fa-xmark"></i></button></td></tr>` + renderQuyCachRows(item);
       }).join('');
       if (emptyHint) emptyHint.style.display = items.length ? 'none' : 'block';
       document.getElementById('totalValue').textContent = total.toLocaleString('vi-VN');
@@ -412,7 +496,43 @@
       item.so_luong = qty;
       renderItems();
     }
+    function updateQuyCachQty(id, qcIdx, val) {
+      const item = items.find(i => i.hang_hoa_id === id);
+      if (!item || !item.quy_cach_items || !item.quy_cach_items[qcIdx]) return;
+      const qc = item.quy_cach_items[qcIdx];
+      const qty = Math.max(0, Number(val) || 0);
+      if (qty > Number(qc.ton_hien_tai || 0)) {
+        alert('Số lượng vượt tồn của thuộc tính này.');
+        renderItems();
+        return;
+      }
+      qc.so_luong_xuat = qty;
+      item.so_luong = itemQty(item);
+      item.gia_von = itemCost(item);
+      renderItems();
+    }
     function removeItem(id){items=items.filter(i=>i.hang_hoa_id!==id); renderItems();}
+
+    function buildPayloadItems() {
+      return items.map(function(item) {
+        const base = {
+          hang_hoa_id: item.hang_hoa_id,
+          lo_hang_id: item.lo_hang_id || '',
+          so_luong: itemQty(item),
+          gia_von: itemCost(item)
+        };
+        if (item.has_quy_cach) {
+          base.quy_cach_items = (item.quy_cach_items || [])
+            .filter(qc => Number(qc.so_luong_xuat || 0) > 0)
+            .map(qc => ({
+              lo_hang_id: qc.lo_hang_id || '',
+              ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+              so_luong: Number(qc.so_luong_xuat || 0)
+            }));
+        }
+        return base;
+      }).filter(item => Number(item.so_luong || 0) > 0);
+    }
 
     async function saveXnb(status){
       if(!items.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
@@ -423,7 +543,9 @@
       const loaiNguoiNhan = document.getElementById('loaiNguoiNhan').value;
       const receiverName = loaiNguoiNhan === 'khac' ? document.getElementById('nguoiNhanKhac').value : document.getElementById('nguoiNhan').value;
       if(!receiverName.trim()) return alert('Vui lòng chọn hoặc nhập người nhận.');
-      const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items};
+      const payloadItems = buildPayloadItems();
+      if (!payloadItems.length) return alert('Vui lòng nhập số lượng xuất cho ít nhất 1 hàng hóa.');
+      const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items:payloadItems};
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         const result = await res.json();

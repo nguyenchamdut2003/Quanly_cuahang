@@ -17,6 +17,11 @@
     gia_ban: p.gia_ban || p.gia_co_dinh || 0,
     ton_kho: p.ton_kho || 0
   }));
+  const partnerPayload = (Array.isArray(locals.partners) ? locals.partners : []).map(p => ({
+    _id: String(p._id),
+    ten_doi_tac: p.ten_doi_tac || p.ten || p.name || '',
+    ma_doi_tac: p.ma_doi_tac || ''
+  }));
 %>
 <!DOCTYPE html>
 <html>
@@ -27,6 +32,37 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     *{box-sizing:border-box}html,body{height:100%;margin:0}body{overflow:hidden;background:#e9edf2;color:#0f172a}.topbar{height:64px;background:#0070f4;color:#fff;display:flex;align-items:center;gap:18px;padding:0 8px}.topbar .search{width:524px;flex:0 0 524px}.search{position:relative;max-width:100%}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:44px;border:0;border-radius:6px;padding:0 12px 0 36px;font-size:16px;outline:none}.topbar-scan{height:32px;width:32px;border:0;background:transparent;color:#9dccff;font-size:20px}.tab{height:54px;background:#fff;color:#111827;padding:0 14px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:14px;font-weight:800;font-size:18px;align-self:flex-end;min-width:150px}.add-tab{height:32px;width:32px;border-radius:50%;border:1px solid rgba(255,255,255,.9);background:#0070f4;color:#fff;font-size:16px}.top-actions{margin-left:auto;display:flex;align-items:center;gap:24px;font-size:20px}.top-actions span{font-size:17px;font-weight:700}.return-app{height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(0,1fr) 570px;gap:0;padding:0}.left{display:flex;flex-direction:column;min-width:0;min-height:0;background:#e9edf2}.right{margin:14px 10px 12px 0;background:#fff;border-radius:10px;display:flex;flex-direction:column;padding:16px 20px;min-height:0}.cart{flex:0 0 min(360px,42vh);min-height:0;overflow:auto;padding:14px 6px 0 12px}.return-row{height:96px;background:#fff;border:1px solid #d7dde5;border-radius:10px;margin-bottom:2px;display:grid;grid-template-columns:38px 150px minmax(220px,1fr) 110px 110px 110px 36px;align-items:center;padding:0 20px;box-shadow:0 2px 8px rgba(15,23,42,.12)}.code{font-size:18px}.name{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qty-wrap{text-align:center}.line-input{height:30px;border:0;border-bottom:1px solid #c2cad3;text-align:center;font-size:18px;outline:none;width:84px;background:transparent}.origin{font-size:15px;color:#475569;margin-top:6px}.num{text-align:right;font-weight:800}.return-swap{height:62px;background:#0070f4;display:flex;align-items:center;padding:0 8px;gap:18px}.return-swap .search{width:524px;flex:0 0 524px}.return-swap:after{content:'\f02a';font-family:'Font Awesome 6 Free';font-weight:900;color:#9dccff;font-size:22px}.swap-cart{flex:1;min-height:120px;padding-top:8px}.note{height:72px;background:#fff;border-radius:10px;margin:12px 12px 12px;padding:24px 32px;color:#667085;font-size:18px}.right-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:18px;align-items:center;font-size:18px;margin-bottom:16px}.right-head span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.customer{height:42px;background:#eef0f3;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 12px;color:#0070f4;font-weight:800;font-size:18px;margin-bottom:22px}.link-line{font-size:22px;font-weight:800;color:#00a651;margin-bottom:18px}.link-line a{color:#0070f4;text-decoration:none;font-weight:500}.sum-line{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px;gap:12px;align-items:center;margin:19px 0;font-size:18px}.sum-line input{height:32px;border:0;border-bottom:1px solid #c2cad3;text-align:right;font-size:20px;outline:none}.sum-line strong{font-weight:800}.payable{color:#0070f4;font-size:22px}.submit{margin-top:auto;height:66px;border:0;border-radius:10px;background:#0070f4;color:#fff;font-weight:900;font-size:22px;cursor:pointer}.product-results{display:none;position:absolute;top:48px;left:0;width:100%;background:#fff;color:#111827;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 12px 26px rgba(0,0,0,.18);z-index:80;max-height:320px;overflow:auto}.product-result{height:44px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}.product-result:hover{background:#f0f7ff}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:22px;z-index:100}.modal-backdrop.open{display:flex}.modal{width:1404px;max-width:calc(100vw - 80px);height:618px;background:#fff;border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.35);padding:26px 36px;position:relative}.modal h2{margin:0 0 24px;font-size:20px}.close{position:absolute;right:34px;top:28px;border:0;background:#fff;font-size:28px;color:#6b7280;cursor:pointer}.modal-grid{display:grid;grid-template-columns:235px minmax(0,1fr);gap:38px}.filter-card{background:#fff;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:18px 20px;margin-bottom:28px}.filter-card h3{margin:0 0 20px;font-size:16px}.filter-input{width:100%;height:46px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none}.invoice-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-table table{width:100%;border-collapse:collapse}.invoice-table th{height:46px;background:#338cf2;color:#fff;text-align:left;padding:0 12px;font-size:16px}.invoice-table td{height:49px;border-bottom:1px solid #dde3ea;padding:0 12px;font-size:16px}.invoice-table a{color:#006dff;text-decoration:none}.choose{height:30px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.pager{height:66px;display:flex;align-items:center;justify-content:flex-end;gap:12px}.page-btn{width:38px;height:38px;border-radius:8px;border:0;background:#fff;color:#111827;font-weight:800;cursor:pointer}.page-btn.active{background:#0070f4;color:#fff}.page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick{position:absolute;right:36px;bottom:28px;height:44px;border:0;border-radius:7px;background:#0070f4;color:#fff;font-weight:800;font-size:16px;padding:0 26px}
+    .return-row{height:76px;grid-template-columns:34px 132px minmax(190px,1fr) 92px 96px 118px 24px;padding:0 16px;border-radius:8px}
+    .code,.name{font-size:15px}
+    .line-input{height:26px;width:72px;font-size:15px}
+    .origin{font-size:12px;margin-top:4px}
+    .num{font-size:15px}
+    .cart{flex-basis:min(300px,38vh);padding-top:8px}
+    .right{padding:14px 18px;overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 88px);min-height:0;scrollbar-gutter:stable}
+    .right::-webkit-scrollbar{width:8px}
+    .right::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
+    .right::-webkit-scrollbar-track{background:transparent}
+    .right-head{font-size:15px;margin-bottom:10px}
+    .customer{height:34px;font-size:15px;margin-bottom:14px}
+    .link-line{font-size:18px;line-height:1.35;margin-bottom:16px}
+    .sum-line{grid-template-columns:minmax(0,1fr) 150px;gap:10px;margin:14px 0;font-size:15px}
+    .sum-line>span.num{display:none}
+    .sum-line>span:empty{display:none}
+    .sum-line input{height:28px;font-size:15px}
+    .payable{font-size:18px}
+    .submit{height:56px;font-size:18px}
+    .return-section{border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:12px 0;margin:4px 0 10px}
+    .section-title{font-weight:800;margin-bottom:8px;font-size:15px}
+    .receive-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+    .receive-option{height:34px;border:1px solid #cbd5e1;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;cursor:pointer;background:#fff}
+    .receive-option input{margin:0}
+    .transport-fields{display:none;grid-template-columns:1fr 1fr;gap:8px}
+    .transport-field{display:flex;flex-direction:column;gap:4px}
+    .transport-field.full{grid-column:1/-1}
+    .transport-field label{font-size:12px;font-weight:700;color:#475569}
+    .transport-field input,.transport-field select,.transport-field textarea{width:100%;border:1px solid #cbd5e1;border-radius:6px;min-height:34px;padding:6px 8px;font-size:14px;background:#fff}
+    .transport-field textarea{min-height:48px;resize:vertical}
+    .fee-note{display:none;color:#64748b;font-size:12px;margin-top:-4px;margin-bottom:4px}
   </style>
 </head>
 <body>
@@ -50,20 +86,80 @@
       <div id="returnItems" class="cart"></div>
       <div class="return-swap"><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="swapSearch" placeholder="Tìm hàng đổi (F7)" onfocus="handleSwapSearch(true)" oninput="handleSwapSearch()"><div id="swapResults" class="product-results"></div></div></div>
       <div id="swapItems" class="cart swap-cart"></div>
-      <div class="note"><i class="fa-solid fa-pen"></i> Ghi chú đơn hàng</div>
+      <div class="note"><i class="fa-solid fa-pen"></i> Ghi chú phiếu trả</div>
     </section>
     <section class="right">
       <div class="right-head"><span id="sellerName">Nguyễn Văn Nguyễn</span><span><%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %></span></div>
       <div class="customer"><i class="fa-solid fa-user"></i> <span id="customerName">Chưa chọn khách hàng</span></div>
       <div class="link-line"><span id="returnInvoiceTitle">Trả hàng</span> / <a id="invoiceLink" href="#">Chưa chọn hóa đơn</a></div>
+      <div class="transport-field full" style="margin-bottom:10px">
+        <label for="returnReason">Lý do trả</label>
+        <input id="returnReason" value="Khách trả hàng">
+      </div>
+      <div class="transport-field full" style="margin-bottom:10px">
+        <label for="returnNote">Ghi chú</label>
+        <input id="returnNote" placeholder="Ghi chú phiếu trả hàng">
+      </div>
       <div class="sum-line"><span>Tổng giá gốc hàng mua</span><span id="originTotal">0</span><span class="num">0</span></div>
       <div class="sum-line"><span>Tổng tiền hàng trả</span><span id="returnTotal">0</span><span class="num">0</span></div>
       <div class="sum-line"><span>Tổng tiền hàng đổi</span><span id="exchangeTotal">0</span><span class="num">0</span></div>
+      <div class="return-section">
+        <div class="section-title">Hình thức nhận hàng trả</div>
+        <div class="receive-options">
+          <label class="receive-option"><input type="radio" name="returnReceiveMethod" value="tai_quay" checked onchange="renderReturnTransport()"> Trả tại quầy</label>
+          <label class="receive-option"><input type="radio" name="returnReceiveMethod" value="lay_tai_nha" onchange="renderReturnTransport()"> Lấy tại nhà</label>
+          <label class="receive-option"><input type="radio" name="returnReceiveMethod" value="khach_gui_ve" onchange="renderReturnTransport()"> Khách gửi về</label>
+        </div>
+        <div id="returnTransportFields" class="transport-fields">
+          <div class="transport-field full">
+            <label id="returnPartnerLabel" for="returnPartnerId">Đối tác giao hàng / người lấy hàng</label>
+            <select id="returnPartnerId">
+              <option value="">Không chọn</option>
+              <% partnerPayload.forEach(partner => { %>
+                <option value="<%= partner._id %>"><%= partner.ma_doi_tac ? partner.ma_doi_tac + ' - ' : '' %><%= partner.ten_doi_tac %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="transport-field">
+            <label for="returnSenderName">Tên người gửi trả</label>
+            <input id="returnSenderName" placeholder="Tên khách/người gửi">
+          </div>
+          <div class="transport-field">
+            <label for="returnSenderPhone">SĐT người gửi trả</label>
+            <input id="returnSenderPhone" placeholder="Số điện thoại">
+          </div>
+          <div id="pickupAddressField" class="transport-field full">
+            <label for="returnPickupAddress">Địa chỉ lấy hàng</label>
+            <input id="returnPickupAddress" placeholder="Địa chỉ lấy hàng trả">
+          </div>
+          <div class="transport-field">
+            <label for="returnPickupFee">Phí lấy hàng trả</label>
+            <input id="returnPickupFee" value="0" oninput="renderTotals()">
+          </div>
+          <div class="transport-field">
+            <label for="returnFeePayer">Người trả phí</label>
+            <select id="returnFeePayer" onchange="renderTotals()">
+              <option value="cua_hang">Cửa hàng trả</option>
+              <option value="khach">Khách trả</option>
+            </select>
+          </div>
+          <div class="transport-field">
+            <label for="returnTrackingCode">Mã vận đơn trả hàng</label>
+            <input id="returnTrackingCode" placeholder="Nếu có">
+          </div>
+          <div class="transport-field">
+            <label for="returnTransportNote">Ghi chú vận chuyển</label>
+            <input id="returnTransportNote" placeholder="Ghi chú vận chuyển">
+          </div>
+        </div>
+      </div>
       <div class="sum-line"><span>Chênh lệch</span><span></span><strong id="differenceTotal" class="num">0</strong></div>
       <div class="sum-line"><span>Giảm giá</span><span></span><input id="discount" value="0" oninput="renderTotals()"></div>
+      <input id="discountType" type="hidden" value="vnd">
       <div class="sum-line"><span>Phí trả hàng</span><span></span><input id="returnFee" value="0" oninput="renderTotals()"></div>
+      <div id="pickupFeeNote" class="fee-note">Phí lấy hàng do cửa hàng trả, không trừ vào tiền trả khách.</div>
       <div class="sum-line"><strong id="payableLabel">Cần trả khách</strong><span></span><strong id="payable" class="payable num">0</strong></div>
-      <div class="sum-line" id="customerPaidExtraRow" style="display:none"><span>Khách thanh toán thêm</span><span></span><input id="customerPaidExtra" value="0" oninput="customerPaidExtraTouched=true"></div>
+      <div class="sum-line" id="customerPaidExtraRow" style="display:none"><span>Khách thanh toán thêm</span><input id="customerPaidExtra" value="0" oninput="customerPaidExtraTouched=true"></div>
       <div id="returnStatus" style="min-height:24px;margin-top:auto;color:#667085;font-size:14px"></div>
       <button id="submitReturnBtn" class="submit" type="button" onclick="submitReturn()">TRẢ HÀNG</button>
     </section>
@@ -115,6 +211,7 @@
     const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
     const invoices = <%- JSON.stringify(invoicePayload) %>;
     const products = <%- JSON.stringify(productPayload) %>;
+    const partners = <%- JSON.stringify(partnerPayload) %>;
     const queryParams = new URLSearchParams(window.location.search);
     const initialInvoiceId = queryParams.get('hoa_don_id') || queryParams.get('invoice_id') || '';
     let selectedInvoice = null;
@@ -122,7 +219,32 @@
     let swapItems = [];
     let customerPaidExtraTouched = false;
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const fmtMoney = n => fmt(n) + ' VNĐ';
     const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
+    function getReceiveMethod(){
+      return document.querySelector('input[name="returnReceiveMethod"]:checked')?.value || 'tai_quay';
+    }
+    function setReceiveMethod(value){
+      const target = document.querySelector(`input[name="returnReceiveMethod"][value="${value || 'tai_quay'}"]`);
+      if (target) target.checked = true;
+      renderReturnTransport();
+    }
+    function renderReturnTransport(){
+      const method = getReceiveMethod();
+      const fields = document.getElementById('returnTransportFields');
+      const addressField = document.getElementById('pickupAddressField');
+      const partnerLabel = document.getElementById('returnPartnerLabel');
+      if (fields) fields.style.display = method === 'tai_quay' ? 'none' : 'grid';
+      if (addressField) addressField.style.display = method === 'lay_tai_nha' ? 'flex' : 'none';
+      if (partnerLabel) partnerLabel.textContent = method === 'khach_gui_ve' ? 'Đơn vị vận chuyển nếu có' : 'Đối tác giao hàng / người lấy hàng';
+      renderTotals();
+    }
+    function prefillReturnSender(){
+      const customer = selectedInvoice?.khach_hang_id || {};
+      if (returnSenderName && !returnSenderName.value) returnSenderName.value = customer.ten_khach_hang || '';
+      if (returnSenderPhone && !returnSenderPhone.value) returnSenderPhone.value = customer.sdt || customer.sdt2 || '';
+      if (returnPickupAddress && !returnPickupAddress.value) returnPickupAddress.value = customer.dia_chi || customer.dia_chi_chi_tiet || '';
+    }
 
     function openInvoiceModal(){
       const modal = document.getElementById('invoiceModal');
@@ -165,7 +287,7 @@
       }
     }
     function renderInvoices(rows, pagination){
-      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmt(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Chọn</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Không tìm thấy hóa đơn phù hợp</td></tr>';
+      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmtMoney(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Chọn</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Không tìm thấy hóa đơn phù hợp</td></tr>';
       renderInvoicePager(pagination);
     }
     function renderInvoicePager(pagination){
@@ -194,9 +316,11 @@
       selectedInvoice = result.data.invoice;
       returnItems = result.data.items.map(item => ({
         line_key: item._id || `${item.hang_hoa_id?._id || item.hang_hoa_id}::${item.lo_hang_id?._id || item.lo_hang_id || ''}`,
+        ct_hoa_don_id: item._id || '',
         hang_hoa_id: item.hang_hoa_id?._id || item.hang_hoa_id,
         ma_hang: item.hang_hoa_id?.ma_hang || '',
         ten_hang: item.hang_hoa_id?.ten_hang || '',
+        ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
         so_luong_goc: Number(item.so_luong || 0),
         so_luong: Number(item.so_luong || 0),
         lo_hang_id: item.lo_hang_id?._id || item.lo_hang_id || '',
@@ -209,6 +333,7 @@
       customerName.textContent = selectedInvoice.khach_hang_id?.ten_khach_hang || 'Khách lẻ';
       returnInvoiceTitle.textContent = `Trả hàng từ hóa đơn ${selectedInvoice.ma_hoa_don || ''}`;
       invoiceLink.textContent = `${selectedInvoice.ma_hoa_don} - ${sellerName.textContent}`;
+      prefillReturnSender();
       closeInvoiceModal();
       itemSearch.value = '';
       productResults.style.display = 'none';
@@ -235,7 +360,7 @@
         return;
       }
       const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 20);
-      productResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addQuickItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmt(p.gia_ban)}</strong></div>`).join('');
+      productResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addQuickItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmtMoney(p.gia_ban)}</strong></div>`).join('');
       productResults.style.display = rows.length ? 'block' : 'none';
     }
     function handleSwapSearch(showAll = false){
@@ -245,7 +370,7 @@
         return;
       }
       const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 20);
-      swapResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addSwapItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmt(p.gia_ban)}</strong></div>`).join('');
+      swapResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addSwapItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmtMoney(p.gia_ban)}</strong></div>`).join('');
       swapResults.style.display = rows.length ? 'block' : 'none';
     }
     function addSwapItem(id){
@@ -299,13 +424,13 @@
       const q = itemSearch.value.trim().toLowerCase();
       const rows = returnItems.filter(i => !q || i.ma_hang.toLowerCase().includes(q) || i.ten_hang.toLowerCase().includes(q));
       const returnItemsEl = document.getElementById('returnItems');
-      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
+      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.ten_thuoc_tinh ? `<div class="origin">Thuộc tính: ${item.ten_thuoc_tinh}</div>` : ''}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
       renderTotals();
     }
     function renderSwapItems(){
       const rows = swapItems;
       const swapItemsEl = document.getElementById('swapItems');
-      swapItemsEl.innerHTML = rows.length ? rows.map(item => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeSwapItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmt(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '';
+      swapItemsEl.innerHTML = rows.length ? rows.map(item => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeSwapItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '';
       renderTotals();
     }
     function setQty(id, value){
@@ -338,14 +463,18 @@
       const origin = returnItems.reduce((sum, item) => sum + item.thanh_tien_goc, 0);
       const total = returnItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
       const exchange = swapItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
-      const difference = exchange - total;
+      const discountValue = num(discount.value);
+      const returnFeeValue = num(returnFee.value);
+      const pickupFee = getReceiveMethod() !== 'tai_quay' && returnFeePayer.value === 'khach' ? num(returnPickupFee.value) : 0;
+      const difference = exchange + discountValue + returnFeeValue + pickupFee - total;
       const payableValue = Math.abs(difference);
-      originTotal.textContent = fmt(origin);
-      returnTotal.textContent = fmt(total);
-      exchangeTotal.textContent = fmt(exchange);
-      differenceTotal.textContent = fmt(difference);
+      originTotal.textContent = fmtMoney(origin);
+      returnTotal.textContent = fmtMoney(total);
+      exchangeTotal.textContent = fmtMoney(exchange);
+      differenceTotal.textContent = fmtMoney(difference);
       payableLabel.textContent = difference > 0 ? 'Khách cần trả thêm' : 'Cần trả khách';
-      payable.textContent = fmt(payableValue);
+      payable.textContent = fmtMoney(payableValue);
+      pickupFeeNote.style.display = getReceiveMethod() !== 'tai_quay' && num(returnPickupFee.value) > 0 && returnFeePayer.value === 'cua_hang' ? 'block' : 'none';
       customerPaidExtraRow.style.display = difference > 0 ? 'grid' : 'none';
       if (difference > 0 && !customerPaidExtraTouched) customerPaidExtra.value = fmt(payableValue);
       if (difference <= 0) {
@@ -361,8 +490,13 @@
         openInvoiceModal();
         return;
       }
-      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ hang_hoa_id: i.hang_hoa_id, lo_hang_id: i.lo_hang_id || '', so_luong: i.so_luong, don_gia: i.don_gia, chiet_khau: i.chiet_khau || 0 }));
+      const items = returnItems.filter(i => i.so_luong > 0).map(i => ({ ct_hoa_don_id: i.ct_hoa_don_id || '', hang_hoa_id: i.hang_hoa_id, lo_hang_id: i.lo_hang_id || '', so_luong: i.so_luong, don_gia: i.don_gia, chiet_khau: i.chiet_khau || 0 }));
       if(!items.length) return alert('Vui lòng nhập số lượng hàng trả');
+      const receiveMethod = getReceiveMethod();
+      const senderName = (returnSenderName.value || '').trim() || selectedInvoice?.khach_hang_id?.ten_khach_hang || '';
+      const pickupAddress = (returnPickupAddress.value || '').trim();
+      if(receiveMethod === 'lay_tai_nha' && !pickupAddress) return alert('Vui lòng nhập địa chỉ lấy hàng trả');
+      if(receiveMethod === 'lay_tai_nha' && !senderName) return alert('Vui lòng nhập tên người gửi trả');
       const exchangeItems = swapItems.filter(i => i.so_luong > 0).map(i => ({
         hang_hoa_id: i.hang_hoa_id,
         so_luong: i.so_luong,
@@ -379,8 +513,19 @@
         exchangeItems,
         khach_thanh_toan_them: num(customerPaidExtra.value),
         giam_gia: num(discount.value),
+        kieu_giam_gia: discountType.value || 'vnd',
         phi_tra_hang: num(returnFee.value),
-        ghi_chu: ''
+        hinh_thuc_nhan_hang_tra: receiveMethod,
+        doi_tac_giao_hang_id: receiveMethod === 'tai_quay' ? '' : returnPartnerId.value,
+        dia_chi_lay_hang: receiveMethod === 'lay_tai_nha' ? pickupAddress : '',
+        ten_nguoi_gui_tra: receiveMethod === 'tai_quay' ? '' : senderName,
+        sdt_nguoi_gui_tra: receiveMethod === 'tai_quay' ? '' : (returnSenderPhone.value || '').trim(),
+        phi_lay_hang_tra: receiveMethod === 'tai_quay' ? 0 : num(returnPickupFee.value),
+        nguoi_tra_phi_lay_hang: returnFeePayer.value,
+        ma_van_don_tra_hang: receiveMethod === 'tai_quay' ? '' : (returnTrackingCode.value || '').trim(),
+        ghi_chu_van_chuyen_tra: receiveMethod === 'tai_quay' ? '' : (returnTransportNote.value || '').trim(),
+        ly_do: (returnReason.value || '').trim(),
+        ghi_chu: (returnNote.value || '').trim()
       };
       button.disabled = true;
       button.textContent = 'ĐANG XỬ LÝ...';
@@ -432,10 +577,25 @@
           };
         });
       }
+      returnReason.value = copyDraft.ly_do || 'Khách trả hàng';
+      returnNote.value = copyDraft.ghi_chu || '';
+      discount.value = fmt(copyDraft.giam_gia || 0);
+      discountType.value = copyDraft.kieu_giam_gia || 'vnd';
+      returnFee.value = fmt(copyDraft.phi_tra_hang || 0);
+      setReceiveMethod(copyDraft.hinh_thuc_nhan_hang_tra || 'tai_quay');
+      returnPartnerId.value = copyDraft.doi_tac_giao_hang_id || '';
+      returnPickupAddress.value = copyDraft.dia_chi_lay_hang || '';
+      returnSenderName.value = copyDraft.ten_nguoi_gui_tra || '';
+      returnSenderPhone.value = copyDraft.sdt_nguoi_gui_tra || '';
+      returnPickupFee.value = fmt(copyDraft.phi_lay_hang_tra || 0);
+      returnFeePayer.value = copyDraft.nguoi_tra_phi_lay_hang || 'cua_hang';
+      returnTrackingCode.value = copyDraft.ma_van_don_tra_hang || '';
+      returnTransportNote.value = copyDraft.ghi_chu_van_chuyen_tra || '';
       renderItems();
       renderSwapItems();
     }
     document.addEventListener('DOMContentLoaded', async () => {
+      renderReturnTransport();
       loadInvoices(1);
       if (copyFromError) alert(copyFromError);
       if (initialInvoiceId) await selectInvoice(initialInvoiceId);

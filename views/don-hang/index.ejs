@@ -4,11 +4,13 @@
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : ['draft', 'shipping', 'completed']);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtMoney = value => fmt(value) + ' VNĐ';
   const statusText = status => ({
     draft: 'Phiếu tạm',
     shipping: 'Đang giao hàng',
     completed: 'Hoàn thành',
-    cancelled: 'Đã hủy'
+    cancelled: 'Đã hủy',
+    merged: 'Đã gộp'
   })[status] || 'Phiếu tạm';
   const deliveryStatusText = status => ({
     chua_giao: 'Chưa giao',
@@ -36,7 +38,7 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     .order-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
-    .order-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px clamp(12px,5vw,80px) 0}
+    .order-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 30px 0}
     .sidebar{background:#fff;border-radius:6px;padding:14px 12px;overflow:auto}
     .title{font-size:20px;font-weight:700;color:#111827;margin:0 0 16px}
     .filter-block{margin-bottom:22px}.filter-title{font-size:13px;font-weight:700;color:#111827;margin-bottom:10px}
@@ -55,7 +57,7 @@
     .date-range{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.date-range input{height:30px;border:1px solid #cfd8e3;border-radius:6px;padding:0 8px;font-size:12px}
     .detail-link{color:#006dff;text-decoration:none;font-weight:700}
     .status-check{display:none}
-    .detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.order-detail{padding:0 18px 14px}.detail-tabs{height:40px;display:flex;align-items:flex-end;border-bottom:1px solid #e5e9ee}.detail-tab{height:40px;border:0;background:#fff;color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700;padding:0 0 8px;font-size:14px}.detail-head{display:flex;justify-content:space-between;gap:16px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 22px;margin-top:12px}.mini-field label{display:block;font-size:12px;margin-bottom:5px}.mini-input,.mini-select{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 9px;font-size:12px}.delivery-box{border:1px solid #cfd8e3;border-radius:6px;background:#fafbfc;padding:12px;margin:6px 0 14px}.delivery-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-bottom:10px}.delivery-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px 22px}.note{width:100%;height:70px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:12px;resize:vertical}.items-table{width:100%;border-collapse:collapse}.items-table th{height:32px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 8px}.items-table td{height:42px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:18px;margin-top:14px}.totals{font-size:12px}.total-line{display:flex;justify-content:space-between;margin-bottom:10px}.detail-actions{height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:10px}.detail-action-group{display:flex;gap:8px}.btn.solid{background:#0070f4;color:#fff;border-color:#0070f4}.loading-detail{height:160px;display:flex;align-items:center;justify-content:center;color:#667085}
+    .detail-row{display:none;cursor:default}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff}.order-detail{padding:0 18px 14px}.detail-tabs{height:40px;display:flex;align-items:flex-end;border-bottom:1px solid #e5e9ee}.detail-tab{height:40px;border:0;background:#fff;color:#0070f4;border-bottom:2px solid #0070f4;font-weight:700;padding:0 0 8px;font-size:14px}.detail-head{display:flex;justify-content:space-between;gap:16px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 22px;margin-top:12px}.mini-field label{display:block;font-size:12px;margin-bottom:5px}.mini-input,.mini-select{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 9px;font-size:12px}.delivery-box{border:1px solid #cfd8e3;border-radius:6px;background:#fafbfc;padding:12px;margin:6px 0 14px}.delivery-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;margin-bottom:10px}.delivery-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px 22px}.note{width:100%;height:70px;border:1px solid #cfd8e3;border-radius:6px;padding:8px;font-size:12px;resize:vertical}.items-table{width:100%;border-collapse:collapse}.items-table th{height:32px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;font-size:12px;text-align:left;padding:0 8px}.items-table td{height:42px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;margin-top:14px}.totals{font-size:12px}.total-line{display:flex;justify-content:space-between;margin-bottom:10px}.totals-receipt-action{display:flex;justify-content:flex-end;margin-top:8px}.detail-actions{min-height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:10px;padding-top:10px;flex-wrap:wrap}.detail-action-group{display:flex;gap:8px;flex-wrap:wrap}.btn.solid{background:#0070f4;color:#fff;border-color:#0070f4}.btn.disabled-action{background:#98c5ff;color:#fff;border-color:#98c5ff;opacity:.58;cursor:not-allowed}.loading-detail{height:160px;display:flex;align-items:center;justify-content:center;color:#667085}
     @media(max-width:1100px){.order-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}}
     .order-export-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;align-items:center;justify-content:center;padding:20px}
     .order-export-modal{background:#fff;border-radius:10px;width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 18px 44px rgba(15,23,42,.28)}
@@ -71,6 +73,36 @@
     .order-export-grid label{display:flex;align-items:center;gap:8px;font-size:13px;color:#344054;cursor:pointer}
     .order-export-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 24px 20px;border-top:1px solid #e5e9ee}
     .order-export-error{color:#d92d20;font-size:13px;margin:0 0 10px;display:none}
+    .delivery-confirm-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1300;align-items:center;justify-content:center;padding:20px}
+    .delivery-confirm-modal{width:min(920px,calc(100vw - 32px));max-height:calc(100vh - 44px);background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}
+    .delivery-confirm-head,.delivery-confirm-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}
+    .delivery-confirm-head h3{margin:0;font-size:18px}.delivery-confirm-head p{margin:5px 0 0;color:#667085;font-size:13px}.delivery-confirm-close{border:0;background:transparent;font-size:24px;cursor:pointer;color:#667085}
+    .delivery-confirm-body{padding:16px 20px;overflow:auto}.delivery-confirm-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}
+    .delivery-confirm-table{width:100%;border-collapse:collapse}.delivery-confirm-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;text-align:left;font-size:12px;padding:0 8px}.delivery-confirm-table td{height:42px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 8px}.delivery-confirm-table input{width:86px;height:30px;border:1px solid #cfd8e3;border-radius:6px;text-align:right;padding:0 8px}.delivery-confirm-error{display:none;color:#d92d20;font-size:13px;margin:0 0 10px}.delivery-payment-due{margin-top:14px;padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;color:#0f172a;font-weight:800}.delivery-confirm-payment{display:grid;grid-template-columns:120px 160px 90px 180px;gap:10px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid #e5e9ee}.delivery-confirm-payment label{font-weight:800;font-size:13px}.delivery-confirm-payment input,.delivery-confirm-payment select{height:32px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px}.delivery-confirm-payment input{text-align:right}
+    .receipt-pay-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1350;align-items:center;justify-content:center;padding:20px}.receipt-pay-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);overflow:hidden}.receipt-pay-head,.receipt-pay-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}.receipt-pay-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}.receipt-pay-body{padding:18px 20px}.receipt-pay-due{padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;font-weight:800;margin-bottom:14px}.receipt-pay-grid{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center}.receipt-pay-grid label{font-weight:800}.receipt-pay-grid input,.receipt-pay-grid select{height:34px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px}.receipt-pay-grid input{text-align:right}
+    .locked-action-message{font-size:15px;line-height:1.5}
+    .order-merge-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:1400;align-items:flex-start;justify-content:center;padding:7px 12px}
+    .order-merge-modal{width:min(1200px,calc(100vw - 24px));max-height:calc(100vh - 14px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}
+    .order-merge-head{display:flex;align-items:center;justify-content:space-between;padding:24px 30px 20px}
+    .order-merge-head h3{margin:0;font-size:21px;font-weight:800;color:#202124}
+    .order-merge-close{border:0;background:transparent;color:#4b5563;font-size:28px;line-height:1;cursor:pointer}
+    .order-merge-body{padding:18px 30px 28px;overflow:auto}
+    .order-merge-desc{font-size:14px;line-height:1.45;color:#2f343b;margin:0 0 14px}
+    .order-merge-desc strong{color:#0070f4}
+    .order-merge-filter{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+    .order-merge-filter label{font-size:13px;font-weight:700;color:#111827}
+    .order-merge-filter select{height:31px;min-width:260px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 9px;font-size:13px;outline:none}
+    .order-merge-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .order-merge-table th{height:37px;background:#f0f1f3;border-bottom:1px solid #cfd4dc;text-align:left;padding:0 10px;color:#202124;font-size:13px;font-weight:800}
+    .order-merge-table td{height:38px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .order-merge-table .num{text-align:right}
+    .order-merge-check{width:38px;text-align:center}
+    .order-merge-empty{min-height:220px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:#202124;padding:16px}
+    .order-merge-empty .empty-icon{width:112px;height:112px;font-size:40px;margin:0 0 20px;background:#f1f7ff;box-shadow:inset 0 0 0 16px #dcecff}
+    .order-merge-empty strong{font-size:15px;line-height:1.45}
+    .order-merge-empty span{display:block;margin-top:8px;color:#667085;font-size:13px;line-height:1.4}
+    .order-merge-foot{display:none;align-items:center;justify-content:flex-end;gap:8px;padding:14px 30px 24px;border-top:1px solid #e5e9ee}
+    @media(max-width:760px){.actions{flex-wrap:wrap;justify-content:flex-end}.order-merge-overlay{padding:8px}.order-merge-head{padding:18px 18px 12px}.order-merge-body{padding:14px 18px 22px}.order-merge-head h3{font-size:20px}.order-merge-desc{font-size:15px}.order-merge-table{min-width:840px}.order-merge-empty{min-height:260px}.order-merge-empty .empty-icon{width:112px;height:112px;font-size:40px;box-shadow:inset 0 0 0 16px #dcecff}}
   </style>
 </head>
 <body>
@@ -88,7 +120,7 @@
         <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
           <div class="tag-box">
-            <% [['draft','Phiếu tạm'],['shipping','Đang giao hàng'],['completed','Hoàn thành'],['cancelled','Đã hủy']].forEach(([value,label]) => { %>
+            <% [['draft','Phiếu tạm'],['shipping','Đang giao hàng'],['completed','Hoàn thành'],['cancelled','Đã hủy'],['merged','Đã gộp']].forEach(([value,label]) => { %>
               <label class="tag" style="<%= selectedStatuses.includes(value) ? '' : 'background:#e8f3ff;color:#006dff' %>"><input class="status-check" type="checkbox" name="trang_thai" value="<%= value %>" <%= selectedStatuses.includes(value) ? 'checked' : '' %> onchange="this.form.submit()"> <%= label %> <i class="fa-solid fa-xmark"></i></label>
             <% }) %>
           </div>
@@ -107,7 +139,7 @@
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu đặt"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
             <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Đặt hàng</a>
-            <button type="button" class="btn" onclick="alert('Chọn các đơn cần gộp trước khi dùng chức năng này.')"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
+            <button type="button" class="btn" id="openOrderMergeModal"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
             <button type="button" class="btn" id="openOrderExportModal"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></button>
           </div>
         </div>
@@ -117,7 +149,7 @@
             <tbody>
               <% if (safeOrders.length) { %>
                 <% safeOrders.forEach(o => { %>
-                  <tr class="order-row" data-order-row="<%= o._id %>" onclick="toggleOrderDetail('<%= o._id %>')"><td class="check-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('order', o, o.ma_don_hang, 'onclick="event.stopPropagation()"') %></td><td><%= new Date(o.ngay_dat || o.created_at).toLocaleString('vi-VN') %></td><td><%- o.khach_hang_id ? refLink('customer', o.khach_hang_id, o.khach_hang_id.ma_khach_hang, 'onclick="event.stopPropagation()"') : '' %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td class="num"><%= fmt(o.tong_thanh_toan || o.tong_tien) %></td><td class="num"><%= fmt(o.khach_thanh_toan || 0) %></td><td><span class="status-badge <%= o.trang_thai %>"><%= statusText(o.trang_thai) %></span></td><td><span class="status-badge <%= o.trang_thai_giao_hang %>"><%= deliveryStatusText(o.trang_thai_giao_hang) %></span></td></tr>
+                  <tr class="order-row" data-order-row="<%= o._id %>" data-order-id="<%= o._id %>" data-order-code="<%= o.ma_don_hang || '' %>" data-order-date="<%= new Date(o.ngay_dat || o.created_at).toISOString() %>" data-order-status="<%= o.trang_thai || '' %>" data-delivery-status="<%= o.trang_thai_giao_hang || 'chua_giao' %>" data-customer-id="<%= o.khach_hang_id ? o.khach_hang_id._id : '' %>" data-customer-code="<%= o.khach_hang_id ? (o.khach_hang_id.ma_khach_hang || '') : '' %>" data-customer-name="<%= o.khach_hang_id ? (o.khach_hang_id.ten_khach_hang || '') : 'Khách lẻ' %>" data-customer-phone="<%= o.khach_hang_id ? (o.khach_hang_id.sdt || o.khach_hang_id.dien_thoai || '') : '' %>" data-payable="<%= Number(o.tong_thanh_toan || o.tong_tien || 0) %>" data-paid="<%= Number(o.khach_thanh_toan || 0) %>" onclick="toggleOrderDetail('<%= o._id %>')"><td class="check-col"><input class="row-check order-select-check" type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('order', o, o.ma_don_hang, 'onclick="event.stopPropagation()"') %></td><td><%= new Date(o.ngay_dat || o.created_at).toLocaleString('vi-VN') %></td><td><%- o.khach_hang_id ? refLink('customer', o.khach_hang_id, o.khach_hang_id.ma_khach_hang, 'onclick="event.stopPropagation()"') : '' %></td><td><%= o.khach_hang_id ? o.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td class="num"><%= fmtMoney(o.tong_thanh_toan || o.tong_tien) %></td><td class="num"><%= fmtMoney(o.khach_thanh_toan || 0) %></td><td><span class="status-badge <%= o.trang_thai %>"><%= statusText(o.trang_thai) %></span></td><td><span class="status-badge <%= o.trang_thai_giao_hang %>"><%= deliveryStatusText(o.trang_thai_giao_hang) %></span></td></tr>
                   <tr class="detail-row" data-order-detail="<%= o._id %>"><td class="detail-cell" colspan="10"><div class="order-detail"><div class="loading-detail">Đang tải thông tin đơn...</div></div></td></tr>
                 <% }) %>
               <% } else { %>
@@ -129,6 +161,47 @@
       </main>
     </div>
   </form>
+
+  <div id="orderMergeModalOverlay" class="order-merge-overlay">
+    <div class="order-merge-modal" role="dialog" aria-labelledby="orderMergeModalTitle" aria-modal="true">
+      <div class="order-merge-head">
+        <h3 id="orderMergeModalTitle">Gộp phiếu đặt hàng</h3>
+        <button type="button" class="order-merge-close" id="orderMergeModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="order-merge-body">
+        <p class="order-merge-desc">Hệ thống hỗ trợ gộp các đơn đặt hàng đang <strong>chưa giao</strong> theo từng khách hàng thành 1 phiếu đặt hàng</p>
+        <div class="order-merge-filter">
+          <label for="orderMergeCustomerSelect">Khách hàng</label>
+          <select id="orderMergeCustomerSelect"></select>
+        </div>
+        <div style="overflow:auto">
+          <table class="order-merge-table">
+            <thead>
+              <tr>
+                <th class="order-merge-check"><input id="orderMergeCheckAll" type="checkbox"></th>
+                <th>Mã đặt hàng</th>
+                <th>Thời gian</th>
+                <th class="num">Khách cần trả</th>
+                <th class="num">Khách đã trả</th>
+                <th>Mã khách hàng</th>
+                <th>Tên khách hàng</th>
+              </tr>
+            </thead>
+            <tbody id="orderMergeRows"></tbody>
+          </table>
+        </div>
+        <div id="orderMergeEmpty" class="order-merge-empty">
+          <div class="empty-icon"><i class="fa-regular fa-inbox"></i></div>
+          <strong id="orderMergeEmptyTitle">Không có đơn hàng chưa giao</strong>
+          <span id="orderMergeEmptyDesc"></span>
+        </div>
+      </div>
+      <div id="orderMergeFoot" class="order-merge-foot">
+        <button type="button" class="btn" id="orderMergeCancel">Bỏ qua</button>
+        <button type="button" class="btn primary" id="orderMergeSubmit">Gộp đơn</button>
+      </div>
+    </div>
+  </div>
 
   <div id="orderExportModalOverlay" class="order-export-overlay">
     <div class="order-export-modal" role="dialog" aria-labelledby="orderExportModalTitle">
@@ -187,14 +260,117 @@
     <% }) %>
   </form>
 
+  <div id="deliveryConfirmOverlay" class="delivery-confirm-overlay">
+    <div class="delivery-confirm-modal" role="dialog" aria-labelledby="deliveryConfirmTitle">
+      <div class="delivery-confirm-head">
+        <div>
+          <h3 id="deliveryConfirmTitle">Xác nhận giao hàng</h3>
+          <p>Nhập số lượng giao cho từng dòng hàng còn thiếu.</p>
+        </div>
+        <button type="button" class="delivery-confirm-close" onclick="closeDeliveryConfirmModal()">×</button>
+      </div>
+      <div class="delivery-confirm-body">
+        <p id="deliveryConfirmError" class="delivery-confirm-error">Vui lòng nhập ít nhất một số lượng giao hợp lệ.</p>
+        <table class="delivery-confirm-table">
+          <thead>
+            <tr>
+              <th>Mã hàng</th>
+              <th>Tên hàng</th>
+              <th>Thuộc tính</th>
+              <th class="num">SL đặt</th>
+              <th class="num">Đã giao</th>
+              <th class="num">Còn thiếu</th>
+              <th class="num">SL giao</th>
+            </tr>
+          </thead>
+          <tbody id="deliveryConfirmBody"></tbody>
+        </table>
+        <div id="deliveryPaymentDue" class="delivery-payment-due"></div>
+        <div class="delivery-confirm-payment">
+          <label>Khách trả thêm</label>
+          <input id="deliveryPaidInput" value="0" inputmode="numeric" oninput="handleDeliveryPaidInput(this)">
+          <label>Phương thức</label>
+          <select id="deliveryPaymentMethod">
+            <option value="tien_mat">Tiền mặt</option>
+            <option value="chuyen_khoan">Chuyển khoản</option>
+            <option value="vi_dien_tu">Ví điện tử</option>
+            <option value="khac">Khác</option>
+          </select>
+        </div>
+      </div>
+      <div class="delivery-confirm-foot">
+        <button type="button" class="btn" onclick="closeDeliveryConfirmModal()">Bỏ qua</button>
+        <button type="button" class="btn solid" onclick="submitDeliveryConfirmModal()">Xác nhận giao</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="receiptPayOverlay" class="receipt-pay-overlay">
+    <div class="receipt-pay-modal" role="dialog" aria-labelledby="receiptPayTitle">
+      <div class="receipt-pay-head">
+        <h3 id="receiptPayTitle">Tạo phiếu thu</h3>
+        <button type="button" class="delivery-confirm-close" onclick="closeReceiptPayModal()">×</button>
+      </div>
+      <div class="receipt-pay-body">
+        <div id="receiptPayDue" class="receipt-pay-due"></div>
+        <div class="receipt-pay-grid">
+          <label>Số tiền thu</label>
+          <input id="receiptPayAmount" value="0" inputmode="numeric" oninput="handleReceiptPayAmountInput(this)">
+          <label>Phương thức</label>
+          <select id="receiptPayMethod">
+            <option value="tien_mat">Tiền mặt</option>
+            <option value="chuyen_khoan">Chuyển khoản</option>
+            <option value="vi_dien_tu">Ví điện tử</option>
+            <option value="khac">Khác</option>
+          </select>
+        </div>
+      </div>
+      <div class="receipt-pay-foot">
+        <button type="button" class="btn" onclick="closeReceiptPayModal()">Bỏ qua</button>
+        <button type="button" class="btn solid" onclick="submitReceiptPayModal()">Tạo phiếu thu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lockedActionOverlay" class="receipt-pay-overlay">
+    <div class="receipt-pay-modal" role="dialog" aria-labelledby="lockedActionTitle">
+      <div class="receipt-pay-head">
+        <h3 id="lockedActionTitle">Không thể thao tác</h3>
+        <button type="button" class="delivery-confirm-close" onclick="closeLockedActionModal()">×</button>
+      </div>
+      <div class="receipt-pay-body">
+        <div id="lockedActionMessage" class="locked-action-message"></div>
+      </div>
+      <div class="receipt-pay-foot">
+        <button type="button" class="btn solid" onclick="closeLockedActionModal()">Đã hiểu</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const money = value => Number(value || 0).toLocaleString('vi-VN');
-    const statusLabels = { draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy' };
+    const moneyText = value => money(value) + ' VNĐ';
+    const num = value => Number(String(value || '').replace(/[^\d-]/g, '')) || 0;
+    const statusLabels = { draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy', merged: 'Đã gộp' };
     const deliveryStatusLabels = { chua_giao: 'Chưa giao', giao_mot_phan: 'Giao một phần', giao_thieu: 'Giao thiếu', giao_du: 'Giao đủ' };
     const deliveryStatusText = status => deliveryStatusLabels[status] || 'Chưa giao';
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const refAnchor = (href, text) => href ? `<a class="ref-link" href="${escapeHtml(href)}" onclick="event.stopPropagation()">${escapeHtml(text || '--')}</a>` : escapeHtml(text || '--');
     const orderDetailCache = {};
+    let pendingDeliveryOrderId = '';
+    let pendingDeliveryPaymentDue = 0;
+    let pendingReceiptOrderId = '';
+    let pendingReceiptDue = 0;
+
+    function handleDeliveryPaidInput(input) {
+      const value = Math.min(num(input.value), pendingDeliveryPaymentDue);
+      input.value = money(value);
+    }
+
+    function handleReceiptPayAmountInput(input) {
+      const value = Math.min(num(input.value), pendingReceiptDue);
+      input.value = money(value);
+    }
 
     async function toggleOrderDetail(id) {
       const row = document.querySelector('[data-order-row="' + id + '"]');
@@ -238,12 +414,25 @@
 
     function renderOrderDetail(order, shipment, invoice, items, totalGoods, discount) {
       const customer = order.khach_hang_id || {};
+      if (order.trang_thai === 'merged') {
+        const mergedTarget = order.merged_to_don_hang_id
+          ? refAnchor('/don-hang?order=' + encodeURIComponent(order.merged_to_don_hang_id), order.merged_to_ma_don_hang || 'đơn nhận')
+          : escapeHtml(order.merged_to_ma_don_hang || 'đơn khác');
+        return `
+          <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
+          <div class="delivery-box">
+            <strong>Đơn này đã được gộp vào ${mergedTarget}</strong>
+            <div style="margin-top:8px;color:#667085">Đơn nguồn đã gộp không còn xử lý riêng. Vui lòng thao tác trên đơn nhận.</div>
+          </div>
+        `;
+      }
       const receiver = shipment?.ten_nguoi_nhan || customer.ten_khach_hang || '';
       const phone = shipment?.sdt_nguoi_nhan || customer.sdt || '';
       const address = shipment?.dia_chi_nhan || customer.dia_chi_day_du || '';
       const itemRows = items.map(item => {
         const product = item.hang_hoa_id || {};
         const deliveryStatus = deliveryStatusLabels[item.trang_thai_giao] || deliveryStatusLabels.chua_giao;
+        const attributeLabel = item.ten_thuoc_tinh || item.ten_quy_cach || '';
         return `<tr>
           <td>${refAnchor(product._id ? '/hang-hoa/' + product._id : '', product.ma_hang || '')}</td>
           <td>${escapeHtml(product.ten_hang || '')}</td>
@@ -252,21 +441,40 @@
           <td class="num">${money(item.so_luong_da_giao || 0)}</td>
           <td class="num">${money(item.so_luong_con_thieu || 0)}</td>
           <td>${escapeHtml(deliveryStatus)}</td>
-          <td class="num">${money(item.don_gia_ban)}</td>
-          <td class="num">${money(item.chiet_khau)}</td>
-          <td class="num">${money(item.don_gia_ban)}</td>
-          <td class="num"><strong>${money(item.thanh_tien)}</strong></td>
+          <td>${escapeHtml(attributeLabel || 'Không có')}</td>
+          <td class="num">${moneyText(item.chiet_khau)}</td>
+          <td class="num">${moneyText(item.don_gia_ban)}</td>
+          <td class="num"><strong>${moneyText(item.thanh_tien)}</strong></td>
         </tr>`;
       }).join('') || '<tr><td colspan="11" class="loading-detail">Đơn chưa có hàng hóa</td></tr>';
       const invoiceAction = invoice
         ? `<a class="btn solid" href="/don-hang/tra-hang/create?invoice_id=${invoice._id}"><i class="fa-solid fa-rotate-left"></i> Trả hàng</a>`
         : `<a class="btn solid" href="/don-hang/hoa-don/create?don_hang_id=${order._id}"><i class="fa-solid fa-file-invoice-dollar"></i> Tạo hóa đơn</a>`;
+      const deliveryComplete = order.trang_thai_giao_hang === 'giao_du';
+      const paidAmount = Number(order.khach_thanh_toan || 0);
+      const payableAmount = Number(order.tong_thanh_toan || order.tong_tien || 0);
+      const remainingAmount = Math.max(payableAmount - paidAmount, 0);
+      const lockedBlueActions = deliveryComplete
+        ? `<button type="button" class="btn disabled-action" onclick="showLockedAction('Xử lý đơn hàng')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn disabled-action" onclick="showLockedAction('Xác nhận giao')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button><button type="button" class="btn disabled-action" onclick="showLockedAction('Tạo hóa đơn')"><i class="fa-solid fa-file-invoice-dollar"></i> Tạo hóa đơn</button>`
+        : `<button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>${invoiceAction}`;
+      const receiptAction = remainingAmount > 0
+        ? `<div class="totals-receipt-action"><button type="button" class="btn solid" onclick="openReceiptPayModal('${order._id}', ${remainingAmount})"><i class="fa-solid fa-money-bill-wave"></i> Tạo phiếu thu</button></div>`
+        : '';
+      const mergedFromIds = Array.isArray(order.merged_from_don_hang_ids) ? order.merged_from_don_hang_ids : [];
+      const mergedFromCodes = Array.isArray(order.merged_from_ma_don_hangs) ? order.merged_from_ma_don_hangs : [];
+      const mergedFromLine = order.is_merged_order && mergedFromCodes.length
+        ? `<div style="margin-top:8px;color:#667085;font-size:13px">Được gộp từ: ${mergedFromCodes.map((code, index) => {
+            const sourceId = mergedFromIds[index];
+            return sourceId ? refAnchor('/don-hang?order=' + encodeURIComponent(sourceId), code) : escapeHtml(code);
+          }).join(', ')}</div>`
+        : '';
 
       return `
         <div class="detail-tabs"><button type="button" class="detail-tab">Thông tin</button></div>
         <div class="detail-head">
           <div>
             <div><span class="detail-title">${escapeHtml(customer.ten_khach_hang || 'Khách lẻ')}</span> <span>${refAnchor(order._id ? '/don-hang/' + order._id : '', order.ma_don_hang || '')}</span></div>
+            ${mergedFromLine}
             <div class="detail-meta">
               <div class="mini-field"><label>Người tạo</label><span>${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}</span></div>
               <div class="mini-field"><label>Người nhận đặt</label><input class="mini-input" value="${escapeHtml(order.nguoi_tao_id?.ho_ten || order.nguoi_tao_id?.username || '')}"></div>
@@ -276,7 +484,7 @@
               <div class="mini-field"><label>Trạng thái</label><select class="mini-select" onchange="updateOrderStatus('${order._id}',this.value)">${['draft','shipping','completed','cancelled'].map(status => `<option value="${status}" ${order.trang_thai === status ? 'selected' : ''}>${statusLabels[status]}</option>`).join('')}</select></div>
             </div>
           </div>
-          <div>${escapeHtml(order.cua_hang_id?.ten_cua_hang || 'Chi nhánh trung tâm')}</div>
+          <div>${escapeHtml(order.cua_hang_id?.ten_cua_hang || 'Cửa hàng trung tâm')}</div>
         </div>
         <div class="delivery-box">
           <div class="delivery-title"><span><i class="fa-regular fa-hand-point-right"></i> Tự giao đến: <strong>${escapeHtml(address || 'Chưa có địa chỉ giao hàng')}</strong></span><i class="fa-solid fa-chevron-up"></i></div>
@@ -293,19 +501,21 @@
           </div>
           <textarea class="note js-shipment-note" data-order-id="${order._id}" placeholder="Ghi chú giao...">${escapeHtml(shipment?.ghi_chu || '')}</textarea>
         </div>
-        <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">SL đặt</th><th class="num">SL xác nhận</th><th class="num">SL đã giao</th><th class="num">SL còn thiếu</th><th>Trạng thái giao</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">SL đặt</th><th class="num">SL xác nhận</th><th class="num">SL đã giao</th><th class="num">SL còn thiếu</th><th>Trạng thái giao</th><th>Thuộc tính</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
         <div class="detail-bottom">
           <textarea class="note js-order-note" data-order-id="${order._id}" placeholder="Ghi chú...">${escapeHtml(order.ghi_chu || '')}</textarea>
           <div class="totals">
-            <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${money(totalGoods)}</strong></div>
-            <div class="total-line"><span>Giảm giá phiếu đặt</span><span>${money(discount)}</span></div>
-            <div class="total-line"><span>Tổng cộng</span><strong>${money(order.tong_thanh_toan || order.tong_tien)}</strong></div>
-            <div class="total-line"><span>Khách đã trả</span><span>0</span></div>
+            <div class="total-line"><span>Tổng tiền hàng (${items.length})</span><strong>${moneyText(totalGoods)}</strong></div>
+            <div class="total-line"><span>Giảm giá phiếu đặt</span><span>${moneyText(discount)}</span></div>
+            <div class="total-line"><span>Tổng cộng</span><strong>${moneyText(order.tong_thanh_toan || order.tong_tien)}</strong></div>
+            <div class="total-line"><span>Khách đã trả</span><span>${moneyText(paidAmount)}</span></div>
+            <div class="total-line"><span>Còn cần thanh toán</span><strong>${moneyText(remainingAmount)}</strong></div>
+            ${receiptAction}
           </div>
         </div>
         <div class="page-actions page-actions--split page-actions--bordered detail-actions">
           <div class="page-actions__left detail-action-group"><button type="button" class="btn" onclick="deleteOrder('${order._id}')"><i class="fa-regular fa-trash-can"></i> Hủy</button><a class="btn" href="/don-hang/create?copy_from=${order._id}"><i class="fa-regular fa-copy"></i> Sao chép</a><a class="btn" href="/don-hang/${order._id}/export.xlsx"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
-          <div class="page-actions__right detail-action-group"><button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>${invoiceAction}<button type="button" class="btn" onclick="saveOrderDetail('${order._id}')"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><a class="btn" href="/chung-tu-kho/ban-hang/${order._id}" target="_blank"><i class="fa-solid fa-print"></i> Mở riêng</a></div>
+          <div class="page-actions__right detail-action-group">${lockedBlueActions}<button type="button" class="btn" onclick="saveOrderDetail('${order._id}')"><i class="fa-regular fa-floppy-disk"></i> Lưu</button><button type="button" class="btn" onclick="finishOrder('${order._id}', '${order.trang_thai_giao_hang || 'chua_giao'}')"><i class="fa-regular fa-circle-check"></i> Kết thúc</button><a class="btn" href="/chung-tu-kho/ban-hang/${order._id}" target="_blank"><i class="fa-solid fa-print"></i> Mở riêng</a></div>
         </div>`;
     }
 
@@ -313,6 +523,47 @@
       const res = await fetch('/don-hang/' + id + '/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trang_thai: status, force_complete_short: forceCompleteShort }) });
       const data = await res.json();
       if (!data.success) return alert(data.message || 'Không cập nhật được trạng thái');
+      location.reload();
+    }
+
+    function showLockedAction(buttonName) {
+      document.getElementById('lockedActionMessage').textContent = `Đơn đã hoàn thành, không thể thao tác nút "${buttonName}".`;
+      document.getElementById('lockedActionOverlay').style.display = 'flex';
+    }
+
+    function closeLockedActionModal() {
+      document.getElementById('lockedActionOverlay').style.display = 'none';
+    }
+
+    function openReceiptPayModal(orderId, dueAmount) {
+      pendingReceiptOrderId = orderId;
+      pendingReceiptDue = Math.max(0, Number(dueAmount || 0));
+      document.getElementById('receiptPayDue').textContent = 'Khách còn nợ đơn hàng này: ' + moneyText(pendingReceiptDue);
+      document.getElementById('receiptPayAmount').value = money(pendingReceiptDue);
+      document.getElementById('receiptPayMethod').value = 'tien_mat';
+      document.getElementById('receiptPayOverlay').style.display = 'flex';
+    }
+
+    function closeReceiptPayModal() {
+      pendingReceiptOrderId = '';
+      pendingReceiptDue = 0;
+      document.getElementById('receiptPayOverlay').style.display = 'none';
+    }
+
+    async function submitReceiptPayModal() {
+      const amount = num(document.getElementById('receiptPayAmount')?.value);
+      if (!pendingReceiptOrderId || amount <= 0) return alert('Vui lòng nhập số tiền thu.');
+      if (amount > pendingReceiptDue) return alert('Khách chỉ còn nợ ' + moneyText(pendingReceiptDue));
+      const res = await fetch('/don-hang/' + pendingReceiptOrderId + '/phieu-thu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gia_tri: amount,
+          phuong_thuc_thanh_toan: document.getElementById('receiptPayMethod')?.value || 'tien_mat'
+        })
+      });
+      const data = await res.json();
+      if (!data.success) return alert(data.message || 'Không tạo được phiếu thu');
       location.reload();
     }
 
@@ -328,27 +579,70 @@
       const items = detail.items || [];
       const khoId = order.kho_id?._id || order.kho_id;
       if (!khoId) return alert('Đơn chưa có kho giao hàng.');
-      const deliveryItems = [];
-      for (const item of items) {
+      const rows = items.map(item => {
         const missing = Number(item.so_luong_con_thieu || item.so_luong_dat || item.so_luong || 0);
-        if (missing <= 0) continue;
+        if (missing <= 0) return '';
         const product = item.hang_hoa_id || {};
-        const raw = prompt(`Số lượng giao cho ${product.ma_hang || product.ten_hang || 'hàng hóa'} (còn thiếu ${missing})`, String(missing));
-        if (raw === null) continue;
-        const quantity = Number(String(raw).replace(',', '.'));
-        if (!Number.isFinite(quantity) || quantity <= 0) continue;
-        deliveryItems.push({
-          ct_don_hang_id: item._id,
-          hang_hoa_id: product._id || item.hang_hoa_id,
-          lo_hang_id: item.lo_hang_id || '',
+        const attributeLabel = item.ten_thuoc_tinh || item.ten_quy_cach || 'Không có';
+        return `<tr data-delivery-line
+          data-ct-id="${escapeHtml(item._id || '')}"
+          data-product-id="${escapeHtml(product._id || item.hang_hoa_id || '')}"
+          data-lot-id="${escapeHtml(item.lo_hang_id || '')}">
+          <td>${escapeHtml(product.ma_hang || '')}</td>
+          <td>${escapeHtml(product.ten_hang || '')}</td>
+          <td>${escapeHtml(attributeLabel)}</td>
+          <td class="num">${money(item.so_luong_dat || item.so_luong || 0)}</td>
+          <td class="num">${money(item.so_luong_da_giao || 0)}</td>
+          <td class="num" data-missing="${missing}">${money(missing)}</td>
+          <td class="num"><input value="${missing}" inputmode="decimal" data-delivery-qty></td>
+        </tr>`;
+      }).filter(Boolean).join('');
+      if (!rows) return alert('Đơn hàng không còn dòng cần giao.');
+      pendingDeliveryPaymentDue = Math.max(Number(order.tong_thanh_toan || order.tong_tien || 0) - Number(order.khach_thanh_toan || 0), 0);
+      pendingDeliveryOrderId = id;
+      document.getElementById('deliveryConfirmBody').innerHTML = rows;
+      document.getElementById('deliveryPaymentDue').textContent = `Khách còn cần thanh toán: ${moneyText(pendingDeliveryPaymentDue)}`;
+      document.getElementById('deliveryPaidInput').value = '0';
+      document.getElementById('deliveryPaymentMethod').value = 'tien_mat';
+      document.getElementById('deliveryConfirmError').style.display = 'none';
+      document.getElementById('deliveryConfirmOverlay').style.display = 'flex';
+    }
+
+    function closeDeliveryConfirmModal() {
+      pendingDeliveryOrderId = '';
+      pendingDeliveryPaymentDue = 0;
+      document.getElementById('deliveryConfirmOverlay').style.display = 'none';
+    }
+
+    async function submitDeliveryConfirmModal() {
+      const id = pendingDeliveryOrderId;
+      const detail = orderDetailCache[id];
+      if (!id || !detail) return closeDeliveryConfirmModal();
+      const order = detail.order || {};
+      const khoId = order.kho_id?._id || order.kho_id;
+      const deliveryItems = Array.from(document.querySelectorAll('[data-delivery-line]')).map(row => {
+        const quantity = Number(String(row.querySelector('[data-delivery-qty]')?.value || '').replace(',', '.'));
+        return {
+          ct_don_hang_id: row.dataset.ctId,
+          hang_hoa_id: row.dataset.productId,
+          lo_hang_id: row.dataset.lotId || '',
           so_luong_giao: quantity
-        });
-      }
+        };
+      }).filter(item => Number.isFinite(item.so_luong_giao) && item.so_luong_giao > 0);
       if (!deliveryItems.length) return alert('Chưa có số lượng giao.');
+      const extraPaid = num(document.getElementById('deliveryPaidInput')?.value);
+      if (extraPaid > pendingDeliveryPaymentDue) {
+        return alert('Khách chỉ còn cần thanh toán ' + moneyText(pendingDeliveryPaymentDue));
+      }
       const res = await fetch('/don-hang/' + id + '/xac-nhan-giao', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kho_id: khoId, items: deliveryItems })
+        body: JSON.stringify({
+          kho_id: khoId,
+          items: deliveryItems,
+          khach_thanh_toan: extraPaid,
+          phuong_thuc_thanh_toan: document.getElementById('deliveryPaymentMethod')?.value || 'tien_mat'
+        })
       });
       const data = await res.json();
       if (!data.success) return alert(data.message || 'Không xác nhận giao được.');
@@ -383,6 +677,179 @@
       if (!data.success) return alert(data.message || 'Không lưu được đơn hàng');
       alert(data.message || 'Đã lưu thông tin đơn hàng');
     }
+
+    (function initOrderMergeModal() {
+      const overlay = document.getElementById('orderMergeModalOverlay');
+      const openBtn = document.getElementById('openOrderMergeModal');
+      const closeBtn = document.getElementById('orderMergeModalClose');
+      const cancelBtn = document.getElementById('orderMergeCancel');
+      const rowsEl = document.getElementById('orderMergeRows');
+      const emptyEl = document.getElementById('orderMergeEmpty');
+      const emptyTitleEl = document.getElementById('orderMergeEmptyTitle');
+      const emptyDescEl = document.getElementById('orderMergeEmptyDesc');
+      const footEl = document.getElementById('orderMergeFoot');
+      const customerSelect = document.getElementById('orderMergeCustomerSelect');
+      const modalCheckAll = document.getElementById('orderMergeCheckAll');
+      const submitBtn = document.getElementById('orderMergeSubmit');
+      const selectAll = document.querySelector('.table thead .row-check');
+      const orderChecks = Array.from(document.querySelectorAll('.order-select-check'));
+      let modalOrders = [];
+
+      function readOrder(row) {
+        return {
+          id: row.dataset.orderId || '',
+          code: row.dataset.orderCode || '',
+          date: new Date(row.dataset.orderDate || ''),
+          status: row.dataset.orderStatus || '',
+          deliveryStatus: row.dataset.deliveryStatus || '',
+          customerId: row.dataset.customerId || '',
+          customerCode: row.dataset.customerCode || '',
+          customerName: row.dataset.customerName || 'Khách lẻ',
+          customerKey: row.dataset.customerId || row.dataset.customerCode || '',
+          payable: Number(row.dataset.payable || 0),
+          paid: Number(row.dataset.paid || 0)
+        };
+      }
+
+      function isUndeliveredOrder(order) {
+        return order.deliveryStatus === 'chua_giao';
+      }
+
+      function getModalCustomers(orders) {
+        const map = new Map();
+        orders.forEach(order => {
+          if (!order.customerKey) return;
+          if (!map.has(order.customerKey)) {
+            map.set(order.customerKey, {
+              key: order.customerKey,
+              code: order.customerCode,
+              name: order.customerName || 'Khách lẻ'
+            });
+          }
+        });
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      }
+
+      function renderCustomerOptions(orders) {
+        if (!customerSelect) return;
+        const customers = getModalCustomers(orders);
+        customerSelect.innerHTML = '<option value="">Tất cả khách hàng</option>' + customers.map(customer => {
+          const label = [customer.code, customer.name].filter(Boolean).join(' - ');
+          return `<option value="${escapeHtml(customer.key)}">${escapeHtml(label)}</option>`;
+        }).join('');
+      }
+
+      function getFilteredModalOrders() {
+        const customerKey = customerSelect?.value || '';
+        return customerKey ? modalOrders.filter(order => order.customerKey === customerKey) : modalOrders;
+      }
+
+      function updateModalCheckAll() {
+        if (!modalCheckAll) return;
+        const rowChecks = Array.from(document.querySelectorAll('.order-merge-row-check'));
+        modalCheckAll.checked = rowChecks.length > 0 && rowChecks.every(cb => cb.checked);
+        modalCheckAll.indeterminate = rowChecks.some(cb => cb.checked) && !modalCheckAll.checked;
+      }
+
+      function renderRows(orders, emptyTitle, emptyDesc) {
+        if (!rowsEl || !emptyEl || !footEl) return;
+        const hasRows = orders.length > 0;
+        rowsEl.innerHTML = hasRows ? orders.map(order => `
+          <tr>
+            <td class="order-merge-check"><input class="order-merge-row-check" type="checkbox" value="${escapeHtml(order.id)}" data-customer-key="${escapeHtml(order.customerKey)}"></td>
+            <td>${escapeHtml(order.code)}</td>
+            <td>${escapeHtml(Number.isFinite(order.date.getTime()) ? order.date.toLocaleString('vi-VN') : '')}</td>
+            <td class="num">${moneyText(order.payable)}</td>
+            <td class="num">${moneyText(order.paid)}</td>
+            <td>${escapeHtml(order.customerCode)}</td>
+            <td>${escapeHtml(order.customerName)}</td>
+          </tr>
+        `).join('') : '';
+        if (emptyTitleEl) emptyTitleEl.textContent = emptyTitle || 'Không có đơn hàng chưa giao';
+        if (emptyDescEl) emptyDescEl.textContent = emptyDesc || '';
+        emptyEl.style.display = hasRows ? 'none' : 'flex';
+        footEl.style.display = hasRows ? 'flex' : 'none';
+        updateModalCheckAll();
+        document.querySelectorAll('.order-merge-row-check').forEach(cb => cb.addEventListener('change', updateModalCheckAll));
+      }
+
+      function refreshModalRows() {
+        const filteredOrders = getFilteredModalOrders();
+        renderRows(filteredOrders, 'Không có đơn hàng chưa giao', 'Không có đơn hàng phù hợp với khách hàng đang chọn.');
+      }
+
+      async function submitMergeOrders() {
+        const selectedIds = Array.from(document.querySelectorAll('.order-merge-row-check:checked')).map(cb => cb.value).filter(Boolean);
+        if (selectedIds.length < 2) {
+          return alert('Vui lòng chọn ít nhất 2 đơn để gộp.');
+        }
+        const selectedCustomerKeys = new Set(
+          Array.from(document.querySelectorAll('.order-merge-row-check:checked'))
+            .map(cb => cb.dataset.customerKey || '')
+            .filter(Boolean)
+        );
+        if (selectedCustomerKeys.size > 1) {
+          return alert('Chỉ được gộp các đơn thuộc cùng một khách hàng.');
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+          const res = await fetch('/api/don-hang/gop-don', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ don_hang_ids: selectedIds })
+          });
+          const data = await res.json();
+          if (!data.success) return alert(data.message || 'Không gộp được đơn.');
+          window.location.href = '/don-hang?order=' + encodeURIComponent(data.data?.don_nhan_id || selectedIds[0]);
+        } catch (error) {
+          alert('Không gộp được đơn.');
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      }
+
+      function openModal() {
+        if (!overlay) return;
+        const allRows = Array.from(document.querySelectorAll('.order-row'));
+        modalOrders = allRows.map(readOrder).filter(isUndeliveredOrder);
+        renderCustomerOptions(modalOrders);
+        if (customerSelect) customerSelect.value = '';
+        renderRows(modalOrders, 'Không có đơn hàng chưa giao', 'Danh sách hiện tại không có đơn hàng nào ở trạng thái Chưa giao.');
+        overlay.style.display = 'flex';
+      }
+
+      function closeModal() {
+        if (overlay) overlay.style.display = 'none';
+      }
+
+      if (selectAll) {
+        selectAll.addEventListener('click', e => {
+          e.stopPropagation();
+          orderChecks.forEach(cb => { cb.checked = selectAll.checked; });
+        });
+      }
+      orderChecks.forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (!selectAll) return;
+          selectAll.checked = orderChecks.length > 0 && orderChecks.every(item => item.checked);
+          selectAll.indeterminate = orderChecks.some(item => item.checked) && !selectAll.checked;
+        });
+      });
+      if (openBtn) openBtn.addEventListener('click', openModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (submitBtn) submitBtn.addEventListener('click', submitMergeOrders);
+      if (customerSelect) customerSelect.addEventListener('change', refreshModalRows);
+      if (modalCheckAll) {
+        modalCheckAll.addEventListener('change', () => {
+          document.querySelectorAll('.order-merge-row-check').forEach(cb => { cb.checked = modalCheckAll.checked; });
+          updateModalCheckAll();
+        });
+      }
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && overlay?.style.display === 'flex') closeModal();
+      });
+    })();
 
     (function initOrderExportModal() {
       const overlay = document.getElementById('orderExportModalOverlay');

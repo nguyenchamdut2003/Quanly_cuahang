@@ -26,6 +26,10 @@ const {
 } = require('../models/kiot.model');
 const { layTonKhoTheoKho, layTonKhoTheoLo } = require('../services/kho.service');
 const { tinhPhiGiaoHang } = require('../services/phiGiaoHang.service');
+const {
+    buildVariantKey,
+    getReservedQuantitiesByOrder
+} = require('../services/availability.service');
 
 router.use(isAuthenticated);
 
@@ -338,6 +342,65 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                 ton_kho: 0,
                 ...supplierFields(product)
             });
+        });
+
+        const qcRows = await TonKhoLoQuyCach.find({ kho_id: khoId, so_luong: { $gt: 0 } }).lean();
+        const qcByProduct = qcRows.reduce((map, row) => {
+            const productId = String(row.hang_hoa_id || '');
+            const name = String(row.ten_quy_cach || row.ten_thuoc_tinh || '').trim();
+            if (!productId || !name) return map;
+            const key = `${productId}::${name}`;
+            if (!map[key]) {
+                map[key] = {
+                    ten_quy_cach: name,
+                    ten_thuoc_tinh: String(row.ten_thuoc_tinh || name),
+                    ton_hien_tai: 0,
+                    gia_von: Number(row.gia_von || 0),
+                    don_gia_nhap: Number(row.don_gia_nhap || 0)
+                };
+            }
+            map[key].ton_hien_tai += Number(row.so_luong || 0);
+            if (Number(row.gia_von || 0) > 0) map[key].gia_von = Number(row.gia_von || 0);
+            if (Number(row.don_gia_nhap || 0) > 0) map[key].don_gia_nhap = Number(row.don_gia_nhap || 0);
+            return map;
+        }, {});
+        Object.entries(qcByProduct).forEach(([key, qc]) => {
+            const productId = key.split('::')[0];
+            const product = products.get(productId);
+            if (!product) return;
+            if (!Array.isArray(product.quy_cach_items)) product.quy_cach_items = [];
+            product.quy_cach_items.push(qc);
+            product.has_quy_cach = true;
+        });
+        const productIds = Array.from(products.keys());
+        const reserved = await getReservedQuantitiesByOrder({
+            kho_id: khoId,
+            hang_hoa_ids: productIds
+        });
+        products.forEach((product, productId) => {
+            const tonThucTe = Number(product.ton_kho || product.ton || 0);
+            const soLuongKhachDat = Number(reserved.byProduct[productId]?.so_luong_khach_dat || 0);
+            product.ton_thuc_te = tonThucTe;
+            product.so_luong_khach_dat = soLuongKhachDat;
+            product.so_luong_kha_dung = tonThucTe - soLuongKhachDat;
+
+            if (Array.isArray(product.quy_cach_items)) {
+                product.quy_cach_items = product.quy_cach_items.map(qc => {
+                    const qcTonThucTe = Number(qc.ton_kho ?? qc.ton_hien_tai ?? qc.ton ?? 0);
+                    const variantKey = buildVariantKey({
+                        hang_hoa_id: productId,
+                        gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
+                        ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || ''
+                    });
+                    const qcKhachDat = Number(reserved.byVariant[variantKey]?.so_luong_khach_dat || 0);
+                    return Object.assign({}, qc, {
+                        ton_kho: qcTonThucTe,
+                        ton_thuc_te: qcTonThucTe,
+                        so_luong_khach_dat: qcKhachDat,
+                        so_luong_kha_dung: qcTonThucTe - qcKhachDat
+                    });
+                });
+            }
         });
 
         res.json({
