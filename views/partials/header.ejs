@@ -14,7 +14,6 @@
             const storeAddress = store?.dia_chi_day_du || [
               store?.dia_chi_chi_tiet,
               store?.phuong_xa,
-              store?.quan_huyen,
               store?.tinh_thanh
             ].filter(Boolean).join(', ');
             const storeEditUrl = store?._id ? `/cua-hang?open=${store._id}` : '/cua-hang';
@@ -162,6 +161,7 @@
           </div>
         </div>
       </div>
+      <a href="/bao-cao/58" class="nav-item">Báo cáo 58</a>
     </nav>
 
   </div>

@@ -12,7 +12,8 @@
 <% } else if (currentFlash && currentFlash.error === 'missing_bang_gia_name') { %>
   <div class="flash-message flash-error">Vui lòng nhập tên bảng giá.</div>
 <% } else if (currentFlash && currentFlash.error) { %>
-  <div class="flash-message flash-error">Thao tác không thành công. Vui lòng thử lại.</div>
+  <% const flashErrorText = String(currentFlash.error || '').trim(); %>
+  <div class="flash-message flash-error"><%= flashErrorText.length > 80 || flashErrorText.includes(' ') ? flashErrorText : 'Thao tác không thành công. Vui lòng thử lại.' %></div>
 <% } %>
 <% if (currentFlash && currentFlash.success === 'created_bang_gia') { %>
   <div class="flash-message flash-success">Đã tạo bảng giá mới.</div>

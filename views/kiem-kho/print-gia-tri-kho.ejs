@@ -1,0 +1,120 @@
+<%
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const d = value => {
+    if (!value) return '';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN');
+  };
+  const lotLabel = row => {
+    const ten = String(row.ten_lo || '').trim();
+    const ma = String(row.ma_lo || '').trim();
+    if (ten) return ten;
+    if (ma) return ma;
+    return row.lo_hang_label || (row.ma_lo || row.ten_lo ? 'Lô không tên' : '');
+  };
+  const store = typeof locals.store !== 'undefined' ? locals.store : {};
+  const warehouse = typeof locals.warehouse !== 'undefined' ? locals.warehouse : {};
+  const creator = typeof locals.creator !== 'undefined' ? locals.creator : {};
+  const creatorName = creator.ho_ten || creator.username || creator.email || '';
+  const lines = Array.isArray(locals.items) ? locals.items : [];
+  const totalTon = typeof locals.totalTon === 'number' ? locals.totalTon : lines.reduce((s, r) => s + Number(r.ton_kho_he_thong || 0), 0);
+  const totalGiaTri = typeof locals.totalGiaTri === 'number' ? locals.totalGiaTri : lines.reduce((s, r) => s + Number(r.gia_tri_kho || 0), 0);
+  const embeddedPrint = !!locals.embeddedPrint;
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title><%= title || 'Phiếu giá trị kho' %></title>
+  <style>
+    body{font-family:Arial,sans-serif;color:#111;margin:0;background:#f3f4f6}
+    .page{width:210mm;min-height:297mm;margin:0 auto;background:#fff;padding:16mm;box-sizing:border-box}
+    h1{text-align:center;font-size:22px;margin:14px 0 6px;text-transform:uppercase}
+    .sub{text-align:center;font-size:13px;color:#475467;margin-bottom:8px}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;font-size:13px;margin:14px 0}
+    .store{text-align:center;font-size:13px}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    th,td{border:1px solid #333;padding:5px 6px;font-size:11px}
+    th{text-align:center;background:#f1f5f9}
+    .num{text-align:right}
+    .summary{width:82mm;margin-left:auto;margin-top:12px;font-size:13px}
+    .summary div{display:flex;justify-content:space-between;padding:4px 0;gap:12px}
+    .sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:28px;text-align:center;font-size:13px}
+    .sign b{display:block;margin-bottom:46px}
+    .print-actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}
+    .print-actions button,.print-actions a{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+    @media print{body{background:#fff}.page{margin:0;width:auto;min-height:auto;padding:12mm}.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+  <% if (!embeddedPrint) { %>
+    <div class="print-actions no-print">
+      <button type="button" onclick="window.print()">In</button>
+      <button type="button" onclick="window.location.href = '/kiem-kho/in-gia-tri-kho-preview/pdf'">Tải PDF</button>
+      <button type="button" onclick="window.open('/kiem-kho/in-gia-tri-kho-preview', '_blank')">Mở riêng</button>
+    </div>
+  <% } %>
+  <main class="page">
+    <div class="store">
+      <strong><%= store.ten_cua_hang || 'Cửa hàng' %></strong><br>
+      <%= store.dia_chi_day_du || store.dia_chi || '' %> <%= store.sdt ? (' - ' + store.sdt) : '' %>
+    </div>
+    <h1>Phiếu giá trị kho</h1>
+    <div class="sub">Giá trị tồn theo hệ thống — không phải phiếu chênh lệch kiểm kho</div>
+    <div style="text-align:center;font-size:13px">Trạng thái: <strong>Xem trước (chưa hoàn thành phiếu kiểm kho)</strong></div>
+
+    <section class="meta">
+      <div>Thời gian in: <strong><%= locals.printedAt ? new Date(locals.printedAt).toLocaleString('vi-VN') : new Date().toLocaleString('vi-VN') %></strong></div>
+      <div>Kho: <strong><%= warehouse.ten_kho || warehouse.ma_kho || '' %></strong></div>
+      <div>Người lập: <strong><%= creatorName %></strong></div>
+      <div>Ghi chú: <strong><%= locals.ghi_chu || '' %></strong></div>
+    </section>
+
+    <table>
+      <thead>
+        <tr>
+          <th>STT</th>
+          <th>Mã hàng</th>
+          <th>Tên hàng</th>
+          <th>ĐVT</th>
+          <th>Tên lô</th>
+          <th>Thuộc tính</th>
+          <th>Hạn SD</th>
+          <th>NCC</th>
+          <th>Số lượng tồn</th>
+          <th>Đơn giá vốn</th>
+          <th>Giá trị kho</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% lines.forEach(function(row, index) { %>
+          <tr>
+            <td class="num"><%= index + 1 %></td>
+            <td><%= row.ma_hang || '' %></td>
+            <td><%= row.ten_hang || '' %></td>
+            <td><%= row.don_vi_tinh || '' %></td>
+            <td><%= lotLabel(row) %></td>
+            <td><%= row.ten_quy_cach || '' %></td>
+            <td><%= d(row.han_su_dung) %></td>
+            <td><%= row.ten_ncc || '---' %></td>
+            <td class="num"><%= fmt(row.ton_kho_he_thong) %></td>
+            <td class="num"><%= fmt(row.don_gia_von) %></td>
+            <td class="num"><%= fmt(row.gia_tri_kho) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div><span>Tổng số lượng tồn</span><strong><%= fmt(totalTon) %></strong></div>
+      <div><span>Tổng giá trị kho</span><strong><%= fmt(totalGiaTri) %> VND</strong></div>
+    </section>
+
+    <section class="sign">
+      <div><b>Người lập phiếu</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Thủ kho</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Kế toán</b>(Ký, ghi rõ họ tên)</div>
+    </section>
+  </main>
+</body>
+</html>

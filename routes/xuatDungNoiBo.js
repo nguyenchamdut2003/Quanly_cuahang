@@ -54,7 +54,7 @@ async function loadProductsForXnbKho(khoId, keyword) {
         const lot = row.lo_hang_id;
         if (lot && lot.trang_thai === 'huy') return map;
         const key = String(row.hang_hoa_id);
-        const lotName = lot ? ([lot.ma_lo, lot.ten_lo].filter(Boolean).join(' - ') || '') : '';
+        const lotName = lot ? ([lot.ten_lo, lot.ma_lo ? `Ma: ${lot.ma_lo}` : ''].filter(Boolean).join(' - ') || '') : '';
         if (!map[key]) map[key] = [];
         map[key].push({
             lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
@@ -218,7 +218,7 @@ function getCreatorName(user) {
 }
 
 function getLotName(lot) {
-    return lot ? (lot.ma_lo || lot.ten_lo || '') : '';
+    return lot ? (lot.ten_lo || lot.ma_lo || '') : '';
 }
 
 function buildExportRow(ticket, detail) {
@@ -292,6 +292,15 @@ function buildDetailSummary(details) {
         totalQuantity,
         totalValue
     };
+}
+
+function sendDetailJsonError(res, error, fallbackMessage) {
+    const status = error && Number(error.status || error.statusCode) || 500;
+    const message = error && error.message ? error.message : fallbackMessage;
+    return res.status(status >= 400 && status < 600 ? status : 500).json({
+        success: false,
+        message
+    });
 }
 
 function applyWorksheetFormat(worksheet) {
@@ -759,7 +768,7 @@ router.get('/details', async (req, res, next) => {
             totalValue: summary.totalValue
         });
     } catch (error) {
-        next(error);
+        return sendDetailJsonError(res, error, 'Không tải được chi tiết tổng xuất dùng nội bộ');
     }
 });
 
@@ -802,7 +811,7 @@ router.get('/:id/details', async (req, res, next) => {
             totalValue: summary.totalValue
         });
     } catch (error) {
-        next(error);
+        return sendDetailJsonError(res, error, 'Không tải được chi tiết phiếu xuất dùng nội bộ');
     }
 });
 

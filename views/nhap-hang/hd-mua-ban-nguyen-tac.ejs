@@ -84,7 +84,7 @@
               <td class="num"><%= fmt(row.thanh_tien) %></td>
             <% } else { %>
               <td><%= product.ten_hang || '' %></td>
-              <td><%= row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '' %></td>
+              <td><%= row.lo_hang_id ? (row.lo_hang_id.ten_lo || row.lo_hang_id.ma_lo || '') : '' %></td>
               <td class="num"><%= fmt(row.so_luong) %></td>
               <td class="num"><%= fmt(row.don_gia_nhap) %></td>
               <td class="num"><%= fmt(row.thanh_tien) %></td>

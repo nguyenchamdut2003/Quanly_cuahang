@@ -120,7 +120,7 @@ function getCreatorName(user) {
 }
 
 function getLotName(lot) {
-  return lot ? (lot.ma_lo || lot.ten_lo || '') : '';
+  return lot ? (lot.ten_lo || lot.ma_lo || '') : '';
 }
 
 function buildExportRow(ticket, detail) {
@@ -460,7 +460,7 @@ exports.index = async function(req, res, next) {
     if (ticketIds.length) {
       detailRows = await CTXuatHuy.find({ phieu_xuat_huy_id: { $in: ticketIds } })
         .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
-        .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+        .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
         .sort({ created_at: 1 })
         .lean();
     }
@@ -536,7 +536,7 @@ async function loadDestroyCopyDraft(copyFromId) {
   if (!ticket || ticket.trang_thai === 'cancelled') return null;
   const lines = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id })
     .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
-    .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo' })
+    .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
     .sort({ created_at: 1 })
     .lean();
   if (!lines.length) return null;
@@ -550,7 +550,8 @@ async function loadDestroyCopyDraft(copyFromId) {
       ten_quy_cach: row.ten_quy_cach || '',
       ma_hang: row.hang_hoa_id?.ma_hang || '',
       ten_hang: row.hang_hoa_id?.ten_hang || '',
-      ma_lo: row.lo_hang_id?.ma_lo || row.lo_hang_id?.ten_lo || '',
+      ma_lo: row.lo_hang_id?.ma_lo || '',
+      ten_lo: row.lo_hang_id?.ten_lo || '',
       so_luong: Number(row.so_luong || 0),
       gia_von: Number(row.gia_von || 0),
       ghi_chu: row.ghi_chu || ''
@@ -704,7 +705,7 @@ exports.apiWarehouseProducts = async function(req, res) {
       if (!map[key]) map[key] = [];
       map[key].push({
         _id: String(row.lo_hang_id && row.lo_hang_id._id ? row.lo_hang_id._id : row.lo_hang_id),
-        ma_lo: row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '',
+        ma_lo: row.lo_hang_id ? (row.lo_hang_id.ma_lo || '') : '',
         ten_lo: row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : '',
         so_luong: Number(row.so_luong || 0),
         gia_von: Number(row.gia_von || 0)
@@ -820,7 +821,7 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
     const details = await CTPhieuNhap.find({ phieu_nhap_id: purchase._id })
       .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang don_vi_tinh_id quan_ly_theo_lo gia_von' })
       .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
-      .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo so_luong_con_lai han_su_dung' })
+      .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo so_luong_con_lai han_su_dung ngay_nhap' })
       .sort({ created_at: 1 })
       .lean();
 
@@ -835,7 +836,7 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
       const lot = lotRow.lo_hang_id;
       map[key].push({
         _id: String(lot && lot._id ? lot._id : lotRow.lo_hang_id),
-        ma_lo: lot ? (lot.ma_lo || lot.ten_lo || '') : '',
+        ma_lo: lot ? (lot.ma_lo || '') : '',
         ten_lo: lot ? (lot.ten_lo || '') : '',
         so_luong: Number(lotRow.so_luong || 0),
         gia_von: Number(lotRow.gia_von || 0)
@@ -883,7 +884,7 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
         don_vi_tinh: row.don_vi_tinh_id ? (row.don_vi_tinh_id.ten_don_vi || row.don_vi_tinh_id.ma_don_vi || '') : '',
         quan_ly_theo_lo: manageLots,
         lo_hang_id: lotId ? String(lotId) : '',
-        ma_lo: selectedLot ? selectedLot.ma_lo : (row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : ''),
+        ma_lo: selectedLot ? selectedLot.ma_lo : (row.lo_hang_id ? (row.lo_hang_id.ma_lo || '') : ''),
         ten_lo: selectedLot ? selectedLot.ten_lo : (row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : ''),
         lots: lotsByProduct[String(productId)] || [],
         has_quy_cach: hasQc,

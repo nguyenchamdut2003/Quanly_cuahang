@@ -203,6 +203,8 @@
                           <tr>
                             <th style="width:200px">Mã hàng</th>
                             <th>Tên hàng</th>
+                            <th style="width:140px">Tên lô</th>
+                            <th style="width:140px">Thuộc tính</th>
                             <th class="num" style="width:120px">Tồn kho</th>
                             <th class="num" style="width:120px">Thực tế</th>
                             <th class="num" style="width:120px">SL lệch</th>
@@ -213,14 +215,20 @@
                           <tr>
                             <td><input class="filter-input" placeholder="Tìm mã hàng"></td>
                             <td><input class="filter-input" placeholder="Tìm tên hàng"></td>
-                            <td></td><td></td><td></td><td></td>
+                            <td></td><td></td><td></td><td></td><td></td><td></td>
                           </tr>
                           <% detailItems.forEach(item => {
                             const product = item.hang_hoa_id || {};
+                            const lot = item.lo_hang_id || {};
+                            const tenLo = String(lot.ten_lo || '').trim();
+                            const maLo = String(lot.ma_lo || '').trim();
+                            const lotName = tenLo || maLo || (lot._id || item.lo_hang_id ? 'Lô không tên' : '');
                           %>
                             <tr>
                               <td><a class="product-code" href="/hang-hoa"><%= product.ma_hang || '' %></a></td>
                               <td><%= product.ten_hang || '' %></td>
+                              <td><%= lotName %></td>
+                              <td><%= item.ten_quy_cach || '' %></td>
                               <td class="num"><%= fmtNumber(item.ton_kho_he_thong || 0) %></td>
                               <td class="num"><%= fmtNumber(item.so_luong_thuc_te || 0) %></td>
                               <td class="num"><%= fmtNumber(item.so_luong_lech || 0) %></td>
@@ -249,6 +257,7 @@
                         <div class="page-actions__right detail-action-right">
                           <button class="small-outline" type="button"><i class="fa-regular fa-floppy-disk"></i> Lưu</button>
                           <a class="small-outline" href="/chung-tu-kho/kiem-kho/<%= t._id %>?variant=thuc-te" target="_blank" rel="noopener"><i class="fa-solid fa-print"></i> In SL thực tế</a>
+                          <a class="small-outline" href="/chung-tu-kho/kiem-kho/<%= t._id %>?variant=gia-tri-kho" target="_blank" rel="noopener"><i class="fa-solid fa-print"></i> In giá trị kho</a>
                           <a class="small-outline" href="/chung-tu-kho/kiem-kho/<%= t._id %>" target="_blank"><i class="fa-solid fa-file-lines"></i> Chứng từ đầy đủ</a>
                         </div>
                       </div>

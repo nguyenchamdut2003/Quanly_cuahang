@@ -1,9 +1,12 @@
-﻿var mongoose = require('mongoose');
+var mongoose = require('mongoose');
 var querystring = require('querystring');
 var ExcelJS = require('exceljs');
 var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang, PhieuXuatNoiBo, CTXuatNoiBo, SoQuy, Counter } = require('../models/kiot.model');
 var { taoPhieuThuChi, parseMoney } = require('../services/soQuy.service');
 var { normalizeAddress } = require('../utils/address');
+var { buildSupplierHangHoaExportPack } = require('../services/supplierHangHoaExport.service');
+var { buildSupplierPurchaseInvoiceExportPack } = require('../services/supplierPurchaseInvoiceExport.service');
+var { handleSupplierDebtExport } = require('../services/supplierDebtExport.service');
 var DiaChiNhaCungCap = DiaChiNcc || DiaChiDoiTuong;
 
 var SUPPLIER_EXPORT_COLUMNS = [
@@ -131,7 +134,7 @@ async function aggregateSupplierPurchaseTotals(storeId) {
         var key = String(r._id);
         if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0 };
         map[key].tong_no = Number(r.tang_no || 0) - Number(r.giam_no || 0);
-        map[key].da_tra_tong = Number(r.thanh_toan || 0);
+        map[key].da_tra_tong = Number(map[key].da_tra_tong || 0) + Number(r.thanh_toan || 0);
     });
     debtTransactionRows.forEach(function(r) {
         if (!r._id) return;
@@ -207,6 +210,17 @@ function mapSupplierDebtTransactionLabel(value) {
     return 'Khác';
 }
 
+function resolveSupplierDaThanhToan(supplier) {
+    var totalBuy = Number(supplier && supplier.tong_mua || 0);
+    var debt = Number(supplier && supplier.tong_no || 0);
+    var paid = Number(supplier && supplier.da_tra_tong || 0);
+    if (!Number.isFinite(paid) || paid < 0) paid = 0;
+    if (!paid && (totalBuy || debt)) {
+        paid = Math.max(0, totalBuy - debt);
+    }
+    return paid;
+}
+
 function applySupplierTotalsFromMap(supplier, totalsMap) {
     if (!supplier) return;
     var t = totalsMap[String(supplier._id)];
@@ -219,6 +233,7 @@ function applySupplierTotalsFromMap(supplier, totalsMap) {
         supplier.tong_no = 0;
         supplier.da_tra_tong = 0;
     }
+    supplier.da_thanh_toan = resolveSupplierDaThanhToan(supplier);
 }
 
 function normalizeIdParam(value) {
@@ -291,14 +306,33 @@ function respondAddressTypeError(req, res, statusCode, message) {
     return res.redirect('/nha-cung-cap?error=address_type_error');
 }
 
+function normalizeFilterMoneyField(value) {
+    var raw = String(value || '').trim();
+    if (raw === '') return '';
+    var amount = parseMoney(raw);
+    if (!Number.isFinite(amount) || amount < 0) return '';
+    return String(Math.floor(amount));
+}
+
+function formatFilterMoneyDisplay(value) {
+    if (value === '' || value == null) return '';
+    var amount = parseMoney(value);
+    if (!Number.isFinite(amount)) return '';
+    return amount.toLocaleString('vi-VN');
+}
+
+function hasFilterQueryValue(value) {
+    return String(value ?? '').trim() !== '';
+}
+
 function normalizeFilterQuery(query) {
     query = query || {};
-    var groupId = String(query.groupId || 'all').trim() || 'all';
+    var groupId = String(query.groupId || query.groupid || 'all').trim() || 'all';
     var status = query.status === 'active' || query.status === 'inactive' ? query.status : 'all';
-    var totalBuyFrom = String(query.totalBuyFrom || '').trim();
-    var totalBuyTo = String(query.totalBuyTo || '').trim();
-    var currentDebtFrom = String(query.currentDebtFrom || '').trim();
-    var currentDebtTo = String(query.currentDebtTo || '').trim();
+    var totalBuyFrom = normalizeFilterMoneyField(query.totalBuyFrom);
+    var totalBuyTo = normalizeFilterMoneyField(query.totalBuyTo);
+    var currentDebtFrom = normalizeFilterMoneyField(query.currentDebtFrom);
+    var currentDebtTo = normalizeFilterMoneyField(query.currentDebtTo);
     var created = ['all', 'today', '7days', '30days', 'custom'].indexOf(query.created) >= 0 ? query.created : 'all';
     var createdFrom = String(query.createdFrom || '').trim();
     var createdTo = String(query.createdTo || '').trim();
@@ -376,10 +410,10 @@ function buildFilterQueryString(filter) {
     var params = [];
     if (filter.groupId !== 'all') params.push('groupId=' + encodeURIComponent(filter.groupId));
     if (filter.status !== 'all') params.push('status=' + encodeURIComponent(filter.status));
-    if (filter.totalBuyFrom) params.push('totalBuyFrom=' + encodeURIComponent(filter.totalBuyFrom));
-    if (filter.totalBuyTo) params.push('totalBuyTo=' + encodeURIComponent(filter.totalBuyTo));
-    if (filter.currentDebtFrom) params.push('currentDebtFrom=' + encodeURIComponent(filter.currentDebtFrom));
-    if (filter.currentDebtTo) params.push('currentDebtTo=' + encodeURIComponent(filter.currentDebtTo));
+    if (hasFilterQueryValue(filter.totalBuyFrom)) params.push('totalBuyFrom=' + encodeURIComponent(filter.totalBuyFrom));
+    if (hasFilterQueryValue(filter.totalBuyTo)) params.push('totalBuyTo=' + encodeURIComponent(filter.totalBuyTo));
+    if (hasFilterQueryValue(filter.currentDebtFrom)) params.push('currentDebtFrom=' + encodeURIComponent(filter.currentDebtFrom));
+    if (hasFilterQueryValue(filter.currentDebtTo)) params.push('currentDebtTo=' + encodeURIComponent(filter.currentDebtTo));
     if (filter.created !== 'all') params.push('created=' + encodeURIComponent(filter.created));
     if (filter.created === 'custom' && filter.createdFrom) params.push('createdFrom=' + encodeURIComponent(filter.createdFrom));
     if (filter.created === 'custom' && filter.createdTo) params.push('createdTo=' + encodeURIComponent(filter.createdTo));
@@ -387,12 +421,12 @@ function buildFilterQueryString(filter) {
 }
 
 function makeRangeFilter(minRaw, maxRaw) {
-    var hasMinValue = String(minRaw || '').trim() !== '';
-    var hasMaxValue = String(maxRaw || '').trim() !== '';
+    var hasMinValue = hasFilterQueryValue(minRaw);
+    var hasMaxValue = hasFilterQueryValue(maxRaw);
     if (!hasMinValue && !hasMaxValue) return null;
 
-    var min = Number(minRaw);
-    var max = Number(maxRaw);
+    var min = hasMinValue ? parseMoney(minRaw) : NaN;
+    var max = hasMaxValue ? parseMoney(maxRaw) : NaN;
     var hasMin = hasMinValue && Number.isFinite(min);
     var hasMax = hasMaxValue && Number.isFinite(max);
     if (!hasMin && !hasMax) return null;
@@ -400,6 +434,11 @@ function makeRangeFilter(minRaw, maxRaw) {
     var range = {};
     if (hasMin) range.$gte = min < 0 ? 0 : min;
     if (hasMax) range.$lte = max < 0 ? 0 : max;
+    if (hasMin && hasMax && range.$gte > range.$lte) {
+        var swap = range.$gte;
+        range.$gte = range.$lte;
+        range.$lte = swap;
+    }
     return range;
 }
 
@@ -420,7 +459,7 @@ function buildSupplierQueryFromFilter(filter) {
 
 function isInRange(value, range) {
     if (!range) return true;
-    var number = Number(value || 0);
+    var number = Math.max(0, Number(value || 0));
     if (range.$gte != null && number < range.$gte) return false;
     if (range.$lte != null && number > range.$lte) return false;
     return true;
@@ -458,9 +497,7 @@ function getSupplierStatusLabel(value) {
 function buildSupplierExportRow(supplier, address) {
     var debt = Number(supplier.tong_no || 0);
     var totalBuy = Number(supplier.tong_mua || 0);
-    var paid = Number(supplier.da_tra_tong || 0);
-    if (!Number.isFinite(paid) || paid < 0) paid = 0;
-    if (!paid && (totalBuy || debt)) paid = Math.max(0, totalBuy - debt);
+    var paid = resolveSupplierDaThanhToan(supplier);
     return {
         ma_ncc: supplier.ma_ncc || '',
         ten_ncc: supplier.ten_ncc || '',
@@ -664,9 +701,9 @@ function buildDebtReconciliation(invoiceDebt, ledgerDebt) {
 async function loadActiveCashBooks(storeId) {
     var query = { trang_thai: 'active' };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
-    var rows = await SoQuy.find(query).sort({ ten_so_quy: 1, loai: 1 }).lean();
+    var rows = await SoQuy.find(query).sort({ ten_so_quy: 1 }).lean();
     if (!rows.length && query.cua_hang_id) {
-        rows = await SoQuy.find({ trang_thai: 'active' }).sort({ ten_so_quy: 1, loai: 1 }).lean();
+        rows = await SoQuy.find({ trang_thai: 'active' }).sort({ ten_so_quy: 1 }).lean();
     }
     return rows;
 }
@@ -688,14 +725,19 @@ function normalizeSupplierAddressPayload(body) {
     };
 }
 
-function buildSupplierReturnUrl(supplierId, returnQueryRaw) {
-    void supplierId;
+function buildSupplierReturnUrl(supplierId, returnQueryRaw, extraParams) {
     var returnQuery = String(returnQueryRaw || '').trim().replace(/^\?/, '');
     var params = returnQuery ? returnQuery.split('&').filter(Boolean) : [];
     var paramsWithoutSupplier = params.filter(function(item) {
         return item.indexOf('supplier=') !== 0;
     });
-    return '/nha-cung-cap' + (paramsWithoutSupplier.length ? '?' + paramsWithoutSupplier.join('&') : '');
+    Object.keys(extraParams || {}).forEach(function(key) {
+        var value = extraParams[key];
+        if (value === undefined || value === null || value === '') return;
+        paramsWithoutSupplier.push(encodeURIComponent(key) + '=' + encodeURIComponent(String(value)));
+    });
+    var hash = supplierId ? '#s-' + encodeURIComponent(String(supplierId)) : '';
+    return '/nha-cung-cap' + (paramsWithoutSupplier.length ? '?' + paramsWithoutSupplier.join('&') : '') + hash;
 }
 
 async function loadSupplierDetailRenderLocals(req, supplierId) {
@@ -921,6 +963,17 @@ exports.index = async function(req, res, next) {
             formatDate: formatDate,
             filter: filter,
             filterQueryString: buildFilterQueryString(filter),
+            formatFilterMoney: formatFilterMoneyDisplay,
+            filterDebtRangeLabel: (function() {
+                if (!hasFilterQueryValue(filter.currentDebtFrom) && !hasFilterQueryValue(filter.currentDebtTo)) return '';
+                var fromText = hasFilterQueryValue(filter.currentDebtFrom)
+                    ? formatFilterMoneyDisplay(filter.currentDebtFrom)
+                    : '0';
+                var toText = hasFilterQueryValue(filter.currentDebtTo)
+                    ? formatFilterMoneyDisplay(filter.currentDebtTo)
+                    : 'không giới hạn';
+                return fromText + ' – ' + toText;
+            })(),
             mapNhapHangStatus: mapNhapHangStatus,
             mapTraHangStatus: mapTraHangStatus,
             mapCongNoLoai: mapCongNoLoai,
@@ -992,6 +1045,7 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             { header: 'Điện thoại', key: 'sdt', width: 14 },
             { header: 'Email', key: 'email', width: 24 },
             { header: 'Tổng nợ', key: 'tong_no', style: { numFmt: '#,##0' } },
+            { header: 'Đã thanh toán', key: 'da_thanh_toan', style: { numFmt: '#,##0' } },
             { header: 'Tổng mua', key: 'tong_mua', style: { numFmt: '#,##0' } },
             { header: 'Trạng thái', key: 'trang_thai', width: 18 },
             { header: 'Ghi chú', key: 'ghi_chu', width: 36 }
@@ -1006,6 +1060,7 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             sdt: supplier.sdt || '',
             email: supplier.email || '',
             tong_no: Number(supplier.tong_no || 0),
+            da_thanh_toan: resolveSupplierDaThanhToan(supplier),
             tong_mua: Number(supplier.tong_mua || 0),
             trang_thai: getSupplierStatusLabel(supplier.trang_thai),
             ghi_chu: supplier.ghi_chu || ''
@@ -1093,48 +1148,6 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
         applySupplierWorksheetFormat(wsH);
         return { workbook: workbook, filename: 'ncc-' + safeMa + '-lich-su.xlsx' };
     }
-    if (section === 'debt') {
-        var wsD = workbook.addWorksheet('Công nợ');
-        wsD.columns = [
-            { header: 'Ngày', key: 'ngay', width: 20 },
-            { header: 'Nhà cung cấp', key: 'nha_cung_cap', width: 28 },
-            { header: 'Loại phát sinh', key: 'loai_phat_sinh', width: 16 },
-            { header: 'Loại chứng từ', key: 'loai_chung_tu', width: 18 },
-            { header: 'Mã chứng từ', key: 'ma_chung_tu', width: 18 },
-            { header: 'Số tiền tăng nợ', key: 'tang_no', style: { numFmt: '#,##0' } },
-            { header: 'Số tiền giảm nợ', key: 'giam_no', style: { numFmt: '#,##0' } },
-            { header: 'Nợ còn lại', key: 'no_con_lai', style: { numFmt: '#,##0' } },
-            { header: 'Ghi chú', key: 'ghi_chu', width: 36 }
-        ];
-        var debtMatch = { nha_cung_cap_id: supplier._id };
-        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) debtMatch.cua_hang_id = storeId;
-        var debtRows = await CongNoNhaCungCap.find(debtMatch)
-            .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
-            .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap' })
-            .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
-            .sort({ ngay: 1, created_at: 1 })
-            .lean();
-        var runningDebt = 0;
-        debtRows.forEach(function(row) {
-            var amount = Number(row.so_tien || 0);
-            if (row.loai === 'tang_no') runningDebt += amount;
-            if (row.loai === 'giam_no' || row.loai === 'thanh_toan') runningDebt -= amount;
-            var docInfo = getDebtDocumentInfo(row);
-            wsD.addRow({
-                ngay: formatExportDate(row.ngay || row.created_at),
-                nha_cung_cap: supplier.ten_ncc || supplier.ma_ncc || '',
-                loai_phat_sinh: mapCongNoLoai(row.loai),
-                loai_chung_tu: docInfo.label,
-                ma_chung_tu: docInfo.code,
-                tang_no: row.loai === 'tang_no' ? amount : 0,
-                giam_no: row.loai === 'giam_no' || row.loai === 'thanh_toan' ? amount : 0,
-                no_con_lai: runningDebt,
-                ghi_chu: row.ghi_chu || ''
-            });
-        });
-        applySupplierWorksheetFormat(wsD);
-        return { workbook: workbook, filename: 'ncc-' + safeMa + '-cong-no.xlsx' };
-    }
     if (section === 'xnb') {
         var wsX = workbook.addWorksheet('Xuat dung noi bo');
         wsX.columns = [
@@ -1167,6 +1180,12 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
         applySupplierWorksheetFormat(wsX);
         return { workbook: workbook, filename: 'ncc-' + safeMa + '-xuat-dung-noi-bo.xlsx' };
     }
+    if (section === 'hang-hoa' || section === 'hang_hoa') {
+        return buildSupplierHangHoaExportPack(supplier, storeId);
+    }
+    if (section === 'hoa-don-gop' || section === 'hoa_don_gop' || section === 'chi-tiet-nhap') {
+        return buildSupplierPurchaseInvoiceExportPack(supplier, storeId);
+    }
     return null;
 }
 
@@ -1177,12 +1196,24 @@ exports.exportSupplierDetail = async function(req, res, next) {
         if (!supplierId || !mongoose.Types.ObjectId.isValid(supplierId)) {
             return res.redirect('/nha-cung-cap?error=invalid_supplier');
         }
-        if (['info', 'address', 'history', 'debt', 'xnb'].indexOf(section) < 0) {
+        if (['info', 'address', 'history', 'debt', 'xnb', 'hang-hoa', 'hang_hoa', 'hoa-don-gop', 'hoa_don_gop', 'chi-tiet-nhap'].indexOf(section) < 0) {
             return res.redirect('/nha-cung-cap?error=invalid_export');
         }
         var supplier = await NhaCungCap.findById(supplierId).lean();
         if (!supplier) return res.redirect('/nha-cung-cap?error=invalid_supplier');
         var storeId = await resolveStoreId(req);
+        if (section === 'debt') {
+            try {
+                await handleSupplierDebtExport(res, supplier, storeId, req.query || {});
+                return;
+            } catch (debtExportError) {
+                if (debtExportError && debtExportError.code === 'INVALID_DEBT_PERIOD') {
+                    return res.redirect('/nha-cung-cap?error=invalid_debt_period#s-' + encodeURIComponent(String(supplierId)));
+                }
+                throw debtExportError;
+            }
+        }
+
         var pack = await exportSupplierDetailWorkbook(section, supplier, storeId);
         if (!pack) return res.redirect('/nha-cung-cap?error=invalid_export');
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1225,9 +1256,9 @@ exports.payDebt = async function(req, res, next) {
             });
         }
 
-        var cashBookId = String(req?.body?.so_quy_id || '').trim();
+        var cashBookId = String(req?.body?.so_quy_id || req?.body?.cashBookId || '').trim();
         if (!mongoose.Types.ObjectId.isValid(cashBookId)) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thanh toán nhà cung cấp.' });
         }
         var paymentMethod = String(req?.body?.phuong_thuc_thanh_toan || '').trim();
         if (['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].indexOf(paymentMethod) < 0) paymentMethod = 'tien_mat';
@@ -1711,7 +1742,7 @@ exports.addAddress = async function(req, res, next) {
 
         var payload = normalizeSupplierAddressPayload(req?.body);
         if (!payload.ten_nguoi_nhan && !payload.sdt_nguoi_nhan && !payload.dia_chi_day_du) {
-            return res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery) + '&error=missing_address_data');
+            return res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, { error: 'missing_address_data' }));
         }
 
         if (!payload.ma_dia_chi) payload.ma_dia_chi = await makeSupplierAddressCode();
@@ -1723,7 +1754,7 @@ exports.addAddress = async function(req, res, next) {
         }
 
         await DiaChiNhaCungCap.create(payload);
-        res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery) + '&success=created_address');
+        res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, { success: 'created_address' }));
     } catch (error) {
         if (error && error.code === 11000) {
             return res.redirect('/nha-cung-cap?error=duplicate_address_code#s-' + normalizeIdParam(req?.params?.id));
@@ -1745,7 +1776,7 @@ exports.updateAddress = async function(req, res, next) {
 
         var payload = normalizeSupplierAddressPayload(req?.body);
         if (!payload.ten_nguoi_nhan && !payload.sdt_nguoi_nhan && !payload.dia_chi_day_du) {
-            return res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery) + '&error=missing_address_data');
+            return res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, { error: 'missing_address_data' }));
         }
 
         if (!payload.ma_dia_chi) delete payload.ma_dia_chi;
@@ -1759,7 +1790,7 @@ exports.updateAddress = async function(req, res, next) {
         }
 
         await DiaChiNhaCungCap.findByIdAndUpdate(addressId, payload, { runValidators: true });
-        res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery) + '&success=updated_address');
+        res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, { success: 'updated_address' }));
     } catch (error) {
         if (error && error.code === 11000) {
             return res.redirect('/nha-cung-cap?error=duplicate_address_code');
@@ -1780,7 +1811,7 @@ exports.removeAddress = async function(req, res, next) {
         var supplierId = String(existingAddress.nha_cung_cap_id || '');
 
         await DiaChiNhaCungCap.findByIdAndDelete(addressId);
-        res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery) + '&success=deleted_address');
+        res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, { success: 'deleted_address' }));
     } catch (error) {
         next(error);
     }

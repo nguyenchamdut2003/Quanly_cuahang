@@ -12,6 +12,7 @@
   const storePhone = business.sdt || store.sdt || business.email || store.email || '';
   const printUrl = '/chung-tu-kho/' + v.type + '/' + v.id;
   const pdfQs = v.inventoryPrintVariant ? ('?variant=' + encodeURIComponent(v.inventoryPrintVariant)) : '';
+  const invoiceTotals = v.invoiceTotals || {};
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -34,24 +35,159 @@
     .summary div{display:flex;justify-content:space-between;padding:4px 0;gap:16px}
     .sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:32px;text-align:center;font-size:13px}
     .sign b{display:block;margin-bottom:46px}
+    .copy-label{text-align:center;font-size:13px;font-weight:bold;margin:2px 0 8px}
+    .page + .page{page-break-before:always;margin-top:12mm}
+    .bundle-shell{height:100vh;display:flex;flex-direction:column;min-width:1024px}
+    .bundle-header{height:54px;background:#fff;border-bottom:1px solid #d7dee8;display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+    .bundle-title{font-weight:800;font-size:16px}.bundle-title span{color:#0070f4}
+    .bundle-actions{display:flex;gap:8px}.bundle-btn{height:34px;border:1px solid #c6d3e1;background:#fff;border-radius:6px;padding:0 12px;font-weight:700;color:#111827;text-decoration:none;display:inline-flex;align-items:center;cursor:pointer}.bundle-btn.primary{border-color:#0070f4;color:#0070f4}
+    .bundle-grid{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px}
+    .print-pane{min-width:0;background:#fff;border:1px solid #d7dee8;border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+    .pane-head{height:42px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5ebf2;padding:0 10px;background:#f8fafc}
+    .pane-head strong{font-size:14px}.pane-actions{display:flex;gap:6px}.pane-actions a,.pane-actions button{height:28px;border:1px solid #c6d3e1;background:#fff;border-radius:5px;padding:0 9px;font-size:12px;font-weight:700;text-decoration:none;color:#111827;display:inline-flex;align-items:center;cursor:pointer}
+    iframe{width:100%;height:100%;border:0;background:#fff}.frame-wrap{flex:1;min-height:0}
+    @media(max-width:1100px){.bundle-shell{min-width:0;height:auto;min-height:100vh}.bundle-grid{grid-template-columns:1fr}.print-pane{height:82vh}}
     .print-actions{position:fixed;right:18px;top:18px;display:flex;gap:8px}
     .print-actions button,.print-actions a{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer;text-decoration:none}
     @media print{body{background:#fff}.page{margin:0;width:auto;min-height:auto;padding:12mm}.no-print{display:none!important}}
   </style>
 </head>
 <body>
+  <% if (v.isRetailInvoice && !v.embeddedPrint && !v.invoicePrintCopy) { %>
+    <div class="bundle-shell">
+      <header class="bundle-header">
+        <div class="bundle-title">In hóa đơn <span><%= v.code || '' %></span></div>
+        <div class="bundle-actions">
+          <a class="bundle-btn" href="/don-hang/hoa-don">Quay lại</a>
+          <button class="bundle-btn primary" type="button" onclick="printBoth()">In cả 2</button>
+        </div>
+      </header>
+      <main class="bundle-grid">
+        <section class="print-pane">
+          <div class="pane-head">
+            <strong>Bản cửa hàng</strong>
+            <div class="pane-actions">
+              <button type="button" onclick="printFrame('storeFrame')">In</button>
+              <a href="<%= printUrl %>/pdf?copy=store" target="_blank">Tải PDF</a>
+              <a href="<%= printUrl %>?copy=store" target="_blank">Mở riêng</a>
+            </div>
+          </div>
+          <div class="frame-wrap"><iframe id="storeFrame" src="<%= printUrl %>?embed=1&copy=store"></iframe></div>
+        </section>
+        <section class="print-pane">
+          <div class="pane-head">
+            <strong>Bản khách hàng</strong>
+            <div class="pane-actions">
+              <button type="button" onclick="printFrame('customerFrame')">In</button>
+              <a href="<%= printUrl %>/pdf?copy=customer" target="_blank">Tải PDF</a>
+              <a href="<%= printUrl %>?copy=customer" target="_blank">Mở riêng</a>
+            </div>
+          </div>
+          <div class="frame-wrap"><iframe id="customerFrame" src="<%= printUrl %>?embed=1&copy=customer"></iframe></div>
+        </section>
+      </main>
+    </div>
+    <script>
+      function printFrame(id) {
+        const frame = document.getElementById(id);
+        if (!frame || !frame.contentWindow) return;
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+      }
+      function printBoth() {
+        printFrame('storeFrame');
+        setTimeout(function() { printFrame('customerFrame'); }, 500);
+      }
+    </script>
+  <% } else { %>
   <% if (!v.embeddedPrint) { %>
     <div class="print-actions no-print">
       <button type="button" onclick="window.print()">In</button>
       <a href="<%= printUrl %>/pdf<%= pdfQs %>">Tải PDF</a>
     </div>
   <% } %>
+  <% if (v.isRetailInvoice) { %>
+    <%
+      const retailCopies = v.invoicePrintCopy === 'store'
+        ? ['Cửa hàng']
+        : (v.invoicePrintCopy === 'customer' ? ['Khách hàng'] : ['Cửa hàng', 'Khách hàng']);
+    %>
+    <% retailCopies.forEach(function(copyType) { const isStoreCopy = copyType === 'Cửa hàng'; %>
+      <main class="page">
+        <div class="store">
+          <strong><%= storeName %></strong><br>
+          <%= storeAddress %><%= storePhone ? (' - ' + storePhone) : '' %>
+        </div>
+        <h1><%= v.heading || 'HÓA ĐƠN BÁN HÀNG' %></h1>
+        <div class="copy-label">Bản <%= copyType %></div>
+        <div style="text-align:center;font-size:13px">Mã hóa đơn: <strong><%= v.code || '' %></strong></div>
+
+        <section class="meta">
+          <div>Ngày bán: <strong><%= d(v.date) %></strong></div>
+          <div>Kho: <strong><%= warehouse.ten_kho || warehouse.ma_kho || '' %></strong></div>
+          <div>Người bán: <strong><%= creatorName %></strong></div>
+          <div>Khách hàng: <strong><%= v.partnerText || '' %></strong></div>
+          <div>Ghi chú: <strong><%= v.note || '' %></strong></div>
+        </section>
+
+        <table>
+          <thead>
+            <% if (isStoreCopy) { %>
+              <tr><th>STT</th><th>Tên hàng</th><th>Lô</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr>
+            <% } else { %>
+              <tr><th>STT</th><th>Tên hàng</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr>
+            <% } %>
+          </thead>
+          <tbody>
+            <% (v.items || []).forEach(function(row, index) { %>
+              <% if (isStoreCopy) { %>
+                <tr>
+                  <td class="num"><%= index + 1 %></td>
+                  <td><%= row.ten_hang || '' %></td>
+                  <td><%= row.lo || '' %></td>
+                  <td><%= row.thuoc_tinh || '' %></td>
+                  <td class="num"><%= fmt(row.so_luong) %></td>
+                  <td class="num"><%= fmt(row.don_gia) %></td>
+                  <td class="num"><%= fmt(row.thanh_tien) %></td>
+                  <td class="note-cell"><%= row.ghi_chu || '' %></td>
+                </tr>
+              <% } else { %>
+                <tr>
+                  <td class="num"><%= index + 1 %></td>
+                  <td><%= row.ten_hang || '' %></td>
+                  <td><%= row.thuoc_tinh || '' %></td>
+                  <td class="num"><%= fmt(row.so_luong) %></td>
+                  <td class="num"><%= fmt(row.don_gia) %></td>
+                  <td class="num"><%= fmt(row.thanh_tien) %></td>
+                  <td class="note-cell"><%= row.ghi_chu || '' %></td>
+                </tr>
+              <% } %>
+            <% }) %>
+          </tbody>
+        </table>
+
+        <section class="summary">
+          <div><span>Tổng tiền hàng</span><strong><%= fmt(invoiceTotals.goods || 0) %> VND</strong></div>
+          <div><span>Chiết khấu</span><strong><%= fmt(invoiceTotals.discount || 0) %> VND</strong></div>
+          <div><span>Khách cần trả</span><strong><%= fmt(invoiceTotals.payable || 0) %> VND</strong></div>
+          <div><span>Khách đã trả</span><strong><%= fmt(invoiceTotals.paid || 0) %> VND</strong></div>
+          <div><span>Còn nợ</span><strong><%= fmt(invoiceTotals.debt || 0) %> VND</strong></div>
+        </section>
+
+        <section class="sign">
+          <div><b>Người lập phiếu</b>(Ký, ghi rõ họ tên)</div>
+          <div><b><%= isStoreCopy ? 'Thủ kho' : 'Người bán' %></b>(Ký, ghi rõ họ tên)</div>
+          <div><b><%= isStoreCopy ? 'Cửa hàng' : 'Người mua' %></b>(Ký, ghi rõ họ tên)</div>
+        </section>
+      </main>
+    <% }) %>
+  <% } else { %>
   <main class="page">
     <div class="store">
       <strong><%= storeName %></strong><br>
       <%= storeAddress %><%= storePhone ? (' - ' + storePhone) : '' %>
     </div>
-    <h1><%= v.isInventoryCheck && v.inventoryPrintVariant === 'thuc-te' ? 'PHIẾU KIỂM KHO — SỐ LƯỢNG THỰC TẾ' : (v.heading || v.title || 'Chứng từ kho') %></h1>
+    <h1><%= v.isInventoryCheck && v.inventoryPrintVariant === 'thuc-te' ? 'PHIẾU KIỂM KHO — SỐ LƯỢNG THỰC TẾ' : (v.isInventoryCheck && v.inventoryPrintVariant === 'gia-tri-kho' ? 'PHIẾU GIÁ TRỊ KHO' : (v.heading || v.title || 'Chứng từ kho')) %></h1>
     <div class="movement"><%= v.movement || '' %></div>
     <div style="text-align:center;font-size:13px">Mã phiếu: <strong><%= v.code || '' %></strong></div>
 
@@ -72,10 +208,40 @@
       <div>Ghi chú: <strong><%= v.note || '' %></strong></div>
     </section>
 
-    <% if (v.isInventoryCheck && v.inventoryPrintVariant === 'thuc-te') { %>
+    <% if (v.isInventoryCheck && v.inventoryPrintVariant === 'gia-tri-kho') { %>
       <table>
         <thead>
-          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính</th><th>Lô</th><th>Số lượng thực tế</th><th>Ghi chú</th></tr>
+          <tr>
+            <th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Tên lô</th><th>Thuộc tính</th>
+            <th>Hạn SD</th><th>NCC</th><th>Số lượng tồn</th><th>Đơn giá vốn</th><th>Giá trị kho</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (v.giaTriKhoItems || []).forEach(function(row, index) { %>
+            <tr>
+              <td class="num"><%= index + 1 %></td>
+              <td><%= row.ma_hang || '' %></td>
+              <td><%= row.ten_hang || '' %></td>
+              <td><%= row.lo || '' %></td>
+              <td><%= row.thuoc_tinh || '' %></td>
+              <td><%= row.han_su_dung ? new Date(row.han_su_dung).toLocaleDateString('vi-VN') : '' %></td>
+              <td><%= row.ten_ncc || '---' %></td>
+              <td class="num"><%= fmt(row.so_luong_ton) %></td>
+              <td class="num"><%= fmt(row.don_gia_von) %></td>
+              <td class="num"><%= fmt(row.gia_tri_kho) %> VND</td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <section class="summary">
+        <div><span>Tổng số lượng tồn</span><strong><%= fmt(v.giaTriKhoTotals && v.giaTriKhoTotals.quantity) %></strong></div>
+        <div><span>Tổng giá trị kho</span><strong><%= fmt(v.giaTriKhoTotals && v.giaTriKhoTotals.value) %> VND</strong></div>
+      </section>
+      <p style="font-size:12px;color:#475467;margin-top:8px">Giá trị kho = Số lượng tồn × Đơn giá vốn (khác với giá trị lệch trên phiếu kiểm chênh lệch).</p>
+    <% } else if (v.isInventoryCheck && v.inventoryPrintVariant === 'thuc-te') { %>
+      <table>
+        <thead>
+          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính</th><th>Tên lô</th><th>Số lượng thực tế</th><th>Ghi chú</th></tr>
         </thead>
         <tbody>
           <% (v.items || []).forEach(function(row, index) { %>
@@ -97,7 +263,7 @@
     <% } else if (v.isInventoryCheck) { %>
       <table>
         <thead>
-          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính/Size</th><th>Lô</th><th>Tồn hệ thống</th><th>Tồn thực tế</th><th>Chênh lệch</th><th>Giá trị lệch</th><th>Ghi chú</th></tr>
+          <tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Thuộc tính</th><th>Tên lô</th><th>Tồn hệ thống</th><th>Tồn thực tế</th><th>Chênh lệch</th><th>Giá trị lệch</th><th>Ghi chú</th></tr>
         </thead>
         <tbody>
           <% (v.items || []).forEach(function(row, index) { %>
@@ -153,5 +319,7 @@
       <div><b>Người nhận/đối soát</b>(Ký, ghi rõ họ tên)</div>
     </section>
   </main>
+  <% } %>
+  <% } %>
 </body>
 </html>

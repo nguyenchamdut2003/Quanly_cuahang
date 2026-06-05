@@ -6,6 +6,9 @@ var hangHoaController = require('../controllers/hangHoa.controller');
 router.use(isAuthenticated);
 
 router.get('/api/:id/detail', hangHoaController.apiProductDetail);
+router.post('/api/:id/mo-ta-ghi-chu', hangHoaController.apiUpdateProductNotes);
+router.get('/api/:id/loi-lo-theo-lo/export.xlsx', hangHoaController.exportLotProfitReport);
+router.get('/api/:id/loi-lo-theo-lo', hangHoaController.apiLotProfitReport);
 router.get('/', hangHoaController.index);
 router.get('/hd-nguyen-tac', hangHoaController.printContract);
 router.get('/hd-nguyen-tac/pdf', hangHoaController.printContractPdf);
@@ -19,6 +22,7 @@ router.post('/thuoc-tinh/:attributeId/gia-tri/add', hangHoaController.addAttribu
 router.post('/thuoc-tinh/gia-tri/:id/update', hangHoaController.updateAttributeValue);
 router.post('/thuoc-tinh/gia-tri/:id/delete', hangHoaController.deleteAttributeValue);
 router.post('/thiet-lap-gia/ct-bang-gia', hangHoaController.updateCTBangGiaPrice);
+router.post('/thiet-lap-gia/gia-ban-hang-hoa', hangHoaController.upsertGiaBanHangHoaPrice);
 router.post('/thiet-lap-gia/:id/retail-price', hangHoaController.updateRetailPrice);
 router.post('/bang-gia/add', hangHoaController.addBangGia);
 router.post('/add', hangHoaController.add);

@@ -42,8 +42,6 @@ function normalize(row) {
     dia_chi_day_du: String(row.dia_chi_day_du || '').trim(),
     tinh_thanh: String(row.tinh_thanh || '').trim(),
     tinh_thanh_id: Number(row.tinh_thanh_id || 0) || undefined,
-    quan_huyen: String(row.quan_huyen || '').trim(),
-    quan_huyen_id: Number(row.quan_huyen_id || 0) || undefined,
     phuong_xa: String(row.phuong_xa || '').trim(),
     phuong_xa_code: String(row.phuong_xa_code || '').trim(),
     sdt: String(row.sdt || '').trim(),

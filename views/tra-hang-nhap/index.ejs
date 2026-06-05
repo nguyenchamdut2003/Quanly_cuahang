@@ -1,6 +1,7 @@
 <%
   const safeReturns = Array.isArray(locals.returns) ? locals.returns : [];
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
+  const safeCashBooks = Array.isArray(locals.cashBooks) ? locals.cashBooks : [];
   const safeFilters = locals.filters || {};
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
@@ -175,6 +176,21 @@
     .empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}
     .empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
     .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .receipt-pay-action{display:flex;justify-content:flex-end;margin-top:10px}
+    .receipt-pay-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1350;padding:16px}
+    .receipt-pay-modal.open{display:flex}
+    .receipt-pay-card{width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}
+    .receipt-pay-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .receipt-pay-head h3{margin:0;font-size:18px}
+    .receipt-pay-close{border:0;background:#fff;font-size:24px;cursor:pointer;color:#667085}
+    .quick-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .quick-pay-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
+    .quick-pay-grid label.full{grid-column:1/-1}
+    .quick-pay-grid input,.quick-pay-grid select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px;box-sizing:border-box}
+    .pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:4px 0}
+    .pay-total-summary{font-size:13px;font-weight:600;color:#111827;padding:4px 0}
+    .pay-summary-error{font-size:12px;color:#b45309;font-weight:600;padding:4px 0}
+    .receipt-pay-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}
     @media(max-width:1100px){.return-shell{padding:12px 24px 14px;grid-template-columns:200px minmax(0,1fr)}}
     @media(max-width:1024px){
       .return-detail-split{flex-direction:column;align-items:stretch;gap:20px}
@@ -367,6 +383,12 @@
                               <span>NCC đã trả</span>
                               <span class="summary-val"><%= fmtMoney(r.ncc_da_tra || 0) %></span>
                             </div>
+                            <% var nccRemain = Math.max(0, Number(r.ncc_can_tra != null ? r.ncc_can_tra : (r.tong_tien_tra || 0)) - Number(r.ncc_da_tra || 0)); %>
+                            <% if (r.trang_thai === 'completed' && nccRemain > 0) { %>
+                              <div class="receipt-pay-action">
+                                <button type="button" class="btn btn-primary js-return-receipt-pay" data-id="<%= r._id %>" data-due="<%= nccRemain %>">Tạo phiếu thu</button>
+                              </div>
+                            <% } %>
                           </aside>
                         </div>
                         <div class="page-actions page-actions--bordered">
@@ -398,8 +420,147 @@
       </main>
     </div>
   </form>
+  <div id="returnReceiptPayModal" class="receipt-pay-modal" role="dialog" aria-labelledby="returnReceiptPayTitle">
+    <div class="receipt-pay-card">
+      <div class="receipt-pay-head">
+        <h3 id="returnReceiptPayTitle">Tạo phiếu thu</h3>
+        <button type="button" class="receipt-pay-close" onclick="closeReturnReceiptPayModal()">&times;</button>
+      </div>
+      <div class="quick-pay-grid">
+        <label class="full"><span>NCC còn phải trả</span><div class="pay-total-readonly" id="returnReceiptPayDue"></div></label>
+        <label><span>Tiền mặt</span><input id="returnReceiptPayCash" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+        <label><span>Chuyển khoản</span><input id="returnReceiptPayTransfer" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+        <label class="full"><span>Thực thu</span><div class="pay-total-readonly" id="returnReceiptPayTotal">0 VNĐ</div></label>
+        <label class="full"><span>Còn phải trả sau thu</span><div class="pay-total-summary" id="returnReceiptPayRemain">0 VNĐ</div></label>
+        <label class="full" id="returnReceiptPayErrorWrap" style="display:none"><span>Lưu ý</span><div class="pay-summary-error" id="returnReceiptPayErrors"></div></label>
+        <label class="full"><span>Sổ quỹ</span><select id="returnReceiptPayCashBook" required>
+          <option value="">— Chọn sổ quỹ —</option>
+          <% safeCashBooks.forEach(function(book) { %>
+            <option value="<%= book._id %>"><%= book.ten_so_quy || 'Sổ quỹ' %></option>
+          <% }) %>
+        </select></label>
+      </div>
+      <div class="receipt-pay-foot">
+        <button type="button" class="kv-btn primary" onclick="submitReturnReceiptPayModal()">Tạo phiếu thu</button>
+        <button type="button" class="kv-btn" onclick="closeReturnReceiptPayModal()">Đóng</button>
+      </div>
+    </div>
+  </div>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      var pendingReturnReceiptId = '';
+      var pendingReturnReceiptDue = 0;
+      function numberValue(value) {
+        return Number(String(value || '').replace(/[^\d]/g, '')) || 0;
+      }
+      function moneyText(value) {
+        return (Number(value || 0)).toLocaleString('vi-VN') + ' VNĐ';
+      }
+      function moneyInput(value) {
+        return Number(value || 0) ? Number(value || 0).toLocaleString('vi-VN') : '';
+      }
+      function balanceReturnReceiptPayment(activeInput) {
+        var cashEl = document.getElementById('returnReceiptPayCash');
+        var transferEl = document.getElementById('returnReceiptPayTransfer');
+        if (!cashEl || !transferEl) return;
+        var cash = Math.max(0, numberValue(cashEl.value));
+        var transfer = Math.max(0, numberValue(transferEl.value));
+        var due = Math.max(0, Number(pendingReturnReceiptDue || 0));
+        if (activeInput === transferEl) {
+          transfer = Math.min(transfer, due);
+          if (cash + transfer > due) cash = Math.max(0, due - transfer);
+        } else if (activeInput === cashEl) {
+          cash = Math.min(cash, due);
+          if (cash + transfer > due) transfer = Math.max(0, due - cash);
+        } else if (cash + transfer > due) {
+          cash = due;
+          transfer = 0;
+        }
+        cashEl.value = moneyInput(cash);
+        transferEl.value = moneyInput(transfer);
+      }
+      function bindReceiptPayInput(input) {
+        if (!input || input.dataset.vnBound === '1') return;
+        input.dataset.vnBound = '1';
+        input.addEventListener('input', function() {
+          var raw = numberValue(input.value);
+          input.value = moneyInput(raw);
+          balanceReturnReceiptPayment(input);
+          refreshReturnReceiptPaySummary();
+        });
+      }
+      function readReturnReceiptPayment() {
+        var tienMat = Math.max(0, numberValue(document.getElementById('returnReceiptPayCash') && document.getElementById('returnReceiptPayCash').value));
+        var chuyenKhoan = Math.max(0, numberValue(document.getElementById('returnReceiptPayTransfer') && document.getElementById('returnReceiptPayTransfer').value));
+        return { tien_mat: tienMat, chuyen_khoan: chuyenKhoan, amount: tienMat + chuyenKhoan };
+      }
+      function refreshReturnReceiptPaySummary() {
+        var payment = readReturnReceiptPayment();
+        var errors = [];
+        if (payment.amount <= 0) errors.push('Vui lòng nhập số tiền nhà cung cấp trả');
+        if (payment.amount > pendingReturnReceiptDue) errors.push('Thực thu không được vượt số NCC còn phải trả');
+        var totalEl = document.getElementById('returnReceiptPayTotal');
+        var remainEl = document.getElementById('returnReceiptPayRemain');
+        var errWrap = document.getElementById('returnReceiptPayErrorWrap');
+        var errEl = document.getElementById('returnReceiptPayErrors');
+        if (totalEl) totalEl.textContent = moneyText(payment.amount);
+        if (remainEl) remainEl.textContent = moneyText(Math.max(pendingReturnReceiptDue - payment.amount, 0));
+        if (errWrap && errEl) {
+          errWrap.style.display = errors.length ? '' : 'none';
+          errEl.textContent = errors.join('. ');
+        }
+      }
+      window.openReturnReceiptPayModal = function(returnId, dueAmount) {
+        pendingReturnReceiptId = returnId;
+        pendingReturnReceiptDue = Math.max(0, Number(dueAmount || 0));
+        var dueEl = document.getElementById('returnReceiptPayDue');
+        var cashEl = document.getElementById('returnReceiptPayCash');
+        var transferEl = document.getElementById('returnReceiptPayTransfer');
+        var cashBookEl = document.getElementById('returnReceiptPayCashBook');
+        if (dueEl) dueEl.textContent = moneyText(pendingReturnReceiptDue);
+        if (cashEl) { cashEl.value = moneyInput(pendingReturnReceiptDue); delete cashEl.dataset.vnBound; }
+        if (transferEl) { transferEl.value = ''; delete transferEl.dataset.vnBound; }
+        if (cashBookEl) cashBookEl.value = '';
+        bindReceiptPayInput(cashEl);
+        bindReceiptPayInput(transferEl);
+        balanceReturnReceiptPayment();
+        refreshReturnReceiptPaySummary();
+        document.getElementById('returnReceiptPayModal').classList.add('open');
+      };
+      window.closeReturnReceiptPayModal = function() {
+        pendingReturnReceiptId = '';
+        pendingReturnReceiptDue = 0;
+        document.getElementById('returnReceiptPayModal').classList.remove('open');
+      };
+      window.submitReturnReceiptPayModal = function() {
+        var payment = readReturnReceiptPayment();
+        var cashBookId = document.getElementById('returnReceiptPayCashBook') && document.getElementById('returnReceiptPayCashBook').value || '';
+        if (!pendingReturnReceiptId) return alert('Không xác định được phiếu trả hàng nhập.');
+        if (payment.amount <= 0) return alert('Vui lòng nhập số tiền nhà cung cấp trả.');
+        if (payment.amount > pendingReturnReceiptDue) return alert('Thực thu không được vượt số NCC còn phải trả.');
+        if (!cashBookId) return alert('Vui lòng chọn sổ quỹ.');
+        fetch('/tra-hang-nhap/' + pendingReturnReceiptId + '/phieu-thu', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            so_quy_id: cashBookId,
+            chi_tiet_thanh_toan: {
+              tien_mat: payment.tien_mat,
+              chuyen_khoan: payment.chuyen_khoan,
+              tien_tra_khach: 0
+            }
+          })
+        })
+          .then(function(res) {
+            return res.json().then(function(data) { return { ok: res.ok, data: data }; });
+          })
+          .then(function(result) {
+            if (!result.ok || !result.data.success) return alert((result.data && result.data.message) || 'Không tạo được phiếu thu');
+            location.reload();
+          })
+          .catch(function() { alert('Không kết nối được máy chủ'); });
+      };
       function expandReturnDetail(id, scroll) {
         var row = document.querySelector('.return-row[data-detail-id="' + id + '"]');
         var detail = document.getElementById('detail-' + id);
@@ -438,6 +599,11 @@
       }
 
       document.body.addEventListener('click', function(e) {
+        var receiptBtn = e.target.closest('.js-return-receipt-pay');
+        if (receiptBtn) {
+          openReturnReceiptPayModal(receiptBtn.getAttribute('data-id'), receiptBtn.getAttribute('data-due'));
+          return;
+        }
         var cancelBtn = e.target.closest('.js-return-cancel');
         if (cancelBtn) {
           if (cancelBtn.disabled) return;

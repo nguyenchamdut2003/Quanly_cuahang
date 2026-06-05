@@ -90,7 +90,7 @@
               <%= row.hang_hoa_id ? (row.hang_hoa_id.ten_hang || '') : '' %>
             </td>
             <td><%= row.don_vi_tinh_id ? (row.don_vi_tinh_id.ten_don_vi || row.don_vi_tinh_id.ma_don_vi || '') : '' %></td>
-            <td><%= row.lo_hang_id ? (row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '') : '' %></td>
+            <td><%= row.lo_hang_id ? (row.lo_hang_id.ten_lo || row.lo_hang_id.ma_lo || '') : '' %></td>
             <td class="num"><%= fmt(row.so_luong) %></td>
             <td class="num"><%= fmt(row.gia_nhap || row.don_gia) %></td>
             <td class="num"><%= fmt(row.gia_tra_lai || row.don_gia) %></td>

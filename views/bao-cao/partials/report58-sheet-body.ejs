@@ -1,0 +1,79 @@
+<%
+  const meta = locals.sheetMeta || {};
+  const columns = Array.isArray(meta.columns) && meta.columns.length
+    ? meta.columns
+    : ['STT', 'Ngày', 'Số chứng từ/hóa đơn', 'Diễn giải/Khách hàng', 'Số tiền'];
+  const ledger = locals.ledgerData || {};
+  const rows = Array.isArray(ledger.detailRows) ? ledger.detailRows : [];
+  const totals = ledger.totals || {};
+  const fmt = value => value === '' || value == null ? '' : Number(value).toLocaleString('vi-VN');
+  const isLedger = meta.hasInvoiceLedger;
+  const isNumCol = col => /số tiền|thuế|doanh thu|thanh toán|giá trị|phát sinh/i.test(col);
+  function ledgerCell(col, row, index) {
+    const key = String(col || '').toLowerCase();
+    if (/^stt/.test(key)) return index + 1;
+    if (/ngày/.test(key)) return row.ngay_thang || '';
+    if (/số chứng|hóa đơn|số hiệu/.test(key)) return row.so_hieu || '';
+    if (/diễn giải|khách hàng|nội dung/.test(key)) return row.dien_giai || '';
+    if (/doanh thu|chưa thuế/.test(key)) return fmt(row.doanh_thu);
+    if (/thuế/.test(key)) return fmt(row.thue_gtgt);
+    if (/thanh toán/.test(key)) return fmt(row.so_tien);
+    if (/ghi chú/.test(key)) return row.ghi_chu || '';
+    if (/số tiền/.test(key)) return fmt(row.so_tien);
+    return '';
+  }
+%>
+<div class="tt58-sheet-body">
+  <table class="tt58-table">
+    <thead>
+      <tr>
+        <% columns.forEach(col => { %>
+          <th class="<%= isNumCol(col) ? 'num' : '' %>"><%= col %></th>
+        <% }) %>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (isLedger) { %>
+        <% if (!rows.length) { %>
+          <tr><td colspan="<%= columns.length %>" class="empty">Chưa có phát sinh trong kỳ đã chọn.</td></tr>
+        <% } %>
+        <% rows.forEach((row, index) => { %>
+          <tr>
+            <% columns.forEach(col => { %>
+              <% const val = ledgerCell(col, row, index); %>
+              <td class="<%= /^stt/i.test(col) ? 'center' : (isNumCol(col) ? 'num' : '') %>"><%= val %></td>
+            <% }) %>
+          </tr>
+        <% }) %>
+        <% if (rows.length) { %>
+          <tr class="total-row">
+            <% columns.forEach(col => { %>
+              <% const key = String(col || '').toLowerCase(); %>
+              <% if (/^stt|ngày|số chứng|hóa đơn|diễn giải|khách hàng|nội dung/i.test(key)) { %>
+                <td class="<%= /^stt/i.test(col) ? 'center' : '' %>"><%= /diễn giải|khách hàng|nội dung/i.test(key) ? 'Tổng cộng' : '' %></td>
+              <% } else if (/doanh thu|chưa thuế/.test(key)) { %>
+                <td class="num"><strong><%= fmt(totals.doanh_thu) %></strong></td>
+              <% } else if (/thuế/.test(key)) { %>
+                <td class="num"><strong><%= fmt(totals.thue_gtgt) %></strong></td>
+              <% } else if (/thanh toán/.test(key)) { %>
+                <td class="num"><strong><%= fmt(totals.tong_thanh_toan) %></strong></td>
+              <% } else { %>
+                <td></td>
+              <% } %>
+            <% }) %>
+          </tr>
+        <% } %>
+      <% } else { %>
+        <% for (let i = 0; i < 6; i++) { %>
+          <tr>
+            <% columns.forEach((col, ci) => { %>
+              <td class="<%= /^stt/i.test(col) ? 'center' : (isNumCol(col) ? 'num' : '') %>">
+                <%= /^stt/i.test(col) ? (i + 1) : '' %>
+              </td>
+            <% }) %>
+          </tr>
+        <% } %>
+      <% } %>
+    </tbody>
+  </table>
+</div>

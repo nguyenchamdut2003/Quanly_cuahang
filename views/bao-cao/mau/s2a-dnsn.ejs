@@ -1,0 +1,183 @@
+<%
+  const store = locals.store || {};
+  const range = locals.range || {};
+  const year = locals.year || (range.to ? String(range.to).slice(0, 4) : new Date().getFullYear());
+  const donViTinh = locals.donViTinh || 'Đồng';
+  const storeName = locals.storeName || store.ten_cua_hang || '';
+  const storeAddress = locals.storeAddress || store.dia_chi_day_du || [
+    store.dia_chi_chi_tiet,
+    store.phuong_xa,
+    store.tinh_thanh
+  ].filter(Boolean).join(', ');
+  const embedded = locals.embedded === true;
+  const standalone = locals.standalone === true;
+  const fmtMoney = value => value === '' || value === null || value === undefined
+    ? ''
+    : Number(value).toLocaleString('vi-VN');
+  const blank = '…………';
+  const detailRows = Array.isArray(locals.detailRows) ? locals.detailRows : [];
+  const formatRangeDate = value => {
+    if (!value) return '—';
+    const text = String(value);
+    const date = new Date(text.length === 10 ? `${text}T00:00:00` : text);
+    return Number.isNaN(date.getTime()) ? text : date.toLocaleDateString('vi-VN');
+  };
+%>
+<% if (standalone) { %>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Mẫu số S2a-DNSN</title>
+<% } %>
+  <style>
+    .s2a-form{font-family:'Times New Roman',Times,serif;font-size:13pt;color:#000;line-height:1.35}
+    .s2a-form .head-grid{display:grid;grid-template-columns:1fr 220px;gap:12px;margin-bottom:8px}
+    .s2a-form .unit-line{margin:2px 0}
+    .s2a-form .mau-box{text-align:right;font-size:12pt}
+    .s2a-form .mau-box .code{font-weight:700;font-size:13pt}
+    .s2a-form .title-main{text-align:center;font-weight:700;font-size:15pt;text-transform:uppercase;margin:10px 0 4px}
+    .s2a-form .title-sub{text-align:center;font-size:13pt;margin-bottom:8px}
+    .s2a-form .meta-row{display:flex;justify-content:center;gap:48px;margin:6px 0 12px;font-size:13pt}
+    .s2a-form table.form-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .s2a-form table.form-table th,.s2a-form table.form-table td{border:1px solid #000;padding:5px 6px;vertical-align:middle;font-size:12.5pt}
+    .s2a-form table.form-table th{text-align:center;font-weight:700;background:#fff}
+    .s2a-form .col-voucher{width:22%}
+    .s2a-form .col-desc{width:48%}
+    .s2a-form .col-amount{width:30%}
+    .s2a-form .num{text-align:right}
+    .s2a-form .center{text-align:center}
+    .s2a-form .indent{padding-left:10px}
+    .s2a-form .sign-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:28px;text-align:center;font-size:12.5pt}
+    .s2a-form .sign-grid .role{font-weight:700;text-transform:uppercase;margin-bottom:56px}
+    .s2a-form .sign-grid .hint{font-style:italic;font-size:12pt}
+    .s2a-form .sign-date{grid-column:1 / -1;text-align:right;margin-top:8px;font-style:italic}
+    <% if (standalone) { %>
+    body{margin:0;background:#fff}
+    .page{width:210mm;min-height:297mm;margin:0 auto;padding:14mm 16mm;box-sizing:border-box}
+    <% } %>
+    <% if (embedded) { %>
+    .s2a-form{font-size:12pt}
+    <% } %>
+  </style>
+<% if (standalone) { %>
+</head>
+<body>
+  <div class="page">
+<% } %>
+<div class="s2a-form">
+  <div class="head-grid">
+    <div>
+      <div class="unit-line"><strong>ĐƠN VỊ:</strong> <%= storeName || blank %></div>
+      <div class="unit-line"><strong>Địa chỉ:</strong> <%= storeAddress || blank %></div>
+    </div>
+    <div class="mau-box">
+      <div class="code">Mẫu số S2a-DNSN</div>
+      <div>(Kèm theo Thông tư số 58/2026/TT-BTC</div>
+      <div>ngày 25 tháng 5 năm 2026 của Bộ trưởng Bộ Tài chính)</div>
+    </div>
+  </div>
+
+  <div class="title-main">Sổ doanh thu bán hàng hóa, dịch vụ</div>
+  <div class="meta-row">
+    <span><strong>Năm:</strong> <%= year %></span>
+    <span><strong>Đơn vị tính:</strong> <%= donViTinh %></span>
+  </div>
+  <% if (range.from || range.to) { %>
+  <div class="title-sub" style="margin-top:-4px">
+    Kỳ báo cáo: <%= formatRangeDate(range.from) %> – <%= formatRangeDate(range.to) %>
+  </div>
+  <% } %>
+
+  <table class="form-table">
+    <thead>
+      <tr>
+        <th colspan="2" class="col-voucher">Hóa đơn, Chứng từ</th>
+        <th class="col-desc">Diễn giải</th>
+        <th class="col-amount">Số tiền</th>
+      </tr>
+      <tr>
+        <th>Số hiệu</th>
+        <th>Ngày, tháng</th>
+        <th></th>
+        <th></th>
+      </tr>
+      <tr>
+        <th class="center">A</th>
+        <th class="center">B</th>
+        <th class="center">C</th>
+        <th class="center">1</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td></td>
+        <td></td>
+        <td>Số thuế GTGT còn phải nộp đầu kỳ (1)</td>
+        <td class="num"><%= fmtMoney(locals.gtgtDauKy) %></td>
+      </tr>
+      <tr>
+        <td colspan="4" style="font-weight:700">Số phát sinh trong kỳ</td>
+      </tr>
+      <% detailRows.forEach(function(row) { %>
+      <tr>
+        <td><%= row.so_hieu || '' %></td>
+        <td><%= row.ngay_thang || '' %></td>
+        <td><%= row.dien_giai || '' %></td>
+        <td class="num"><%= fmtMoney(row.so_tien) %></td>
+      </tr>
+      <% }) %>
+      <tr>
+        <td></td>
+        <td></td>
+        <td class="indent"><strong>Tổng cộng (1)</strong></td>
+        <td class="num"><%= fmtMoney(locals.tongCong1) %></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td class="indent">Thuế GTGT</td>
+        <td class="num"><%= fmtMoney(locals.thueGtgt1) %></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td><strong>Tổng số thuế GTGT phải nộp trong kỳ (2)</strong></td>
+        <td class="num"><%= fmtMoney(locals.gtgtPhaiNopKy) %></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td><strong>Số thuế GTGT đã nộp trong kỳ (3)</strong></td>
+        <td class="num"><%= fmtMoney(locals.gtgtDaNopKy) %></td>
+      </tr>
+      <tr>
+        <td></td>
+        <td></td>
+        <td><strong>Số thuế GTGT còn phải nộp cuối kỳ {(4)= (1) + (2) - (3)}</strong></td>
+        <td class="num"><%= fmtMoney(locals.gtgtCuoiKy) %></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="sign-grid">
+    <div>
+      <div class="role">Người lập biểu</div>
+      <div class="hint">(Ký, ghi rõ họ tên)</div>
+    </div>
+    <div>
+      <div class="role">Kế toán trưởng</div>
+      <div class="hint">(Ký, ghi rõ họ tên)</div>
+    </div>
+    <div>
+      <div class="role">Người đại diện theo pháp luật</div>
+      <div class="hint">(Ký, ghi rõ họ tên, đóng dấu)</div>
+    </div>
+    <div class="sign-date">Ngày …… tháng …… năm ……</div>
+  </div>
+</div>
+<% if (standalone) { %>
+  </div>
+</body>
+</html>
+<% } %>

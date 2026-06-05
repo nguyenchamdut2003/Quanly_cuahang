@@ -161,6 +161,19 @@
       const formatMoney = value => formatNumber(value) + ' VNĐ';
       const escapeHtml = value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+      async function fetchJson(url) {
+        const res = await fetch(url, { headers: { Accept: 'application/json' } });
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          throw new Error('Máy chủ không trả dữ liệu JSON cho chi tiết xuất dùng nội bộ.');
+        }
+        const result = await res.json();
+        if (!res.ok || !result.success) {
+          throw new Error(result.message || 'Không tải được chi tiết xuất dùng nội bộ.');
+        }
+        return result;
+      }
+
       function renderDetailContent(result) {
         const ticket = result.ticket || {};
         const rows = result.items || [];
@@ -222,9 +235,7 @@
         detailRow.querySelector('td').innerHTML = '<div class="xnb-detail">Đang tải dữ liệu...</div>';
 
         try {
-          const res = await fetch('/xuat-dung-noi-bo/' + encodeURIComponent(id) + '/details');
-          const result = await res.json();
-          if (!result.success) throw new Error(result.message || 'Không tải được chi tiết.');
+          const result = await fetchJson('/xuat-dung-noi-bo/' + encodeURIComponent(id) + '/details');
           detailRow.querySelector('td').innerHTML = renderDetailContent(result);
           detailRow.setAttribute('data-loaded', '1');
         } catch (error) {
@@ -259,9 +270,7 @@
         summaryModal.classList.add('is-open');
 
         try {
-          const res = await fetch(summaryDetailUrl);
-          const result = await res.json();
-          if (!result.success) throw new Error(result.message || 'Không tải được chi tiết tổng.');
+          const result = await fetchJson(summaryDetailUrl);
           const rows = result.items || [];
           summaryQty.textContent = formatNumber(result.totalQuantity || 0);
           summaryValue.textContent = formatMoney(result.totalValue || 0);

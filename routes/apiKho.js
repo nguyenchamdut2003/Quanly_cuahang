@@ -25,7 +25,14 @@ const {
     PhieuXuatHuy
 } = require('../models/kiot.model');
 const { layTonKhoTheoKho, layTonKhoTheoLo } = require('../services/kho.service');
+const { resolveSalePrice } = require('../services/salePrice.service');
+const { resolveStoreId } = require('../utils/storeScope');
 const { tinhPhiGiaoHang } = require('../services/phiGiaoHang.service');
+const {
+    formatLotName,
+    buildStockMaps,
+    enrichKiemKhoLine
+} = require('../utils/kiemKhoDisplay');
 const {
     buildVariantKey,
     getReservedQuantitiesByOrder
@@ -212,25 +219,19 @@ router.get('/hang-hoa/:id/gia', async (req, res, next) => {
             .lean();
         if (!product) return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
 
-        let price = product.loai_gia === 'co_dinh' ? Number(product.gia_co_dinh || 0) : null;
-        let priceSource = product.loai_gia === 'co_dinh' ? 'gia_co_dinh' : 'thi_truong';
         const bangGiaId = String(req.query.bang_gia_id || '').trim();
-        if (bangGiaId) {
-            const priceRow = await CTBangGia.findOne({ bang_gia_id: bangGiaId, hang_hoa_id: product._id }).lean();
-            if (priceRow) {
-                price = Number(priceRow.gia_ban || 0);
-                priceSource = 'bang_gia';
-            }
-        } else {
-            const activePriceList = await BangGia.findOne({ trang_thai: 'active' }).sort({ created_at: -1 }).lean();
-            if (activePriceList) {
-                const priceRow = await CTBangGia.findOne({ bang_gia_id: activePriceList._id, hang_hoa_id: product._id }).lean();
-                if (priceRow) {
-                    price = Number(priceRow.gia_ban || 0);
-                    priceSource = 'bang_gia';
-                }
-            }
-        }
+        const storeId = await resolveStoreId(req);
+        const resolved = await resolveSalePrice({
+            hang_hoa_id: product._id,
+            bang_gia_id: bangGiaId || undefined,
+            product,
+            tryActivePriceList: !bangGiaId,
+            cua_hang_id: storeId,
+            lo_hang_id: req.query.lo_hang_id,
+            gia_tri_thuoc_tinh_id: req.query.gia_tri_thuoc_tinh_id,
+            ten_quy_cach: req.query.ten_quy_cach,
+            loai_gia_ban: req.query.loai_gia_ban
+        });
 
         res.json({
             success: true,
@@ -239,11 +240,17 @@ router.get('/hang-hoa/:id/gia', async (req, res, next) => {
                 ma_hang: product.ma_hang || '',
                 ten_hang: product.ten_hang || '',
                 loai_gia: product.loai_gia || 'thi_truong',
-                gia_ban: price,
-                nguon_gia: priceSource,
+                gia_ban: resolved.gia_ban > 0 ? resolved.gia_ban : null,
+                nguon_gia: resolved.nguon_gia,
+                gia_co_dinh: resolved.gia_co_dinh,
+                gia_thi_truong: resolved.gia_thi_truong,
+                loai_ap_dung: resolved.loai_ap_dung,
+                gia_mac_dinh: resolved.gia_mac_dinh,
+                gia_ban_resolved_from: resolved.gia_ban_resolved_from,
+                cho_phep_sua_gia: resolved.cho_phep_sua_gia !== false,
                 gia_von: Number(product.gia_von || 0),
                 gia_nhap_cuoi: Number(product.gia_nhap_cuoi || 0),
-                cho_phep_nhap_tay: product.loai_gia !== 'co_dinh' && price == null
+                cho_phep_nhap_tay: product.loai_gia !== 'co_dinh' && resolved.gia_ban <= 0
             }
         });
     } catch (error) {
@@ -298,10 +305,10 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                 path: 'hang_hoa_id',
                 populate: { path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty' }
             })
-            .populate({ path: 'lo_hang_id', select: 'han_su_dung trang_thai' })
+            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo ngay_nhap han_su_dung so_luong_con_lai trang_thai' })
             .lean();
 
-        lotRows
+        const validLotRows = lotRows
             .filter(row => {
                 if (!row.hang_hoa_id || !row.hang_hoa_id.quan_ly_theo_lo || row.hang_hoa_id.trang_thai === 'inactive') return false;
                 if (!row.lo_hang_id || row.lo_hang_id.trang_thai === 'huy') return false;
@@ -309,8 +316,13 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                 const expiry = new Date(row.lo_hang_id.han_su_dung);
                 expiry.setHours(0, 0, 0, 0);
                 return expiry.getTime() >= today.getTime();
-            })
-            .forEach(row => {
+            });
+        const validLotMap = validLotRows.reduce((map, row) => {
+            map[String(row.lo_hang_id?._id || row.lo_hang_id || '')] = row;
+            return map;
+        }, {});
+
+        validLotRows.forEach(row => {
                 const product = row.hang_hoa_id;
                 const id = String(product._id);
                 const current = products.get(id) || {
@@ -323,6 +335,18 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                     ...supplierFields(product)
                 };
                 current.ton_kho += Number(row.so_luong || 0);
+                if (!Array.isArray(current.lot_items)) current.lot_items = [];
+                current.lot_items.push({
+                    lo_hang_id: String(row.lo_hang_id?._id || row.lo_hang_id || ''),
+                    ma_lo: row.lo_hang_id?.ma_lo || '',
+                    ten_lo: row.lo_hang_id?.ten_lo || '',
+                    ngay_nhap: row.lo_hang_id?.ngay_nhap || '',
+                    han_su_dung: row.lo_hang_id?.han_su_dung || '',
+                    ton_kho: Number(row.so_luong || 0),
+                    ton_hien_tai: Number(row.so_luong || 0),
+                    gia_von: Number(row.gia_von || row.lo_hang_id?.gia_von || 0),
+                    don_gia_nhap: Number(row.lo_hang_id?.don_gia_nhap || row.gia_von || 0)
+                });
                 products.set(id, current);
             });
 
@@ -345,31 +369,28 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
         });
 
         const qcRows = await TonKhoLoQuyCach.find({ kho_id: khoId, so_luong: { $gt: 0 } }).lean();
-        const qcByProduct = qcRows.reduce((map, row) => {
+        qcRows.forEach(row => {
             const productId = String(row.hang_hoa_id || '');
             const name = String(row.ten_quy_cach || row.ten_thuoc_tinh || '').trim();
-            if (!productId || !name) return map;
-            const key = `${productId}::${name}`;
-            if (!map[key]) {
-                map[key] = {
-                    ten_quy_cach: name,
-                    ten_thuoc_tinh: String(row.ten_thuoc_tinh || name),
-                    ton_hien_tai: 0,
-                    gia_von: Number(row.gia_von || 0),
-                    don_gia_nhap: Number(row.don_gia_nhap || 0)
-                };
-            }
-            map[key].ton_hien_tai += Number(row.so_luong || 0);
-            if (Number(row.gia_von || 0) > 0) map[key].gia_von = Number(row.gia_von || 0);
-            if (Number(row.don_gia_nhap || 0) > 0) map[key].don_gia_nhap = Number(row.don_gia_nhap || 0);
-            return map;
-        }, {});
-        Object.entries(qcByProduct).forEach(([key, qc]) => {
-            const productId = key.split('::')[0];
+            const lotId = String(row.lo_hang_id || '');
+            const lotStock = validLotMap[lotId];
+            if (!productId || !name || !lotStock) return;
             const product = products.get(productId);
             if (!product) return;
             if (!Array.isArray(product.quy_cach_items)) product.quy_cach_items = [];
-            product.quy_cach_items.push(qc);
+            product.quy_cach_items.push({
+                lo_hang_id: lotId,
+                ma_lo: lotStock.lo_hang_id?.ma_lo || '',
+                ten_lo: lotStock.lo_hang_id?.ten_lo || '',
+                ngay_nhap: lotStock.lo_hang_id?.ngay_nhap || '',
+                han_su_dung: lotStock.lo_hang_id?.han_su_dung || '',
+                ten_quy_cach: name,
+                ten_thuoc_tinh: String(row.ten_thuoc_tinh || name),
+                ton_hien_tai: Number(row.so_luong || 0),
+                ton_kho: Number(row.so_luong || 0),
+                gia_von: Number(row.gia_von || 0),
+                don_gia_nhap: Number(row.don_gia_nhap || 0)
+            });
             product.has_quy_cach = true;
         });
         const productIds = Array.from(products.keys());
@@ -456,7 +477,11 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
                     { path: 'nhom_hang_id', select: 'ten_nhom_hang' }
                 ]
             })
-            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung trang_thai' })
+            .populate({
+                path: 'lo_hang_id',
+                select: 'ten_lo ma_lo han_su_dung ngay_nhap trang_thai gia_von nha_cung_cap_id',
+                populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+            })
             .sort({ updated_at: -1, created_at: -1 })
             .lean();
 
@@ -486,7 +511,7 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
         }, {});
 
         const validLotRows = validLots.flatMap(row => {
-            const lotName = row.lo_hang_id.ma_lo || row.lo_hang_id.ten_lo || '';
+            const lotCode = row.lo_hang_id.ma_lo || '';
             const base = {
                 hang_hoa_id: row.hang_hoa_id._id,
                 lo_hang_id: row.lo_hang_id._id,
@@ -495,7 +520,8 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
                 don_vi_tinh: row.hang_hoa_id.don_vi_tinh_id?.ten_don_vi || '',
                 nhom_hang: row.hang_hoa_id.nhom_hang_id?.ten_nhom_hang || '',
                 quan_ly_theo_lo: true,
-                ma_lo: lotName,
+                ten_lo: row.lo_hang_id.ten_lo || '',
+                ma_lo: lotCode,
                 han_su_dung: row.lo_hang_id.han_su_dung || ''
             };
             const lotQcRows = qcByLot[String(row.lo_hang_id._id)] || [];
@@ -506,13 +532,43 @@ router.get('/kho/:id/hang-kiem-kho', async (req, res, next) => {
                 const tenQuyCach = String(qc.ten_quy_cach || qc.ten_thuoc_tinh || '').trim();
                 return Object.assign({}, base, {
                     ten_quy_cach: tenQuyCach,
-                    ma_lo: tenQuyCach ? `${lotName} - ${tenQuyCach}` : lotName,
+                    ten_lo: row.lo_hang_id.ten_lo || '',
+                    ma_lo: lotCode,
                     ton_kho_he_thong: Number(qc.so_luong || 0)
                 });
             });
         });
 
-        res.json({ success: true, data: normalRows.concat(validLotRows) });
+        const allRows = normalRows.concat(validLotRows);
+        const hangIds = [...new Set(allRows.map(row => String(row.hang_hoa_id)))];
+
+        const [products, tonLoList, loList] = await Promise.all([
+            hangIds.length
+                ? HangHoa.find({ _id: { $in: hangIds } })
+                    .select('gia_von nha_cung_cap_id')
+                    .populate('nha_cung_cap_id', 'ten_ncc ma_ncc')
+                    .lean()
+                : [],
+            lotIds.length
+                ? TonKhoLo.find({ kho_id: khoId, lo_hang_id: { $in: lotIds } }).lean()
+                : [],
+            lotIds.length
+                ? LoHang.find({ _id: { $in: lotIds } })
+                    .select('gia_von nha_cung_cap_id')
+                    .populate('nha_cung_cap_id', 'ten_ncc ma_ncc')
+                    .lean()
+                : []
+        ]);
+
+        const maps = buildStockMaps({
+            products,
+            tonLoList,
+            qcList: qcRows,
+            loList
+        });
+
+        const data = allRows.map(row => enrichKiemKhoLine(row, maps));
+        res.json({ success: true, data });
     } catch (error) {
         next(error);
     }
@@ -743,7 +799,7 @@ router.get('/don-hang/:id/phan-bo', async (req, res, next) => {
         if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         const details = await CTDonHang.find({ don_hang_id: order._id })
             .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang quan_ly_theo_lo gia_co_dinh loai_gia' })
-            .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+            .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
             .lean();
         const allocations = await PhanBoHang.find({ don_hang_id: order._id })
             .sort({ created_at: -1 })
@@ -752,7 +808,7 @@ router.get('/don-hang/:id/phan-bo', async (req, res, next) => {
         const allocationDetails = allocationIds.length
             ? await CTPhanBoHang.find({ phan_bo_hang_id: { $in: allocationIds } })
                 .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
-                .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+                .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
                 .lean()
             : [];
         res.json({

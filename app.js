@@ -101,12 +101,12 @@ app.use(function(req, res, next) {
       nha_cung_cap: '/nha-cung-cap/' + safeId,
       customer: '/khach-hang/' + safeId,
       khach_hang: '/khach-hang/' + safeId,
-      purchase: '/nhap-hang/' + safeId,
-      phieu_nhap: '/nhap-hang/' + safeId,
-      order: '/don-hang/' + safeId,
-      don_hang: '/don-hang/' + safeId,
-      invoice: '/hoa-don/' + safeId,
-      hoa_don: '/hoa-don/' + safeId,
+      purchase: '/nhap-hang?purchase=' + encodeURIComponent(safeId),
+      phieu_nhap: '/nhap-hang?purchase=' + encodeURIComponent(safeId),
+      order: '/don-hang?order=' + encodeURIComponent(safeId),
+      don_hang: '/don-hang?order=' + encodeURIComponent(safeId),
+      invoice: '/don-hang/hoa-don?invoice=' + encodeURIComponent(safeId),
+      hoa_don: '/don-hang/hoa-don?invoice=' + encodeURIComponent(safeId),
       customer_return: '/don-hang/tra-hang/' + safeId,
       phieu_tra_hang: '/don-hang/tra-hang/' + safeId,
       supplier_return: '/tra-hang-nhap/' + safeId,
@@ -126,7 +126,9 @@ app.use(function(req, res, next) {
       warehouse: '/cua-hang?kho=' + encodeURIComponent(safeId),
       kho: '/cua-hang?kho=' + encodeURIComponent(safeId),
       cashbook: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
-      so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId)
+      so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
+      payroll: '/bang-luong/' + safeId,
+      bang_luong: '/bang-luong/' + safeId
     };
     return map[type] || '';
   };

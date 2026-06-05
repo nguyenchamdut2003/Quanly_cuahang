@@ -39,6 +39,7 @@ const mongoose = require('mongoose');
 const { connectDB } = require('../models/db.model');
 const { BangLuong, ChiTietBangLuong } = require('../models/hr.model');
 const { SoQuy, PhieuThuChi, CuaHang } = require('../models/kiot.model');
+const { calculateCashBookBalances } = require('../services/cashBookBalance.service');
 const bangLuongController = require('../controllers/bangLuong.controller');
 
 const TAG = '__IT_PAYROLL__';
@@ -79,8 +80,16 @@ async function callPayDetail(req, detailId, body) {
   return { status: res.statusCode, body: res.body };
 }
 
+async function loadCashBalance(storeId, soQuyId) {
+  const map = await calculateCashBookBalances({
+    cua_hang_id: storeId,
+    so_quy_ids: [soQuyId]
+  });
+  return map[String(soQuyId)] || { tong_thu: 0, tong_chi: 0, so_du_tinh_toan: 0 };
+}
+
 async function loadState(storeId, payrollId, detailIds, soQuyId) {
-  const [payroll, details, soQuy, plCount] = await Promise.all([
+  const [payroll, details, soQuy, plCount, balance] = await Promise.all([
     BangLuong.findById(payrollId).lean(),
     ChiTietBangLuong.find({ _id: { $in: detailIds } }).lean(),
     SoQuy.findById(soQuyId).lean(),
@@ -89,9 +98,10 @@ async function loadState(storeId, payrollId, detailIds, soQuyId) {
       loai_thu_chi: 'tra_luong_nhan_vien',
       ma_phieu: /^PL/,
       ghi_chu: new RegExp(TAG)
-    })
+    }),
+    loadCashBalance(storeId, soQuyId)
   ]);
-  return { payroll, details, soQuy, plCount };
+  return { payroll, details, soQuy, balance, plCount };
 }
 
 async function cleanup(storeId, ids) {
@@ -151,13 +161,10 @@ async function seedPayroll(storeId, opts) {
   return { payroll, details };
 }
 
-async function seedSoQuy(storeId, soDu, choPhepAm) {
+async function seedSoQuy(storeId, suffix) {
   return SoQuy.create({
     cua_hang_id: storeId,
-    ten_so_quy: TAG + ' so quy',
-    loai: 'tien_mat',
-    so_du: soDu,
-    cho_phep_am: choPhepAm,
+    ten_so_quy: TAG + ' so quy ' + (suffix || ''),
     trang_thai: 'active'
   });
 }
@@ -173,33 +180,23 @@ async function runTestC(storeId, payroll, detail, soQuy, req) {
   const results = [];
   const hooks = [
     {
-      label: 'sau update CT, truoc SoQuy',
-      patch: async () => {
-        const orig = SoQuy.findOneAndUpdate.bind(SoQuy);
-        SoQuy.findOneAndUpdate = async function () {
-          throw new Error(TAG + ' forced after CT');
-        };
-        return () => { SoQuy.findOneAndUpdate = orig; };
-      }
-    },
-    {
-      label: 'sau tru SoQuy, truoc PhieuThuChi',
-      patch: async () => {
-        const orig = PhieuThuChi.create.bind(PhieuThuChi);
-        PhieuThuChi.create = async function () {
-          throw new Error(TAG + ' forced before receipt');
-        };
-        return () => { PhieuThuChi.create = orig; };
-      }
-    },
-    {
       label: 'sau update BangLuong, truoc PhieuThuChi',
       patch: async () => {
         const origCreate = PhieuThuChi.create.bind(PhieuThuChi);
         PhieuThuChi.create = async function () {
-          throw new Error(TAG + ' forced after BL');
+          throw new Error(TAG + ' forced before receipt');
         };
         return () => { PhieuThuChi.create = origCreate; };
+      }
+    },
+    {
+      label: 'sau update CT, truoc PhieuThuChi',
+      patch: async () => {
+        const orig = PhieuThuChi.create.bind(PhieuThuChi);
+        PhieuThuChi.create = async function () {
+          throw new Error(TAG + ' forced after CT');
+        };
+        return () => { PhieuThuChi.create = orig; };
       }
     }
   ];
@@ -213,8 +210,6 @@ async function runTestC(storeId, payroll, detail, soQuy, req) {
       { _id: payroll._id },
       { $set: { da_tra_nhan_vien: 0, con_can_tra: 10000000, trang_thai: 'locked' } }
     );
-    await SoQuy.updateOne({ _id: soQuy._id }, { $set: { so_du: 20000000, cho_phep_am: false } });
-
     const before = await loadState(storeId, payroll._id, [detail._id], soQuy._id);
     const restore = await hook.patch();
     const pay = await callPayDetail(req, detail._id, {
@@ -230,7 +225,7 @@ async function runTestC(storeId, payroll, detail, soQuy, req) {
     const unchanged =
       money(after.details[0].da_tra) === money(before.details[0].da_tra) &&
       money(after.details[0].con_can_tra) === money(before.details[0].con_can_tra) &&
-      money(after.soQuy.so_du) === money(before.soQuy.so_du) &&
+      money(after.balance.so_du_tinh_toan) === money(before.balance.so_du_tinh_toan) &&
       money(after.payroll.da_tra_nhan_vien) === money(before.payroll.da_tra_nhan_vien) &&
       plForCt === 0;
 
@@ -243,12 +238,12 @@ async function runTestC(storeId, payroll, detail, soQuy, req) {
       before: {
         ct: snap(before.details[0], ['da_tra', 'con_can_tra']),
         bl: snap(before.payroll, ['da_tra_nhan_vien', 'con_can_tra']),
-        soQuy: snap(before.soQuy, ['so_du'])
+        balance: snap(before.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan'])
       },
       after: {
         ct: snap(after.details[0], ['da_tra', 'con_can_tra']),
         bl: snap(after.payroll, ['da_tra_nhan_vien', 'con_can_tra']),
-        soQuy: snap(after.soQuy, ['so_du']),
+        balance: snap(after.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
         plForCt
       }
     });
@@ -286,7 +281,7 @@ async function main() {
   try {
     // --- Test A ---
     console.log('\n=== Test A: Race cùng ChiTietBangLuong ===');
-    const soQuyA = await seedSoQuy(storeId, 50000000, true);
+    const soQuyA = await seedSoQuy(storeId, 'A');
     allSoQuyIds.push(soQuyA._id);
     const seedA = await seedPayroll(storeId, { tongLuong: 10000000, detailCount: 1 });
     allPayrollIds.push(seedA.payroll._id);
@@ -326,12 +321,12 @@ async function main() {
         { label: 'req2', status: rA2.status, success: !!(rA2.body && rA2.body.success), message: rA2.body && rA2.body.message, ma_phieu: rA2.body && rA2.body.receipt && rA2.body.receipt.ma_phieu }
       ],
       before: {
-        soQuy: snap(beforeA.soQuy, ['so_du']),
+        balance: snap(beforeA.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
         ct: snap(beforeA.details[0], ['da_tra', 'con_can_tra', 'tong_luong']),
         bl: snap(beforeA.payroll, ['da_tra_nhan_vien', 'con_can_tra', 'tong_luong'])
       },
       after: {
-        soQuy: snap(afterA.soQuy, ['so_du']),
+        balance: snap(afterA.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
         ct: snap(afterA.details[0], ['da_tra', 'con_can_tra']),
         bl: snap(afterA.payroll, ['da_tra_nhan_vien', 'con_can_tra'])
       },
@@ -341,7 +336,7 @@ async function main() {
         oneFail: failCountA === 1,
         da_tra: 7000000,
         con_can_tra: 3000000,
-        soQuyMinus: 7000000,
+        balanceChi: 7000000,
         plCount: 1
       },
       pass:
@@ -350,14 +345,15 @@ async function main() {
         money(afterA.details[0].con_can_tra) === 3000000 &&
         money(afterA.payroll.da_tra_nhan_vien) === 7000000 &&
         money(afterA.payroll.con_can_tra) === 3000000 &&
-        money(beforeA.soQuy.so_du) - money(afterA.soQuy.so_du) === 7000000 &&
+        money(afterA.balance.tong_chi) - money(beforeA.balance.tong_chi) === 7000000 &&
+        money(beforeA.balance.so_du_tinh_toan) - money(afterA.balance.so_du_tinh_toan) === 7000000 &&
         plA.length === 1
     };
     console.log(JSON.stringify(report.tests.A, null, 2));
 
     // --- Test B ---
-    console.log('\n=== Test B: Race quỹ không âm ===');
-    const soQuyB = await seedSoQuy(storeId, 5000000, false);
+    console.log('\n=== Test B: Race hai dong luong (khong con chan so du SoQuy) ===');
+    const soQuyB = await seedSoQuy(storeId, 'B');
     allSoQuyIds.push(soQuyB._id);
     const seedB = await seedPayroll(storeId, { tongLuong: 8000000, detailCount: 2, detailTong: 5000000 });
     allPayrollIds.push(seedB.payroll._id);
@@ -394,23 +390,23 @@ async function main() {
         { label: 'ct1', status: rB1.status, success: !!(rB1.body && rB1.body.success), message: rB1.body && rB1.body.message },
         { label: 'ct2', status: rB2.status, success: !!(rB2.body && rB2.body.success), message: rB2.body && rB2.body.message }
       ],
-      before: { soQuy: snap(beforeB.soQuy, ['so_du', 'cho_phep_am']) },
+      before: { balance: snap(beforeB.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']) },
       after: {
-        soQuy: snap(afterB.soQuy, ['so_du']),
+        balance: snap(afterB.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
         details: afterB.details.map((d) => snap(d, ['da_tra', 'con_can_tra']))
       },
       plReceipts: plB.map((p) => p.ma_phieu),
+      note: 'Moi model: khong chan chi khi so du tinh toan am; ca hai co the thanh cong',
       pass:
-        okB === 1 &&
-        money(afterB.soQuy.so_du) === 1000000 &&
-        money(afterB.soQuy.so_du) >= 0 &&
-        plB.length === 1
+        okB === 2 &&
+        money(afterB.balance.tong_chi) === 8000000 &&
+        plB.length === 2
     };
     console.log(JSON.stringify(report.tests.B, null, 2));
 
     // --- Test C ---
     console.log('\n=== Test C: Rollback (patch trong script test) ===');
-    const soQuyC = await seedSoQuy(storeId, 20000000, false);
+    const soQuyC = await seedSoQuy(storeId, 'C');
     allSoQuyIds.push(soQuyC._id);
     const seedC = await seedPayroll(storeId, { tongLuong: 10000000, detailCount: 1 });
     allPayrollIds.push(seedC.payroll._id);
@@ -421,7 +417,7 @@ async function main() {
 
     // --- Test D ---
     console.log('\n=== Test D: Mã phiếu PL tuần tự ===');
-    const soQuyD = await seedSoQuy(storeId, 50000000, true);
+    const soQuyD = await seedSoQuy(storeId, 'D');
     allSoQuyIds.push(soQuyD._id);
     const seedD = await seedPayroll(storeId, { tongLuong: 10000000, detailCount: 1 });
     allPayrollIds.push(seedD.payroll._id);

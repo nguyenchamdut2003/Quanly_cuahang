@@ -13,6 +13,7 @@ var {
 var ExcelJS = require('exceljs');
 var querystring = require('querystring');
 var { buildFullAddress, normalizeAddress } = require('../utils/address');
+var { handleCustomerDebtExport } = require('../services/customerDebtExport.service');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -1108,6 +1109,22 @@ exports.exportOneExcel = async function(req, res, next) {
         await workbook.xlsx.write(res);
         res.end();
     } catch (error) {
+        next(error);
+    }
+};
+
+exports.exportCustomerDebt = async function(req, res, next) {
+    try {
+        var customerId = normalizeIdParam(req?.params?.id);
+        if (!customerId) return res.redirect('/khach-hang?error=invalid_customer');
+        var customer = await KhachHang.findById(customerId).lean();
+        if (!customer) return res.redirect('/khach-hang?error=invalid_customer');
+        await handleCustomerDebtExport(res, customer, req.query || {});
+    } catch (error) {
+        if (error && error.code === 'INVALID_DEBT_PERIOD') {
+            var cid = normalizeIdParam(req?.params?.id);
+            return res.redirect('/khach-hang?error=invalid_debt_period#c-' + encodeURIComponent(String(cid || '')));
+        }
         next(error);
     }
 };

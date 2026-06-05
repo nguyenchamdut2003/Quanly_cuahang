@@ -102,12 +102,15 @@
     function renderLotSelect(it, realIndex) {
       const lots = it.lots || [];
       if (!it.quan_ly_theo_lo || !lots.length) {
-        return `<span>${it.ma_lo || '--'}</span>`;
+        return `<span>${it.ten_lo || it.ma_lo || '--'}</span>`;
       }
       const opts = lots.map(lot => {
         const selected = String(lot._id) === String(it.lo_hang_id) ? 'selected' : '';
-        const label = [lot.ma_lo, lot.ten_lo].filter(Boolean).join(' - ') || lot._id;
-        return `<option value="${lot._id}" ${selected}>${label} (${fmt(lot.so_luong)})</option>`;
+        const name = String(lot.ten_lo || '').trim();
+        const code = String(lot.ma_lo || '').trim();
+        const label = name || code || 'Lo khong ten';
+        const codeSuffix = name && code && code !== name ? ` (Ma: ${code})` : '';
+        return `<option value="${lot._id}" ${selected}>${label}${codeSuffix} (${fmt(lot.so_luong)})</option>`;
       }).join('');
       return `<select class="cell-select" onchange="changeLot(${realIndex}, this.value)">${opts}</select>`;
     }
@@ -262,7 +265,7 @@
     function filterItems() {
       const key = search.value.trim().toLowerCase();
       items = key
-        ? allItems.filter(x => (x.ma_hang + ' ' + x.ten_hang + ' ' + (x.ma_lo || '')).toLowerCase().includes(key))
+        ? allItems.filter(x => (x.ma_hang + ' ' + x.ten_hang + ' ' + (x.ten_lo || '') + ' ' + (x.ma_lo || '')).toLowerCase().includes(key))
         : allItems.slice();
       renderItems();
     }
@@ -315,7 +318,7 @@
         }
         if (src.has_quy_cach) {
           const hasQcQty = (src.quy_cach_items || []).some(qc => Number(qc.so_luong_huy || 0) > 0);
-          if (!hasQcQty) return showError('Lô ' + (src.ma_lo || '') + ' có quy cách — vui lòng nhập SL theo quy cách');
+          if (!hasQcQty) return showError('Lô ' + (src.ten_lo || src.ma_lo || '') + ' có quy cách — vui lòng nhập SL theo quy cách');
         }
       }
       const payload = {

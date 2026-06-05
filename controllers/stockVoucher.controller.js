@@ -20,6 +20,8 @@ var {
   CTPhanBoHang,
   LichSuKho
 } = require('../models/kiot.model');
+const kiotModels = require('../models/kiot.model');
+const { formatLotName, enrichInventoryCheckPrintLines } = require('../utils/kiemKhoDisplay');
 
 function isObjectId(value) {
   return /^[0-9a-fA-F]{24}$/.test(String(value || ''));
@@ -34,7 +36,8 @@ function userName(user) {
 }
 
 function lotName(lot) {
-  return lot ? (lot.ma_lo || lot.ten_lo || '') : '';
+  if (!lot) return '';
+  return formatLotName(lot) || '';
 }
 
 function attrName(attr) {
@@ -59,6 +62,7 @@ function rowBase(row, options) {
     so_luong: qty,
     don_gia: price,
     thanh_tien: total,
+    chiet_khau: Number(options.discount != null ? options.discount : row.chiet_khau || 0),
     ghi_chu: options.note || row.ghi_chu || row.nguyen_nhan_lech || ''
   };
 }
@@ -135,16 +139,28 @@ async function loadRetailInvoice(id) {
     partnerLabel: 'Khách hàng',
     partnerText: invoice.khach_hang_id ? (invoice.khach_hang_id.ten_khach_hang || invoice.khach_hang_id.ma_khach_hang || '') : 'Khách lẻ',
     note: invoice.ghi_chu,
+    isRetailInvoice: true,
+    invoiceTotals: {
+      goods: Number(invoice.tong_tien || 0),
+      discount: Number(invoice.giam_gia || 0),
+      payable: Number(invoice.thanh_toan || invoice.tong_tien || 0),
+      paid: Number(invoice.khach_thanh_toan || invoice.khach_da_tra || 0),
+      debt: Number(invoice.con_no || invoice.khach_can_tra || 0)
+    },
     totals: {
       quantity: items.reduce(function(sum, row) { return sum + Number(row.so_luong || 0); }, 0),
       value: Number(invoice.thanh_toan || invoice.tong_tien || 0)
     },
     items: items.map(function(row) {
-      return rowBase(row, { qty: row.so_luong, price: row.don_gia, total: row.thanh_tien });
+      return rowBase(row, {
+        qty: row.so_luong,
+        price: row.don_gia,
+        total: row.thanh_tien,
+        discount: row.chiet_khau
+      });
     })
   };
 }
-
 async function loadSalesReturn(id) {
   var ticket = await PhieuTraHang.findById(id)
     .populate('cua_hang_id')
@@ -231,8 +247,28 @@ async function loadInventoryCheck(id) {
   if (!ticket) return null;
   var items = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: ticket._id })
     .populate('hang_hoa_id')
-    .populate('lo_hang_id')
+    .populate({
+      path: 'lo_hang_id',
+      select: 'ten_lo ma_lo han_su_dung gia_von nha_cung_cap_id',
+      populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+    })
     .lean();
+  var mapped = items.map(function(row) {
+    var product = row.hang_hoa_id || {};
+    return {
+      ma_hang: product.ma_hang || '',
+      ten_hang: product.ten_hang || '',
+      thuoc_tinh: row.ten_quy_cach || '',
+      lo: lotName(row.lo_hang_id),
+      ton_he_thong: Number(row.ton_kho_he_thong || 0),
+      ton_thuc_te: Number(row.so_luong_thuc_te || 0),
+      chenh_lech: Number(row.so_luong_lech || 0),
+      gia_tri_lech: Number(row.gia_tri_lech || 0),
+      ghi_chu: row.nguyen_nhan_lech || ''
+    };
+  });
+  var khoId = ticket.kho_id && ticket.kho_id._id ? ticket.kho_id._id : ticket.kho_id;
+  var giaTriItems = await enrichInventoryCheckPrintLines(khoId, items, kiotModels);
   return {
     title: 'Phiếu kiểm kho / điều chỉnh kho',
     heading: 'PHIẾU KIỂM KHO / ĐIỀU CHỈNH KHO',
@@ -248,20 +284,12 @@ async function loadInventoryCheck(id) {
       quantity: Number(ticket.tong_so_luong_lech || 0),
       value: Number(ticket.tong_gia_tri_lech || 0)
     },
-    items: items.map(function(row) {
-      var product = row.hang_hoa_id || {};
-      return {
-        ma_hang: product.ma_hang || '',
-        ten_hang: product.ten_hang || '',
-        thuoc_tinh: row.ten_quy_cach || '',
-        lo: lotName(row.lo_hang_id),
-        ton_he_thong: Number(row.ton_kho_he_thong || 0),
-        ton_thuc_te: Number(row.so_luong_thuc_te || 0),
-        chenh_lech: Number(row.so_luong_lech || 0),
-        gia_tri_lech: Number(row.gia_tri_lech || 0),
-        ghi_chu: row.nguyen_nhan_lech || ''
-      };
-    }),
+    items: mapped,
+    giaTriKhoItems: giaTriItems,
+    giaTriKhoTotals: {
+      quantity: giaTriItems.reduce(function(sum, row) { return sum + Number(row.so_luong_ton || 0); }, 0),
+      value: giaTriItems.reduce(function(sum, row) { return sum + Number(row.gia_tri_kho || 0); }, 0)
+    },
     total_so_luong_thuc_te: Number(ticket.tong_so_luong_thuc_te || items.reduce(function(sum, row) {
       return sum + Number(row.so_luong_thuc_te || 0);
     }, 0))
@@ -409,6 +437,9 @@ async function buildVoucherData(req) {
   voucher.type = type;
   voucher.id = id;
   voucher.embeddedPrint = String(req.query && req.query.embed || '') === '1';
+  voucher.invoicePrintCopy = type === 'hoa-don-ban'
+    ? String(req.query && req.query.copy || '').trim()
+    : '';
   voucher.inventoryPrintVariant = voucher.isInventoryCheck
     ? String(req.query && req.query.variant || '').trim()
     : '';
@@ -434,6 +465,7 @@ exports.pdf = async function(req, res, next) {
   try {
     var data = await buildVoucherData(req);
     if (!data) return res.status(404).send('Không tìm thấy chứng từ kho');
+    data.voucher.embeddedPrint = true;
     var viewPath = path.join(__dirname, '..', 'views', 'stock-voucher', 'print.ejs');
     var html = await pdfService.renderViewToHtml(viewPath, data);
     var buffer = await pdfService.generatePdfFromHtml(html, {

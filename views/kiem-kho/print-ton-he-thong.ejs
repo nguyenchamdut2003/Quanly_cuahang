@@ -9,6 +9,13 @@
   const warehouse = typeof locals.warehouse !== 'undefined' ? locals.warehouse : {};
   const creator = typeof locals.creator !== 'undefined' ? locals.creator : {};
   const creatorName = creator.ho_ten || creator.username || creator.email || '';
+  const lotLabel = row => {
+    const ten = String(row.ten_lo || '').trim();
+    const ma = String(row.ma_lo || '').trim();
+    if (ten) return ten;
+    if (ma) return ma;
+    return row.lo_hang_id || row.ma_lo || row.ten_lo ? 'Lô không tên' : '';
+  };
   const lines = Array.isArray(locals.items) ? locals.items : [];
   const totalTon = typeof locals.totalTon === 'number' ? locals.totalTon : lines.reduce((s, r) => s + Number(r.ton_kho_he_thong || 0), 0);
   const embeddedPrint = !!locals.embeddedPrint;
@@ -70,9 +77,9 @@
           <th>Mã hàng</th>
           <th>Tên hàng</th>
           <th>ĐVT</th>
-          <th>Lô</th>
-          <th>Hạn SD</th>
+          <th>Tên lô</th>
           <th>Thuộc tính</th>
+          <th>Hạn SD</th>
           <th>Số lượng<br>(hệ thống)</th>
           <th>Ghi chú</th>
         </tr>
@@ -84,9 +91,9 @@
             <td><%= row.ma_hang || '' %></td>
             <td><%= row.ten_hang || '' %></td>
             <td><%= row.don_vi_tinh || '' %></td>
-            <td><%= row.ma_lo || '' %></td>
-            <td><%= d(row.han_su_dung) %></td>
+            <td><%= lotLabel(row) %></td>
             <td><%= row.ten_quy_cach || '' %></td>
+            <td><%= d(row.han_su_dung) %></td>
             <td class="num"><%= fmt(row.ton_kho_he_thong) %></td>
             <td class="note-cell"></td>
           </tr>

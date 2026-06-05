@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title><%= title %></title>
+  <style>
+    @page{size:A4;margin:12mm}
+    html,body{max-width:100%;overflow-x:hidden}
+    body{font-family:Arial,sans-serif;color:#111;margin:0;background:#f3f4f6}
+    .page{width:210mm;max-width:100%;min-height:277mm;margin:0 auto;background:#fff;padding:14mm 12mm;box-sizing:border-box;overflow-x:hidden}
+    h1{text-align:center;font-size:22px;margin:12px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+    .store{text-align:center;font-size:13px;line-height:1.45;margin-bottom:8px;overflow-wrap:anywhere}
+    .sub-title{text-align:center;font-size:13px;margin-bottom:14px}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:13px;margin:12px 0}
+    .meta div{line-height:1.4;overflow-wrap:anywhere;min-width:0}
+    .section-title{font-size:13px;font-weight:700;margin:14px 0 8px;text-transform:uppercase}
+    .amount-box{border:1px solid #333;padding:10px 12px;margin:12px 0;font-size:14px;overflow-wrap:anywhere}
+    .amount-box .big{font-size:18px;font-weight:800}
+    table{width:100%;max-width:100%;border-collapse:collapse;margin-top:8px;table-layout:fixed}
+    th,td{border:1px solid #333;padding:5px 4px;font-size:11.5px;overflow-wrap:anywhere;word-break:break-word}
+    th{text-align:center;background:#f1f5f9}
+    .num{text-align:right}
+    .pay-grid{font-size:13px;margin:8px 0}
+    .pay-grid div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dotted #ddd}
+    .sign{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:24px;text-align:center;font-size:11px}
+    .sign b{display:block;margin-bottom:32px;font-size:11px}
+    .print-actions{position:fixed;right:18px;top:18px;display:flex;gap:8px;z-index:10}
+    .print-actions button,.print-actions a{border:1px solid #1f2937;background:#fff;color:#111;padding:7px 12px;border-radius:3px;font-family:Arial,sans-serif;font-size:13px;cursor:pointer;text-decoration:none}
+    body.embed-preview{background:#fff}
+    body.embed-preview .page{width:100%;min-height:0;padding:10px 8px}
+    body.embed-preview h1{font-size:15px;margin:8px 0 4px}
+    body.embed-preview .store,body.embed-preview .sub-title,body.embed-preview .meta,body.embed-preview .pay-grid{font-size:11px}
+    body.embed-preview .amount-box{font-size:12px;padding:8px}
+    body.embed-preview .amount-box .big{font-size:14px}
+    body.embed-preview th,body.embed-preview td{font-size:9.5px;padding:3px 2px}
+    body.embed-preview .sign{font-size:9px;margin-top:16px}
+    body.embed-preview .sign b{margin-bottom:20px}
+    @media print{body{background:#fff}.page{margin:0;width:auto;min-height:auto;padding:10mm}.no-print{display:none!important}}
+  </style>
+</head>
+<body class="<%= embeddedPrint ? 'embed-preview' : '' %>">
+  <% if (!embeddedPrint) { %>
+    <div class="print-actions no-print">
+      <button type="button" onclick="window.print()">In</button>
+      <a href="/so-quy/<%= receiptId %>/in-phieu/pdf" target="_blank">Tải PDF</a>
+      <a href="/so-quy/<%= receiptId %>/in-tong-hop" target="_blank">Mở tổng hợp</a>
+    </div>
+  <% } %>
+  <main class="page">
+    <div class="store">
+      <strong><%= store ? (store.ten_cua_hang || 'Cửa hàng') : 'Cửa hàng' %></strong><br>
+      <%= store ? (store.dia_chi_day_du || store.dia_chi || '') : '' %>
+      <% if (store && store.sdt) { %><br>ĐT: <%= store.sdt %><% } %>
+    </div>
+    <h1><%= receiptTitle %></h1>
+    <div class="sub-title">Mã phiếu: <strong><%= receipt.ma_phieu || '' %></strong></div>
+
+    <section class="meta">
+      <div>Ngày lập: <strong><%= formatDate(receipt.ngay_lap) %></strong></div>
+      <div>Sổ quỹ: <strong><%= cashBookName %></strong></div>
+      <div>Trạng thái: <strong><%= statusLabel %></strong></div>
+      <div>Hạch toán: <strong><%= accountingLabel %></strong></div>
+      <div><%= subjectLabel %>: <strong><%= subjectName || '—' %></strong></div>
+      <div>Nhóm đối tượng: <strong><%= groupLabel %></strong></div>
+      <div>Loại thu/chi: <strong><%= loaiThuChiLabel || receiptTypeLabel %></strong></div>
+      <div>Phương thức: <strong><%= paymentMethodLabel %></strong></div>
+      <div>Người lập phiếu: <strong><%= creatorName || '—' %></strong></div>
+      <div>Ghi chú: <strong><%= receipt.ghi_chu || '—' %></strong></div>
+    </section>
+
+    <div class="amount-box">
+      <div>Số tiền: <span class="big"><%= formatMoney(amount) %></span></div>
+      <div style="margin-top:6px">Bằng chữ: <em><%= amountWords %></em></div>
+    </div>
+
+    <% if (payment.hasDetail) { %>
+      <div class="section-title">Chi tiết thanh toán</div>
+      <div class="pay-grid">
+        <div><span>Tiền mặt</span><strong><%= formatMoney(payment.tienMat) %></strong></div>
+        <div><span>Chuyển khoản</span><strong><%= formatMoney(payment.chuyenKhoan) %></strong></div>
+        <div><span>Tiền trả khách</span><strong><%= formatMoney(payment.tienTraKhach) %></strong></div>
+        <div><span><%= tongPaymentLabel %></span><strong><%= formatMoney(payment.tongChiTiet) %></strong></div>
+        <div><span><%= netPaymentLabel %></span><strong><%= formatMoney(payment.giaTriRong) %></strong></div>
+      </div>
+    <% } %>
+
+    <% if (compactRelatedRows && compactRelatedRows.length) { %>
+      <div class="section-title">Chứng từ liên quan (tóm tắt)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Loại chứng từ</th>
+            <th>Mã chứng từ</th>
+            <th>Ngày</th>
+            <th class="num">Giá trị phiếu này</th>
+            <th>Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% compactRelatedRows.forEach(function(row) { %>
+            <tr>
+              <td><%= row.typeLabel %></td>
+              <td><%= row.code %></td>
+              <td><%= row.docDate %></td>
+              <td class="num"><%= formatMoney(row.receiptValue) %></td>
+              <td><%= row.status %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+
+    <section class="sign">
+      <div><b>Người lập phiếu</b>(Ký, ghi rõ họ tên)</div>
+      <div><b><%= signPartyLabel %></b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Thủ quỹ</b>(Ký, ghi rõ họ tên)</div>
+      <div><b>Kế toán/Quản lý</b>(Ký, ghi rõ họ tên)</div>
+    </section>
+  </main>
+</body>
+</html>

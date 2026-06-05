@@ -1,0 +1,32 @@
+<div id="debtPeriodExportModal" class="debt-period-modal-overlay" aria-hidden="true">
+  <div class="debt-period-modal" role="dialog" aria-modal="true" aria-labelledby="debtPeriodExportModalTitle">
+    <div class="debt-period-modal__header">
+      <h3 id="debtPeriodExportModalTitle">Chọn kỳ xuất công nợ</h3>
+      <button type="button" class="debt-period-modal__close js-close-debt-period-modal" aria-label="Đóng">×</button>
+    </div>
+    <div class="debt-period-modal__body">
+      <label class="debt-period-option">
+        <input type="radio" name="debtPeriodMode" value="all" checked>
+        <span>Tất cả</span>
+      </label>
+      <label class="debt-period-option">
+        <input type="radio" name="debtPeriodMode" value="range">
+        <span>Theo ngày</span>
+      </label>
+      <div class="debt-period-range" data-debt-period-range hidden>
+        <label class="debt-period-field">
+          <span>Từ ngày</span>
+          <input type="date" data-debt-period-from>
+        </label>
+        <label class="debt-period-field">
+          <span>Đến ngày</span>
+          <input type="date" data-debt-period-to>
+        </label>
+      </div>
+    </div>
+    <div class="debt-period-modal__footer">
+      <button type="button" class="btn btn-light btn-sm js-cancel-debt-period-modal">Hủy</button>
+      <button type="button" class="btn btn-primary btn-sm js-submit-debt-period-modal">Xuất file</button>
+    </div>
+  </div>
+</div>

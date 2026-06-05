@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const path = require('path');
 const { isAuthenticated } = require('../middlewares/auth.middleware');
@@ -14,7 +14,19 @@ const {
     TonKhoLo,
     TonKhoLoQuyCach
 } = require('../models/kiot.model');
-const { congTonKho, truTonKho } = require('../services/kho.service');
+const {
+    congTonKho,
+    truTonKho,
+    lotHasQuyCachStock,
+    resolveTenQuyCachFromParams
+} = require('../services/kho.service');
+const { formatLotName } = require('../utils/kiemKhoDisplay');
+
+async function shouldSyncQuyCach(khoId, hangHoaId, loHangId, tenQuyCach) {
+    if (tenQuyCach) return true;
+    if (!loHangId) return false;
+    return lotHasQuyCachStock(khoId, hangHoaId, loHangId);
+}
 
 router.use(isAuthenticated);
 
@@ -89,8 +101,14 @@ function normalizeTenQuyCach(value) {
 }
 
 const SESSION_TON_PREVIEW = 'kiemKhoTonPreview';
+const SESSION_GIA_TRI_PREVIEW = 'kiemKhoGiaTriPreview';
 const TON_PREVIEW_MAX_MS = 60 * 60 * 1000;
 const TON_PREVIEW_MAX_ROWS = 2500;
+
+function lotDisplayFromPopulated(lo) {
+    if (!lo) return '';
+    return formatLotName(lo);
+}
 
 function isObjectId(value) {
     return /^[0-9a-fA-F]{24}$/.test(String(value || '').trim());
@@ -105,12 +123,70 @@ function sanitizeTonPreviewRows(rawItems) {
             ten_hang: String(row.ten_hang || '').slice(0, 400),
             don_vi_tinh: String(row.don_vi_tinh || '').slice(0, 60),
             ma_lo: String(row.ma_lo || '').slice(0, 200),
+            ten_lo: String(row.ten_lo || '').slice(0, 200),
+            lo_hang_label: String(row.lo_hang_label || formatLotName(row) || '').slice(0, 240),
             han_su_dung: row.han_su_dung || null,
             ten_quy_cach: String(row.ten_quy_cach || '').slice(0, 200),
-            ton_kho_he_thong: Number(row.ton_kho_he_thong || 0)
+            ton_kho_he_thong: Number(row.ton_kho_he_thong || 0),
+            don_gia_von: Number(row.don_gia_von || 0),
+            ten_ncc: String(row.ten_ncc || '---').slice(0, 200),
+            gia_tri_kho: Number(row.gia_tri_kho || 0)
         });
     }
     return out;
+}
+
+function sanitizeGiaTriPreviewRows(rawItems) {
+    const list = parseItems(rawItems);
+    const out = [];
+    for (const row of list.slice(0, TON_PREVIEW_MAX_ROWS)) {
+        const qty = Number(row.ton_kho_he_thong || row.so_luong_ton || 0);
+        const cost = Number(row.don_gia_von || 0);
+        out.push({
+            ma_hang: String(row.ma_hang || '').slice(0, 120),
+            ten_hang: String(row.ten_hang || '').slice(0, 400),
+            don_vi_tinh: String(row.don_vi_tinh || '').slice(0, 60),
+            ma_lo: String(row.ma_lo || '').slice(0, 200),
+            ten_lo: String(row.ten_lo || '').slice(0, 200),
+            lo_hang_label: String(row.lo_hang_label || formatLotName(row) || '').slice(0, 240),
+            han_su_dung: row.han_su_dung || null,
+            ten_quy_cach: String(row.ten_quy_cach || '').slice(0, 200),
+            ton_kho_he_thong: qty,
+            don_gia_von: cost,
+            ten_ncc: String(row.ten_ncc || '---').slice(0, 200),
+            gia_tri_kho: Number(row.gia_tri_kho != null ? row.gia_tri_kho : qty * cost)
+        });
+    }
+    return out;
+}
+
+async function loadGiaTriPreviewFromSession(req) {
+    const raw = req.session && req.session[SESSION_GIA_TRI_PREVIEW];
+    if (!raw || typeof raw.savedAt !== 'number' || Date.now() - raw.savedAt > TON_PREVIEW_MAX_MS) {
+        return null;
+    }
+    const kho = raw.kho_id && isObjectId(raw.kho_id) ? await Kho.findById(raw.kho_id).lean() : null;
+    if (!kho) return null;
+    let store = null;
+    if (raw.cua_hang_id && isObjectId(raw.cua_hang_id)) {
+        store = await CuaHang.findById(raw.cua_hang_id).lean();
+    }
+    if (!store && kho.cua_hang_id) {
+        store = await CuaHang.findById(kho.cua_hang_id).lean();
+    }
+    const items = Array.isArray(raw.items) ? raw.items : [];
+    const totalTon = items.reduce((s, r) => s + Number(r.ton_kho_he_thong || 0), 0);
+    const totalGiaTri = items.reduce((s, r) => s + Number(r.gia_tri_kho || 0), 0);
+    return {
+        store: store || {},
+        warehouse: kho,
+        creator: req.user || {},
+        ghi_chu: String(raw.ghi_chu || ''),
+        items,
+        totalTon,
+        totalGiaTri,
+        printedAt: raw.savedAt
+    };
 }
 
 async function loadTonPreviewFromSession(req) {
@@ -195,6 +271,77 @@ router.get('/in-ton-he-thong-preview/pdf', async (req, res, next) => {
     }
 });
 
+router.post('/preview-gia-tri-kho', async (req, res, next) => {
+    try {
+        const body = req.body || {};
+        const kho_id = String(body.kho_id || '').trim();
+        if (!isObjectId(kho_id)) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho hợp lệ.' });
+        }
+        const kho = await Kho.findById(kho_id).lean();
+        if (!kho) {
+            return res.status(400).json({ success: false, message: 'Không tìm thấy kho.' });
+        }
+        const items = sanitizeGiaTriPreviewRows(body.items);
+        if (!items.length) {
+            return res.status(400).json({ success: false, message: 'Không có hàng để in.' });
+        }
+        req.session[SESSION_GIA_TRI_PREVIEW] = {
+            cua_hang_id: body.cua_hang_id ? String(body.cua_hang_id).trim() : '',
+            kho_id,
+            ghi_chu: String(body.ghi_chu || ''),
+            items,
+            savedAt: Date.now()
+        };
+        res.json({ success: true, url: '/kiem-kho/in-gia-tri-kho-preview' });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/in-gia-tri-kho-preview/pdf', async (req, res, next) => {
+    try {
+        const data = await loadGiaTriPreviewFromSession(req);
+        if (!data) {
+            return res.status(410).send('Phiếu xem trước đã hết hạn. Quay lại màn Kiểm kho và bấm in lại.');
+        }
+        const viewPath = path.join(__dirname, '..', 'views', 'kiem-kho', 'print-gia-tri-kho.ejs');
+        const locals = {
+            title: 'Phiếu giá trị kho',
+            embeddedPrint: false,
+            ...data
+        };
+        const html = await pdfService.renderViewToHtml(viewPath, locals);
+        const buffer = await pdfService.generatePdfFromHtml(html, {
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+        });
+        const fname = 'kiem-kho-gia-tri-kho.pdf';
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + fname + '"');
+        return res.send(Buffer.from(buffer));
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/in-gia-tri-kho-preview', async (req, res, next) => {
+    try {
+        const data = await loadGiaTriPreviewFromSession(req);
+        if (!data) {
+            return res.status(410).send('Phiếu xem trước đã hết hạn. Quay lại màn Kiểm kho và bấm in lại.');
+        }
+        res.render('kiem-kho/print-gia-tri-kho', {
+            title: 'Phiếu giá trị kho',
+            embeddedPrint: String(req.query.embed || '') === '1',
+            ...data
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/in-ton-he-thong-preview', async (req, res, next) => {
     try {
         const data = await loadTonPreviewFromSession(req);
@@ -230,7 +377,10 @@ router.get('/', async (req, res, next) => {
         const details = ticketIds.length
             ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: ticketIds } })
                 .populate('hang_hoa_id')
-                .populate('lo_hang_id')
+                .populate({
+                    path: 'lo_hang_id',
+                    select: 'ten_lo ma_lo han_su_dung'
+                })
             : [];
         const detailMap = details.reduce((acc, item) => {
             const key = String(item.phieu_kiem_kho_id);
@@ -383,6 +533,9 @@ router.get('/:id/export.csv', async (req, res, next) => {
             'Tên hàng',
             'Thương hiệu',
             'Đơn vị tính',
+            'Tên lô',
+            'Mã lô',
+            'Thuộc tính',
             'Tồn kho',
             'Kiểm thực tế',
             'SL lệch',
@@ -391,6 +544,7 @@ router.get('/:id/export.csv', async (req, res, next) => {
 
         details.forEach(item => {
             const product = item.hang_hoa_id || {};
+            const lot = item.lo_hang_id || {};
             rows.push([
                 ticket.ma_kiem_kho || '',
                 ticket.created_at ? ticket.created_at.toISOString() : '',
@@ -406,6 +560,9 @@ router.get('/:id/export.csv', async (req, res, next) => {
                 product.ten_hang || '',
                 product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '',
                 product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi : '',
+                lotDisplayFromPopulated(lot),
+                lot.ma_lo || '',
+                item.ten_quy_cach || '',
                 item.ton_kho_he_thong || 0,
                 item.so_luong_thuc_te || 0,
                 item.so_luong_lech || 0,
@@ -425,7 +582,7 @@ router.get('/:id/export.csv', async (req, res, next) => {
                 0,
                 ticket.ghi_chu || '',
                 ticket.trang_thai || '',
-                '', '', '', '', '', '', '', ''
+                '', '', '', '', '', '', '', '', '', '', ''
             ]);
         }
 
@@ -540,7 +697,15 @@ async function saveKiemKho(req, res, next) {
             const stock = item.lo_hang_id
                 ? await TonKhoLo.findOne({ kho_id: kho._id, hang_hoa_id: item.hang_hoa_id, lo_hang_id: item.lo_hang_id })
                 : await TonKho.findOne({ kho_id: kho._id, hang_hoa_id: item.hang_hoa_id });
-            const tenQuyCach = normalizeTenQuyCach(item.ten_quy_cach || item.ten_thuoc_tinh);
+            const tenQuyCach = normalizeTenQuyCach(
+                item.ten_quy_cach || item.ten_thuoc_tinh || await resolveTenQuyCachFromParams(item)
+            );
+            if (item.lo_hang_id && await shouldSyncQuyCach(kho._id, item.hang_hoa_id, item.lo_hang_id, tenQuyCach) && !tenQuyCach) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Lô có quản lý quy cách, vui lòng kiểm kho theo từng quy cách'
+                });
+            }
             let systemQuantity = Number(stock?.so_luong || 0);
             if (item.lo_hang_id && tenQuyCach) {
                 const qcStock = await TonKhoLoQuyCach.findOne({
@@ -573,7 +738,8 @@ async function saveKiemKho(req, res, next) {
                         hang_hoa_id: item.hang_hoa_id,
                         lo_hang_id: item.lo_hang_id,
                         ten_quy_cach: tenQuyCach,
-                        sync_quy_cach: Boolean(item.lo_hang_id),
+                        gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+                        sync_quy_cach: await shouldSyncQuyCach(kho._id, item.hang_hoa_id, item.lo_hang_id, tenQuyCach),
                         so_luong: difference,
                         gia_von: cost,
                         nguoi_tao_id: req.user?._id,
@@ -591,7 +757,8 @@ async function saveKiemKho(req, res, next) {
                         hang_hoa_id: item.hang_hoa_id,
                         lo_hang_id: item.lo_hang_id,
                         ten_quy_cach: tenQuyCach,
-                        sync_quy_cach: Boolean(item.lo_hang_id),
+                        gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+                        sync_quy_cach: await shouldSyncQuyCach(kho._id, item.hang_hoa_id, item.lo_hang_id, tenQuyCach),
                         so_luong: Math.abs(difference),
                         nguoi_tao_id: req.user?._id,
                         loai_phieu: 'kiem_kho',
@@ -642,13 +809,15 @@ router.post('/:id/cancel', async (req, res, next) => {
             if (!diff) continue;
             const product = await HangHoa.findById(row.hang_hoa_id).select('gia_von').lean();
             const cost = Number(product?.gia_von || 0);
+            const tenQuyCach = normalizeTenQuyCach(row.ten_quy_cach);
+            const syncQuyCach = await shouldSyncQuyCach(phieu.kho_id, row.hang_hoa_id, row.lo_hang_id, tenQuyCach);
             if (diff > 0) {
                 await truTonKho({
                     kho_id: phieu.kho_id,
                     hang_hoa_id: row.hang_hoa_id,
                     lo_hang_id: row.lo_hang_id,
-                    ten_quy_cach: row.ten_quy_cach,
-                    sync_quy_cach: Boolean(row.lo_hang_id),
+                    ten_quy_cach: tenQuyCach,
+                    sync_quy_cach: syncQuyCach,
                     so_luong: diff,
                     nguoi_tao_id: req.user?._id,
                     loai_phieu: 'kiem_kho',
@@ -660,8 +829,8 @@ router.post('/:id/cancel', async (req, res, next) => {
                     kho_id: phieu.kho_id,
                     hang_hoa_id: row.hang_hoa_id,
                     lo_hang_id: row.lo_hang_id,
-                    ten_quy_cach: row.ten_quy_cach,
-                    sync_quy_cach: Boolean(row.lo_hang_id),
+                    ten_quy_cach: tenQuyCach,
+                    sync_quy_cach: syncQuyCach,
                     so_luong: Math.abs(diff),
                     gia_von: cost,
                     nguoi_tao_id: req.user?._id,

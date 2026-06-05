@@ -7,7 +7,7 @@ const {
     Kho, LoHang, TonKho, CongNoNhaCungCap
 } = require('../models/kiot.model');
 const { congTonKho } = require('../services/kho.service');
-const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
+const { taoPhieuThuChi } = require('../services/soQuy.service');
 
 router.use(isAuthenticated);
 
@@ -57,6 +57,20 @@ function normalizePaymentMethod(daTraNcc, conNoNcc, inputMethod) {
     if (daTraNcc <= 0) return 'cong_no';
     if (conNoNcc > 0) return 'thanh_toan_mot_phan';
     return 'da_thanh_toan';
+}
+
+function normalizeReceiptPaymentMethod(value) {
+    const method = String(value || '').trim();
+    return ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(method) ? method : 'tien_mat';
+}
+
+function resolveCashBookId(body = {}) {
+    const value = body.so_quy_id || body.cashBookId || '';
+    return String(value || '').trim();
+}
+
+function isObjectId(value) {
+    return /^[0-9a-fA-F]{24}$/.test(String(value || '').trim());
 }
 
 function safeLotCodeSegment(value) {
@@ -433,6 +447,10 @@ router.post('/add', async (req, res, next) => {
         const can_tra_ncc = tong_tien;
         const con_no_ncc = Math.max(can_tra_ncc - da_tra_ncc, 0);
         const paymentMethod = normalizePaymentMethod(da_tra_ncc, con_no_ncc, phuong_thuc_thanh_toan);
+        const cashBookId = resolveCashBookId(req.body || {});
+        if (da_tra_ncc > 0 && !isObjectId(cashBookId)) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thanh toán phiếu nhập.' });
+        }
 
         const count = await PhieuNhap.countDocuments();
         const ma_phieu_nhap = inputCode && inputCode.trim() !== '' ? inputCode.trim() : 'PN' + String(count + 1).padStart(6, '0');
@@ -513,27 +531,9 @@ router.post('/add', async (req, res, next) => {
             });
 
             if (phieu.trang_thai === 'completed') {
-                const newProductCost = await calculateMovingAverageCost(
-                    item.hang_hoa_id,
-                    item.so_luong,
-                    item.don_gia_nhap
+                throw new Error(
+                    'Route nhap hang cu (phieuNhap.js) da ngung. Vui long dung module Nhap hang (purchase.service).'
                 );
-                await congTonKho({
-                    kho_id: kho._id,
-                    hang_hoa_id: item.hang_hoa_id,
-                    lo_hang_id: loHangId,
-                    so_luong: item.so_luong,
-                    gia_von: item.don_gia_nhap,
-                    nguoi_tao_id: req.user?._id,
-                    loai_phieu: 'nhap_hang',
-                    ma_phieu: ma_phieu_nhap,
-                    ghi_chu: ghi_chu || 'Nhap hang'
-                });
-
-                await HangHoa.findByIdAndUpdate(item.hang_hoa_id, {
-                    $inc: { ton_kho: item.so_luong },
-                    $set: { gia_nhap_cuoi: item.don_gia_nhap, gia_von: newProductCost }
-                });
             }
         }
 
@@ -555,19 +555,19 @@ router.post('/add', async (req, res, next) => {
             }
 
             if (da_tra_ncc > 0) {
-                const cashBook = await ensureDefaultSoQuy(phieu.cua_hang_id);
                 await taoPhieuThuChi({
                     loai_phieu: 'chi',
                     loai_thu_chi: 'Chi tra nha cung cap',
                     gia_tri: da_tra_ncc,
-                    so_quy_id: cashBook._id,
+                    ngay_lap: phieu.ngay_nhap || new Date(),
+                    so_quy_id: cashBookId,
                     cua_hang_id: phieu.cua_hang_id,
                     nguoi_tao_id: req.user?._id,
                     nha_cung_cap_id,
                     phieu_nhap_id: phieu._id,
                     ma_chung_tu_goc: ma_phieu_nhap,
                     nhom_doi_tuong: 'nha_cung_cap',
-                    phuong_thuc_thanh_toan: ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(phuong_thuc_thanh_toan) ? phuong_thuc_thanh_toan : 'tien_mat',
+                    phuong_thuc_thanh_toan: normalizeReceiptPaymentMethod(phuong_thuc_thanh_toan),
                     hach_toan: true
                 });
             }

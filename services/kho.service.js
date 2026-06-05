@@ -6,8 +6,11 @@ const {
   LoHang,
   TonKhoLo,
   TonKhoLoQuyCach,
-  LichSuKho
+  LichSuKho,
+  GiaTriThuocTinh
 } = require('../models/kiot.model');
+
+const QUY_CACH_REQUIRED_MSG = 'Hàng/lô có quản lý quy cách, cần truyền quy cách để trừ tồn.';
 
 function toObjectId(value, fieldName) {
   if (!value) {
@@ -45,6 +48,59 @@ function normalizeQuantity(value) {
 
 function normalizeTenQuyCach(value) {
   return String(value || '').trim();
+}
+
+function isSellableLot(lot) {
+  if (!lot || lot.trang_thai === 'huy') return false;
+  if (!lot.han_su_dung) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const expiry = new Date(lot.han_su_dung);
+  expiry.setHours(0, 0, 0, 0);
+  return expiry.getTime() >= today.getTime();
+}
+
+function sortLotsFefo(a, b) {
+  const aLot = a.lo_hang_id;
+  const bLot = b.lo_hang_id;
+  const aDate = aLot && aLot.han_su_dung ? new Date(aLot.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
+  const bDate = bLot && bLot.han_su_dung ? new Date(bLot.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
+  if (aDate !== bDate) return aDate - bDate;
+  return new Date(a.updated_at || a.created_at || 0).getTime() - new Date(b.updated_at || b.created_at || 0).getTime();
+}
+
+function buildAllocationEntry(lotDoc, quantity) {
+  const lotId = lotDoc?._id || lotDoc || null;
+  return {
+    lo_hang_id: lotId,
+    ma_lo: lotDoc?.ma_lo || '',
+    ten_lo: lotDoc?.ten_lo || '',
+    han_su_dung: lotDoc?.han_su_dung || null,
+    so_luong: Number(quantity) || 0
+  };
+}
+
+function pushAllocation(allocations, lotDoc, quantity) {
+  const qty = Number(quantity) || 0;
+  if (qty <= 0) return allocations;
+  const entry = buildAllocationEntry(lotDoc, qty);
+  const key = String(entry.lo_hang_id || '');
+  if (!key) return allocations;
+  const existing = allocations.find(row => String(row.lo_hang_id) === key);
+  if (existing) {
+    existing.so_luong += qty;
+    return allocations;
+  }
+  allocations.push(entry);
+  return allocations;
+}
+
+function finalizeTruTonKho(inventory, allocations = []) {
+  return {
+    success: true,
+    allocations,
+    inventory
+  };
 }
 
 async function getWarehouse(khoId) {
@@ -96,6 +152,31 @@ async function ghiLichSuKho(params) {
   }
 
   return LichSuKho.create(historyData);
+}
+
+async function resolveTenQuyCachFromParams(params) {
+  const direct = normalizeTenQuyCach(params.ten_quy_cach || params.ten_thuoc_tinh);
+  if (direct) return direct;
+  const attrId = optionalObjectId(params.gia_tri_thuoc_tinh_id, 'gia_tri_thuoc_tinh_id');
+  if (!attrId) return '';
+  const attr = await GiaTriThuocTinh.findById(attrId).select('ten_gia_tri').lean();
+  return normalizeTenQuyCach(attr && attr.ten_gia_tri);
+}
+
+async function lotHasQuyCachStock(khoId, hangHoaId, loHangId) {
+  return Boolean(await TonKhoLoQuyCach.exists({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    lo_hang_id: loHangId
+  }));
+}
+
+async function productHasQuyCachStock(khoId, hangHoaId) {
+  return Boolean(await TonKhoLoQuyCach.exists({
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    so_luong: { $gt: 0 }
+  }));
 }
 
 async function resolveQuyCachStock(khoId, hangHoaId, loHangId, tenQuyCach) {
@@ -202,8 +283,29 @@ async function dieuChinhTonQuyCach(params, direction) {
   const quantity = normalizeQuantity(params.so_luong);
   const cost = Number(params.gia_von) || 0;
   const warehouse = await getWarehouse(khoId);
-  const qcStock = await resolveQuyCachStock(khoId, hangHoaId, loHangId, params.ten_quy_cach);
-  if (!qcStock) return null;
+  const tenQuyCach = await resolveTenQuyCachFromParams(params);
+  if (!tenQuyCach) {
+    throw new Error('Thiếu quy cách để điều chỉnh tồn');
+  }
+
+  let qcStock = await resolveQuyCachStock(khoId, hangHoaId, loHangId, tenQuyCach);
+  if (!qcStock) {
+    if (direction < 0) {
+      throw new Error('Không tìm thấy tồn quy cách trong lô');
+    }
+    qcStock = await TonKhoLoQuyCach.create({
+      cua_hang_id: warehouse.cua_hang_id,
+      kho_id: khoId,
+      hang_hoa_id: hangHoaId,
+      lo_hang_id: loHangId,
+      ten_quy_cach: tenQuyCach,
+      ten_thuoc_tinh: tenQuyCach,
+      so_luong: 0,
+      don_gia_nhap: cost,
+      gia_von: cost,
+      thanh_tien: 0
+    });
+  }
 
   const beforeQc = Number(qcStock.so_luong || 0);
   const nextQc = beforeQc + direction * quantity;
@@ -239,6 +341,80 @@ async function dieuChinhTonQuyCach(params, direction) {
   return syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost);
 }
 
+async function truTonKhoQuyCach(params, inventory, quantity) {
+  const khoId = toObjectId(params.kho_id, 'kho_id');
+  const hangHoaId = toObjectId(params.hang_hoa_id, 'hang_hoa_id');
+  const loHangId = optionalObjectId(params.lo_hang_id, 'lo_hang_id');
+  const warehouse = await getWarehouse(khoId);
+  const tenQuyCach = await resolveTenQuyCachFromParams(params);
+  if (!tenQuyCach) {
+    throw new Error('Thiếu quy cách để trừ tồn');
+  }
+
+  const qcFilter = {
+    kho_id: khoId,
+    hang_hoa_id: hangHoaId,
+    $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }],
+    so_luong: { $gt: 0 }
+  };
+  if (loHangId) qcFilter.lo_hang_id = loHangId;
+
+  let qcRows = await TonKhoLoQuyCach.find(qcFilter)
+    .populate('lo_hang_id')
+    .sort({ updated_at: 1, created_at: 1 });
+  qcRows = qcRows.filter(row => isSellableLot(row.lo_hang_id)).sort(sortLotsFefo);
+
+  let remaining = quantity;
+  const allocations = [];
+
+  for (const qcStock of qcRows) {
+    if (remaining <= 0) break;
+    const lotId = qcStock.lo_hang_id?._id || qcStock.lo_hang_id;
+    if (!lotId) continue;
+
+    const lot = qcStock.lo_hang_id?._id ? qcStock.lo_hang_id : await LoHang.findById(lotId);
+    const qcQty = Number(qcStock.so_luong || 0);
+    const take = Math.min(qcQty, remaining);
+    if (take <= 0) continue;
+
+    const beforeQc = qcQty;
+    qcStock.so_luong = beforeQc - take;
+    qcStock.thanh_tien = qcStock.so_luong * (Number(qcStock.don_gia_nhap || qcStock.gia_von) || 0);
+    if (!qcStock.ten_quy_cach && qcStock.ten_thuoc_tinh) qcStock.ten_quy_cach = qcStock.ten_thuoc_tinh;
+    await qcStock.save();
+
+    await syncTonKhoSauQuyCach(khoId, hangHoaId, lotId, warehouse);
+
+    pushAllocation(allocations, lot, take);
+    remaining -= take;
+    await ghiLichSuKho({
+      kho_id: khoId,
+      hang_hoa_id: hangHoaId,
+      lo_hang_id: lotId,
+      ten_quy_cach: qcStock.ten_quy_cach || qcStock.ten_thuoc_tinh,
+      cap_ton: 'quy_cach',
+      nguoi_tao_id: params.nguoi_tao_id,
+      loai_phieu: params.loai_phieu,
+      ma_phieu: params.ma_phieu,
+      so_luong_thay_doi: -take,
+      ton_kho_truoc: beforeQc,
+      ton_kho_sau: qcStock.so_luong,
+      gia_tri_thay_doi: -(take * (Number(qcStock.gia_von) || 0)),
+      ghi_chu: params.ghi_chu
+    });
+  }
+
+  if (remaining > 0) {
+    throw new Error('Tồn kho quy cách không đủ để trừ');
+  }
+
+  const refreshed = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: hangHoaId });
+  if (!refreshed || refreshed.so_luong < 0) {
+    throw new Error('Tồn kho không đủ để trừ');
+  }
+  return finalizeTruTonKho(refreshed, allocations);
+}
+
 async function congTonKho(params) {
   const khoId = toObjectId(params.kho_id, 'kho_id');
   const hangHoaId = toObjectId(params.hang_hoa_id, 'hang_hoa_id');
@@ -248,6 +424,10 @@ async function congTonKho(params) {
   const warehouse = await getWarehouse(khoId);
   const product = await HangHoa.findById(hangHoaId).select('quan_ly_theo_lo');
   const manageLots = Boolean(product && product.quan_ly_theo_lo);
+  const tenQuyCach = await resolveTenQuyCachFromParams(params);
+  const useQuyCach = Boolean(
+    params.sync_quy_cach || tenQuyCach || (manageLots && loHangId && await lotHasQuyCachStock(khoId, hangHoaId, loHangId))
+  );
 
   if (!manageLots) {
     loHangId = null;
@@ -255,9 +435,12 @@ async function congTonKho(params) {
     throw new Error('Hàng hóa quản lý theo lô phải có lô hàng khi nhập kho');
   }
 
-  if (manageLots && loHangId && (params.sync_quy_cach || params.ten_quy_cach)) {
-    const synced = await dieuChinhTonQuyCach(params, 1);
-    if (synced) return synced.inventory;
+  if (manageLots && loHangId && useQuyCach) {
+    if (!tenQuyCach) {
+      throw new Error('Lô có quản lý quy cách, vui lòng truyền quy cách khi cộng tồn.');
+    }
+    const synced = await dieuChinhTonQuyCach(Object.assign({}, params, { ten_quy_cach: tenQuyCach }), 1);
+    return synced.inventory;
   }
 
   const inventory = await TonKho.findOneAndUpdate(
@@ -333,14 +516,13 @@ async function truTonKho(params) {
   const quantity = normalizeQuantity(params.so_luong);
   const product = await HangHoa.findById(hangHoaId).select('quan_ly_theo_lo');
   const manageLots = Boolean(product && product.quan_ly_theo_lo);
+  const tenQuyCach = await resolveTenQuyCachFromParams(params);
+  const useQuyCach = Boolean(
+    params.sync_quy_cach || tenQuyCach
+  );
 
   if (!manageLots) {
     loHangId = null;
-  }
-
-  if (manageLots && loHangId && (params.sync_quy_cach || params.ten_quy_cach)) {
-    const synced = await dieuChinhTonQuyCach(params, -1);
-    if (synced) return synced.inventory;
   }
 
   const inventory = await TonKho.findOne({
@@ -352,8 +534,21 @@ async function truTonKho(params) {
     throw new Error('Tồn kho không đủ để trừ');
   }
 
+  if (manageLots && useQuyCach) {
+    return truTonKhoQuyCach(params, inventory, quantity);
+  }
+
+  if (manageLots && loHangId && await lotHasQuyCachStock(khoId, hangHoaId, loHangId)) {
+    throw new Error(QUY_CACH_REQUIRED_MSG);
+  }
+
+  if (manageLots && !loHangId && await productHasQuyCachStock(khoId, hangHoaId)) {
+    throw new Error(QUY_CACH_REQUIRED_MSG);
+  }
+
   if (manageLots && !loHangId) {
     let remaining = quantity;
+    const allocations = [];
     const lotRows = await TonKhoLo.find({
       kho_id: khoId,
       hang_hoa_id: hangHoaId,
@@ -362,23 +557,7 @@ async function truTonKho(params) {
       .populate('lo_hang_id')
       .sort({ updated_at: 1, created_at: 1 });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const sellableLotRows = lotRows.filter(row => {
-      const lot = row.lo_hang_id;
-      if (!lot || lot.trang_thai === 'huy') return false;
-      if (!lot.han_su_dung) return true;
-      const expiry = new Date(lot.han_su_dung);
-      expiry.setHours(0, 0, 0, 0);
-      return expiry.getTime() >= today.getTime();
-    });
-
-    sellableLotRows.sort((a, b) => {
-      const aDate = a.lo_hang_id && a.lo_hang_id.han_su_dung ? new Date(a.lo_hang_id.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
-      const bDate = b.lo_hang_id && b.lo_hang_id.han_su_dung ? new Date(b.lo_hang_id.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
-      if (aDate !== bDate) return aDate - bDate;
-      return new Date(a.updated_at || a.created_at || 0).getTime() - new Date(b.updated_at || b.created_at || 0).getTime();
-    });
+    const sellableLotRows = lotRows.filter(row => isSellableLot(row.lo_hang_id)).sort(sortLotsFefo);
 
     for (const row of sellableLotRows) {
       if (remaining <= 0) break;
@@ -393,6 +572,7 @@ async function truTonKho(params) {
         lot.so_luong_con_lai = Math.max(0, Number(lot.so_luong_con_lai || 0) - take);
         lot.trang_thai = lot.so_luong_con_lai > 0 ? lot.trang_thai : 'het_hang';
         await lot.save();
+        pushAllocation(allocations, lot, take);
       }
 
       remaining -= take;
@@ -416,10 +596,11 @@ async function truTonKho(params) {
 
     inventory.so_luong -= quantity;
     await inventory.save();
-    return inventory;
+    return finalizeTruTonKho(inventory, allocations);
   }
 
   let lotInventory = null;
+  const allocations = [];
   if (manageLots && loHangId) {
     lotInventory = await TonKhoLo.findOne({
       kho_id: khoId,
@@ -443,6 +624,7 @@ async function truTonKho(params) {
       lot.so_luong_con_lai -= quantity;
       lot.trang_thai = lot.so_luong_con_lai > 0 ? lot.trang_thai : 'het_hang';
       await lot.save();
+      pushAllocation(allocations, lot, quantity);
     }
   }
 
@@ -463,7 +645,7 @@ async function truTonKho(params) {
     ghi_chu: params.ghi_chu
   });
 
-  return inventory;
+  return finalizeTruTonKho(inventory, allocations);
 }
 
 async function layTonKhoTheoKho(kho_id) {
@@ -490,6 +672,10 @@ module.exports = {
   congTonKho,
   truTonKho,
   ghiLichSuKho,
+  syncTonKhoSauQuyCach,
+  lotHasQuyCachStock,
+  productHasQuyCachStock,
+  resolveTenQuyCachFromParams,
   layTonKhoTheoKho,
   layTonKhoTheoLo
 };

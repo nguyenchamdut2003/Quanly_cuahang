@@ -18,6 +18,7 @@ router.post('/groups/:groupId/delete', khachHangController.removeGroup);
 router.post('/address-types/add', khachHangController.addAddressType);
 router.post('/address-types/:addressTypeId/update', khachHangController.updateAddressType);
 router.post('/address-types/:addressTypeId/delete', khachHangController.removeAddressType);
+router.get('/:id/export/debt', khachHangController.exportCustomerDebt);
 router.get('/:id/export/:section.xlsx', khachHangController.exportSectionExcel);
 router.get('/:id/export.xlsx', khachHangController.exportOneExcel);
 router.post('/:id/addresses/add', khachHangController.addAddress);

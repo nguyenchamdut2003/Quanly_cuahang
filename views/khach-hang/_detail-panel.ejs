@@ -133,6 +133,23 @@
                                   <strong class="customer-detail-note"><%= formatDetailText(c.ghi_chu) %></strong>
                                 </div>
                               </div>
+                              <div class="customer-detail-footer">
+                                <button
+                                  class="btn btn-success btn-sm btn-edit-customer"
+                                  type="button"
+                                  data-customer="<%= encodeURIComponent(JSON.stringify(selectedCustomer)) %>"
+                                >Chỉnh sửa</button>
+                                <button
+                                  class="btn btn-danger btn-sm"
+                                  type="submit"
+                                  form="deleteCustomerForm_<%= selectedCustomer._id %>"
+                                  onclick="return confirm('Bạn có chắc muốn xóa khách hàng này không?')"
+                                >Xóa</button>
+                                <a
+                                  class="btn btn-success btn-sm"
+                                  href="/khach-hang/<%= selectedCustomer._id %>/export/info.xlsx"
+                                >Xuất thông tin</a>
+                              </div>
                             </div>
                             <div class="customer-detail-pane" data-tab-pane="address">
                               <% var returnQuery = filterQueryString || ''; %>
@@ -296,7 +313,22 @@
                               <% }) %>
                             </div>
                             <div class="customer-detail-pane" data-tab-pane="orders">
-                              <table class="admin-table warehouse-table">
+                              <%
+                                var customerOrderStatusLabel = {
+                                  draft: 'Phiếu tạm',
+                                  shipping: 'Đang giao hàng',
+                                  completed: 'Hoàn thành',
+                                  cancelled: 'Đã hủy',
+                                  merged: 'Đã gộp'
+                                };
+                                var customerDeliveryStatusLabel = {
+                                  chua_giao: 'Chưa giao',
+                                  giao_mot_phan: 'Giao một phần',
+                                  giao_thieu: 'Giao thiếu',
+                                  giao_du: 'Giao đủ'
+                                };
+                              %>
+                              <table class="admin-table warehouse-table customer-orders-table">
                                 <thead><tr><th>Mã đơn hàng</th><th>Ngày đặt</th><th>Tổng tiền hàng</th><th>Khách cần trả</th><th>Khách đã trả</th><th>Trạng thái đơn</th><th>Giao hàng</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                   <% if (!historyOrders.length) { %>
@@ -309,8 +341,8 @@
                                       <td><%= money(order.tong_tien_hang || order.tong_tien || 0) %></td>
                                       <td><%= money(order.tong_thanh_toan || order.tong_tien || 0) %></td>
                                       <td><%= money(order.khach_thanh_toan || order.khach_da_tra || 0) %></td>
-                                      <td><%= order.trang_thai || '---' %></td>
-                                      <td><%= order.trang_thai_giao_hang || '---' %></td>
+                                      <td><%= customerOrderStatusLabel[order.trang_thai] || order.trang_thai || '---' %></td>
+                                      <td><%= customerDeliveryStatusLabel[order.trang_thai_giao_hang] || order.trang_thai_giao_hang || '---' %></td>
                                       <td><a class="btn btn-light btn-sm" href="/don-hang?order=<%= order._id %>">Xem</a></td>
                                     </tr>
                                   <% }) %>
@@ -318,7 +350,18 @@
                               </table>
                             </div>
                             <div class="customer-detail-pane" data-tab-pane="invoices">
-                              <table class="admin-table warehouse-table">
+                              <%
+                                var customerInvoiceStatusLabel = {
+                                  processing: 'Đang xử lý',
+                                  completed: 'Hoàn thành',
+                                  failed: 'Không giao được',
+                                  cancelled: 'Đã hủy',
+                                  paid: 'Đã thanh toán',
+                                  partial: 'Thanh toán một phần',
+                                  unpaid: 'Chưa thanh toán'
+                                };
+                              %>
+                              <table class="admin-table warehouse-table customer-invoices-table">
                                 <thead><tr><th>Mã hóa đơn</th><th>Ngày bán</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Đơn hàng</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                   <% if (!historyInvoices.length) { %>
@@ -330,7 +373,7 @@
                                       <td><%= formatDate(invoice.ngay_ban || invoice.created_at) %></td>
                                       <td><%= money(invoice.tong_tien || 0) %></td>
                                       <td><%= money(invoice.thanh_toan || 0) %></td>
-                                      <td><%= invoice.trang_thai || '---' %></td>
+                                      <td><%= customerInvoiceStatusLabel[invoice.trang_thai] || invoice.trang_thai || '---' %></td>
                                       <td><%- invoice.don_hang_id ? refLink('order', invoice.don_hang_id, invoice.don_hang_id.ma_don_hang || '---') : '---' %></td>
                                       <td>
                                         <a class="btn btn-light btn-sm" href="/don-hang/hoa-don">Xem</a>
@@ -342,7 +385,15 @@
                               </table>
                             </div>
                             <div class="customer-detail-pane" data-tab-pane="returns">
-                              <table class="admin-table warehouse-table">
+                              <%
+                                var customerReturnStatusLabel = {
+                                  draft: 'Phiếu tạm',
+                                  pending: 'Chờ xử lý',
+                                  completed: 'Đã trả',
+                                  cancelled: 'Đã hủy'
+                                };
+                              %>
+                              <table class="admin-table warehouse-table customer-returns-table">
                                 <thead><tr><th>Mã phiếu trả</th><th>Ngày trả</th><th>Hóa đơn gốc</th><th>Tổng tiền trả</th><th>Trạng thái</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                   <% if (!historyReturns.length) { %>
@@ -354,7 +405,7 @@
                                       <td><%= formatDate(ret.ngay_tra || ret.created_at) %></td>
                                       <td><%- ret.hoa_don_id ? refLink('invoice', ret.hoa_don_id, ret.hoa_don_id.ma_hoa_don || '---') : '---' %></td>
                                       <td><%= money(ret.can_tra_khach || ret.tong_tien_tra || 0) %></td>
-                                      <td><%= ret.trang_thai || '---' %></td>
+                                      <td><%= customerReturnStatusLabel[ret.trang_thai] || ret.trang_thai || '---' %></td>
                                       <td><%= ret.ghi_chu || '---' %></td>
                                       <td><a class="btn btn-light btn-sm" href="/don-hang/tra-hang?customer=<%= selectedCustomer._id %>">Xem</a></td>
                                     </tr>
@@ -363,6 +414,29 @@
                               </table>
                             </div>
                             <div class="customer-detail-pane" data-tab-pane="debts">
+                              <div class="customer-debt-toolbar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                                <button
+                                  type="button"
+                                  class="btn btn-primary btn-sm js-debt-export-trigger"
+                                  data-export-kind="both"
+                                  data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+                                  data-extra-qs=""
+                                >Xuất công nợ</button>
+                                <button
+                                  type="button"
+                                  class="btn btn-light btn-sm js-debt-export-trigger"
+                                  data-export-kind="quan-tri"
+                                  data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+                                  data-extra-qs=""
+                                >Quản trị</button>
+                                <button
+                                  type="button"
+                                  class="btn btn-light btn-sm js-debt-export-trigger"
+                                  data-export-kind="doi-tac"
+                                  data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+                                  data-extra-qs=""
+                                >Gửi đối tác</button>
+                              </div>
                               <table class="admin-table warehouse-table">
                                 <thead><tr><th>Ngày</th><th>Loại</th><th>Số tiền</th><th>Hóa đơn</th><th>Đơn hàng</th><th>Phiếu thu chi</th><th>Ghi chú</th></tr></thead>
                                 <tbody>
@@ -384,41 +458,6 @@
                               </table>
                             </div>
                           </div>
-                          <div class="customer-detail-footer">
-                            <button
-                              class="btn btn-success btn-sm btn-edit-customer"
-                              type="button"
-                              data-customer="<%= encodeURIComponent(JSON.stringify(selectedCustomer)) %>"
-                            >Chỉnh sửa</button>
-                            <button
-                              class="btn btn-danger btn-sm"
-                              type="submit"
-                              form="deleteCustomerForm_<%= selectedCustomer._id %>"
-                              onclick="return confirm('Bạn có chắc muốn xóa khách hàng này không?')"
-                            >Xóa</button>
-                            <a
-                              class="btn btn-success btn-sm customer-detail-export-action"
-                              href="/khach-hang/<%= selectedCustomer._id %>/export/info.xlsx"
-                              data-export-action
-                              data-info-url="/khach-hang/<%= selectedCustomer._id %>/export/info.xlsx"
-                              data-info-label="Xuất thông tin"
-                              data-info-disabled="0"
-                              data-address-url="/khach-hang/<%= selectedCustomer._id %>/export/address.xlsx"
-                              data-address-label="Xuất địa chỉ"
-                              data-address-disabled="<%= customerAddresses && customerAddresses.length ? '0' : '1' %>"
-                              data-orders-url="/khach-hang/<%= selectedCustomer._id %>/export/orders.xlsx"
-                              data-orders-label="Xuất đơn hàng"
-                              data-orders-disabled="<%= historyOrders.length ? '0' : '1' %>"
-                              data-invoices-url="/khach-hang/<%= selectedCustomer._id %>/export/invoices.xlsx"
-                              data-invoices-label="Xuất hóa đơn"
-                              data-invoices-disabled="<%= historyInvoices.length ? '0' : '1' %>"
-                              data-returns-url="/khach-hang/<%= selectedCustomer._id %>/export/returns.xlsx"
-                              data-returns-label="Xuất trả hàng"
-                              data-returns-disabled="<%= historyReturns.length ? '0' : '1' %>"
-                              data-debts-url="/khach-hang/<%= selectedCustomer._id %>/export/debts.xlsx"
-                              data-debts-label="Xuất công nợ"
-                              data-debts-disabled="<%= historyDebts.length ? '0' : '1' %>"
-                            >Xuất thông tin</a>
-                          </div>
+                          <form id="deleteCustomerForm_<%= selectedCustomer._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/delete" style="display:none" aria-hidden="true"></form>
                         </div>
 </div>

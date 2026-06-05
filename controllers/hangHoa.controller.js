@@ -13,6 +13,7 @@ var {
     CuaHang,
     LoHang,
     TonKhoLo,
+    TonKhoLoQuyCach,
     LichSuKho,
     ThuocTinhHang,
     GiaTriThuocTinh,
@@ -35,6 +36,12 @@ var {
     CTXuatNoiBo
 } = require('../models/kiot.model');
 var pdfService = require('../services/pdf.service');
+var { buildLotProfitReport } = require('../services/lotProfitReport.service');
+var {
+    resolveSalePrice,
+    buildPriceSetupLines,
+    upsertGiaBanHangHoa
+} = require('../services/salePrice.service');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -45,6 +52,26 @@ function formatDate(value) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+
+function normalizeStockNumber(value) {
+    var number = Number(value || 0);
+    return Number.isFinite(number) ? number : 0;
+}
+
+function isExpiredLot(lot) {
+    if (!lot || !lot.han_su_dung) return false;
+    var expiry = new Date(lot.han_su_dung);
+    if (isNaN(expiry.getTime())) return false;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    expiry.setHours(0, 0, 0, 0);
+    return expiry.getTime() < today.getTime();
+}
+
+function isSellableLot(lot) {
+    if (!lot || lot.trang_thai === 'huy') return false;
+    return !isExpiredLot(lot);
 }
 
 function normalizeFilterQuery(query) {
@@ -125,6 +152,115 @@ function buildPriceSetupQueryString(filter) {
     return params.join('&');
 }
 
+async function loadAvgLotCostByProductId(productIds) {
+    var map = {};
+    if (!productIds || !productIds.length) return map;
+
+    var rows = await TonKhoLo.aggregate([
+        { $match: { hang_hoa_id: { $in: productIds }, so_luong: { $gt: 0 } } },
+        {
+            $group: {
+                _id: '$hang_hoa_id',
+                totalQty: { $sum: { $ifNull: ['$so_luong', 0] } },
+                totalValue: {
+                    $sum: {
+                        $multiply: [
+                            { $ifNull: ['$so_luong', 0] },
+                            { $ifNull: ['$gia_von', 0] }
+                        ]
+                    }
+                }
+            }
+        }
+    ]);
+
+    rows.forEach(function(row) {
+        var totalQty = Number(row.totalQty || 0);
+        var totalValue = Number(row.totalValue || 0);
+        map[String(row._id)] = {
+            totalQty: totalQty,
+            avgCost: totalQty > 0 ? Math.round(totalValue / totalQty) : 0
+        };
+    });
+    return map;
+}
+
+async function loadAvgSalePriceByProductId(productIds) {
+    var map = {};
+    if (!productIds || !productIds.length) return map;
+
+    var rows = await CTHoaDonBanHang.aggregate([
+        { $match: { hang_hoa_id: { $in: productIds }, so_luong: { $gt: 0 } } },
+        {
+            $lookup: {
+                from: 'hoa_don_ban_hang',
+                localField: 'hoa_don_id',
+                foreignField: '_id',
+                as: 'invoice'
+            }
+        },
+        { $unwind: '$invoice' },
+        { $match: { 'invoice.trang_thai': { $ne: 'cancelled' } } },
+        {
+            $group: {
+                _id: '$hang_hoa_id',
+                totalQty: { $sum: { $ifNull: ['$so_luong', 0] } },
+                totalRevenue: {
+                    $sum: {
+                        $multiply: [
+                            { $ifNull: ['$so_luong', 0] },
+                            { $ifNull: ['$don_gia', 0] }
+                        ]
+                    }
+                }
+            }
+        }
+    ]);
+
+    rows.forEach(function(row) {
+        var totalQty = Number(row.totalQty || 0);
+        var totalRevenue = Number(row.totalRevenue || 0);
+        map[String(row._id)] = {
+            totalQty: totalQty,
+            avgPrice: totalQty > 0 ? Math.round(totalRevenue / totalQty) : null
+        };
+    });
+    return map;
+}
+
+async function buildProductListPriceMaps(productIds) {
+    var ids = productIds || [];
+    var results = await Promise.all([
+        loadAvgLotCostByProductId(ids),
+        loadAvgSalePriceByProductId(ids)
+    ]);
+    return {
+        avgCostByProductId: results[0],
+        avgSalePriceByProductId: results[1]
+    };
+}
+
+function applyProductListPriceFields(item, priceMaps) {
+    priceMaps = priceMaps || {};
+    var pid = String(item._id || '');
+    var lotStats = priceMaps.avgCostByProductId && priceMaps.avgCostByProductId[pid];
+    var saleStats = priceMaps.avgSalePriceByProductId && priceMaps.avgSalePriceByProductId[pid];
+
+    if (lotStats && lotStats.totalQty > 0) {
+        item.gia_von_trung_binh_hien_thi = Number(lotStats.avgCost || 0);
+    } else {
+        item.gia_von_trung_binh_hien_thi = Number(item.gia_von || 0);
+    }
+
+    if (saleStats && saleStats.totalQty > 0) {
+        item.gia_ban_trung_binh_hien_thi = Number(saleStats.avgPrice || 0);
+    } else {
+        item.gia_ban_trung_binh_hien_thi = null;
+    }
+
+    return item;
+}
+
 function buildFilterQueryString(filter) {
     var params = [];
     if (filter.groupId !== 'all') params.push('groupId=' + encodeURIComponent(filter.groupId));
@@ -143,6 +279,33 @@ function buildFilterQueryString(filter) {
     return params.join('&');
 }
 
+function decodeLegacyEntities(value) {
+    var text = String(value == null ? '' : value);
+    if (!text || !/&(?:#x?[0-9a-f]+|[a-z]+);/i.test(text)) return text;
+    return text
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/&#(\d+);/g, function(_match, code) {
+            var num = Number(code);
+            return Number.isFinite(num) ? String.fromCharCode(num) : _match;
+        })
+        .replace(/&#x([0-9a-f]+);/gi, function(_match, hex) {
+            var num = parseInt(hex, 16);
+            return Number.isFinite(num) ? String.fromCharCode(num) : _match;
+        });
+}
+
+function normalizeProductNotePayload(body) {
+    body = body || {};
+    return {
+        mo_ta: String(body.mo_ta == null ? '' : body.mo_ta).trim(),
+        ghi_chu_dat_hang: String(body.ghi_chu_dat_hang == null ? '' : body.ghi_chu_dat_hang).trim()
+    };
+}
+
 function normalizeProductPayload(body) {
     body = body || {};
     var giaVonRaw = Number(body.gia_von || 0);
@@ -153,6 +316,7 @@ function normalizeProductPayload(body) {
         ma_hang: String(body.ma_hang || '').trim(),
         ten_hang: String(body.ten_hang || '').trim(),
         mo_ta: String(body.mo_ta || '').trim(),
+        ghi_chu_dat_hang: String(body.ghi_chu_dat_hang || '').trim(),
         nhom_hang_id: String(body.nhom_hang_id || '').trim() || null,
         don_vi_tinh_id: String(body.don_vi_tinh_id || '').trim() || null,
         nha_cung_cap_id: String(body.nha_cung_cap_id || '').trim() || null,
@@ -857,6 +1021,8 @@ async function loadProductDetailById(productId, req) {
     }
     var item = await HangHoa.findOne(productQuery).lean();
     if (!item) return null;
+    item.mo_ta = decodeLegacyEntities(item.mo_ta || '');
+    item.ghi_chu_dat_hang = decodeLegacyEntities(item.ghi_chu_dat_hang || '');
 
     var scopedQuery = hasStoreScope ? { cua_hang_id: storeId } : {};
     var groups = await loadProductGroups(storeId);
@@ -960,7 +1126,7 @@ async function loadProductDetailById(productId, req) {
     var historyQuery = { hang_hoa_id: item._id };
     if (hasStoreScope) historyQuery.cua_hang_id = storeId;
     var selectedProductHistories = await LichSuKho.find(historyQuery)
-        .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo han_su_dung' })
+        .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
     selectedProductHistories = await enrichStockCardRows(selectedProductHistories, item._id);
@@ -986,6 +1152,131 @@ async function loadProductDetailById(productId, req) {
         : [];
     selectedProductLots = selectedProductLots.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
+        var lot = row.lo_hang_id || {};
+        var rawQty = normalizeStockNumber(row.so_luong !== undefined && row.so_luong !== null ? row.so_luong : lot.so_luong_con_lai);
+        var remainQty = normalizeStockNumber(lot.so_luong_con_lai !== undefined && lot.so_luong_con_lai !== null ? lot.so_luong_con_lai : rawQty);
+        var sellableQty = isSellableLot(lot) ? Math.max(Math.min(rawQty, remainQty), 0) : 0;
+        var expiredQty = isExpiredLot(lot) ? rawQty : 0;
+        row.ton_thuc_te = rawQty;
+        row.ton_co_the_giao = sellableQty;
+        row.ton_het_han = expiredQty;
+        row.lo_da_het_han = isExpiredLot(lot);
+        row.ly_do_khong_the_giao = '';
+        return row;
+    });
+
+    var lotStockById = selectedProductLots.reduce(function(map, row) {
+        var lotId = String((row.lo_hang_id && row.lo_hang_id._id) || row.lo_hang_id || '');
+        if (!lotId) return map;
+        map[lotId] = row;
+        return map;
+    }, {});
+    var stockSummaryByWarehouse = selectedProductLots.reduce(function(map, row) {
+        var warehouseId = String(row.kho_id || '');
+        if (!map[warehouseId]) map[warehouseId] = { raw: 0, sellable: 0, expired: 0 };
+        map[warehouseId].raw += normalizeStockNumber(row.ton_thuc_te);
+        map[warehouseId].sellable += normalizeStockNumber(row.ton_co_the_giao);
+        map[warehouseId].expired += normalizeStockNumber(row.ton_het_han);
+        return map;
+    }, {});
+
+    var selectedProductLotAttributes = [];
+    if (item.quan_ly_theo_lo) {
+        var qcQuery = { hang_hoa_id: item._id };
+        if (hasStoreScope) qcQuery.cua_hang_id = storeId;
+        var qcRows = await TonKhoLoQuyCach.find(qcQuery)
+            .populate({
+                path: 'lo_hang_id',
+                select: 'ma_lo ten_lo ngay_nhap han_su_dung so_luong_con_lai trang_thai kho_id'
+            })
+            .sort({ updated_at: -1, created_at: -1, ten_quy_cach: 1 })
+            .lean();
+        var lotAttributeMap = {};
+        qcRows.forEach(function(row) {
+            var lot = row.lo_hang_id || {};
+            var lotId = String(lot._id || row.lo_hang_id || '');
+            if (!lotId) return;
+            if (!lotAttributeMap[lotId]) {
+                var lotStockInfo = lotStockById[lotId] || {};
+                lotAttributeMap[lotId] = {
+                    lot: lot,
+                    kho_ten: warehouseMap[String(row.kho_id || lot.kho_id || '')] || '---',
+                    items: [],
+                    lot_stock_quantity: normalizeStockNumber(lotStockInfo.ton_thuc_te),
+                    total_quantity: 0,
+                    total_sellable_quantity: 0,
+                    total_expired_quantity: 0,
+                    total_amount: 0
+                };
+            }
+            var quantity = Number(row.so_luong || 0);
+            var unitCost = Number(row.don_gia_nhap || row.gia_von || 0);
+            var amount = Number(row.thanh_tien || 0) || quantity * unitCost;
+            var lotExpired = isExpiredLot(lot);
+            var qcSellableQty = isSellableLot(lot) ? quantity : 0;
+            lotAttributeMap[lotId].items.push({
+                ten_quy_cach: row.ten_quy_cach || row.ten_thuoc_tinh || '---',
+                so_luong: quantity,
+                ton_thuc_te: quantity,
+                ton_co_the_giao: qcSellableQty,
+                ton_het_han: lotExpired ? quantity : 0,
+                lo_da_het_han: lotExpired,
+                ly_do_khong_the_giao: '',
+                don_gia: unitCost,
+                thanh_tien: amount
+            });
+            lotAttributeMap[lotId].total_quantity += quantity;
+            lotAttributeMap[lotId].total_sellable_quantity += qcSellableQty;
+            lotAttributeMap[lotId].total_expired_quantity += lotExpired ? quantity : 0;
+            lotAttributeMap[lotId].total_amount += amount;
+        });
+        selectedProductLotAttributes = Object.keys(lotAttributeMap).map(function(lotId) {
+            var group = lotAttributeMap[lotId];
+            group.lech_quy_cach = normalizeStockNumber(group.total_quantity) - normalizeStockNumber(group.lot_stock_quantity);
+            group.has_reconcile_warning = Math.abs(group.lech_quy_cach) > 0.000001;
+            group.reconcile_message = group.has_reconcile_warning
+                ? 'TonKhoLo = ' + normalizeStockNumber(group.lot_stock_quantity).toLocaleString('vi-VN') + ', TonKhoLoQuyCach = ' + normalizeStockNumber(group.total_quantity).toLocaleString('vi-VN') + '.'
+                : '';
+            return group;
+        });
+        selectedProductLots = selectedProductLots.map(function(row) {
+            var lotId = String((row.lo_hang_id && row.lo_hang_id._id) || row.lo_hang_id || '');
+            var group = lotAttributeMap[lotId];
+            row.quy_cach_items = group && Array.isArray(group.items) ? group.items : [];
+            return row;
+        });
+    }
+
+    var qcTotalQuantity = selectedProductLotAttributes.reduce(function(sum, group) {
+        return sum + normalizeStockNumber(group.total_quantity);
+    }, 0);
+    var qcExpiredQuantity = selectedProductLotAttributes.reduce(function(sum, group) {
+        return sum + normalizeStockNumber(group.total_expired_quantity);
+    }, 0);
+    item.ton_quy_cach = qcTotalQuantity;
+    item.ton_co_the_giao = item.quan_ly_theo_lo
+        ? selectedProductLots.reduce(function(sum, row) { return sum + normalizeStockNumber(row.ton_co_the_giao); }, 0)
+        : item.ton_kho;
+    item.ton_het_han = item.quan_ly_theo_lo
+        ? selectedProductLots.reduce(function(sum, row) { return sum + normalizeStockNumber(row.ton_het_han); }, 0)
+        : 0;
+    item.ton_quy_cach_het_han = qcExpiredQuantity;
+    var tonKhoThucTe = normalizeStockNumber(item.ton_kho);
+    var tonCoTheGiao = normalizeStockNumber(item.ton_co_the_giao);
+    var tonHetHan = normalizeStockNumber(item.ton_het_han);
+    item.co_ton_nhung_khong_the_giao = tonKhoThucTe > 0 && tonCoTheGiao <= 0 && tonHetHan < tonKhoThucTe;
+    item.ly_do_khong_the_giao = item.co_ton_nhung_khong_the_giao
+        ? 'Tồn thực tế còn nhưng không đủ điều kiện giao (ngoài lô hết hạn).'
+        : '';
+
+    selectedProductInventory = selectedProductInventory.map(function(row) {
+        var summary = stockSummaryByWarehouse[String(row.kho_id || '')] || null;
+        row.ton_thuc_te = normalizeStockNumber(row.so_luong);
+        row.ton_co_the_giao = item.quan_ly_theo_lo && summary ? summary.sellable : row.ton_thuc_te;
+        row.ton_het_han = item.quan_ly_theo_lo && summary ? summary.expired : 0;
+        row.ly_do_khong_the_giao = row.ton_thuc_te > 0 && row.ton_co_the_giao <= 0 && row.ton_het_han < row.ton_thuc_te
+            ? 'Tồn kho còn nhưng không đủ điều kiện giao (ngoài lô hết hạn).'
+            : '';
         return row;
     });
 
@@ -994,6 +1285,7 @@ async function loadProductDetailById(productId, req) {
         selectedProductInventory: selectedProductInventory,
         selectedProductHistories: selectedProductHistories,
         selectedProductLots: selectedProductLots,
+        selectedProductLotAttributes: selectedProductLotAttributes,
         formatDate: formatDate
     };
 }
@@ -1005,6 +1297,153 @@ exports.apiProductDetail = async function(req, res, next) {
             return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tìm thấy hàng hóa.</p></div>');
         }
         res.render('hang-hoa/_detail-panel', ctx);
+    } catch (err) {
+        next(err);
+    }
+};
+
+exports.apiUpdateProductNotes = async function(req, res, next) {
+    try {
+        var productId = normalizeIdParam(req && req.params && req.params.id);
+        if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({ success: false, message: 'Hàng hóa không hợp lệ.' });
+        }
+
+        var storeId = await resolveStoreId(req);
+        var productQuery = { _id: productId };
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+            productQuery.$or = [
+                { cua_hang_id: storeId },
+                { cua_hang_id: null },
+                { cua_hang_id: { $exists: false } }
+            ];
+        }
+
+        var existing = await HangHoa.findOne(productQuery).select('_id').lean();
+        if (!existing) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa.' });
+        }
+
+        var payload = normalizeProductNotePayload(req && req.body);
+        var updated = await HangHoa.findByIdAndUpdate(
+            productId,
+            { $set: payload },
+            { runValidators: true, new: true }
+        ).select('mo_ta ghi_chu_dat_hang').lean();
+
+        res.json({
+            success: true,
+            message: 'Đã lưu mô tả và ghi chú đặt hàng.',
+            data: {
+                mo_ta: decodeLegacyEntities(updated.mo_ta || ''),
+                ghi_chu_dat_hang: decodeLegacyEntities(updated.ghi_chu_dat_hang || '')
+            }
+        });
+    } catch (err) {
+        res.status(err.status || err.statusCode || 500).json({
+            success: false,
+            message: err.message || 'Không cập nhật được mô tả/ghi chú.'
+        });
+    }
+};
+
+function lotProfitQueryFromRequest(req) {
+    return {
+        hang_hoa_id: req.params.id,
+        lo_hang_id: req.query.lo_hang_id,
+        cua_hang_id: null
+    };
+}
+
+exports.apiLotProfitReport = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var query = lotProfitQueryFromRequest(req);
+        query.cua_hang_id = storeId;
+        var result = await buildLotProfitReport(query);
+        if (!result.product) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
+        }
+        res.json({ success: true, data: result });
+    } catch (err) {
+        res.status(err.status || err.statusCode || 500).json({
+            success: false,
+            message: err.message || 'Không tải được báo cáo lời lỗ theo lô'
+        });
+    }
+};
+
+exports.exportLotProfitReport = async function(req, res, next) {
+    try {
+        var ExcelJS = require('exceljs');
+        var storeId = await resolveStoreId(req);
+        var query = lotProfitQueryFromRequest(req);
+        query.cua_hang_id = storeId;
+        var result = await buildLotProfitReport(query);
+        if (!result.product) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
+        }
+
+        var workbook = new ExcelJS.Workbook();
+        var sheet = workbook.addWorksheet('Loi lo theo lo');
+        sheet.columns = [
+            { header: 'Ngày nhập / Ngày lô', key: 'ngay_nhap', width: 16 },
+            { header: 'Tên hàng', key: 'ten_hang', width: 28 },
+            { header: 'Lô', key: 'lo', width: 20 },
+            { header: 'Thuộc tính', key: 'quy_cach', width: 22 },
+            { header: 'Số lượng nhập', key: 'so_luong_nhap', width: 14 },
+            { header: 'Đơn giá nhập', key: 'don_gia_nhap', width: 14 },
+            { header: 'Tổng giá vốn', key: 'tong_gia_von', width: 14 },
+            { header: 'Số lượng xuất', key: 'so_luong_xuat', width: 14 },
+            { header: 'Đơn giá xuất bình quân', key: 'don_gia_xuat_binh_quan', width: 18 },
+            { header: 'Tổng doanh thu', key: 'tong_doanh_thu', width: 14 },
+            { header: 'Lợi nhuận', key: 'loi_nhuan', width: 14 }
+        ];
+
+        var sumGv = 0;
+        var sumDt = 0;
+        var sumLn = 0;
+        var sumSlXuat = 0;
+        (result.rows || []).forEach(function(row) {
+            sumGv += Number(row.tong_gia_von || 0);
+            sumDt += Number(row.tong_doanh_thu || 0);
+            sumLn += Number(row.loi_nhuan || 0);
+            sumSlXuat += Number(row.so_luong_xuat || 0);
+            sheet.addRow({
+                ngay_nhap: row.ngay_nhap ? new Date(row.ngay_nhap) : '',
+                ten_hang: row.ten_hang || '',
+                lo: row.lo_hien_thi || '',
+                quy_cach: row.ten_quy_cach || '',
+                so_luong_nhap: row.so_luong_nhap,
+                don_gia_nhap: row.don_gia_nhap,
+                tong_gia_von: row.tong_gia_von,
+                so_luong_xuat: row.so_luong_xuat,
+                don_gia_xuat_binh_quan: row.don_gia_xuat_binh_quan,
+                tong_doanh_thu: row.tong_doanh_thu,
+                loi_nhuan: row.loi_nhuan
+            });
+        });
+        if (result.rows && result.rows.length) {
+            sheet.addRow({
+                ngay_nhap: '',
+                ten_hang: '',
+                lo: '',
+                quy_cach: 'Tổng',
+                so_luong_nhap: '',
+                don_gia_nhap: '',
+                tong_gia_von: sumGv,
+                so_luong_xuat: sumSlXuat,
+                don_gia_xuat_binh_quan: '',
+                tong_doanh_thu: sumDt,
+                loi_nhuan: sumLn
+            });
+        }
+
+        var filename = 'loi-lo-theo-lo-' + (result.product.ma_hang || result.product._id) + '.xlsx';
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+        await workbook.xlsx.write(res);
+        res.end();
     } catch (err) {
         next(err);
     }
@@ -1081,13 +1520,16 @@ exports.index = async function(req, res, next) {
             return map;
         }, {});
 
+        var finalProductIds = products.map(function(item) { return item._id; });
+        var priceMaps = await buildProductListPriceMaps(finalProductIds);
+
         products = products.map(function(item) {
             item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
             item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
             item.nha_cung_cap_ten = supplierMap[String(item.nha_cung_cap_id || '')] || '---';
             item.don_vi_tinh_ten = unitMap[String(item.don_vi_tinh_id || '')] || '---';
             item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
-            return item;
+            return applyProductListPriceFields(item, priceMaps);
         });
         var filterQueryString = buildFilterQueryString(filter);
 
@@ -1541,19 +1983,13 @@ exports.priceSetup = async function(req, res, next) {
             return true;
         });
 
-        var total = products.length;
-        var totalPages = Math.max(1, Math.ceil(total / filter.limit));
-        if (filter.page > totalPages) filter.page = totalPages;
-        var start = (filter.page - 1) * filter.limit;
-        var pageItems = products.slice(start, start + filter.limit);
-
         var groups = await loadProductGroups();
         var groupMap = groups.reduce(function(map, group) {
             map[String(group._id)] = group.ten_nhom_hang || '';
             return map;
         }, {});
 
-        pageItems = pageItems.map(function(item) {
+        products = products.map(function(item) {
             item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
             item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
             return item;
@@ -1564,29 +2000,21 @@ exports.priceSetup = async function(req, res, next) {
             return bangGiaList.find(function(b) { return String(b._id) === id; });
         }).filter(Boolean);
 
-        var ctMapByProduct = {};
-        if (selectedBangGiaOrdered.length > 0 && pageItems.length > 0) {
-            var pageIds = pageItems.map(function(p) { return p._id; });
-            var bangIds = selectedBangGiaOrdered.map(function(b) { return b._id; });
-            var ctRows = await CTBangGia.find({
-                bang_gia_id: { $in: bangIds },
-                hang_hoa_id: { $in: pageIds }
-            }).lean();
-            ctRows.forEach(function(row) {
-                var hid = String(row.hang_hoa_id);
-                var bid = String(row.bang_gia_id);
-                if (!ctMapByProduct[hid]) ctMapByProduct[hid] = {};
-                ctMapByProduct[hid][bid] = {
-                    gia_ban: Number(row.gia_ban || 0),
-                    _id: row._id
-                };
-            });
-        }
+        var primaryBangGiaId = selectedBangGiaOrdered.length === 1
+            ? String(selectedBangGiaOrdered[0]._id)
+            : (selectedBangGiaOrdered[0] ? String(selectedBangGiaOrdered[0]._id) : '');
 
-        pageItems = pageItems.map(function(item) {
-            item.ctBangGiaByBangId = ctMapByProduct[String(item._id)] || {};
-            return item;
+        var storeId = await resolveStoreId(req);
+        var allLines = await buildPriceSetupLines(products, {
+            bang_gia_id: primaryBangGiaId || null,
+            cua_hang_id: storeId
         });
+
+        var total = allLines.length;
+        var totalPages = Math.max(1, Math.ceil(total / filter.limit));
+        if (filter.page > totalPages) filter.page = totalPages;
+        var start = (filter.page - 1) * filter.limit;
+        var pageItems = allLines.slice(start, start + filter.limit);
 
         var qs = function(overrides) {
             var merged = Object.assign({}, filter, overrides || {});
@@ -1608,10 +2036,12 @@ exports.priceSetup = async function(req, res, next) {
             activeMenu: 'hang-hoa',
             user: req.user,
             flash: requestQuery,
+            priceLines: pageItems,
             products: pageItems,
             groups: groups,
             bangGiaList: bangGiaList,
             selectedBangGiaOrdered: selectedBangGiaOrdered,
+            primaryBangGiaId: primaryBangGiaId,
             defaultNgayBatDau: toDatetimeLocalValue(now),
             defaultNgayKetThuc: toDatetimeLocalValue(defaultEnd),
             filter: filter,
@@ -1924,6 +2354,36 @@ exports.updateRetailPrice = async function(req, res, next) {
     }
 };
 
+exports.upsertGiaBanHangHoaPrice = async function(req, res, next) {
+    try {
+        var body = req.body || {};
+        var storeId = await resolveStoreId(req);
+        var doc = await upsertGiaBanHangHoa({
+            cua_hang_id: storeId,
+            bang_gia_id: body.bang_gia_id,
+            hang_hoa_id: body.hang_hoa_id,
+            lo_hang_id: body.lo_hang_id,
+            gia_tri_thuoc_tinh_id: body.gia_tri_thuoc_tinh_id,
+            ten_quy_cach: body.ten_quy_cach,
+            gia_co_dinh: body.gia_co_dinh,
+            gia_thi_truong: body.gia_thi_truong,
+            loai_ap_dung: body.loai_ap_dung,
+            gia_mac_dinh: body.gia_mac_dinh,
+            cho_phep_sua_gia: body.cho_phep_sua_gia
+        });
+
+        if (shouldRespondJson(req)) {
+            return res.json({ success: true, data: doc });
+        }
+        res.redirect('/hang-hoa/thiet-lap-gia?success=updated_gia_ban');
+    } catch (error) {
+        if (shouldRespondJson(req)) {
+            return res.status(400).json({ success: false, message: error.message || 'Lưu giá thất bại.' });
+        }
+        next(error);
+    }
+};
+
 exports.updateCTBangGiaPrice = async function(req, res, next) {
     try {
         var bangGiaId = normalizeIdParam(req?.body?.bang_gia_id);
@@ -2059,8 +2519,8 @@ var HANG_HOA_COLUMNS = {
     hinh_anh:        { header: 'Hình ảnh',             width: 20 },
     dang_kinh_doanh: { header: 'Đang kinh doanh',      width: 16 },
     ban_truc_tiep:   { header: 'Được bán trực tiếp',   width: 18 },
-    gia_ban:         { header: 'Giá bán',              width: 14, numeric: true },
-    gia_von:         { header: 'Giá vốn',              width: 14, numeric: true },
+    gia_von_trung_binh: { header: 'Giá vốn trung bình', width: 18, numeric: true },
+    gia_ban_trung_binh: { header: 'Giá bán trung bình', width: 18 },
     ton_kho:         { header: 'Tồn kho',              width: 12, numeric: true },
     kh_dat:          { header: 'KH đặt',               width: 12, numeric: true },
     du_kien_het:     { header: 'Dự kiến hết hàng',     width: 18 },
@@ -2143,6 +2603,13 @@ exports.exportExcel = async function(req, res, next) {
                 return true;
             });
         }
+
+        var exportProductIds = products.map(function(item) { return item._id; });
+        var exportPriceMaps = await buildProductListPriceMaps(exportProductIds);
+        products.forEach(function(item) {
+            item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
+            applyProductListPriceFields(item, exportPriceMaps);
+        });
 
         // --- 4. Resolve selected Price Books ---
         var bangGiaIds = normalizeBangGiaIdsFromQuery(req.body);
@@ -2236,11 +2703,13 @@ exports.exportExcel = async function(req, res, next) {
                     case 'ban_truc_tiep':
                         rowData[key] = item.ban_truc_tiep ? 'Có' : 'Không';
                         break;
-                    case 'gia_ban':
-                        rowData[key] = Number(item.gia_co_dinh || 0);
+                    case 'gia_von_trung_binh':
+                        rowData[key] = Number(item.gia_von_trung_binh_hien_thi != null ? item.gia_von_trung_binh_hien_thi : (item.gia_von || 0));
                         break;
-                    case 'gia_von':
-                        rowData[key] = Number(item.gia_von || 0);
+                    case 'gia_ban_trung_binh':
+                        rowData[key] = item.gia_ban_trung_binh_hien_thi == null
+                            ? '---'
+                            : Number(item.gia_ban_trung_binh_hien_thi || 0);
                         break;
                     case 'ton_kho':
                         rowData[key] = tonKho;
@@ -2302,3 +2771,6 @@ exports.exportExcel = async function(req, res, next) {
         next(error);
     }
 };
+
+/** Re-export — nguồn giá bán mặc định Phase 0 (xem services/salePrice.service.js). */
+exports.resolveSalePrice = resolveSalePrice;

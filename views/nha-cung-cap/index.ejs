@@ -239,14 +239,70 @@
       border-top: 1px solid #e2e8f0;
       background: #fbfdff;
     }
-    .supplier-pane-actions {
+
+    .debt-period-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1200;
+      background: rgba(15, 23, 42, 0.45);
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .debt-period-modal-overlay.is-open { display: flex; }
+    .debt-period-modal {
+      width: min(420px, 100%);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+      overflow: hidden;
+    }
+    .debt-period-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .debt-period-modal__header h3 { margin: 0; font-size: 16px; }
+    .debt-period-modal__close {
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .debt-period-modal__body { padding: 16px; display: grid; gap: 12px; }
+    .debt-period-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .debt-period-range {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .debt-period-field { display: grid; gap: 4px; font-size: 13px; }
+    .debt-period-field input[type="date"] {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font: inherit;
+    }
+    .debt-period-modal__footer {
       display: flex;
       justify-content: flex-end;
-      align-items: center;
-      flex-wrap: wrap;
       gap: 8px;
-      margin-top: 16px;
-      padding-top: 14px;
+      padding: 12px 16px;
       border-top: 1px solid #e2e8f0;
     }
 
@@ -432,8 +488,8 @@
             </div>
             <h4>Tổng mua</h4>
             <div class="range-stack">
-              <div class="range-row"><span>Từ</span><input type="number" min="0" name="totalBuyFrom" value="<%= filter.totalBuyFrom || '' %>" placeholder="Nhập giá trị"></div>
-              <div class="range-row"><span>Tới</span><input type="number" min="0" name="totalBuyTo" value="<%= filter.totalBuyTo || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Từ</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="totalBuyFrom" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.totalBuyFrom) : (filter.totalBuyFrom || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
+              <div class="range-row"><span>Tới</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="totalBuyTo" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.totalBuyTo) : (filter.totalBuyTo || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
             </div>
             <h4>Thời gian</h4>
             <label class="filter-radio-row">
@@ -450,8 +506,8 @@
             </div>
             <h4>Nợ hiện tại</h4>
             <div class="range-stack">
-              <div class="range-row"><span>Từ</span><input type="number" min="0" name="currentDebtFrom" value="<%= filter.currentDebtFrom || '' %>" placeholder="Nhập giá trị"></div>
-              <div class="range-row"><span>Tới</span><input type="number" min="0" name="currentDebtTo" value="<%= filter.currentDebtTo || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Từ</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="currentDebtFrom" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.currentDebtFrom) : (filter.currentDebtFrom || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
+              <div class="range-row"><span>Tới</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="currentDebtTo" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.currentDebtTo) : (filter.currentDebtTo || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
             </div>
             <h4>Trạng thái</h4>
             <div class="pill-row">
@@ -475,11 +531,18 @@
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllSuppliers" type="checkbox" aria-label="Chọn tất cả"></th>
-                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng nợ</th><th>Tổng mua</th><th>Trạng thái</th>
+                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng nợ</th><th>Đã thanh toán</th><th>Tổng mua</th><th>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
-              <% if (suppliers.length === 0) { %><tr><td colspan="8" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr><% } %>
+              <% if (suppliers.length === 0) { %>
+                <tr><td colspan="9" class="empty-cell">
+                  Không có nhà cung cấp phù hợp với bộ lọc.
+                  <% if (typeof filterDebtRangeLabel === 'string' && filterDebtRangeLabel) { %>
+                    <div style="margin-top:6px;font-size:12px;color:#64748b;">Đang lọc nợ hiện tại từ <strong><%= filterDebtRangeLabel %></strong>. Kiểm tra cột <strong>Tổng nợ</strong> trên bảng khi bỏ lọc.</div>
+                  <% } %>
+                </td></tr>
+              <% } %>
               <% suppliers.forEach(function(supplier) { %>
                 <% var listBase = '/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
                 <tr data-kv-detail-id="<%= supplier._id %>">
@@ -489,6 +552,7 @@
                   <td><%= supplier.sdt || '---' %></td>
                   <td><%= supplier.email || '---' %></td>
                   <td><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></td>
+                  <td><%= Number(supplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
                   <td><%= Number(supplier.tong_mua || 0).toLocaleString('vi-VN') %></td>
                   <td><span class="status-pill <%= supplier.trang_thai === 'active' ? 'is-active' : '' %>"><%= supplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></td>
                 </tr>
@@ -542,6 +606,8 @@
   </div>
   <script id="supplierGroupsSeed" type="application/json"><%- JSON.stringify(supplierGroups || []) %></script>
   <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
+  <%- include('../partials/debt-period-export-modal') %>
+  <script src="/js/debt-period-export.js"></script>
   <script src="/js/kv-inline-detail.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -579,6 +645,39 @@
         openAddSupplierModal();
       }
 
+      function parseSupplierMoney(value) {
+        var normalized = String(value || '').replace(/\./g, '').replace(/,/g, '').trim();
+        if (normalized === '') return '';
+        var number = Number(normalized);
+        return Number.isFinite(number) && number >= 0 ? Math.floor(number) : '';
+      }
+      function formatSupplierMoney(value) {
+        if (value === '' || value == null) return '';
+        var number = Math.max(0, Math.floor(Number(value || 0)));
+        return number.toLocaleString('vi-VN');
+      }
+      function bindVnMoneyFilterInputs(root) {
+        var scope = root || document;
+        scope.querySelectorAll('.js-vn-money-filter').forEach(function(input) {
+          if (input.getAttribute('data-vn-money-bound') === '1') return;
+          input.setAttribute('data-vn-money-bound', '1');
+          input.addEventListener('input', function() {
+            var digits = String(input.value || '').replace(/\D/g, '');
+            input.value = digits === '' ? '' : formatSupplierMoney(digits);
+          });
+        });
+      }
+      var supplierFilterForm = document.querySelector('.store-filter-form');
+      if (supplierFilterForm) {
+        bindVnMoneyFilterInputs(supplierFilterForm);
+        supplierFilterForm.addEventListener('submit', function() {
+          supplierFilterForm.querySelectorAll('.js-vn-money-filter').forEach(function(input) {
+            var parsed = parseSupplierMoney(input.value);
+            input.value = parsed === '' ? '' : String(parsed);
+          });
+        });
+      }
+
       var selectAll = document.getElementById('selectAllSuppliers');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.supplier-checkbox'));
       if (selectAll) {
@@ -593,27 +692,12 @@
 
       var kvSupplierTable = document.querySelector('table[data-kv-master="nha-cung-cap"]');
       var kvSupplier = null;
-      var exportLabels = { info: 'Xuất thông tin', address: 'Xuất địa chỉ', history: 'Xuất lịch sử', debt: 'Xuất công nợ', xnb: 'Xuất xuất dùng nội bộ' };
-      function getActiveSupplierTab(detailBlock) {
-        var activeBtn = detailBlock.querySelector('.detail-tab.is-active[data-detail-tab]');
-        return activeBtn ? activeBtn.getAttribute('data-detail-tab') : 'info';
-      }
-      function syncSupplierExportLink(detailBlock) {
-        var link = detailBlock.querySelector('.supplier-detail-export-link');
-        if (!link) return;
-        var id = link.getAttribute('data-supplier-id');
-        if (!id) return;
-        var tab = getActiveSupplierTab(detailBlock);
-        link.href = '/nha-cung-cap/' + id + '/export/' + tab;
-        link.textContent = exportLabels[tab] || 'Xuất';
-        link.style.display = tab === 'debt' ? 'none' : '';
-      }
       function bindSupplierInlinePanel(rootEl) {
         var wrap = rootEl.classList.contains('supplier-inline-detail') ? rootEl : rootEl.querySelector('.supplier-inline-detail');
         if (!wrap) return;
+        if (window.KvDebtPeriodExport) window.KvDebtPeriodExport.bind(wrap);
         var detailBlock = wrap.querySelector('[data-supplier-detail]');
         if (!detailBlock) return;
-        syncSupplierExportLink(detailBlock);
         var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
         if (collapseBtn && !collapseBtn.getAttribute('data-kv-collapse-bound')) {
           collapseBtn.setAttribute('data-kv-collapse-bound', '1');
@@ -627,7 +711,7 @@
       if (kvSupplierTable && typeof KvInlineDetail !== 'undefined') {
         kvSupplier = new KvInlineDetail({
           table: kvSupplierTable,
-          colspan: 8,
+          colspan: 9,
           buildUrl: function(id) {
             return '/nha-cung-cap/api/' + encodeURIComponent(id) + '/detail';
           },
@@ -645,26 +729,12 @@
         }
       }
 
-      var supplierTablePanel = document.querySelector('.store-table-panel');
-      if (supplierTablePanel) {
-        supplierTablePanel.addEventListener('click', function(ev) {
-          var tabBtn = ev.target.closest('.supplier-inline-detail .detail-tab[data-detail-tab]');
-          if (!tabBtn) return;
-          var panel = tabBtn.closest('.supplier-inline-detail');
-          if (!panel) return;
-          var detailBlock = panel.querySelector('[data-supplier-detail]');
-          if (!detailBlock) return;
-          window.setTimeout(function() { syncSupplierExportLink(detailBlock); }, 0);
-        });
+      function parseSupplierMoneyAmount(value) {
+        var parsed = parseSupplierMoney(value);
+        return parsed === '' ? 0 : parsed;
       }
-
-      function parseSupplierMoney(value) {
-        var normalized = String(value || '').replace(/\./g, '').replace(/,/g, '').trim();
-        var number = Number(normalized);
-        return Number.isFinite(number) && number > 0 ? Math.floor(number) : 0;
-      }
-      function formatSupplierMoney(value) {
-        return Math.max(0, Math.floor(Number(value || 0))).toLocaleString('vi-VN');
+      function formatSupplierMoneyDisplay(value) {
+        return formatSupplierMoney(value);
       }
       function formatSupplierSignedMoney(value) {
         var number = Math.floor(Number(value || 0));
@@ -676,7 +746,7 @@
       function getSupplierPayRowAllocations(form) {
         var rows = [];
         Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
-          var paid = parseSupplierMoney(input.value);
+          var paid = parseSupplierMoneyAmount(input.value);
           if (paid <= 0) return;
           rows.push({
             phieu_nhap_id: input.getAttribute('data-purchase-id') || '',
@@ -692,7 +762,7 @@
         var amountInput = form ? form.querySelector('.js-supplier-pay-amount') : null;
         var overpaymentInput = form ? form.querySelector('.js-supplier-pay-overpayment') : null;
         if (overpaymentInput) {
-          var amount = parseSupplierMoney(amountInput ? amountInput.value : 0);
+          var amount = parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
           var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
           overpaymentInput.value = String(Math.max(0, amount - payableDebt));
         }
@@ -703,7 +773,7 @@
         var payableDebt = Math.max(0, debt);
         var allowOverpayment = !!form.querySelector('.js-supplier-pay-allow-overpayment:checked');
         var amountInput = form.querySelector('.js-supplier-pay-amount');
-        var amount = parseSupplierMoney(amountInput ? amountInput.value : 0);
+        var amount = parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
         if (!allowOverpayment) amount = Math.min(amount, payableDebt);
         if (source === 'amount') {
           if (amountInput) amountInput.value = amount ? formatSupplierMoney(amount) : '';
@@ -719,7 +789,7 @@
           var rowBudget = payableDebt;
           Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
             var rowDebt = Number(input.getAttribute('data-debt') || 0);
-            var paid = Math.min(parseSupplierMoney(input.value), rowDebt, Math.max(0, rowBudget - amount));
+            var paid = Math.min(parseSupplierMoneyAmount(input.value), rowDebt, Math.max(0, rowBudget - amount));
             amount += paid;
             setSupplierPayInputValue(input, paid);
           });
@@ -731,7 +801,7 @@
         Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row')).forEach(function(row) {
           var rowDebt = Number(row.getAttribute('data-debt') || 0);
           var input = row.querySelector('.js-supplier-pay-row-paid-input');
-          var paid = Math.min(parseSupplierMoney(input ? input.value : 0), rowDebt);
+          var paid = Math.min(parseSupplierMoneyAmount(input ? input.value : 0), rowDebt);
           totalPaid += paid;
           totalRowDebt += rowDebt;
           totalRowLeft += Math.max(0, rowDebt - paid);
@@ -776,7 +846,7 @@
         if (!form) return;
         var debt = Number(form.getAttribute('data-current-debt') || 0);
         var amountInput = form.querySelector('.js-supplier-discount-amount');
-        var amount = parseSupplierMoney(amountInput ? amountInput.value : 0);
+        var amount = parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
         if (amountInput && amount) amountInput.value = formatSupplierMoney(amount);
         var remaining = form.querySelector('.js-supplier-discount-remaining');
         if (remaining) remaining.textContent = formatSupplierMoney(Math.max(0, debt - amount));
@@ -834,7 +904,7 @@
           event.stopPropagation();
           var discountForm = document.getElementById(discountSubmitBtn.getAttribute('data-form-id'));
           if (!discountForm || discountSubmitBtn.disabled) return;
-          var discountAmount = parseSupplierMoney((discountForm.querySelector('[name="gia_tri"]') || {}).value);
+          var discountAmount = parseSupplierMoneyAmount((discountForm.querySelector('[name="gia_tri"]') || {}).value);
           var discountDebt = Math.max(0, Number(discountForm.getAttribute('data-current-debt') || 0));
           if (discountAmount <= 0) return alert('Vui lòng nhập số tiền chiết khấu.');
           if (discountAmount > discountDebt) return alert('Số tiền chiết khấu không được vượt quá nợ hiện tại.');
@@ -875,7 +945,7 @@
         event.stopPropagation();
         var form = document.getElementById(submitBtn.getAttribute('data-form-id'));
         if (!form || submitBtn.disabled) return;
-        var amount = parseSupplierMoney((form.querySelector('[name="gia_tri"]') || {}).value);
+        var amount = parseSupplierMoneyAmount((form.querySelector('[name="gia_tri"]') || {}).value);
         var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
         var allowOverpayment = !!form.querySelector('.js-supplier-pay-allow-overpayment:checked');
         if (amount <= 0) return alert('Vui lòng nhập số tiền thanh toán.');

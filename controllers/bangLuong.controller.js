@@ -10,6 +10,7 @@ var {
   PhieuThuChi,
   SoQuy
 } = require('../models/kiot.model');
+var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { resolveStoreId } = require('../utils/storeScope');
 var {
   normalizeWorkDate,
@@ -21,7 +22,7 @@ var { makeBangLuongCode, makePayrollPaymentCode } = require('../utils/hrCode');
 var hrLog = require('../utils/hrPayrollLogger');
 
 var PAY_DETAIL_OVERPAY_MSG = 'So tien tra vuot qua so tien con can tra hoac dong luong khong con hop le.';
-var PAY_CASHBOOK_INVALID_MSG = 'So quy khong du so du hoac khong hop le.';
+var PAY_CASHBOOK_INVALID_MSG = 'So quy khong hop le hoac da ngung su dung.';
 var PAY_RECEIPT_CANCEL_INVALID_MSG = 'Phieu luong khong hop le hoac da duoc huy.';
 
 var PAYROLL_STATUSES = ['draft', 'calculated', 'locked', 'cancelled'];
@@ -340,59 +341,13 @@ function payrollRecalcBlockedError() {
   return err;
 }
 
-function cashBookTypeScore(book, paymentMethod) {
-  var type = String(book && book.loai || '').trim().toLowerCase();
-  var name = String(book && book.ten_so_quy || '').trim().toLowerCase();
-  var haystack = type + ' ' + name;
-  if (paymentMethod === 'tien_mat') {
-    if (type === 'cash' || haystack.indexOf('tien mat') >= 0 || haystack.indexOf('tiền mặt') >= 0) return 30;
-  }
-  if (paymentMethod === 'chuyen_khoan') {
-    if (['bank', 'ngan_hang', 'tai_khoan', 'chuyen_khoan'].indexOf(type) >= 0) return 30;
-    if (haystack.indexOf('ngan hang') >= 0 || haystack.indexOf('ngân hàng') >= 0 ||
-      haystack.indexOf('tai khoan') >= 0 || haystack.indexOf('tài khoản') >= 0 ||
-      haystack.indexOf('chuyen khoan') >= 0 || haystack.indexOf('chuyển khoản') >= 0) return 30;
-  }
-  if (paymentMethod === 'vi_dien_tu') {
-    if (['wallet', 'vi_dien_tu'].indexOf(type) >= 0) return 30;
-    if (haystack.indexOf('vi dien tu') >= 0 || haystack.indexOf('ví điện tử') >= 0) return 30;
-  }
-  return 0;
-}
-
-function isDefaultCashBook(book) {
-  return !!(book && (book.mac_dinh || book.is_default || book.default || book.la_mac_dinh));
-}
-
 async function resolvePayrollCashBook(storeId, paymentMethod, cashBookId, session) {
-  if (cashBookId) {
-    return SoQuy.findOne({
-      _id: cashBookId,
-      cua_hang_id: storeId,
-      trang_thai: 'active'
-    }).session(session || null);
-  }
-
-  var query = SoQuy.find({
+  if (!cashBookId) return null;
+  return SoQuy.findOne({
+    _id: cashBookId,
     cua_hang_id: storeId,
     trang_thai: 'active'
-  }).sort({ ten_so_quy: 1, loai: 1 });
-  if (session) query = query.session(session);
-  var books = await query;
-  if (!books.length) return null;
-  if (books.length === 1) return books[0];
-
-  var ranked = books.map(function(book, index) {
-    var score = cashBookTypeScore(book, paymentMethod);
-    if (isDefaultCashBook(book)) score += 100;
-    return { book: book, score: score, index: index };
-  }).sort(function(a, b) {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.index - b.index;
-  });
-
-  if (ranked[0].score > 0) return ranked[0].book;
-  return null;
+  }).session(session || null);
 }
 
 async function assertPayrollCanRecalculate(storeId, payroll) {
@@ -738,7 +693,7 @@ exports.apiDetail = async function(req, res, next) {
       loai_phieu: 'chi',
       loai_thu_chi: 'tra_luong_nhan_vien'
     })
-      .populate('so_quy_id', 'ten_so_quy loai')
+      .populate('so_quy_id', 'ten_so_quy')
       .populate('nhan_vien_id', 'ma_nhan_vien ten_nhan_vien')
       .sort({ ngay_lap: -1, created_at: -1 })
       .lean();
@@ -902,17 +857,17 @@ exports.apiPayDetail = async function(req, res, next) {
     if (!detailId) return jsonError(res, 400, 'Ma chi tiet bang luong khong hop le');
     if (amount <= 0) return jsonError(res, 400, 'So tien thanh toan phai lon hon 0');
     if (PAYMENT_METHODS.indexOf(paymentMethod) < 0) return jsonError(res, 400, 'Phuong thuc thanh toan khong hop le');
+    if (!cashBookId) return jsonError(res, 400, 'Vui lòng chọn sổ quỹ để chi lương.');
 
     var detailPreview = await ChiTietBangLuong.findOne({ _id: detailId, cua_hang_id: storeId }).lean();
-    var cashPreview = cashBookId ? await SoQuy.findOne({ _id: cashBookId, cua_hang_id: storeId }).lean() : null;
+    var cashPreview = await SoQuy.findOne({ _id: cashBookId, cua_hang_id: storeId }).lean();
     hrLog.logPayrollInfo('payroll.payment.validate', Object.assign({}, payCtx, {
       bang_luong_id: detailPreview ? hrLog.idStr(detailPreview.bang_luong_id) : undefined,
       nhan_vien_id: detailPreview ? hrLog.idStr(detailPreview.nhan_vien_id) : undefined,
       ct_trang_thai: detailPreview && detailPreview.trang_thai,
       con_can_tra_before: detailPreview && detailPreview.con_can_tra,
       da_tra_before: detailPreview && detailPreview.da_tra,
-      so_du_quy_before: cashPreview && cashPreview.so_du,
-      cho_phep_am: cashPreview && cashPreview.cho_phep_am
+      so_quy_active: !!(cashPreview && cashPreview.trang_thai === 'active')
     }));
 
     session = await mongoose.startSession();
@@ -931,25 +886,13 @@ exports.apiPayDetail = async function(req, res, next) {
       payCtx.bang_luong_id = hrLog.idStr(payroll._id);
       payCtx.nhan_vien_id = hrLog.idStr(detail.nhan_vien_id);
 
-      var cashBook = null;
-      if (cashBookId) {
-        cashBook = await resolvePayrollCashBook(storeId, paymentMethod, cashBookId, session);
-        if (!cashBook) throw new Error(PAY_CASHBOOK_INVALID_MSG);
-        payCtx.so_quy_id = hrLog.idStr(cashBook._id);
-        payCtx.so_quy_auto_resolved = false;
-        hrLog.logPayrollInfo('payroll.payment.cash.resolved', Object.assign({}, payCtx, {
-          ten_so_quy: cashBook.ten_so_quy,
-          loai: cashBook.loai,
-          so_du_quy_before: cashBook.so_du,
-          cho_phep_am: cashBook.cho_phep_am
-        }));
-      } else {
-        payCtx.so_quy_id = undefined;
-        payCtx.so_quy_auto_resolved = false;
-        hrLog.logPayrollInfo('payroll.payment.cash.skipped', Object.assign({}, payCtx, {
-          reason: 'payroll_payment_without_cashbook'
-        }));
-      }
+      var cashBook = await resolvePayrollCashBook(storeId, paymentMethod, cashBookId, session);
+      if (!cashBook) throw new Error(PAY_CASHBOOK_INVALID_MSG);
+      payCtx.so_quy_id = hrLog.idStr(cashBook._id);
+      payCtx.so_quy_auto_resolved = false;
+      hrLog.logPayrollInfo('payroll.payment.cash.resolved', Object.assign({}, payCtx, {
+        ten_so_quy: cashBook.ten_so_quy
+      }));
 
       var updatedDetail = await ChiTietBangLuong.findOneAndUpdate(
         {
@@ -970,37 +913,9 @@ exports.apiPayDetail = async function(req, res, next) {
         con_can_tra_after: updatedDetail.con_can_tra
       });
 
-      var updatedCashBook = null;
-      if (cashBook) {
-        updatedCashBook = await SoQuy.findOneAndUpdate(
-          {
-            _id: cashBook._id,
-            cua_hang_id: storeId,
-            trang_thai: 'active',
-            cho_phep_am: false,
-            so_du: { $gte: amount }
-          },
-          { $inc: { so_du: -amount } },
-          { session: session, new: true }
-        );
-        if (!updatedCashBook) {
-          updatedCashBook = await SoQuy.findOneAndUpdate(
-            {
-              _id: cashBook._id,
-              cua_hang_id: storeId,
-              trang_thai: 'active',
-              cho_phep_am: true
-            },
-            { $inc: { so_du: -amount } },
-            { session: session, new: true }
-          );
-        }
-        if (!updatedCashBook) throw new Error(PAY_CASHBOOK_INVALID_MSG);
-        hrLog.logPayrollInfo('payroll.payment.cash.updated', {
-          so_quy_id: hrLog.idStr(updatedCashBook._id),
-          so_du_quy_after: updatedCashBook.so_du
-        });
-      }
+      hrLog.logPayrollInfo('payroll.payment.cash.validated', {
+        so_quy_id: hrLog.idStr(cashBook._id)
+      });
 
       var updatedPayroll = await BangLuong.findOneAndUpdate(
         {
@@ -1017,7 +932,7 @@ exports.apiPayDetail = async function(req, res, next) {
       hrLog.logPayrollInfo('payroll.payment.payroll.updated', hrLog.logPayrollSummary(updatedPayroll));
 
       var receiptCode = await makePayrollPaymentCode(storeId);
-      var receiptRows = await PhieuThuChi.create([{
+      var receipt = await taoPhieuThuChi({
         ma_phieu: receiptCode,
         ngay_lap: new Date(),
         loai_phieu: 'chi',
@@ -1027,9 +942,9 @@ exports.apiPayDetail = async function(req, res, next) {
         nhom_doi_tuong: 'nhan_vien',
         phuong_thuc_thanh_toan: paymentMethod,
         trang_thai: 'paid',
-        hach_toan: true,
+        hach_toan: false,
         cua_hang_id: storeId,
-        so_quy_id: updatedCashBook ? updatedCashBook._id : undefined,
+        so_quy_id: cashBook._id,
         nguoi_tao_id: userId,
         nhan_vien_id: updatedDetail.nhan_vien_id,
         bang_luong_id: updatedPayroll._id,
@@ -1037,17 +952,18 @@ exports.apiPayDetail = async function(req, res, next) {
         ma_chung_tu_goc: updatedPayroll.ma_bang_luong,
         ghi_chu: note || ('Thanh toan luong ' + (updatedPayroll.ma_bang_luong || '') + ' - ' +
           (updatedDetail.ma_nhan_vien || '') + ' - ' +
-          (updatedDetail.ten_nhan_vien || 'nhan vien'))
-      }], { session: session });
+          (updatedDetail.ten_nhan_vien || 'nhan vien')),
+        session: session
+      });
 
       hrLog.logPayrollInfo('payroll.payment.receipt.created', {
-        phieu_thu_chi_id: hrLog.idStr(receiptRows[0]._id),
-        ma_phieu: receiptRows[0].ma_phieu,
-        gia_tri: receiptRows[0].gia_tri
+        phieu_thu_chi_id: hrLog.idStr(receipt._id),
+        ma_phieu: receipt.ma_phieu,
+        gia_tri: receipt.gia_tri
       });
 
       result = {
-        receipt: receiptRows[0],
+        receipt: receipt,
         detail: updatedDetail,
         payroll: updatedPayroll
       };
@@ -1138,7 +1054,7 @@ exports.apiCancelPayrollReceipt = async function(req, res, next) {
       so_quy_id: hrLog.idStr(receipt.so_quy_id),
       da_tra_before: detailPreview.da_tra,
       con_can_tra_before: detailPreview.con_can_tra,
-      so_du_before: cashPreview && cashPreview.so_du
+      so_quy_found: !!cashPreview
     }));
 
     session = await mongoose.startSession();
@@ -1169,24 +1085,10 @@ exports.apiCancelPayrollReceipt = async function(req, res, next) {
         ma_phieu: cancelledReceipt.ma_phieu
       });
 
-      if (receipt.so_quy_id) {
-        var cashBookUpdate = await SoQuy.updateOne(
-          { _id: receipt.so_quy_id, cua_hang_id: storeId },
-          { $inc: { so_du: amount } },
-          { session: session }
-        );
-        if (!cashBookUpdate.matchedCount) throw new Error('So quy khong hop le');
-        var cashAfter = await SoQuy.findById(receipt.so_quy_id).session(session).lean();
-        hrLog.logPayrollInfo('payroll.receipt_cancel.cash.refunded', {
-          so_quy_id: hrLog.idStr(receipt.so_quy_id),
-          so_du_after: cashAfter && cashAfter.so_du
-        });
-      } else {
-        hrLog.logPayrollInfo('payroll.receipt_cancel.cash.skipped', {
-          phieu_thu_chi_id: hrLog.idStr(receiptId),
-          reason: 'payroll_receipt_without_cashbook'
-        });
-      }
+      hrLog.logPayrollInfo('payroll.receipt_cancel.cash.cache.skipped', {
+        phieu_thu_chi_id: hrLog.idStr(receiptId),
+        so_quy_id: hrLog.idStr(receipt.so_quy_id)
+      });
 
       var updatedDetail = await ChiTietBangLuong.findOneAndUpdate(
         {

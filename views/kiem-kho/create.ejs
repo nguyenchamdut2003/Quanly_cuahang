@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
   <head>
   <meta charset="UTF-8">
@@ -103,6 +103,19 @@
         margin-top: 14px;
       }
       .btn-print-ton:hover { background: #e6f4ff; }
+      .btn-print-gia-tri {
+        width: 100%;
+        padding: 12px;
+        background: #fff;
+        color: #389e0d;
+        border: 1px solid #389e0d;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+      .btn-print-gia-tri:hover { background: #f6ffed; }
     </style>
   </head>
   <body>
@@ -128,8 +141,9 @@
               <th width="120">Mã hàng</th>
               <th>Tên hàng</th>
               <th width="80">ĐVT</th>
-              <th width="110">Mã lô</th>
-              <th width="120">Hạn sử dụng</th>
+              <th width="110">Tên lô</th>
+              <th width="120">Thuộc tính</th>
+              <th width="110">Hạn sử dụng</th>
               <th width="100" style="text-align: right;">Hệ thống</th>
               <th width="100" style="text-align: right;">Thực tế</th>
               <th width="100" style="text-align: right;">Lệch</th>
@@ -184,6 +198,10 @@
           <i class="fa-solid fa-print"></i> In phiếu số lượng hiện tại (tồn hệ thống)
         </button>
 
+        <button type="button" class="btn-print-gia-tri" onclick="printGiaTriKho()">
+          <i class="fa-solid fa-print"></i> In phiếu giá trị kho
+        </button>
+
         <button class="btn-finish" onclick="saveKiemKho()">
           <i class="fa-solid fa-check-double"></i> HOÀN THÀNH
         </button>
@@ -211,6 +229,15 @@
 
       function rowKey(item) {
         return String(item.hang_hoa_id || '') + '::' + String(item.lo_hang_id || '') + '::' + String(item.ten_quy_cach || '');
+      }
+
+      function formatLotName(item) {
+        const ten = String(item.ten_lo || '').trim();
+        const ma = String(item.ma_lo || '').trim();
+        if (ten) return ten;
+        if (ma) return ma;
+        if (item.lo_hang_id) return 'Lô không tên';
+        return '';
       }
 
       function formatDate(value) {
@@ -261,8 +288,13 @@
             ten_hang: row.ten_hang || '',
             don_vi_tinh: row.don_vi_tinh || '',
             ma_lo: row.ma_lo || '',
+            ten_lo: row.ten_lo || '',
+            lo_hang_label: row.lo_hang_label || formatLotName(row),
             ten_quy_cach: row.ten_quy_cach || '',
             han_su_dung: row.han_su_dung || '',
+            don_gia_von: Number(row.don_gia_von || 0),
+            ten_ncc: row.ten_ncc || '---',
+            gia_tri_kho: Number(row.gia_tri_kho || 0),
             ton_kho_he_thong: Number(row.ton_kho_he_thong || 0),
             so_luong_thuc_te: Number(row.ton_kho_he_thong || 0),
             nguyen_nhan_lech: ''
@@ -317,12 +349,13 @@
         const filtered = kkItems.filter(item =>
           String(item.ten_hang || '').toLowerCase().includes(query) ||
           String(item.ma_hang || '').toLowerCase().includes(query) ||
+          String(item.ten_lo || '').toLowerCase().includes(query) ||
           String(item.ma_lo || '').toLowerCase().includes(query)
         ).slice(0, 30);
 
         resultsDiv.innerHTML = filtered.map(item => `
           <div class="search-item" onclick="focusKKItem('${item.key}')">
-            <span>${item.ten_hang} (${item.ma_hang})${item.ma_lo ? ' - Lô ' + item.ma_lo : ''}</span>
+            <span>${item.ten_hang} (${item.ma_hang})${formatLotName(item) ? ' - Lô ' + formatLotName(item) : ''}${item.ten_quy_cach ? ' - ' + item.ten_quy_cach : ''}</span>
             <span style="float: right; color: #999;">Tồn: ${item.ton_kho_he_thong}</span>
           </div>
         `).join('') || '<div class="search-item"><span>Không có hàng phù hợp</span></div>';
@@ -356,7 +389,8 @@
               <td>${item.ma_hang}</td>
               <td>${item.ten_hang}</td>
               <td>${item.don_vi_tinh || ''}</td>
-              <td>${item.ma_lo || ''}</td>
+              <td>${formatLotName(item)}</td>
+              <td>${item.ten_quy_cach || ''}</td>
               <td>${formatDate(item.han_su_dung)}</td>
               <td style="text-align: right;">${item.ton_kho_he_thong}</td>
               <td style="text-align: right;">
@@ -370,7 +404,7 @@
               </td>
             </tr>
           `;
-        }).join('') || '<tr><td colspan="10" style="text-align:center;color:#777;padding:40px;">Chọn kho để tải hàng hóa đang có tồn.</td></tr>';
+        }).join('') || '<tr><td colspan="11" style="text-align:center;color:#777;padding:40px;">Chọn kho để tải hàng hóa đang có tồn.</td></tr>';
 
         document.getElementById('totalThucTe').innerText = totalTT;
         document.getElementById('totalLech').innerText = totalL;
@@ -386,6 +420,42 @@
       function updateReason(key, val) {
         const item = kkItems.find(i => i.key === key);
         if (item) item.nguyen_nhan_lech = val || '';
+      }
+
+      async function printGiaTriKho() {
+        if (!khoSelect.value) return alert('Vui lòng chọn kho.');
+        if (!kkItems.length) return alert('Không có hàng để in.');
+        try {
+          const res = await fetch('/kiem-kho/preview-gia-tri-kho', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              cua_hang_id: document.getElementById('storeId').value,
+              kho_id: khoSelect.value,
+              ghi_chu: document.getElementById('ghiChu').value,
+              items: kkItems.map(item => ({
+                ma_hang: item.ma_hang,
+                ten_hang: item.ten_hang,
+                don_vi_tinh: item.don_vi_tinh,
+                ma_lo: item.ma_lo,
+                ten_lo: item.ten_lo,
+                lo_hang_label: formatLotName(item),
+                han_su_dung: item.han_su_dung,
+                ten_quy_cach: item.ten_quy_cach,
+                ton_kho_he_thong: item.ton_kho_he_thong,
+                don_gia_von: item.don_gia_von,
+                ten_ncc: item.ten_ncc,
+                gia_tri_kho: Number(item.ton_kho_he_thong || 0) * Number(item.don_gia_von || 0)
+              }))
+            })
+          });
+          const result = await res.json().catch(() => ({}));
+          if (!result.success) return alert(result.message || 'Không tạo được phiếu in.');
+          window.open(result.url, '_blank', 'noopener');
+        } catch (err) {
+          alert('Không kết nối được máy chủ.');
+        }
       }
 
       async function printTonHeThong() {
@@ -405,6 +475,8 @@
                 ten_hang: item.ten_hang,
                 don_vi_tinh: item.don_vi_tinh,
                 ma_lo: item.ma_lo,
+                ten_lo: item.ten_lo,
+                lo_hang_label: formatLotName(item),
                 han_su_dung: item.han_su_dung,
                 ten_quy_cach: item.ten_quy_cach,
                 ton_kho_he_thong: item.ton_kho_he_thong

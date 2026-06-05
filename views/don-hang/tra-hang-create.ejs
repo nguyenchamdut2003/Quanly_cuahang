@@ -1,4 +1,4 @@
-﻿<%
+<%
   const safeInvoices = Array.isArray(locals.invoices) ? locals.invoices : [];
   const invoicePayload = safeInvoices.map(i => ({
     _id: String(i._id),
@@ -314,17 +314,20 @@
       const result = await res.json();
       if(!result.success) return alert(result.message || 'Không tải được hóa đơn');
       selectedInvoice = result.data.invoice;
+      if (result.data.return_multi_lot_note) {
+        alert(result.data.return_multi_lot_note);
+      }
       returnItems = result.data.items.map(item => ({
-        line_key: item._id || `${item.hang_hoa_id?._id || item.hang_hoa_id}::${item.lo_hang_id?._id || item.lo_hang_id || ''}`,
+        line_key: `${item._id || item.ct_hoa_don_id || ''}::${item.lo_hang_id?._id || item.lo_hang_id || ''}`,
         ct_hoa_don_id: item._id || '',
         hang_hoa_id: item.hang_hoa_id?._id || item.hang_hoa_id,
         ma_hang: item.hang_hoa_id?.ma_hang || '',
         ten_hang: item.hang_hoa_id?.ten_hang || '',
         ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
-        so_luong_goc: Number(item.so_luong || 0),
-        so_luong: Number(item.so_luong || 0),
+        so_luong_goc: Number(item.so_luong_con_lai ?? item.so_luong || 0),
+        so_luong: Number(item.so_luong_con_lai ?? item.so_luong || 0),
         lo_hang_id: item.lo_hang_id?._id || item.lo_hang_id || '',
-        lo_hang: item.lo_hang_id?.ma_lo || item.lo_hang_id?.ten_lo || '',
+        lo_hang: item.lo_hang_display || item.lo_hang_id?.ten_lo || item.lo_hang_id?.ma_lo || '',
         chiet_khau: Number(item.chiet_khau || 0),
         don_gia: Number(item.don_gia || 0),
         thanh_tien_goc: Number(item.thanh_tien || 0)

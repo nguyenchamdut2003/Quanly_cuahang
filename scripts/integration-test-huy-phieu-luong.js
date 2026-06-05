@@ -37,6 +37,7 @@ const mongoose = require('mongoose');
 const { connectDB } = require('../models/db.model');
 const { BangLuong, ChiTietBangLuong } = require('../models/hr.model');
 const { SoQuy, PhieuThuChi, CuaHang } = require('../models/kiot.model');
+const { calculateCashBookBalances } = require('../services/cashBookBalance.service');
 const bangLuongController = require('../controllers/bangLuong.controller');
 
 const TAG = '__IT_HUY_PL__';
@@ -116,15 +117,20 @@ async function seedLockedPayroll(storeId, tongLuong) {
   return { payroll, detail };
 }
 
-async function seedSoQuy(storeId, soDu) {
+async function seedSoQuy(storeId, suffix) {
   return SoQuy.create({
     cua_hang_id: storeId,
-    ten_so_quy: TAG + ' SQ',
-    loai: 'tien_mat',
-    so_du: soDu,
-    cho_phep_am: true,
+    ten_so_quy: TAG + ' SQ ' + (suffix || ''),
     trang_thai: 'active'
   });
+}
+
+async function loadCashBalance(storeId, soQuyId) {
+  const map = await calculateCashBookBalances({
+    cua_hang_id: storeId,
+    so_quy_ids: [soQuyId]
+  });
+  return map[String(soQuyId)] || { tong_thu: 0, tong_chi: 0, so_du_tinh_toan: 0 };
 }
 
 async function payAndGetReceipt(req, detail, soQuy, amount) {
@@ -156,31 +162,31 @@ async function main() {
   try {
     // Test A — Huy phieu tra mot phan
     console.log('\n=== Test A: Huy phieu 3M (tong 10M) ===');
-    const soQuyA = await seedSoQuy(storeId, 10000000);
+    const soQuyA = await seedSoQuy(storeId, 'A');
     ids.soQuyIds.push(soQuyA._id);
     const seedA = await seedLockedPayroll(storeId, 10000000);
     ids.payrollIds.push(seedA.payroll._id);
     ids.detailIds.push(seedA.detail._id);
-    const beforeSoQuyA = money((await SoQuy.findById(soQuyA._id).lean()).so_du);
+    const beforeBalA = await loadCashBalance(storeId, soQuyA._id);
     const receiptA = await payAndGetReceipt(req, seedA.detail, soQuyA, 3000000);
     ids.receiptIds.push(receiptA._id);
-    const midSoQuyA = money((await SoQuy.findById(soQuyA._id).lean()).so_du);
+    const midBalA = await loadCashBalance(storeId, soQuyA._id);
     const rA = await callCancel(req, receiptA._id, { ly_do_huy: TAG + ' A' });
     const afterA = {
       receipt: await PhieuThuChi.findById(receiptA._id).lean(),
       ct: await ChiTietBangLuong.findById(seedA.detail._id).lean(),
       bl: await BangLuong.findById(seedA.payroll._id).lean(),
-      soQuy: await SoQuy.findById(soQuyA._id).lean()
+      balance: await loadCashBalance(storeId, soQuyA._id)
     };
     report.tests.A = {
       cancel: { status: rA.status, success: !!(rA.body && rA.body.success) },
-      beforeSoQuy: beforeSoQuyA,
-      afterPaySoQuy: midSoQuyA,
+      beforeBalance: snap(beforeBalA, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
+      afterPayBalance: snap(midBalA, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
       after: {
         receipt: snap(afterA.receipt, []),
         ct: snap(afterA.ct, ['da_tra', 'con_can_tra']),
         bl: snap(afterA.bl, ['da_tra_nhan_vien', 'con_can_tra']),
-        soQuy: snap(afterA.soQuy, ['so_du'])
+        balance: snap(afterA.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan'])
       },
       pass:
         rA.status === 200 &&
@@ -189,13 +195,15 @@ async function main() {
         money(afterA.ct.con_can_tra) === 10000000 &&
         money(afterA.bl.da_tra_nhan_vien) === 0 &&
         money(afterA.bl.con_can_tra) === 10000000 &&
-        money(afterA.soQuy.so_du) === beforeSoQuyA
+        money(midBalA.tong_chi) === 3000000 &&
+        money(afterA.balance.tong_chi) === 0 &&
+        money(afterA.balance.so_du_tinh_toan) === money(beforeBalA.so_du_tinh_toan)
     };
     console.log(JSON.stringify(report.tests.A, null, 2));
 
     // Test B — Huy 1 trong 2 phieu
     console.log('\n=== Test B: Huy 1/2 phieu ===');
-    const soQuyB = await seedSoQuy(storeId, 20000000);
+    const soQuyB = await seedSoQuy(storeId, 'B');
     ids.soQuyIds.push(soQuyB._id);
     const seedB = await seedLockedPayroll(storeId, 10000000);
     ids.payrollIds.push(seedB.payroll._id);
@@ -225,14 +233,14 @@ async function main() {
 
     // Test C — Double cancel
     console.log('\n=== Test C: Double cancel ===');
-    const soQuyC = await seedSoQuy(storeId, 10000000);
+    const soQuyC = await seedSoQuy(storeId, 'C');
     ids.soQuyIds.push(soQuyC._id);
     const seedC = await seedLockedPayroll(storeId, 5000000);
     ids.payrollIds.push(seedC.payroll._id);
     ids.detailIds.push(seedC.detail._id);
     const receiptC = await payAndGetReceipt(req, seedC.detail, soQuyC, 5000000);
     ids.receiptIds.push(receiptC._id);
-    const soQuyBeforeC = money((await SoQuy.findById(soQuyC._id).lean()).so_du);
+    const balBeforeC = await loadCashBalance(storeId, soQuyC._id);
     const [c1, c2] = await Promise.all([
       callCancel(req, receiptC._id, { ly_do_huy: TAG + ' C1' }),
       callCancel(req, receiptC._id, { ly_do_huy: TAG + ' C2' })
@@ -241,21 +249,22 @@ async function main() {
     const afterC = {
       receipt: await PhieuThuChi.findById(receiptC._id).lean(),
       ct: await ChiTietBangLuong.findById(seedC.detail._id).lean(),
-      soQuy: await SoQuy.findById(soQuyC._id).lean()
+      balance: await loadCashBalance(storeId, soQuyC._id)
     };
     report.tests.C = {
       requests: [
         { status: c1.status, success: !!(c1.body && c1.body.success), message: c1.body && c1.body.message },
         { status: c2.status, success: !!(c2.body && c2.body.success), message: c2.body && c2.body.message }
       ],
-      soQuyBefore: soQuyBeforeC,
-      soQuyAfter: money(afterC.soQuy.so_du),
+      balanceBefore: snap(balBeforeC, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
+      balanceAfter: snap(afterC.balance, ['tong_thu', 'tong_chi', 'so_du_tinh_toan']),
       ct: snap(afterC.ct, ['da_tra', 'con_can_tra']),
       pass:
         okC === 1 &&
         afterC.receipt.trang_thai === 'cancelled' &&
         money(afterC.ct.da_tra) === 0 &&
-        money(afterC.soQuy.so_du) === soQuyBeforeC + 5000000
+        money(afterC.balance.tong_chi) === 0 &&
+        money(afterC.balance.so_du_tinh_toan) === money(balBeforeC.so_du_tinh_toan)
     };
     console.log(JSON.stringify(report.tests.C, null, 2));
 
@@ -284,21 +293,11 @@ async function main() {
     const rollbackCases = [];
     const hooks = [
       {
-        label: 'sau cancelled, truoc SoQuy',
-        patch: async () => {
-          const orig = SoQuy.updateOne.bind(SoQuy);
-          SoQuy.updateOne = async function () {
-            throw new Error(TAG + ' forced after receipt');
-          };
-          return () => { SoQuy.updateOne = orig; };
-        }
-      },
-      {
-        label: 'sau SoQuy, truoc CT',
+        label: 'sau set cancelled, truoc CT',
         patch: async () => {
           const orig = ChiTietBangLuong.findOneAndUpdate.bind(ChiTietBangLuong);
           ChiTietBangLuong.findOneAndUpdate = async function () {
-            throw new Error(TAG + ' forced after so quy');
+            throw new Error(TAG + ' forced after receipt cancel');
           };
           return () => { ChiTietBangLuong.findOneAndUpdate = orig; };
         }
@@ -316,7 +315,7 @@ async function main() {
     ];
 
     for (const hook of hooks) {
-      const soQuyE = await seedSoQuy(storeId, 8000000);
+      const soQuyE = await seedSoQuy(storeId, 'E-' + hook.label);
       ids.soQuyIds.push(soQuyE._id);
       const seedE = await seedLockedPayroll(storeId, 8000000);
       ids.payrollIds.push(seedE.payroll._id);
@@ -327,7 +326,7 @@ async function main() {
         receipt: await PhieuThuChi.findById(receiptE._id).lean(),
         ct: await ChiTietBangLuong.findById(seedE.detail._id).lean(),
         bl: await BangLuong.findById(seedE.payroll._id).lean(),
-        soQuy: await SoQuy.findById(soQuyE._id).lean()
+        balance: await loadCashBalance(storeId, soQuyE._id)
       };
       const restore = await hook.patch();
       const fail = await callCancel(req, receiptE._id, { ly_do_huy: TAG + ' E ' + hook.label });
@@ -336,13 +335,13 @@ async function main() {
         receipt: await PhieuThuChi.findById(receiptE._id).lean(),
         ct: await ChiTietBangLuong.findById(seedE.detail._id).lean(),
         bl: await BangLuong.findById(seedE.payroll._id).lean(),
-        soQuy: await SoQuy.findById(soQuyE._id).lean()
+        balance: await loadCashBalance(storeId, soQuyE._id)
       };
       const unchanged =
         after.receipt.trang_thai === 'paid' &&
         money(after.ct.da_tra) === money(before.ct.da_tra) &&
         money(after.bl.da_tra_nhan_vien) === money(before.bl.da_tra_nhan_vien) &&
-        money(after.soQuy.so_du) === money(before.soQuy.so_du);
+        money(after.balance.so_du_tinh_toan) === money(before.balance.so_du_tinh_toan);
       rollbackCases.push({
         scenario: hook.label,
         status: fail.status,

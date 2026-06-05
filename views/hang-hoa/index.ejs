@@ -283,8 +283,8 @@
                 <th class="check-cell"><input id="selectAllProducts" type="checkbox" aria-label="Chọn tất cả"></th>
                 <th>Mã hàng</th>
                 <th>Tên hàng</th>
-                <th>Giá bán</th>
-                <th>Giá vốn</th>
+                <th class="text-right">Giá vốn trung bình</th>
+                <th class="text-right">Giá bán trung bình</th>
                 <th>Tồn kho</th>
                 <th>Nhóm hàng</th>
                 <th>Nhà cung cấp</th>
@@ -303,8 +303,8 @@
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="product-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn hàng hóa"></td>
                   <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_hang || '---' %></a></td>
                   <td><strong><%= item.ten_hang || '---' %></strong></td>
-                  <td><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></td>
-                  <td><%= Number(item.gia_von || 0).toLocaleString('vi-VN') %></td>
+                  <td class="text-right"><%= Number(item.gia_von_trung_binh_hien_thi != null ? item.gia_von_trung_binh_hien_thi : 0).toLocaleString('vi-VN') %></td>
+                  <td class="text-right"><% if (item.gia_ban_trung_binh_hien_thi == null) { %>---<% } else { %><%= Number(item.gia_ban_trung_binh_hien_thi).toLocaleString('vi-VN') %><% } %></td>
                   <td><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></td>
                   <td><%= item.nhom_hang_ten || '---' %></td>
                   <td><%= item.nha_cung_cap_ten || '---' %></td>
@@ -338,8 +338,8 @@
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="hinh_anh"> Hình ảnh</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="dang_kinh_doanh" checked> Đang kinh doanh</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ban_truc_tiep"> Được bán trực tiếp</label>
-        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="gia_ban" checked> Giá bán</label>
-        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="gia_von" checked> Giá vốn</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="gia_von_trung_binh" checked> Giá vốn trung bình</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="gia_ban_trung_binh" checked> Giá bán trung bình</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="ton_kho" checked> Tồn kho</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="kh_dat"> KH đặt</label>
         <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="export-col-cb" value="du_kien_het"> Dự kiến hết hàng</label>

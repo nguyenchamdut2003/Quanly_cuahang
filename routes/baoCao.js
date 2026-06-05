@@ -1,6 +1,9 @@
 const express = require('express');
+const path = require('path');
 const router = express.Router();
 const { isAuthenticated } = require('../middlewares/auth.middleware');
+const pdfService = require('../services/pdf.service');
+const report58Excel = require('../services/report58Excel.service');
 const {
     DonHang,
     CTDonHang,
@@ -428,8 +431,117 @@ const reportTitles = {
     'hang-hoa': 'Báo cáo hàng hóa',
     'khach-hang': 'Báo cáo khách hàng',
     'nha-cung-cap': 'Báo cáo nhà cung cấp',
-    'ton-kho-lo': 'Báo cáo tồn kho theo lô'
+    'ton-kho-lo': 'Báo cáo tồn kho theo lô',
+    '58': 'Báo cáo 58'
 };
+
+const REPORT_58_MAU = report58Excel.REPORT_58_MAU;
+
+function resolveReport58Mau(value) {
+    const mau = String(value || '').trim();
+    return REPORT_58_MAU.includes(mau) ? mau : REPORT_58_MAU[0];
+}
+
+function buildReport58ViewData(query = {}, extras = {}) {
+    const range = getSalesRange(query);
+    const mau = resolveReport58Mau(query.mau);
+    const store = extras.store || null;
+    const year = query.year || (range.to ? String(range.to).slice(0, 4) : String(new Date().getFullYear()));
+    return {
+        title: reportTitles['58'],
+        heading: reportTitles['58'],
+        reportType: '58',
+        range,
+        mau,
+        mauList: REPORT_58_MAU,
+        generatedAt: new Date(),
+        store,
+        storeName: store?.ten_cua_hang || '',
+        storeAddress: store?.dia_chi_day_du || [
+            store?.dia_chi_chi_tiet,
+            store?.phuong_xa,
+            store?.tinh_thanh
+        ].filter(Boolean).join(', '),
+        year,
+        donViTinh: query.don_vi_tinh || 'Đồng',
+        s2aData: extras.s2aData || {}
+    };
+}
+
+async function buildInvoiceLedgerViewData(query = {}, store = null) {
+    const range = getSalesRange(query);
+    const rows = await report58Excel.fetchInvoiceLedgerRows({ range }, store);
+    const detailRows = rows.map(row => ({
+        so_hieu: row.so_chung_tu,
+        ngay_thang: row.ngay ? new Date(row.ngay).toLocaleDateString('vi-VN') : '',
+        dien_giai: row.dien_giai,
+        so_tien: Number(row.tong_thanh_toan || 0),
+        doanh_thu: Number(row.doanh_thu || 0),
+        thue_gtgt: Number(row.thue_gtgt || 0),
+        ghi_chu: row.ghi_chu || ''
+    }));
+    const totals = report58Excel.sumLedgerRows(rows);
+    return {
+        detailRows,
+        ledgerRows: rows,
+        totals,
+        tongCong1: totals.tong_thanh_toan
+    };
+}
+
+async function enrichReport58Data(query = {}, store = null) {
+    const base = buildReport58ViewData(query, { store });
+    base.sheetMeta = await report58Excel.getMauSheetMeta(base.mau);
+    if (base.mau === report58Excel.S2A_DNSN_MAU) {
+        base.s2aData = await report58Excel.buildS2aDnsnData(query, store, base.range);
+    } else if (report58Excel.INVOICE_LEDGER_MAU.has(base.mau)) {
+        base.ledgerData = await buildInvoiceLedgerViewData(query, store);
+    }
+    return base;
+}
+
+async function buildReport58PdfBuffer(query = {}, store = null) {
+    const data = await enrichReport58Data(query, store);
+    const isS2a = data.mau === report58Excel.S2A_DNSN_MAU;
+    const viewPath = path.join(
+        __dirname,
+        '..',
+        'views',
+        'bao-cao',
+        'mau',
+        isS2a ? 's2a-dnsn.ejs' : 'report58-print.ejs'
+    );
+    const viewLocals = isS2a
+        ? {
+            store: data.store,
+            storeName: data.storeName,
+            storeAddress: data.storeAddress,
+            year: data.year,
+            donViTinh: data.donViTinh,
+            range: data.range,
+            mau: data.mau,
+            standalone: true,
+            embedded: false,
+            ...(data.s2aData || {})
+        }
+        : {
+            mau: data.mau,
+            sheetMeta: data.sheetMeta,
+            storeName: data.storeName,
+            storeAddress: data.storeAddress,
+            year: data.year,
+            donViTinh: data.donViTinh,
+            range: data.range,
+            ledgerData: data.ledgerData
+        };
+    const html = await pdfService.renderViewToHtml(viewPath, viewLocals);
+    const buffer = await pdfService.generatePdfFromHtml(html, {
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '14mm' }
+    });
+    return { buffer, mau: data.mau };
+}
 
 async function buildLotStockReport(query = {}) {
     const filter = {};
@@ -461,7 +573,7 @@ async function buildLotStockReport(query = {}) {
             ma_hang: product.ma_hang || '',
             ten_hang: product.ten_hang || '',
             kho: row.kho_id?.ten_kho || '',
-            ma_lo: lot.ma_lo || lot.ten_lo || '',
+            ma_lo: lot.ten_lo || lot.ma_lo || '',
             ngay_nhap: lot.ngay_nhap || row.created_at,
             han_su_dung: lot.han_su_dung,
             so_luong: quantity,
@@ -740,10 +852,115 @@ router.get('/nha-cung-cap/export.csv', async (req, res, next) => {
     }
 });
 
+router.get('/58/export.csv', async (req, res, next) => {
+    try {
+        const mau = resolveReport58Mau(req.query.mau);
+        const range = getSalesRange(req.query || {});
+        const store = res.locals.currentStore || null;
+        const workbook = await report58Excel.exportMauExcel(mau, req.query || {}, store, range);
+        const sheet = workbook.getWorksheet(mau);
+        const csv = await report58Excel.sheetToCsvBuffer(sheet);
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="bao-cao-58-${mau}.csv"`);
+        res.send(csv);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/58/export.xlsx', async (req, res, next) => {
+    try {
+        const range = getSalesRange(req.query || {});
+        const store = res.locals.currentStore || null;
+        const exportAll = req.query.all === '1' || req.query.all === 'true';
+        const workbook = exportAll
+            ? await report58Excel.exportAllMauExcel(req.query || {}, store, range)
+            : await report58Excel.exportMauExcel(
+                resolveReport58Mau(req.query.mau),
+                req.query || {},
+                store,
+                range
+            );
+        const buffer = await report58Excel.workbookToBuffer(workbook);
+        const filename = exportAll
+            ? 'TT58-2026-bo-mau-excel.xlsx'
+            : `${resolveReport58Mau(req.query.mau)}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(Buffer.from(buffer));
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/58/preview.pdf', async (req, res, next) => {
+    try {
+        const mau = resolveReport58Mau(req.query.mau);
+        if (!REPORT_58_MAU.includes(mau)) {
+            return res.status(404).send('Không tìm thấy mẫu báo cáo.');
+        }
+        const { buffer } = await buildReport58PdfBuffer(req.query || {}, res.locals.currentStore || null);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${mau}-preview.pdf"`);
+        return res.send(Buffer.from(buffer));
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/58/preview/excel', async (req, res, next) => {
+    try {
+        const mau = resolveReport58Mau(req.query.mau);
+        const range = getSalesRange(req.query || {});
+        const store = res.locals.currentStore || null;
+        const workbook = await report58Excel.exportMauExcel(mau, req.query || {}, store, range);
+        const sheet = workbook.getWorksheet(mau);
+        const preview = report58Excel.worksheetToPreviewModel(sheet);
+        res.render('bao-cao/58-excel-preview', {
+            mau,
+            preview
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/58/export.pdf', async (req, res, next) => {
+    try {
+        const mau = resolveReport58Mau(req.query.mau);
+        if (REPORT_58_MAU.includes(mau)) {
+            const { buffer } = await buildReport58PdfBuffer(req.query || {}, res.locals.currentStore || null);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${mau}.pdf"`);
+            return res.send(Buffer.from(buffer));
+        }
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="bao-cao-58-${mau}.txt"`);
+        res.send(`Mẫu PDF cho ${mau} sẽ được bổ sung sau khi nhận file mẫu.\n`);
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/58', async (req, res, next) => {
+    try {
+        const data = await enrichReport58Data(req.query || {}, res.locals.currentStore || null);
+        data.view = req.query.view === 'excel' ? 'excel' : 'pdf';
+        res.render('bao-cao/58', data);
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/:reportType', async (req, res, next) => {
     try {
         const reportType = req.params.reportType;
         if (!reportTitles[reportType]) return next();
+        if (reportType === '58') {
+            const data = await enrichReport58Data(req.query || {}, res.locals.currentStore || null);
+            data.view = req.query.view === 'excel' ? 'excel' : 'pdf';
+            return res.render('bao-cao/58', data);
+        }
         if (reportType === 'ton-kho-lo') {
             const report = await buildLotStockReport(req.query || {});
             return res.render('bao-cao/ton-kho-lo', {

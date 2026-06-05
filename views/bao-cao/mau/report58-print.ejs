@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title><%= (locals.sheetMeta && locals.sheetMeta.mauCode) || locals.mau %></title>
+  <%- include('../partials/report58-sheet-styles') %>
+  <style>
+    body{font-family:'Times New Roman',Times,serif;margin:0;padding:12mm;color:#000}
+  </style>
+</head>
+<body>
+  <%- include('../partials/report58-sheet-header', locals) %>
+  <%- include('../partials/report58-sheet-body', locals) %>
+</body>
+</html>

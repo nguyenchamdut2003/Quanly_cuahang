@@ -1,4 +1,4 @@
-﻿<%
+<%
   const safeTickets = Array.isArray(locals.importSlips) ? locals.importSlips : [];
   const safeFilters = locals.filter || {};
   const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
@@ -132,6 +132,8 @@
     .col-code{width:130px}
     .col-time{width:160px}
     .col-ncc-code{width:95px}
+    .col-order-total{width:130px}
+    .col-paid{width:110px}
     .col-payable{width:120px}
     .col-status{width:120px}
     .cell-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -178,6 +180,8 @@
     .quick-pay-grid label.full{grid-column:1/-1}
     .quick-pay-grid input,.quick-pay-grid select,.quick-pay-grid textarea{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}
     .quick-pay-grid textarea{height:76px;min-height:76px}
+    .pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:8px 0}
+    .pay-total-summary{font-size:13px;color:#475467;padding:4px 0}
     .edit-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
     .edit-field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
     .edit-field label{font-weight:700;color:#344054}
@@ -259,6 +263,8 @@
                 <th class="col-time">Thời gian</th>
                 <th class="col-ncc-code">Mã NCC</th>
                 <th>Nhà cung cấp</th>
+                <th class="num col-order-total">Tổng giá trị đơn hàng</th>
+                <th class="num col-paid">Đã thanh toán</th>
                 <th class="num col-payable">Cần trả NCC</th>
                 <th class="col-status">Trạng thái</th>
               </tr>
@@ -279,11 +285,13 @@
                       <% } %>
                     </td>
                     <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
-                    <td class="num"><%= fmtMoney((t.con_no_ncc ?? 0)) %></td>
+                    <td class="num"><%= fmtMoney((t.tong_tien ?? t.can_tra_ncc ?? 0)) %></td>
+                    <td class="num"><%= fmtMoney((t.da_tra_ncc ?? 0)) %></td>
+                    <td class="num"><%= fmtMoney((t.can_tra_ncc ?? t.tong_tien ?? 0)) %></td>
                     <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
                   <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
-                    <td colspan="8">
+                    <td colspan="10">
                       <div class="po-detail">
                         <div class="po-detail-tabs">
                           <button class="po-detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
@@ -384,18 +392,17 @@
                         <div class="po-detail-pane" data-tab-pane="payment">
                           <table class="mini-table">
                             <thead>
-                              <tr><th>Ngày</th><th>Mã phiếu chi</th><th>Số tiền</th><th>Phương thức</th><th>Sổ quỹ</th><th>Người tạo</th><th>Ghi chú</th></tr>
+                              <tr><th>Ngày</th><th>Mã phiếu chi</th><th>Số tiền</th><th>Sổ quỹ</th><th>Người tạo</th><th>Ghi chú</th></tr>
                             </thead>
                             <tbody>
                               <% if (!(t.payment_rows || []).length) { %>
-                                <tr><td colspan="7">Chưa có lịch sử thanh toán.</td></tr>
+                                <tr><td colspan="6">Chưa có lịch sử thanh toán.</td></tr>
                               <% } %>
                               <% (t.payment_rows || []).forEach(function(p) { %>
                                 <tr>
                                   <td><%= formatDate(p.thoi_gian) %></td>
                                   <td><%- p._id ? refLink('receipt', p._id, p.ma_phieu || '--') : (p.ma_phieu || '--') %></td>
                                   <td><%= fmtMoney(p.tien_chi || 0) %></td>
-                                  <td><%= p.phuong_thuc || '--' %></td>
                                   <td><%= p.so_quy || '--' %></td>
                                   <td><%= p.nguoi_tao || '--' %></td>
                                   <td><%= p.ghi_chu || '--' %></td>
@@ -409,7 +416,7 @@
                   </tr>
                 <% }) %>
               <% } else { %>
-                <tr><td colspan="8" class="po-empty">Chưa có phiếu nhập hàng</td></tr>
+                <tr><td colspan="10" class="po-empty">Chưa có phiếu nhập hàng</td></tr>
               <% } %>
             </tbody>
           </table>
@@ -479,7 +486,49 @@
     let currentPurchaseEdit = null;
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
     function moneyText(value){ return money(value) + ' VNĐ'; }
-    function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '')) || 0; }
+    function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0; }
+    function applyLiveVNFormat(el) {
+      if (!el) return;
+      const start = el.selectionStart == null ? el.value.length : el.selectionStart;
+      const digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
+      const raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
+      if (!raw) {
+        el.value = '';
+        return;
+      }
+      const formatted = Number(raw).toLocaleString('vi-VN');
+      el.value = formatted;
+      let pos = formatted.length;
+      if (digitsBefore > 0) {
+        let digits = 0;
+        for (let i = 0; i < formatted.length; i++) {
+          if (/\d/.test(formatted[i])) {
+            digits++;
+            if (digits === digitsBefore) {
+              pos = i + 1;
+              break;
+            }
+          }
+        }
+      } else {
+        pos = 0;
+      }
+      try { el.setSelectionRange(pos, pos); } catch (_) {}
+    }
+    function bindPayAmountInput(el) {
+      if (!el || el.dataset.vnBound === '1') return;
+      el.dataset.vnBound = '1';
+      el.addEventListener('input', function() {
+        applyLiveVNFormat(el);
+        updatePaySupplierTotals();
+      });
+    }
+    function updatePaySupplierTotals() {
+      const tienMat = numberValue(document.getElementById('paySupplierTienMat')?.value || 0);
+      const chuyenKhoan = numberValue(document.getElementById('paySupplierChuyenKhoan')?.value || 0);
+      const totalEl = document.getElementById('paySupplierPayTotal');
+      if (totalEl) totalEl.textContent = moneyText(tienMat + chuyenKhoan);
+    }
     function toDateInput(value){
       if (!value) return '';
       const d = new Date(value);
@@ -568,7 +617,6 @@
             <div class="edit-field"><label>Nhà cung cấp</label><select id="editSupplier" ${readonly ? 'disabled' : ''}>${supplierOptions}</select></div>
             <div class="edit-field"><label>Kho nhập</label><select id="editWarehouse" ${readonly ? 'disabled' : ''}>${warehouseOptions}</select></div>
             <div class="edit-field"><label>Ngày nhập</label><input id="editImportDate" type="date" value="${toDateInput(ticket.ngay_nhap || ticket.created_at)}" ${readonly ? 'disabled' : ''}></div>
-            <div class="edit-field"><label>Phương thức</label><select id="editPaymentMethod" ${readonly ? 'disabled' : ''}><option value="cong_no" ${ticket.phuong_thuc_thanh_toan === 'cong_no' ? 'selected' : ''}>Công nợ</option><option value="tien_mat" ${ticket.phuong_thuc_thanh_toan === 'tien_mat' ? 'selected' : ''}>Tiền mặt</option><option value="chuyen_khoan" ${ticket.phuong_thuc_thanh_toan === 'chuyen_khoan' ? 'selected' : ''}>Chuyển khoản</option></select></div>
             <div class="edit-field"><label>Giảm giá phiếu</label><input id="editDiscount" inputmode="numeric" value="${money(ticket.giam_gia || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
             <div class="edit-field"><label>Kiểu giảm giá</label><select id="editDiscountType" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${ticket.kieu_giam_gia !== 'percent' ? 'selected' : ''}>VND</option><option value="percent" ${ticket.kieu_giam_gia === 'percent' ? 'selected' : ''}>%</option></select></div>
             <div class="edit-field"><label>Cần trả NCC</label><input id="editPayable" inputmode="numeric" value="${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}" oninput="this.dataset.touched='1';calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
@@ -641,7 +689,6 @@
           nha_cung_cap_id: document.getElementById('editSupplier')?.value || '',
           kho_id: document.getElementById('editWarehouse')?.value || '',
           ngay_nhap: document.getElementById('editImportDate')?.value || '',
-          phuong_thuc_thanh_toan: document.getElementById('editPaymentMethod')?.value || 'cong_no',
           giam_gia: document.getElementById('editDiscount')?.value || 0,
           kieu_giam_gia: document.getElementById('editDiscountType')?.value || 'vnd',
           can_tra_ncc: document.getElementById('editPayable')?.value || 0,
@@ -667,23 +714,31 @@
       if (debt <= 0) return alert('Phiếu nhập không còn nợ NCC');
       currentPurchaseId = id;
       const supplier = p.nha_cung_cap_id || {};
-      const cashBookOptions = cashBooks.map(book => {
-        const name = book.ten_so_quy || book.loai || 'Sổ quỹ';
-        const balance = money(book.so_du || 0);
-        return `<option value="${book._id}">${escapeHtml(name)} - ${balance}</option>`;
-      }).join('');
+      const cashBookOptions = ['<option value="">— Chọn sổ quỹ —</option>']
+        .concat(cashBooks.map(book => {
+          const name = book.ten_so_quy || 'Sổ quỹ';
+          return `<option value="${book._id}">${escapeHtml(name)}</option>`;
+        }))
+        .join('');
       document.getElementById('paySupplierBody').innerHTML = `
         <div class="quick-pay-grid">
           <label><span>Loại phiếu</span><input value="Chi" readonly></label>
           <label><span>Nhóm đối tượng</span><input value="Nhà cung cấp" readonly></label>
           <label><span>Nhà cung cấp</span><input value="${escapeHtml((supplier.ma_ncc ? supplier.ma_ncc + ' - ' : '') + (supplier.ten_ncc || ''))}" readonly></label>
           <label><span>Phiếu nhập</span><input value="${escapeHtml(p.ma_phieu_nhap || '')}" readonly></label>
-          <label><span>Giá trị</span><input id="paySupplierAmount" inputmode="numeric" value="${money(debt)}"></label>
-          <label><span>Phương thức</span><select id="paySupplierMethod"><option value="tien_mat">Tiền mặt</option><option value="chuyen_khoan">Chuyển khoản</option></select></label>
-          <label class="full"><span>Sổ quỹ</span><select id="paySupplierCashBook">${cashBookOptions || '<option value="">Chưa có sổ quỹ</option>'}</select></label>
+          <label class="full"><span>Tổng cần trả NCC</span><div class="pay-total-readonly" id="paySupplierDebt" data-debt="${debt}">${moneyText(debt)}</div></label>
+          <label><span>Tiền mặt</span><input id="paySupplierTienMat" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+          <label><span>Chuyển khoản</span><input id="paySupplierChuyenKhoan" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+          <label class="full"><span>Tiền trả khách</span><input id="paySupplierTienTraKhach" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+          <label class="full"><span>Tổng thanh toán</span><div class="pay-total-summary" id="paySupplierPayTotal">${moneyText(0)}</div></label>
+          <label class="full"><span>Sổ quỹ</span><select id="paySupplierCashBook" required>${cashBookOptions || '<option value="">Chưa có sổ quỹ</option>'}</select></label>
           <label class="full"><span>Ghi chú</span><textarea id="paySupplierNote">Thanh toán tiền nhập hàng cho phiếu ${escapeHtml(p.ma_phieu_nhap || '')}</textarea></label>
         </div>
       `;
+      bindPayAmountInput(document.getElementById('paySupplierTienMat'));
+      bindPayAmountInput(document.getElementById('paySupplierChuyenKhoan'));
+      bindPayAmountInput(document.getElementById('paySupplierTienTraKhach'));
+      updatePaySupplierTotals();
       document.getElementById('paySupplierModal').classList.add('open');
     }
     function closePaySupplierModal(){
@@ -691,11 +746,30 @@
     }
     async function submitPaySupplier(){
       if (!currentPurchaseId) return;
+      const debt = numberValue(document.getElementById('paySupplierDebt')?.dataset.debt || 0);
+      const tienMat = numberValue(document.getElementById('paySupplierTienMat')?.value || 0);
+      const chuyenKhoan = numberValue(document.getElementById('paySupplierChuyenKhoan')?.value || 0);
+      const tienTraKhach = numberValue(document.getElementById('paySupplierTienTraKhach')?.value || 0);
+      const total = tienMat + chuyenKhoan;
+      if (total <= 0) {
+        alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+        document.getElementById('paySupplierTienMat')?.focus();
+        return;
+      }
+      if (total > debt) {
+        alert('Tổng thanh toán không được vượt quá số nợ còn lại.');
+        return;
+      }
+      const cashBookId = String(document.getElementById('paySupplierCashBook')?.value || '').trim();
+      if (!cashBookId) {
+        alert('Vui lòng chọn sổ quỹ.');
+        document.getElementById('paySupplierCashBook')?.focus();
+        return;
+      }
       try {
         const data = await postJson('/nhap-hang/' + currentPurchaseId + '/pay-supplier', {
-          gia_tri: document.getElementById('paySupplierAmount')?.value || 0,
-          phuong_thuc_thanh_toan: document.getElementById('paySupplierMethod')?.value || 'tien_mat',
-          so_quy_id: document.getElementById('paySupplierCashBook')?.value || '',
+          chi_tiet_thanh_toan: { tien_mat: tienMat, chuyen_khoan: chuyenKhoan, tien_tra_khach: tienTraKhach },
+          so_quy_id: cashBookId,
           ghi_chu: document.getElementById('paySupplierNote')?.value || ''
         });
         alert(data.message || 'Đã tạo phiếu chi');
@@ -743,7 +817,18 @@
           detail.style.display = detail.style.display === 'none' ? 'table-row' : 'none';
         });
       });
-      var purchaseId = new URLSearchParams(window.location.search).get('purchase');
+      var params = new URLSearchParams(window.location.search);
+      var purchaseId = params.get('purchase');
+      if (params.get('export') === '1' && purchaseId) {
+        var exportFrame = document.createElement('iframe');
+        exportFrame.style.display = 'none';
+        exportFrame.src = '/nhap-hang/' + encodeURIComponent(purchaseId) + '/export.xlsx';
+        document.body.appendChild(exportFrame);
+        setTimeout(function() { exportFrame.remove(); }, 120000);
+        params.delete('export');
+        var cleanQs = params.toString();
+        history.replaceState({}, '', '/nhap-hang' + (cleanQs ? '?' + cleanQs : ''));
+      }
       if (purchaseId) {
         var purchaseRow = document.querySelector('[data-expand-id="' + purchaseId + '"]');
         var purchaseDetail = document.getElementById('detail-' + purchaseId);

@@ -1,0 +1,87 @@
+<%
+  const ledger = locals.ledgerData || {};
+  const rows = Array.isArray(ledger.detailRows) ? ledger.detailRows : [];
+  const totals = ledger.totals || {};
+  const fmt = value => value === '' || value == null ? '' : Number(value).toLocaleString('vi-VN');
+  const standalone = locals.standalone === true;
+  const storeName = locals.storeName || '';
+  const range = locals.range || {};
+  const year = locals.year || '';
+%>
+<% if (standalone) { %>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title><%= locals.mau %> — TT58</title>
+<% } %>
+  <style>
+    body{font-family:'Times New Roman',Times,serif;margin:0;padding:14mm;color:#000}
+    .ledger-head{margin-bottom:12px;font-size:13pt}
+    .ledger-excel-preview .ledger-hint{color:#64748b;font-size:13px;margin:0 0 12px}
+    .ledger-table{width:100%;border-collapse:collapse;font-size:12pt}
+    .ledger-table th,.ledger-table td{border:1px solid #000;padding:6px 8px}
+    .ledger-table th{background:#f1f5f9;font-weight:700;text-align:center}
+    .ledger-table td.num{text-align:right}
+    .ledger-table td.center{text-align:center}
+    .ledger-table td.empty{text-align:center;color:#64748b;padding:24px}
+  </style>
+<% if (standalone) { %>
+</head>
+<body>
+<% } %>
+<div class="ledger-excel-preview">
+  <% if (standalone) { %>
+  <div class="ledger-head">
+    <div><strong>Đơn vị:</strong> <%= storeName %></div>
+    <div><strong>Mẫu số <%= locals.mau %></strong> — Năm <%= year %>
+      <% if (range.from || range.to) { %> | Kỳ <%= range.from || '—' %> – <%= range.to || '—' %><% } %>
+    </div>
+  </div>
+  <% } %>
+  <p class="ledger-hint">Hiển thị theo khung mẫu Excel TT58/2026 (sheet <strong><%= locals.mau %></strong>). Xuất file để giữ đúng định dạng in ấn.</p>
+  <table class="ledger-table">
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Ngày</th>
+        <th>Số chứng từ/hóa đơn</th>
+        <th>Diễn giải/Khách hàng</th>
+        <th class="num">Doanh thu chưa thuế</th>
+        <th class="num">Thuế GTGT</th>
+        <th class="num">Tổng thanh toán</th>
+        <th>Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!rows.length) { %>
+        <tr><td colspan="8" class="empty">Chưa có phát sinh trong kỳ đã chọn.</td></tr>
+      <% } %>
+      <% rows.forEach((row, index) => { %>
+        <tr>
+          <td class="center"><%= index + 1 %></td>
+          <td><%= row.ngay_thang || '' %></td>
+          <td><%= row.so_hieu || '' %></td>
+          <td><%= row.dien_giai || '' %></td>
+          <td class="num"><%= fmt(row.doanh_thu) %></td>
+          <td class="num"><%= fmt(row.thue_gtgt) %></td>
+          <td class="num"><%= fmt(row.so_tien) %></td>
+          <td><%= row.ghi_chu || '' %></td>
+        </tr>
+      <% }) %>
+      <% if (rows.length) { %>
+        <tr>
+          <td colspan="4"><strong>Tổng cộng</strong></td>
+          <td class="num"><strong><%= fmt(totals.doanh_thu) %></strong></td>
+          <td class="num"><strong><%= fmt(totals.thue_gtgt) %></strong></td>
+          <td class="num"><strong><%= fmt(totals.tong_thanh_toan) %></strong></td>
+          <td></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<% if (standalone) { %>
+</body>
+</html>
+<% } %>

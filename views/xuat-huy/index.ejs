@@ -231,7 +231,7 @@
                                       <td class="cell-ten">
                                         <%= hh ? (hh.ten_hang || '--') : '--' %>
                                         <% if (item.lo_hang_id) { %>
-                                          <div class="mini-wrap-meta">Lô: <%= item.lo_hang_id.ma_lo || item.lo_hang_id.ten_lo || '--' %></div>
+                                          <div class="mini-wrap-meta">Lô: <%= item.lo_hang_id.ten_lo || item.lo_hang_id.ma_lo || '--' %></div>
                                         <% } %>
                                       </td>
                                       <td><%= item.ten_quy_cach || 'Không có' %></td>

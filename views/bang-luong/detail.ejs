@@ -154,8 +154,8 @@
         </div>
         <div class="pay-field">
           <label>Sổ quỹ</label>
-          <select id="payCashBook"></select>
-          <div class="pay-help" id="payCashBookHelp">He thong se tao phieu chi luong. Neu khong chon so quy, phieu chi khong cap nhat so du quy.</div>
+          <select id="payCashBook" required></select>
+          <div class="pay-help" id="payCashBookHelp">Chon so quy de tao phieu chi luong.</div>
         </div>
         <div class="pay-field">
           <label>Phương thức thanh toán</label>
@@ -235,49 +235,23 @@
       const map = { tien_mat: 'Tiền mặt', chuyen_khoan: 'Chuyển khoản', vi_dien_tu: 'Ví điện tử', khac: 'Khác' };
       return map[method] || method || '---';
     }
-    function isDefaultCashBook(book) {
-      return !!(book && (book.mac_dinh || book.is_default || book.default || book.la_mac_dinh));
-    }
-    function cashBookTypeScore(book, method) {
-      const type = String(book && book.loai || '').trim().toLowerCase();
-      const name = String(book && book.ten_so_quy || '').trim().toLowerCase();
-      const haystack = type + ' ' + name;
-      if (method === 'tien_mat' && (type === 'cash' || haystack.includes('tien mat'))) return 30;
-      if (method === 'chuyen_khoan' && (
-        ['bank', 'ngan_hang', 'tai_khoan', 'chuyen_khoan'].includes(type) ||
-        haystack.includes('ngan hang') || haystack.includes('tai khoan') || haystack.includes('chuyen khoan')
-      )) return 30;
-      if (method === 'vi_dien_tu' && (['wallet', 'vi_dien_tu'].includes(type) || haystack.includes('vi dien tu'))) return 30;
-      return 0;
-    }
-    function chooseCashBookForMethod(method) {
-      if (!cashBooks.length) return '';
-      if (cashBooks.length === 1) return String(cashBooks[0]._id);
-      const ranked = cashBooks.map((book, index) => ({
-        book,
-        index,
-        score: cashBookTypeScore(book, method) + (isDefaultCashBook(book) ? 100 : 0)
-      })).sort((a, b) => b.score !== a.score ? b.score - a.score : a.index - b.index);
-      return ranked[0].score > 0 ? String(ranked[0].book._id) : '';
-    }
     function updateCashBookSelectForMethod() {
       const select = document.getElementById('payCashBook');
       const help = document.getElementById('payCashBookHelp');
-      const method = document.getElementById('payMethod').value;
       if (!cashBooks.length) {
-        select.innerHTML = '<option value="">Khong chon so quy</option>';
-        help.className = 'pay-help';
-        help.textContent = 'He thong se tao phieu chi luong. Neu khong chon so quy, phieu chi khong cap nhat so du quy.';
+        select.innerHTML = '<option value="">Khong co so quy dang su dung</option>';
+        help.className = 'pay-warning';
+        help.textContent = 'Can tao hoac kich hoat so quy truoc khi chi luong.';
         return;
       }
       select.innerHTML =
-        '<option value="">Khong chon so quy</option>' +
+        '<option value="">Chon so quy</option>' +
         cashBooks.map(book => '<option value="' + escapeHtml(book._id) + '">' +
-          escapeHtml((book.ten_so_quy || book.loai || 'So quy') + ' - SD: ' + formatMoneyText(book.so_du)) +
+          escapeHtml(book.ten_so_quy || 'So quy') +
           '</option>').join('');
       select.value = '';
       help.className = 'pay-help';
-      help.textContent = 'He thong se tao phieu chi luong. Neu khong chon so quy, phieu chi khong cap nhat so du quy.';
+      help.textContent = 'Chon so quy de tao phieu chi luong.';
     }
     function renderPayments(items) {
       const body = document.getElementById('paymentHistoryBody');
@@ -486,7 +460,8 @@
         ghi_chu: document.getElementById('payNote').value.trim()
       };
       const cashBookId = document.getElementById('payCashBook').value;
-      if (cashBookId) payload.so_quy_id = cashBookId;
+      if (!cashBookId) return alert('Vui lòng chọn sổ quỹ để chi lương.');
+      payload.so_quy_id = cashBookId;
       payrollUiLog('payroll.ui.payment.submit.start', { ct_id: selectedPayDetail._id });
       payrollUiLog('payroll.ui.payment.submit.payload', payload);
       if (amount <= 0) return alert('Số tiền trả phải lớn hơn 0');

@@ -234,10 +234,10 @@ async function main() {
       const plRow = (afterFull.payments || []).find((p) => String(p._id) === String(firstPlId));
       const refund = plRow ? plRow.gia_tri : partialAmount;
       soQuyBefore = await page.evaluate(async (sqId) => {
-        const res = await fetch('/api/so-quy/active', { headers: { Accept: 'application/json' } });
+        const res = await fetch('/api/so-quy', { headers: { Accept: 'application/json' } });
         const json = await res.json();
-        const book = (json.items || []).find((b) => String(b._id) === String(sqId));
-        return book ? book.so_du : 0;
+        const book = (json.data || json.items || []).find((b) => String(b._id) === String(sqId));
+        return book ? Number(book.so_du_tinh_toan || 0) : 0;
       }, plRow && plRow.so_quy_id);
       await cancelBtn.click();
       await wait(2500);
@@ -247,14 +247,14 @@ async function main() {
       }, payrollId);
       const cancelled = (afterCancel.payments || []).find((p) => String(p._id) === String(firstPlId));
       soQuyAfter = await page.evaluate(async (sqId) => {
-        const res = await fetch('/api/so-quy/active', { headers: { Accept: 'application/json' } });
+        const res = await fetch('/api/so-quy', { headers: { Accept: 'application/json' } });
         const json = await res.json();
-        const book = (json.items || []).find((b) => String(b._id) === String(sqId));
-        return book ? book.so_du : 0;
+        const book = (json.data || json.items || []).find((b) => String(b._id) === String(sqId));
+        return book ? Number(book.so_du_tinh_toan || 0) : 0;
       }, plRow && plRow.so_quy_id);
       const dc = (afterCancel.details || [])[0];
       const cancelOk = cancelled && cancelled.trang_thai === 'cancelled' && cancelled.ly_do_huy
-        && soQuyAfter >= soQuyBefore + refund - 1;
+        && Math.abs(soQuyAfter - soQuyBefore) <= 1;
       row('/bang-luong/:id', 'Hủy phiếu lương', 'cancelled + hoàn quỹ + CT/BL', cancelOk ? `ly_do=${cancelled.ly_do_huy}, so_quy+${refund}` : 'Lỗi', cancelOk ? 'Pass' : 'Fail');
       const payBtnBack = await page.$('.pay-btn');
       row('/bang-luong/:id', 'Nút TT sau hủy', 'Hiện lại nếu còn cần trả', payBtnBack ? 'Có nút Thanh toán' : 'Không có nút', payBtnBack ? 'Pass' : 'Fail');

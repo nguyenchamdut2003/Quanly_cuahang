@@ -1,4 +1,4 @@
-﻿<%
+<%
   const safeList = Array.isArray(locals.list) ? locals.list : [];
   const safeCashBooks = Array.isArray(locals.cashBooks) ? locals.cashBooks : [];
   const safeCustomers = Array.isArray(locals.customers) ? locals.customers : [];
@@ -8,10 +8,50 @@
   const docs = locals.relatedDocuments || {};
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
-  const selectedBookId = String(locals.selectedCashBook?._id || '');
-  const codeOf = locals.relatedCode || function(item) {
-    return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don || item.phieu_nhap_id?.ma_phieu_nhap || item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.van_don_id?.ma_van_don || item.ma_chung_tu_goc || '';
+  const fmtDate = value => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('vi-VN');
   };
+  const timeFilterActive = safeFilters.time_type === 'this_month' || !!(safeFilters.date_from || safeFilters.date_to);
+  const selectedBookId = safeFilters.so_quy_id && safeFilters.so_quy_id !== 'all' && safeFilters.so_quy_id !== 'unassigned'
+    ? String(safeFilters.so_quy_id)
+    : '';
+  const codeOf = locals.relatedCode || function(item) {
+    const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
+    const allocPn = firstAlloc?.phieu_nhap_id;
+    return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don || item.phieu_nhap_id?.ma_phieu_nhap || firstAlloc?.ma_phieu_nhap || (allocPn && typeof allocPn === 'object' ? allocPn.ma_phieu_nhap : '') || item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.phieu_tra_hang_id?.ma_phieu_tra || item.van_don_id?.ma_van_don || item.bang_luong_id?.ma_bang_luong || item.ct_bang_luong_id?.ma_nhan_vien || item.ma_chung_tu_goc || '';
+  };
+  const relatedDocLink = function(item) {
+    const code = codeOf(item);
+    if (item.phieu_tra_hang_nhap_id) return refLink('supplier_return', item.phieu_tra_hang_nhap_id, code);
+    if (item.phieu_tra_hang_id) return refLink('customer_return', item.phieu_tra_hang_id, code);
+    if (item.phieu_nhap_id) return refLink('purchase', item.phieu_nhap_id, code);
+    if (item.don_hang_id) return refLink('order', item.don_hang_id, code);
+    if (item.hoa_don_id) return refLink('invoice', item.hoa_don_id, code);
+    if (item.van_don_id) return refLink('shipment', item.van_don_id, code);
+    if (item.bang_luong_id) return refLink('payroll', item.bang_luong_id, code);
+    if (item.ct_bang_luong_id) {
+      const parent = item.ct_bang_luong_id.bang_luong_id || item.ct_bang_luong_id;
+      return refLink('payroll', parent, code);
+    }
+    const allocs = item.allocations || [];
+    if (allocs.length) {
+      const first = allocs[0];
+      if (first.phieu_nhap_id) return refLink('purchase', first.phieu_nhap_id, code || first.ma_phieu_nhap);
+    }
+    if (item._docLinkType && item._docLinkId) return refLink(item._docLinkType, item._docLinkId, code);
+    const label = String(code || '').trim();
+    if (/^THN/i.test(label)) return '<a href="/tra-hang-nhap?q=' + encodeURIComponent(label) + '" class="ref-link">' + label.replace(/[&<>"']/g, function(char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+    }) + '</a>';
+    return label ? String(label).replace(/[&<>"']/g, function(char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+    }) : '';
+  };
+  const safeEmployees = Array.isArray(locals.employees) ? locals.employees : [];
+  const safeCarriers = Array.isArray(locals.carriers) ? locals.carriers : [];
   const payLabel = value => ({ tien_mat: 'Tiền mặt', chuyen_khoan: 'Chuyển khoản', vi_dien_tu: 'Ví điện tử', khac: 'Khác' }[value] || 'Tiền mặt');
   const categoryLabel = value => {
     const map = {
@@ -23,71 +63,102 @@
   const groupLabel = value => ({ khach_hang: 'Khách hàng', nha_cung_cap: 'Nhà cung cấp', doi_tac_giao_hang: 'Đối tác giao hàng', nhan_vien: 'Nhân viên', khac: 'Khác' }[value] || 'Khác');
 %>
 <!DOCTYPE html>
-<html>
+<html class="so-quy-page">
 <head>
   <meta charset="UTF-8">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    *{box-sizing:border-box}body{background:#f3f6f9}.page{height:calc(100vh - 98px);display:grid;grid-template-columns:230px minmax(0,1fr);gap:14px;padding:16px 30px;overflow:hidden}aside{min-height:0;display:flex;flex-direction:column}.sidebar{background:#fff;border-radius:7px;padding:14px;overflow:auto;min-height:0;flex:1}.title{font-size:24px;font-weight:800;margin:0 0 18px}.filter{margin-bottom:18px}.filter-title{font-weight:800;margin-bottom:10px}.radio,.check{display:flex;align-items:center;gap:9px;margin:11px 0;font-size:15px}.radio input,.check input{width:17px;height:17px;accent-color:#0070f4}.control{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 12px;font-size:14px;color:#475467;margin-bottom:9px}.seg{display:flex;gap:6px}.seg button{height:32px;border:1px solid #cfd8e3;background:#fff;border-radius:18px;padding:0 10px;cursor:pointer}.seg button.active{background:#0070f4;border-color:#0070f4;color:#fff;font-weight:800}.main{min-width:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px}.search{position:relative;width:500px;max-width:100%}.search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:37px;border:1px solid #cfd8e3;border-radius:8px;padding:0 42px 0 38px;font-size:15px}.search button{position:absolute;right:5px;top:5px;width:26px;height:26px;border:0;background:#fff}.actions{display:flex;gap:8px;flex-wrap:wrap}.btn{height:37px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 13px;color:#111827;font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer}.btn.primary{color:#0070f4;border-color:#0070f4}.summary{height:88px;background:#fff;border-radius:7px;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;text-align:center}.summary label{display:block;color:#667085;font-size:14px;margin-bottom:10px}.summary strong{font-size:20px}.blue{color:#0070f4}.red{color:#d92d20}.green{color:#00a651}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:7px;overflow-y:auto;overflow-x:hidden}.table{width:100%;table-layout:fixed;border-collapse:collapse}.table th{height:43px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;text-align:left;padding:0 8px;font-size:13px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 8px;font-size:14px;overflow-wrap:anywhere}.table th:nth-child(1),.table td:nth-child(1){width:9%}.table th:nth-child(2),.table td:nth-child(2){width:13%}.table th:nth-child(3),.table td:nth-child(3){width:17%}.table th:nth-child(4),.table td:nth-child(4){width:17%}.table th:nth-child(5),.table td:nth-child(5){width:9%}.table th:nth-child(6),.table td:nth-child(6){width:14%}.table th:nth-child(7),.table td:nth-child(7){width:10%}.table th:nth-child(8),.table td:nth-child(8){width:11%}.check-col,.star-col{width:36px;text-align:center}.num{text-align:right}.receipt{color:#006dff;text-decoration:none;font-weight:800}.type{font-weight:800}.type.thu{color:#0070f4}.type.chi{color:#d92d20}.empty{height:420px;text-align:center}.empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}.empty-icon{width:96px;height:96px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:36px}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:24px;z-index:1000}.modal-backdrop.open{display:flex}.modal{width:1080px;max-width:calc(100vw - 40px);background:#fff;border-radius:10px;box-shadow:0 18px 42px rgba(0,0,0,.35);overflow:hidden}.modal-head{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 28px}.modal-head h2{font-size:24px;margin:0}.modal-close{border:0;background:#fff;font-size:26px;color:#5b646f;cursor:pointer}.modal-body{padding:16px 28px 26px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 28px}.field label{display:block;font-size:14px;margin-bottom:7px}.field input,.field select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px;font-size:15px}.field.full{grid-column:1 / -1}.money-wrap{position:relative}.money-wrap input{text-align:right;padding-right:28px}.money-wrap span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#8b95a1;font-weight:800}.modal-foot{height:72px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 28px}.modal-btn{height:45px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 20px;font-weight:800;cursor:pointer}.modal-btn.save{border:0;background:#0070f4;color:#fff}.accounting{display:flex;align-items:center;gap:8px;margin-top:18px}.accounting input{width:18px;height:18px;accent-color:#0070f4}.receipt-detail-grid{display:grid;grid-template-columns:150px 1fr;gap:10px 16px;margin-bottom:18px}.receipt-detail-grid span{color:#667085}.receipt-allocation-note{font-weight:800;margin:10px 0}.receipt-allocation-table{width:100%;border-collapse:collapse}.receipt-allocation-table th,.receipt-allocation-table td{border-bottom:1px solid #e5e9ee;height:38px;padding:0 10px;text-align:left}.receipt-allocation-table th{background:#eef6ff;font-size:13px}.receipt-allocation-table .num{text-align:right}.receipt-allocation-table a{color:#006dff;font-weight:800;text-decoration:none}.receipt-inline-row td{height:auto!important;padding:0!important;background:#fff}.receipt-inline-panel{border:1px solid #0070f4;border-top:0;padding:14px 20px 18px;background:#fff}.receipt-inline-tab{display:inline-block;color:#006dff;border-bottom:2px solid #006dff;padding:0 2px 9px;margin-bottom:12px;font-weight:700}.receipt-inline-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:12px}.receipt-inline-title{font-size:18px;font-weight:800}.receipt-inline-badge{display:inline-block;border-radius:4px;padding:2px 7px;margin-left:6px;font-size:12px;background:#dcfce7;color:#047857}.receipt-inline-badge.no-account{background:#fee2e2;color:#b91c1c}.receipt-inline-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:13px}.receipt-inline-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 22px;margin:22px 0}.receipt-inline-field span{display:block;color:#64748b;font-size:12px;margin-bottom:6px}.receipt-inline-field b{display:block;border-bottom:1px solid #e5e7eb;padding-bottom:8px;font-weight:500}.receipt-inline-link{color:#006dff;text-decoration:none}.receipt-inline-note{border-top:1px solid #e5e7eb;padding-top:10px;color:#334155}.receipt-inline-actions{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;margin-top:14px;padding-top:12px}.receipt-inline-allocation{border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-top:10px}.receipt-inline-allocation-title{padding:10px 12px;font-weight:500}.receipt-inline-allocation table{width:100%;border-collapse:collapse}.receipt-inline-allocation th{height:34px;background:#f1f3f5;text-align:left;padding:0 12px;font-size:12px}.receipt-inline-allocation td{height:38px!important;padding:0 12px!important;border-top:1px solid #e5e7eb}.receipt-inline-allocation .num{text-align:right}.receipt-inline-main-row.is-open{outline:1px solid #0070f4;outline-offset:-1px}
+    *{box-sizing:border-box}html.so-quy-page,body.so-quy-page{height:100%;overflow:hidden;margin:0}body.so-quy-page{background:#f3f6f9;display:flex;flex-direction:column}.so-quy-page .kv-header{flex-shrink:0}.page{display:flex;flex-direction:column;min-height:0;height:calc(100vh - 48px);padding:16px 20px 20px;min-width:0;overflow:hidden}.main{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}.toolbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.toolbar-left{display:flex;align-items:center;gap:16px;min-width:0;flex:1}.search{position:relative;width:500px;max-width:100%;flex:1}.search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:37px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px 0 38px;font-size:15px}.actions{display:flex;gap:8px;flex-wrap:wrap}.cash-time-filter{position:relative}.cash-time-filter-trigger.is-active{border-color:#0070f4;color:#0070f4}.cash-time-filter-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:20;min-width:280px;background:#fff;border:1px solid #cfd8e3;border-radius:8px;padding:14px;box-shadow:0 10px 24px rgba(15,23,42,.12)}.cash-time-filter-panel.is-open{display:block}.cash-time-filter-panel label{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px;font-weight:600;color:#111827;cursor:pointer}.cash-time-filter-panel input[type=radio]{accent-color:#0070f4}.cash-time-range{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}.cash-time-range input{height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 10px;font-size:14px}.cash-time-filter-actions{display:flex;gap:8px;justify-content:flex-end}.btn{height:37px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 13px;color:#111827;font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px;text-decoration:none;cursor:pointer}.btn.primary{color:#0070f4;border-color:#0070f4}.summary{flex-shrink:0;height:88px;background:#fff;border-radius:7px;display:grid;grid-template-columns:repeat(4,1fr);align-items:center;text-align:center}.summary label{display:block;color:#667085;font-size:14px;margin-bottom:10px}.summary strong{font-size:20px}.blue{color:#0070f4}.red{color:#d92d20}.green{color:#00a651}.cash-list-panel{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#fff;border-radius:7px}.table-wrap{flex:1;min-height:0;overflow-y:auto;overflow-x:auto;background:#fff;border-radius:7px}.table th.th-time-col{position:relative;z-index:4;white-space:nowrap}.th-filter-toggle{border:0;background:transparent;padding:0;font:inherit;font-size:13px;font-weight:800;color:#111827;cursor:pointer;display:inline-flex;align-items:center;gap:4px}.th-filter-toggle.is-active,.cash-time-filter-trigger.is-active{color:#0070f4}.table{width:100%;table-layout:auto;border-collapse:collapse}.table th{height:43px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;text-align:left;padding:0 8px;font-size:13px;white-space:nowrap}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 8px;font-size:14px;overflow-wrap:anywhere}.table th:first-child,.table td:first-child{padding-left:20px}.table th:last-child,.table td:last-child{padding-right:20px}.table th:nth-child(3),.table td:nth-child(3){min-width:140px}.table th:nth-child(4),.table td:nth-child(4){min-width:120px}.check-col,.star-col{width:36px;text-align:center}.num{text-align:right}.receipt{color:#006dff;text-decoration:none;font-weight:800}.table .ref-link{color:#006dff;text-decoration:none;font-weight:800}.type{font-weight:800}.type.thu{color:#0070f4}.type.chi{color:#d92d20}.empty{padding:48px 20px;text-align:center}.empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px}.empty-icon{width:96px;height:96px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:36px}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:24px;z-index:1000}.modal-backdrop.open{display:flex}.modal{width:1080px;max-width:calc(100vw - 40px);background:#fff;border-radius:10px;box-shadow:0 18px 42px rgba(0,0,0,.35);overflow:hidden}.modal-head{height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 28px}.modal-head h2{font-size:24px;margin:0}.modal-close{border:0;background:#fff;font-size:26px;color:#5b646f;cursor:pointer}.modal-body{padding:16px 28px 26px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 28px}.field label{display:block;font-size:14px;margin-bottom:7px}.field input,.field select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px;font-size:15px}.field.full{grid-column:1 / -1}.money-wrap{position:relative}.money-wrap input{text-align:right;padding-right:28px}.money-wrap span{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#8b95a1;font-weight:800}.modal-foot{height:72px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:0 28px}.modal-btn{height:45px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 20px;font-weight:800;cursor:pointer}.modal-btn.save{border:0;background:#0070f4;color:#fff}.accounting-wrap{display:flex;flex-wrap:wrap;gap:12px 20px}.accounting{display:flex;align-items:center;gap:8px;font-size:14px}.accounting input{width:18px;height:18px;accent-color:#0070f4}.accounting.is-disabled{opacity:.55}#receiptModal.modal-backdrop.open{align-items:center;padding:16px}#receiptModal .modal.receipt-modal{max-height:calc(100vh - 32px);display:flex;flex-direction:column}#receiptModal .receipt-modal-form{display:flex;flex-direction:column;min-height:0;max-height:calc(100vh - 32px);overflow:hidden}#receiptModal .receipt-modal-head{flex-shrink:0;height:56px;padding:0 24px}#receiptModal .receipt-modal-head h2{font-size:20px}#receiptModal .receipt-modal-body{flex:1 1 auto;overflow-y:auto;padding:12px 24px 8px}#receiptModal .receipt-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 16px}#receiptModal .receipt-form-grid .field.full{grid-column:1/-1}#receiptModal .receipt-form-grid .field.span-2{grid-column:span 2}#receiptModal .receipt-form-grid .field label{font-size:13px;margin-bottom:5px}#receiptModal .receipt-form-grid .field input,#receiptModal .receipt-form-grid .field select{height:34px;font-size:14px}#receiptModal .partner-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}#receiptModal .partner-row.is-manual-only{grid-template-columns:1fr}#receiptModal .partner-hint{font-size:11px;color:#667085;margin:3px 0 0;line-height:1.35}#receiptModal .receipt-modal-foot{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:60px;padding:10px 24px;border-top:1px solid #e5e9ee;background:#fff}#receiptModal .modal-foot-actions{display:flex;gap:8px;flex-shrink:0}@media (max-width:900px){#receiptModal .receipt-form-grid{grid-template-columns:1fr 1fr}#receiptModal .receipt-form-grid .field.span-2{grid-column:span 1}}@media (max-width:640px){#receiptModal .receipt-form-grid{grid-template-columns:1fr}#receiptModal .partner-row{grid-template-columns:1fr}}.receipt-detail-grid{display:grid;grid-template-columns:150px 1fr;gap:10px 16px;margin-bottom:18px}.receipt-detail-grid span{color:#667085}.receipt-allocation-note{font-weight:800;margin:10px 0}.receipt-allocation-table{width:100%;border-collapse:collapse}.receipt-allocation-table th,.receipt-allocation-table td{border-bottom:1px solid #e5e9ee;height:38px;padding:0 10px;text-align:left}.receipt-allocation-table th{background:#eef6ff;font-size:13px}.receipt-allocation-table .num{text-align:right}.receipt-allocation-table a{color:#006dff;font-weight:800;text-decoration:none}.receipt-inline-row td{height:auto!important;padding:0!important;background:#fff}.receipt-inline-panel{border:1px solid #0070f4;border-top:0;padding:14px 20px 18px 20px;background:#fff}.receipt-inline-tab{display:inline-block;color:#006dff;border-bottom:2px solid #006dff;padding:0 2px 9px;margin-bottom:12px;font-weight:700}.receipt-inline-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:12px}.receipt-inline-title{font-size:18px;font-weight:800}.receipt-inline-badge{display:inline-block;border-radius:4px;padding:2px 7px;margin-left:6px;font-size:12px;background:#dcfce7;color:#047857}.receipt-inline-badge.no-account{background:#fee2e2;color:#b91c1c}.receipt-inline-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;font-size:13px}.receipt-inline-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 22px;margin:22px 0}.receipt-inline-field span{display:block;color:#64748b;font-size:12px;margin-bottom:6px}.receipt-inline-field b{display:block;border-bottom:1px solid #e5e7eb;padding-bottom:8px;font-weight:500}.receipt-inline-link{color:#006dff;text-decoration:none}.receipt-inline-note{border-top:1px solid #e5e7eb;padding-top:10px;color:#334155}.receipt-inline-actions{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e5e7eb;margin-top:14px;padding-top:12px}.receipt-inline-allocation{border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;margin-top:10px}.receipt-inline-allocation-title{padding:10px 12px;font-weight:500}.receipt-inline-allocation table{width:100%;border-collapse:collapse}.receipt-inline-allocation th{height:34px;background:#f1f3f5;text-align:left;padding:0 12px;font-size:12px}.receipt-inline-allocation td{height:38px!important;padding:0 12px!important;border-top:1px solid #e5e7eb}.receipt-inline-allocation .num{text-align:right}.receipt-related-docs-scroll{overflow-x:auto}.receipt-related-docs-table{min-width:880px}.receipt-related-docs-table th{font-size:11px;white-space:nowrap}.receipt-related-docs-table td{font-size:13px;vertical-align:middle}.receipt-related-docs-empty{padding:12px 14px;color:#64748b;font-size:13px}.receipt-inline-main-row.is-open{outline:1px solid #0070f4;outline-offset:-1px}
+  </style>
+  <style>
+    .cashbook-manage-modal{width:1040px;max-width:calc(100vw - 32px)}.cashbook-manage-modal .modal-head h2{font-size:27px}.cashbook-manage-modal .modal-close{font-size:29px}.cashbook-manage-modal .modal-btn{font-size:17px}.cashbook-manage-body{padding:16px 24px 20px;max-height:calc(100vh - 160px);overflow-y:auto}.cashbook-note{color:#667085;font-size:16px;margin:0 0 14px}.cashbook-table-wrap{max-height:420px;overflow:auto;border:1px solid #e5e9ee;border-radius:8px}.cashbook-table{width:100%;border-collapse:collapse;table-layout:fixed}.cashbook-table th{height:42px;background:#f4f8fc;border-bottom:1px solid #d9e4f2;text-align:left;padding:0 8px;font-size:15px}.cashbook-table td{height:46px;border-bottom:1px solid #edf1f5;padding:6px 8px;font-size:16px;overflow-wrap:anywhere;vertical-align:middle}.cashbook-table .num{text-align:right}.cashbook-table .cash-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.cashbook-edit-row:hover td{background:#f8fafc}.cashbook-add-row td{background:#f0fdf4}.cashbook-edit-row input,.cashbook-edit-row select{width:100%;height:37px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc;font-size:16px}.cashbook-edit-row input:focus,.cashbook-edit-row select:focus{background:#fff;border-color:#0070f4;outline:none}.cashbook-readonly-cell{color:#94a3b8;text-align:center}.cashbook-manage-modal .mini-btn{height:33px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;padding:0 10px;font-size:16px;font-weight:700;cursor:pointer}.cashbook-manage-modal .mini-btn.primary{border-color:#0070f4;color:#0070f4}.cashbook-manage-modal .mini-btn:disabled{opacity:.55;cursor:not-allowed}.cashbook-empty{padding:22px;text-align:center;color:#475467;font-size:16px}.cashbook-empty strong{display:block;color:#111827;margin-bottom:6px}.cashbook-message{display:none;padding:8px 12px;border-radius:7px;font-weight:700;font-size:16px;margin-bottom:12px}.cashbook-message.show{display:block}.cashbook-message.success{background:#dcfce7;color:#047857}.cashbook-message.error{background:#fee2e2;color:#b91c1c}.negative{color:#b91c1c}.cashbook-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:7px;padding:9px 12px;font-weight:700;font-size:13px}.cancel-badge{display:inline-block;margin-left:6px;border-radius:999px;background:#fee2e2;color:#b91c1c;padding:2px 6px;font-size:11px;font-weight:800}
+  </style>
+  <style>
+    .payment-breakdown{margin-top:4px;color:#64748b;font-size:12px;line-height:1.35}.receipt-payment-detail{display:inline-block;vertical-align:top;max-width:360px;width:100%;margin:12px 0 18px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;background:#f8fafc;box-sizing:border-box}.receipt-payment-detail-title{font-weight:800;font-size:14px;margin-bottom:8px;color:#111827}.receipt-payment-detail-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:6px 0;font-size:13px;border-bottom:1px solid #eef2f6}.receipt-payment-detail-row:last-child{border-bottom:0}.receipt-payment-detail-row span{color:#64748b}.receipt-payment-detail-row b{font-weight:700;color:#111827;text-align:right;white-space:nowrap}.receipt-payment-detail-warn{margin-top:8px;font-size:12px;color:#b45309;font-weight:600;line-height:1.35}
   </style>
 </head>
-<body>
+<body class="so-quy-page">
   <%- include('../partials/header') %>
   <form class="page" method="GET" action="/so-quy">
-    <aside>
-      <h1 class="title">Sổ quỹ</h1>
-      <div class="sidebar">
-        <div class="filter"><div class="filter-title">Thời gian</div><label class="radio"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"> Tháng này</label><input class="control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()"><input class="control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()"></div>
-        <div class="filter"><div class="filter-title">Loại chứng từ</div><label class="check"><input type="radio" name="loai_phieu" value="thu" <%= safeFilters.loai_phieu === 'thu' ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu thu</label><label class="check"><input type="radio" name="loai_phieu" value="chi" <%= safeFilters.loai_phieu === 'chi' ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu chi</label></div>
-        <div class="filter"><div class="filter-title">Loại thu chi</div><input class="control" name="loai_thu_chi" value="<%= safeFilters.loai_thu_chi || '' %>" placeholder="Chọn loại thu chi"></div>
-        <div class="filter"><div class="filter-title">Phương thức thanh toán</div><select class="control" name="phuong_thuc_thanh_toan" onchange="this.form.submit()"><option value="all">Tất cả</option><option value="tien_mat" <%= safeFilters.phuong_thuc_thanh_toan === 'tien_mat' ? 'selected' : '' %>>Tiền mặt</option><option value="chuyen_khoan" <%= safeFilters.phuong_thuc_thanh_toan === 'chuyen_khoan' ? 'selected' : '' %>>Chuyển khoản</option><option value="vi_dien_tu" <%= safeFilters.phuong_thuc_thanh_toan === 'vi_dien_tu' ? 'selected' : '' %>>Ví điện tử</option><option value="khac" <%= safeFilters.phuong_thuc_thanh_toan === 'khac' ? 'selected' : '' %>>Khác</option></select></div>
-        <div class="filter"><div class="filter-title">Nhóm đối tượng</div><select class="control" name="nhom_doi_tuong" onchange="this.form.submit()"><option value="all">Tất cả</option><option value="khach_hang" <%= safeFilters.nhom_doi_tuong === 'khach_hang' ? 'selected' : '' %>>Khách hàng</option><option value="nha_cung_cap" <%= safeFilters.nhom_doi_tuong === 'nha_cung_cap' ? 'selected' : '' %>>Nhà cung cấp</option><option value="doi_tac_giao_hang" <%= safeFilters.nhom_doi_tuong === 'doi_tac_giao_hang' ? 'selected' : '' %>>Đối tác giao hàng</option><option value="nhan_vien" <%= safeFilters.nhom_doi_tuong === 'nhan_vien' ? 'selected' : '' %>>Nhân viên</option><option value="khac" <%= safeFilters.nhom_doi_tuong === 'khac' ? 'selected' : '' %>>Khác</option></select></div>
-        <div class="filter"><div class="filter-title">Trạng thái</div><select class="control" name="trang_thai" onchange="this.form.submit()"><option value="all">Tất cả</option><option value="paid" <%= safeFilters.trang_thai === 'paid' ? 'selected' : '' %>>Đã thanh toán</option><option value="cancelled" <%= safeFilters.trang_thai === 'cancelled' ? 'selected' : '' %>>Đã hủy</option></select></div>
-        <div class="filter"><div class="filter-title">Hạch toán công nợ</div><div class="seg"><button type="button" class="<%= !safeFilters.hach_toan ? 'active' : '' %>" onclick="setCashFilter('hach_toan','')">Tất cả</button><button type="button" class="<%= safeFilters.hach_toan === 'yes' ? 'active' : '' %>" onclick="setCashFilter('hach_toan','yes')">Có</button><button type="button" class="<%= safeFilters.hach_toan === 'no' ? 'active' : '' %>" onclick="setCashFilter('hach_toan','no')">Không</button></div></div>
-        <div class="filter"><div class="filter-title">Người tạo</div><input class="control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo"></div>
-        <div class="filter"><div class="filter-title">Người nộp/nhận</div><select class="control" name="doi_tuong_loai" onchange="this.form.submit()"><option value="">Tất cả</option><option value="khach_hang" <%= safeFilters.doi_tuong_loai === 'khach_hang' ? 'selected' : '' %>>Khách hàng</option><option value="nha_cung_cap" <%= safeFilters.doi_tuong_loai === 'nha_cung_cap' ? 'selected' : '' %>>Nhà cung cấp</option><option value="khac" <%= safeFilters.doi_tuong_loai === 'khac' ? 'selected' : '' %>>Khác</option></select><input name="doi_tuong_search" value="<%= safeFilters.doi_tuong_search || '' %>" class="control" placeholder="Tên, mã người nộp/nhận"><input class="control" name="doi_tuong_phone" value="<%= safeFilters.doi_tuong_phone || '' %>" placeholder="Số điện thoại"></div>
-      </div>
-    </aside>
     <main class="main">
       <div class="toolbar">
-        <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu"><button><i class="fa-solid fa-sliders"></i></button></div>
-        <div class="actions"><button type="button" class="btn primary" onclick="openReceiptModal('thu')"><i class="fa-solid fa-plus"></i> Phiếu thu</button><button type="button" class="btn primary" onclick="openReceiptModal('chi')"><i class="fa-solid fa-plus"></i> Phiếu chi</button><a class="btn" href="/so-quy/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
+        <div class="toolbar-left">
+          <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu"></div>
+        </div>
+        <div class="actions"><button type="button" class="btn primary" onclick="openReceiptModal('thu')"><i class="fa-solid fa-plus"></i> Phiếu thu</button><button type="button" class="btn primary" onclick="openReceiptModal('chi')"><i class="fa-solid fa-plus"></i> Phiếu chi</button><button type="button" class="btn" onclick="openCashBookManageModal()"><i class="fa-solid fa-book"></i> Xem sổ quỹ</button><a class="btn" href="/so-quy/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a></div>
       </div>
       <div class="summary"><div><label>Đầu kỳ</label><strong><%= fmtMoney(safeSummary.opening) %></strong></div><div><label>Tổng thu</label><strong class="blue"><%= fmtMoney(safeSummary.totalThu) %></strong></div><div><label>Tổng chi</label><strong class="red"><%= fmtMoney(safeSummary.totalChi) %></strong></div><div><label>Tồn quỹ</label><strong class="green"><%= fmtMoney(safeSummary.balance) %></strong></div></div>
-      <div class="table-wrap"><table class="table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Loại thu chi</th><th>Người nộp/nhận</th><th>Nhóm</th><th>Chứng từ liên quan</th><th>Phương thức</th><th class="num">Giá trị</th></tr></thead><tbody>
+      <div class="cash-list-panel">
+        <div class="table-wrap"><table class="table"><thead><tr><th>Mã phiếu</th><th class="th-time-col"><div class="cash-time-filter"><button type="button" class="th-filter-toggle cash-time-filter-trigger <%= timeFilterActive ? 'is-active' : '' %>" id="cashTimeFilterBtn">Thời gian ▼</button><div class="cash-time-filter-panel" id="cashTimeFilterPanel"><label><input type="radio" name="time_mode" value="all" <%= safeFilters.time_type !== 'this_month' && !safeFilters.date_from && !safeFilters.date_to ? 'checked' : '' %>> Toàn thời gian</label><label><input type="radio" name="time_mode" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %>> Tháng này</label><label><input type="radio" name="time_mode" value="custom" <%= safeFilters.time_type !== 'this_month' && (safeFilters.date_from || safeFilters.date_to) ? 'checked' : '' %>> Khoảng ngày</label><div class="cash-time-range"><input type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" aria-label="Từ ngày"><input type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" aria-label="Đến ngày"></div><div class="cash-time-filter-actions"><button type="button" class="btn" id="cashTimeFilterClear">Xóa lọc</button><button type="button" class="btn primary" id="cashTimeFilterApply">Áp dụng</button></div></div></div></th><th>Loại thu chi</th><th>Người nộp/nhận</th><th>Nhóm</th><th>Chứng từ liên quan</th><th>Sổ quỹ</th><th>Phương thức</th><th class="num">Giá trị</th></tr></thead><tbody>
         <% if (safeList.length) { %>
-          <% safeList.forEach(item => { %><tr class="receipt-main-row" data-receipt-id="<%= item._id %>"><td><a href="/so-quy/phieu-thu-chi/<%= item._id %>" class="receipt ref-link" onclick="showReceipt('<%= item._id %>');return false"><%= item.ma_phieu %></a></td><td><%= item.ngay_lap ? new Date(item.ngay_lap).toLocaleString('vi-VN') : '' %></td><td><span class="type <%= item.loai_phieu %>"><%= categoryLabel(item.loai_thu_chi) || (item.loai_phieu === 'thu' ? 'Phiếu thu' : 'Phiếu chi') %></span></td><td><%= item.doi_tuong || item.khach_hang_id?.ten_khach_hang || item.nha_cung_cap_id?.ten_ncc || '' %></td><td><%= groupLabel(item.nhom_doi_tuong) %></td><td><%- item.phieu_nhap_id ? refLink('purchase', item.phieu_nhap_id, codeOf(item)) : item.don_hang_id ? refLink('order', item.don_hang_id, codeOf(item)) : item.hoa_don_id ? refLink('invoice', item.hoa_don_id, codeOf(item)) : item.van_don_id ? refLink('shipment', item.van_don_id, codeOf(item)) : codeOf(item) %></td><td><%= payLabel(item.phuong_thuc_thanh_toan) %></td><td class="num <%= item.loai_phieu === 'thu' ? 'blue' : 'red' %>"><%= item.loai_phieu === 'thu' ? '+' : '-' %><%= fmtMoney(item.gia_tri) %></td></tr><% }) %>
+          <% safeList.forEach(item => { const payDetail = item.chi_tiet_thanh_toan || {}; const payCash = Number(payDetail.tien_mat || 0); const payTransfer = Number(payDetail.chuyen_khoan || 0); const payRefund = Number(payDetail.tien_tra_khach || 0); const hasPaySubline = payCash > 0 || payTransfer > 0 || payRefund > 0; %><tr class="receipt-main-row" data-receipt-id="<%= item._id %>"><td><a href="/so-quy/phieu-thu-chi/<%= item._id %>" class="receipt ref-link" onclick="showReceipt('<%= item._id %>');return false"><%= item.ma_phieu %></a></td><td><%= fmtDate(item.ngay_lap) %></td><td><span class="type <%= item.loai_phieu %>"><%= categoryLabel(item.loai_thu_chi) || (item.loai_phieu === 'thu' ? 'Phiếu thu' : 'Phiếu chi') %></span><% if (item.trang_thai === 'cancelled') { %><span class="cancel-badge">Đã hủy</span><% } %></td><td><%= item.doi_tuong || item.khach_hang_id?.ten_khach_hang || item.nha_cung_cap_id?.ten_ncc || '' %></td><td><%= groupLabel(item.nhom_doi_tuong) %></td><td><%- relatedDocLink(item) %></td><td><%= item.so_quy_id?.ten_so_quy || 'Chưa phân sổ' %></td><td><%= payLabel(item.phuong_thuc_thanh_toan) %><% if (hasPaySubline) { %><div class="payment-breakdown">TM: <%= fmtMoney(payCash) %> | CK: <%= fmtMoney(payTransfer) %> | Trả khách: <%= fmtMoney(payRefund) %></div><% } %></td><td class="num <%= item.loai_phieu === 'thu' ? 'blue' : 'red' %>"><%= item.loai_phieu === 'thu' ? '+' : '-' %><%= fmtMoney(item.gia_tri) %></td></tr><% }) %>
         <% } else { %>
-          <tr><td colspan="8" class="empty"><div class="empty-box"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><strong>Không tìm thấy giao dịch nào phù hợp</strong></div></td></tr>
+          <tr><td colspan="9" class="empty"><div class="empty-box"><div class="empty-icon"><i class="fa-regular fa-inbox"></i></div><strong>Không tìm thấy giao dịch nào phù hợp</strong></div></td></tr>
         <% } %>
       </tbody></table></div>
+      </div>
     </main>
   </form>
 
+  <div id="cashBookManageModal" class="modal-backdrop">
+    <div class="modal cashbook-manage-modal">
+      <div class="modal-head">
+        <h2>Quản lý sổ quỹ</h2>
+        <button type="button" class="modal-close" onclick="closeCashBookManageModal()">&times;</button>
+      </div>
+      <div class="modal-body cashbook-manage-body">
+        <p class="cashbook-note">Số dư được tính từ phiếu thu chi đang hiệu lực theo từng sổ. Chỉnh sửa trực tiếp trên bảng rồi bấm Sửa để lưu.</p>
+        <span id="cashBookMessage" class="cashbook-message"></span>
+        <div class="cashbook-table-wrap">
+          <table class="cashbook-table">
+            <thead><tr><th>Tên sổ</th><th class="num">Tổng thu</th><th class="num">Tổng chi</th><th class="num">Số dư</th><th>Trạng thái</th><th class="num">Thao tác</th></tr></thead>
+            <tbody id="cashBookRows"><tr><td colspan="6" class="cashbook-empty">Đang tải danh sách sổ quỹ...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="page-actions modal-foot"><button type="button" class="modal-btn" onclick="closeCashBookManageModal()">Đóng</button></div>
+    </div>
+  </div>
+
   <div id="receiptModal" class="modal-backdrop">
-    <form class="modal" onsubmit="saveReceipt(event)">
-      <div class="modal-head"><h2 id="receiptTitle">Tạo phiếu thu</h2><button type="button" class="modal-close" onclick="closeReceiptModal()">&times;</button></div>
-      <div class="modal-body">
+    <form class="modal receipt-modal receipt-modal-form" onsubmit="saveReceipt(event)">
+      <div class="modal-head receipt-modal-head"><h2 id="receiptTitle">Tạo phiếu thu</h2><button type="button" class="modal-close" onclick="closeReceiptModal()">&times;</button></div>
+      <div class="modal-body receipt-modal-body">
         <input type="hidden" name="loai_phieu" id="receiptType">
-        <div class="form-grid">
+        <div class="receipt-form-grid">
           <div class="field"><label>Mã phiếu</label><input name="ma_phieu" placeholder="Tự động"></div>
           <div class="field"><label>Thời gian</label><input type="datetime-local" name="ngay_lap" id="receiptDate"></div>
-          <div class="field"><label>Sổ quỹ</label><select name="so_quy_id" id="cashBookSelect"><% safeCashBooks.forEach(book => { %><option value="<%= book._id %>" <%= String(book._id) === selectedBookId ? 'selected' : '' %>><%= book.ten_so_quy %></option><% }) %></select></div>
-          <div class="field"><label>Phương thức thanh toán</label><select name="phuong_thuc_thanh_toan"><option value="tien_mat">Tiền mặt</option><option value="chuyen_khoan">Chuyển khoản</option><option value="vi_dien_tu">Ví điện tử</option><option value="khac">Khác</option></select></div>
+          <div class="field"><label>Sổ quỹ</label><select name="so_quy_id" id="cashBookSelect" required><option value="">Chọn sổ quỹ</option><% safeCashBooks.forEach(book => { %><option value="<%= book._id %>" <%= String(book._id) === selectedBookId ? 'selected' : '' %>><%= book.ten_so_quy %></option><% }) %></select></div>
           <div class="field"><label id="categoryLabel">Loại thu</label><input name="loai_thu_chi" id="receiptCategory" placeholder="Nhập loại thu"></div>
-          <div class="field"><label>Nhóm đối tượng</label><select name="nhom_doi_tuong" id="subjectGroup" onchange="syncObjectType()"><option value="khach_hang">Khách hàng</option><option value="nha_cung_cap">Nhà cung cấp</option><option value="doi_tac_giao_hang">Đối tác giao hàng</option><option value="nhan_vien">Nhân viên</option><option value="khac">Khác</option></select></div>
-          <div class="field"><label id="objectTypeLabel">Đối tượng nộp</label><select name="doi_tuong_loai" id="objectType" onchange="renderPartners()"><option value="khac">Khác</option><option value="khach_hang">Khách hàng</option><option value="nha_cung_cap">Nhà cung cấp</option></select></div>
-          <div class="field"><label id="partnerLabel">Tên người nộp</label><select name="doi_tuong_id" id="partnerSelect"></select><input name="doi_tuong" id="partnerNameInput" placeholder="Nhập tên người nộp" style="display:none"></div>
-          <div class="field"><label>Loại chứng từ liên quan</label><select id="documentType" name="document_type" onchange="renderRelatedDocuments()"><option value="">Không chọn</option><option value="don_hang">Đơn hàng</option><option value="hoa_don">Hóa đơn bán hàng</option><option value="phieu_nhap">Phiếu nhập</option><option value="phieu_tra_hang_nhap">Phiếu trả hàng nhập</option><option value="van_don">Vận đơn/COD</option></select></div>
-          <div class="field"><label>Chứng từ liên quan</label><select id="documentSelect" onchange="applyRelatedDocument()"><option value="">Chọn chứng từ</option></select><input type="hidden" name="don_hang_id" id="donHangId"><input type="hidden" name="hoa_don_id" id="hoaDonId"><input type="hidden" name="phieu_nhap_id" id="phieuNhapId"><input type="hidden" name="phieu_tra_hang_nhap_id" id="phieuTraHangNhapId"><input type="hidden" name="van_don_id" id="vanDonId"><input type="hidden" name="khach_hang_id" id="khachHangId"><input type="hidden" name="nha_cung_cap_id" id="nhaCungCapId"><input type="hidden" name="ma_chung_tu_goc" id="maChungTuGoc"></div>
-          <div class="field full"><label>Số tiền</label><div class="money-wrap"><input name="gia_tri" id="amountInput" value="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="formatAmount(this)"><span>đ</span></div></div>
-          <div class="field full"><label>Ghi chú</label><input name="ghi_chu" placeholder="Nhập ghi chú"></div>
+          <div class="field"><label>Nhóm đối tượng</label><select name="nhom_doi_tuong" id="subjectGroup" onchange="onSubjectGroupChange()"><option value="khach_hang">Khách hàng</option><option value="nha_cung_cap">Nhà cung cấp</option><option value="doi_tac_giao_hang">Đối tác giao hàng</option><option value="nhan_vien">Nhân viên</option><option value="khac">Khác</option></select></div>
+          <div class="field full partner-field">
+            <label id="partnerLabel">Người nộp</label>
+            <div class="partner-row">
+              <select id="partnerSelect" onchange="onPartnerChange()"><option value="">Chọn từ danh sách</option></select>
+              <input name="doi_tuong" id="partnerNameInput" placeholder="Hoặc nhập tên">
+            </div>
+            <input type="hidden" name="doi_tuong_entity_id" id="partnerEntityId">
+            <div class="partner-hint" id="partnerHint">Chọn danh sách hoặc nhập tay — không tạo mới danh mục.</div>
+          </div>
+          <div class="field"><label>Loại chứng từ</label><select id="documentType" name="document_type" onchange="onDocumentTypeChange()"></select></div>
+          <div class="field span-2"><label>Chứng từ liên quan</label><select id="documentSelect" onchange="applyRelatedDocument()"><option value="">Chọn chứng từ</option></select><div class="partner-hint" id="relatedDocHint">Danh sách chỉ gồm chứng từ còn phát sinh theo đối tượng đã chọn.</div><div class="partner-hint selected-related-doc" id="selectedRelatedDocHint" style="display:none"></div></div>
+          <input type="hidden" name="don_hang_id" id="donHangId"><input type="hidden" name="hoa_don_id" id="hoaDonId"><input type="hidden" name="phieu_nhap_id" id="phieuNhapId"><input type="hidden" name="phieu_tra_hang_nhap_id" id="phieuTraHangNhapId"><input type="hidden" name="phieu_tra_hang_id" id="phieuTraHangId"><input type="hidden" name="van_don_id" id="vanDonId"><input type="hidden" name="bang_luong_id" id="bangLuongId"><input type="hidden" name="ct_bang_luong_id" id="ctBangLuongId"><input type="hidden" name="ma_chung_tu_goc" id="maChungTuGoc">
+          <div class="field"><label>Số tiền</label><div class="money-wrap"><input name="gia_tri" id="amountInput" value="0" onfocus="this.value=this.value.replace(/\./g,'')" onblur="formatAmount(this)"><span>đ</span></div></div>
+          <div class="field span-2"><label>Ghi chú</label><input name="ghi_chu" placeholder="Nhập ghi chú"></div>
         </div>
-        <label class="accounting"><input type="checkbox" name="hach_toan" id="accountingCheck" checked> Hạch toán công nợ</label>
       </div>
-      <div class="page-actions modal-foot"><button type="button" class="modal-btn" onclick="closeReceiptModal()">Bỏ qua</button><button type="submit" class="modal-btn save">Lưu</button></div>
+      <div class="receipt-modal-foot">
+        <div class="accounting-wrap">
+          <label class="accounting" id="accountingWrap"><input type="checkbox" name="hach_toan" id="accountingCheck"> Hạch toán công nợ</label>
+          <div class="partner-hint">Lưu phiếu tạo <strong>PhieuThuChi</strong> vào sổ quỹ; nếu bật hạch toán thì ghi thêm công nợ KH/NCC. Chưa cập nhật <em>đã trả / còn nợ</em> trên chứng từ gốc (đơn, phiếu nhập, v.v.).</div>
+        </div>
+        <div class="modal-foot-actions">
+          <button type="button" class="modal-btn" onclick="closeReceiptModal()">Bỏ qua</button>
+          <button type="submit" class="modal-btn save">Lưu</button>
+        </div>
+      </div>
     </form>
   </div>
 
@@ -100,41 +171,372 @@
   </div>
 
   <script>
-    const receipts = <%- JSON.stringify(safeList.map(item => ({_id:String(item._id),ma_phieu:item.ma_phieu,loai_phieu:item.loai_phieu,loai_thu_chi:item.loai_thu_chi||'',gia_tri:item.gia_tri||0,doi_tuong:item.doi_tuong||'',ghi_chu:item.ghi_chu||'',ngay_lap:item.ngay_lap,so_quy:item.so_quy_id?.ten_so_quy||'',chung_tu:codeOf(item)}))) %>;
+    const receipts = <%- JSON.stringify(safeList.map(item => ({_id:String(item._id),ma_phieu:item.ma_phieu,loai_phieu:item.loai_phieu,loai_thu_chi:item.loai_thu_chi||'',gia_tri:item.gia_tri||0,chi_tiet_thanh_toan:item.chi_tiet_thanh_toan||{},phuong_thuc_thanh_toan:item.phuong_thuc_thanh_toan||'',nhom_doi_tuong:item.nhom_doi_tuong||'',trang_thai:item.trang_thai||'',hach_toan:!!item.hach_toan,doi_tuong:item.doi_tuong||'',ghi_chu:item.ghi_chu||'',ngay_lap:item.ngay_lap,so_quy:item.so_quy_id?.ten_so_quy||'Chưa phân sổ',chung_tu:codeOf(item)}))) %>;
     const customers = <%- JSON.stringify(safeCustomers.map(item => ({_id:String(item._id),name:item.ten_khach_hang,code:item.ma_khach_hang,phone:item.sdt||''}))) %>;
     const suppliers = <%- JSON.stringify(safeSuppliers.map(item => ({_id:String(item._id),name:item.ten_ncc,code:item.ma_ncc,phone:item.sdt||''}))) %>;
-    const relatedDocs = {
-      don_hang: <%- JSON.stringify((docs.orders || []).map(x => ({ _id:String(x._id), code:x.ma_don_hang, amount:x.tong_thanh_toan || x.tong_tien || 0, khach_hang_id:x.khach_hang_id?._id ? String(x.khach_hang_id._id) : String(x.khach_hang_id || ''), partner:x.khach_hang_id?.ten_khach_hang || '' }))) %>,
-      hoa_don: <%- JSON.stringify((docs.invoices || []).map(x => ({ _id:String(x._id), code:x.ma_hoa_don, amount:x.thanh_toan || x.tong_tien || 0, don_hang_id:x.don_hang_id ? String(x.don_hang_id) : '', khach_hang_id:x.khach_hang_id?._id ? String(x.khach_hang_id._id) : String(x.khach_hang_id || ''), partner:x.khach_hang_id?.ten_khach_hang || '' }))) %>,
-      phieu_nhap: <%- JSON.stringify((docs.purchases || []).map(x => ({ _id:String(x._id), code:x.ma_phieu_nhap, amount:x.con_no_ncc || x.da_tra_ncc || x.can_tra_ncc || x.tong_tien || 0, nha_cung_cap_id:x.nha_cung_cap_id?._id ? String(x.nha_cung_cap_id._id) : String(x.nha_cung_cap_id || ''), partner:x.nha_cung_cap_id?.ten_ncc || '' }))) %>,
-      phieu_tra_hang_nhap: <%- JSON.stringify((docs.purchaseReturns || []).map(x => ({ _id:String(x._id), code:x.ma_phieu_tra_nhap, amount:x.ncc_da_tra || x.ncc_can_tra || 0, nha_cung_cap_id:x.nha_cung_cap_id?._id ? String(x.nha_cung_cap_id._id) : String(x.nha_cung_cap_id || ''), phieu_nhap_id:x.phieu_nhap_id ? String(x.phieu_nhap_id) : '', partner:x.nha_cung_cap_id?.ten_ncc || '' }))) %>,
-      van_don: <%- JSON.stringify((docs.shipments || []).map(x => ({ _id:String(x._id), code:x.ma_van_don, amount:x.cod_amount || x.phi_giao_hang || 0, don_hang_id:x.don_hang_id ? String(x.don_hang_id) : '', hoa_don_id:x.hoa_don_id ? String(x.hoa_don_id) : '', khach_hang_id:x.khach_hang_id?._id ? String(x.khach_hang_id._id) : String(x.khach_hang_id || ''), partner:x.khach_hang_id?.ten_khach_hang || x.doi_tac_giao_hang_id?.ten_doi_tac || '' }))) %>
-    };
+    const employees = <%- JSON.stringify(safeEmployees.map(item => ({_id:String(item._id),name:item.ten_nhan_vien,code:item.ma_nhan_vien,phone:item.sdt||''}))) %>;
+    const carriers = <%- JSON.stringify(safeCarriers.map(item => ({_id:String(item._id),name:item.ten_doi_tac,code:item.ma_doi_tac,phone:item.sdt||''}))) %>;
+    const partnerLists = { khach_hang: customers, nha_cung_cap: suppliers, nhan_vien: employees, doi_tac_giao_hang: carriers };
+    const thuDocOptions = [{value:'',label:'Không chọn'},{value:'don_hang',label:'Đơn hàng'},{value:'hoa_don',label:'Hóa đơn bán hàng'},{value:'phieu_tra_hang_nhap',label:'Phiếu trả hàng nhập'},{value:'van_don',label:'Vận đơn/COD'},{value:'khac',label:'Khác'}];
+    const chiDocOptions = [{value:'',label:'Không chọn'},{value:'phieu_nhap',label:'Phiếu nhập'},{value:'phieu_tra_hang',label:'Phiếu trả hàng bán'},{value:'bang_luong',label:'Bảng lương'},{value:'ct_bang_luong',label:'Chi tiết bảng lương'},{value:'van_don',label:'Vận đơn/phí giao hàng'},{value:'don_hang',label:'Đơn hàng (hoàn tiền)'},{value:'hoa_don',label:'Hóa đơn (hoàn tiền)'},{value:'khac',label:'Khác'}];
+    let relatedDocRows=[];
+    let selectedRelatedDoc=null;
+    const DOC_HIDDEN_IDS = ['donHangId','hoaDonId','phieuNhapId','phieuTraHangNhapId','phieuTraHangId','vanDonId','bangLuongId','ctBangLuongId','maChungTuGoc'];
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
     const fmtMoney = n => fmt(n) + ' VNĐ';
-    function setCashFilter(key,value){const form=document.querySelector('form.page');let input=form.querySelector('[name="'+key+'"]');if(!input){input=document.createElement('input');input.type='hidden';input.name=key;form.appendChild(input)}input.value=value;form.submit()}
+    let cashBookState=[];
+    function cashEscape(value){return String(value ?? '').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+    function cashStatusOptions(selected){const opts=[{value:'active',label:'Đang sử dụng'},{value:'inactive',label:'Ngừng sử dụng'}];return opts.map(o=>`<option value="${o.value}" ${selected===o.value?'selected':''}>${o.label}</option>`).join('')}
+    function showCashBookMessage(message,type='success'){const el=document.getElementById('cashBookMessage');if(!el)return;el.textContent=message;el.className='cashbook-message show '+type;setTimeout(()=>{el.className='cashbook-message'},3000)}
+    function renderCashBookAddRow(){
+      return `<tr class="cashbook-edit-row cashbook-add-row" data-cashbook-id=""><td><input class="js-cashbook-name" placeholder="Ví dụ: Tiền mặt, Tài khoản ngân hàng..."></td><td class="num cashbook-readonly-cell">--</td><td class="num cashbook-readonly-cell">--</td><td class="num cashbook-readonly-cell">--</td><td><select class="js-cashbook-status">${cashStatusOptions('active')}</select></td><td class="cash-actions"><button type="button" class="mini-btn primary js-cashbook-add">Thêm</button></td></tr>`;
+    }
+    function renderCashBookDataRow(row){
+      const id=String(row._id||'');
+      const balance=Number(row.so_du_tinh_toan||0);
+      const status=row.trang_thai==='inactive'?'inactive':'active';
+      return `<tr class="cashbook-edit-row" data-cashbook-id="${cashEscape(id)}"><td><input class="js-cashbook-name" value="${cashEscape(row.ten_so_quy||'')}" placeholder="Tên sổ quỹ"></td><td class="num blue">${fmtMoney(row.tong_thu)}</td><td class="num red">${fmtMoney(row.tong_chi)}</td><td class="num ${balance<0?'negative':'green'}">${fmtMoney(balance)}</td><td><select class="js-cashbook-status">${cashStatusOptions(status)}</select></td><td class="cash-actions"><button type="button" class="mini-btn primary js-cashbook-save" data-id="${cashEscape(id)}">Sửa</button></td></tr>`;
+    }
+    function renderCashBooks(rows){
+      const body=document.getElementById('cashBookRows');
+      if(!body)return;
+      const dataRows=(rows||[]).map(renderCashBookDataRow).join('');
+      if(!rows.length){
+        body.innerHTML=renderCashBookAddRow()+`<tr><td colspan="6" class="cashbook-empty"><strong>Chưa có sổ quỹ nào.</strong>Nhập tên ở dòng đầu tiên và bấm Thêm.</td></tr>`;
+        return;
+      }
+      body.innerHTML=renderCashBookAddRow()+dataRows;
+    }
+    function readCashBookRowFields(tr){
+      if(!tr)return null;
+      const nameInput=tr.querySelector('.js-cashbook-name');
+      const statusSelect=tr.querySelector('.js-cashbook-status');
+      return{
+        ten_so_quy:(nameInput&&nameInput.value||'').trim(),
+        trang_thai:statusSelect?statusSelect.value:'active'
+      };
+    }
+    async function saveCashBookRow(id){
+      const tr=document.querySelector(`#cashBookRows tr[data-cashbook-id="${id}"]`);
+      const fields=readCashBookRowFields(tr);
+      if(!fields||!fields.ten_so_quy)return showCashBookMessage('Vui lòng nhập tên sổ quỹ.','error');
+      const prev=cashBookState.find(item=>String(item._id)===String(id));
+      if(fields.trang_thai==='inactive'&&prev&&prev.trang_thai!=='inactive'&&!confirm('Bạn có chắc muốn ngừng sử dụng sổ quỹ này? Các phiếu cũ vẫn được giữ để đối soát.'))return;
+      const btn=tr&&tr.querySelector('.js-cashbook-save');
+      if(btn)btn.disabled=true;
+      try{
+        const res=await fetch('/api/so-quy/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});
+        const result=await res.json();
+        if(!result.success)throw new Error(result.message||'Không cập nhật được sổ quỹ');
+        showCashBookMessage('Sửa thành công','success');
+        await loadCashBooks();
+        await reloadActiveCashBookDropdown();
+      }catch(error){
+        showCashBookMessage(error.message||'Không cập nhật được sổ quỹ','error');
+      }finally{
+        if(btn)btn.disabled=false;
+      }
+    }
+    async function addCashBookRow(){
+      const tr=document.querySelector('#cashBookRows tr.cashbook-add-row');
+      const fields=readCashBookRowFields(tr);
+      if(!fields||!fields.ten_so_quy)return showCashBookMessage('Vui lòng nhập tên sổ quỹ.','error');
+      const btn=tr&&tr.querySelector('.js-cashbook-add');
+      if(btn)btn.disabled=true;
+      try{
+        const res=await fetch('/api/so-quy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)});
+        const result=await res.json();
+        if(!result.success)throw new Error(result.message||'Không tạo được sổ quỹ');
+        if(tr){const nameInput=tr.querySelector('.js-cashbook-name');const statusSelect=tr.querySelector('.js-cashbook-status');if(nameInput)nameInput.value='';if(statusSelect)statusSelect.value='active'}
+        showCashBookMessage(result.message||'Thêm sổ quỹ thành công','success');
+        await loadCashBooks();
+        await reloadActiveCashBookDropdown();
+      }catch(error){
+        showCashBookMessage(error.message||'Không tạo được sổ quỹ','error');
+      }finally{
+        if(btn)btn.disabled=false;
+      }
+    }
+    async function loadCashBooks(){const body=document.getElementById('cashBookRows');if(body)body.innerHTML='<tr><td colspan="6" class="cashbook-empty">Đang tải danh sách sổ quỹ...</td></tr>';try{const res=await fetch('/api/so-quy');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được danh sách sổ quỹ');cashBookState=Array.isArray(json.data)?json.data:(json.items||[]);renderCashBooks(cashBookState)}catch(error){if(body)body.innerHTML=`<tr><td colspan="6" class="cashbook-empty"><strong>Không tải được danh sách sổ quỹ</strong>${cashEscape(error.message||'')}</td></tr>`}}
+    async function reloadActiveCashBookDropdown(){const select=document.getElementById('cashBookSelect');if(!select)return;try{const current=select.value;const res=await fetch('/api/so-quy/active');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được sổ quỹ active');const rows=Array.isArray(json.items)?json.items:[];select.innerHTML='<option value="">Chọn sổ quỹ</option>'+rows.map(row=>`<option value="${cashEscape(row._id)}">${cashEscape(row.ten_so_quy||'')}</option>`).join('');if(rows.some(row=>String(row._id)===current))select.value=current}catch(error){}}
+    function openCashBookManageModal(){document.getElementById('cashBookManageModal').classList.add('open');loadCashBooks()}
+    function closeCashBookManageModal(){document.getElementById('cashBookManageModal').classList.remove('open')}
+    document.addEventListener('click',function(event){
+      const saveBtn=event.target.closest('.js-cashbook-save');
+      if(saveBtn){event.preventDefault();saveCashBookRow(saveBtn.getAttribute('data-id'));return}
+      const addBtn=event.target.closest('.js-cashbook-add');
+      if(addBtn){event.preventDefault();addCashBookRow()}
+    });
     function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
-    function openReceiptModal(type){receiptType.value=type;receiptDate.value=nowLocal();receiptTitle.textContent=type==='thu'?'Tạo phiếu thu':'Tạo phiếu chi';categoryLabel.textContent=type==='thu'?'Loại thu':'Loại chi';objectTypeLabel.textContent=type==='thu'?'Đối tượng nộp':'Đối tượng nhận';partnerLabel.textContent=type==='thu'?'Tên người nộp':'Tên người nhận';receiptCategory.value='';receiptCategory.placeholder=type==='thu'?'Nhập loại thu':'Nhập loại chi';subjectGroup.value=type==='thu'?'khach_hang':'nha_cung_cap';syncObjectType();clearRelatedDocument();document.getElementById('receiptModal').classList.add('open')}
+    function buildDocumentTypeOptions(){const opts=receiptType.value==='thu'?thuDocOptions:chiDocOptions;documentType.innerHTML=opts.map(o=>`<option value="${o.value}">${o.label}</option>`).join('')}
+    function clearDocumentRefs(){DOC_HIDDEN_IDS.forEach(id=>{const el=document.getElementById(id);if(el)el.value=''})}
+    async function fetchRelatedDocuments(opts){
+      const preserveId=opts&&opts.preserveId||(selectedRelatedDoc&&selectedRelatedDoc._id)||documentSelect.value||'';
+      const type=documentType.value;
+      if(!type||type==='khac'){relatedDocRows=[];documentSelect.innerHTML='<option value="">Không cần chọn</option>';updateSelectedRelatedDocHint();return}
+      const group=subjectGroup.value;
+      if(group!=='khac'&&!partnerEntityId.value){relatedDocRows=[];documentSelect.innerHTML='<option value="">Chọn người nộp/nhận trước</option>';updateSelectedRelatedDocHint();return}
+      documentSelect.innerHTML='<option value="">Đang tải...</option>';
+      try{
+        const params=new URLSearchParams({loai_phieu:receiptType.value,document_type:type,nhom_doi_tuong:group,doi_tuong_entity_id:partnerEntityId.value||''});
+        const res=await fetch('/so-quy/related-documents?'+params.toString());
+        const json=await res.json();
+        if(!json.success)throw new Error(json.message||'Không tải được chứng từ');
+        relatedDocRows=Array.isArray(json.items)?json.items:[];
+        if(preserveId){selectedRelatedDoc=relatedDocRows.find(x=>x._id===preserveId)||selectedRelatedDoc}
+        renderRelatedDocuments(preserveId);
+        if(json.message&&relatedDocRows.length===0){
+          documentSelect.innerHTML='<option value="">'+cashEscape(json.message)+'</option>';
+          updateSelectedRelatedDocHint();
+        }
+      }catch(error){
+        relatedDocRows=[];
+        documentSelect.innerHTML='<option value="">'+cashEscape(error.message||'Không tải được chứng từ')+'</option>';
+        updateSelectedRelatedDocHint();
+      }
+    }
+    function onDocumentTypeChange(){clearDocumentRefs();selectedRelatedDoc=null;updateSelectedRelatedDocHint();fetchRelatedDocuments()}
+    function clearRelatedDocument(){clearDocumentRefs();selectedRelatedDoc=null;documentType.value='';relatedDocRows=[];documentSelect.innerHTML='<option value="">Chọn chứng từ</option>';updateSelectedRelatedDocHint()}
+    function openReceiptModal(type){receiptType.value=type;receiptDate.value=nowLocal();receiptTitle.textContent=type==='thu'?'Tạo phiếu thu':'Tạo phiếu chi';categoryLabel.textContent=type==='thu'?'Loại thu':'Loại chi';partnerLabel.textContent=type==='thu'?'Người nộp':'Người nhận';receiptCategory.value='';receiptCategory.placeholder=type==='thu'?'Nhập loại thu':'Nhập loại chi';subjectGroup.value=type==='thu'?'khach_hang':'nha_cung_cap';buildDocumentTypeOptions();onSubjectGroupChange();clearRelatedDocument();accountingCheck.checked=false;document.getElementById('receiptModal').classList.add('open')}
     function closeReceiptModal(){document.getElementById('receiptModal').classList.remove('open')}
-    function syncObjectType(){const group=subjectGroup.value;objectType.value=['khach_hang','nha_cung_cap'].includes(group)?group:'khac';renderPartners()}
-    function renderPartners(){const type=objectType.value;const isOther=type==='khac';let rows=[];if(type==='khach_hang')rows=customers;if(type==='nha_cung_cap')rows=suppliers;partnerSelect.innerHTML='<option value="">Tìm người nộp/nhận</option>'+rows.map(x=>`<option value="${x._id}">${x.code || ''} - ${x.name || ''} ${x.phone?'- '+x.phone:''}</option>`).join('');partnerSelect.style.display=isOther?'none':'';partnerSelect.disabled=isOther;partnerNameInput.style.display=isOther?'':'none';partnerNameInput.disabled=!isOther;partnerNameInput.placeholder=receiptType.value==='thu'?'Nhập tên người nộp':'Nhập tên người nhận'}
-    function clearRelatedDocument(){['donHangId','hoaDonId','phieuNhapId','phieuTraHangNhapId','vanDonId','khachHangId','nhaCungCapId','maChungTuGoc'].forEach(id=>document.getElementById(id).value='');documentType.value='';documentSelect.innerHTML='<option value="">Chọn chứng từ</option>'}
-    function renderRelatedDocuments(){const type=documentType.value;const rows=relatedDocs[type]||[];documentSelect.innerHTML='<option value="">Chọn chứng từ</option>'+rows.map(x=>`<option value="${x._id}">${x.code || ''} - ${x.partner || ''} - ${fmtMoney(x.amount)}</option>`).join('')}
-    function applyRelatedDocument(){['donHangId','hoaDonId','phieuNhapId','phieuTraHangNhapId','vanDonId','khachHangId','nhaCungCapId','maChungTuGoc'].forEach(id=>document.getElementById(id).value='');const type=documentType.value;const row=(relatedDocs[type]||[]).find(x=>x._id===documentSelect.value);if(!row)return;maChungTuGoc.value=row.code||'';amountInput.value=fmt(row.amount||0);if(type==='don_hang')donHangId.value=row._id;if(type==='hoa_don'){hoaDonId.value=row._id;if(row.don_hang_id)donHangId.value=row.don_hang_id}if(type==='phieu_nhap')phieuNhapId.value=row._id;if(type==='phieu_tra_hang_nhap'){phieuTraHangNhapId.value=row._id;if(row.phieu_nhap_id)phieuNhapId.value=row.phieu_nhap_id}if(type==='van_don'){vanDonId.value=row._id;if(row.don_hang_id)donHangId.value=row.don_hang_id;if(row.hoa_don_id)hoaDonId.value=row.hoa_don_id}if(row.khach_hang_id){khachHangId.value=row.khach_hang_id;subjectGroup.value='khach_hang';objectType.value='khach_hang';renderPartners();partnerSelect.value=row.khach_hang_id}if(row.nha_cung_cap_id){nhaCungCapId.value=row.nha_cung_cap_id;subjectGroup.value='nha_cung_cap';objectType.value='nha_cung_cap';renderPartners();partnerSelect.value=row.nha_cung_cap_id}}
+    function onSubjectGroupChange(){partnerSelect.value='';partnerEntityId.value='';partnerNameInput.value='';renderPartners();updateAccountingOptions();if(documentType.value)fetchRelatedDocuments()}
+    function renderPartners(){const group=subjectGroup.value;const isOther=group==='khac';const rows=partnerLists[group]||[];const partnerRow=document.querySelector('#receiptModal .partner-row');partnerSelect.innerHTML='<option value="">Chọn từ danh sách</option>'+rows.map(x=>`<option value="${x._id}" data-name="${cashEscape(x.name||'')}">${cashEscape(x.code||'')} - ${cashEscape(x.name||'')} ${x.phone?'- '+cashEscape(x.phone):''}</option>`).join('');partnerSelect.disabled=isOther;partnerSelect.style.display=isOther?'none':'';if(partnerRow)partnerRow.classList.toggle('is-manual-only',isOther);partnerNameInput.disabled=false;partnerNameInput.placeholder=receiptType.value==='thu'?'Nhập tên người nộp':'Nhập tên người nhận';partnerHint.textContent=isOther?'Chỉ nhập tay — không tạo mới danh mục.':'Chọn danh sách hoặc nhập tay.'}
+    function onPartnerChange(skipRelatedReload){
+      const opt=partnerSelect.options[partnerSelect.selectedIndex];
+      if(opt&&opt.value){partnerEntityId.value=opt.value;partnerNameInput.value=opt.getAttribute('data-name')||opt.textContent}else{partnerEntityId.value=''}
+      if(skipRelatedReload)return;
+      if(documentType.value){selectedRelatedDoc=null;updateSelectedRelatedDocHint();fetchRelatedDocuments()}
+    }
+    function relatedDocOptionLabel(x){const total=Number(x.total||0);const remain=Number(x.amount||0);return `${cashEscape(x.code||'')} - ${cashEscape(x.partner||'')} - Tổng ${fmtMoney(total)} - còn ${fmtMoney(remain)}`}
+    function renderRelatedDocuments(preserveId){
+      const type=documentType.value;
+      if(!type||type==='khac'){documentSelect.innerHTML='<option value="">Không cần chọn</option>';updateSelectedRelatedDocHint();return}
+      if(!relatedDocRows.length){documentSelect.innerHTML='<option value="">Không có chứng từ còn phát sinh</option>';updateSelectedRelatedDocHint();return}
+      documentSelect.innerHTML='<option value="">Chọn chứng từ</option>'+relatedDocRows.map(x=>`<option value="${x._id}">${relatedDocOptionLabel(x)}</option>`).join('');
+      const keepId=preserveId||(selectedRelatedDoc&&selectedRelatedDoc._id)||'';
+      if(keepId&&relatedDocRows.some(x=>x._id===keepId))documentSelect.value=keepId;
+      updateSelectedRelatedDocHint();
+    }
+    function updateSelectedRelatedDocHint(){
+      const el=document.getElementById('selectedRelatedDocHint');
+      if(!el)return;
+      if(selectedRelatedDoc&&selectedRelatedDoc.code){
+        el.innerHTML='Đã chọn: <strong>'+cashEscape(selectedRelatedDoc.code)+'</strong> — Tổng '+fmtMoney(selectedRelatedDoc.total||0)+', còn '+fmtMoney(selectedRelatedDoc.amount||0);
+        el.style.display='';
+      }else{
+        el.textContent='';
+        el.style.display='none';
+      }
+    }
+    function setPartnerFromDoc(row){
+      if(!row||!row.nhom)return;
+      const sameGroup=subjectGroup.value===row.nhom;
+      const sameEntity=String(partnerEntityId.value||'')===String(row.entity_id||'');
+      if(sameGroup&&sameEntity)return;
+      subjectGroup.value=row.nhom;
+      renderPartners();
+      if(row.entity_id){partnerSelect.value=row.entity_id;onPartnerChange(true)}else if(row.partner){partnerEntityId.value='';partnerNameInput.value=row.partner}
+    }
+    function applyRelatedDocument(){
+      const type=documentType.value;
+      const selectedId=documentSelect.value;
+      if(!selectedId){selectedRelatedDoc=null;clearDocumentRefs();amountInput.value=fmt(0);updateSelectedRelatedDocHint();return}
+      const row=relatedDocRows.find(x=>x._id===selectedId);
+      if(!row)return;
+      selectedRelatedDoc=row;
+      clearDocumentRefs();
+      maChungTuGoc.value=row.code||'';
+      amountInput.value=fmt(row.amount||0);
+      if(type==='don_hang')donHangId.value=row._id;
+      if(type==='hoa_don')hoaDonId.value=row._id;
+      if(type==='phieu_nhap')phieuNhapId.value=row._id;
+      if(type==='phieu_tra_hang_nhap')phieuTraHangNhapId.value=row._id;
+      if(type==='phieu_tra_hang')phieuTraHangId.value=row._id;
+      if(type==='van_don')vanDonId.value=row._id;
+      if(type==='bang_luong')bangLuongId.value=row._id;
+      if(type==='ct_bang_luong')ctBangLuongId.value=row._id;
+      setPartnerFromDoc(row);
+      documentSelect.value=selectedId;
+      updateSelectedRelatedDocHint();
+    }
+    function updateAccountingOptions(){const group=subjectGroup.value;const canDebt=['khach_hang','nha_cung_cap'].includes(group);accountingWrap.classList.toggle('is-disabled',!canDebt);accountingCheck.disabled=!canDebt;if(!canDebt)accountingCheck.checked=false}
     function formatAmount(input){input.value=fmt(String(input.value||'').replace(/\./g,''))}
+    // TODO: cleanup dead showReceipt (alert + modal) — active handler is assigned below (inline panel).
     async function showReceipt(id){const item=receipts.find(x=>x._id===id);if(!item)return;try{const res=await fetch('/so-quy/'+id+'/detail');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được phiếu');const receipt=json.data.receipt||{};const rows=(json.data.items||[]).map(row=>`- ${(row.hang_hoa_id&&row.hang_hoa_id.ma_hang)||''} ${(row.hang_hoa_id&&row.hang_hoa_id.ten_hang)||''}: ${fmt(row.so_luong||0)} x ${fmt(row.don_gia_nhap||0)}`).join('\n');alert(`${item.ma_phieu}\n${item.loai_thu_chi || (item.loai_phieu==='thu'?'Phiếu thu':'Phiếu chi')}\nSổ quỹ: ${item.so_quy}\nNhà cung cấp: ${(receipt.nha_cung_cap_id&&receipt.nha_cung_cap_id.ten_ncc)||item.doi_tuong||''}\nPhiếu nhập: ${(receipt.phieu_nhap_id&&receipt.phieu_nhap_id.ma_phieu_nhap)||item.chung_tu||''}\nGiá trị: ${fmt(item.gia_tri)}\nGhi chú: ${item.ghi_chu||''}${rows?'\n\nHàng trong phiếu nhập:\n'+rows:''}`)}catch(error){alert(error.message||'Không tải được phiếu')}}
     function escapeHtml(value){return String(value ?? '').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
     function closeReceiptDetailModal(){document.getElementById('receiptDetailModal').classList.remove('open')}
     showReceipt=async function(id){const item=receipts.find(x=>x._id===id);if(!item)return;try{const res=await fetch('/so-quy/'+id+'/detail');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được phiếu');const receipt=json.data.receipt||{};const allocations=Array.isArray(receipt.allocations)?receipt.allocations:[];const rows=(json.data.items||[]).map(row=>`<div>- ${escapeHtml((row.hang_hoa_id&&row.hang_hoa_id.ma_hang)||'')} ${escapeHtml((row.hang_hoa_id&&row.hang_hoa_id.ten_hang)||'')}: ${fmt(row.so_luong||0)} x ${fmt(row.don_gia_nhap||0)}</div>`).join('');const allocationHtml=allocations.length?`<div class="receipt-allocation-note">Phiếu chi tự động được gắn với ${allocations.length} phiếu nhập hàng</div><table class="receipt-allocation-table"><thead><tr><th>Mã phiếu</th><th class="num">Giá trị chi</th><th class="num">Nợ trước</th><th class="num">Nợ sau</th></tr></thead><tbody>${allocations.map(row=>{const pn=row.phieu_nhap_id||{};const pnId=pn._id||row.phieu_nhap_id||'';const code=row.ma_phieu_nhap||(pn&&pn.ma_phieu_nhap)||'--';const link=pnId?`<a class="ref-link" href="/nhap-hang/${encodeURIComponent(String(pnId))}">${escapeHtml(code)}</a>`:escapeHtml(code);return `<tr><td>${link}</td><td class="num">${fmt(row.so_tien||0)}</td><td class="num">${fmt(row.con_no_truoc||0)}</td><td class="num">${fmt(row.con_no_sau||0)}</td></tr>`}).join('')}</tbody></table>`:'';document.getElementById('receiptDetailTitle').textContent=item.ma_phieu||'Chi tiết phiếu';document.getElementById('receiptDetailBody').innerHTML=`<div class="receipt-detail-grid"><span>Loại phiếu</span><b>${escapeHtml(item.loai_thu_chi || (item.loai_phieu==='thu'?'Phiếu thu':'Phiếu chi'))}</b><span>Sổ quỹ</span><b>${escapeHtml(item.so_quy||'')}</b><span>Nhà cung cấp</span><b>${escapeHtml((receipt.nha_cung_cap_id&&receipt.nha_cung_cap_id.ten_ncc)||item.doi_tuong||'')}</b><span>Phiếu nhập</span><b>${escapeHtml((receipt.phieu_nhap_id&&receipt.phieu_nhap_id.ma_phieu_nhap)||item.chung_tu||'')}</b><span>Giá trị</span><b>${fmt(item.gia_tri)}</b><span>Ghi chú</span><b>${escapeHtml(item.ghi_chu||'')}</b></div>${allocationHtml}${!allocationHtml&&rows?'<div class="receipt-allocation-note">Hàng trong phiếu nhập</div>'+rows:''}`;document.getElementById('receiptDetailModal').classList.add('open')}catch(error){alert(error.message||'Không tải được phiếu')}}
-    function formatReceiptDate(value){if(!value)return'';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}
+    function formatReceiptDate(value){if(!value)return'';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleDateString('vi-VN')}
+    function applyCashTimeFilter(clear){
+      const form=document.querySelector('form.page');
+      if(!form)return;
+      let timeTypeInput=form.querySelector('input[name="time_type"]');
+      if(!timeTypeInput){timeTypeInput=document.createElement('input');timeTypeInput.type='hidden';timeTypeInput.name='time_type';form.appendChild(timeTypeInput)}
+      const dateFrom=form.querySelector('input[name="date_from"]');
+      const dateTo=form.querySelector('input[name="date_to"]');
+      if(clear){
+        timeTypeInput.value='';
+        if(dateFrom)dateFrom.value='';
+        if(dateTo)dateTo.value='';
+        form.submit();
+        return;
+      }
+      const mode=form.querySelector('input[name="time_mode"]:checked')?.value||'all';
+      if(mode==='this_month'){
+        timeTypeInput.value='this_month';
+        if(dateFrom)dateFrom.value='';
+        if(dateTo)dateTo.value='';
+      }else if(mode==='custom'){
+        timeTypeInput.value='';
+      }else{
+        timeTypeInput.value='';
+        if(dateFrom)dateFrom.value='';
+        if(dateTo)dateTo.value='';
+      }
+      form.submit();
+    }
+    (function initCashTimeFilter(){
+      const btn=document.getElementById('cashTimeFilterBtn');
+      const panel=document.getElementById('cashTimeFilterPanel');
+      const applyBtn=document.getElementById('cashTimeFilterApply');
+      const clearBtn=document.getElementById('cashTimeFilterClear');
+      if(!btn||!panel)return;
+      btn.addEventListener('click',function(event){
+        event.stopPropagation();
+        panel.classList.toggle('is-open');
+      });
+      if(applyBtn)applyBtn.addEventListener('click',function(){applyCashTimeFilter(false)});
+      if(clearBtn)clearBtn.addEventListener('click',function(){applyCashTimeFilter(true)});
+      document.addEventListener('click',function(event){
+        if(panel.contains(event.target)||btn.contains(event.target))return;
+        panel.classList.remove('is-open');
+      });
+    })();
     function cashGroupLabel(value){return({khach_hang:'Khách hàng',nha_cung_cap:'Nhà cung cấp',doi_tac_giao_hang:'Đối tác giao hàng',nhan_vien:'Nhân viên',khac:'Khác'}[value]||'Khác')}
     function cashPayLabel(value){return({tien_mat:'Tiền mặt',chuyen_khoan:'Chuyển khoản',vi_dien_tu:'Ví điện tử',khac:'Khác'}[value]||'Tiền mặt')}
     function closeInlineReceiptDetail(){document.querySelectorAll('.receipt-inline-row').forEach(row=>row.remove());document.querySelectorAll('.receipt-inline-main-row').forEach(row=>row.classList.remove('is-open'))}
-    function buildReceiptAllocationRows(allocations){if(!allocations.length)return'<div class="receipt-inline-note">Phiếu chi này chưa có bảng phân bổ phiếu nhập.</div>';return `<div class="receipt-inline-allocation"><div class="receipt-inline-allocation-title">Phiếu chi tự động được gắn với ${allocations.length} phiếu nhập hàng</div><table><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th class="num">Giá trị phiếu</th><th class="num">Đã thu trước</th><th class="num">Giá trị thu</th><th>Trạng thái</th></tr></thead><tbody>${allocations.map(row=>{const pn=row.phieu_nhap_id||{};const pnId=pn._id||row.phieu_nhap_id||'';const code=row.ma_phieu_nhap||(pn&&pn.ma_phieu_nhap)||'--';const total=Number(pn.can_tra_ncc||pn.tong_tien||0)||Number(row.con_no_truoc||0)+Number(row.so_tien||0);const paidBefore=Math.max(0,total-Number(row.con_no_truoc||0));const status=Number(row.con_no_sau||0)<=0?'Đã thanh toán':'Còn nợ';const link=pnId?`<a class="receipt-inline-link ref-link" href="/nhap-hang/${encodeURIComponent(String(pnId))}">${escapeHtml(code)}</a>`:escapeHtml(code);return `<tr><td>${link}</td><td>${formatReceiptDate(pn.ngay_nhap||pn.created_at)}</td><td class="num">${fmt(total)}</td><td class="num">${fmt(paidBefore)}</td><td class="num">${fmt(row.so_tien||0)}</td><td>${status}</td></tr>`}).join('')}</tbody></table></div>`}
+    function openReceiptPrint(id){if(!id)return;window.open('/so-quy/'+encodeURIComponent(String(id))+'/in-tong-hop','_blank')}
+    function receiptDocId(doc){if(!doc)return'';if(typeof doc==='string')return String(doc);return doc._id?String(doc._id):''}
+    function receiptDocHref(type,id){const safeId=String(id||'').trim();if(!safeId)return'';const map={order:'/don-hang?order=',invoice:'/don-hang/hoa-don?invoice=',purchase:'/nhap-hang?purchase=',supplier_return:'/tra-hang-nhap/',phieu_tra_hang_nhap:'/tra-hang-nhap/',customer_return:'/don-hang/tra-hang/',phieu_tra_hang:'/don-hang/tra-hang/',shipment:'/don-hang/van-don/',van_don:'/don-hang/van-don/',payroll:'/bang-luong/',bang_luong:'/bang-luong/'};const base=map[type];return base?base+encodeURIComponent(safeId):''}
+    function receiptDocLink(type,id,code){const label=escapeHtml(code||'—');const href=receiptDocHref(type,id);return href?`<a class="receipt-inline-link ref-link" href="${href}">${label}</a>`:label}
+    function relDocObject(doc){return doc&&typeof doc==='object'?doc:null}
+    function relMoneyCell(value){if(value==null||value===''||Number.isNaN(Number(value)))return '—';return fmtMoney(Math.abs(Number(value)||0))}
+    function relTextCell(value){const text=String(value??'').trim();return text?escapeHtml(text):'—'}
+    function relPartnerLabel(entity){if(!entity)return '';const name=String(entity.ten_khach_hang||entity.ten_ncc||entity.ten_doi_tac||entity.ten_nhan_vien||'').trim();const code=String(entity.ma_khach_hang||entity.ma_ncc||entity.ma_doi_tac||entity.ma_nhan_vien||'').trim();if(name&&code)return name+' ('+code+')';return name||code}
+    function receiptPayAmount(receipt,override){const v=override!=null?override:receipt.gia_tri;return Math.abs(Number(v)||0)}
+    function paidBeforeFromTotal(docTotal,paidTotal,receiptAmount){const total=Number(docTotal||0);const paid=Number(paidTotal||0);const pay=receiptPayAmount({gia_tri:receiptAmount},receiptAmount);if(total<=0&&paid<=0)return null;if(paid>pay)return paid-pay;if(paid>0&&pay>=paid)return 0;return paid>0?paid:null}
+    function getRelatedDocumentLink(type,docId){return receiptDocHref(type,docId)}
+    function formatDocStatusLabel(value){const key=String(value||'').trim();if(!key)return '—';const map={partial:'Thanh toán một phần',paid:'Đã thanh toán',unpaid:'Chưa thanh toán',draft:'Phiếu tạm',completed:'Hoàn thành',cancelled:'Đã hủy',processing:'Đang xử lý',shipping:'Đang giao hàng',failed:'Không giao được',done:'Hoàn thành',merged:'Đã gộp',calculated:'Đã tính lương',locked:'Đã khóa',khong_cod:'Không COD',chua_thu:'Chưa thu COD',da_thu:'Đã thu COD',da_doi_soat:'Đã đối soát COD',active:'Đang hoạt động',inactive:'Ngừng hoạt động'};return map[key]||key}
+    function getRelatedDocumentStatus(type,doc,remainAfter,docTotal){const remain=remainAfter!=null&&!Number.isNaN(Number(remainAfter))?Number(remainAfter):null;if(remain!=null){if(remain<=0)return 'Đã thanh toán';const total=Number(docTotal||0);if(total>0&&remain>0&&remain<total)return 'Thanh toán một phần';if(remain>0)return 'Còn nợ'}const d=relDocObject(doc);if(!d)return '—';if(type==='shipment'&&d.trang_thai_cod)return formatDocStatusLabel(d.trang_thai_cod);if(d.trang_thai)return formatDocStatusLabel(d.trang_thai);return '—'}
+    function buildRelatedDocumentRows(receipt){
+      const rows=[];
+      const defaultReceiptValue=receiptPayAmount(receipt);
+      const allocations=Array.isArray(receipt.allocations)?receipt.allocations:[];
+      const pushRow=(row)=>rows.push(row);
+      if(allocations.length){
+        allocations.forEach(alloc=>{
+          const pn=relDocObject(alloc.phieu_nhap_id)||{};
+          const pnId=receiptDocId(pn)||receiptDocId(alloc.phieu_nhap_id);
+          const code=String(alloc.ma_phieu_nhap||pn.ma_phieu_nhap||'').trim();
+          const docVal=Number(pn.can_tra_ncc||pn.tong_tien||0)||(Number(alloc.con_no_truoc||0)+Number(alloc.so_tien||0))||null;
+          let paidBefore=null;
+          if(alloc.con_no_truoc!=null&&docVal>0)paidBefore=Math.max(0,docVal-Number(alloc.con_no_truoc||0));
+          else if(pn.da_tra_ncc!=null)paidBefore=paidBeforeFromTotal(docVal,pn.da_tra_ncc,Number(alloc.so_tien||0));
+          pushRow({type:'purchase',typeLabel:'Phiếu nhập',code,docId:pnId,docDate:pn.ngay_nhap||pn.created_at,partner:relPartnerLabel(pn.nha_cung_cap_id),docValue:docVal,paidBefore,receiptValue:Number(alloc.so_tien||0),remainAfter:alloc.con_no_sau!=null?Number(alloc.con_no_sau):null,status:getRelatedDocumentStatus('purchase',pn,alloc.con_no_sau,docVal)});
+        });
+        return rows;
+      }
+      const hd=relDocObject(receipt.hoa_don_id);
+      if(hd){
+        const docVal=Number(hd.thanh_toan||hd.tong_tien||0)||null;
+        pushRow({type:'invoice',typeLabel:'Hóa đơn',code:hd.ma_hoa_don,docId:receiptDocId(hd),docDate:hd.ngay_ban,partner:relPartnerLabel(hd.khach_hang_id),docValue:docVal,paidBefore:null,receiptValue:defaultReceiptValue,remainAfter:null,status:getRelatedDocumentStatus('invoice',hd)});
+      }
+      const dh=relDocObject(receipt.don_hang_id);
+      if(dh){
+        const docVal=Number(dh.tong_thanh_toan||dh.tong_tien||dh.khach_can_tra||0)||null;
+        const paid=Number(dh.khach_thanh_toan||0);
+        pushRow({type:'order',typeLabel:'Đơn hàng',code:dh.ma_don_hang,docId:receiptDocId(dh),docDate:dh.ngay_dat,partner:relPartnerLabel(dh.khach_hang_id),docValue:docVal,paidBefore:paid>0?paid:null,receiptValue:defaultReceiptValue,remainAfter:dh.khach_can_tra!=null?Math.max(0,Number(dh.khach_can_tra||0)-defaultReceiptValue):null,status:getRelatedDocumentStatus('order',dh)});
+      }
+      const pn=relDocObject(receipt.phieu_nhap_id);
+      if(pn){
+        const docVal=Number(pn.can_tra_ncc||pn.tong_tien||0)||null;
+        pushRow({type:'purchase',typeLabel:'Phiếu nhập',code:pn.ma_phieu_nhap,docId:receiptDocId(pn),docDate:pn.ngay_nhap,partner:relPartnerLabel(pn.nha_cung_cap_id),docValue:docVal,paidBefore:paidBeforeFromTotal(docVal,pn.da_tra_ncc,defaultReceiptValue),receiptValue:defaultReceiptValue,remainAfter:pn.con_no_ncc!=null?Number(pn.con_no_ncc):null,status:getRelatedDocumentStatus('purchase',pn,pn.con_no_ncc,docVal)});
+      }
+      const pth=relDocObject(receipt.phieu_tra_hang_id);
+      if(pth){
+        const docVal=Number(pth.tong_tien_tra||0)||null;
+        pushRow({type:'customer_return',typeLabel:'Phiếu trả hàng',code:pth.ma_phieu_tra,docId:receiptDocId(pth),docDate:pth.ngay_tra,partner:relPartnerLabel(pth.khach_hang_id),docValue:docVal,paidBefore:null,receiptValue:defaultReceiptValue,remainAfter:pth.can_tra_khach!=null?Number(pth.can_tra_khach):null,status:getRelatedDocumentStatus('customer_return',pth)});
+      }
+      const ptn=relDocObject(receipt.phieu_tra_hang_nhap_id);
+      if(ptn){
+        const docVal=Number(ptn.tong_tien_tra||ptn.ncc_can_tra||0)||null;
+        pushRow({type:'supplier_return',typeLabel:'Phiếu trả hàng nhập',code:ptn.ma_phieu_tra_nhap,docId:receiptDocId(ptn),docDate:ptn.ngay_tra,partner:relPartnerLabel(ptn.nha_cung_cap_id),docValue:docVal,paidBefore:Number(ptn.ncc_da_tra||0)>0?Number(ptn.ncc_da_tra):null,receiptValue:defaultReceiptValue,remainAfter:null,status:getRelatedDocumentStatus('supplier_return',ptn)});
+      }
+      const vd=relDocObject(receipt.van_don_id);
+      if(vd){
+        const partner=vd.doi_tac_giao_hang_id?relPartnerLabel(vd.doi_tac_giao_hang_id):relPartnerLabel(vd.khach_hang_id);
+        pushRow({type:'shipment',typeLabel:'Vận đơn/COD',code:vd.ma_van_don,docId:receiptDocId(vd),docDate:vd.created_at,partner,docValue:Number(vd.cod_amount||0)||null,paidBefore:null,receiptValue:defaultReceiptValue,remainAfter:null,status:getRelatedDocumentStatus('shipment',vd)});
+      }
+      const bl=relDocObject(receipt.bang_luong_id);
+      if(bl){
+        pushRow({type:'payroll',typeLabel:'Bảng lương',code:bl.ma_bang_luong||bl.ten_bang_luong,docId:receiptDocId(bl),docDate:bl.tu_ngay||bl.created_at,partner:'',docValue:Number(bl.tong_luong||0)||null,paidBefore:Number(bl.da_tra_nhan_vien||0)>0?Number(bl.da_tra_nhan_vien):null,receiptValue:defaultReceiptValue,remainAfter:bl.con_can_tra!=null?Number(bl.con_can_tra):null,status:getRelatedDocumentStatus('payroll',bl)});
+      }
+      const ct=relDocObject(receipt.ct_bang_luong_id);
+      if(ct){
+        const blParent=relDocObject(ct.bang_luong_id);
+        const nv=relDocObject(ct.nhan_vien_id);
+        pushRow({type:'payroll',typeLabel:'Chi tiết bảng lương',code:ct.ma_nhan_vien||(blParent&&blParent.ma_bang_luong),docId:receiptDocId(blParent)||receiptDocId(ct),docDate:ct.tu_ngay||ct.den_ngay,partner:nv?relPartnerLabel(nv):String(ct.ten_nhan_vien||''),docValue:Number(ct.tong_luong||0)||null,paidBefore:Number(ct.da_tra||0)>0?Number(ct.da_tra):null,receiptValue:defaultReceiptValue,remainAfter:ct.con_can_tra!=null?Number(ct.con_can_tra):null,status:getRelatedDocumentStatus('payroll',ct)});
+      }
+      if(!rows.length&&String(receipt.ma_chung_tu_goc||'').trim()){
+        pushRow({type:'',typeLabel:'Chứng từ khác',code:receipt.ma_chung_tu_goc,docId:'',docDate:receipt.ngay_lap,partner:relTextCell(receipt.doi_tuong),docValue:null,paidBefore:null,receiptValue:defaultReceiptValue,remainAfter:null,status:'Chứng từ nhập tay'});
+      }
+      return rows;
+    }
+    function buildRelatedDocumentTable(receipt){
+      const rows=buildRelatedDocumentRows(receipt);
+      if(!rows.length)return '<div class="receipt-related-docs-empty">Phiếu này chưa gắn chứng từ liên quan.</div>';
+      const head='<thead><tr><th>Loại chứng từ</th><th>Mã chứng từ</th><th>Ngày chứng từ</th><th>Đối tượng</th><th class="num">Giá trị phiếu này</th><th class="num">Còn lại sau phiếu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>';
+      const body=rows.map(row=>{
+        const codeCell=row.docId?receiptDocLink(row.type,row.docId,row.code||'—'):relTextCell(row.code||'—');
+        const href=getRelatedDocumentLink(row.type,row.docId);
+        const action=href?`<a class="receipt-inline-link ref-link" href="${href}">Xem</a>`:'—';
+        return `<tr><td>${relTextCell(row.typeLabel)}</td><td>${codeCell}</td><td>${row.docDate?relTextCell(formatReceiptDate(row.docDate)):'—'}</td><td>${relTextCell(row.partner)}</td><td class="num">${relMoneyCell(row.receiptValue)}</td><td class="num">${relMoneyCell(row.remainAfter)}</td><td>${relTextCell(row.status)}</td><td>${action}</td></tr>`;
+      }).join('');
+      return `<div class="receipt-inline-allocation"><div class="receipt-inline-allocation-title">Chứng từ liên quan</div><div class="receipt-related-docs-scroll"><table class="receipt-related-docs-table">${head}<tbody>${body}</tbody></table></div></div>`;
+    }
+    function buildReceiptRelatedDocumentsSection(receipt){return buildRelatedDocumentTable(receipt)}
     function buildReceiptOverpayment(receipt){const amount=Number(receipt.overpayment_amount||0);if(amount<=0)return'';return `<div class="receipt-inline-note"><strong>Trả dư / ứng trước NCC:</strong> ${fmt(amount)}</div>`}
-    showReceipt=async function(id){const item=receipts.find(x=>x._id===id);if(!item)return;const mainRow=document.querySelector(`tr.receipt-main-row[data-receipt-id="${id}"]`);if(mainRow&&mainRow.classList.contains('is-open')){closeInlineReceiptDetail();return}try{const res=await fetch('/so-quy/'+id+'/detail');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được phiếu');const receipt=json.data.receipt||{};const allocations=Array.isArray(receipt.allocations)?receipt.allocations:[];closeInlineReceiptDetail();if(!mainRow)return;mainRow.classList.add('receipt-inline-main-row','is-open');const detailRow=document.createElement('tr');detailRow.className='receipt-inline-row';detailRow.innerHTML=`<td colspan="8"><div class="receipt-inline-panel"><span class="receipt-inline-tab">Thông tin</span><div class="receipt-inline-head"><div><div class="receipt-inline-title">${item.loai_phieu==='chi'?'Phiếu chi':'Phiếu thu'} <span>${escapeHtml(item.ma_phieu||'')}</span><span class="receipt-inline-badge">${receipt.trang_thai==='cancelled'?'Đã hủy':'Đã thanh toán'}</span><span class="receipt-inline-badge ${receipt.hach_toan?'':'no-account'}">${receipt.hach_toan?'Hạch toán':'Không hạch toán'}</span></div><div class="receipt-inline-meta"><span>Người tạo: ${escapeHtml((receipt.nguoi_tao_id&&(receipt.nguoi_tao_id.ho_ten||receipt.nguoi_tao_id.email))||'')}</span><span>Người chi: ${escapeHtml((receipt.nguoi_tao_id&&(receipt.nguoi_tao_id.ho_ten||receipt.nguoi_tao_id.email))||'')}</span><span>Thời gian: ${formatReceiptDate(receipt.ngay_lap)}</span></div></div><div>${escapeHtml((receipt.cua_hang_id&&receipt.cua_hang_id.ten_cua_hang)||'Cửa hàng trung tâm')}</div></div><div class="receipt-inline-fields"><div class="receipt-inline-field"><span>Số tiền</span><b>${item.loai_phieu==='chi'?'-':''}${fmt(item.gia_tri)}</b></div><div class="receipt-inline-field"><span>Loại chi</span><b>${escapeHtml(item.loai_thu_chi||'')}</b></div><div class="receipt-inline-field"><span>Đối tượng nhận</span><b>${cashGroupLabel(receipt.nhom_doi_tuong)}</b></div><div class="receipt-inline-field"><span>Phương thức thanh toán</span><b>${cashPayLabel(receipt.phuong_thuc_thanh_toan)}</b></div></div><div class="receipt-inline-field"><span>Người nhận</span><b>${escapeHtml((receipt.nha_cung_cap_id&&(receipt.nha_cung_cap_id.ten_ncc||receipt.nha_cung_cap_id.ma_ncc))||item.doi_tuong||'')}</b></div>${buildReceiptAllocationRows(allocations)}<div class="receipt-inline-actions"><span><i class="fa-regular fa-pen-to-square"></i> ${escapeHtml(receipt.ghi_chu||'Chưa có ghi chú')}</span><div><button class="btn btn-light" type="button">In</button></div></div></div></td>`;mainRow.insertAdjacentElement('afterend',detailRow)}catch(error){alert(error.message||'Không tải được phiếu')}}
+    function toNumber(value){return Math.max(0,Number(value)||0)}
+    function resolveReceiptPaymentDetail(receipt,item){
+      const source=receipt||item||{};
+      const detail=source.chi_tiet_thanh_toan||{};
+      let tienMat=toNumber(detail.tien_mat);
+      let chuyenKhoan=toNumber(detail.chuyen_khoan);
+      let tienTraKhach=toNumber(detail.tien_tra_khach);
+      const giaTri=toNumber(source.gia_tri!=null?source.gia_tri:item?.gia_tri);
+      const phuongThuc=source.phuong_thuc_thanh_toan||item?.phuong_thuc_thanh_toan||'';
+      if(tienMat+chuyenKhoan<=0&&giaTri>0){
+        if(phuongThuc==='chuyen_khoan')chuyenKhoan=giaTri;
+        else if(phuongThuc==='tien_mat')tienMat=giaTri;
+      }
+      const tongChiTiet=tienMat+chuyenKhoan;
+      const giaTriRong=tongChiTiet-tienTraKhach;
+      const lechGiaTri=tongChiTiet>0&&Math.abs(giaTriRong-giaTri)>0.5;
+      return{tienMat,chuyenKhoan,tienTraKhach,giaTri,tongChiTiet,giaTriRong,lechGiaTri,hasDetail:tongChiTiet>0||tienTraKhach>0};
+    }
+    function buildReceiptPaymentBreakdown(receipt,item){
+      const loaiPhieu=(receipt&&receipt.loai_phieu)||item.loai_phieu||'thu';
+      const p=resolveReceiptPaymentDetail(receipt,item);
+      if(!p.hasDetail)return'';
+      const isThu=loaiPhieu==='thu';
+      const tongLabel=isThu?'Tổng khách đưa':'Tổng thanh toán';
+      const rongLabel=isThu?'Thực thu':'Giá trị ròng';
+      const warn=p.lechGiaTri?'<div class="receipt-payment-detail-warn">⚠ Tổng chi tiết sau trả khách đang lệch với giá trị phiếu.</div>':'';
+      return`<div class="receipt-payment-detail"><div class="receipt-payment-detail-title">Chi tiết thanh toán</div><div class="receipt-payment-detail-row"><span>Tiền mặt</span><b>${fmtMoney(p.tienMat)}</b></div><div class="receipt-payment-detail-row"><span>Chuyển khoản</span><b>${fmtMoney(p.chuyenKhoan)}</b></div><div class="receipt-payment-detail-row"><span>Tiền trả khách</span><b>${fmtMoney(p.tienTraKhach)}</b></div><div class="receipt-payment-detail-row"><span>${tongLabel}</span><b>${fmtMoney(p.tongChiTiet)}</b></div><div class="receipt-payment-detail-row"><span>${rongLabel}</span><b>${fmtMoney(p.giaTriRong)}</b></div>${warn}</div>`;
+    }
+    showReceipt=async function(id){const item=receipts.find(x=>x._id===id);if(!item)return;const mainRow=document.querySelector(`tr.receipt-main-row[data-receipt-id="${id}"]`);if(mainRow&&mainRow.classList.contains('is-open')){closeInlineReceiptDetail();return}try{const res=await fetch('/so-quy/'+id+'/detail');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được phiếu');const receipt=json.data.receipt||{};closeInlineReceiptDetail();if(!mainRow)return;mainRow.classList.add('receipt-inline-main-row','is-open');const detailRow=document.createElement('tr');detailRow.className='receipt-inline-row';detailRow.innerHTML=`<td colspan="9"><div class="receipt-inline-panel"><span class="receipt-inline-tab">Thông tin</span><div class="receipt-inline-head"><div><div class="receipt-inline-title">${item.loai_phieu==='chi'?'Phiếu chi':'Phiếu thu'} <span>${escapeHtml(item.ma_phieu||'')}</span><span class="receipt-inline-badge">${receipt.trang_thai==='cancelled'?'Đã hủy':'Đã thanh toán'}</span><span class="receipt-inline-badge ${receipt.hach_toan?'':'no-account'}">${receipt.hach_toan?'Hạch toán':'Không hạch toán'}</span></div><div class="receipt-inline-meta"><span>Người tạo: ${escapeHtml((receipt.nguoi_tao_id&&(receipt.nguoi_tao_id.ho_ten||receipt.nguoi_tao_id.email))||'')}</span><span>Người chi: ${escapeHtml((receipt.nguoi_tao_id&&(receipt.nguoi_tao_id.ho_ten||receipt.nguoi_tao_id.email))||'')}</span><span>Thời gian: ${formatReceiptDate(receipt.ngay_lap)}</span></div></div><div>${escapeHtml((receipt.cua_hang_id&&receipt.cua_hang_id.ten_cua_hang)||'Cửa hàng trung tâm')}</div></div><div class="receipt-inline-fields"><div class="receipt-inline-field"><span>Số tiền</span><b class="${item.loai_phieu==='chi'?'red':'blue'}">${fmtMoney(receipt.gia_tri!=null?receipt.gia_tri:item.gia_tri)}</b></div><div class="receipt-inline-field"><span>Loại phiếu</span><b>${escapeHtml((item.loai_phieu==='chi'?'Phiếu chi':'Phiếu thu')+(item.loai_thu_chi?(' — '+item.loai_thu_chi):''))}</b></div><div class="receipt-inline-field"><span>Đối tượng nhận</span><b>${cashGroupLabel(receipt.nhom_doi_tuong)}</b></div><div class="receipt-inline-field"><span>Phương thức thanh toán</span><b>${cashPayLabel(receipt.phuong_thuc_thanh_toan)}</b></div></div>${buildReceiptPaymentBreakdown(receipt,item)}<div class="receipt-inline-field"><span>Người nhận</span><b>${escapeHtml((receipt.nha_cung_cap_id&&(receipt.nha_cung_cap_id.ten_ncc||receipt.nha_cung_cap_id.ma_ncc))||item.doi_tuong||'')}</b></div>${buildReceiptRelatedDocumentsSection(receipt)}<div class="receipt-inline-actions"><span><i class="fa-regular fa-pen-to-square"></i> ${escapeHtml(receipt.ghi_chu||'Chưa có ghi chú')}</span><div><button class="btn btn-light" type="button" onclick="event.stopPropagation();openReceiptPrint('${escapeHtml(String(id))}')">In</button></div></div></div></td>`;mainRow.insertAdjacentElement('afterend',detailRow)}catch(error){alert(error.message||'Không tải được phiếu')}}
     document.addEventListener('click',function(event){const row=event.target.closest('tr.receipt-main-row[data-receipt-id]');if(!row)return;if(event.target.closest('input,select,textarea,button,a.ref-link'))return;event.preventDefault();showReceipt(row.getAttribute('data-receipt-id'))})
-    async function saveReceipt(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());data.gia_tri=String(data.gia_tri||'').replace(/\./g,'').replace(/,/g,'');const selected=partnerSelect.options[partnerSelect.selectedIndex];if(!partnerSelect.disabled&&selected&&!data.doi_tuong)data.doi_tuong=selected.textContent;const res=await fetch('/so-quy/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await res.json();if(!result.success)return alert(result.message||'Không tạo được phiếu');location.reload()}
+    async function saveReceipt(e){e.preventDefault();const data=Object.fromEntries(new FormData(e.target).entries());if(!data.so_quy_id)return alert('Vui lòng chọn sổ quỹ.');data.gia_tri=String(data.gia_tri||'').replace(/\./g,'').replace(/,/g,'');if(Number(data.gia_tri||0)<=0)return alert('Số tiền phải lớn hơn 0.');const group=data.nhom_doi_tuong;data.doi_tuong_entity_id=partnerEntityId.value||'';data.doi_tuong=String(data.doi_tuong||'').trim();if(group==='khac'){data.doi_tuong_entity_id='';if(!data.doi_tuong)return alert('Vui lòng nhập tên người nộp/nhận.')}else if(data.doi_tuong_entity_id){if(!data.doi_tuong){const opt=partnerSelect.options[partnerSelect.selectedIndex];data.doi_tuong=(opt&&opt.getAttribute('data-name'))||''}}else if(!data.doi_tuong){return alert('Chọn từ danh sách hoặc nhập tên người nộp/nhận.')}data.hach_toan=accountingCheck.checked&&!accountingCheck.disabled;const docType=documentType.value;if(docType&&docType!=='khac'){if(selectedRelatedDoc&&Number(data.gia_tri)>Number(selectedRelatedDoc.amount||0))return alert('Số tiền không được vượt số còn lại của chứng từ ('+fmtMoney(selectedRelatedDoc.amount)+').')}DOC_HIDDEN_IDS.forEach(id=>{const field=document.getElementById(id);if(!field||!field.name)return;if(field.value)data[field.name]=field.value;else delete data[field.name]});const res=await fetch('/so-quy/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const result=await res.json();if(!result.success)return alert(result.message||'Không tạo được phiếu');location.reload()}
     document.addEventListener('DOMContentLoaded',()=>{const id=new URLSearchParams(location.search).get('receipt');if(id)showReceipt(id)})
   </script>
 </body>

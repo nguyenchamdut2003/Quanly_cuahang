@@ -1,4 +1,4 @@
-﻿<%
+<%
   const safeOrders = Array.isArray(locals.orders) ? locals.orders : [];
   const safeFilters = locals.filters || {};
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
@@ -79,7 +79,7 @@
     .delivery-confirm-head h3{margin:0;font-size:18px}.delivery-confirm-head p{margin:5px 0 0;color:#667085;font-size:13px}.delivery-confirm-close{border:0;background:transparent;font-size:24px;cursor:pointer;color:#667085}
     .delivery-confirm-body{padding:16px 20px;overflow:auto}.delivery-confirm-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}
     .delivery-confirm-table{width:100%;border-collapse:collapse}.delivery-confirm-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;text-align:left;font-size:12px;padding:0 8px}.delivery-confirm-table td{height:42px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 8px}.delivery-confirm-table input{width:86px;height:30px;border:1px solid #cfd8e3;border-radius:6px;text-align:right;padding:0 8px}.delivery-confirm-error{display:none;color:#d92d20;font-size:13px;margin:0 0 10px}.delivery-payment-due{margin-top:14px;padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;color:#0f172a;font-weight:800}.delivery-confirm-payment{display:grid;grid-template-columns:120px 160px 90px 180px;gap:10px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid #e5e9ee}.delivery-confirm-payment label{font-weight:800;font-size:13px}.delivery-confirm-payment input,.delivery-confirm-payment select{height:32px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px}.delivery-confirm-payment input{text-align:right}
-    .receipt-pay-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1350;align-items:center;justify-content:center;padding:20px}.receipt-pay-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);overflow:hidden}.receipt-pay-head,.receipt-pay-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}.receipt-pay-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}.receipt-pay-body{padding:18px 20px}.receipt-pay-due{padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;font-weight:800;margin-bottom:14px}.receipt-pay-grid{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center}.receipt-pay-grid label{font-weight:800}.receipt-pay-grid input,.receipt-pay-grid select{height:34px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px}.receipt-pay-grid input{text-align:right}
+    .receipt-pay-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1350;align-items:center;justify-content:center;padding:20px}.receipt-pay-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);overflow:hidden}.receipt-pay-head,.receipt-pay-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}.receipt-pay-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}.receipt-pay-body{padding:18px 20px}.receipt-pay-due{padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;font-weight:800;margin-bottom:14px}.po-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1350;padding:16px}.po-modal.open{display:flex}.po-modal-card{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}.po-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.po-modal-head h3{margin:0;font-size:18px}.po-modal-close{border:0;background:#fff;font-size:24px;cursor:pointer;color:#667085}.quick-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick-pay-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}.quick-pay-grid label.full{grid-column:1/-1}.quick-pay-grid input,.quick-pay-grid select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}.pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:4px 0}.pay-total-summary{font-size:13px;font-weight:600;color:#111827;padding:4px 0}.pay-summary-error{font-size:12px;color:#b45309;font-weight:600;padding:4px 0}.invoice-receipt-pay-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}.kv-btn{height:37px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 13px;color:#111827;font-size:14px;font-weight:800;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.kv-btn.primary{color:#0070f4;border-color:#0070f4}
     .locked-action-message{font-size:15px;line-height:1.5}
     .order-merge-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:1400;align-items:flex-start;justify-content:center;padding:7px 12px}
     .order-merge-modal{width:min(1200px,calc(100vw - 24px));max-height:calc(100vh - 14px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}
@@ -265,7 +265,7 @@
       <div class="delivery-confirm-head">
         <div>
           <h3 id="deliveryConfirmTitle">Xác nhận giao hàng</h3>
-          <p>Nhập số lượng giao cho từng dòng hàng còn thiếu.</p>
+          <p>Nhập số lượng giao và đơn giá giao thực tế. Hệ thống sẽ tạo hóa đơn và trừ kho khi xác nhận.</p>
         </div>
         <button type="button" class="delivery-confirm-close" onclick="closeDeliveryConfirmModal()">×</button>
       </div>
@@ -281,21 +281,29 @@
               <th class="num">Đã giao</th>
               <th class="num">Còn thiếu</th>
               <th class="num">SL giao</th>
+              <th class="num">Đơn giá giao</th>
+              <th class="num">Thành tiền</th>
             </tr>
           </thead>
           <tbody id="deliveryConfirmBody"></tbody>
         </table>
+        <div id="deliveryInvoiceTotal" class="delivery-payment-due"></div>
         <div id="deliveryPaymentDue" class="delivery-payment-due"></div>
         <div class="delivery-confirm-payment">
-          <label>Khách trả thêm</label>
-          <input id="deliveryPaidInput" value="0" inputmode="numeric" oninput="handleDeliveryPaidInput(this)">
-          <label>Phương thức</label>
-          <select id="deliveryPaymentMethod">
-            <option value="tien_mat">Tiền mặt</option>
-            <option value="chuyen_khoan">Chuyển khoản</option>
-            <option value="vi_dien_tu">Ví điện tử</option>
-            <option value="khac">Khác</option>
+          <label>Tiền mặt khách đưa</label>
+          <input id="deliveryCashInput" value="0" inputmode="numeric" oninput="refreshDeliveryPaymentSummary()">
+          <label>Chuyển khoản khách đưa</label>
+          <input id="deliveryTransferInput" value="0" inputmode="numeric" oninput="refreshDeliveryPaymentSummary()">
+          <label>Tiền thừa trả khách</label>
+          <input id="deliveryChangeInput" value="0" inputmode="numeric" oninput="refreshDeliveryPaymentSummary()">
+          <label>Sổ quỹ</label>
+          <select id="deliveryCashBookId">
+            <option value="">Chọn sổ quỹ</option>
+            <% (cashBooks || []).forEach(function(book) { %>
+              <option value="<%= book._id %>"><%= book.ten_so_quy || 'Sổ quỹ' %></option>
+            <% }) %>
           </select>
+          <div id="deliveryPaymentSummary" class="delivery-payment-due"></div>
         </div>
       </div>
       <div class="delivery-confirm-foot">
@@ -305,29 +313,31 @@
     </div>
   </div>
 
-  <div id="receiptPayOverlay" class="receipt-pay-overlay">
-    <div class="receipt-pay-modal" role="dialog" aria-labelledby="receiptPayTitle">
-      <div class="receipt-pay-head">
+  <div id="receiptPayModal" class="po-modal" role="dialog" aria-labelledby="receiptPayTitle">
+    <div class="po-modal-card">
+      <div class="po-modal-head">
         <h3 id="receiptPayTitle">Tạo phiếu thu</h3>
-        <button type="button" class="delivery-confirm-close" onclick="closeReceiptPayModal()">×</button>
+        <button type="button" class="po-modal-close" onclick="closeReceiptPayModal()">&times;</button>
       </div>
-      <div class="receipt-pay-body">
-        <div id="receiptPayDue" class="receipt-pay-due"></div>
-        <div class="receipt-pay-grid">
-          <label>Số tiền thu</label>
-          <input id="receiptPayAmount" value="0" inputmode="numeric" oninput="handleReceiptPayAmountInput(this)">
-          <label>Phương thức</label>
-          <select id="receiptPayMethod">
-            <option value="tien_mat">Tiền mặt</option>
-            <option value="chuyen_khoan">Chuyển khoản</option>
-            <option value="vi_dien_tu">Ví điện tử</option>
-            <option value="khac">Khác</option>
-          </select>
-        </div>
+      <div class="quick-pay-grid">
+        <label class="full"><span>Còn phải thu</span><div class="pay-total-readonly" id="receiptPayDue"></div></label>
+        <label><span>Tiền mặt</span><input id="receiptPayCash" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+        <label><span>Chuyển khoản</span><input id="receiptPayTransfer" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+        <label class="full"><span>Tiền trả khách</span><input id="receiptPayChange" class="vn-pay-amount" inputmode="numeric" value="" placeholder="0"></label>
+        <label class="full"><span>Tổng khách đưa</span><div class="pay-total-summary" id="receiptPayTongKhach">0 VNĐ</div></label>
+        <label class="full"><span>Thực thu</span><div class="pay-total-readonly" id="receiptPayThucThu">0 VNĐ</div></label>
+        <label class="full"><span>Còn phải thu sau thu</span><div class="pay-total-summary" id="receiptPayConLai">0 VNĐ</div></label>
+        <label class="full" id="receiptPayErrorWrap" style="display:none"><span>Lưu ý</span><div class="pay-summary-error" id="receiptPayErrors"></div></label>
+        <label class="full"><span>Sổ quỹ</span><select id="receiptPayCashBook" required>
+          <option value="">— Chọn sổ quỹ —</option>
+          <% (cashBooks || []).forEach(function(book) { %>
+            <option value="<%= book._id %>"><%= book.ten_so_quy || 'Sổ quỹ' %></option>
+          <% }) %>
+        </select></label>
       </div>
-      <div class="receipt-pay-foot">
-        <button type="button" class="btn" onclick="closeReceiptPayModal()">Bỏ qua</button>
-        <button type="button" class="btn solid" onclick="submitReceiptPayModal()">Tạo phiếu thu</button>
+      <div class="invoice-receipt-pay-foot">
+        <button type="button" class="kv-btn primary" onclick="submitReceiptPayModal()">Tạo phiếu thu</button>
+        <button type="button" class="kv-btn" onclick="closeReceiptPayModal()">Đóng</button>
       </div>
     </div>
   </div>
@@ -350,26 +360,150 @@
   <script>
     const money = value => Number(value || 0).toLocaleString('vi-VN');
     const moneyText = value => money(value) + ' VNĐ';
-    const num = value => Number(String(value || '').replace(/[^\d-]/g, '')) || 0;
+    const num = value => Number(String(value || '').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
+    const numberValue = value => num(value);
+    function applyLiveVNFormat(el) {
+      if (!el) return;
+      const start = el.selectionStart == null ? el.value.length : el.selectionStart;
+      const digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
+      const raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
+      if (!raw) { el.value = ''; return; }
+      const formatted = Number(raw).toLocaleString('vi-VN');
+      el.value = formatted;
+      let pos = formatted.length;
+      if (digitsBefore > 0) {
+        let digits = 0;
+        for (let i = 0; i < formatted.length; i++) {
+          if (/\d/.test(formatted[i])) {
+            digits++;
+            if (digits === digitsBefore) { pos = i + 1; break; }
+          }
+        }
+      } else pos = 0;
+      try { el.setSelectionRange(pos, pos); } catch (_) {}
+    }
+    function bindReceiptPayInput(el, refreshFn) {
+      if (!el || el.dataset.vnBound === '1') return;
+      el.dataset.vnBound = '1';
+      el.addEventListener('input', function() {
+        applyLiveVNFormat(el);
+        refreshFn();
+      });
+    }
     const statusLabels = { draft: 'Phiếu tạm', shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã hủy', merged: 'Đã gộp' };
     const deliveryStatusLabels = { chua_giao: 'Chưa giao', giao_mot_phan: 'Giao một phần', giao_thieu: 'Giao thiếu', giao_du: 'Giao đủ' };
     const deliveryStatusText = status => deliveryStatusLabels[status] || 'Chưa giao';
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const refAnchor = (href, text) => href ? `<a class="ref-link" href="${escapeHtml(href)}" onclick="event.stopPropagation()">${escapeHtml(text || '--')}</a>` : escapeHtml(text || '--');
+    function formatOrderLotCell(item, product) {
+      const lot = item.lo_hang_id || {};
+      if (lot.ten_lo || lot.ma_lo) {
+        const hsd = lot.han_su_dung ? ' HSD ' + new Date(lot.han_su_dung).toLocaleDateString('vi-VN') : '';
+        return (lot.ten_lo || lot.ma_lo) + hsd;
+      }
+      if (product && product.quan_ly_theo_lo) return 'Chưa chốt lô';
+      return 'Không có';
+    }
     const orderDetailCache = {};
     let pendingDeliveryOrderId = '';
     let pendingDeliveryPaymentDue = 0;
     let pendingReceiptOrderId = '';
     let pendingReceiptDue = 0;
 
-    function handleDeliveryPaidInput(input) {
-      const value = Math.min(num(input.value), pendingDeliveryPaymentDue);
-      input.value = money(value);
+    function readCustomerPaymentFields(cashId, transferId, changeId) {
+      const tien_mat = Math.max(0, numberValue(document.getElementById(cashId)?.value));
+      const chuyen_khoan = Math.max(0, numberValue(document.getElementById(transferId)?.value));
+      const tien_thua = Math.max(0, numberValue(document.getElementById(changeId)?.value));
+      const tong_khach_dua = tien_mat + chuyen_khoan;
+      const thuc_thu = Math.max(0, tong_khach_dua - tien_thua);
+      return { tien_mat, chuyen_khoan, tien_thua, tong_khach_dua, thuc_thu };
     }
 
-    function handleReceiptPayAmountInput(input) {
-      const value = Math.min(num(input.value), pendingReceiptDue);
-      input.value = money(value);
+    function validateCustomerPayment(payment, dueAmount) {
+      const errors = [];
+      if (payment.tien_thua > payment.tong_khach_dua) errors.push('Tiền trả khách không được vượt tổng khách đưa');
+      if (payment.tong_khach_dua > 0 && payment.thuc_thu <= 0) errors.push('Thực thu phải lớn hơn 0');
+      if (payment.thuc_thu > dueAmount) errors.push('Thực thu không được vượt số còn phải thu');
+      return errors;
+    }
+
+    function formatCustomerPaymentFields(cashId, transferId, changeId) {
+      const cashEl = document.getElementById(cashId);
+      const transferEl = document.getElementById(transferId);
+      const changeEl = document.getElementById(changeId);
+      if (cashEl) cashEl.value = money(numberValue(cashEl.value));
+      if (transferEl) transferEl.value = money(numberValue(transferEl.value));
+      if (changeEl) changeEl.value = money(numberValue(changeEl.value));
+    }
+
+    function renderReceiptPaySummary(payment, dueAmount) {
+      const tongEl = document.getElementById('receiptPayTongKhach');
+      const thucEl = document.getElementById('receiptPayThucThu');
+      const conEl = document.getElementById('receiptPayConLai');
+      const errWrap = document.getElementById('receiptPayErrorWrap');
+      const errEl = document.getElementById('receiptPayErrors');
+      const errors = validateCustomerPayment(payment, dueAmount);
+      if (tongEl) tongEl.textContent = moneyText(payment.tong_khach_dua);
+      if (thucEl) thucEl.textContent = moneyText(payment.thuc_thu);
+      if (conEl) conEl.textContent = moneyText(Math.max(dueAmount - payment.thuc_thu, 0));
+      if (errWrap && errEl) {
+        if (errors.length) {
+          errWrap.style.display = '';
+          errEl.textContent = errors.join('. ');
+        } else {
+          errWrap.style.display = 'none';
+          errEl.textContent = '';
+        }
+      }
+      return errors;
+    }
+    const CHANGE_RECEIPT_TYPE = 'tra_tien_thua_khach';
+    function receiptPaymentParts(receipt) {
+      const detail = receipt?.chi_tiet_thanh_toan || {};
+      return { cash: Number(detail.tien_mat || 0), transfer: Number(detail.chuyen_khoan || 0) };
+    }
+    function paymentSummaryFromReceipts(rows) {
+      return (rows || []).reduce((sum, receipt) => {
+        const amount = Math.abs(Number(receipt.gia_tri || 0));
+        if (receipt.loai_phieu === 'thu') {
+          const parts = receiptPaymentParts(receipt);
+          sum.gross += amount;
+          sum.cash += parts.cash;
+          sum.transfer += parts.transfer;
+        } else if (receipt.loai_phieu === 'chi' && receipt.loai_thu_chi === CHANGE_RECEIPT_TYPE) {
+          sum.change += amount;
+        }
+        sum.net = Math.max(0, sum.gross - sum.change);
+        return sum;
+      }, { gross: 0, cash: 0, transfer: 0, change: 0, net: 0 });
+    }
+    function buildPaymentHistoryBox(receipts, paidAmount) {
+      const summary = paymentSummaryFromReceipts(receipts);
+      if (!summary.gross && !summary.change) return '';
+      const rows = (receipts || []).map(receipt => {
+        const amount = Math.abs(Number(receipt.gia_tri || 0));
+        const parts = receiptPaymentParts(receipt);
+        const isChange = receipt.loai_phieu === 'chi' && receipt.loai_thu_chi === CHANGE_RECEIPT_TYPE;
+        const signedText = receipt.loai_phieu === 'chi' ? '-' + moneyText(amount) : moneyText(amount);
+        return `<tr><td>${refAnchor(receipt._id ? '/so-quy/phieu-thu-chi/' + receipt._id : '', receipt.ma_phieu || '')}</td><td>${escapeHtml(receipt.ngay_lap ? new Date(receipt.ngay_lap).toLocaleString('vi-VN') : '')}</td><td>${escapeHtml(receipt.nguoi_tao_id?.ho_ten || '')}</td><td>${receipt.loai_phieu === 'thu' ? moneyText(amount) : ''}</td><td>${receipt.loai_phieu === 'thu' && (parts.cash || parts.transfer) ? moneyText(parts.cash) : ''}</td><td>${receipt.loai_phieu === 'thu' && (parts.cash || parts.transfer) ? moneyText(parts.transfer) : ''}</td><td>${isChange ? moneyText(amount) : ''}</td><td>${receipt.loai_phieu === 'chi' ? 'Chi' : 'Thu'}</td><td class="num">${signedText}</td></tr>`;
+      }).join('');
+      return `<div class="delivery-box"><div class="delivery-title"><span><i class="fa-solid fa-money-bill-wave"></i> Thanh toán</span></div><div class="delivery-grid" style="margin-bottom:10px"><div class="mini-field"><label>Tổng khách đưa</label><span>${moneyText(summary.gross)}</span></div><div class="mini-field"><label>Tiền mặt</label><span>${moneyText(summary.cash)}</span></div><div class="mini-field"><label>Chuyển khoản</label><span>${moneyText(summary.transfer)}</span></div><div class="mini-field"><label>Tiền thừa trả khách</label><span>${moneyText(summary.change)}</span></div><div class="mini-field"><label>Thực thu</label><span>${moneyText(Number(paidAmount ?? summary.net))}</span></div></div><table class="items-table"><thead><tr><th>Mã phiếu</th><th>Thời gian</th><th>Người tạo</th><th>Tổng khách đưa</th><th>Tiền mặt</th><th>Chuyển khoản</th><th>Tiền thừa</th><th>Loại</th><th class="num">Tiền thu/chi</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+
+    function refreshReceiptPaySummary() {
+      const payment = readCustomerPaymentFields('receiptPayCash', 'receiptPayTransfer', 'receiptPayChange');
+      renderReceiptPaySummary(payment, pendingReceiptDue);
+    }
+
+    function refreshDeliveryPaymentSummary() {
+      formatCustomerPaymentFields('deliveryCashInput', 'deliveryTransferInput', 'deliveryChangeInput');
+      const payment = readCustomerPaymentFields('deliveryCashInput', 'deliveryTransferInput', 'deliveryChangeInput');
+      const errors = validateCustomerPayment(payment, pendingDeliveryPaymentDue);
+      document.getElementById('deliveryPaymentSummary').textContent =
+        'Tổng khách đưa: ' + moneyText(payment.tong_khach_dua) +
+        ' | Thực thu: ' + moneyText(payment.thuc_thu) +
+        ' | Còn phải thu: ' + moneyText(Math.max(pendingDeliveryPaymentDue - payment.thuc_thu, 0)) +
+        (errors.length ? ' — ' + errors.join('. ') : '');
     }
 
     async function toggleOrderDetail(id) {
@@ -398,21 +532,30 @@
     });
 
     async function loadOrderDetail(id, detailRow) {
-      const res = await fetch('/don-hang/' + id + '/detail');
-      const data = await res.json();
-      if (!data.success) return alert(data.message || 'Không tải được đơn hàng');
-      const order = data.data.order;
-      const shipment = data.data.shipment;
-      const invoice = data.data.invoice;
-      const items = data.data.items || [];
-      orderDetailCache[id] = data.data;
-      const totalGoods = items.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
-      const discount = Math.max(totalGoods - Number(order.tong_thanh_toan || order.tong_tien || 0), 0);
-      detailRow.querySelector('.order-detail').innerHTML = renderOrderDetail(order, shipment, invoice, items, totalGoods, discount);
-      detailRow.dataset.loaded = 'true';
+      const panel = detailRow.querySelector('.order-detail');
+      try {
+        const res = await fetch('/don-hang/' + id + '/detail');
+        const data = await res.json();
+        if (!data.success) {
+          panel.innerHTML = '<div class="loading-detail">' + escapeHtml(data.message || 'Không tải được đơn hàng') + '</div>';
+          return;
+        }
+        const order = data.data.order;
+        const shipment = data.data.shipment;
+        const invoice = data.data.invoice;
+        const items = data.data.items || [];
+        orderDetailCache[id] = data.data;
+        const totalGoods = items.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
+        const discount = Math.max(totalGoods - Number(order.tong_thanh_toan || order.tong_tien || 0), 0);
+        panel.innerHTML = renderOrderDetail(order, shipment, data.data.invoices || (invoice ? [invoice] : []), items, totalGoods, discount, data.data.receipts || []);
+        detailRow.dataset.loaded = 'true';
+      } catch (err) {
+        panel.innerHTML = '<div class="loading-detail">Không tải được chi tiết đơn. ' + escapeHtml(err.message || '') + '</div>';
+      }
     }
 
-    function renderOrderDetail(order, shipment, invoice, items, totalGoods, discount) {
+    function renderOrderDetail(order, shipment, invoices, items, totalGoods, discount, receipts) {
+      const invoiceList = Array.isArray(invoices) ? invoices : (invoices ? [invoices] : []);
       const customer = order.khach_hang_id || {};
       if (order.trang_thai === 'merged') {
         const mergedTarget = order.merged_to_don_hang_id
@@ -433,9 +576,11 @@
         const product = item.hang_hoa_id || {};
         const deliveryStatus = deliveryStatusLabels[item.trang_thai_giao] || deliveryStatusLabels.chua_giao;
         const attributeLabel = item.ten_thuoc_tinh || item.ten_quy_cach || '';
+        const lotName = formatOrderLotCell(item, product);
         return `<tr>
           <td>${refAnchor(product._id ? '/hang-hoa/' + product._id : '', product.ma_hang || '')}</td>
           <td>${escapeHtml(product.ten_hang || '')}</td>
+          <td>${escapeHtml(lotName)}</td>
           <td class="num">${money(item.so_luong_dat || item.so_luong || 0)}</td>
           <td class="num">${money(item.so_luong_xac_nhan || 0)}</td>
           <td class="num">${money(item.so_luong_da_giao || 0)}</td>
@@ -446,17 +591,34 @@
           <td class="num">${moneyText(item.don_gia_ban)}</td>
           <td class="num"><strong>${moneyText(item.thanh_tien)}</strong></td>
         </tr>`;
-      }).join('') || '<tr><td colspan="11" class="loading-detail">Đơn chưa có hàng hóa</td></tr>';
-      const invoiceAction = invoice
-        ? `<a class="btn solid" href="/don-hang/tra-hang/create?invoice_id=${invoice._id}"><i class="fa-solid fa-rotate-left"></i> Trả hàng</a>`
-        : `<a class="btn solid" href="/don-hang/hoa-don/create?don_hang_id=${order._id}"><i class="fa-solid fa-file-invoice-dollar"></i> Tạo hóa đơn</a>`;
-      const deliveryComplete = order.trang_thai_giao_hang === 'giao_du';
+      }).join('') || '<tr><td colspan="12" class="loading-detail">Đơn chưa có hàng hóa</td></tr>';
+      const hasLinesToDeliver = items.some(item => Number(item.so_luong_con_thieu || 0) > 0);
+      const invoiceLinks = invoiceList.length
+        ? invoiceList.map(inv => {
+            const invId = inv._id;
+            return `<a class="btn" href="/don-hang/hoa-don?invoice=${encodeURIComponent(invId)}"><i class="fa-solid fa-file-invoice"></i> ${escapeHtml(inv.ma_hoa_don || '')}</a>`;
+          }).join('')
+        : '';
+      const invoiceAction = hasLinesToDeliver
+        ? ''
+        : (invoiceList.length
+          ? invoiceLinks + `<a class="btn solid" href="/don-hang/tra-hang/create?invoice_id=${invoiceList[0]._id}"><i class="fa-solid fa-rotate-left"></i> Trả hàng</a>`
+          : '<span class="partner-hint">Chưa có hóa đơn — xác nhận giao để tạo.</span>');
       const paidAmount = Number(order.khach_thanh_toan || 0);
-      const payableAmount = Number(order.tong_thanh_toan || order.tong_tien || 0);
-      const remainingAmount = Math.max(payableAmount - paidAmount, 0);
-      const lockedBlueActions = deliveryComplete
-        ? `<button type="button" class="btn disabled-action" onclick="showLockedAction('Xử lý đơn hàng')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn disabled-action" onclick="showLockedAction('Xác nhận giao')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button><button type="button" class="btn disabled-action" onclick="showLockedAction('Tạo hóa đơn')"><i class="fa-solid fa-file-invoice-dollar"></i> Tạo hóa đơn</button>`
-        : `<button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>${invoiceAction}`;
+      const paymentHistoryBox = buildPaymentHistoryBox(receipts || [], paidAmount);
+      const hasInvoices = invoiceList.length > 0;
+      const payableAmount = hasInvoices
+        ? invoiceList.reduce((sum, inv) => sum + Number(inv.thanh_toan || 0), 0)
+        : Number(order.tong_thanh_toan || order.tong_tien || 0);
+      const remainingAmount = hasInvoices
+        ? Math.max(payableAmount - paidAmount, 0)
+        : Math.max(Number(order.khach_can_tra ?? (payableAmount - paidAmount)), 0);
+      const deliveryComplete = order.trang_thai_giao_hang === 'giao_du'
+        || (items.length > 0 && !hasLinesToDeliver);
+      const deliveryProcessActions = deliveryComplete
+        ? `<button type="button" class="btn disabled-action" onclick="showLockedAction('Xử lý đơn hàng')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn disabled-action" onclick="showLockedAction('Xác nhận giao')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>`
+        : `<button type="button" class="btn solid" onclick="updateOrderStatus('${order._id}','shipping')"><i class="fa-solid fa-truck-fast"></i> Xử lý đơn hàng</button><button type="button" class="btn solid" onclick="confirmDelivery('${order._id}')"><i class="fa-solid fa-box-open"></i> Xác nhận giao</button>`;
+      const lockedBlueActions = `${deliveryProcessActions}${invoiceAction}`;
       const receiptAction = remainingAmount > 0
         ? `<div class="totals-receipt-action"><button type="button" class="btn solid" onclick="openReceiptPayModal('${order._id}', ${remainingAmount})"><i class="fa-solid fa-money-bill-wave"></i> Tạo phiếu thu</button></div>`
         : '';
@@ -486,6 +648,7 @@
           </div>
           <div>${escapeHtml(order.cua_hang_id?.ten_cua_hang || 'Cửa hàng trung tâm')}</div>
         </div>
+        ${invoiceList.length ? `<div class="delivery-box" style="margin-bottom:8px"><div class="delivery-title"><span><i class="fa-solid fa-file-invoice"></i> Hóa đơn (${invoiceList.length}):</span></div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px">${invoiceList.map(inv => refAnchor('/don-hang/hoa-don?invoice=' + encodeURIComponent(inv._id), inv.ma_hoa_don || '')).join(' ')}</div></div>` : ''}
         <div class="delivery-box">
           <div class="delivery-title"><span><i class="fa-regular fa-hand-point-right"></i> Tự giao đến: <strong>${escapeHtml(address || 'Chưa có địa chỉ giao hàng')}</strong></span><i class="fa-solid fa-chevron-up"></i></div>
           <div class="delivery-grid">
@@ -501,7 +664,8 @@
           </div>
           <textarea class="note js-shipment-note" data-order-id="${order._id}" placeholder="Ghi chú giao...">${escapeHtml(shipment?.ghi_chu || '')}</textarea>
         </div>
-        <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th class="num">SL đặt</th><th class="num">SL xác nhận</th><th class="num">SL đã giao</th><th class="num">SL còn thiếu</th><th>Trạng thái giao</th><th>Thuộc tính</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <table class="items-table"><thead><tr><th>Mã hàng</th><th>Tên hàng</th><th>Lô</th><th class="num">SL đặt</th><th class="num">SL xác nhận</th><th class="num">SL đã giao</th><th class="num">SL còn thiếu</th><th>Trạng thái giao</th><th>Thuộc tính</th><th class="num">Giảm giá</th><th class="num">Giá bán</th><th class="num">Thành tiền</th></tr></thead><tbody>${itemRows}</tbody></table>
+        ${paymentHistoryBox}
         <div class="detail-bottom">
           <textarea class="note js-order-note" data-order-id="${order._id}" placeholder="Ghi chú...">${escapeHtml(order.ghi_chu || '')}</textarea>
           <div class="totals">
@@ -538,28 +702,42 @@
     function openReceiptPayModal(orderId, dueAmount) {
       pendingReceiptOrderId = orderId;
       pendingReceiptDue = Math.max(0, Number(dueAmount || 0));
-      document.getElementById('receiptPayDue').textContent = 'Khách còn nợ đơn hàng này: ' + moneyText(pendingReceiptDue);
-      document.getElementById('receiptPayAmount').value = money(pendingReceiptDue);
-      document.getElementById('receiptPayMethod').value = 'tien_mat';
-      document.getElementById('receiptPayOverlay').style.display = 'flex';
+      document.getElementById('receiptPayDue').textContent = moneyText(pendingReceiptDue);
+      const cashEl = document.getElementById('receiptPayCash');
+      const transferEl = document.getElementById('receiptPayTransfer');
+      const changeEl = document.getElementById('receiptPayChange');
+      if (cashEl) { cashEl.value = pendingReceiptDue > 0 ? money(pendingReceiptDue) : ''; delete cashEl.dataset.vnBound; }
+      if (transferEl) { transferEl.value = ''; delete transferEl.dataset.vnBound; }
+      if (changeEl) { changeEl.value = ''; delete changeEl.dataset.vnBound; }
+      document.getElementById('receiptPayCashBook').value = '';
+      bindReceiptPayInput(cashEl, refreshReceiptPaySummary);
+      bindReceiptPayInput(transferEl, refreshReceiptPaySummary);
+      bindReceiptPayInput(changeEl, refreshReceiptPaySummary);
+      refreshReceiptPaySummary();
+      document.getElementById('receiptPayModal').classList.add('open');
     }
 
     function closeReceiptPayModal() {
       pendingReceiptOrderId = '';
       pendingReceiptDue = 0;
-      document.getElementById('receiptPayOverlay').style.display = 'none';
+      document.getElementById('receiptPayModal').classList.remove('open');
     }
 
     async function submitReceiptPayModal() {
-      const amount = num(document.getElementById('receiptPayAmount')?.value);
-      if (!pendingReceiptOrderId || amount <= 0) return alert('Vui lòng nhập số tiền thu.');
-      if (amount > pendingReceiptDue) return alert('Khách chỉ còn nợ ' + moneyText(pendingReceiptDue));
+      const payment = readCustomerPaymentFields('receiptPayCash', 'receiptPayTransfer', 'receiptPayChange');
+      const cashBookId = document.getElementById('receiptPayCashBook')?.value || '';
+      if (!pendingReceiptOrderId || payment.tong_khach_dua <= 0) return alert('Vui lòng nhập số tiền khách đưa.');
+      const errors = validateCustomerPayment(payment, pendingReceiptDue);
+      if (errors.length) return alert(errors.join('. '));
+      if (!cashBookId) return alert('Vui lòng chọn sổ quỹ.');
       const res = await fetch('/don-hang/' + pendingReceiptOrderId + '/phieu-thu', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          gia_tri: amount,
-          phuong_thuc_thanh_toan: document.getElementById('receiptPayMethod')?.value || 'tien_mat'
+          tien_mat_khach_dua: payment.tien_mat,
+          chuyen_khoan_khach_dua: payment.chuyen_khoan,
+          tien_thua_tra_khach: payment.tien_thua,
+          so_quy_id: cashBookId
         })
       });
       const data = await res.json();
@@ -572,6 +750,24 @@
       await updateOrderStatus(id, 'completed', deliveryStatus !== 'giao_du');
     }
 
+    function calcDeliveryLineTotal(row) {
+      const qty = Number(String(row.querySelector('[data-delivery-qty]')?.value || '').replace(',', '.')) || 0;
+      const price = Number(String(row.querySelector('[data-delivery-price]')?.value || '').replace(/\./g, '').replace(/,/g, '')) || 0;
+      const total = Math.max(qty * price, 0);
+      const cell = row.querySelector('[data-delivery-line-total]');
+      if (cell) cell.textContent = money(total);
+      return total;
+    }
+    function refreshDeliveryModalTotals() {
+      const rows = Array.from(document.querySelectorAll('[data-delivery-line]'));
+      const batchTotal = rows.reduce((sum, row) => sum + calcDeliveryLineTotal(row), 0);
+      const totalEl = document.getElementById('deliveryInvoiceTotal');
+      if (totalEl) totalEl.textContent = 'Tổng lần giao (ước tính): ' + moneyText(batchTotal);
+      const dueEl = document.getElementById('deliveryPaymentDue');
+      if (dueEl) dueEl.textContent = 'Khách trả thêm (tối đa theo lần giao): ' + moneyText(batchTotal);
+      pendingDeliveryPaymentDue = batchTotal;
+      refreshDeliveryPaymentSummary();
+    }
     async function confirmDelivery(id) {
       const detail = orderDetailCache[id];
       if (!detail) return alert('Vui lòng mở lại chi tiết đơn trước khi xác nhận giao.');
@@ -584,26 +780,31 @@
         if (missing <= 0) return '';
         const product = item.hang_hoa_id || {};
         const attributeLabel = item.ten_thuoc_tinh || item.ten_quy_cach || 'Không có';
+        const unitPrice = Number(item.don_gia_ban || 0);
         return `<tr data-delivery-line
           data-ct-id="${escapeHtml(item._id || '')}"
           data-product-id="${escapeHtml(product._id || item.hang_hoa_id || '')}"
-          data-lot-id="${escapeHtml(item.lo_hang_id || '')}">
+          data-lot-id="${escapeHtml(item.lo_hang_id?._id || item.lo_hang_id || '')}">
           <td>${escapeHtml(product.ma_hang || '')}</td>
           <td>${escapeHtml(product.ten_hang || '')}</td>
           <td>${escapeHtml(attributeLabel)}</td>
           <td class="num">${money(item.so_luong_dat || item.so_luong || 0)}</td>
           <td class="num">${money(item.so_luong_da_giao || 0)}</td>
           <td class="num" data-missing="${missing}">${money(missing)}</td>
-          <td class="num"><input value="${missing}" inputmode="decimal" data-delivery-qty></td>
+          <td class="num"><input value="${missing}" inputmode="decimal" data-delivery-qty oninput="refreshDeliveryModalTotals()"></td>
+          <td class="num"><input value="${money(unitPrice)}" inputmode="numeric" data-delivery-price oninput="refreshDeliveryModalTotals()"></td>
+          <td class="num" data-delivery-line-total>${money(missing * unitPrice)}</td>
         </tr>`;
       }).filter(Boolean).join('');
       if (!rows) return alert('Đơn hàng không còn dòng cần giao.');
-      pendingDeliveryPaymentDue = Math.max(Number(order.tong_thanh_toan || order.tong_tien || 0) - Number(order.khach_thanh_toan || 0), 0);
       pendingDeliveryOrderId = id;
       document.getElementById('deliveryConfirmBody').innerHTML = rows;
-      document.getElementById('deliveryPaymentDue').textContent = `Khách còn cần thanh toán: ${moneyText(pendingDeliveryPaymentDue)}`;
-      document.getElementById('deliveryPaidInput').value = '0';
-      document.getElementById('deliveryPaymentMethod').value = 'tien_mat';
+      refreshDeliveryModalTotals();
+      document.getElementById('deliveryCashInput').value = '0';
+      document.getElementById('deliveryTransferInput').value = '0';
+      document.getElementById('deliveryChangeInput').value = '0';
+      document.getElementById('deliveryCashBookId').value = '';
+      refreshDeliveryPaymentSummary();
       document.getElementById('deliveryConfirmError').style.display = 'none';
       document.getElementById('deliveryConfirmOverlay').style.display = 'flex';
     }
@@ -622,17 +823,21 @@
       const khoId = order.kho_id?._id || order.kho_id;
       const deliveryItems = Array.from(document.querySelectorAll('[data-delivery-line]')).map(row => {
         const quantity = Number(String(row.querySelector('[data-delivery-qty]')?.value || '').replace(',', '.'));
+        const donGiaGiao = num(row.querySelector('[data-delivery-price]')?.value);
         return {
           ct_don_hang_id: row.dataset.ctId,
           hang_hoa_id: row.dataset.productId,
           lo_hang_id: row.dataset.lotId || '',
-          so_luong_giao: quantity
+          so_luong_giao: quantity,
+          don_gia_giao: donGiaGiao
         };
       }).filter(item => Number.isFinite(item.so_luong_giao) && item.so_luong_giao > 0);
       if (!deliveryItems.length) return alert('Chưa có số lượng giao.');
-      const extraPaid = num(document.getElementById('deliveryPaidInput')?.value);
-      if (extraPaid > pendingDeliveryPaymentDue) {
-        return alert('Khách chỉ còn cần thanh toán ' + moneyText(pendingDeliveryPaymentDue));
+      const payment = readCustomerPaymentFields('deliveryCashInput', 'deliveryTransferInput', 'deliveryChangeInput');
+      const errors = validateCustomerPayment(payment, pendingDeliveryPaymentDue);
+      if (errors.length) return alert(errors.join('. '));
+      if (payment.tong_khach_dua > 0 && !document.getElementById('deliveryCashBookId')?.value) {
+        return alert('Vui lòng chọn sổ quỹ để thu tiền khi giao hàng.');
       }
       const res = await fetch('/don-hang/' + id + '/xac-nhan-giao', {
         method: 'PUT',
@@ -640,8 +845,10 @@
         body: JSON.stringify({
           kho_id: khoId,
           items: deliveryItems,
-          khach_thanh_toan: extraPaid,
-          phuong_thuc_thanh_toan: document.getElementById('deliveryPaymentMethod')?.value || 'tien_mat'
+          tien_mat_khach_dua: payment.tien_mat,
+          chuyen_khoan_khach_dua: payment.chuyen_khoan,
+          tien_thua_tra_khach: payment.tien_thua,
+          so_quy_id: document.getElementById('deliveryCashBookId')?.value || ''
         })
       });
       const data = await res.json();

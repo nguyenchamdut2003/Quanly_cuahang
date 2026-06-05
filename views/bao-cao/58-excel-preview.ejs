@@ -1,0 +1,67 @@
+<%
+  const model = locals.preview || {};
+  const rows = Array.isArray(model.rows) ? model.rows : [];
+  const colWidths = Array.isArray(model.colWidths) ? model.colWidths : [];
+  const colCount = model.colCount || 8;
+  const mau = locals.mau || model.sheetName || '';
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Xem trước Excel — <%= mau %></title>
+  <style>
+    *{box-sizing:border-box}
+    html,body{margin:0;height:100%}
+    body{font-family:'Times New Roman',Times,serif;background:#fff;color:#000;font-size:12pt}
+    .sheet-wrap{height:100%;overflow:auto;padding:10px 12px 16px}
+    table.excel-grid{border-collapse:collapse;table-layout:fixed;width:max-content;min-width:100%;background:#fff}
+    table.excel-grid td{border:1px solid #000;padding:4px 8px;vertical-align:middle;line-height:1.35;word-break:break-word}
+    table.excel-grid td.bold{font-weight:700}
+    table.excel-grid td.italic{font-style:italic}
+    table.excel-grid td.center{text-align:center}
+    table.excel-grid td.right{text-align:right}
+    table.excel-grid td.wrap{white-space:pre-wrap}
+    table.excel-grid tr.head-block td{border-color:#000}
+    table.excel-grid tr.col-header td{font-weight:700;text-align:center;vertical-align:middle}
+    table.excel-grid tr.data-row td{min-height:22px}
+    table.excel-grid tr.total-row td{font-weight:700}
+    .empty{padding:24px;text-align:center;color:#64748b}
+  </style>
+</head>
+<body>
+  <div class="sheet-wrap">
+    <% if (!rows.length) { %>
+      <div class="empty">Không có dữ liệu hiển thị.</div>
+    <% } else { %>
+      <table class="excel-grid">
+        <% if (colWidths.length) { %>
+          <colgroup>
+            <% colWidths.forEach(w => { %><col style="width:<%= w %>px"><% }) %>
+          </colgroup>
+        <% } %>
+        <tbody>
+          <% rows.forEach(row => {
+            const rowClass = row.rowNumber <= 4 ? 'head-block' : (row.rowNumber === 6 ? 'col-header' : (String(row.cells[0] && row.cells[0].text).toLowerCase().includes('tổng cộng') ? 'total-row' : 'data-row'));
+          %>
+            <tr class="<%= rowClass %>">
+              <% row.cells.forEach(cell => { %>
+                <td
+                  colspan="<%= cell.colSpan || 1 %>"
+                  rowspan="<%= cell.rowSpan || 1 %>"
+                  class="<%= [
+                    cell.bold ? 'bold' : '',
+                    cell.italic ? 'italic' : '',
+                    cell.align === 'center' ? 'center' : (cell.align === 'right' ? 'right' : ''),
+                    cell.wrap ? 'wrap' : ''
+                  ].filter(Boolean).join(' ') %>"
+                ><%= cell.text %></td>
+              <% }) %>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</body>
+</html>

@@ -285,8 +285,6 @@ function normalizeStorePayload(body) {
         dia_chi_chi_tiet: address.dia_chi_chi_tiet,
         tinh_thanh: address.tinh_thanh,
         tinh_thanh_id: address.tinh_thanh_id,
-        quan_huyen: address.quan_huyen,
-        quan_huyen_id: address.quan_huyen_id,
         phuong_xa: address.phuong_xa,
         phuong_xa_code: address.phuong_xa_code,
         dia_chi_day_du: address.dia_chi_day_du,

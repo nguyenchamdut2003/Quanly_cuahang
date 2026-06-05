@@ -49,8 +49,6 @@
               <option value="">Chọn phường/xã</option>
             </select>
             <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code">
-            <input type="hidden" name="quan_huyen" class="js-ghn-district-name">
-            <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id">
           </label>
           <label>
             <span>Tỉnh/thành</span>
@@ -120,7 +118,7 @@
             <input name="email" value="<%= formStore.email || '' %>" type="email">
           </label>
           <label class="span-2">
-            <span>Địa chỉ</span>
+            <span>Địa chỉ chi tiết</span>
             <input name="dia_chi_chi_tiet" value="<%= formStore.dia_chi_chi_tiet || '' %>">
           </label>
           <label>
@@ -133,8 +131,6 @@
               <% } %>
             </select>
             <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= formStore.phuong_xa_code || '' %>">
-            <input type="hidden" name="quan_huyen" class="js-ghn-district-name" value="<%= formStore.quan_huyen || '' %>">
-            <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id" value="<%= formStore.quan_huyen_id || '' %>">
           </label>
           <label>
             <span>Tỉnh/thành</span>
@@ -333,8 +329,12 @@
                               <input name="email" type="email" value="<%= selectedStore.email || '' %>">
                             </div>
                             <div>
-                              <span>Địa chỉ</span>
+                              <span>Địa chỉ chi tiết</span>
                               <input name="dia_chi_chi_tiet" value="<%= selectedStore.dia_chi_chi_tiet || '' %>">
+                            </div>
+                            <div>
+                              <span>Địa chỉ đầy đủ</span>
+                              <input value="<%= selectedStore.dia_chi_day_du || selectedStore.dia_chi || '' %>" readonly>
                             </div>
                             <div>
                               <span>Phường/xã</span>
@@ -346,8 +346,6 @@
                                 <% } %>
                               </select>
                               <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= selectedStore.phuong_xa_code || '' %>">
-                              <input type="hidden" name="quan_huyen" class="js-ghn-district-name" value="<%= selectedStore.quan_huyen || '' %>">
-                              <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id" value="<%= selectedStore.quan_huyen_id || '' %>">
                             </div>
                             <div>
                               <span>Tỉnh/thành</span>
@@ -683,15 +681,11 @@
           || null;
       }
 
-      function syncAddressHidden(container, province, ward) {
+      function syncWardHidden(container, province, ward) {
         var provinceIdInput = container.querySelector('.js-ghn-province-id');
         var wardCodeInput = container.querySelector('.js-ghn-ward-code');
-        var districtNameInput = container.querySelector('.js-ghn-district-name');
-        var districtIdInput = container.querySelector('.js-ghn-district-id');
         if (provinceIdInput) provinceIdInput.value = province ? province.province_id : '';
         if (wardCodeInput) wardCodeInput.value = ward ? ward.ward_code : '';
-        if (districtNameInput) districtNameInput.value = ward ? (ward.district_name || '') : '';
-        if (districtIdInput) districtIdInput.value = ward ? (ward.district_id || '') : '';
       }
 
       function renderProvinceSelect(select, items) {
@@ -715,8 +709,7 @@
         var selected = findByIdOrName(items, select.getAttribute('data-selected-id'), select.getAttribute('data-selected-name') || select.value, 'ward_code', 'ward_name');
         var currentName = select.getAttribute('data-selected-name') || select.value || '';
         select.innerHTML = '<option value="">Chọn phường/xã</option>' + items.map(function(item) {
-          var label = item.ward_name + (item.district_name ? ' - ' + item.district_name : '');
-          return '<option value="' + item.ward_name.replace(/"/g, '&quot;') + '" data-code="' + item.ward_code + '" data-district-id="' + item.district_id + '" data-district-name="' + String(item.district_name || '').replace(/"/g, '&quot;') + '">' + label + '</option>';
+          return '<option value="' + item.ward_name.replace(/"/g, '&quot;') + '" data-code="' + item.ward_code + '">' + item.ward_name + '</option>';
         }).join('');
         if (selected) {
           select.value = selected.ward_name;
@@ -742,9 +735,7 @@
         return option && option.getAttribute('data-code')
           ? {
             ward_code: option.getAttribute('data-code'),
-            ward_name: select.value,
-            district_id: option.getAttribute('data-district-id') || '',
-            district_name: option.getAttribute('data-district-name') || ''
+            ward_name: select.value
           }
           : null;
       }
@@ -759,11 +750,11 @@
           getGhnProvinces().then(function(provinces) {
             renderProvinceSelect(provinceSelect, provinces);
             var province = selectedProvinceFromSelect(provinceSelect);
-            syncAddressHidden(container, province, selectedWardFromSelect(wardSelect));
+            syncWardHidden(container, province, selectedWardFromSelect(wardSelect));
             if (province && wardSelect) {
               return getGhnWardsByProvince(province.province_id).then(function(wards) {
                 renderWardSelect(wardSelect, wards);
-                syncAddressHidden(container, province, selectedWardFromSelect(wardSelect));
+                syncWardHidden(container, province, selectedWardFromSelect(wardSelect));
               });
             }
           }).catch(function(error) {
@@ -779,7 +770,7 @@
               wardSelect.setAttribute('data-selected-name', '');
               refreshAddressSelect(wardSelect);
             }
-            syncAddressHidden(container, province, null);
+            syncWardHidden(container, province, null);
             if (!province || !wardSelect) return;
             getGhnWardsByProvince(province.province_id).then(function(wards) {
               renderWardSelect(wardSelect, wards);
@@ -790,7 +781,7 @@
 
           if (wardSelect) {
             wardSelect.addEventListener('change', function() {
-              syncAddressHidden(container, selectedProvinceFromSelect(provinceSelect), selectedWardFromSelect(wardSelect));
+              syncWardHidden(container, selectedProvinceFromSelect(provinceSelect), selectedWardFromSelect(wardSelect));
             });
           }
         });

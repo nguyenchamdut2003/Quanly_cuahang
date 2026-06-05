@@ -1,0 +1,30 @@
+<%
+  const meta = locals.sheetMeta || {};
+  const storeName = locals.storeName || '';
+  const storeAddress = locals.storeAddress || '';
+  const year = locals.year || '';
+  const donViTinh = locals.donViTinh || 'đồng';
+  const range = locals.range || {};
+  const mau = locals.mau || meta.mauCode || '';
+  const periodLabel = range.from && range.to
+    ? `${new Date(range.from).toLocaleDateString('vi-VN')} – ${new Date(range.to).toLocaleDateString('vi-VN')}`
+    : '........';
+%>
+<header class="tt58-sheet-header">
+  <div class="tt58-head-top">
+    <div class="tt58-unit">
+      <div><strong>Đơn vị:</strong> <%= storeName || '…………………..' %></div>
+      <% if (storeAddress) { %><div class="tt58-address"><strong>Địa chỉ:</strong> <%= storeAddress %></div><% } %>
+    </div>
+    <div class="tt58-mau-code">
+      <div class="code-label">Mẫu số <%= mau %></div>
+      <div class="code-note">(Kèm theo Thông tư số 58/2026/TT-BTC ngày 25 tháng 5 năm 2026 của Bộ trưởng Bộ Tài chính)</div>
+    </div>
+  </div>
+  <h2 class="tt58-title"><%= meta.title || mau %></h2>
+  <div class="tt58-meta-line">
+    <span><strong>Năm/Kỳ:</strong> <%= year %> (<%= periodLabel %>)</span>
+    <span><strong>Đơn vị tính:</strong> <%= donViTinh %></span>
+  </div>
+  <% if (meta.hint) { %><p class="tt58-hint"><%= meta.hint %></p><% } %>
+</header>

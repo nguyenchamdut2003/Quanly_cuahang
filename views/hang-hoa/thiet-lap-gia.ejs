@@ -150,77 +150,84 @@
           </div>
         </header>
 
-        <% var _dynCols = (selectedBangGiaOrdered || []).length; %>
-        <% var _tableColspan = 5 + _dynCols; %>
-        <div class="customer-table-wrap price-setup-table-card">
+        <% var _tableColspan = 11; %>
+        <% if (selectedBangGiaOrdered && selectedBangGiaOrdered.length > 1) { %>
+          <p class="price-setup-hint">Đang lưu giá theo lô/quy cách cho bảng giá: <strong><%= selectedBangGiaOrdered[0].ten_bang_gia || '—' %></strong>. Chọn một bảng giá để tránh nhầm lẫn.</p>
+        <% } %>
+        <div class="customer-table-wrap price-setup-table-card price-setup-table-card--wide">
           <table class="admin-table customer-table price-setup-table">
             <thead>
               <tr>
-                <th class="price-setup-col-icon" scope="col">
-                  <button type="button" class="price-setup-row-icon" disabled aria-hidden="true">🗑</button>
-                </th>
                 <th scope="col">Mã hàng</th>
                 <th scope="col">Tên hàng</th>
+                <th scope="col">Lô</th>
+                <th scope="col">Thuộc tính</th>
                 <th class="text-right" scope="col">Giá vốn</th>
                 <th class="text-right" scope="col">Giá nhập cuối</th>
-                <% (selectedBangGiaOrdered || []).forEach(function(bg) { %>
-                  <th class="text-right price-setup-col-retail" scope="col" title="<%= bg.ten_bang_gia || '' %>"><%= bg.ten_bang_gia || '—' %></th>
-                <% }) %>
+                <th class="text-right" scope="col">Giá cố định</th>
+                <th class="text-right" scope="col">Giá thị trường</th>
+                <th scope="col">Loại áp dụng</th>
+                <th scope="col">Giá mặc định</th>
+                <th scope="col">Cho sửa giá</th>
               </tr>
               <tr class="price-setup-filter-row">
-                <th class="price-setup-col-icon"></th>
                 <th>
                   <input class="price-setup-th-input" type="text" name="filterMa" placeholder="Tìm mã hàng" value="<%= filter.filterMa %>">
                 </th>
                 <th>
                   <input class="price-setup-th-input" type="text" name="filterTen" placeholder="Tìm tên hàng" value="<%= filter.filterTen %>">
                 </th>
-                <th colspan="<%= 2 + _dynCols %>" class="price-setup-filter-row-spacer"></th>
+                <th colspan="9" class="price-setup-filter-row-spacer"></th>
               </tr>
             </thead>
             <tbody>
-              <% if (!products || products.length === 0) { %>
+              <% if (!priceLines || priceLines.length === 0) { %>
                 <tr>
                   <td colspan="<%= _tableColspan %>" class="empty-cell">Chưa có dữ liệu hàng hóa phù hợp bộ lọc.</td>
                 </tr>
               <% } %>
-              <% (products || []).forEach(function(item) {
-                   var giaVon = Number(item.gia_von || 0);
-                   var giaNhap = Number(item.gia_nhap_cuoi || 0);
+              <% (priceLines || []).forEach(function(row) {
+                   var giaNhap = Number(row.gia_nhap_cuoi || 0);
                    var giaNhapDisplay = giaNhap > 0 ? giaNhap.toLocaleString('vi-VN') : '—';
-                   var ctByBang = item.ctBangGiaByBangId || {};
+                   var loHangId = row.lo_hang_id ? String(row.lo_hang_id) : '';
+                   var attrId = row.gia_tri_thuoc_tinh_id ? String(row.gia_tri_thuoc_tinh_id) : '';
               %>
-                <tr data-product-id="<%= item._id %>">
-                  <td class="price-setup-col-icon">
-                    <button type="button" class="price-setup-row-icon" disabled title="Xóa">🗑</button>
-                  </td>
-                  <td><%- refLink('product', item, item.ma_hang || '---') %></td>
-                  <td><%= item.ten_hang || '—' %></td>
-                  <td class="text-right"><%= giaVon.toLocaleString('vi-VN') %></td>
+                <tr class="js-gia-ban-row" data-hang-hoa-id="<%= row.hang_hoa_id %>">
+                  <td><%- refLink('product', row, row.ma_hang || '---') %></td>
+                  <td><%= row.ten_hang || '—' %></td>
+                  <td><%= row.lo_label || '—' %></td>
+                  <td><%= row.ten_quy_cach || '—' %></td>
+                  <td class="text-right"><%= Number(row.gia_von || 0).toLocaleString('vi-VN') %></td>
                   <td class="text-right"><%= giaNhapDisplay %></td>
-                  <% (selectedBangGiaOrdered || []).forEach(function(bg) {
-                       var bid = String(bg._id);
-                       var cell = ctByBang[bid] || {};
-                       var giaCell = Number(cell.gia_ban || 0);
-                  %>
-                    <td class="text-right price-setup-col-retail">
-                      <input
-                        class="price-setup-price-input js-ct-bang-gia-price"
-                        type="number"
-                        min="0"
-                        step="1000"
-                        data-product-id="<%= item._id %>"
-                        data-bang-gia-id="<%= bg._id %>"
-                        value="<%= giaCell %>"
-                        aria-label="Giá <%= bg.ten_bang_gia || '' %> — <%= item.ma_hang || '' %>"
-                      >
-                    </td>
-                  <% }) %>
+                  <td class="text-right">
+                    <input class="price-setup-price-input js-gia-ban-field" type="number" min="0" step="1000" data-field="gia_co_dinh" value="<%= Number(row.gia_co_dinh || 0) %>">
+                  </td>
+                  <td class="text-right">
+                    <input class="price-setup-price-input js-gia-ban-field" type="number" min="0" step="1000" data-field="gia_thi_truong" value="<%= Number(row.gia_thi_truong || 0) %>">
+                  </td>
+                  <td>
+                    <select class="price-setup-select js-gia-ban-field" data-field="loai_ap_dung">
+                      <option value="co_dinh" <%= row.loai_ap_dung === 'co_dinh' ? 'selected' : '' %>>Cố định</option>
+                      <option value="thi_truong" <%= row.loai_ap_dung === 'thi_truong' ? 'selected' : '' %>>Thị trường</option>
+                      <option value="ca_hai" <%= row.loai_ap_dung === 'ca_hai' ? 'selected' : '' %>>Cả hai</option>
+                    </select>
+                  </td>
+                  <td>
+                    <select class="price-setup-select js-gia-ban-field" data-field="gia_mac_dinh">
+                      <option value="co_dinh" <%= row.gia_mac_dinh !== 'thi_truong' ? 'selected' : '' %>>Cố định</option>
+                      <option value="thi_truong" <%= row.gia_mac_dinh === 'thi_truong' ? 'selected' : '' %>>Thị trường</option>
+                    </select>
+                  </td>
+                  <td class="text-center">
+                    <input type="checkbox" class="js-gia-ban-field" data-field="cho_phep_sua_gia" <%= row.cho_phep_sua_gia !== false ? 'checked' : '' %>>
+                  </td>
+                  <input type="hidden" class="js-gia-ban-meta" data-lo-hang-id="<%= loHangId %>" data-gia-tri-id="<%= attrId %>" data-ten-quy-cach="<%= row.ten_quy_cach || '' %>">
                 </tr>
               <% }) %>
             </tbody>
           </table>
         </div>
+        <p class="price-setup-hint">Giá bảng giá cũ (<code>CTBangGia</code>) vẫn dùng khi chưa thiết lập giá theo lô/thuộc tính.</p>
 
         <footer class="price-setup-footer">
           <div class="price-setup-page-size">
@@ -394,34 +401,69 @@
         });
       }
 
-      document.querySelectorAll('.js-ct-bang-gia-price').forEach(function (input) {
-        input.addEventListener('change', function () {
-          var pid = input.getAttribute('data-product-id');
-          var bid = input.getAttribute('data-bang-gia-id');
-          if (!pid || !bid) return;
-          var v = parseInt(input.value, 10);
-          if (!Number.isFinite(v) || v < 0) v = 0;
-          input.disabled = true;
-          fetch('/hang-hoa/thiet-lap-gia/ct-bang-gia', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({ hang_hoa_id: pid, bang_gia_id: bid, gia_ban: v })
+      var primaryBangGiaId = <%- JSON.stringify(typeof primaryBangGiaId !== 'undefined' ? primaryBangGiaId : '') %>;
+
+      function collectGiaBanRowPayload(tr) {
+        var meta = tr.querySelector('.js-gia-ban-meta');
+        var payload = {
+          bang_gia_id: primaryBangGiaId || null,
+          hang_hoa_id: tr.getAttribute('data-hang-hoa-id'),
+          lo_hang_id: meta ? meta.getAttribute('data-lo-hang-id') || null : null,
+          gia_tri_thuoc_tinh_id: meta ? meta.getAttribute('data-gia-tri-id') || null : null,
+          ten_quy_cach: meta ? meta.getAttribute('data-ten-quy-cach') || '' : '',
+          gia_co_dinh: 0,
+          gia_thi_truong: 0,
+          loai_ap_dung: 'co_dinh',
+          gia_mac_dinh: 'co_dinh',
+          cho_phep_sua_gia: true
+        };
+        tr.querySelectorAll('.js-gia-ban-field').forEach(function (el) {
+          var field = el.getAttribute('data-field');
+          if (!field) return;
+          if (field === 'cho_phep_sua_gia') {
+            payload.cho_phep_sua_gia = !!el.checked;
+            return;
+          }
+          if (el.tagName === 'SELECT') {
+            payload[field] = el.value;
+            return;
+          }
+          var v = parseInt(el.value, 10);
+          payload[field] = Number.isFinite(v) && v >= 0 ? v : 0;
+        });
+        return payload;
+      }
+
+      function saveGiaBanRow(tr, changedEl) {
+        if (!tr) return;
+        var payload = collectGiaBanRowPayload(tr);
+        if (!payload.hang_hoa_id) return;
+        if (changedEl) changedEl.disabled = true;
+        fetch('/hang-hoa/thiet-lap-gia/gia-ban-hang-hoa', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (changedEl) changedEl.disabled = false;
+            if (data && data.success && changedEl) {
+              changedEl.classList.add('is-saved');
+              setTimeout(function () { changedEl.classList.remove('is-saved'); }, 1200);
+            }
           })
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-              input.disabled = false;
-              if (data && data.success) {
-                input.classList.add('is-saved');
-                setTimeout(function () { input.classList.remove('is-saved'); }, 1200);
-              }
-            })
-            .catch(function () {
-              input.disabled = false;
-            });
+          .catch(function () {
+            if (changedEl) changedEl.disabled = false;
+          });
+      }
+
+      document.querySelectorAll('.js-gia-ban-row').forEach(function (tr) {
+        tr.querySelectorAll('.js-gia-ban-field').forEach(function (el) {
+          el.addEventListener('change', function () { saveGiaBanRow(tr, el); });
         });
       });
 

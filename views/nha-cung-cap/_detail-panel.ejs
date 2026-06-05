@@ -35,7 +35,13 @@
                             <div><span>Tổng nợ</span>
                               <div>
                                 <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %></strong>
-                                <div class="supplier-metric-hint">Tự động tính từ phiếu nhập</div>
+                                <div class="supplier-metric-hint">Tự động tính từ sổ công nợ NCC</div>
+                              </div>
+                            </div>
+                            <div><span>Đã thanh toán</span>
+                              <div>
+                                <strong class="supplier-metric-readonly"><%= Number(selectedSupplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></strong>
+                                <div class="supplier-metric-hint">Tổng mua − Tổng nợ (hoặc từ sổ thanh toán)</div>
                               </div>
                             </div>
                             <div><span>Tổng mua</span>
@@ -54,10 +60,28 @@
             <div class="supplier-detail-field-full"><span>Ghi chú</span><input name="ghi_chu" value="<%= selectedSupplier.ghi_chu || '' %>"></div>
                           </div>
                           </form>
-        <div class="supplier-pane-actions">
-          <button class="btn btn-danger btn-sm" type="submit" form="supplierInlineDel_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
-          <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
-        </div>
+    <div class="supplier-detail-footer">
+      <a
+        class="btn btn-primary btn-sm"
+        href="/nha-cung-cap/<%= selectedSupplier._id %>/export/hoa-don-gop"
+        target="_blank"
+        rel="noopener"
+      >Xuất chi tiết SP (hóa đơn gộp)</a>
+      <a
+        class="btn btn-light btn-sm"
+        href="/nha-cung-cap/<%= selectedSupplier._id %>/export/hang-hoa"
+        target="_blank"
+        rel="noopener"
+      >Xuất danh mục hàng</a>
+      <a
+        class="btn btn-light btn-sm"
+        href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
+        target="_blank"
+        rel="noopener"
+      >Xuất thông tin</a>
+      <button class="btn btn-danger btn-sm" type="submit" form="supplierInlineDel_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
+      <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>" onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
+    </div>
                           </div>
 
                           <div class="detail-pane" data-detail-pane="address">
@@ -256,10 +280,27 @@
               type="button"
               data-modal-id="supplierDiscountModal_<%= selectedSupplier._id %>"
             >Chiết khấu thanh toán</button>
-            <a
-              class="btn btn-primary btn-sm"
-              href="/nha-cung-cap/<%= selectedSupplier._id %>/export/debt"
-            >Xuất công nợ</a>
+            <button
+              type="button"
+              class="btn btn-primary btn-sm js-debt-export-trigger"
+              data-export-kind="both"
+              data-export-base="/nha-cung-cap/<%= selectedSupplier._id %>/export/debt"
+              data-extra-qs="<%= filterQueryString || '' %>"
+            >Xuất công nợ</button>
+            <button
+              type="button"
+              class="btn btn-light btn-sm js-debt-export-trigger"
+              data-export-kind="quan-tri"
+              data-export-base="/nha-cung-cap/<%= selectedSupplier._id %>/export/debt"
+              data-extra-qs="<%= filterQueryString || '' %>"
+            >Quản trị</button>
+            <button
+              type="button"
+              class="btn btn-light btn-sm js-debt-export-trigger"
+              data-export-kind="doi-tac"
+              data-export-base="/nha-cung-cap/<%= selectedSupplier._id %>/export/debt"
+              data-extra-qs="<%= filterQueryString || '' %>"
+            >Gửi đối tác</button>
           </div>
         </div>
         <div class="supplier-pane-table-wrap table-wrap">
@@ -351,7 +392,7 @@
                         <option value="">Chưa có sổ quỹ</option>
                       <% } %>
                       <% (cashBooks || []).forEach(function(cashBook) { %>
-                        <option value="<%= cashBook._id %>"><%= cashBook.ten_so_quy || cashBook.loai || 'Sổ quỹ' %></option>
+                        <option value="<%= cashBook._id %>"><%= cashBook.ten_so_quy || 'Sổ quỹ' %></option>
                       <% }) %>
                     </select>
                   </label>
@@ -568,12 +609,5 @@
                         </div>
 
                         <form id="supplierInlineDel_<%= selectedSupplier._id %>" method="post" action="/nha-cung-cap/<%= selectedSupplier._id %>/delete" style="display:none" aria-hidden="true"></form>
-    <div class="supplier-detail-footer">
-                          <a
-                            class="btn btn-primary btn-sm supplier-detail-export-link"
-                            href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info"
-                            data-supplier-id="<%= selectedSupplier._id %>"
-                          >Xuất thông tin</a>
-                        </div>
                       </div>
 </div>

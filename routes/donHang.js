@@ -33,7 +33,12 @@ const {
 } = require('../models/kiot.model');
 const { congTonKho, truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
-const { taoPhieuThuChi, ensureDefaultSoQuy } = require('../services/soQuy.service');
+const { taoPhieuThuChi, taoPhieuThuKhachHang } = require('../services/soQuy.service');
+const {
+    normalizeCustomerPaymentInput,
+    computeNetPaidFromReceiptRows,
+    receiptRowsForNetPaidFilter
+} = require('../utils/customerPayment');
 const { createCustomerDebtTransaction } = require('../services/customerDebt.service');
 const {
     buildVariantKey,
@@ -41,6 +46,39 @@ const {
 } = require('../services/availability.service');
 const { normalizeAddress } = require('../utils/address');
 const { resolveStoreId } = require('../utils/storeScope');
+const { resolveSalePrice, normalizeUnitPrice } = require('../services/salePrice.service');
+
+async function resolveOrderLineUnitPrice(item, product, bangGiaId, storeId) {
+    const resolved = await resolveSalePrice({
+        hang_hoa_id: product._id,
+        bang_gia_id: bangGiaId,
+        product,
+        cua_hang_id: storeId,
+        lo_hang_id: item.lo_hang_id,
+        gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+        ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh,
+        loai_gia_ban: item.loai_gia_ban
+    });
+
+    const manualRaw = Number(item.don_gia_ban ?? item.don_gia);
+    const hasManual = Number.isFinite(manualRaw) && manualRaw >= 0
+        && item.don_gia_ban !== ''
+        && item.don_gia_ban != null;
+
+    if (resolved.cho_phep_sua_gia === false) {
+        if (hasManual && normalizeUnitPrice(manualRaw) !== normalizeUnitPrice(resolved.gia_ban)) {
+            return {
+                error: 'Không được thay đổi đơn giá cho dòng hàng này (đã khóa sửa giá).'
+            };
+        }
+        return { unitPrice: resolved.gia_ban, resolved };
+    }
+
+    return {
+        unitPrice: hasManual ? normalizeUnitPrice(manualRaw) : resolved.gia_ban,
+        resolved
+    };
+}
 
 router.use(isAuthenticated);
 
@@ -420,7 +458,148 @@ function exportAddress(customer, shipment) {
 }
 
 function exportLotName(lot) {
-    return lot ? (lot.ma_lo || lot.ten_lo || '') : '';
+    return lot ? (lot.ten_lo || lot.ma_lo || '') : '';
+}
+
+function exportInvoiceLotName(detail) {
+    const allocs = Array.isArray(detail?.lot_allocations)
+        ? detail.lot_allocations.filter(row => Number(row.so_luong) > 0)
+        : [];
+    if (allocs.length) {
+        return allocs.map(row => formatLotAllocationLabel(row)).join(', ');
+    }
+    return exportLotName(detail?.lo_hang_id);
+}
+
+function formatLotDisplay(lot) {
+    if (!lot) return '';
+    const label = lot.ten_lo || lot.ma_lo || '';
+    const expiry = lot.han_su_dung
+        ? 'HSD ' + new Date(lot.han_su_dung).toLocaleDateString('vi-VN')
+        : '';
+    return [label, expiry].filter(Boolean).join(' - ');
+}
+
+function formatLotAllocationLabel(alloc) {
+    if (!alloc) return '';
+    const name = alloc.ten_lo || alloc.ma_lo || '';
+    const expiry = alloc.han_su_dung
+        ? ' HSD ' + new Date(alloc.han_su_dung).toLocaleDateString('vi-VN')
+        : '';
+    return `${name}${expiry} - SL ${Number(alloc.so_luong || 0)}`;
+}
+
+function formatInvoiceLotText(item, product) {
+    const allocs = Array.isArray(item.lot_allocations)
+        ? item.lot_allocations.filter(row => Number(row.so_luong) > 0)
+        : [];
+    if (allocs.length) {
+        return allocs.map(formatLotAllocationLabel).filter(Boolean).join(', ');
+    }
+    const lot = item.lo_hang_id;
+    if (lot && typeof lot === 'object' && (lot.ten_lo || lot.ma_lo)) {
+        return formatLotDisplay(lot);
+    }
+    if (product?.quan_ly_theo_lo === false) return 'Không có';
+    return 'Không có';
+}
+
+function formatOrderLotText(item, product) {
+    const lot = item.lo_hang_id;
+    if (lot && typeof lot === 'object' && (lot.ten_lo || lot.ma_lo)) {
+        return lot.ten_lo || lot.ma_lo || '';
+    }
+    if (product?.quan_ly_theo_lo) return 'Chưa chốt lô';
+    return 'Không có';
+}
+
+function applyLotAllocationsToInvoiceLine(allocations) {
+    const rows = Array.isArray(allocations)
+        ? allocations.filter(row => Number(row.so_luong) > 0 && row.lo_hang_id)
+        : [];
+    return {
+        lot_allocations: rows,
+        lo_hang_id: rows.length === 1 ? rows[0].lo_hang_id : null
+    };
+}
+
+async function restoreStockLine(khoId, line, options = {}) {
+    const qty = Number(line.so_luong || 0);
+    if (!qty || !khoId || !line.hang_hoa_id) return;
+
+    const base = {
+        kho_id: khoId,
+        hang_hoa_id: line.hang_hoa_id,
+        ten_quy_cach: line.ten_quy_cach || line.ten_thuoc_tinh || '',
+        gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id || undefined,
+        sync_quy_cach: Boolean(line.gia_tri_thuoc_tinh_id || line.ten_quy_cach || line.ten_thuoc_tinh),
+        nguoi_tao_id: options.nguoi_tao_id,
+        loai_phieu: options.loai_phieu,
+        ma_phieu: options.ma_phieu,
+        ghi_chu: options.ghi_chu
+    };
+
+    const allocs = Array.isArray(line.lot_allocations)
+        ? line.lot_allocations.filter(row => Number(row.so_luong) > 0 && row.lo_hang_id)
+        : [];
+
+    if (allocs.length) {
+        for (const alloc of allocs) {
+            await congTonKho({
+                ...base,
+                lo_hang_id: alloc.lo_hang_id,
+                so_luong: Number(alloc.so_luong || 0)
+            });
+        }
+        return;
+    }
+
+    await congTonKho({
+        ...base,
+        lo_hang_id: line.lo_hang_id || undefined,
+        so_luong: qty
+    });
+}
+
+function returnStockLineKey(row) {
+    const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
+    const lotId = row.lo_hang_id?._id || row.lo_hang_id || '';
+    if (invoiceLineId && lotId) return `${invoiceLineId}::${lotId}`;
+    if (invoiceLineId) return String(invoiceLineId);
+    return legacyReturnLineKey(row);
+}
+
+function expandReturnableInvoiceItems(items) {
+    const expanded = [];
+    for (const item of items) {
+        const object = item && typeof item.toObject === 'function' ? item.toObject() : { ...item };
+        const allocs = Array.isArray(object.lot_allocations)
+            ? object.lot_allocations.filter(row => Number(row.so_luong) > 0 && row.lo_hang_id)
+            : [];
+
+        if (allocs.length > 1) {
+            for (const alloc of allocs) {
+                expanded.push({
+                    ...object,
+                    lo_hang_id: alloc.lo_hang_id,
+                    lo_hang_display: formatLotAllocationLabel(alloc),
+                    lot_allocations: [alloc],
+                    so_luong: Number(alloc.so_luong || 0),
+                    _return_from_multi_lot: true
+                });
+            }
+            continue;
+        }
+
+        if (allocs.length === 1) {
+            object.lo_hang_id = allocs[0].lo_hang_id;
+            object.lo_hang_display = formatLotAllocationLabel(allocs[0]);
+            object.lot_allocations = allocs;
+            object.so_luong = Number(alloc.so_luong || object.so_luong || 0);
+        }
+        expanded.push(object);
+    }
+    return expanded;
 }
 
 function buildOrderExportRow(order, detail, shipment) {
@@ -824,7 +1003,7 @@ function buildInvoiceExportRow(invoice, detail, shipment, paidAmount, debtAmount
         thuong_hieu: product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu || '' : '',
         nhom_hang: product.nhom_hang_id ? product.nhom_hang_id.ten_nhom_hang || '' : '',
         don_vi_tinh: product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi || product.don_vi_tinh_id.ma_don_vi || '' : '',
-        lo_hang: exportLotName(detail?.lo_hang_id),
+        lo_hang: exportInvoiceLotName(detail),
         so_luong: quantity,
         don_gia: detail ? Number(detail.don_gia || 0) : 0,
         chiet_khau: detail ? Number(detail.chiet_khau || 0) : 0,
@@ -868,14 +1047,12 @@ async function loadInvoiceExportData(filter) {
             }).populate('doi_tac_giao_hang_id').lean()
             : [],
         (invoiceIds.length || orderIds.length)
-            ? PhieuThuChi.find({
-                loai_phieu: 'thu',
-                trang_thai: { $ne: 'cancelled' },
+            ? PhieuThuChi.find(receiptRowsForNetPaidFilter({
                 $or: [
                     { hoa_don_id: { $in: invoiceIds } },
                     { don_hang_id: { $in: orderIds } }
                 ]
-            }).lean()
+            })).lean()
             : [],
         invoiceIds.length
             ? CongNoKhachHang.find({ hoa_don_id: { $in: invoiceIds } }).lean()
@@ -902,12 +1079,17 @@ async function loadInvoiceExportData(filter) {
         if (orderId) map[orderId] = String(invoice._id);
         return map;
     }, {});
-    const paidMap = receipts.reduce((map, row) => {
+    const paidRowsByInvoice = receipts.reduce((map, row) => {
         const key = row.hoa_don_id
             ? String(row.hoa_don_id)
             : orderToInvoiceId[String(row.don_hang_id || '')];
         if (!key) return map;
-        map[key] = (map[key] || 0) + Number(row.gia_tri || 0);
+        if (!map[key]) map[key] = [];
+        map[key].push(row);
+        return map;
+    }, {});
+    const paidMap = Object.entries(paidRowsByInvoice).reduce((map, [key, rows]) => {
+        map[key] = computeNetPaidFromReceiptRows(rows);
         return map;
     }, {});
     const debtMap = debts.reduce((map, row) => {
@@ -929,7 +1111,7 @@ async function sendInvoiceWorkbook(res, filename, invoices, detailMap, shipmentM
         const shipment = shipmentMap[String(invoice._id)] || null;
         const paid = paidMap[String(invoice._id)] || 0;
         const payable = Number(invoice.thanh_toan || invoice.tong_tien || 0);
-        const debt = debtMap[String(invoice._id)] != null ? debtMap[String(invoice._id)] : Math.max(0, payable - paid);
+        const debt = Math.max(0, payable - paid);
         if (!details.length) {
             worksheet.addRow(buildInvoiceExportRow(invoice, null, shipment, paid, debt));
             return;
@@ -1230,14 +1412,6 @@ function normalizeDiscount(value, type, baseAmount) {
     return Math.min(amount, base);
 }
 
-async function resolveSalePrice(product, priceBookId) {
-    if (priceBookId && /^[0-9a-fA-F]{24}$/.test(String(priceBookId))) {
-        const row = await CTBangGia.findOne({ bang_gia_id: priceBookId, hang_hoa_id: product._id }).lean();
-        if (row && Number(row.gia_ban || 0) > 0) return Number(row.gia_ban || 0);
-    }
-    return Number(product.gia_co_dinh || 0) || 0;
-}
-
 async function getSellableStock(khoId, product) {
     if (!product?.quan_ly_theo_lo) {
         const stock = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: product._id }).lean();
@@ -1393,19 +1567,439 @@ function normalizePaymentMethodValue(value) {
     return 'tien_mat';
 }
 
+function resolveCashBookIdFromBody(body = {}) {
+    const id = String(body.so_quy_id || body.cashBookId || body.cash_book_id || '').trim();
+    return /^[0-9a-fA-F]{24}$/.test(id) ? id : '';
+}
+
 function isEnabled(value) {
     return value === true || value === 'true' || value === 'on' || value === '1';
 }
 
 async function getOrderPaidAmount(orderId, extraFilter = {}) {
     if (!orderId) return 0;
-    const receipts = await PhieuThuChi.find({
+    const receipts = await PhieuThuChi.find(
+        receiptRowsForNetPaidFilter({ don_hang_id: orderId, ...extraFilter })
+    ).select('loai_phieu loai_thu_chi gia_tri trang_thai').lean();
+    return computeNetPaidFromReceiptRows(receipts);
+}
+
+async function getInvoicePaidAmount(invoiceId, extraFilter = {}) {
+    if (!invoiceId) return 0;
+    const receipts = await PhieuThuChi.find(
+        receiptRowsForNetPaidFilter({ hoa_don_id: invoiceId, ...extraFilter })
+    ).select('loai_phieu loai_thu_chi gia_tri trang_thai').lean();
+    return computeNetPaidFromReceiptRows(receipts);
+}
+
+function parseCustomerPaymentFromRequest(body, soTienConPhaiThu, requirePayment = false) {
+    return normalizeCustomerPaymentInput(body || {}, {
+        so_tien_con_phai_thu: soTienConPhaiThu,
+        requirePayment
+    });
+}
+
+async function recordCustomerPaymentReceipts(data, payment) {
+    if (!payment || payment.tong_khach_dua <= 0) {
+        return { thu: null, chi: null };
+    }
+    return taoPhieuThuKhachHang(Object.assign({}, data, { payment }));
+}
+
+/** Tổng phải thu / đã thu / còn nợ đơn: theo HĐ active nếu đã có HĐ, không thì theo tổng đơn gốc. */
+async function computeOrderPaymentBalance(orderId, orderFallback = {}) {
+    const invoices = await HoaDonBanHang.find({
         don_hang_id: orderId,
-        loai_phieu: 'thu',
-        trang_thai: { $ne: 'cancelled' },
-        ...extraFilter
-    }).select('gia_tri').lean();
-    return receipts.reduce((sum, row) => sum + Number(row.gia_tri || 0), 0);
+        trang_thai: { $ne: 'cancelled' }
+    }).select('thanh_toan').lean();
+    const tong_da_thu = await getOrderPaidAmount(orderId);
+    const tong_phai_thu = invoices.length
+        ? invoices.reduce((sum, row) => sum + Number(row.thanh_toan || 0), 0)
+        : Number(orderFallback.tong_thanh_toan || orderFallback.tong_tien || 0);
+    return {
+        tong_phai_thu,
+        tong_da_thu,
+        khach_thanh_toan: tong_da_thu,
+        khach_can_tra: Math.max(tong_phai_thu - tong_da_thu, 0)
+    };
+}
+
+async function applyOrderPaymentBalance(order, orderId = order?._id) {
+    const balance = await computeOrderPaymentBalance(orderId, order);
+    order.khach_thanh_toan = balance.khach_thanh_toan;
+    order.khach_can_tra = balance.khach_can_tra;
+    return balance;
+}
+
+/** Danh sách HĐ còn nợ (theo thứ tự tạo) và tổng còn nợ. */
+async function getOrderInvoiceDebtSummary(orderId) {
+    const invoices = await HoaDonBanHang.find({
+        don_hang_id: orderId,
+        trang_thai: { $ne: 'cancelled' }
+    })
+        .sort({ created_at: 1 })
+        .lean();
+    let totalRemaining = 0;
+    const openInvoices = [];
+    for (const inv of invoices) {
+        const paidOnInvoice = await getInvoicePaidAmount(inv._id);
+        const remaining = Math.max(Number(inv.thanh_toan || 0) - paidOnInvoice, 0);
+        if (remaining > 0) {
+            totalRemaining += remaining;
+            openInvoices.push({ invoice: inv, remaining, paidOnInvoice });
+        }
+    }
+    return { invoices, openInvoices, totalRemaining };
+}
+
+function formatStockQty(value) {
+    const number = Number(value || 0);
+    return Number.isInteger(number)
+        ? number.toLocaleString('vi-VN')
+        : number.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+}
+
+function deliveryStockKey(row) {
+    return [
+        String(row.kho_id || ''),
+        String(row.hang_hoa_id || ''),
+        String(row.lo_hang_id || ''),
+        String(row.gia_tri_thuoc_tinh_id || ''),
+        String(row.ten_quy_cach || '').trim()
+    ].join('|');
+}
+
+function sortStockLotsFefo(a, b) {
+    const aLot = a.lo_hang_id;
+    const bLot = b.lo_hang_id;
+    const aDate = aLot && aLot.han_su_dung ? new Date(aLot.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
+    const bDate = bLot && bLot.han_su_dung ? new Date(bLot.han_su_dung).getTime() : Number.MAX_SAFE_INTEGER;
+    if (aDate !== bDate) return aDate - bDate;
+    return new Date(a.updated_at || a.created_at || 0).getTime() - new Date(b.updated_at || b.created_at || 0).getTime();
+}
+
+function isSellableStockLot(lot) {
+    if (!lot || lot.trang_thai === 'huy') return false;
+    if (!lot.han_su_dung) return true;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(lot.han_su_dung);
+    expiry.setHours(0, 0, 0, 0);
+    return expiry.getTime() >= today.getTime();
+}
+
+function isExpiredStockLot(lot) {
+    if (!lot || !lot.han_su_dung) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiry = new Date(lot.han_su_dung);
+    expiry.setHours(0, 0, 0, 0);
+    return expiry.getTime() < today.getTime();
+}
+
+function stockShortageMessage(row) {
+    const parts = [
+        row.ten_hang || row.ma_hang,
+        row.ten_quy_cach
+    ].filter(Boolean);
+    const location = [
+        row.kho_ten ? `kho ${row.kho_ten}` : '',
+        row.lo_ten ? `lô ${row.lo_ten}` : ''
+    ].filter(Boolean).join(', ');
+    const label = `${parts.join(' - ')}${location ? ` (${location})` : ''}`;
+    return `${label}: Cần giao ${formatStockQty(row.so_luong_can)}, tồn có thể giao ${formatStockQty(row.so_luong_ton)}.`;
+}
+
+async function getSellableLotStockRows(khoId, hangHoaId, loHangId) {
+    const filter = {
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId,
+        so_luong: { $gt: 0 }
+    };
+    if (loHangId) filter.lo_hang_id = loHangId;
+    const rows = await TonKhoLo.find(filter)
+        .populate('lo_hang_id')
+        .lean();
+    return rows.filter(row => isSellableStockLot(row.lo_hang_id)).sort(sortStockLotsFefo);
+}
+
+async function getSellableLotQuantity(khoId, hangHoaId, loHangId) {
+    const rows = await getSellableLotStockRows(khoId, hangHoaId, loHangId);
+    return rows.reduce((sum, row) => {
+        const lotQty = Number(row.so_luong || 0);
+        const lotRemain = row.lo_hang_id ? Number(row.lo_hang_id.so_luong_con_lai ?? lotQty) : lotQty;
+        return sum + Math.max(Math.min(lotQty, lotRemain), 0);
+    }, 0);
+}
+
+async function getSellableQuyCachQuantity(khoId, hangHoaId, tenQuyCach, loHangId) {
+    const filter = {
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId,
+        so_luong: { $gt: 0 },
+        $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
+    };
+    if (loHangId) filter.lo_hang_id = loHangId;
+    const qcRows = await TonKhoLoQuyCach.find(filter)
+        .populate('lo_hang_id')
+        .lean();
+    const lotIds = qcRows.map(row => row.lo_hang_id?._id || row.lo_hang_id).filter(Boolean);
+    const lotStocks = lotIds.length
+        ? await TonKhoLo.find({ kho_id: khoId, hang_hoa_id: hangHoaId, lo_hang_id: { $in: lotIds } }).lean()
+        : [];
+    const lotStockMap = lotStocks.reduce((map, row) => {
+        map[String(row.lo_hang_id)] = Number(row.so_luong || 0);
+        return map;
+    }, {});
+    return qcRows
+        .filter(row => isSellableStockLot(row.lo_hang_id))
+        .sort(sortStockLotsFefo)
+        .reduce((sum, row) => {
+            const lotId = String(row.lo_hang_id?._id || row.lo_hang_id || '');
+            const qcQty = Number(row.so_luong || 0);
+            const lotQty = Number(lotStockMap[lotId] || 0);
+            const lotRemain = row.lo_hang_id ? Number(row.lo_hang_id.so_luong_con_lai ?? lotQty) : lotQty;
+            return sum + Math.max(Math.min(qcQty, lotQty, lotRemain), 0);
+        }, 0);
+}
+
+async function getExpiredLotQuantity(khoId, hangHoaId, loHangId) {
+    const filter = {
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId,
+        so_luong: { $gt: 0 }
+    };
+    if (loHangId) filter.lo_hang_id = loHangId;
+    const rows = await TonKhoLo.find(filter)
+        .populate('lo_hang_id')
+        .lean();
+    return rows.reduce((sum, row) => {
+        if (!isExpiredStockLot(row.lo_hang_id) || row.lo_hang_id?.trang_thai === 'huy') return sum;
+        return sum + Math.max(Number(row.so_luong || 0), 0);
+    }, 0);
+}
+
+async function getExpiredQuyCachQuantity(khoId, hangHoaId, tenQuyCach, loHangId) {
+    const filter = {
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId,
+        so_luong: { $gt: 0 },
+        $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
+    };
+    if (loHangId) filter.lo_hang_id = loHangId;
+    const rows = await TonKhoLoQuyCach.find(filter)
+        .populate('lo_hang_id')
+        .lean();
+    return rows.reduce((sum, row) => {
+        if (!isExpiredStockLot(row.lo_hang_id) || row.lo_hang_id?.trang_thai === 'huy') return sum;
+        return sum + Math.max(Number(row.so_luong || 0), 0);
+    }, 0);
+}
+
+async function validateDeliveryStockPreflight(khoId, warehouse, deliveryLines) {
+    const groups = new Map();
+    for (const line of deliveryLines) {
+        const detail = line.detail;
+        const row = {
+            kho_id: khoId,
+            hang_hoa_id: line.hang_hoa_id,
+            lo_hang_id: line.lo_hang_id || '',
+            gia_tri_thuoc_tinh_id: detail.gia_tri_thuoc_tinh_id || '',
+            ten_quy_cach: String(detail.ten_quy_cach || detail.ten_thuoc_tinh || '').trim(),
+            so_luong: Number(line.quantity || 0),
+            ma_hang: detail.ma_hang_snapshot || '',
+            ten_hang: detail.ten_hang_snapshot || '',
+            kho_ten: warehouse.ten_kho || warehouse.ma_kho || ''
+        };
+        const key = deliveryStockKey(row);
+        const current = groups.get(key) || Object.assign({}, row, { so_luong: 0, detail_ids: [] });
+        current.so_luong += row.so_luong;
+        current.detail_ids.push(String(detail._id));
+        groups.set(key, current);
+    }
+
+    const productIds = [...new Set([...groups.values()].map(row => String(row.hang_hoa_id)))];
+    const products = productIds.length
+        ? await HangHoa.find({ _id: { $in: productIds } }).select('ma_hang ten_hang quan_ly_theo_lo').lean()
+        : [];
+    const productMap = products.reduce((map, product) => {
+        map[String(product._id)] = product;
+        return map;
+    }, {});
+
+    const shortages = [];
+    const productTotals = {};
+    const lotTotals = {};
+    for (const group of groups.values()) {
+        const product = productMap[String(group.hang_hoa_id)] || {};
+        group.ma_hang = group.ma_hang || product.ma_hang || '';
+        group.ten_hang = group.ten_hang || product.ten_hang || '';
+        group.quan_ly_theo_lo = Boolean(product.quan_ly_theo_lo);
+        const productKey = String(group.hang_hoa_id);
+        productTotals[productKey] = (productTotals[productKey] || 0) + group.so_luong;
+        if (group.quan_ly_theo_lo && group.lo_hang_id && !(group.ten_quy_cach || group.gia_tri_thuoc_tinh_id)) {
+            const lotKey = [String(group.hang_hoa_id), String(group.lo_hang_id)].join('|');
+            lotTotals[lotKey] = (lotTotals[lotKey] || 0) + group.so_luong;
+        }
+    }
+
+    for (const [productId, requiredQty] of Object.entries(productTotals)) {
+        const stock = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: productId }).lean();
+        const available = Number(stock?.so_luong || 0);
+        if (available < requiredQty) {
+            const product = productMap[productId] || {};
+            shortages.push({
+                cap_ton: 'TonKho',
+                ma_hang: product.ma_hang || '',
+                ten_hang: product.ten_hang || '',
+                kho_ten: warehouse.ten_kho || warehouse.ma_kho || '',
+                so_luong_can: requiredQty,
+                so_luong_ton: available
+            });
+        }
+    }
+
+    for (const [key, requiredQty] of Object.entries(lotTotals)) {
+        const [productId, lotId] = key.split('|');
+        const lotStock = await TonKhoLo.findOne({ kho_id: khoId, hang_hoa_id: productId, lo_hang_id: lotId }).lean();
+        const lot = await LoHang.findById(lotId).lean();
+        const rawAvailable = Math.min(Number(lotStock?.so_luong || 0), Number(lot?.so_luong_con_lai ?? lotStock?.so_luong ?? 0));
+        const available = isSellableStockLot(lot) ? rawAvailable : 0;
+        const expiredQty = isExpiredStockLot(lot) && lot?.trang_thai !== 'huy' ? Math.max(Number(lotStock?.so_luong || 0), 0) : 0;
+        if (available < requiredQty) {
+            const product = productMap[productId] || {};
+            shortages.push({
+                cap_ton: 'TonKhoLo',
+                ma_hang: product.ma_hang || '',
+                ten_hang: product.ten_hang || '',
+                kho_ten: warehouse.ten_kho || warehouse.ma_kho || '',
+                lo_ten: lot?.ten_lo || lot?.ma_lo || '',
+                so_luong_can: requiredQty,
+                so_luong_ton: available,
+                so_luong_het_han: expiredQty,
+                nguyen_nhan: expiredQty > 0 && available <= 0 ? 'het_han' : 'thieu_ton'
+            });
+        }
+    }
+
+    for (const group of groups.values()) {
+        if (!group.quan_ly_theo_lo) continue;
+        if (group.ten_quy_cach || group.gia_tri_thuoc_tinh_id) {
+            const available = group.ten_quy_cach
+                ? await getSellableQuyCachQuantity(khoId, group.hang_hoa_id, group.ten_quy_cach, group.lo_hang_id)
+                : 0;
+            if (available < group.so_luong) {
+                let lotName = '';
+                if (group.lo_hang_id) {
+                    const lot = await LoHang.findById(group.lo_hang_id).lean();
+                    lotName = lot?.ten_lo || lot?.ma_lo || '';
+                }
+                const expiredQty = group.ten_quy_cach
+                    ? await getExpiredQuyCachQuantity(khoId, group.hang_hoa_id, group.ten_quy_cach, group.lo_hang_id)
+                    : 0;
+                shortages.push(Object.assign({}, group, {
+                    cap_ton: 'TonKhoLoQuyCach',
+                    lo_ten: lotName,
+                    so_luong_can: group.so_luong,
+                    so_luong_ton: available,
+                    so_luong_het_han: expiredQty,
+                    nguyen_nhan: expiredQty > 0 && available <= 0 ? 'het_han' : 'thieu_ton'
+                }));
+            }
+        } else {
+            const available = await getSellableLotQuantity(khoId, group.hang_hoa_id, group.lo_hang_id);
+            if (available < group.so_luong) {
+                let lotName = '';
+                if (group.lo_hang_id) {
+                    const lot = await LoHang.findById(group.lo_hang_id).lean();
+                    lotName = lot?.ten_lo || lot?.ma_lo || '';
+                }
+                const expiredQty = await getExpiredLotQuantity(khoId, group.hang_hoa_id, group.lo_hang_id);
+                shortages.push(Object.assign({}, group, {
+                    cap_ton: 'TonKhoLo',
+                    lo_ten: lotName,
+                    so_luong_can: group.so_luong,
+                    so_luong_ton: available,
+                    so_luong_het_han: expiredQty,
+                    nguyen_nhan: expiredQty > 0 && available <= 0 ? 'het_han' : 'thieu_ton'
+                }));
+            }
+        }
+    }
+
+    if (shortages.length) {
+        return {
+            valid: false,
+            shortages,
+            message: shortages.map(stockShortageMessage).join(' ')
+        };
+    }
+    return { valid: true, shortages: [] };
+}
+
+async function rollbackDeliveryInvoice(invoiceId, options = {}) {
+    if (!invoiceId) return;
+    const invoice = await HoaDonBanHang.findById(invoiceId).lean();
+    if (!invoice) return;
+
+    const invoiceLines = await CTHoaDonBanHang.find({ hoa_don_id: invoiceId }).lean();
+    const khoId = options.kho_id || invoice.kho_id;
+    const maPhieu = invoice.ma_hoa_don || String(invoiceId);
+    const stockLines = Array.isArray(options.stockLines) && options.stockLines.length
+        ? options.stockLines
+        : (options.restoreStock === false ? [] : invoiceLines);
+
+    for (const line of stockLines) {
+        await restoreStockLine(khoId, line, {
+            nguoi_tao_id: options.nguoi_tao_id,
+            loai_phieu: 'rollback_ban_hang',
+            ma_phieu: maPhieu,
+            ghi_chu: options.ghi_chu || `Hoan ton HĐ ${maPhieu}`
+        });
+    }
+
+    if (options.revertOrderLines) {
+        for (const line of invoiceLines) {
+            if (!line.ct_don_hang_id) continue;
+            const detail = await CTDonHang.findById(line.ct_don_hang_id);
+            if (!detail) continue;
+            const qty = Number(line.so_luong || 0);
+            const orderedQuantity = Number(detail.so_luong_dat || detail.so_luong || 0);
+            const deliveredAfter = Math.max(Number(detail.so_luong_da_giao || 0) - qty, 0);
+            const missingAfter = Math.max(orderedQuantity - deliveredAfter, 0);
+            detail.so_luong_da_giao = deliveredAfter;
+            detail.so_luong_con_thieu = missingAfter;
+            detail.so_luong_xac_nhan = Math.max(Number(detail.so_luong_xac_nhan || 0) - qty, 0);
+            detail.trang_thai_giao = deliveredAfter <= 0
+                ? 'chua_giao'
+                : (missingAfter <= 0 ? 'giao_du' : 'giao_thieu');
+            await detail.save();
+        }
+    }
+
+    const debtRows = await CongNoKhachHang.find({ hoa_don_id: invoiceId }).lean();
+    let debtDelta = 0;
+    for (const row of debtRows) {
+        const amount = Math.abs(Number(row.so_tien || 0));
+        if (row.loai === 'tang_no') debtDelta -= amount;
+        else if (row.loai === 'giam_no') debtDelta += amount;
+    }
+    if (invoice.khach_hang_id && debtDelta !== 0) {
+        await KhachHang.updateOne({ _id: invoice.khach_hang_id }, { $inc: { tong_no: debtDelta } });
+    }
+    await CongNoKhachHang.deleteMany({ hoa_don_id: invoiceId });
+
+    const receipts = await PhieuThuChi.find({
+        hoa_don_id: invoiceId,
+        trang_thai: { $ne: 'cancelled' }
+    });
+    for (const receipt of receipts) {
+        receipt.trang_thai = 'cancelled';
+        await receipt.save();
+    }
+
+    await CTHoaDonBanHang.deleteMany({ hoa_don_id: invoiceId });
+    await HoaDonBanHang.findByIdAndDelete(invoiceId);
 }
 
 async function generateInvoiceCode() {
@@ -1585,22 +2179,20 @@ async function ensureHoaDonDonHangIndex() {
         }
         const collection = HoaDonBanHang.collection;
         const indexes = await collection.indexes();
-        const orderIndex = indexes.find(index => index.name === 'don_hang_id_1');
-
-        if (orderIndex && orderIndex.unique && !orderIndex.sparse) {
-            await collection.dropIndex('don_hang_id_1');
-            await collection.updateMany(
-                { don_hang_id: null },
-                { $unset: { don_hang_id: '' } }
-            );
+        for (const index of indexes) {
+            if (index.key && index.key.don_hang_id === 1 && index.unique) {
+                await collection.dropIndex(index.name);
+                console.log('[InvoiceIndex] Dropped unique don_hang_id index:', index.name);
+            }
         }
-
-        await collection.createIndex(
-            { don_hang_id: 1 },
-            { unique: true, sparse: true, name: 'don_hang_id_1' }
+        const hasPlainIndex = (await collection.indexes()).some(
+            index => index.key && index.key.don_hang_id === 1 && !index.unique
         );
+        if (!hasPlainIndex) {
+            await collection.createIndex({ don_hang_id: 1 }, { name: 'don_hang_id_1', background: true });
+        }
     } catch (error) {
-        console.error('[InvoiceIndex] Cannot ensure sparse don_hang_id index:', error.message);
+        console.error('[InvoiceIndex] Cannot ensure don_hang_id index:', error.message);
     }
 }
 
@@ -1857,12 +2449,21 @@ async function decorateInvoices(invoices) {
             ]
         }).populate('doi_tac_giao_hang_id').lean(),
         PhieuThuChi.find({
-            loai_phieu: 'thu',
-            trang_thai: { $ne: 'cancelled' },
-            $or: [
-                { hoa_don_id: { $in: invoiceIds } },
-                { don_hang_id: { $in: orderIds } }
-            ]
+            $and: [
+                {
+                    $or: [
+                        { hoa_don_id: { $in: invoiceIds } },
+                        { don_hang_id: { $in: orderIds } }
+                    ]
+                },
+                {
+                    $or: [
+                        { loai_phieu: 'thu' },
+                        { loai_phieu: 'chi', loai_thu_chi: 'tra_tien_thua_khach' }
+                    ]
+                }
+            ],
+            trang_thai: { $ne: 'cancelled' }
         }).lean(),
         PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' } }).lean(),
         CongNoKhachHang.find({ hoa_don_id: { $in: invoiceIds } }).lean()
@@ -1883,14 +2484,18 @@ async function decorateInvoices(invoices) {
         if (orderId) map[orderId] = String(invoice._id);
         return map;
     }, {});
-    const paidByInvoice = receipts.reduce((map, row) => {
+    const paidByInvoice = {};
+    receipts.forEach(row => {
         const key = row.hoa_don_id
             ? String(row.hoa_don_id)
             : orderToInvoiceId[String(row.don_hang_id || '')];
-        if (!key) return map;
-        map[key] = (map[key] || 0) + Number(row.gia_tri || 0);
-        return map;
-    }, {});
+        if (!key) return;
+        if (!paidByInvoice[key]) paidByInvoice[key] = [];
+        paidByInvoice[key].push(row);
+    });
+    Object.keys(paidByInvoice).forEach(key => {
+        paidByInvoice[key] = computeNetPaidFromReceiptRows(paidByInvoice[key]);
+    });
     const returnByInvoice = returns.reduce((map, row) => {
         const key = String(row.hoa_don_id || '');
         if (!map[key]) map[key] = row;
@@ -2280,15 +2885,21 @@ router.get('/', async (req, res, next) => {
             .populate('nguoi_tao_id')
             .sort({ created_at: -1 });
 
-        const [partners, users] = await Promise.all([
+        const storeId = await resolveStoreId(req);
+        const cashBookQuery = storeId
+            ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
+            : { trang_thai: 'active' };
+        const [partners, users, cashBooks] = await Promise.all([
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
-            NguoiDung.find().sort({ ho_ten: 1, username: 1 })
+            NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
         res.render('don-hang/index', {
             title: 'Đặt hàng',
             orders,
             partners,
             users,
+            cashBooks,
             filters: req.query || {},
             exportColumnGroups: getOrderExportColumnGroupsForView()
         });
@@ -2374,7 +2985,7 @@ router.get('/create', async (req, res, next) => {
             storeId
                 ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 }).lean()
                 : [],
-            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1, loai: 1 }).lean()
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
         let sourceOrder = null;
         let sourceOrderItems = [];
@@ -2443,8 +3054,6 @@ router.post('/add', async (req, res, next) => {
             thu_ho_cod,
             cod_enabled,
             nguoi_tra_phi_giao_hang,
-            khach_thanh_toan,
-            phuong_thuc_thanh_toan,
             so_quy_id
         } = req.body || {};
 
@@ -2487,11 +3096,13 @@ router.post('/add', async (req, res, next) => {
                     .map(qc => Object.assign({}, sourceItem, {
                         so_luong: Number(qc.so_luong_dat ?? qc.so_luong),
                         so_luong_dat: Number(qc.so_luong_dat ?? qc.so_luong),
+                        lo_hang_id: qc.lo_hang_id || sourceItem.lo_hang_id || null,
                         gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || sourceItem.gia_tri_thuoc_tinh_id || null,
                         ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
                         ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
                         don_gia_ban: qc.don_gia_ban ?? sourceItem.don_gia_ban,
                         don_gia: qc.don_gia_ban ?? sourceItem.don_gia_ban ?? sourceItem.don_gia,
+                        loai_gia_ban: qc.loai_gia_ban ?? sourceItem.loai_gia_ban,
                         chiet_khau: qc.chiet_khau ?? 0,
                         kieu_chiet_khau: qc.kieu_chiet_khau || 'vnd'
                     }))
@@ -2510,9 +3121,11 @@ router.post('/add', async (req, res, next) => {
             if (Number.isFinite(manualUnitPrice) && manualUnitPrice < 0) {
                 return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n giÃƒÂ¡ khÃƒÂ´ng Ã„â€˜Ã†Â°Ã¡Â»Â£c ÃƒÂ¢m.' });
             }
-            const unitPrice = Number.isFinite(manualUnitPrice) && manualUnitPrice >= 0
-                ? manualUnitPrice
-                : await resolveSalePrice(product, validBangGiaId);
+            const priceResult = await resolveOrderLineUnitPrice(item, product, validBangGiaId, sessionStoreId);
+            if (priceResult.error) {
+                return res.status(400).json({ success: false, message: priceResult.error });
+            }
+            const unitPrice = priceResult.unitPrice;
             const lineBase = quantity * unitPrice;
             const lineDiscountAmount = normalizeDiscount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
             const lineDiscountValue = item.kieu_chiet_khau === 'phan_tram'
@@ -2588,23 +3201,19 @@ router.post('/add', async (req, res, next) => {
         const shippingFeeForCustomer = 0;
         const tong_thanh_toan = Math.max(tong_tien_hang - orderDiscount + shippingFeeForCustomer, 0);
         const codEnabled = false;
-        const khachCanTra = tong_thanh_toan;
-        const requestedPrepaid = Number(khach_thanh_toan ?? req.body?.khach_da_tra ?? 0);
-        const khachThanhToan = Math.min(Math.max(Number.isFinite(requestedPrepaid) ? requestedPrepaid : 0, 0), khachCanTra);
-        const codAmount = 0;
-        const tienThuaTraKhach = 0;
-        const ma_don_hang = await generateOrderCode();
-        let receiptCashBook = null;
-        if (khachThanhToan > 0) {
-            const requestedCashBookId = /^[0-9a-fA-F]{24}$/.test(String(so_quy_id || '')) ? so_quy_id : null;
-            receiptCashBook = requestedCashBookId ? await SoQuy.findById(requestedCashBookId).lean() : await ensureDefaultSoQuy(sessionStoreId);
-            if (!receiptCashBook) {
-                return res.status(400).json({ success: false, message: 'SÃ¡Â»â€¢ quÃ¡Â»Â¹ khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡.' });
-            }
-            if (receiptCashBook.cua_hang_id && String(receiptCashBook.cua_hang_id) !== sessionStoreId) {
-                return res.status(400).json({ success: false, message: 'SÃ¡Â»â€¢ quÃ¡Â»Â¹ khÃƒÂ´ng thuÃ¡Â»â„¢c cÃ¡Â»Â­a hÃƒÂ ng Ã„â€˜ang lÃƒÂ m viÃ¡Â»â€¡c.' });
-            }
+        const orderPayment = parseCustomerPaymentFromRequest(req.body, tong_thanh_toan, false);
+        if (orderPayment.tong_khach_dua > 0 && !orderPayment.valid) {
+            return res.status(400).json({ success: false, message: orderPayment.errors.join('. ') });
         }
+        const receiptCashBookId = resolveCashBookIdFromBody(req.body || {});
+        if (orderPayment.tong_khach_dua > 0 && !receiptCashBookId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền đơn hàng.' });
+        }
+        const khachThanhToan = Math.max(0, orderPayment.thuc_thu);
+        const khachCanTra = Math.max(tong_thanh_toan - khachThanhToan, 0);
+        const codAmount = 0;
+        const tienThuaTraKhach = orderPayment.tien_thua;
+        const ma_don_hang = await generateOrderCode();
 
         const order = await DonHang.create({
             ma_don_hang,
@@ -2676,23 +3285,23 @@ router.post('/add', async (req, res, next) => {
             trang_thai: 'draft'
         });
 
-        if (khachThanhToan > 0) {
-            await taoPhieuThuChi({
-                loai_phieu: 'thu',
+        if (orderPayment.tong_khach_dua > 0) {
+            const customerName = khach_hang_id
+                ? (await KhachHang.findById(khach_hang_id).select('ten_khach_hang').lean())?.ten_khach_hang
+                : ten_nguoi_nhan;
+            await recordCustomerPaymentReceipts({
                 loai_thu_chi: 'Thu tien don hang',
-                gia_tri: khachThanhToan,
-                so_quy_id: receiptCashBook._id,
+                ngay_lap: order.ngay_dat || new Date(),
+                so_quy_id: receiptCashBookId,
                 cua_hang_id: order.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id,
                 don_hang_id: order._id,
                 van_don_id: shipment._id,
                 ma_chung_tu_goc: ma_don_hang,
-                doi_tuong: order.khach_hang_id ? undefined : ten_nguoi_nhan,
-                nhom_doi_tuong: 'khach_hang',
-                phuong_thuc_thanh_toan: phuong_thuc_thanh_toan || 'tien_mat',
-                hach_toan: false
-            });
+                doi_tuong: customerName || ten_nguoi_nhan || 'Khách lẻ',
+                nhom_doi_tuong: 'khach_hang'
+            }, orderPayment);
         }
 
         res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o Ã„â€˜Ã†Â¡n Ã„â€˜Ã¡ÂºÂ·t hÃƒÂ ng', ma_don_hang });
@@ -2710,13 +3319,18 @@ router.get('/hoa-don', async (req, res, next) => {
             .populate('kho_id')
             .populate('nguoi_ban_id')
             .sort({ created_at: -1 });
-        const [invoices, partners, users, priceBooks] = await Promise.all([
+        const storeId = await resolveStoreId(req);
+        const cashBookQuery = storeId
+            ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
+            : { trang_thai: 'active' };
+        const [invoices, partners, users, priceBooks, cashBooks] = await Promise.all([
             decorateInvoices(rawInvoices),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
-            BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 })
+            BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }),
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
-        res.render('don-hang/hoa-don', { title: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n', invoices, partners, users, priceBooks, filters: req.query || {} });
+        res.render('don-hang/hoa-don', { title: 'Hóa đơn', invoices, partners, users, priceBooks, cashBooks, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -2764,11 +3378,15 @@ router.get('/hoa-don/export.xlsx', async (req, res, next) => {
 router.get('/hoa-don/create', async (req, res, next) => {
     try {
         const storeId = await resolveStoreId(req);
-        const [data, warehouses] = await Promise.all([
+        const cashBookQuery = storeId
+            ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
+            : { trang_thai: 'active' };
+        const [data, warehouses, cashBooks] = await Promise.all([
             getOrderCreateData(),
             storeId
                 ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 }).lean()
-                : []
+                : [],
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
         let sourceOrder = null;
         let sourceOrderItems = [];
@@ -2829,10 +3447,11 @@ router.get('/hoa-don/create', async (req, res, next) => {
         }
 
         res.render('don-hang/hoa-don-create', {
-            title: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n',
+            title: 'Hóa đơn',
             ...data,
             currentStoreId: storeId || '',
             warehouses,
+            cashBooks,
             sourceOrder,
             sourceOrderItems,
             sourceShipment,
@@ -2878,8 +3497,8 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
             .populate('nguoi_ban_id');
         if (!invoice) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y hÃƒÂ³a Ã„â€˜Ã†Â¡n' });
 
-        const [items, shipment, debtHistory, receipts] = await Promise.all([
-            CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id'),
+        let [items, shipment, debtHistory, receipts] = await Promise.all([
+            CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).populate('hang_hoa_id').populate('lo_hang_id'),
             VanDon.findOne({
                 $or: [
                     { hoa_don_id: invoice._id },
@@ -2900,10 +3519,7 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
                 .sort({ ngay_lap: -1, created_at: -1 })
                 .limit(20)
         ]);
-
-        const paid = receipts
-            .filter(row => row.loai_phieu === 'thu')
-            .reduce((sum, row) => sum + Number(row.gia_tri || 0), 0);
+        const paid = computeNetPaidFromReceiptRows(receipts);
         const payable = Number(invoice.thanh_toan || 0);
 
         res.json({ success: true, data: { invoice, items, shipment, debtHistory, receipts, paid, debt: Math.max(0, payable - paid) } });
@@ -2921,14 +3537,14 @@ router.post('/hoa-don/:id/phieu-thu', async (req, res, next) => {
         }
 
         const [receipts, shipment] = await Promise.all([
-            PhieuThuChi.find({
-                loai_phieu: 'thu',
-                trang_thai: { $ne: 'cancelled' },
-                $or: [
-                    { hoa_don_id: invoice._id },
-                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
-                ]
-            }).lean(),
+            PhieuThuChi.find(
+                receiptRowsForNetPaidFilter({
+                    $or: [
+                        { hoa_don_id: invoice._id },
+                        ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                    ]
+                })
+            ).lean(),
             VanDon.findOne({
                 $or: [
                     { hoa_don_id: invoice._id },
@@ -2937,65 +3553,67 @@ router.post('/hoa-don/:id/phieu-thu', async (req, res, next) => {
             }).lean()
         ]);
         const payable = Number(invoice.thanh_toan || 0);
-        const paidBefore = receipts.reduce((sum, row) => sum + Number(row.gia_tri || 0), 0);
+        const paidBefore = computeNetPaidFromReceiptRows(receipts);
         const remaining = Math.max(payable - paidBefore, 0);
-        const amount = Math.max(0, Number(req.body?.gia_tri || req.body?.khach_thanh_toan || 0));
-        if (amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền thu không hợp lệ' });
-        if (amount > remaining) {
-            return res.status(400).json({
-                success: false,
-                message: `Khách chỉ còn nợ ${remaining.toLocaleString('vi-VN')} VNĐ`
-            });
+        const payment = parseCustomerPaymentFromRequest(req.body, remaining, true);
+        if (!payment.valid) {
+            return res.status(400).json({ success: false, message: payment.errors.join('. ') });
         }
 
-        const cashBook = await ensureDefaultSoQuy(invoice.cua_hang_id);
-        const receipt = await taoPhieuThuChi({
-            loai_phieu: 'thu',
+        const cashBookId = resolveCashBookIdFromBody(req.body || {});
+        if (!cashBookId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền hóa đơn.' });
+        }
+
+        const customer = invoice.khach_hang_id
+            ? await KhachHang.findById(invoice.khach_hang_id).select('ten_khach_hang').lean()
+            : null;
+
+        const { thu: receipt } = await recordCustomerPaymentReceipts({
             loai_thu_chi: 'Thu tien hoa don',
-            gia_tri: amount,
-            so_quy_id: cashBook._id,
+            ngay_lap: new Date(),
+            so_quy_id: cashBookId,
             cua_hang_id: invoice.cua_hang_id,
             nguoi_tao_id: req.user?._id,
             khach_hang_id: invoice.khach_hang_id,
+            doi_tuong: customer?.ten_khach_hang || 'Khách lẻ',
             don_hang_id: invoice.don_hang_id || undefined,
             hoa_don_id: invoice._id,
             van_don_id: shipment?._id,
             ma_chung_tu_goc: invoice.ma_hoa_don,
             nhom_doi_tuong: 'khach_hang',
-            phuong_thuc_thanh_toan: normalizePaymentMethodValue(req.body?.phuong_thuc_thanh_toan),
             hach_toan: false
-        });
+        }, payment);
 
-        const paidAfter = paidBefore + amount;
+        const paidAfter = paidBefore + payment.thuc_thu;
         invoice.trang_thai = resolveInvoiceStatus(payable, paidAfter);
         await invoice.save();
-        if (invoice.don_hang_id) {
-            await DonHang.updateOne(
-                { _id: invoice.don_hang_id },
-                { $set: { khach_thanh_toan: paidAfter } }
-            );
-        }
         if (invoice.khach_hang_id) {
             await CongNoKhachHang.create({
                 khach_hang_id: invoice.khach_hang_id,
                 don_hang_id: invoice.don_hang_id || undefined,
                 hoa_don_id: invoice._id,
                 phieu_thu_chi_id: receipt._id,
-                so_tien: amount,
+                so_tien: payment.thuc_thu,
                 loai: 'giam_no',
                 ghi_chu: `Thu tiền hóa đơn ${invoice.ma_hoa_don}`,
                 ngay: new Date()
             });
-            const customer = await KhachHang.findById(invoice.khach_hang_id).select('tong_no').lean();
-            if (customer && typeof customer.tong_no === 'number') {
-                await KhachHang.updateOne({ _id: invoice.khach_hang_id }, { $inc: { tong_no: -amount } });
+            const customerDebt = await KhachHang.findById(invoice.khach_hang_id).select('tong_no').lean();
+            if (customerDebt && typeof customerDebt.tong_no === 'number') {
+                await KhachHang.updateOne({ _id: invoice.khach_hang_id }, { $inc: { tong_no: -payment.thuc_thu } });
             }
+        }
+
+        if (invoice.don_hang_id) {
+            const orderDoc = await DonHang.findById(invoice.don_hang_id);
+            if (orderDoc) await applyOrderPaymentBalance(orderDoc, orderDoc._id);
         }
 
         res.json({
             success: true,
             message: 'Đã tạo phiếu thu',
-            data: { receipt, paid: paidAfter, remaining: Math.max(payable - paidAfter, 0) }
+            data: { receipt, paid: paidAfter, remaining: Math.max(payable - paidAfter, 0), payment }
         });
     } catch (error) {
         next(error);
@@ -3050,6 +3668,10 @@ router.post('/hoa-don/:id/duplicate', async (req, res, next) => {
             hoa_don_id: newInvoice._id,
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: item.lo_hang_id || null,
+            lot_allocations: Array.isArray(item.lot_allocations) ? item.lot_allocations : [],
+            gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+            ten_quy_cach: item.ten_quy_cach,
+            ten_thuoc_tinh: item.ten_thuoc_tinh,
             so_luong: Number(item.so_luong || 0),
             don_gia: Number(item.don_gia || 0),
             chiet_khau: Number(item.chiet_khau || 0),
@@ -3087,12 +3709,6 @@ router.post('/hoa-don/:id/cancel', async (req, res, next) => {
         ]);
 
         for (const receipt of receipts) {
-            const amount = Number(receipt.gia_tri || 0);
-            if (receipt.so_quy_id && amount > 0) {
-                await SoQuy.findByIdAndUpdate(receipt.so_quy_id, {
-                    $inc: { so_du: receipt.loai_phieu === 'thu' ? -amount : amount }
-                });
-            }
             receipt.trang_thai = 'cancelled';
             await receipt.save();
         }
@@ -3162,70 +3778,10 @@ async function createInvoice(req, res, next) {
         let sourceOrder = null;
         let invoiceItems = parseItems(items);
         if (don_hang_id && /^[0-9a-fA-F]{24}$/.test(String(don_hang_id))) {
-            sourceOrder = await DonHang.findById(don_hang_id).lean();
-            if (!sourceOrder) return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n hÃƒÂ ng gÃ¡Â»â€˜c khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
-            if (sourceOrder.trang_thai === 'merged') {
-                return res.status(400).json({
-                    success: false,
-                    message: `Đơn hàng ${sourceOrder.ma_don_hang} đã được gộp vào ${sourceOrder.merged_to_ma_don_hang || 'đơn khác'}, không thể tạo hóa đơn riêng.`
-                });
-            }
-            const existingInvoice = await HoaDonBanHang.findOne({ don_hang_id: sourceOrder._id }).lean();
-            if (existingInvoice) {
-                return res.status(409).json({
-                    success: false,
-                    message: `Ã„ÂÃ†Â¡n hÃƒÂ ng nÃƒÂ y Ã„â€˜ÃƒÂ£ cÃƒÂ³ hÃƒÂ³a Ã„â€˜Ã†Â¡n ${existingInvoice.ma_hoa_don}`,
-                    data: { invoice: existingInvoice, id: existingInvoice._id, ma_hoa_don: existingInvoice.ma_hoa_don }
-                });
-            }
-            const parsedFromBody = parseItems(items);
-            const orderDetails = await CTDonHang.find({ don_hang_id }).lean();
-            const hasDeliveredQuantity = orderDetails.some(row => Number(row.so_luong_da_giao || 0) > 0);
-            const orderDetailById = orderDetails.reduce((map, row) => {
-                map[String(row._id)] = row;
-                return map;
-            }, {});
-            const orderDetailsByLegacyKey = orderDetails.reduce((map, row) => {
-                const key = legacyReturnLineKey(row);
-                if (!map[key]) map[key] = [];
-                map[key].push(row);
-                return map;
-            }, {});
-            if (Array.isArray(parsedFromBody) && parsedFromBody.length) {
-                invoiceItems = parsedFromBody.map(item => {
-                    const detailId = optionalLineObjectId(item.ct_don_hang_id);
-                    const sourceDetail = detailId
-                        ? orderDetailById[detailId]
-                        : ((orderDetailsByLegacyKey[legacyReturnLineKey(item)] || []).length === 1
-                            ? orderDetailsByLegacyKey[legacyReturnLineKey(item)][0]
-                            : null);
-                    return sourceDetail
-                        ? Object.assign({}, item, {
-                            ct_don_hang_id: sourceDetail._id,
-                            so_luong: hasDeliveredQuantity
-                                ? Number(sourceDetail.so_luong_da_giao || 0)
-                                : Number(item.so_luong_dat ?? item.so_luong ?? sourceDetail.so_luong_dat ?? sourceDetail.so_luong ?? 0),
-                            so_luong_dat: hasDeliveredQuantity
-                                ? Number(sourceDetail.so_luong_da_giao || 0)
-                                : Number(item.so_luong_dat ?? item.so_luong ?? sourceDetail.so_luong_dat ?? sourceDetail.so_luong ?? 0),
-                            ...copyLineMetadata(sourceDetail)
-                        })
-                        : item;
-                });
-            } else {
-                invoiceItems = orderDetails.map(row => ({
-                    ct_don_hang_id: row._id,
-                    hang_hoa_id: row.hang_hoa_id,
-                    lo_hang_id: row.lo_hang_id,
-                    so_luong: hasDeliveredQuantity
-                        ? Number(row.so_luong_da_giao || 0)
-                        : Number(row.so_luong_dat || row.so_luong || 0),
-                    don_gia_ban: row.don_gia_ban || 0,
-                    chiet_khau: row.chiet_khau || 0,
-                    kieu_chiet_khau: row.kieu_chiet_khau || 'vnd',
-                    ...copyLineMetadata(row)
-                }));
-            }
+            return res.status(400).json({
+                success: false,
+                message: 'Hóa đơn từ đơn hàng được tạo tự động khi xác nhận giao hàng. Vui lòng dùng nút Xác nhận giao.'
+            });
         }
 
         if (!Array.isArray(invoiceItems) || !invoiceItems.length) {
@@ -3259,6 +3815,7 @@ async function createInvoice(req, res, next) {
                         expandedInvoiceItems.push(Object.assign({}, sourceItem, {
                             so_luong: Number(qc.so_luong_dat ?? qc.so_luong),
                             so_luong_dat: Number(qc.so_luong_dat ?? qc.so_luong),
+                            lo_hang_id: qc.lo_hang_id || sourceItem.lo_hang_id || null,
                             gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || sourceItem.gia_tri_thuoc_tinh_id || null,
                             ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
                             ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
@@ -3275,8 +3832,7 @@ async function createInvoice(req, res, next) {
         for (const item of expandedInvoiceItems) {
             const productId = String(item.hang_hoa_id || '').trim();
             const quantity = Number(item.so_luong_dat ?? item.so_luong ?? 0);
-            if (sourceOrder && quantity <= 0) continue;
-            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'DÃƒÂ²ng hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
+            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'Dong hang khong hop le' });
             const unitPrice = Number(item.don_gia_ban ?? item.don_gia ?? 0);
             const lineBase = quantity * unitPrice;
             const lineDiscount = normalizeDiscount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
@@ -3330,10 +3886,22 @@ async function createInvoice(req, res, next) {
         const shippingFeeForCustomer = shouldShip && shippingFeePayer === 'khach' ? shippingFee : 0;
         const payable = Math.max(tong_tien_hang - discount + shippingFeeForCustomer, 0);
         const orderPaidBeforeInvoice = sourceOrder ? await getOrderPaidAmount(sourceOrder._id) : 0;
-        const rawPaid = sourceOrder
+        let paymentAtCreate = { tong_khach_dua: 0, thuc_thu: 0, tien_mat: 0, chuyen_khoan: 0, tien_thua: 0, valid: true, errors: [] };
+        if (!sourceOrder && !codEnabled) {
+            paymentAtCreate = parseCustomerPaymentFromRequest(req.body, payable, false);
+            if (paymentAtCreate.tong_khach_dua > 0 && !paymentAtCreate.valid) {
+                return res.status(400).json({ success: false, message: paymentAtCreate.errors.join('. ') });
+            }
+            if (paymentAtCreate.tong_khach_dua > 0) {
+                const cashBookIdCheck = resolveCashBookIdFromBody(req.body || {});
+                if (!cashBookIdCheck) {
+                    return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền hóa đơn.' });
+                }
+            }
+        }
+        const paid = sourceOrder
             ? orderPaidBeforeInvoice
-            : (codEnabled ? 0 : (khach_thanh_toan ?? req.body?.khach_da_tra ?? 0));
-        const paid = Math.min(Math.max(Number(rawPaid) || 0, 0), payable);
+            : Math.min(Math.max(paymentAtCreate.thuc_thu, 0), payable);
         const debt = Math.max(payable - paid, 0);
         const ma_hoa_don = String(req.body?.ma_hoa_don || '').trim() || await generateInvoiceCode();
         const invoiceStatus = resolveInvoiceStatus(payable, paid);
@@ -3430,6 +3998,7 @@ async function createInvoice(req, res, next) {
                 {
                     $set: {
                         khach_thanh_toan: orderPaidBeforeInvoice,
+                        khach_can_tra: Math.max(payable - orderPaidBeforeInvoice, 0),
                         trang_thai: invoiceStatus === 'paid' ? 'completed' : sourceOrder.trang_thai
                     }
                 }
@@ -3452,24 +4021,25 @@ async function createInvoice(req, res, next) {
             }
         }
 
-        if (!sourceOrder && !codEnabled && paid > 0) {
-            const cashBook = await ensureDefaultSoQuy(invoice.cua_hang_id);
-            await taoPhieuThuChi({
-                loai_phieu: 'thu',
+        if (!sourceOrder && !codEnabled && paymentAtCreate.tong_khach_dua > 0) {
+            const cashBookId = resolveCashBookIdFromBody(req.body || {});
+            const customerName = finalCustomerId
+                ? (await KhachHang.findById(finalCustomerId).select('ten_khach_hang').lean())?.ten_khach_hang
+                : 'Khách lẻ';
+            await recordCustomerPaymentReceipts({
                 loai_thu_chi: 'Thu tien hoa don',
-                gia_tri: paid,
-                so_quy_id: cashBook._id,
+                ngay_lap: invoice.ngay_ban || new Date(),
+                so_quy_id: cashBookId,
                 cua_hang_id: invoice.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id: finalCustomerId,
-                don_hang_id: sourceOrder?._id || undefined,
+                doi_tuong: customerName || 'Khách lẻ',
                 hoa_don_id: invoice._id,
                 van_don_id: shipment?._id,
                 ma_chung_tu_goc: ma_hoa_don,
                 nhom_doi_tuong: 'khach_hang',
-                phuong_thuc_thanh_toan: normalizePaymentMethodValue(phuong_thuc_thanh_toan),
                 hach_toan: false
-            });
+            }, paymentAtCreate);
         }
 
         res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o hÃƒÂ³a Ã„â€˜Ã†Â¡n', ma_hoa_don, id: invoice._id, data: { invoice, shipment } });
@@ -3513,7 +4083,7 @@ router.get('/tra-hang', async (req, res, next) => {
             .populate('nguoi_tao_id')
             .sort({ created_at: -1 });
         const users = await NguoiDung.find().sort({ ho_ten: 1, username: 1 });
-        res.render('don-hang/tra-hang', { title: 'TrÃ¡ÂºÂ£ hÃƒÂ ng', returns, users, filters: req.query || {} });
+        res.render('don-hang/tra-hang', { title: 'Trả hàng', returns, users, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -3618,7 +4188,7 @@ router.get('/tra-hang/create', async (req, res, next) => {
         }
         const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
         res.render('don-hang/tra-hang-create', {
-            title: 'TrÃ¡ÂºÂ£ hÃƒÂ ng',
+            title: 'Trả hàng',
             invoices,
             products,
             partners,
@@ -3865,12 +4435,6 @@ router.post('/tra-hang/:id/cancel', async (req, res, next) => {
 
         const receipts = await PhieuThuChi.find({ ma_chung_tu_goc: maPhieu, trang_thai: { $ne: 'cancelled' } });
         for (const receipt of receipts) {
-            const amount = Number(receipt.gia_tri || 0);
-            if (receipt.so_quy_id && amount > 0) {
-                await SoQuy.findByIdAndUpdate(receipt.so_quy_id, {
-                    $inc: { so_du: receipt.loai_phieu === 'thu' ? -amount : amount }
-                });
-            }
             receipt.trang_thai = 'cancelled';
             await receipt.save();
         }
@@ -3964,31 +4528,46 @@ router.get('/tra-hang/invoice/:id', async (req, res, next) => {
                 .select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong')
                 .lean()
             : [];
-        const returnedByInvoiceLine = {};
+        const returnedByLineKey = {};
         const returnedByLegacyLine = {};
         returnedItems.forEach(row => {
             const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
-            const map = invoiceLineId ? returnedByInvoiceLine : returnedByLegacyLine;
-            const key = invoiceLineId || legacyReturnLineKey(row);
-            map[key] = (map[key] || 0) + Number(row.so_luong || 0);
+            if (invoiceLineId) {
+                const key = returnStockLineKey(row);
+                returnedByLineKey[key] = (returnedByLineKey[key] || 0) + Number(row.so_luong || 0);
+                return;
+            }
+            const legacyKey = legacyReturnLineKey(row);
+            returnedByLegacyLine[legacyKey] = (returnedByLegacyLine[legacyKey] || 0) + Number(row.so_luong || 0);
         });
-        const returnableItems = items
+        const expandedItems = expandReturnableInvoiceItems(items);
+        const returnableItems = expandedItems
             .map(item => {
-                const object = item.toObject();
-                const invoiceLineId = String(object._id);
-                const legacyKey = legacyReturnLineKey(object);
-                const returnedQty = Number(returnedByInvoiceLine[invoiceLineId] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
-                const remainingQty = Math.max(Number(object.so_luong || 0) - returnedQty, 0);
-                object.so_luong_da_tra = returnedQty;
-                object.so_luong_con_lai = remainingQty;
-                object.so_luong = remainingQty;
-                return object;
+                const key = returnStockLineKey(item);
+                const legacyKey = legacyReturnLineKey(item);
+                const returnedQty = Number(returnedByLineKey[key] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
+                const originalQty = Number(item.so_luong || 0);
+                const remainingQty = Math.max(originalQty - returnedQty, 0);
+                item.so_luong_da_tra = returnedQty;
+                item.so_luong_con_lai = remainingQty;
+                item.so_luong = remainingQty;
+                return item;
             })
             .filter(item => Number(item.so_luong_con_lai || 0) > 0);
         if (!returnableItems.length) {
             return res.status(400).json({ success: false, message: 'HÃƒÂ³a Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ Ã„â€˜Ã†Â°Ã¡Â»Â£c trÃ¡ÂºÂ£ hÃ¡ÂºÂ¿t hÃƒÂ ng' });
         }
-        res.json({ success: true, data: { invoice, items: returnableItems } });
+        const hasMultiLotLines = returnableItems.some(item => item._return_from_multi_lot);
+        res.json({
+            success: true,
+            data: {
+                invoice,
+                items: returnableItems,
+                return_multi_lot_note: hasMultiLotLines
+                    ? 'Một số dòng hóa đơn xuất từ nhiều lô — trả hàng theo từng lô riêng.'
+                    : ''
+            }
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message || 'KhÃƒÂ´ng tÃ¡ÂºÂ£i Ã„â€˜Ã†Â°Ã¡Â»Â£c hÃƒÂ³a Ã„â€˜Ã†Â¡n trÃ¡ÂºÂ£ hÃƒÂ ng' });
     }
@@ -4170,6 +4749,37 @@ router.post('/tra-hang/add', async (req, res, next) => {
         const chenhLech = tongTienHangDoi + discountValue + returnFeeValue + pickupFeeCustomerPays - tongTienHangTra;
         const khachCanTraThem = Math.max(chenhLech, 0);
         const canTraKhach = Math.max(-chenhLech, 0);
+        const customerId = khach_hang_id || invoice?.khach_hang_id || null;
+        const storeId = invoice?.cua_hang_id || warehouse.cua_hang_id || null;
+        const cashBookId = resolveCashBookIdFromBody(req.body || {});
+        const refundCashBookId = resolveCashBookIdFromBody({
+            so_quy_id: req.body?.refund_so_quy_id || req.body?.refundCashBookId || req.body?.refund_cash_book_id || cashBookId
+        });
+        const returnPaymentMethod = normalizePaymentMethodValue(
+            req.body?.phuong_thuc_thanh_toan || req.body?.payment_method || req.body?.paymentMethod
+        );
+        let paid = 0;
+        let debt = 0;
+        let refund = 0;
+        let debtReduction = 0;
+        if (chenhLech > 0) {
+            paid = Math.min(Math.max(Number(khach_thanh_toan_them || 0), 0), chenhLech);
+            debt = Math.max(chenhLech - paid, 0);
+            if (paid > 0 && !cashBookId) {
+                return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền trả hàng/đổi hàng.' });
+            }
+        } else if (chenhLech < 0) {
+            refund = Math.abs(chenhLech);
+            if (customerId) {
+                const customer = await KhachHang.findById(customerId).select('tong_no').lean();
+                const currentDebt = Number(customer?.tong_no || 0);
+                debtReduction = Math.min(currentDebt, refund);
+                refund -= debtReduction;
+            }
+            if (refund > 0 && !refundCashBookId) {
+                return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để hoàn tiền trả hàng.' });
+            }
+        }
         const count = await PhieuTraHang.countDocuments();
         const ma_phieu_tra = 'TH' + String(count + 1).padStart(6, '0');
         if (receiveMethod === 'lay_tai_nha' && !cleanSenderName) {
@@ -4266,25 +4876,23 @@ router.post('/tra-hang/add', async (req, res, next) => {
             });
         }
 
-        const customerId = khach_hang_id || invoice?.khach_hang_id || null;
-        const storeId = invoice?.cua_hang_id || warehouse.cua_hang_id || null;
         if (chenhLech > 0) {
-            const paid = Math.min(Math.max(Number(khach_thanh_toan_them || 0), 0), chenhLech);
-            const debt = Math.max(chenhLech - paid, 0);
             if (paid > 0) {
-                const cashBook = await ensureDefaultSoQuy(storeId);
                 await taoPhieuThuChi({
                     loai_phieu: 'thu',
                     loai_thu_chi: 'Thu tien doi hang',
                     gia_tri: paid,
-                    so_quy_id: cashBook._id,
+                    ngay_lap: returnSlip.ngay_tra || new Date(),
+                    so_quy_id: cashBookId,
                     cua_hang_id: storeId,
                     nguoi_tao_id: req.user?._id,
                     khach_hang_id: customerId || undefined,
                     hoa_don_id: hoa_don_id || undefined,
+                    phieu_tra_hang_id: returnSlip._id,
                     ma_chung_tu_goc: ma_phieu_tra,
                     doi_tuong: customerId ? undefined : 'KhÃƒÂ¡ch lÃ¡ÂºÂ»',
                     nhom_doi_tuong: 'khach_hang',
+                    phuong_thuc_thanh_toan: returnPaymentMethod,
                     hach_toan: false
                 });
             }
@@ -4303,13 +4911,6 @@ router.post('/tra-hang/add', async (req, res, next) => {
                 }
             }
         } else if (chenhLech < 0) {
-            let refund = Math.abs(chenhLech);
-            let debtReduction = 0;
-            if (customerId) {
-                const customer = await KhachHang.findById(customerId).select('tong_no').lean();
-                const currentDebt = Number(customer?.tong_no || 0);
-                debtReduction = Math.min(currentDebt, refund);
-            }
             if (debtReduction > 0 && customerId) {
                 await KhachHang.updateOne({ _id: customerId }, { $inc: { tong_no: -debtReduction } });
                 await CongNoKhachHang.create({
@@ -4320,22 +4921,23 @@ router.post('/tra-hang/add', async (req, res, next) => {
                     ghi_chu: `GiÃ¡ÂºÂ£m cÃƒÂ´ng nÃ¡Â»Â£ trÃ¡ÂºÂ£/Ã„â€˜Ã¡Â»â€¢i hÃƒÂ ng ${ma_phieu_tra}`,
                     ngay: new Date()
                 });
-                refund -= debtReduction;
             }
             if (refund > 0) {
-                const cashBook = await ensureDefaultSoQuy(storeId);
                 await taoPhieuThuChi({
                     loai_phieu: 'chi',
                     loai_thu_chi: 'Hoan tien tra hang',
                     gia_tri: refund,
-                    so_quy_id: cashBook._id,
+                    ngay_lap: returnSlip.ngay_tra || new Date(),
+                    so_quy_id: refundCashBookId,
                     cua_hang_id: storeId,
                     nguoi_tao_id: req.user?._id,
                     khach_hang_id: customerId || undefined,
                     hoa_don_id: hoa_don_id || undefined,
+                    phieu_tra_hang_id: returnSlip._id,
                     ma_chung_tu_goc: ma_phieu_tra,
                     doi_tuong: customerId ? undefined : 'KhÃƒÂ¡ch lÃ¡ÂºÂ»',
                     nhom_doi_tuong: 'khach_hang',
+                    phuong_thuc_thanh_toan: returnPaymentMethod,
                     hach_toan: false
                 });
             }
@@ -4574,15 +5176,9 @@ router.post('/van-don/:id/thu-cod', async (req, res, next) => {
                 throw error;
             }
 
-            const cashBookId = req.body?.so_quy_id;
-            if (!cashBookId || !/^[0-9a-fA-F]{24}$/.test(String(cashBookId))) {
-                const error = new Error('Vui long chon so quy de thu COD.');
-                error.statusCode = 400;
-                throw error;
-            }
-            const cashBook = await SoQuy.findById(cashBookId).session(session).lean();
-            if (!cashBook) {
-                const error = new Error('So quy thu COD khong hop le.');
+            const cashBookId = resolveCashBookIdFromBody(req.body || {});
+            if (!cashBookId) {
+                const error = new Error('Vui lòng chọn sổ quỹ để thu COD.');
                 error.statusCode = 400;
                 throw error;
             }
@@ -4604,7 +5200,8 @@ router.post('/van-don/:id/thu-cod', async (req, res, next) => {
                 loai_phieu: 'thu',
                 loai_thu_chi: 'thu_cod',
                 gia_tri: codAmount,
-                so_quy_id: cashBook._id,
+                ngay_lap: new Date(),
+                so_quy_id: cashBookId,
                 cua_hang_id: shipment.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id: customerId,
@@ -4615,7 +5212,7 @@ router.post('/van-don/:id/thu-cod', async (req, res, next) => {
                 doi_tuong: shipment.khach_hang_id?.ten_khach_hang || shipment.ten_nguoi_nhan || 'COD',
                 ghi_chu: note,
                 nhom_doi_tuong: 'khach_hang',
-                phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
+                phuong_thuc_thanh_toan: normalizePaymentMethodValue(req.body?.phuong_thuc_thanh_toan),
                 hach_toan: false,
                 session
             });
@@ -4668,42 +5265,11 @@ router.post('/van-don/:id/thu-cod', async (req, res, next) => {
     }
 });
 
-router.post('/van-don/:id/thu-cod-legacy', async (req, res, next) => {
-    try {
-        return res.status(410).json({ success: false, message: 'Legacy COD collection endpoint is disabled.' });
-        const shipment = await VanDon.findById(req.params.id)
-            .populate('khach_hang_id')
-            .populate('hoa_don_id')
-            .populate('don_hang_id');
-        if (!shipment) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n' });
-        const amount = Number(req.body?.gia_tri || shipment.cod_amount || shipment.hoa_don_id?.thanh_toan || shipment.don_hang_id?.tong_thanh_toan || 0);
-        if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'SÃ¡Â»â€˜ tiÃ¡Â»Ân COD khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
-        const exists = await PhieuThuChi.findOne({ van_don_id: shipment._id, loai_phieu: 'thu', loai_thu_chi: 'Thu COD' });
-        if (exists) return res.json({ success: true, message: 'VÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n Ã„â€˜ÃƒÂ£ cÃƒÂ³ phiÃ¡ÂºÂ¿u thu COD', data: exists });
-        const cashBook = await ensureDefaultSoQuy(shipment.cua_hang_id);
-        const receipt = await taoPhieuThuChi({
-            loai_phieu: 'thu',
-            loai_thu_chi: 'Thu COD',
-            gia_tri: amount,
-            so_quy_id: cashBook._id,
-            cua_hang_id: shipment.cua_hang_id,
-            nguoi_tao_id: req.user?._id,
-            khach_hang_id: shipment.khach_hang_id?._id || shipment.khach_hang_id,
-            don_hang_id: shipment.don_hang_id?._id || shipment.don_hang_id,
-            hoa_don_id: shipment.hoa_don_id?._id || shipment.hoa_don_id,
-            van_don_id: shipment._id,
-            ma_chung_tu_goc: shipment.ma_van_don,
-            doi_tuong: shipment.khach_hang_id?.ten_khach_hang || shipment.ten_nguoi_nhan || 'COD',
-            nhom_doi_tuong: 'khach_hang',
-            phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
-            hach_toan: req.body?.hach_toan === true || req.body?.hach_toan === 'true'
-        });
-        shipment.trang_thai_cod = 'da_thu';
-        await shipment.save();
-        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u thu COD', data: receipt });
-    } catch (error) {
-        return res.status(400).json({ success: false, message: error.message || 'KhÃƒÂ´ng thu Ã„â€˜Ã†Â°Ã¡Â»Â£c COD' });
-    }
+router.post('/van-don/:id/thu-cod-legacy', async (req, res) => {
+    return res.status(410).json({
+        success: false,
+        message: 'Endpoint thu COD cũ đã ngừng sử dụng. Vui lòng dùng endpoint thu COD mới.'
+    });
 });
 
 router.post('/van-don/:id/chi-phi-van-chuyen', async (req, res, next) => {
@@ -4712,12 +5278,17 @@ router.post('/van-don/:id/chi-phi-van-chuyen', async (req, res, next) => {
         if (!shipment) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y vÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n' });
         const amount = Number(req.body?.gia_tri || shipment.phi_giao_hang || 0);
         if (!Number.isFinite(amount) || amount <= 0) return res.status(400).json({ success: false, message: 'PhÃƒÂ­ vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
-        const cashBook = await ensureDefaultSoQuy(shipment.cua_hang_id);
+        const cashBookId = resolveCashBookIdFromBody(req.body || {});
+        if (!cashBookId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để chi phí vận chuyển.' });
+        }
+
         const receipt = await taoPhieuThuChi({
             loai_phieu: 'chi',
             loai_thu_chi: 'Chi phi van chuyen',
             gia_tri: amount,
-            so_quy_id: cashBook._id,
+            ngay_lap: new Date(),
+            so_quy_id: cashBookId,
             cua_hang_id: shipment.cua_hang_id,
             nguoi_tao_id: req.user?._id,
             don_hang_id: shipment.don_hang_id,
@@ -4726,7 +5297,7 @@ router.post('/van-don/:id/chi-phi-van-chuyen', async (req, res, next) => {
             ma_chung_tu_goc: shipment.ma_van_don,
             doi_tuong: shipment.doi_tac_giao_hang_id?.ten_doi_tac || 'Ã„ÂÃ¡Â»â€˜i tÃƒÂ¡c giao hÃƒÂ ng',
             nhom_doi_tuong: 'doi_tac_giao_hang',
-            phuong_thuc_thanh_toan: req.body?.phuong_thuc_thanh_toan || 'tien_mat',
+            phuong_thuc_thanh_toan: normalizePaymentMethodValue(req.body?.phuong_thuc_thanh_toan),
             hach_toan: false
         });
         res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u chi phÃƒÂ­ vÃ¡ÂºÂ­n chuyÃ¡Â»Æ’n', data: receipt });
@@ -4772,7 +5343,7 @@ router.get('/van-don', async (req, res, next) => {
                 .populate('khach_hang_id')
                 .sort({ created_at: -1 }),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
-            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1, loai: 1 }).lean()
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
         res.locals.cashBooks = cashBooks;
         res.render('don-hang/van-don', { title: 'VÃ¡ÂºÂ­n Ã„â€˜Ã†Â¡n', shipments, partners, filters: req.query || {} });
@@ -4899,11 +5470,35 @@ router.get('/:id/detail', async (req, res, next) => {
             .populate('cua_hang_id')
             .populate('nguoi_tao_id');
         if (!order) return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
-        const items = await CTDonHang.find({ don_hang_id: order._id }).populate('hang_hoa_id');
-        const shipment = await VanDon.findOne({ don_hang_id: order._id }).populate('doi_tac_giao_hang_id').populate('cua_hang_id');
-        const invoice = await HoaDonBanHang.findOne({ don_hang_id: order._id }).select('_id ma_hoa_don trang_thai');
-        order.khach_thanh_toan = await getOrderPaidAmount(order._id);
-        res.json({ success: true, data: { order, items, shipment, invoice } });
+        const [items, shipment, invoices] = await Promise.all([
+            CTDonHang.find({ don_hang_id: order._id }).populate('hang_hoa_id').populate('lo_hang_id'),
+            VanDon.findOne({ don_hang_id: order._id }).populate('doi_tac_giao_hang_id').populate('cua_hang_id'),
+            HoaDonBanHang.find({ don_hang_id: order._id })
+                .select('_id ma_hoa_don trang_thai thanh_toan ngay_ban created_at')
+                .sort({ created_at: -1 })
+                .lean()
+        ]);
+        const invoiceIds = invoices.map(row => row._id).filter(Boolean);
+        const receiptLinkFilter = invoiceIds.length
+            ? { $or: [{ don_hang_id: order._id }, { hoa_don_id: { $in: invoiceIds } }] }
+            : { don_hang_id: order._id };
+        const receipts = await PhieuThuChi.find(receiptRowsForNetPaidFilter(receiptLinkFilter))
+            .populate('nguoi_tao_id')
+            .sort({ ngay_lap: -1, created_at: -1 })
+            .lean();
+        const paymentBalance = await applyOrderPaymentBalance(order, order._id);
+        res.json({
+            success: true,
+            data: {
+                order,
+                items,
+                shipment,
+                invoices,
+                receipts,
+                invoice: invoices[0] || null,
+                payment_balance: paymentBalance
+            }
+        });
     } catch (error) {
         next(error);
     }
@@ -4942,36 +5537,56 @@ router.put('/:id/detail', async (req, res, next) => {
 });
 
 async function confirmOrderDelivery(req, res, next) {
+    let createdInvoiceId = null;
+    let stockAppliedLines = [];
+    let orderLinesUpdated = false;
     try {
         const { kho_id, items, khach_thanh_toan, phuong_thuc_thanh_toan } = req.body || {};
         const deliveryItems = parseItems(items);
 
         if (!kho_id) {
-            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân kho.' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
         }
 
         const warehouse = await Kho.findById(kho_id);
         if (!warehouse) {
-            return res.status(400).json({ success: false, message: 'Kho giao hÃƒÂ ng khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
+            return res.status(400).json({ success: false, message: 'Kho giao hàng không hợp lệ' });
         }
 
         if (!deliveryItems.length) {
-            return res.status(400).json({ success: false, message: 'Vui lÃƒÂ²ng chÃ¡Â»Ân hÃƒÂ ng cÃ¡ÂºÂ§n giao' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn hàng cần giao' });
         }
 
         const order = await DonHang.findById(req.params.id);
         if (!order) {
-            return res.status(404).json({ success: false, message: 'KhÃƒÂ´ng tÃƒÂ¬m thÃ¡ÂºÂ¥y Ã„â€˜Ã†Â¡n hÃƒÂ ng' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         }
 
-        let hasDelivered = false;
         if (order.trang_thai === 'merged') {
-            return res.status(400).json({ success: false, message: `Ãon nÃ y dÃ£ du?c g?p vÃ o ${order.merged_to_ma_don_hang || 'don khÃ¡c'}, khÃ´ng th? xÃ¡c nh?n giao.` });
+            return res.status(400).json({
+                success: false,
+                message: `Đơn này đã được gộp vào ${order.merged_to_ma_don_hang || 'đơn khác'}, không thể xác nhận giao.`
+            });
         }
+
+        const sessionStoreId = await resolveStoreId(req);
+        if (!sessionStoreId) {
+            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng' });
+        }
+        if (String(warehouse.cua_hang_id || '') !== String(sessionStoreId)) {
+            return res.status(400).json({ success: false, message: 'Kho không thuộc cửa hàng đang làm việc.' });
+        }
+
+        const cashBookId = resolveCashBookIdFromBody(req.body || {});
+
+        const deliveryLines = [];
         for (const item of deliveryItems) {
             const quantity = Number(item.so_luong_giao);
-            if (!Number.isFinite(quantity) || quantity <= 0) {
-                return res.status(400).json({ success: false, message: 'So luong giao phai lon hon 0' });
+            if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+            const deliveryPrice = Number(item.don_gia_giao ?? item.don_gia_ban ?? 0);
+            if (!Number.isFinite(deliveryPrice) || deliveryPrice < 0) {
+                return res.status(400).json({ success: false, message: 'Đơn giá giao không hợp lệ' });
             }
 
             const detail = item.ct_don_hang_id
@@ -4979,114 +5594,259 @@ async function confirmOrderDelivery(req, res, next) {
                 : await CTDonHang.findOne({ don_hang_id: order._id, hang_hoa_id: item.hang_hoa_id });
 
             if (!detail) {
-                return res.status(400).json({ success: false, message: 'DÃƒÂ²ng hÃƒÂ ng giao khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
+                return res.status(400).json({ success: false, message: 'Dòng hàng giao không hợp lệ' });
             }
 
             const orderedQuantity = Number(detail.so_luong_dat || detail.so_luong || 0);
             const deliveredBefore = Number(detail.so_luong_da_giao || 0);
             const remainingBefore = Math.max(orderedQuantity - deliveredBefore, 0);
             if (quantity > remainingBefore) {
-                return res.status(400).json({ success: false, message: 'So luong giao vuot qua so luong con thieu' });
+                return res.status(400).json({ success: false, message: 'Số lượng giao vượt quá số lượng còn thiếu' });
             }
 
-            try {
-                await truTonKho({
+            const lineBase = quantity * deliveryPrice;
+            const lineDiscount = normalizeDiscount(detail.chiet_khau, detail.kieu_chiet_khau, lineBase);
+            const lineTotal = Math.max(lineBase - lineDiscount, 0);
+
+            deliveryLines.push({
+                detail,
+                quantity,
+                deliveryPrice,
+                lineDiscount,
+                lineTotal,
+                lo_hang_id: item.lo_hang_id || detail.lo_hang_id,
+                hang_hoa_id: item.hang_hoa_id || detail.hang_hoa_id
+            });
+        }
+
+        if (!deliveryLines.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng nhập ít nhất một số lượng giao hợp lệ' });
+        }
+
+        const stockPreflight = await validateDeliveryStockPreflight(kho_id, warehouse, deliveryLines);
+        if (!stockPreflight.valid) {
+            return res.status(400).json({
+                success: false,
+                message: stockPreflight.message,
+                shortages: stockPreflight.shortages
+            });
+        }
+
+        let tong_tien_hang = deliveryLines.reduce((sum, row) => sum + row.lineTotal, 0);
+        const orderGoodsTotal = Number(order.tong_tien_hang || 0);
+        const orderDiscount = normalizeDiscount(order.giam_gia, order.kieu_giam_gia, orderGoodsTotal);
+        const discountShare = orderGoodsTotal > 0
+            ? Math.round(orderDiscount * (tong_tien_hang / orderGoodsTotal))
+            : 0;
+        const payable = Math.max(tong_tien_hang - discountShare, 0);
+
+        const deliveryPayment = parseCustomerPaymentFromRequest(req.body, payable, false);
+        if (deliveryPayment.tong_khach_dua > 0 && !deliveryPayment.valid) {
+            return res.status(400).json({ success: false, message: deliveryPayment.errors.join('. ') });
+        }
+        if (deliveryPayment.tong_khach_dua > 0 && !cashBookId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền khi giao hàng.' });
+        }
+
+        const ma_hoa_don = await generateInvoiceCode();
+        const invoiceStatus = resolveInvoiceStatus(payable, deliveryPayment.thuc_thu);
+        const shipmentRow = await VanDon.findOne({ don_hang_id: order._id }).lean();
+
+        const invoice = await HoaDonBanHang.create({
+            ma_hoa_don,
+            ngay_ban: new Date(),
+            tong_tien: tong_tien_hang,
+            giam_gia: discountShare,
+            thanh_toan: payable,
+            phuong_thuc_tt: shipmentRow?.cod_enabled ? 'COD' : normalizePaymentMethodValue(phuong_thuc_thanh_toan) || 'Tiền mặt',
+            trang_thai: invoiceStatus,
+            ghi_chu: `Giao hang don ${order.ma_don_hang}`,
+            cua_hang_id: sessionStoreId,
+            kho_id,
+            don_hang_id: order._id,
+            khach_hang_id: order.khach_hang_id,
+            nguoi_ban_id: req.user?._id
+        });
+        createdInvoiceId = invoice._id;
+
+        const invoiceLineRefs = [];
+        for (const line of deliveryLines) {
+            const detail = line.detail;
+            const invoiceLine = await CTHoaDonBanHang.create({
+                hoa_don_id: invoice._id,
+                ct_don_hang_id: detail._id,
+                hang_hoa_id: line.hang_hoa_id,
+                lo_hang_id: null,
+                lot_allocations: [],
+                gia_tri_thuoc_tinh_id: detail.gia_tri_thuoc_tinh_id,
+                ten_quy_cach: detail.ten_quy_cach,
+                ten_thuoc_tinh: detail.ten_thuoc_tinh,
+                don_vi_tinh_id: detail.don_vi_tinh_id,
+                ma_hang_snapshot: detail.ma_hang_snapshot,
+                ten_hang_snapshot: detail.ten_hang_snapshot,
+                don_vi_tinh_snapshot: detail.don_vi_tinh_snapshot,
+                so_luong: line.quantity,
+                don_gia: line.deliveryPrice,
+                chiet_khau: line.lineDiscount,
+                thanh_tien: line.lineTotal,
+                ghi_chu: detail.ghi_chu
+            });
+            invoiceLineRefs.push({ invoiceLine, line });
+        }
+
+        try {
+            for (const { invoiceLine, line } of invoiceLineRefs) {
+                const detail = line.detail;
+                const preferredLotId = line.lo_hang_id || detail.lo_hang_id || undefined;
+                const stockResult = await truTonKho({
                     kho_id,
-                    hang_hoa_id: item.hang_hoa_id || detail.hang_hoa_id,
-                    lo_hang_id: item.lo_hang_id || detail.lo_hang_id,
-                    so_luong: quantity,
+                    hang_hoa_id: line.hang_hoa_id,
+                    lo_hang_id: preferredLotId,
+                    ten_quy_cach: detail.ten_quy_cach || detail.ten_thuoc_tinh || '',
+                    gia_tri_thuoc_tinh_id: detail.gia_tri_thuoc_tinh_id || undefined,
+                    sync_quy_cach: Boolean(detail.gia_tri_thuoc_tinh_id || detail.ten_quy_cach || detail.ten_thuoc_tinh),
+                    so_luong: line.quantity,
                     nguoi_tao_id: req.user?._id,
                     loai_phieu: 'ban_hang',
-                    ma_phieu: order.ma_don_hang,
-                    ghi_chu: `Giao hang don ${order.ma_don_hang}`
+                    ma_phieu: ma_hoa_don,
+                    ghi_chu: `Xuat kho HĐ ${ma_hoa_don} - don ${order.ma_don_hang}`
                 });
-            } catch (error) {
-                if (/tÃ¡Â»â€œn kho|ton kho|TÃ¡Â»â€œn kho|lo/i.test(error.message || '')) {
-                    return res.status(400).json({ success: false, message: 'KhÃƒÂ´ng Ã„â€˜Ã¡Â»Â§ tÃ¡Â»â€œn kho Ã„â€˜Ã¡Â»Æ’ giao hÃƒÂ ng' });
-                }
-                throw error;
+                const lotPatch = applyLotAllocationsToInvoiceLine(stockResult.allocations);
+                await CTHoaDonBanHang.updateOne({ _id: invoiceLine._id }, { $set: lotPatch });
+                stockAppliedLines.push({
+                    hang_hoa_id: line.hang_hoa_id,
+                    lo_hang_id: lotPatch.lo_hang_id,
+                    lot_allocations: lotPatch.lot_allocations,
+                    gia_tri_thuoc_tinh_id: detail.gia_tri_thuoc_tinh_id,
+                    ten_quy_cach: detail.ten_quy_cach,
+                    ten_thuoc_tinh: detail.ten_thuoc_tinh,
+                    so_luong: line.quantity
+                });
             }
+        } catch (stockError) {
+            await rollbackDeliveryInvoice(createdInvoiceId, {
+                kho_id,
+                nguoi_tao_id: req.user?._id,
+                stockLines: stockAppliedLines,
+                restoreStock: stockAppliedLines.length > 0
+            });
+            createdInvoiceId = null;
+            stockAppliedLines = [];
+            if (/tồn kho|ton kho|Ton kho/i.test(stockError.message || '')) {
+                return res.status(400).json({ success: false, message: stockError.message });
+            }
+            throw stockError;
+        }
 
-            const deliveredAfter = deliveredBefore + quantity;
+        for (const line of deliveryLines) {
+            const detail = line.detail;
+            const orderedQuantity = Number(detail.so_luong_dat || detail.so_luong || 0);
+            const deliveredBefore = Number(detail.so_luong_da_giao || 0);
+            const deliveredAfter = deliveredBefore + line.quantity;
             const missingAfter = Math.max(orderedQuantity - deliveredAfter, 0);
             detail.so_luong_dat = orderedQuantity;
-            detail.so_luong_xac_nhan = Number(detail.so_luong_xac_nhan || 0) + quantity;
+            detail.so_luong_xac_nhan = Number(detail.so_luong_xac_nhan || 0) + line.quantity;
             detail.so_luong_da_giao = deliveredAfter;
             detail.so_luong_con_thieu = missingAfter;
             detail.trang_thai_giao = deliveredAfter <= 0
                 ? 'chua_giao'
                 : (missingAfter <= 0 ? 'giao_du' : 'giao_thieu');
-            if (item.lo_hang_id) detail.lo_hang_id = item.lo_hang_id;
             await detail.save();
-            hasDelivered = true;
         }
+        orderLinesUpdated = true;
 
         const allDetails = await CTDonHang.find({ don_hang_id: order._id });
         const allDelivered = allDetails.length > 0 && allDetails.every(item => Number(item.so_luong_con_thieu || 0) <= 0);
         const anyDelivered = allDetails.some(item => Number(item.so_luong_da_giao || 0) > 0);
-        const anyMissing = allDetails.some(item => Number(item.so_luong_con_thieu || item.so_luong_dat || item.so_luong || 0) > 0);
+        const anyMissing = allDetails.some(item => Number(item.so_luong_con_thieu || 0) > 0);
 
         order.kho_id = kho_id;
         order.trang_thai_giao_hang = allDelivered
             ? 'giao_du'
             : (anyDelivered && anyMissing ? 'giao_mot_phan' : 'chua_giao');
-        if (hasDelivered) {
-            order.ngay_giao_thuc_te = new Date();
-            if (!order.trang_thai || order.trang_thai === 'draft' || order.trang_thai === 'da_xac_nhan') {
-                order.trang_thai = allDelivered ? 'completed' : 'shipping';
-            } else if (order.trang_thai === 'shipping' && allDelivered) {
-                order.trang_thai = 'completed';
+        order.ngay_giao_thuc_te = new Date();
+        if (!order.trang_thai || order.trang_thai === 'draft' || order.trang_thai === 'da_xac_nhan') {
+            order.trang_thai = allDelivered ? 'completed' : 'shipping';
+        } else if (order.trang_thai === 'shipping' && allDelivered) {
+            order.trang_thai = 'completed';
+        }
+
+        const debt = Math.max(payable - deliveryPayment.thuc_thu, 0);
+        if (debt > 0 && order.khach_hang_id) {
+            await CongNoKhachHang.create({
+                khach_hang_id: order.khach_hang_id,
+                don_hang_id: order._id,
+                hoa_don_id: invoice._id,
+                so_tien: debt,
+                loai: 'tang_no',
+                ghi_chu: `Công nợ hóa đơn ${ma_hoa_don}`,
+                ngay: invoice.ngay_ban
+            });
+            const customer = await KhachHang.findById(order.khach_hang_id).select('tong_no').lean();
+            if (customer && typeof customer.tong_no === 'number') {
+                await KhachHang.updateOne({ _id: order.khach_hang_id }, { $inc: { tong_no: debt } });
             }
         }
-        const paidBeforeDelivery = await getOrderPaidAmount(order._id);
-        const remainingPayment = Math.max(Number(order.tong_thanh_toan || order.tong_tien || 0) - paidBeforeDelivery, 0);
-        const extraPaid = Math.max(0, Number(khach_thanh_toan || 0));
-        if (extraPaid > remainingPayment) {
-            return res.status(400).json({
-                success: false,
-                message: `KhÃƒÂ¡ch chÃ¡Â»â€° cÃƒÂ²n cÃ¡ÂºÂ§n thanh toÃƒÂ¡n ${remainingPayment.toLocaleString('vi-VN')} VNÃ„Â`
-            });
-        }
+
         let receipt = null;
-        if (extraPaid > 0) {
-            const cashBook = await ensureDefaultSoQuy(order.cua_hang_id);
-            const shipment = await VanDon.findOne({ don_hang_id: order._id }).lean();
-            const invoice = await HoaDonBanHang.findOne({ don_hang_id: order._id }).lean();
-            receipt = await taoPhieuThuChi({
-                loai_phieu: 'thu',
+        if (deliveryPayment.tong_khach_dua > 0) {
+            const customerName = order.khach_hang_id
+                ? (await KhachHang.findById(order.khach_hang_id).select('ten_khach_hang').lean())?.ten_khach_hang
+                : 'Khách lẻ';
+            const paymentResult = await recordCustomerPaymentReceipts({
                 loai_thu_chi: 'Thu tien khi giao hang',
-                gia_tri: extraPaid,
-                so_quy_id: cashBook._id,
+                ngay_lap: new Date(),
+                so_quy_id: cashBookId,
                 cua_hang_id: order.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id: order.khach_hang_id,
+                doi_tuong: customerName || 'Khách lẻ',
                 don_hang_id: order._id,
-                hoa_don_id: invoice?._id,
-                van_don_id: shipment?._id,
-                ma_chung_tu_goc: order.ma_don_hang,
+                hoa_don_id: invoice._id,
+                van_don_id: shipmentRow?._id,
+                ma_chung_tu_goc: ma_hoa_don,
                 nhom_doi_tuong: 'khach_hang',
-                phuong_thuc_thanh_toan: normalizePaymentMethodValue(phuong_thuc_thanh_toan),
                 hach_toan: false
-            });
-            order.khach_thanh_toan = paidBeforeDelivery + extraPaid;
-        } else {
-            order.khach_thanh_toan = paidBeforeDelivery;
+            }, deliveryPayment);
+            receipt = paymentResult.thu;
         }
+
+        await applyOrderPaymentBalance(order, order._id);
         await order.save();
+
+        if (shipmentRow) {
+            await VanDon.updateOne(
+                { _id: shipmentRow._id },
+                { $set: { hoa_don_id: invoice._id } }
+            );
+        }
 
         return res.json({
             success: true,
-            message: 'Da xac nhan giao hang',
+            message: `Đã xác nhận giao và tạo hóa đơn ${ma_hoa_don}`,
             data: {
                 don_hang_id: order._id,
+                hoa_don_id: invoice._id,
+                ma_hoa_don,
                 trang_thai_giao_hang: order.trang_thai_giao_hang,
                 ngay_giao_thuc_te: order.ngay_giao_thuc_te,
                 khach_thanh_toan: order.khach_thanh_toan,
+                khach_can_tra: order.khach_can_tra,
+                thanh_toan_hoa_don: payable,
                 phieu_thu_id: receipt?._id
             },
-            print_url: '/chung-tu-kho/ban-hang/' + order._id
+            print_url: '/chung-tu-kho/hoa-don-ban/' + invoice._id
         });
     } catch (error) {
+        if (createdInvoiceId) {
+            await rollbackDeliveryInvoice(createdInvoiceId, {
+                kho_id: req.body?.kho_id,
+                nguoi_tao_id: req.user?._id,
+                stockLines: stockAppliedLines,
+                restoreStock: stockAppliedLines.length > 0,
+                revertOrderLines: orderLinesUpdated
+            });
+        }
         next(error);
     }
 }
@@ -5101,66 +5861,94 @@ router.post('/:id/phieu-thu', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Ã„ÂÃ†Â¡n Ã„â€˜ÃƒÂ£ hÃ¡Â»Â§y, khÃƒÂ´ng thÃ¡Â»Æ’ thu tiÃ¡Â»Ân' });
         }
 
-        const invoice = await HoaDonBanHang.findOne({ don_hang_id: order._id });
-        const payable = Number(invoice?.thanh_toan || order.tong_thanh_toan || order.tong_tien || 0);
-        const paidBefore = await getOrderPaidAmount(order._id);
-        const remaining = Math.max(payable - paidBefore, 0);
-        const amount = Math.max(0, Number(req.body?.gia_tri || req.body?.khach_thanh_toan || 0));
-        if (amount <= 0) return res.status(400).json({ success: false, message: 'SÃ¡Â»â€˜ tiÃ¡Â»Ân thu khÃƒÂ´ng hÃ¡Â»Â£p lÃ¡Â»â€¡' });
-        if (amount > remaining) {
-            return res.status(400).json({
-                success: false,
-                message: `KhÃƒÂ¡ch chÃ¡Â»â€° cÃƒÂ²n nÃ¡Â»Â£ ${remaining.toLocaleString('vi-VN')} VNÃ„Â`
-            });
+        const debtSummary = await getOrderInvoiceDebtSummary(order._id);
+        const balance = await computeOrderPaymentBalance(order._id, order);
+        const remaining = debtSummary.invoices.length
+            ? debtSummary.totalRemaining
+            : balance.khach_can_tra;
+        const payment = parseCustomerPaymentFromRequest(req.body, remaining, true);
+        if (!payment.valid) {
+            return res.status(400).json({ success: false, message: payment.errors.join('. ') });
+        }
+        const cashBookId = resolveCashBookIdFromBody(req.body || {});
+        if (!cashBookId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền đơn hàng.' });
         }
 
-        const [cashBook, shipment] = await Promise.all([
-            ensureDefaultSoQuy(order.cua_hang_id),
-            VanDon.findOne({ don_hang_id: order._id }).lean()
-        ]);
-        const receipt = await taoPhieuThuChi({
-            loai_phieu: 'thu',
-            loai_thu_chi: 'Thu tien don hang',
-            gia_tri: amount,
-            so_quy_id: cashBook._id,
-            cua_hang_id: order.cua_hang_id,
-            nguoi_tao_id: req.user?._id,
-            khach_hang_id: order.khach_hang_id,
-            don_hang_id: order._id,
-            hoa_don_id: invoice?._id,
-            van_don_id: shipment?._id,
-            ma_chung_tu_goc: order.ma_don_hang,
-            nhom_doi_tuong: 'khach_hang',
-            phuong_thuc_thanh_toan: normalizePaymentMethodValue(req.body?.phuong_thuc_thanh_toan),
-            hach_toan: false
-        });
+        const shipment = await VanDon.findOne({ don_hang_id: order._id }).lean();
+        const receipts = [];
+        const customerName = order.khach_hang_id
+            ? (await KhachHang.findById(order.khach_hang_id).select('ten_khach_hang').lean())?.ten_khach_hang
+            : 'Khách lẻ';
+        const primaryInvoice = debtSummary.openInvoices[0]?.invoice || null;
 
-        const paidAfter = paidBefore + amount;
-        order.khach_thanh_toan = paidAfter;
-        await order.save();
+        if (payment.tong_khach_dua > 0) {
+            const paymentResult = await recordCustomerPaymentReceipts({
+                loai_thu_chi: 'Thu tien don hang',
+                ngay_lap: new Date(),
+                so_quy_id: cashBookId,
+                cua_hang_id: order.cua_hang_id,
+                nguoi_tao_id: req.user?._id,
+                khach_hang_id: order.khach_hang_id,
+                doi_tuong: customerName || 'Khách lẻ',
+                don_hang_id: order._id,
+                hoa_don_id: primaryInvoice?._id,
+                van_don_id: shipment?._id,
+                ma_chung_tu_goc: primaryInvoice?.ma_hoa_don || order.ma_don_hang,
+                nhom_doi_tuong: 'khach_hang',
+                hach_toan: false
+            }, payment);
+            if (paymentResult.thu) receipts.push(paymentResult.thu);
+        }
 
-        if (invoice) {
-            invoice.trang_thai = resolveInvoiceStatus(payable, paidAfter);
-            await invoice.save();
-            if (order.khach_hang_id) {
-                await CongNoKhachHang.create({
-                    khach_hang_id: order.khach_hang_id,
-                    don_hang_id: order._id,
-                    hoa_don_id: invoice._id,
-                    phieu_thu_chi_id: receipt._id,
-                    so_tien: amount,
-                    loai: 'giam_no',
-                    ghi_chu: `Thu tiÃ¡Â»Ân Ã„â€˜Ã†Â¡n hÃƒÂ ng ${order.ma_don_hang}`,
-                    ngay: new Date()
-                });
-                const customer = await KhachHang.findById(order.khach_hang_id).select('tong_no').lean();
-                if (customer && typeof customer.tong_no === 'number') {
-                    await KhachHang.updateOne({ _id: order.khach_hang_id }, { $inc: { tong_no: -amount } });
+        let amountLeft = payment.thuc_thu;
+        if (debtSummary.openInvoices.length) {
+            for (const row of debtSummary.openInvoices) {
+                if (amountLeft <= 0) break;
+                const slice = Math.min(amountLeft, row.remaining);
+                const inv = row.invoice;
+                amountLeft -= slice;
+
+                const invoiceDoc = await HoaDonBanHang.findById(inv._id);
+                if (invoiceDoc) {
+                    const paidOnInvoice = await getInvoicePaidAmount(inv._id);
+                    invoiceDoc.trang_thai = resolveInvoiceStatus(Number(inv.thanh_toan || 0), paidOnInvoice);
+                    await invoiceDoc.save();
+                }
+                if (order.khach_hang_id && slice > 0) {
+                    await CongNoKhachHang.create({
+                        khach_hang_id: order.khach_hang_id,
+                        don_hang_id: order._id,
+                        hoa_don_id: inv._id,
+                        phieu_thu_chi_id: receipts[0]?._id,
+                        so_tien: slice,
+                        loai: 'giam_no',
+                        ghi_chu: `Thu tiền hóa đơn ${inv.ma_hoa_don || order.ma_don_hang}`,
+                        ngay: new Date()
+                    });
+                    const customerDebt = await KhachHang.findById(order.khach_hang_id).select('tong_no').lean();
+                    if (customerDebt && typeof customerDebt.tong_no === 'number') {
+                        await KhachHang.updateOne({ _id: order.khach_hang_id }, { $inc: { tong_no: -slice } });
+                    }
                 }
             }
         }
 
-        res.json({ success: true, message: 'Ã„ÂÃƒÂ£ tÃ¡ÂºÂ¡o phiÃ¡ÂºÂ¿u thu', data: { receipt, paid: paidAfter, remaining: Math.max(payable - paidAfter, 0) } });
+        await applyOrderPaymentBalance(order, order._id);
+        await order.save();
+
+        const paidAfter = order.khach_thanh_toan;
+        const remainingAfter = order.khach_can_tra;
+        res.json({
+            success: true,
+            message: 'Đã tạo phiếu thu',
+            data: {
+                receipt: receipts[0] || null,
+                receipts,
+                paid: paidAfter,
+                remaining: remainingAfter
+            }
+        });
     } catch (error) {
         next(error);
     }
@@ -5194,4 +5982,3 @@ router.post('/:id/status', async (req, res, next) => {
 });
 
 module.exports = router;
-
