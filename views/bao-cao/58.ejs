@@ -4,14 +4,59 @@
   const activeMau = locals.mau || mauList[0] || '';
   const activeTab = locals.view === 'excel' ? 'excel' : 'pdf';
   const sheetMeta = locals.sheetMeta || { mauCode: activeMau, title: activeMau, columns: [], hint: '' };
-  const baseQs = `mau=${encodeURIComponent(activeMau)}&from=${encodeURIComponent(safeRange.from || '')}&to=${encodeURIComponent(safeRange.to || '')}`;
+  const s2cData = locals.s2cData || {};
+  const s2cFilters = s2cData.filters || {};
+  const s2cProducts = Array.isArray(s2cFilters.products) ? s2cFilters.products : [];
+  const s2cWarehouses = Array.isArray(s2cFilters.warehouses) ? s2cFilters.warehouses : [];
+  const activeHangHoaId = s2cFilters.hang_hoa_id || '';
+  const activeKhoId = s2cFilters.kho_id || '';
+  const s2dFilters = locals.s2dFilters || {};
+  const voucherFilters = locals.voucherFilters || {};
+  const purchaseFilters = locals.purchaseFilters || {};
+  const exportFilters = locals.exportFilters || {};
+  const cashBooks = Array.isArray(s2dFilters.cashBooks) ? s2dFilters.cashBooks : [];
+  const voucherReceipts = Array.isArray(voucherFilters.receipts) ? voucherFilters.receipts : [];
+  const purchaseVouchers = Array.isArray(purchaseFilters.purchases) ? purchaseFilters.purchases : [];
+  const exportVoucherOptions = Array.isArray(exportFilters.options) ? exportFilters.options : [];
+  const activeSoQuyId = String(locals.query && locals.query.so_quy_id || '').trim() || '';
+  const activePhieuId = String(locals.query && locals.query.phieu_id || '').trim() || '';
+  const activePhieuNhapId = String(locals.query && locals.query.phieu_nhap_id || '').trim() || '';
+  const activeXuatRef = String(locals.query && locals.query.xuat_ref || '').trim() || '';
+  const voucherReceiptsFiltered = voucherReceipts.filter(function(item) {
+    if (activeMau === '01-TT') return item.loai_phieu === 'thu';
+    if (activeMau === '02-TT') return item.loai_phieu === 'chi';
+    return true;
+  });
+  const isS2c = activeMau === 'S2c-DNSN';
+  const isS2d = activeMau === 'S2d-DNSN';
+  const isVoucherTT = ['01-TT', '02-TT'].includes(activeMau);
+  const isVoucherNhap = activeMau === '01-VT';
+  const isVoucherXuat = activeMau === '02-VT';
+  const extraQs = [
+    isS2c ? `hang_hoa_id=${encodeURIComponent(activeHangHoaId)}` : '',
+    isS2c ? `kho_id=${encodeURIComponent(activeKhoId)}` : '',
+    isS2d && activeSoQuyId ? `so_quy_id=${encodeURIComponent(activeSoQuyId)}` : '',
+    isVoucherTT && activePhieuId ? `phieu_id=${encodeURIComponent(activePhieuId)}` : '',
+    isVoucherNhap && activePhieuNhapId ? `phieu_nhap_id=${encodeURIComponent(activePhieuNhapId)}` : '',
+    isVoucherXuat && activeXuatRef ? `xuat_ref=${encodeURIComponent(activeXuatRef)}` : ''
+  ].filter(Boolean).join('&');
+  const stockQs = extraQs ? `&${extraQs}` : '';
+  const baseQs = `mau=${encodeURIComponent(activeMau)}&from=${encodeURIComponent(safeRange.from || '')}&to=${encodeURIComponent(safeRange.to || '')}${stockQs}`;
   const exportCsvUrl = `/bao-cao/58/export.csv?${baseQs}`;
   const exportXlsxUrl = `/bao-cao/58/export.xlsx?${baseQs}`;
   const exportPdfUrl = `/bao-cao/58/export.pdf?${baseQs}`;
   const previewPdfUrl = `/bao-cao/58/preview.pdf?${baseQs}`;
   const previewExcelUrl = `/bao-cao/58/preview/excel?${baseQs}`;
   function mauHref(code) {
-    return `/bao-cao/58?mau=${encodeURIComponent(code)}&from=${encodeURIComponent(safeRange.from || '')}&to=${encodeURIComponent(safeRange.to || '')}&view=${activeTab}`;
+    let extra = '';
+    if (code === 'S2c-DNSN' && activeHangHoaId && activeKhoId) {
+      extra = `&hang_hoa_id=${encodeURIComponent(activeHangHoaId)}&kho_id=${encodeURIComponent(activeKhoId)}`;
+    }
+    if (code === 'S2d-DNSN' && activeSoQuyId) extra += `&so_quy_id=${encodeURIComponent(activeSoQuyId)}`;
+    if (['01-TT', '02-TT'].includes(code) && activePhieuId) extra += `&phieu_id=${encodeURIComponent(activePhieuId)}`;
+    if (code === '01-VT' && activePhieuNhapId) extra += `&phieu_nhap_id=${encodeURIComponent(activePhieuNhapId)}`;
+    if (code === '02-VT' && activeXuatRef) extra += `&xuat_ref=${encodeURIComponent(activeXuatRef)}`;
+    return `/bao-cao/58?mau=${encodeURIComponent(code)}&from=${encodeURIComponent(safeRange.from || '')}&to=${encodeURIComponent(safeRange.to || '')}${extra}&view=${activeTab}`;
   }
 %>
 <!DOCTYPE html>
@@ -48,12 +93,15 @@
     .viewer-bar .bar-export:hover{opacity:1}
     .viewer-bar .bar-filter{display:inline-flex;align-items:center;gap:6px;margin-left:4px;flex-wrap:wrap}
     .viewer-bar .bar-filter input[type=date]{height:28px;width:132px;border:1px solid rgba(255,255,255,.45);border-radius:6px;padding:0 8px;font-size:12px;background:rgba(255,255,255,.14);color:#fff}
-    .viewer-bar .bar-filter input[type=date]::-webkit-calendar-picker-indicator{filter:invert(1);opacity:.9}
+    .viewer-bar .bar-filter select{height:28px;min-width:140px;max-width:180px;border:1px solid rgba(255,255,255,.45);border-radius:6px;padding:0 8px;font-size:12px;background:rgba(255,255,255,.14);color:#fff}
+    .viewer-bar .bar-filter select option{color:#111827}
     .viewer-bar .bar-filter-sep{opacity:.7;font-size:12px}
     .viewer-bar .bar-filter-btn{border:1px solid rgba(255,255,255,.55);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;background:rgba(255,255,255,.12);color:#fff;cursor:pointer}
     .viewer-bar .bar-filter-btn:hover{background:rgba(255,255,255,.22)}
     .viewer-bar .bar-filter-link{font-size:12px;color:rgba(255,255,255,.9);text-decoration:none}
     .viewer-bar .bar-filter-link:hover{text-decoration:underline}
+    .report58-notice{flex:0 0 auto;margin:8px 10px 0;padding:8px 12px;background:#fff8e6;border:1px solid #f0c674;border-radius:6px;font-size:12px;line-height:1.45;color:#5c4813}
+    .report58-notice i{margin-right:6px;color:#b45309}
     .viewer-panels{flex:1;display:flex;flex-direction:column;overflow:hidden;margin:10px;min-height:0}
     .viewer-panel{display:none;flex:1;flex-direction:column;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12);border-radius:2px;min-height:0}
     .viewer-panel.active{display:flex}
@@ -79,6 +127,64 @@
         <a class="mau-link <%= code === activeMau ? 'active' : '' %>" href="<%= mauHref(code) %>"><%= code %></a>
       <% }) %>
       <div class="nav-filter">
+        <label for="report58From">Từ ngày</label>
+        <input class="input" type="date" id="report58From" form="report58RangeForm" value="<%= safeRange.from || '' %>" aria-label="Từ ngày">
+        <label for="report58To">Đến ngày</label>
+        <input class="input" type="date" id="report58To" form="report58RangeForm" value="<%= safeRange.to || '' %>" aria-label="Đến ngày">
+        <% if (isS2c) { %>
+        <label for="report58HangHoa">Hàng hóa</label>
+        <select class="input" id="report58HangHoa" form="report58RangeForm" aria-label="Hàng hóa">
+          <option value="">— Chọn hàng hóa —</option>
+          <% s2cProducts.forEach(function(item) { %>
+            <option value="<%= item._id %>" <%= String(item._id) === String(activeHangHoaId) ? 'selected' : '' %>><%= item.ten_hang %><%= item.ma_hang ? ' (' + item.ma_hang + ')' : '' %></option>
+          <% }) %>
+        </select>
+        <label for="report58Kho">Kho</label>
+        <select class="input" id="report58Kho" form="report58RangeForm" aria-label="Kho">
+          <option value="">— Chọn kho —</option>
+          <% s2cWarehouses.forEach(function(item) { %>
+            <option value="<%= item._id %>" <%= String(item._id) === String(activeKhoId) ? 'selected' : '' %>><%= item.ten_kho %></option>
+          <% }) %>
+        </select>
+        <% } %>
+        <% if (isS2d) { %>
+        <label for="report58SoQuy">Sổ quỹ</label>
+        <select class="input" id="report58SoQuy" form="report58RangeForm" aria-label="Sổ quỹ">
+          <option value="">— Tất cả sổ quỹ —</option>
+          <% cashBooks.forEach(function(item) { %>
+            <option value="<%= item._id %>" <%= String(item._id) === String(activeSoQuyId) ? 'selected' : '' %>><%= item.ten_so_quy %></option>
+          <% }) %>
+        </select>
+        <% } %>
+        <% if (isVoucherTT) { %>
+        <label for="report58Phieu">Phiếu thu/chi</label>
+        <select class="input" id="report58Phieu" form="report58RangeForm" aria-label="Phiếu thu chi">
+          <option value="">— Chọn phiếu —</option>
+          <% voucherReceiptsFiltered.forEach(function(item) { %>
+            <option value="<%= item._id %>" <%= String(item._id) === String(activePhieuId) ? 'selected' : '' %>><%= item.ma_phieu %> — <%= item.loai_phieu === 'thu' ? 'Thu' : 'Chi' %> <%= Number(item.gia_tri || 0).toLocaleString('vi-VN') %>đ</option>
+          <% }) %>
+        </select>
+        <% } %>
+        <% if (isVoucherNhap) { %>
+        <label for="report58PhieuNhap">Phiếu nhập hàng</label>
+        <select class="input" id="report58PhieuNhap" form="report58RangeForm" aria-label="Phiếu nhập hàng">
+          <option value="">— Chọn phiếu nhập —</option>
+          <% purchaseVouchers.forEach(function(item) { %>
+            <option value="<%= item._id %>" <%= String(item._id) === String(activePhieuNhapId) ? 'selected' : '' %>><%= item.ma_phieu_nhap %><%= item.nha_cung_cap_id && item.nha_cung_cap_id.ten_ncc ? ' — ' + item.nha_cung_cap_id.ten_ncc : '' %><%= item.trang_thai === 'draft' ? ' (nháp)' : '' %></option>
+          <% }) %>
+        </select>
+        <% } %>
+        <% if (isVoucherXuat) { %>
+        <label for="report58XuatRef">Chứng từ xuất kho</label>
+        <select class="input" id="report58XuatRef" form="report58RangeForm" aria-label="Chứng từ xuất kho">
+          <option value="">— Chọn chứng từ xuất —</option>
+          <% exportVoucherOptions.forEach(function(item) { %>
+            <option value="<%= item.value %>" <%= String(item.value) === String(activeXuatRef) ? 'selected' : '' %>><%= item.label %></option>
+          <% }) %>
+        </select>
+        <% } %>
+        <button class="btn primary" type="submit" form="report58RangeForm">Lọc báo cáo</button>
+        <a class="btn" href="/bao-cao/58?mau=<%= encodeURIComponent(activeMau) %>&view=<%= activeTab %>">Bỏ lọc</a>
         <a class="btn" href="/bao-cao/58/export.xlsx?all=1&amp;from=<%= encodeURIComponent(safeRange.from || '') %>&amp;to=<%= encodeURIComponent(safeRange.to || '') %>">Tải bộ mẫu Excel</a>
       </div>
     </aside>
@@ -93,6 +199,52 @@
             <input type="date" name="from" value="<%= safeRange.from || '' %>" aria-label="Từ ngày">
             <span class="bar-filter-sep">—</span>
             <input type="date" name="to" value="<%= safeRange.to || '' %>" aria-label="Đến ngày">
+            <% if (isS2c) { %>
+            <select name="hang_hoa_id" aria-label="Hàng hóa">
+              <option value="">Hàng hóa</option>
+              <% s2cProducts.forEach(function(item) { %>
+                <option value="<%= item._id %>" <%= String(item._id) === String(activeHangHoaId) ? 'selected' : '' %>><%= item.ten_hang %></option>
+              <% }) %>
+            </select>
+            <select name="kho_id" aria-label="Kho">
+              <option value="">Kho</option>
+              <% s2cWarehouses.forEach(function(item) { %>
+                <option value="<%= item._id %>" <%= String(item._id) === String(activeKhoId) ? 'selected' : '' %>><%= item.ten_kho %></option>
+              <% }) %>
+            </select>
+            <% } %>
+            <% if (isS2d) { %>
+            <select name="so_quy_id" aria-label="Sổ quỹ">
+              <option value="">Sổ quỹ</option>
+              <% cashBooks.forEach(function(item) { %>
+                <option value="<%= item._id %>" <%= String(item._id) === String(activeSoQuyId) ? 'selected' : '' %>><%= item.ten_so_quy %></option>
+              <% }) %>
+            </select>
+            <% } %>
+            <% if (isVoucherTT) { %>
+            <select name="phieu_id" aria-label="Phiếu thu chi">
+              <option value="">Phiếu</option>
+              <% voucherReceiptsFiltered.forEach(function(item) { %>
+                <option value="<%= item._id %>" <%= String(item._id) === String(activePhieuId) ? 'selected' : '' %>><%= item.ma_phieu %></option>
+              <% }) %>
+            </select>
+            <% } %>
+            <% if (isVoucherNhap) { %>
+            <select name="phieu_nhap_id" aria-label="Phiếu nhập hàng">
+              <option value="">Phiếu nhập</option>
+              <% purchaseVouchers.forEach(function(item) { %>
+                <option value="<%= item._id %>" <%= String(item._id) === String(activePhieuNhapId) ? 'selected' : '' %>><%= item.ma_phieu_nhap %></option>
+              <% }) %>
+            </select>
+            <% } %>
+            <% if (isVoucherXuat) { %>
+            <select name="xuat_ref" aria-label="Chứng từ xuất kho">
+              <option value="">Chứng từ xuất</option>
+              <% exportVoucherOptions.forEach(function(item) { %>
+                <option value="<%= item.value %>" <%= String(item.value) === String(activeXuatRef) ? 'selected' : '' %>><%= item.label %></option>
+              <% }) %>
+            </select>
+            <% } %>
             <button type="submit" class="bar-filter-btn">Lọc</button>
             <a class="bar-filter-link" href="/bao-cao/58?mau=<%= encodeURIComponent(activeMau) %>&view=<%= activeTab %>">Bỏ lọc</a>
           </form>
@@ -108,6 +260,15 @@
           <a class="bar-export" href="<%= exportXlsxUrl %>" title="Tải Excel"><i class="fa-solid fa-download"></i> Excel</a>
           <a class="bar-export" href="<%= exportCsvUrl %>" title="Tải CSV"><i class="fa-solid fa-cloud-arrow-down"></i></a>
           <button type="button" class="bar-export" id="report58PrintBtn" title="In"><i class="fa-solid fa-print"></i></button>
+        </div>
+
+        <div class="report58-notice" role="status">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+          <% if (isVoucherNhap || isVoucherXuat) { %>
+          Lưu ý: Với 01-VT/02-VT, bản PDF đã lấy đúng phiếu nhập/xuất kho. Excel/CSV hiện vẫn thuộc pipeline cũ và có thể chưa khớp PDF.
+          <% } else { %>
+          Lưu ý: PDF đã dùng nguồn dữ liệu mới theo DB thực tế. Excel/CSV của một số mẫu chưa được đồng bộ trong phase này và sẽ xử lý ở phase Excel.
+          <% } %>
         </div>
 
         <div class="viewer-panels" id="report58Panels">
@@ -180,6 +341,61 @@
 
       const initial = '<%= activeTab %>';
       ensureFrameLoaded(initial);
+
+      // Chỉ một bộ name= trong form (thanh bar). Sidebar đồng bộ qua JS trước khi submit.
+      const rangeForm = document.getElementById('report58RangeForm');
+      const fromBar = rangeForm ? rangeForm.querySelector('input[name="from"]') : null;
+      const toBar = rangeForm ? rangeForm.querySelector('input[name="to"]') : null;
+      const fromSide = document.getElementById('report58From');
+      const toSide = document.getElementById('report58To');
+
+      const filterSyncPairs = [
+        ['report58HangHoa', 'hang_hoa_id'],
+        ['report58Kho', 'kho_id'],
+        ['report58SoQuy', 'so_quy_id'],
+        ['report58Phieu', 'phieu_id'],
+        ['report58PhieuNhap', 'phieu_nhap_id'],
+        ['report58XuatRef', 'xuat_ref']
+      ];
+
+      function syncSidebarFieldToBar(sideId, fieldName) {
+        const side = document.getElementById(sideId);
+        const bar = rangeForm ? rangeForm.querySelector('[name="' + fieldName + '"]') : null;
+        if (side && bar) bar.value = side.value;
+      }
+
+      function syncBarFieldToSidebar(sideId, fieldName) {
+        const side = document.getElementById(sideId);
+        const bar = rangeForm ? rangeForm.querySelector('[name="' + fieldName + '"]') : null;
+        if (side && bar) side.value = bar.value;
+      }
+
+      function syncSidebarToBar() {
+        if (fromSide && fromBar) fromBar.value = fromSide.value;
+        if (toSide && toBar) toBar.value = toSide.value;
+        filterSyncPairs.forEach(function(pair) {
+          syncSidebarFieldToBar(pair[0], pair[1]);
+        });
+      }
+
+      if (fromSide && fromBar) {
+        fromSide.addEventListener('change', () => { fromBar.value = fromSide.value; });
+        fromBar.addEventListener('change', () => { fromSide.value = fromBar.value; });
+      }
+      if (toSide && toBar) {
+        toSide.addEventListener('change', () => { toBar.value = toSide.value; });
+        toBar.addEventListener('change', () => { toSide.value = toBar.value; });
+      }
+      filterSyncPairs.forEach(function(pair) {
+        const side = document.getElementById(pair[0]);
+        const bar = rangeForm ? rangeForm.querySelector('[name="' + pair[1] + '"]') : null;
+        if (!side || !bar) return;
+        side.addEventListener('change', () => { bar.value = side.value; });
+        bar.addEventListener('change', () => { side.value = bar.value; });
+      });
+      if (rangeForm) {
+        rangeForm.addEventListener('submit', syncSidebarToBar);
+      }
     })();
   </script>
 </body>

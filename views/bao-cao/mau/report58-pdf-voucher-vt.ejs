@@ -1,0 +1,178 @@
+<%
+  const storeInfo = locals.storeInfo || {};
+  const v = locals.voucher || {};
+  const rows = Array.isArray(v.rows) ? v.rows : [];
+  const totals = v.totals || {};
+  const warnings = Array.isArray(locals.warnings) ? locals.warnings.filter(Boolean) : [];
+  const notes = Array.isArray(locals.notes) ? locals.notes.filter(Boolean) : [];
+  const isNhap = v.direction === 'nhap';
+  const fmtMoney = value => {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    return Number.isFinite(num) ? Math.round(num).toLocaleString('vi-VN') : '';
+  };
+  const fmtQty = value => {
+    if (value === null || value === undefined || value === '') return '';
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return Number.isInteger(num) ? num.toLocaleString('vi-VN') : num.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+  };
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title><%= locals.title || '' %> <%= v.ma_phieu || '' %></title>
+  <style>
+    @page{size:A4;margin:12mm 12mm}
+    body{font-family:'Times New Roman',Times,serif;color:#000;margin:0;font-size:12.5pt;line-height:1.4}
+    .head-grid{display:grid;grid-template-columns:1fr 230px;gap:12px;margin-bottom:6px}
+    .unit-line{margin:2px 0}
+    .mau-box{text-align:right;font-size:11pt}
+    .mau-box .code{font-weight:700;font-size:12.5pt}
+    .title-main{text-align:center;font-weight:700;font-size:17pt;text-transform:uppercase;margin:12px 0 2px}
+    .sub-line{text-align:center;font-size:12pt;margin-bottom:12px}
+    .field{margin:4px 0;font-size:12pt}
+    table.goods{width:100%;border-collapse:collapse;margin:10px 0;table-layout:fixed}
+    table.goods th,table.goods td{border:1px solid #000;padding:3px 4px;font-size:9.5pt;word-wrap:break-word;vertical-align:middle}
+    table.goods th{text-align:center;font-weight:700}
+    td.right{text-align:right;white-space:nowrap}
+    td.center{text-align:center}
+    tr.total td{font-weight:700}
+    .totals-extra{width:90mm;margin-left:auto;font-size:11.5pt}
+    .totals-extra div{display:flex;justify-content:space-between;gap:12px;padding:2px 0;border-bottom:1px dotted #999}
+    .amount-words{margin:10px 0;font-size:12pt}
+    .draft-banner{border:2px solid #000;background:#fff8e6;padding:10px 12px;margin:10px 0;font-size:12pt;font-weight:700;text-align:center}
+    .warning-box{border:1.5px solid #000;padding:8px 10px;margin:8px 0 0;font-size:11pt;font-weight:700}
+    .notes{margin-top:8px;font-size:10.5pt;font-style:italic}
+    .sign-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:24px;text-align:center;font-size:11pt;page-break-inside:avoid}
+    .sign-grid .role{font-weight:700;margin-bottom:48px}
+    .sign-grid .hint{font-style:italic;font-size:10pt}
+    .sign-date{text-align:right;font-style:italic;font-size:11pt;margin-top:14px}
+  </style>
+</head>
+<body>
+  <div class="head-grid">
+    <div>
+      <div class="unit-line"><strong>ĐƠN VỊ:</strong> <%= storeInfo.ten_cua_hang || '…………' %></div>
+      <div class="unit-line"><strong>Địa chỉ:</strong> <%= storeInfo.dia_chi || '…………' %></div>
+      <% if (storeInfo.ma_so_thue) { %><div class="unit-line"><strong>Mã số thuế:</strong> <%= storeInfo.ma_so_thue %></div><% } %>
+      <% if (storeInfo.sdt) { %><div class="unit-line"><strong>Điện thoại:</strong> <%= storeInfo.sdt %></div><% } %>
+    </div>
+    <div class="mau-box">
+      <div class="code"><%= locals.mauSo || '' %></div>
+      <div>(Kèm theo Thông tư số 58/2026/TT-BTC</div>
+      <div>ngày 25 tháng 5 năm 2026 của Bộ trưởng Bộ Tài chính)</div>
+    </div>
+  </div>
+
+  <div class="title-main"><%= isNhap ? 'PHIẾU NHẬP KHO' : 'PHIẾU XUẤT KHO' %></div>
+  <div class="sub-line"><%= v.ngay_text || '' %> &nbsp;&nbsp;&nbsp; Số: <strong><%= v.ma_phieu || '........' %></strong></div>
+
+  <% if (isNhap && v.is_draft) { %>
+  <div class="draft-banner">Phiếu nhập này đang ở trạng thái nháp. Bản in chỉ dùng để kiểm tra, chưa phải chứng từ chính thức.</div>
+  <% } %>
+
+  <div class="field"><%= v.partner_label %>: <strong><%= v.partner || '………………………………' %></strong><%= v.partner_extra ? ' — ' + v.partner_extra : '' %></div>
+  <div class="field">Lý do <%= isNhap ? 'nhập' : 'xuất' %> kho: <%= v.ly_do || '………………………………' %></div>
+  <div class="field"><%= v.kho_label %>: <strong><%= v.kho || '…………' %></strong><%= v.kho_dia_chi ? ' — ' + v.kho_dia_chi : '' %></div>
+
+  <table class="goods">
+    <colgroup>
+      <col style="width:4%"><col style="width:9%"><col style="width:17%"><col style="width:6%">
+      <col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:7%">
+      <col style="width:9%"><col style="width:11%"><col style="width:8%">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Mã hàng</th>
+        <th>Tên hàng hóa</th>
+        <th>ĐVT</th>
+        <th>Lô</th>
+        <th>Hạn sử dụng</th>
+        <th>Quy cách/Thuộc tính</th>
+        <th>Số lượng</th>
+        <th>Đơn giá</th>
+        <th>Thành tiền</th>
+        <th>Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach(function(row, index) { %>
+      <tr>
+        <td class="center"><%= index + 1 %></td>
+        <td><%= row.ma_hang || '' %></td>
+        <td><%= row.ten_hang || '' %></td>
+        <td class="center"><%= row.dvt || '' %></td>
+        <td><%= row.lo || '' %></td>
+        <td class="center"><%= row.han_su_dung || '' %></td>
+        <td><%= row.quy_cach || '' %></td>
+        <td class="right"><%= fmtQty(row.so_luong) %></td>
+        <td class="right"><%= fmtMoney(row.don_gia) %></td>
+        <td class="right"><%= fmtMoney(row.thanh_tien) %></td>
+        <td><%= row.ghi_chu || '' %></td>
+      </tr>
+      <% }) %>
+      <% if (!rows.length) { %>
+      <tr><td colspan="11" class="center">Không có dòng hàng hóa.</td></tr>
+      <% } %>
+      <tr class="total">
+        <td colspan="7" class="center">Cộng</td>
+        <td class="right"><%= fmtQty(totals.so_luong) %></td>
+        <td></td>
+        <td class="right"><%= fmtMoney(totals.tien_hang) %></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="totals-extra">
+    <% if (Number(totals.giam_gia || 0) > 0) { %>
+    <div><span>Giảm giá</span><strong><%= fmtMoney(totals.giam_gia) %></strong></div>
+    <% } %>
+    <div><span>Tổng thanh toán</span><strong><%= fmtMoney(totals.tong_thanh_toan) %></strong></div>
+    <% if (totals.da_tra != null) { %>
+    <div><span>Đã trả</span><strong><%= fmtMoney(totals.da_tra) %></strong></div>
+    <% } %>
+    <% if (totals.con_no != null) { %>
+    <div><span>Còn nợ</span><strong><%= fmtMoney(totals.con_no) %></strong></div>
+    <% } %>
+  </div>
+
+  <div class="amount-words">Tổng số tiền (viết bằng chữ): <em><%= v.amount_words || '' %></em></div>
+  <div class="field">Người lập phiếu: <strong><%= v.nguoi_lap || '—' %></strong></div>
+
+  <% warnings.forEach(function(message) { %>
+  <div class="warning-box">⚠ <%= message %></div>
+  <% }) %>
+
+  <% if (notes.length) { %>
+  <div class="notes">
+    <% notes.forEach(function(note) { %>
+    <div>(*) <%= note %></div>
+    <% }) %>
+  </div>
+  <% } %>
+
+  <div class="sign-date">Ngày …… tháng …… năm ……</div>
+  <div class="sign-grid">
+    <div>
+      <div class="role">Người lập phiếu</div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+    <div>
+      <div class="role"><%= v.sign_giver_label || (isNhap ? 'Người giao hàng' : 'Người nhận hàng') %></div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+    <div>
+      <div class="role"><%= v.sign_receiver_label || 'Thủ kho' %></div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+    <div>
+      <div class="role">Kế toán trưởng / Quản lý</div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+  </div>
+</body>
+</html>

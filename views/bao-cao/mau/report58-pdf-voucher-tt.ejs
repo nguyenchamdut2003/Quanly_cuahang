@@ -1,0 +1,144 @@
+<%
+  const storeInfo = locals.storeInfo || {};
+  const v = locals.voucher || {};
+  const warnings = Array.isArray(locals.warnings) ? locals.warnings.filter(Boolean) : [];
+  const notes = Array.isArray(locals.notes) ? locals.notes.filter(Boolean) : [];
+  const isThu = v.loai_phieu === 'thu';
+  const relatedDocs = Array.isArray(v.related_docs) ? v.related_docs : [];
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title><%= locals.title || '' %> <%= v.ma_phieu || '' %></title>
+  <style>
+    @page{size:A4;margin:14mm 16mm}
+    body{font-family:'Times New Roman',Times,serif;color:#000;margin:0;font-size:13pt;line-height:1.45}
+    .head-grid{display:grid;grid-template-columns:1fr 230px;gap:12px;margin-bottom:6px}
+    .unit-line{margin:2px 0}
+    .mau-box{text-align:right;font-size:11pt}
+    .mau-box .code{font-weight:700;font-size:12.5pt}
+    .title-main{text-align:center;font-weight:700;font-size:17pt;text-transform:uppercase;margin:14px 0 2px}
+    .sub-line{text-align:center;font-size:12pt;margin-bottom:14px}
+    .field{margin:6px 0}
+    .field .dots{font-weight:700}
+    .amount-box{border:1px solid #000;padding:10px 12px;margin:12px 0}
+    .amount-box .big{font-size:15pt;font-weight:700}
+    table{width:100%;border-collapse:collapse;margin:8px 0;table-layout:fixed}
+    th,td{border:1px solid #000;padding:4px 6px;font-size:11pt;word-wrap:break-word}
+    th{text-align:center;font-weight:700}
+    td.right{text-align:right;white-space:nowrap}
+    .section-title{font-weight:700;margin:12px 0 4px;font-size:12pt}
+    .pay-grid div{display:flex;justify-content:space-between;gap:12px;padding:2px 0;border-bottom:1px dotted #999;font-size:12pt}
+    .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 24px;font-size:12pt;margin:8px 0}
+    .warning-box{border:1.5px solid #000;padding:8px 10px;margin:10px 0 0;font-size:11pt;font-weight:700}
+    .notes{margin-top:10px;font-size:10.5pt;font-style:italic}
+    .sign-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:26px;text-align:center;font-size:10.5pt;page-break-inside:avoid}
+    .sign-grid .role{font-weight:700;margin-bottom:46px}
+    .sign-grid .hint{font-style:italic;font-size:9.5pt}
+    .sign-date{text-align:right;font-style:italic;font-size:11pt;margin-top:16px}
+  </style>
+</head>
+<body>
+  <div class="head-grid">
+    <div>
+      <div class="unit-line"><strong>ĐƠN VỊ:</strong> <%= storeInfo.ten_cua_hang || '…………' %></div>
+      <div class="unit-line"><strong>Địa chỉ:</strong> <%= storeInfo.dia_chi || '…………' %></div>
+      <% if (storeInfo.ma_so_thue) { %><div class="unit-line"><strong>Mã số thuế:</strong> <%= storeInfo.ma_so_thue %></div><% } %>
+      <% if (storeInfo.sdt) { %><div class="unit-line"><strong>Điện thoại:</strong> <%= storeInfo.sdt %></div><% } %>
+    </div>
+    <div class="mau-box">
+      <div class="code"><%= locals.mauSo || '' %></div>
+      <div>(Kèm theo Thông tư số 58/2026/TT-BTC</div>
+      <div>ngày 25 tháng 5 năm 2026 của Bộ trưởng Bộ Tài chính)</div>
+    </div>
+  </div>
+
+  <div class="title-main"><%= isThu ? 'PHIẾU THU' : 'PHIẾU CHI' %></div>
+  <div class="sub-line"><%= v.ngay_lap_text || '' %> &nbsp;&nbsp;&nbsp; Số: <strong><%= v.ma_phieu || '........' %></strong></div>
+
+  <div class="field"><%= v.person_label %>: <span class="dots"><%= v.person_name || '………………………………' %></span></div>
+  <% if (v.person_address) { %><div class="field">Địa chỉ: <%= v.person_address %></div><% } %>
+  <div class="field">Nhóm đối tượng: <%= v.nhom_doi_tuong || '—' %></div>
+  <div class="field">Lý do <%= isThu ? 'thu' : 'chi' %>: <span class="dots"><%= v.ly_do || '………………………………' %></span></div>
+
+  <div class="amount-box">
+    <div>Số tiền: <span class="big"><%= v.amount_text %></span> đồng</div>
+    <div style="margin-top:4px">(Viết bằng chữ): <em><%= v.amount_words %></em></div>
+  </div>
+
+  <% if (v.payment_detail) { %>
+  <div class="section-title">Chi tiết thanh toán</div>
+  <div class="pay-grid">
+    <div><span>Tiền mặt</span><strong><%= v.payment_detail.tien_mat %></strong></div>
+    <div><span>Chuyển khoản</span><strong><%= v.payment_detail.chuyen_khoan %></strong></div>
+    <div><span>Tiền trả khách</span><strong><%= v.payment_detail.tien_tra_khach %></strong></div>
+    <div><span><%= v.payment_detail.tong_label %></span><strong><%= v.payment_detail.tong %></strong></div>
+    <div><span><%= v.payment_detail.rong_label %></span><strong><%= v.payment_detail.rong %></strong></div>
+  </div>
+  <% } %>
+
+  <% if (relatedDocs.length) { %>
+  <div class="section-title">Chứng từ liên quan</div>
+  <table>
+    <colgroup><col style="width:40%"><col style="width:35%"><col style="width:25%"></colgroup>
+    <thead>
+      <tr><th>Loại chứng từ</th><th>Mã chứng từ</th><th>Số tiền phân bổ</th></tr>
+    </thead>
+    <tbody>
+      <% relatedDocs.forEach(function(doc) { %>
+      <tr>
+        <td><%= doc.label %></td>
+        <td><%= doc.code %></td>
+        <td class="right"><%= doc.amount != null ? Number(doc.amount).toLocaleString('vi-VN') : '' %></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+
+  <div class="meta-grid">
+    <div>Sổ quỹ: <strong><%= v.so_quy || '—' %></strong></div>
+    <div>Phương thức thanh toán: <strong><%= v.phuong_thuc || '—' %></strong></div>
+    <div>Người lập phiếu: <strong><%= v.nguoi_lap || '—' %></strong></div>
+    <div>Hạch toán kết quả kinh doanh: <strong><%= v.hach_toan ? 'Có' : 'Không' %></strong></div>
+    <% if (v.ghi_chu) { %><div style="grid-column:1/-1">Ghi chú: <%= v.ghi_chu %></div><% } %>
+  </div>
+
+  <% warnings.forEach(function(message) { %>
+  <div class="warning-box">⚠ <%= message %></div>
+  <% }) %>
+
+  <% if (notes.length) { %>
+  <div class="notes">
+    <% notes.forEach(function(note) { %>
+    <div>(*) <%= note %></div>
+    <% }) %>
+  </div>
+  <% } %>
+
+  <div class="sign-date">Ngày …… tháng …… năm ……</div>
+  <div class="sign-grid">
+    <div>
+      <div class="role">Giám đốc</div>
+      <div class="hint">(Ký, họ tên, đóng dấu)</div>
+    </div>
+    <div>
+      <div class="role">Kế toán trưởng</div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+    <div>
+      <div class="role"><%= isThu ? 'Người nộp tiền' : 'Người nhận tiền' %></div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+    <div>
+      <div class="role">Người lập phiếu</div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+    <div>
+      <div class="role">Thủ quỹ</div>
+      <div class="hint">(Ký, họ tên)</div>
+    </div>
+  </div>
+</body>
+</html>

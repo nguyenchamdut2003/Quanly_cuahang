@@ -11,9 +11,26 @@
   ].filter(Boolean).join(', ');
   const embedded = locals.embedded === true;
   const standalone = locals.standalone === true;
+  const storeTaxCode = locals.storeTaxCode || store.ma_so_thue || '';
+  const storePhone = locals.storePhone || store.sdt || '';
+  const formNotes = Array.isArray(locals.notes) ? locals.notes.filter(Boolean) : [];
+  const vatConfigured = locals.vatConfigured === true;
   const fmtMoney = value => value === '' || value === null || value === undefined
     ? ''
     : Number(value).toLocaleString('vi-VN');
+  /** Chỉ tiêu thuế GTGT: hiển thị — khi chưa có cấu hình thuế (tránh nhầm với số 0 thật). */
+  const fmtVatCell = value => {
+    if (!vatConfigured) return '—';
+    if (value === '' || value === null || value === undefined) return '—';
+    return fmtMoney(value);
+  };
+  /** Số đã nộp: vẫn hiện số nếu lấy được từ phiếu chi nộp thuế GTGT. */
+  const fmtGtgtDaNop = value => {
+    const num = Number(value || 0);
+    if (num > 0) return fmtMoney(num);
+    if (!vatConfigured) return '—';
+    return fmtMoney(0);
+  };
   const blank = '…………';
   const detailRows = Array.isArray(locals.detailRows) ? locals.detailRows : [];
   const formatRangeDate = value => {
@@ -70,6 +87,8 @@
     <div>
       <div class="unit-line"><strong>ĐƠN VỊ:</strong> <%= storeName || blank %></div>
       <div class="unit-line"><strong>Địa chỉ:</strong> <%= storeAddress || blank %></div>
+      <% if (storeTaxCode) { %><div class="unit-line"><strong>Mã số thuế:</strong> <%= storeTaxCode %></div><% } %>
+      <% if (storePhone) { %><div class="unit-line"><strong>Điện thoại:</strong> <%= storePhone %></div><% } %>
     </div>
     <div class="mau-box">
       <div class="code">Mẫu số S2a-DNSN</div>
@@ -114,7 +133,7 @@
         <td></td>
         <td></td>
         <td>Số thuế GTGT còn phải nộp đầu kỳ (1)</td>
-        <td class="num"><%= fmtMoney(locals.gtgtDauKy) %></td>
+        <td class="num"><%= fmtVatCell(locals.gtgtDauKy) %></td>
       </tr>
       <tr>
         <td colspan="4" style="font-weight:700">Số phát sinh trong kỳ</td>
@@ -137,28 +156,36 @@
         <td></td>
         <td></td>
         <td class="indent">Thuế GTGT</td>
-        <td class="num"><%= fmtMoney(locals.thueGtgt1) %></td>
+        <td class="num"><%= fmtVatCell(locals.thueGtgt1) %></td>
       </tr>
       <tr>
         <td></td>
         <td></td>
         <td><strong>Tổng số thuế GTGT phải nộp trong kỳ (2)</strong></td>
-        <td class="num"><%= fmtMoney(locals.gtgtPhaiNopKy) %></td>
+        <td class="num"><%= fmtVatCell(locals.gtgtPhaiNopKy) %></td>
       </tr>
       <tr>
         <td></td>
         <td></td>
         <td><strong>Số thuế GTGT đã nộp trong kỳ (3)</strong></td>
-        <td class="num"><%= fmtMoney(locals.gtgtDaNopKy) %></td>
+        <td class="num"><%= fmtGtgtDaNop(locals.gtgtDaNopKy) %></td>
       </tr>
       <tr>
         <td></td>
         <td></td>
         <td><strong>Số thuế GTGT còn phải nộp cuối kỳ {(4)= (1) + (2) - (3)}</strong></td>
-        <td class="num"><%= fmtMoney(locals.gtgtCuoiKy) %></td>
+        <td class="num"><%= fmtVatCell(locals.gtgtCuoiKy) %></td>
       </tr>
     </tbody>
   </table>
+
+  <% if (formNotes.length) { %>
+  <div style="margin-top:10px;font-size:11pt;font-style:italic">
+    <% formNotes.forEach(function(note) { %>
+    <div style="margin:2px 0">(*) <%= note %></div>
+    <% }) %>
+  </div>
+  <% } %>
 
   <div class="sign-grid">
     <div>

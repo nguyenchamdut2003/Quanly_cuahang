@@ -1,6 +1,8 @@
 const path = require('path');
 const ExcelJS = require('exceljs');
-const { HoaDonBanHang } = require('../models/kiot.model');
+const mongoose = require('mongoose');
+const { HoaDonBanHang, LichSuKho, HangHoa, Kho } = require('../models/kiot.model');
+const report58Data = require('./report58Data.service');
 
 const TEMPLATE_PATH = path.join(__dirname, '..', 'data', 'templates', 'tt58-2026-bo-mau-excel.xlsx');
 
@@ -26,7 +28,28 @@ const REPORT_58_MAU = [
 
 /** Các mẫu sổ doanh thu lấy dòng từ hóa đơn bán (khung Excel TT58). */
 const INVOICE_LEDGER_MAU = new Set(['S1-DNSN', 'S2a-DNSN', 'S3a-DNSN']);
+const STOCK_LEDGER_MAU = new Set(['S2c-DNSN']);
+const REVENUE_EXPENSE_MAU = new Set(['S2b-DNSN']);
+const CASH_LEDGER_MAU = new Set(['S2d-DNSN']);
+const VAT_LEDGER_MAU = new Set(['S3b-DNSN']);
+const DEBT_LEDGER_MAU = new Set(['S4a-DNSN']);
+const FINANCIAL_REPORT_MAU = new Set(['B01-DNSN', 'B02-DNSN']);
+const VOUCHER_MAU = report58Data.VOUCHER_MAU;
 const S2A_DNSN_MAU = 'S2a-DNSN';
+const S2C_DNSN_MAU = 'S2c-DNSN';
+
+const STOCK_DATA_START_ROW = 7;
+const GENERIC_DATA_START_ROW = 7;
+const LOAI_PHIEU_LABELS = {
+    nhap_hang: 'Nhập hàng',
+    tra_hang_nhap: 'Trả hàng nhập',
+    tra_hang: 'Trả hàng bán',
+    kiem_kho: 'Kiểm kho',
+    ban_hang: 'Bán hàng',
+    xuat_huy: 'Xuất hủy',
+    xuat_noi_bo: 'Xuất dùng nội bộ',
+    dieu_chinh: 'Điều chỉnh tồn kho'
+};
 
 const INVOICE_DATA_START_ROW = 7;
 const INVOICE_TEMPLATE_SAMPLE_ROWS = 6;
@@ -149,6 +172,635 @@ async function loadTemplateWorkbook() {
     return workbook;
 }
 
+function roundMoney(value) {
+    return Math.round(Number(value) || 0);
+}
+
+function formatQty(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    if (Number.isInteger(num)) return String(num);
+    return num.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+}
+
+function formatDateKey(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function formatDisplayDate(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN');
+}
+
+function createStockState() {
+    return { qty: 0, value: 0 };
+}
+
+function avgUnitPrice(state) {
+    if (state.qty <= 0) return 0;
+    return state.value / state.qty;
+}
+
+function applyInbound(state, qty, value) {
+    const amount = Math.abs(Number(qty) || 0);
+    const money = Math.abs(Number(value) || 0);
+    state.qty += amount;
+    state.value += money;
+    return {
+        unitPrice: amount > 0 ? money / amount : 0,
+        qty: amount,
+        value: money
+    };
+}
+
+function applyOutbound(state, qty) {
+    const amount = Math.abs(Number(qty) || 0);
+    const unitPrice = avgUnitPrice(state);
+    const exportValue = roundMoney(amount * unitPrice);
+    state.qty = Math.max(0, state.qty - amount);
+    state.value = Math.max(0, state.value - exportValue);
+    return {
+        unitPrice,
+        qty: amount,
+        value: exportValue
+    };
+}
+
+function aggregateStockMovements(records = []) {
+    const map = new Map();
+    records.forEach(record => {
+        const dayKey = formatDateKey(record.ngay);
+        const voucherKey = `${record.ma_phieu || ''}|${dayKey}|${record.loai_phieu || ''}`;
+        if (!map.has(voucherKey)) {
+            map.set(voucherKey, {
+                ma_phieu: record.ma_phieu || '',
+                ngay: record.ngay,
+                loai_phieu: record.loai_phieu || '',
+                so_luong: 0,
+                gia_tri: 0,
+                ghi_chu: record.ghi_chu || ''
+            });
+        }
+        const row = map.get(voucherKey);
+        row.so_luong += Number(record.so_luong_thay_doi || 0);
+        row.gia_tri += Number(record.gia_tri_thay_doi || 0);
+        if (!row.ghi_chu && record.ghi_chu) row.ghi_chu = record.ghi_chu;
+    });
+    return Array.from(map.values()).sort((a, b) => {
+        const diff = new Date(a.ngay).getTime() - new Date(b.ngay).getTime();
+        if (diff !== 0) return diff;
+        return String(a.ma_phieu || '').localeCompare(String(b.ma_phieu || ''), 'vi');
+    });
+}
+
+function buildMovementDescription(movement) {
+    const label = LOAI_PHIEU_LABELS[movement.loai_phieu] || movement.loai_phieu || 'Phát sinh kho';
+    if (movement.ghi_chu) return `${label} — ${movement.ghi_chu}`;
+    return label;
+}
+
+function movementToLedgerRow(movement, state, fallbackUnitCost = 0) {
+    const qtyChange = Number(movement.so_luong || 0);
+    const row = {
+        so_hieu: movement.ma_phieu || '',
+        ngay_thang: formatDisplayDate(movement.ngay),
+        dien_giai: buildMovementDescription(movement),
+        don_vi_tinh: '',
+        don_gia: '',
+        nhap_sl: '',
+        nhap_tien: '',
+        xuat_sl: '',
+        xuat_tien: '',
+        ton_sl: '',
+        ton_tien: '',
+        ghi_chu: movement.ghi_chu || '',
+        kind: 'movement'
+    };
+
+    if (qtyChange > 0) {
+        let importValue = Math.abs(Number(movement.gia_tri || 0));
+        if (!importValue && fallbackUnitCost) {
+            importValue = roundMoney(qtyChange * fallbackUnitCost);
+        }
+        const inbound = applyInbound(state, qtyChange, importValue);
+        row.don_gia = inbound.unitPrice;
+        row.nhap_sl = inbound.qty;
+        row.nhap_tien = inbound.value;
+    } else if (qtyChange < 0) {
+        const outbound = applyOutbound(state, qtyChange);
+        row.don_gia = outbound.unitPrice;
+        row.xuat_sl = outbound.qty;
+        row.xuat_tien = outbound.value;
+    }
+
+    row.ton_sl = state.qty;
+    row.ton_tien = roundMoney(state.value);
+    return row;
+}
+
+function replayStockMovements(movements, fallbackUnitCost = 0) {
+    const state = createStockState();
+    movements.forEach(movement => {
+        movementToLedgerRow(movement, state, fallbackUnitCost);
+    });
+    return state;
+}
+
+function buildStockLedgerRows(movements, openingState, fallbackUnitCost = 0) {
+    const state = {
+        qty: Number(openingState.qty || 0),
+        value: Number(openingState.value || 0)
+    };
+    const detailRows = [];
+    let periodInQty = 0;
+    let periodInValue = 0;
+    let periodOutQty = 0;
+    let periodOutValue = 0;
+
+    movements.forEach(movement => {
+        const row = movementToLedgerRow(movement, state, fallbackUnitCost);
+        detailRows.push(row);
+        periodInQty += Number(row.nhap_sl || 0);
+        periodInValue += Number(row.nhap_tien || 0);
+        periodOutQty += Number(row.xuat_sl || 0);
+        periodOutValue += Number(row.xuat_tien || 0);
+    });
+
+    return {
+        detailRows,
+        closing: { qty: state.qty, value: roundMoney(state.value) },
+        periodIn: { qty: periodInQty, value: roundMoney(periodInValue) },
+        periodOut: { qty: periodOutQty, value: roundMoney(periodOutValue) }
+    };
+}
+
+async function loadS2cFilterOptions(store = null) {
+    const storeId = store?._id;
+    const productFilter = { trang_thai: 'active' };
+    const warehouseFilter = { trang_thai: 'active' };
+    if (storeId) {
+        productFilter.cua_hang_id = storeId;
+        warehouseFilter.cua_hang_id = storeId;
+    }
+
+    const [products, warehouses] = await Promise.all([
+        HangHoa.find(productFilter).select('ten_hang ma_hang').sort({ ten_hang: 1 }).lean(),
+        Kho.find(warehouseFilter).select('ten_kho').sort({ ten_kho: 1 }).lean()
+    ]);
+
+    return { products, warehouses };
+}
+
+async function buildS2cDnsnData(query = {}, store = null, range = null) {
+    const safeRange = range || {};
+    const hangHoaId = String(query.hang_hoa_id || '').trim();
+    const khoId = String(query.kho_id || '').trim();
+    const filters = await loadS2cFilterOptions(store);
+
+    if (!hangHoaId || !khoId || !mongoose.Types.ObjectId.isValid(hangHoaId) || !mongoose.Types.ObjectId.isValid(khoId)) {
+        return {
+            missingFilters: true,
+            tenHang: '',
+            maHang: '',
+            donViTinhLabel: '',
+            tenKho: '',
+            detailRows: [],
+            opening: { qty: 0, value: 0 },
+            periodIn: { qty: 0, value: 0 },
+            periodOut: { qty: 0, value: 0 },
+            closing: { qty: 0, value: 0 },
+            filters: {
+                ...filters,
+                hang_hoa_id: hangHoaId,
+                kho_id: khoId
+            }
+        };
+    }
+
+    const [product, warehouse] = await Promise.all([
+        HangHoa.findById(hangHoaId).populate('don_vi_tinh_id', 'ten_don_vi ma_don_vi').lean(),
+        Kho.findById(khoId).select('ten_kho cua_hang_id').lean()
+    ]);
+
+    if (!product || !warehouse) {
+        return {
+            missingFilters: true,
+            missingData: true,
+            tenHang: product?.ten_hang || '',
+            maHang: product?.ma_hang || '',
+            donViTinhLabel: product?.don_vi_tinh_id?.ten_don_vi || product?.don_vi_tinh_id?.ma_don_vi || '',
+            tenKho: warehouse?.ten_kho || '',
+            detailRows: [],
+            opening: { qty: 0, value: 0 },
+            periodIn: { qty: 0, value: 0 },
+            periodOut: { qty: 0, value: 0 },
+            closing: { qty: 0, value: 0 },
+            filters: {
+                ...filters,
+                hang_hoa_id: hangHoaId,
+                kho_id: khoId
+            }
+        };
+    }
+
+    const historyFilter = {
+        hang_hoa_id: hangHoaId,
+        kho_id: khoId
+    };
+    if (store?._id) historyFilter.cua_hang_id = store._id;
+
+    const periodEnd = safeRange.end ? new Date(safeRange.end) : new Date();
+    const periodStart = safeRange.start ? new Date(safeRange.start) : new Date(periodEnd.getTime() - 6 * 86400000);
+
+    const [beforeRecords, periodRecords] = await Promise.all([
+        LichSuKho.find({
+            ...historyFilter,
+            ngay: { $lt: periodStart }
+        }).sort({ ngay: 1, created_at: 1 }).lean(),
+        LichSuKho.find({
+            ...historyFilter,
+            ngay: { $gte: periodStart, $lt: periodEnd }
+        }).sort({ ngay: 1, created_at: 1 }).lean()
+    ]);
+
+    const fallbackUnitCost = Number(product.gia_von || product.gia_nhap_cuoi || 0);
+    const beforeMovements = aggregateStockMovements(beforeRecords);
+    const opening = replayStockMovements(beforeMovements, fallbackUnitCost);
+    const periodMovements = aggregateStockMovements(periodRecords);
+    const ledger = buildStockLedgerRows(periodMovements, opening, fallbackUnitCost);
+
+    return {
+        missingFilters: false,
+        tenHang: product.ten_hang || '',
+        maHang: product.ma_hang || '',
+        donViTinhLabel: product.don_vi_tinh_id?.ten_don_vi || product.don_vi_tinh_id?.ma_don_vi || '',
+        tenKho: warehouse.ten_kho || '',
+        detailRows: ledger.detailRows,
+        opening: {
+            qty: opening.qty,
+            value: roundMoney(opening.value)
+        },
+        periodIn: ledger.periodIn,
+        periodOut: ledger.periodOut,
+        closing: ledger.closing,
+        filters: {
+            ...filters,
+            hang_hoa_id: hangHoaId,
+            kho_id: khoId
+        }
+    };
+}
+
+function findDataTotalRow(worksheet, startRow = GENERIC_DATA_START_ROW) {
+    const last = Math.max(worksheet.rowCount || 0, startRow + 20);
+    for (let rowNumber = startRow; rowNumber <= last; rowNumber += 1) {
+        const text = cellText(worksheet.getRow(rowNumber).getCell(1).value).trim();
+        if (/^tổng cộng$/i.test(text)) return rowNumber;
+    }
+    return null;
+}
+
+function spliceTemplateDataRows(worksheet, startRow, totalRowBefore) {
+    const templateDataRowCount = totalRowBefore - startRow;
+    if (templateDataRowCount > 0) {
+        worksheet.spliceRows(startRow, templateDataRowCount);
+    }
+}
+
+function insertDataRows(worksheet, startRow, rowCount) {
+    if (rowCount > 0) {
+        worksheet.spliceRows(
+            startRow,
+            0,
+            ...Array.from({ length: rowCount }, () => [])
+        );
+    }
+}
+
+function fillNumericTotals(totalRow, totalsMap) {
+    Object.entries(totalsMap).forEach(([col, value]) => {
+        totalRow.getCell(Number(col)).value = Number(value || 0);
+    });
+}
+
+function fillRevenueExpenseRows(worksheet, rows = []) {
+    const totalRowBefore = findDataTotalRow(worksheet);
+    if (!totalRowBefore) return;
+    spliceTemplateDataRows(worksheet, GENERIC_DATA_START_ROW, totalRowBefore);
+    insertDataRows(worksheet, GENERIC_DATA_START_ROW, rows.length);
+    rows.forEach((row, index) => {
+        const excelRow = worksheet.getRow(GENERIC_DATA_START_ROW + index);
+        excelRow.getCell(1).value = row.stt;
+        excelRow.getCell(2).value = row.ngay || '';
+        excelRow.getCell(3).value = row.chung_tu || '';
+        excelRow.getCell(4).value = row.dien_giai || '';
+        excelRow.getCell(5).value = row.doanh_thu ?? 0;
+        excelRow.getCell(6).value = row.chi_mua ?? 0;
+        excelRow.getCell(7).value = row.chi_ban_hang ?? 0;
+        excelRow.getCell(8).value = row.chi_khac ?? 0;
+        excelRow.getCell(9).value = row.loi_nhuan ?? 0;
+        excelRow.getCell(10).value = row.ghi_chu || '';
+    });
+    const totalRowNumber = findDataTotalRow(worksheet);
+    if (!totalRowNumber) return;
+    const totalRow = worksheet.getRow(totalRowNumber);
+    totalRow.getCell(1).value = 'Tổng cộng';
+    fillNumericTotals(totalRow, {
+        5: rows.reduce((sum, row) => sum + Number(row.doanh_thu || 0), 0),
+        6: rows.reduce((sum, row) => sum + Number(row.chi_mua || 0), 0),
+        7: rows.reduce((sum, row) => sum + Number(row.chi_ban_hang || 0), 0),
+        8: rows.reduce((sum, row) => sum + Number(row.chi_khac || 0), 0),
+        9: rows.reduce((sum, row) => sum + Number(row.loi_nhuan || 0), 0)
+    });
+}
+
+function fillCashLedgerRows(worksheet, rows = []) {
+    const totalRowBefore = findDataTotalRow(worksheet);
+    if (!totalRowBefore) return;
+    spliceTemplateDataRows(worksheet, GENERIC_DATA_START_ROW, totalRowBefore);
+    insertDataRows(worksheet, GENERIC_DATA_START_ROW, rows.length);
+    rows.forEach((row, index) => {
+        const excelRow = worksheet.getRow(GENERIC_DATA_START_ROW + index);
+        excelRow.getCell(1).value = row.stt;
+        excelRow.getCell(2).value = row.ngay || '';
+        excelRow.getCell(3).value = row.chung_tu || '';
+        excelRow.getCell(4).value = row.dien_giai || '';
+        excelRow.getCell(5).value = row.thu ?? 0;
+        excelRow.getCell(6).value = row.chi ?? 0;
+        excelRow.getCell(7).value = row.ton_quy ?? 0;
+        excelRow.getCell(8).value = row.so_quy || '';
+        excelRow.getCell(9).value = row.ghi_chu || '';
+    });
+    const totalRowNumber = findDataTotalRow(worksheet);
+    if (!totalRowNumber) return;
+    const totalRow = worksheet.getRow(totalRowNumber);
+    totalRow.getCell(1).value = 'Tổng cộng';
+    fillNumericTotals(totalRow, {
+        5: rows.reduce((sum, row) => sum + Number(row.thu || 0), 0),
+        6: rows.reduce((sum, row) => sum + Number(row.chi || 0), 0),
+        7: rows.length ? Number(rows[rows.length - 1].ton_quy || 0) : 0
+    });
+}
+
+function fillVatLedgerRows(worksheet, rows = []) {
+    const totalRowBefore = findDataTotalRow(worksheet);
+    if (!totalRowBefore) return;
+    spliceTemplateDataRows(worksheet, GENERIC_DATA_START_ROW, totalRowBefore);
+    insertDataRows(worksheet, GENERIC_DATA_START_ROW, rows.length);
+    rows.forEach((row, index) => {
+        const excelRow = worksheet.getRow(GENERIC_DATA_START_ROW + index);
+        excelRow.getCell(1).value = row.stt;
+        excelRow.getCell(2).value = row.ky_thue || '';
+        excelRow.getCell(3).value = row.chung_tu || '';
+        excelRow.getCell(4).value = row.dien_giai || '';
+        excelRow.getCell(5).value = row.doanh_thu_chiu_thue ?? 0;
+        excelRow.getCell(6).value = row.thue_suat || '';
+        excelRow.getCell(7).value = row.thue_dau_ra ?? 0;
+        excelRow.getCell(8).value = row.thue_dau_vao ?? 0;
+        excelRow.getCell(9).value = row.thue_phai_nop ?? 0;
+        excelRow.getCell(10).value = row.ghi_chu || '';
+    });
+    const totalRowNumber = findDataTotalRow(worksheet);
+    if (!totalRowNumber) return;
+    const totalRow = worksheet.getRow(totalRowNumber);
+    totalRow.getCell(1).value = 'Tổng cộng';
+    fillNumericTotals(totalRow, {
+        5: rows.reduce((sum, row) => sum + Number(row.doanh_thu_chiu_thue || 0), 0),
+        7: rows.reduce((sum, row) => sum + Number(row.thue_dau_ra || 0), 0),
+        8: rows.reduce((sum, row) => sum + Number(row.thue_dau_vao || 0), 0),
+        9: rows.reduce((sum, row) => sum + Number(row.thue_phai_nop || 0), 0)
+    });
+}
+
+function fillDebtLedgerRows(worksheet, rows = []) {
+    const totalRowBefore = findDataTotalRow(worksheet);
+    if (!totalRowBefore) return;
+    spliceTemplateDataRows(worksheet, GENERIC_DATA_START_ROW, totalRowBefore);
+    insertDataRows(worksheet, GENERIC_DATA_START_ROW, rows.length);
+    rows.forEach((row, index) => {
+        const excelRow = worksheet.getRow(GENERIC_DATA_START_ROW + index);
+        excelRow.getCell(1).value = row.stt;
+        excelRow.getCell(2).value = row.ngay || '';
+        excelRow.getCell(3).value = row.chung_tu || '';
+        excelRow.getCell(4).value = row.doi_tuong || '';
+        excelRow.getCell(5).value = row.loai_doi_tuong || '';
+        excelRow.getCell(6).value = row.dien_giai || '';
+        excelRow.getCell(7).value = row.no_tang ?? 0;
+        excelRow.getCell(8).value = row.no_giam ?? 0;
+        excelRow.getCell(9).value = row.so_du ?? 0;
+        excelRow.getCell(10).value = row.ghi_chu || '';
+    });
+    const totalRowNumber = findDataTotalRow(worksheet);
+    if (!totalRowNumber) return;
+    const totalRow = worksheet.getRow(totalRowNumber);
+    totalRow.getCell(1).value = 'Tổng cộng';
+    fillNumericTotals(totalRow, {
+        7: rows.reduce((sum, row) => sum + Number(row.no_tang || 0), 0),
+        8: rows.reduce((sum, row) => sum + Number(row.no_giam || 0), 0),
+        9: rows.length ? Number(rows[rows.length - 1].so_du || 0) : 0
+    });
+}
+
+function fillFinancialReportRows(worksheet, rows = [], mau = '') {
+    const totalRowBefore = findDataTotalRow(worksheet);
+    if (!totalRowBefore) return;
+    spliceTemplateDataRows(worksheet, GENERIC_DATA_START_ROW, totalRowBefore);
+    insertDataRows(worksheet, GENERIC_DATA_START_ROW, rows.length);
+    const isBalance = mau === 'B01-DNSN';
+    rows.forEach((row, index) => {
+        const excelRow = worksheet.getRow(GENERIC_DATA_START_ROW + index);
+        excelRow.getCell(1).value = row.ma_so || row.stt;
+        excelRow.getCell(2).value = row.chi_tieu || '';
+        excelRow.getCell(3).value = row.thuyet_minh || '';
+        excelRow.getCell(4).value = isBalance ? (row.cuoi_nam ?? 0) : (row.nam_nay ?? 0);
+        excelRow.getCell(5).value = isBalance ? (row.dau_nam ?? 0) : (row.nam_truoc ?? 0);
+        excelRow.getCell(6).value = row.ghi_chu || '';
+    });
+    const totalRowNumber = findDataTotalRow(worksheet);
+    if (!totalRowNumber) return;
+    const totalRow = worksheet.getRow(totalRowNumber);
+    totalRow.getCell(1).value = 'Tổng cộng';
+    if (isBalance) {
+        fillNumericTotals(totalRow, {
+            4: rows.reduce((sum, row) => sum + Number(row.cuoi_nam || 0), 0),
+            5: rows.reduce((sum, row) => sum + Number(row.dau_nam || 0), 0)
+        });
+    } else {
+        fillNumericTotals(totalRow, {
+            4: rows.reduce((sum, row) => sum + Number(row.nam_nay || 0), 0),
+            5: rows.reduce((sum, row) => sum + Number(row.nam_truoc || 0), 0)
+        });
+    }
+}
+
+function fillVoucherFormRows(worksheet, data = {}) {
+    if (!data || data.missingPhieu) return;
+    worksheet.getRow(4).getCell(1).value = data.ngay_so || worksheet.getRow(4).getCell(1).value;
+    worksheet.getRow(6).getCell(2).value = data.person_name || '';
+    worksheet.getRow(7).getCell(2).value = data.address || '';
+    worksheet.getRow(8).getCell(2).value = data.reason || '';
+    worksheet.getRow(9).getCell(2).value = Number(data.amount || 0);
+    worksheet.getRow(10).getCell(2).value = data.amount_text || '';
+    const detailRows = Array.isArray(data.detail_rows) ? data.detail_rows : [];
+    const totalRowBefore = findDataTotalRow(worksheet, 14);
+    if (!totalRowBefore) return;
+    spliceTemplateDataRows(worksheet, 14, totalRowBefore);
+    insertDataRows(worksheet, 14, detailRows.length);
+    detailRows.forEach((row, index) => {
+        const excelRow = worksheet.getRow(14 + index);
+        excelRow.getCell(1).value = row.stt;
+        excelRow.getCell(2).value = row.noi_dung || '';
+        excelRow.getCell(3).value = row.tai_khoan || '';
+        excelRow.getCell(4).value = row.so_tien ?? 0;
+        excelRow.getCell(5).value = row.chung_tu_lien_quan || '';
+        excelRow.getCell(6).value = row.doi_tuong || '';
+        excelRow.getCell(7).value = row.ghi_chu || '';
+    });
+}
+
+async function fillMauWorksheetData(worksheet, mau, context) {
+    const query = context.query || {};
+    const range = context.range || {};
+    const store = context.store || null;
+    const needsInvoiceRows = INVOICE_LEDGER_MAU.has(mau) || VAT_LEDGER_MAU.has(mau);
+    const invoiceRows = needsInvoiceRows
+        ? await fetchInvoiceLedgerRows({ range }, store)
+        : [];
+
+    if (INVOICE_LEDGER_MAU.has(mau)) {
+        fillInvoiceLedgerRows(worksheet, invoiceRows);
+        return;
+    }
+    if (STOCK_LEDGER_MAU.has(mau)) {
+        const s2cData = await buildS2cDnsnData(query, store, range);
+        fillStockLedgerRows(worksheet, s2cData);
+        return;
+    }
+    if (REVENUE_EXPENSE_MAU.has(mau)) {
+        const { rows } = await report58Data.buildMauDataset(mau, query, store, range, { invoiceRows, fetchInvoiceLedgerRows });
+        fillRevenueExpenseRows(worksheet, rows);
+        return;
+    }
+    if (CASH_LEDGER_MAU.has(mau)) {
+        const { rows } = await report58Data.buildMauDataset(mau, query, store, range, { invoiceRows, fetchInvoiceLedgerRows });
+        fillCashLedgerRows(worksheet, rows);
+        return;
+    }
+    if (VAT_LEDGER_MAU.has(mau)) {
+        const { rows } = await report58Data.buildMauDataset(mau, query, store, range, { invoiceRows, fetchInvoiceLedgerRows });
+        fillVatLedgerRows(worksheet, rows);
+        return;
+    }
+    if (DEBT_LEDGER_MAU.has(mau)) {
+        const { rows } = await report58Data.buildMauDataset(mau, query, store, range, { invoiceRows, fetchInvoiceLedgerRows });
+        fillDebtLedgerRows(worksheet, rows);
+        return;
+    }
+    if (FINANCIAL_REPORT_MAU.has(mau)) {
+        const { rows } = await report58Data.buildMauDataset(mau, query, store, range, { invoiceRows, fetchInvoiceLedgerRows });
+        fillFinancialReportRows(worksheet, rows, mau);
+        return;
+    }
+    if (VOUCHER_MAU.has(mau)) {
+        const voucherData = await report58Data.buildMauDataset(mau, query, store, range, { invoiceRows, fetchInvoiceLedgerRows });
+        fillVoucherFormRows(worksheet, voucherData);
+    }
+}
+
+function findStockLedgerTotalRow(worksheet) {
+    const last = Math.max(worksheet.rowCount || 0, STOCK_DATA_START_ROW + 20);
+    for (let rowNumber = STOCK_DATA_START_ROW; rowNumber <= last; rowNumber += 1) {
+        const text = cellText(worksheet.getRow(rowNumber).getCell(1).value).trim();
+        if (/^tổng cộng$/i.test(text)) return rowNumber;
+    }
+    return null;
+}
+
+function fillStockLedgerRows(worksheet, s2cData = {}) {
+    const totalRowBefore = findStockLedgerTotalRow(worksheet);
+    if (!totalRowBefore) return;
+
+    const templateDataRowCount = totalRowBefore - STOCK_DATA_START_ROW;
+    if (templateDataRowCount > 0) {
+        worksheet.spliceRows(STOCK_DATA_START_ROW, templateDataRowCount);
+    }
+
+    const exportRows = [];
+    if (Number(s2cData.opening?.qty || 0) > 0 || Number(s2cData.opening?.value || 0) > 0) {
+        exportRows.push({
+            ngay: '',
+            so_chung_tu: '',
+            ma_hang: s2cData.maHang || '',
+            ten_hang: s2cData.tenHang || '',
+            don_vi_tinh: s2cData.donViTinhLabel || '',
+            nhap_sl: '',
+            nhap_tien: '',
+            xuat_sl: '',
+            xuat_tien: '',
+            ton_sl: s2cData.opening.qty,
+            ton_tien: s2cData.opening.value,
+            ghi_chu: 'Số dư đầu kỳ'
+        });
+    }
+
+    (s2cData.detailRows || []).forEach(row => {
+        exportRows.push({
+            ngay: row.ngay_thang || '',
+            so_chung_tu: row.so_hieu || '',
+            ma_hang: s2cData.maHang || '',
+            ten_hang: s2cData.tenHang || '',
+            don_vi_tinh: s2cData.donViTinhLabel || '',
+            nhap_sl: row.nhap_sl || '',
+            nhap_tien: row.nhap_tien || '',
+            xuat_sl: row.xuat_sl || '',
+            xuat_tien: row.xuat_tien || '',
+            ton_sl: row.ton_sl || '',
+            ton_tien: row.ton_tien || '',
+            ghi_chu: row.ghi_chu || row.dien_giai || ''
+        });
+    });
+
+    if (exportRows.length > 0) {
+        worksheet.spliceRows(
+            STOCK_DATA_START_ROW,
+            0,
+            ...Array.from({ length: exportRows.length }, () => [])
+        );
+        exportRows.forEach((row, index) => {
+            const excelRow = worksheet.getRow(STOCK_DATA_START_ROW + index);
+            excelRow.getCell(1).value = index + 1;
+            excelRow.getCell(2).value = row.ngay || '';
+            excelRow.getCell(3).value = row.so_chung_tu || '';
+            excelRow.getCell(4).value = row.ma_hang || '';
+            excelRow.getCell(5).value = row.ten_hang || '';
+            excelRow.getCell(6).value = row.don_vi_tinh || '';
+            excelRow.getCell(7).value = row.nhap_sl === '' ? '' : Number(row.nhap_sl);
+            excelRow.getCell(8).value = row.nhap_tien === '' ? '' : Number(row.nhap_tien);
+            excelRow.getCell(9).value = row.xuat_sl === '' ? '' : Number(row.xuat_sl);
+            excelRow.getCell(10).value = row.xuat_tien === '' ? '' : Number(row.xuat_tien);
+            excelRow.getCell(11).value = row.ton_sl === '' ? '' : Number(row.ton_sl);
+            excelRow.getCell(12).value = row.ton_tien === '' ? '' : Number(row.ton_tien);
+        });
+    }
+
+    const totalRowNumber = findStockLedgerTotalRow(worksheet);
+    if (!totalRowNumber) return;
+
+    const totalRow = worksheet.getRow(totalRowNumber);
+    totalRow.getCell(1).value = 'Tổng cộng';
+    totalRow.getCell(7).value = Number(s2cData.periodIn?.qty || 0);
+    totalRow.getCell(8).value = Number(s2cData.periodIn?.value || 0);
+    totalRow.getCell(9).value = Number(s2cData.periodOut?.qty || 0);
+    totalRow.getCell(10).value = Number(s2cData.periodOut?.value || 0);
+    totalRow.getCell(11).value = Number(s2cData.closing?.qty || 0);
+    totalRow.getCell(12).value = Number(s2cData.closing?.value || 0);
+}
+
 async function buildS2aDnsnData(query = {}, store = null, range = null) {
     const safeRange = range || query.range || {};
     const rows = await fetchInvoiceLedgerRows({ range: safeRange }, store);
@@ -259,7 +911,8 @@ function buildExportContext(query = {}, store = null, range = null) {
         ].filter(Boolean).join(', '),
         year: query.year || (safeRange.to ? String(safeRange.to).slice(0, 4) : String(new Date().getFullYear())),
         donViTinh: query.don_vi_tinh || 'đồng',
-        range: safeRange
+        range: safeRange,
+        query
     };
 }
 
@@ -274,13 +927,7 @@ async function prepareWorksheet(templateWb, mau, context) {
     copyWorksheet(source, sheet);
     fillCommonCells(sheet, context);
 
-    if (INVOICE_LEDGER_MAU.has(mau)) {
-        const rows = await fetchInvoiceLedgerRows(
-            { range: context.range },
-            context.store
-        );
-        fillInvoiceLedgerRows(sheet, rows);
-    }
+    await fillMauWorksheetData(sheet, mau, context);
 
     return workbook;
 }
@@ -306,10 +953,7 @@ async function exportAllMauExcel(query = {}, store = null, range = null) {
         const sheet = outWb.getWorksheet(mau);
         if (!sheet) continue;
         fillCommonCells(sheet, context);
-        if (INVOICE_LEDGER_MAU.has(mau)) {
-            const rows = await fetchInvoiceLedgerRows({ range: context.range }, context.store);
-            fillInvoiceLedgerRows(sheet, rows);
-        }
+        await fillMauWorksheetData(sheet, mau, { ...context, query, range });
     }
 
     return outWb;
@@ -356,7 +1000,17 @@ async function ensureSheetMetaCache() {
             title: cellText(worksheet.getRow(2).getCell(1).value).trim(),
             hint: cellText(worksheet.getRow(4).getCell(1).value).trim(),
             columns,
-            hasInvoiceLedger: INVOICE_LEDGER_MAU.has(mau)
+            hasInvoiceLedger: INVOICE_LEDGER_MAU.has(mau),
+            hasStockLedger: STOCK_LEDGER_MAU.has(mau),
+            hasDataFill: INVOICE_LEDGER_MAU.has(mau)
+                || STOCK_LEDGER_MAU.has(mau)
+                || REVENUE_EXPENSE_MAU.has(mau)
+                || CASH_LEDGER_MAU.has(mau)
+                || VAT_LEDGER_MAU.has(mau)
+                || DEBT_LEDGER_MAU.has(mau)
+                || FINANCIAL_REPORT_MAU.has(mau)
+                || VOUCHER_MAU.has(mau),
+            landscape: report58Data.LANDSCAPE_MAU.has(mau) || STOCK_LEDGER_MAU.has(mau)
         };
     }
     return sheetMetaCache;
@@ -369,8 +1023,21 @@ async function getMauSheetMeta(mau) {
         title: mau,
         hint: '',
         columns: [],
-        hasInvoiceLedger: INVOICE_LEDGER_MAU.has(mau)
+        hasInvoiceLedger: INVOICE_LEDGER_MAU.has(mau),
+        hasStockLedger: STOCK_LEDGER_MAU.has(mau),
+        hasDataFill: false,
+        landscape: report58Data.LANDSCAPE_MAU.has(mau)
     };
+}
+
+function isLandscapeMau(mau) {
+    return mau === S2C_DNSN_MAU || report58Data.LANDSCAPE_MAU.has(mau);
+}
+
+async function buildFilledMauPreview(mau, query = {}, store = null, range = null) {
+    const workbook = await exportMauExcel(mau, query, store, range);
+    const sheet = workbook.getWorksheet(mau);
+    return worksheetToPreviewModel(sheet);
 }
 
 function colLettersToNumber(letters) {
@@ -527,7 +1194,19 @@ module.exports = {
     worksheetToPreviewModel,
     fetchInvoiceLedgerRows,
     buildS2aDnsnData,
+    buildS2cDnsnData,
+    loadS2cFilterOptions,
     S2A_DNSN_MAU,
+    S2C_DNSN_MAU,
+    STOCK_LEDGER_MAU,
+    REVENUE_EXPENSE_MAU,
+    CASH_LEDGER_MAU,
+    VAT_LEDGER_MAU,
+    DEBT_LEDGER_MAU,
+    FINANCIAL_REPORT_MAU,
+    VOUCHER_MAU,
+    isLandscapeMau,
+    buildFilledMauPreview,
     VAT_RATE,
     formatMoneyVN,
     computeLedgerLineAmounts,

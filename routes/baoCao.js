@@ -4,6 +4,8 @@ const router = express.Router();
 const { isAuthenticated } = require('../middlewares/auth.middleware');
 const pdfService = require('../services/pdf.service');
 const report58Excel = require('../services/report58Excel.service');
+const report58Data = require('../services/report58Data.service');
+const report58Pdf = require('../services/report58Pdf.service');
 const {
     DonHang,
     CTDonHang,
@@ -59,15 +61,48 @@ function formatDisplayDate(date) {
     return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
+/** Tránh lỗi khi form gửi trùng from/to (sidebar + thanh bar) → Express nhận mảng. */
+function pickQueryParam(value) {
+    if (value == null || value === '') return '';
+    if (Array.isArray(value)) {
+        const parts = value
+            .map(item => String(item ?? '').trim())
+            .filter(Boolean);
+        return parts.length ? parts[parts.length - 1] : '';
+    }
+    return String(value).trim();
+}
+
+/** Gộp query khi form gửi trùng tên field (sidebar + thanh bar). */
+function normalizeReport58Query(query = {}) {
+    return {
+        ...query,
+        mau: pickQueryParam(query.mau),
+        view: pickQueryParam(query.view),
+        from: pickQueryParam(query.from),
+        to: pickQueryParam(query.to),
+        phieu_id: pickQueryParam(query.phieu_id),
+        phieu_nhap_id: pickQueryParam(query.phieu_nhap_id),
+        xuat_ref: pickQueryParam(query.xuat_ref),
+        hang_hoa_id: pickQueryParam(query.hang_hoa_id),
+        kho_id: pickQueryParam(query.kho_id),
+        so_quy_id: pickQueryParam(query.so_quy_id),
+        year: pickQueryParam(query.year),
+        don_vi_tinh: pickQueryParam(query.don_vi_tinh)
+    };
+}
+
 function getSalesRange(query = {}) {
-    const today = query.to ? new Date(`${query.to}T00:00:00`) : new Date();
+    const fromStr = pickQueryParam(query.from);
+    const toStr = pickQueryParam(query.to);
+    const today = toStr ? new Date(`${toStr}T00:00:00`) : new Date();
     const endBase = Number.isNaN(today.getTime()) ? new Date() : today;
     let start;
     let end;
 
-    if (query.from && query.to) {
-        start = new Date(`${query.from}T00:00:00`);
-        end = new Date(`${query.to}T00:00:00`);
+    if (fromStr && toStr) {
+        start = new Date(`${fromStr}T00:00:00`);
+        end = new Date(`${toStr}T00:00:00`);
         if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
             return getSalesRange({});
         }
@@ -464,7 +499,10 @@ function buildReport58ViewData(query = {}, extras = {}) {
         ].filter(Boolean).join(', '),
         year,
         donViTinh: query.don_vi_tinh || 'Đồng',
-        s2aData: extras.s2aData || {}
+        s2aData: extras.s2aData || {},
+        s2cData: extras.s2cData || {},
+        s2dFilters: extras.s2dFilters || {},
+        voucherFilters: extras.voucherFilters || {}
     };
 }
 
@@ -490,57 +528,58 @@ async function buildInvoiceLedgerViewData(query = {}, store = null) {
 }
 
 async function enrichReport58Data(query = {}, store = null) {
-    const base = buildReport58ViewData(query, { store });
+    const normalizedQuery = normalizeReport58Query(query);
+    const base = buildReport58ViewData(normalizedQuery, { store });
     base.sheetMeta = await report58Excel.getMauSheetMeta(base.mau);
     if (base.mau === report58Excel.S2A_DNSN_MAU) {
-        base.s2aData = await report58Excel.buildS2aDnsnData(query, store, base.range);
+        base.s2aData = await report58Excel.buildS2aDnsnData(normalizedQuery, store, base.range);
+    } else if (base.mau === report58Excel.S2C_DNSN_MAU) {
+        base.s2cData = await report58Excel.buildS2cDnsnData(normalizedQuery, store, base.range);
     } else if (report58Excel.INVOICE_LEDGER_MAU.has(base.mau)) {
-        base.ledgerData = await buildInvoiceLedgerViewData(query, store);
+        base.ledgerData = await buildInvoiceLedgerViewData(normalizedQuery, store);
+    }
+    if (base.mau === 'S2d-DNSN') {
+        base.s2dFilters = await report58Data.loadS2dFilterOptions(store);
+    }
+    if (base.mau === '01-TT' || base.mau === '02-TT') {
+        base.voucherFilters = await report58Data.loadVoucherFilterOptions(store);
+    }
+    if (base.mau === '01-VT') {
+        base.purchaseFilters = { purchases: await report58Pdf.loadPurchaseVoucherOptions(store) };
+    }
+    if (base.mau === '02-VT') {
+        base.exportFilters = { options: await report58Pdf.loadExportVoucherOptions(store) };
     }
     return base;
 }
 
+/**
+ * Render PDF Báo cáo 58 qua report58Pdf.service (nguồn dữ liệu chuẩn hóa từng mẫu).
+ * Excel/CSV vẫn dùng report58Excel.service — không đổi.
+ */
 async function buildReport58PdfBuffer(query = {}, store = null) {
-    const data = await enrichReport58Data(query, store);
-    const isS2a = data.mau === report58Excel.S2A_DNSN_MAU;
+    const normalizedQuery = normalizeReport58Query(query);
+    const mau = resolveReport58Mau(normalizedQuery.mau);
+    const range = getSalesRange(normalizedQuery);
+    const pdfView = await report58Pdf.buildReport58PdfData({ mau, query: normalizedQuery, store, range });
     const viewPath = path.join(
         __dirname,
         '..',
         'views',
         'bao-cao',
         'mau',
-        isS2a ? 's2a-dnsn.ejs' : 'report58-print.ejs'
+        pdfView.view
     );
-    const viewLocals = isS2a
-        ? {
-            store: data.store,
-            storeName: data.storeName,
-            storeAddress: data.storeAddress,
-            year: data.year,
-            donViTinh: data.donViTinh,
-            range: data.range,
-            mau: data.mau,
-            standalone: true,
-            embedded: false,
-            ...(data.s2aData || {})
-        }
-        : {
-            mau: data.mau,
-            sheetMeta: data.sheetMeta,
-            storeName: data.storeName,
-            storeAddress: data.storeAddress,
-            year: data.year,
-            donViTinh: data.donViTinh,
-            range: data.range,
-            ledgerData: data.ledgerData
-        };
-    const html = await pdfService.renderViewToHtml(viewPath, viewLocals);
+    const html = await pdfService.renderViewToHtml(viewPath, pdfView.locals);
     const buffer = await pdfService.generatePdfFromHtml(html, {
         format: 'A4',
+        landscape: pdfView.landscape === true,
         printBackground: true,
-        margin: { top: '12mm', right: '12mm', bottom: '12mm', left: '14mm' }
+        margin: pdfView.landscape
+            ? { top: '10mm', right: '8mm', bottom: '10mm', left: '10mm' }
+            : { top: '12mm', right: '12mm', bottom: '12mm', left: '14mm' }
     });
-    return { buffer, mau: data.mau };
+    return { buffer, mau };
 }
 
 async function buildLotStockReport(query = {}) {
@@ -944,8 +983,10 @@ router.get('/58/export.pdf', async (req, res, next) => {
 
 router.get('/58', async (req, res, next) => {
     try {
-        const data = await enrichReport58Data(req.query || {}, res.locals.currentStore || null);
-        data.view = req.query.view === 'excel' ? 'excel' : 'pdf';
+        const query = normalizeReport58Query(req.query || {});
+        const data = await enrichReport58Data(query, res.locals.currentStore || null);
+        data.view = query.view === 'excel' ? 'excel' : 'pdf';
+        data.query = query;
         res.render('bao-cao/58', data);
     } catch (error) {
         next(error);
@@ -957,8 +998,10 @@ router.get('/:reportType', async (req, res, next) => {
         const reportType = req.params.reportType;
         if (!reportTitles[reportType]) return next();
         if (reportType === '58') {
-            const data = await enrichReport58Data(req.query || {}, res.locals.currentStore || null);
-            data.view = req.query.view === 'excel' ? 'excel' : 'pdf';
+            const query = normalizeReport58Query(req.query || {});
+            const data = await enrichReport58Data(query, res.locals.currentStore || null);
+            data.view = query.view === 'excel' ? 'excel' : 'pdf';
+            data.query = query;
             return res.render('bao-cao/58', data);
         }
         if (reportType === 'ton-kho-lo') {
