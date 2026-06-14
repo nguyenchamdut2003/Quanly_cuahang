@@ -116,6 +116,33 @@
         margin-top: 10px;
       }
       .btn-print-gia-tri:hover { background: #f6ffed; }
+      .kk-groups { display: flex; flex-direction: column; gap: 14px; }
+      .kk-product-group { margin-bottom: 4px; }
+      .lot-group-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #111827;
+        margin: 0 0 8px;
+      }
+      .lot-group-title:first-child { margin-top: 0; }
+      .grouped-lot-table { margin-bottom: 10px; }
+      .grouped-lot-table th,
+      .grouped-lot-table td { vertical-align: middle; }
+      .grouped-lot-table .lot-cell {
+        width: 140px;
+        max-width: 180px;
+        color: #111827;
+        font-weight: 700;
+        vertical-align: top;
+      }
+      .grouped-lot-table .attr-cell { min-width: 100px; }
+      .kk-empty {
+        text-align: center;
+        color: #777;
+        padding: 40px 16px;
+        border: 1px dashed #ddd;
+        border-radius: 6px;
+      }
     </style>
   </head>
   <body>
@@ -134,26 +161,9 @@
           <div id="kkResults" class="search-results"></div>
         </div>
 
-        <table class="kk-table">
-          <thead>
-            <tr>
-              <th width="40">STT</th>
-              <th width="120">Mã hàng</th>
-              <th>Tên hàng</th>
-              <th width="80">ĐVT</th>
-              <th width="110">Tên lô</th>
-              <th width="120">Thuộc tính</th>
-              <th width="110">Hạn sử dụng</th>
-              <th width="100" style="text-align: right;">Hệ thống</th>
-              <th width="100" style="text-align: right;">Thực tế</th>
-              <th width="100" style="text-align: right;">Lệch</th>
-              <th width="220">Nguyên nhân lệch</th>
-            </tr>
-          </thead>
-          <tbody id="kkBody">
-            <!-- Items added here -->
-          </tbody>
-        </table>
+        <div id="kkBody" class="kk-groups">
+          <!-- Nhóm theo sản phẩm / lô -->
+        </div>
       </div>
 
       <div class="right-panel">
@@ -245,6 +255,57 @@
         var date = new Date(value);
         if (isNaN(date.getTime())) return '';
         return date.toLocaleDateString('vi-VN');
+      }
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      function escapeAttr(value) {
+        return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      }
+
+      function formatLotLabel(item) {
+        const lotName = formatLotName(item);
+        const hsd = formatDate(item.han_su_dung);
+        if (!lotName) return hsd ? ('HSD: ' + hsd) : 'Không theo lô';
+        return hsd ? (lotName + ' - HSD: ' + hsd) : lotName;
+      }
+
+      function buildKiemKhoDisplayGroups(items) {
+        const productGroups = [];
+        const productIndex = {};
+
+        (items || []).forEach(item => {
+          const productId = String(item.hang_hoa_id || '');
+          if (!productIndex[productId]) {
+            productIndex[productId] = {
+              ma_hang: item.ma_hang || '',
+              ten_hang: item.ten_hang || '',
+              don_vi_tinh: item.don_vi_tinh || '',
+              lotGroups: [],
+              lotIndex: {}
+            };
+            productGroups.push(productIndex[productId]);
+          }
+
+          const productGroup = productIndex[productId];
+          const lotId = item.lo_hang_id ? String(item.lo_hang_id) : 'no-lot';
+          if (!productGroup.lotIndex[lotId]) {
+            productGroup.lotIndex[lotId] = {
+              lot_label: formatLotLabel(item),
+              items: []
+            };
+            productGroup.lotGroups.push(productGroup.lotIndex[lotId]);
+          }
+          productGroup.lotIndex[lotId].items.push(item);
+        });
+
+        return productGroups;
       }
 
       async function loadKhoByStore() {
@@ -377,35 +438,76 @@
         const body = document.getElementById('kkBody');
         let totalTT = 0;
         let totalL = 0;
+        let stt = 0;
 
-        body.innerHTML = kkItems.map((item, index) => {
-          const lech = Number(item.so_luong_thuc_te || 0) - Number(item.ton_kho_he_thong || 0);
-          totalTT += Number(item.so_luong_thuc_te || 0);
-          totalL += lech;
+        if (!kkItems.length) {
+          body.innerHTML = '<div class="kk-empty">Chọn kho để tải hàng hóa đang có tồn.</div>';
+          document.getElementById('totalThucTe').innerText = 0;
+          document.getElementById('totalLech').innerText = 0;
+          return;
+        }
 
-          return `
-            <tr data-row-key="${item.key}">
-              <td>${index + 1}</td>
-              <td>${item.ma_hang}</td>
-              <td>${item.ten_hang}</td>
-              <td>${item.don_vi_tinh || ''}</td>
-              <td>${formatLotName(item)}</td>
-              <td>${item.ten_quy_cach || ''}</td>
-              <td>${formatDate(item.han_su_dung)}</td>
-              <td style="text-align: right;">${item.ton_kho_he_thong}</td>
-              <td style="text-align: right;">
-                <input type="number" min="0" class="input-thuc-te" value="${item.so_luong_thuc_te}" onchange="updateTT('${item.key}', this.value)">
-              </td>
-              <td style="text-align: right;" class="${lech > 0 ? 'lech-positive' : (lech < 0 ? 'lech-negative' : '')}">
-                ${lech > 0 ? '+' + lech : lech}
-              </td>
-              <td>
-                <input class="input-thuc-te" style="width: 100%; text-align: left;" value="${item.nguyen_nhan_lech || ''}" placeholder="${lech !== 0 ? 'Bắt buộc khi lệch' : ''}" onchange="updateReason('${item.key}', this.value)">
-              </td>
-            </tr>
-          `;
-        }).join('') || '<tr><td colspan="11" style="text-align:center;color:#777;padding:40px;">Chọn kho để tải hàng hóa đang có tồn.</td></tr>';
+        const productGroups = buildKiemKhoDisplayGroups(kkItems);
+        let html = '';
 
+        productGroups.forEach(productGroup => {
+          const titleParts = [
+            escapeHtml(productGroup.ma_hang),
+            escapeHtml(productGroup.ten_hang)
+          ].filter(Boolean).join(' - ');
+          const dvt = productGroup.don_vi_tinh ? ' (' + escapeHtml(productGroup.don_vi_tinh) + ')' : '';
+
+          html += '<div class="kk-product-group">';
+          html += '<div class="lot-group-title">' + (titleParts || '--') + dvt + '</div>';
+
+          productGroup.lotGroups.forEach(lotGroup => {
+            const rowCount = lotGroup.items.length;
+            html += `
+              <table class="kk-table grouped-lot-table">
+                <thead>
+                  <tr>
+                    <th width="40">STT</th>
+                    <th width="140">Lô</th>
+                    <th width="120">Thuộc tính</th>
+                    <th width="100" style="text-align: right;">Hệ thống</th>
+                    <th width="100" style="text-align: right;">Thực tế</th>
+                    <th width="100" style="text-align: right;">Lệch</th>
+                    <th width="220">Nguyên nhân lệch</th>
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+
+            lotGroup.items.forEach((item, rowIndex) => {
+              const lech = Number(item.so_luong_thuc_te || 0) - Number(item.ton_kho_he_thong || 0);
+              totalTT += Number(item.so_luong_thuc_te || 0);
+              totalL += lech;
+              stt += 1;
+              const keyAttr = escapeAttr(item.key);
+              const lechClass = lech > 0 ? 'lech-positive' : (lech < 0 ? 'lech-negative' : '');
+              const lechText = lech > 0 ? ('+' + lech) : String(lech);
+              const reasonPlaceholder = lech !== 0 ? 'Bắt buộc khi lệch' : '';
+
+              html += '<tr data-row-key="' + escapeHtml(item.key) + '">';
+              html += '<td>' + stt + '</td>';
+              if (rowIndex === 0) {
+                html += '<td class="lot-cell" rowspan="' + rowCount + '">' + escapeHtml(lotGroup.lot_label) + '</td>';
+              }
+              html += '<td class="attr-cell">' + escapeHtml(item.ten_quy_cach || '--') + '</td>';
+              html += '<td style="text-align: right;">' + item.ton_kho_he_thong + '</td>';
+              html += '<td style="text-align: right;"><input type="number" min="0" class="input-thuc-te" value="' + item.so_luong_thuc_te + '" onchange="updateTT(\'' + keyAttr + '\', this.value)"></td>';
+              html += '<td style="text-align: right;" class="' + lechClass + '">' + lechText + '</td>';
+              html += '<td><input class="input-thuc-te" style="width: 100%; text-align: left;" value="' + escapeHtml(item.nguyen_nhan_lech || '') + '" placeholder="' + escapeHtml(reasonPlaceholder) + '" onchange="updateReason(\'' + keyAttr + '\', this.value)"></td>';
+              html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+          });
+
+          html += '</div>';
+        });
+
+        body.innerHTML = html;
         document.getElementById('totalThucTe').innerText = totalTT;
         document.getElementById('totalLech').innerText = totalL;
       }

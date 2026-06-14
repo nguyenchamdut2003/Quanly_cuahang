@@ -21,6 +21,7 @@ function normalizeFilterQuery(query) {
     var created = ['all', 'today', '7days', '30days', 'custom'].indexOf(query.created) >= 0 ? query.created : 'all';
     var createdFrom = String(query.createdFrom || '').trim();
     var createdTo = String(query.createdTo || '').trim();
+    var keyword = String(query.keyword || '').trim();
 
     return {
         status: status,
@@ -28,7 +29,8 @@ function normalizeFilterQuery(query) {
         warehouse: warehouse,
         created: created,
         createdFrom: createdFrom,
-        createdTo: createdTo
+        createdTo: createdTo,
+        keyword: keyword
     };
 }
 
@@ -91,6 +93,7 @@ function buildFilterQueryString(filter) {
     if (filter.created !== 'all') params.push('created=' + encodeURIComponent(filter.created));
     if (filter.created === 'custom' && filter.createdFrom) params.push('createdFrom=' + encodeURIComponent(filter.createdFrom));
     if (filter.created === 'custom' && filter.createdTo) params.push('createdTo=' + encodeURIComponent(filter.createdTo));
+    if (filter.keyword) params.push('keyword=' + encodeURIComponent(filter.keyword));
 
     return params.join('&');
 }
@@ -98,6 +101,13 @@ function buildFilterQueryString(filter) {
 async function buildStoreQueryFromFilter(filter) {
     var dateRange = getDateRange(filter);
     var storeQuery = {};
+
+    if (filter.keyword) {
+        storeQuery.$or = [
+            { ma_cua_hang: { $regex: filter.keyword, $options: 'i' } },
+            { ten_cua_hang: { $regex: filter.keyword, $options: 'i' } }
+        ];
+    }
 
     if (filter.status !== 'all') {
         storeQuery.trang_thai = filter.status;

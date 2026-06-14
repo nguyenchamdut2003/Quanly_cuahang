@@ -345,7 +345,6 @@ async function resolvePayrollCashBook(storeId, paymentMethod, cashBookId, sessio
   if (!cashBookId) return null;
   return SoQuy.findOne({
     _id: cashBookId,
-    cua_hang_id: storeId,
     trang_thai: 'active'
   }).session(session || null);
 }
@@ -860,7 +859,7 @@ exports.apiPayDetail = async function(req, res, next) {
     if (!cashBookId) return jsonError(res, 400, 'Vui lòng chọn sổ quỹ để chi lương.');
 
     var detailPreview = await ChiTietBangLuong.findOne({ _id: detailId, cua_hang_id: storeId }).lean();
-    var cashPreview = await SoQuy.findOne({ _id: cashBookId, cua_hang_id: storeId }).lean();
+    var cashPreview = await SoQuy.findOne({ _id: cashBookId, trang_thai: 'active' }).lean();
     hrLog.logPayrollInfo('payroll.payment.validate', Object.assign({}, payCtx, {
       bang_luong_id: detailPreview ? hrLog.idStr(detailPreview.bang_luong_id) : undefined,
       nhan_vien_id: detailPreview ? hrLog.idStr(detailPreview.nhan_vien_id) : undefined,
@@ -1043,7 +1042,7 @@ exports.apiCancelPayrollReceipt = async function(req, res, next) {
     if (!detailPreview) return jsonError(res, 404, 'Khong tim thay chi tiet bang luong');
 
     var cashPreview = receipt.so_quy_id
-      ? await SoQuy.findOne({ _id: receipt.so_quy_id, cua_hang_id: storeId }).lean()
+      ? await SoQuy.findOne({ _id: receipt.so_quy_id, trang_thai: 'active' }).lean()
       : null;
     hrLog.logPayrollInfo('payroll.receipt_cancel.validate', Object.assign({}, cancelCtx, {
       ma_phieu: receipt.ma_phieu,

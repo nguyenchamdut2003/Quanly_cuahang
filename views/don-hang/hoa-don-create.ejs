@@ -1,9 +1,8 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <title>
     <%= title %>
   </title>
@@ -12,17 +11,7 @@
   <style>
     body {
       overflow: hidden;
-      background: #e9edf2;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .order-create,
-    .order-create input,
-    .order-create select,
-    .order-create button,
-    .order-create table {
-      font-family: inherit;
+      background: #e9edf2
     }
 
     .order-create {
@@ -167,6 +156,99 @@
       font-weight: 800
     }
 
+    .payment-input,
+    .payment-select {
+      height: 32px;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 14px;
+      background: #fff;
+      text-align: right;
+    }
+
+    .payment-select {
+      text-align: left;
+    }
+
+    .middle-payment {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid #d7dde5;
+    }
+
+    .middle-payment-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+      color: #667085;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .middle-payment-row .payment-input,
+    .middle-payment-row .payment-select {
+      width: 180px;
+    }
+
+    .middle-payment-total {
+      color: #0b172a;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .payment-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: #344054;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      margin-bottom: 4px;
+    }
+
+    .middle-payment-row .payment-select.field-invalid,
+    .middle-payment-row .payment-input.field-invalid {
+      border-color: #d92d20;
+      box-shadow: 0 0 0 1px #fda29b;
+    }
+
+    .required-mark {
+      color: #d92d20;
+    }
+
+    .money-input-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .money-input-wrap .delivery-input {
+      flex: 1;
+    }
+
+    .money-unit {
+      color: #667085;
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .btn-pay-all {
+      height: 28px;
+      border: 1px solid #0070f4;
+      background: #fff;
+      color: #0070f4;
+      border-radius: 6px;
+      padding: 0 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
     .payable {
       color: #006dff;
       font-size: 22px
@@ -236,6 +318,18 @@
       font-size: 12px;
       line-height: 1.35;
       text-align: left;
+    }
+
+    .availability-warning.warn {
+      background: #fff7d6;
+      color: #8a5a00;
+      border: 1px solid #f5d46a;
+    }
+
+    .availability-warning.danger {
+      background: #fff1f0;
+      color: #b42318;
+      border: 1px solid #fda29b;
     }
 
     .qty-input-wrap {
@@ -331,8 +425,65 @@
       padding: 0 6px;
     }
 
+    .lot-cell {
+      min-width: 88px;
+      cursor: pointer;
+      vertical-align: middle;
+      transition: background .15s;
+    }
+
+    .lot-cell:hover {
+      background: #eef6ff;
+    }
+
+    .lot-cell.is-active {
+      background: #dbeafe;
+      box-shadow: inset 0 0 0 2px #3b82f6;
+    }
+
+    .lot-cell-empty {
+      cursor: default;
+      background: #fafbfc;
+    }
+
+    .lot-cell-main {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+
+    .lot-cell-sub {
+      margin-top: 2px;
+      color: #667085;
+      font-size: 11px;
+      line-height: 1.25;
+      text-align: right;
+    }
+
+    .lot-inline-normal {
+      padding: 6px 10px !important;
+      height: auto !important;
+    }
+
+    .lot-inline-normal .inline-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .lot-inline-normal .inline-detail-grid .inline-label {
+      color: #667085;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+
     .middle {
-      padding: 12px 18px
+      padding: 12px 18px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      min-height: 0;
     }
 
     .mid-head {
@@ -423,10 +574,10 @@
     .middle select.line-input {
       appearance: none;
       background-image: linear-gradient(45deg, transparent 50%, #475467 50%), linear-gradient(135deg, #475467 50%, transparent 50%);
-      background-position: calc(100% - 18px) 16px, calc(100% - 12px) 16px;
-      background-size: 6px 6px, 6px 6px;
+      background-position: calc(100% - 16px) 14px, calc(100% - 10px) 14px;
+      background-size: 5px 5px, 5px 5px;
       background-repeat: no-repeat;
-      padding-right: 34px;
+      padding-right: 30px;
     }
 
     .muted-red {
@@ -475,70 +626,56 @@
       text-align: center
     }
 
-    .payment-input,
-    .payment-select {
-      height: 32px;
-      border: 1px solid #cfd8e3;
-      border-radius: 6px;
-      padding: 0 10px;
-      font-size: 14px;
-      background: #fff;
-      text-align: right;
+    .cod {
+      margin-top: auto;
+      border-top: 1px solid #edf0f3;
+      padding-top: 14px
     }
 
-    .payment-select {
-      text-align: left;
-    }
-
-    .middle-payment {
-      margin-top: 18px;
-      padding-top: 16px;
-      border-top: 1px solid #d7dde5;
-    }
-
-    .middle-payment-row {
+    .cod-row {
       display: flex;
-      align-items: center;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 12px;
+      margin-top: 12px;
       color: #667085;
-      font-size: 15px;
-      font-weight: 700;
     }
 
-    .middle-payment-row .payment-input,
-    .middle-payment-row .payment-select {
-      width: 180px;
-    }
-
-    .middle-payment-row strong {
+    .cod-row strong {
       color: #111827;
-      font-size: 15px;
     }
 
-    .middle-payment-total {
-      color: #0b172a;
-      font-size: 20px;
-      font-weight: 800;
+    .toggle {
+      display: inline-block;
+      width: 42px;
+      height: 20px;
+      background: #9aa4b2;
+      border-radius: 999px;
+      vertical-align: middle;
+      margin-left: 10px;
+      position: relative;
+      cursor: pointer;
+      transition: .2s
     }
 
-    .money-input-wrap {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 6px;
-      white-space: nowrap;
+    .toggle:before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 1px;
+      top: 1px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+      transition: .2s
     }
 
-    .money-unit {
-      color: #667085;
-      font-weight: 700;
-      font-size: 13px;
+    .toggle.on {
+      background: #0070f4
     }
 
-    .money-input-wrap .delivery-input {
-      flex: 1;
+    .toggle.on:before {
+      transform: translateX(22px)
     }
 
     .right {
@@ -563,36 +700,36 @@
     }
 
     .right-body {
-      padding: 22px 20px
+      padding: 16px 14px
     }
 
     .delivery-row {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      margin-bottom: 18px
+      gap: 6px;
+      margin-bottom: 14px
     }
 
     .delivery-row label {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       color: #344054
     }
 
     .delivery-input {
       width: 100%;
-      height: 38px;
+      height: 34px;
       border: 1px solid #cfd8e3;
       border-radius: 6px;
-      padding: 0 12px;
-      font-size: 14px;
+      padding: 0 10px;
+      font-size: 13px;
       background: #fff;
     }
 
     .delivery-help {
       min-height: 18px;
       color: #667085;
-      font-size: 12px;
+      font-size: 11px;
     }
 
     .partner-picker {
@@ -601,7 +738,7 @@
 
     .partner-trigger {
       width: 100%;
-      min-height: 38px;
+      min-height: 34px;
       border: 1px solid #cfd8e3;
       border-radius: 7px;
       background: #fff;
@@ -610,8 +747,8 @@
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      padding: 0 11px;
-      font-size: 14px;
+      padding: 0 9px;
+      font-size: 13px;
       cursor: pointer
     }
 
@@ -686,7 +823,7 @@
         </div>
         <div class="cart-area">
           <table class="cart-table">
-            <thead>
+            <thead id="cartHead">
               <tr>
                 <th>STT</th>
                 <th>Mã hàng</th>
@@ -737,25 +874,19 @@
                 <option value="<%= w._id %>" data-address="<%= (w.dia_chi_day_du || w.dia_chi || '').replace(/"/g, '&quot;') %>"><%= w.ten_kho %></option>
               <% }) %>
             </select>
-            <select id="priceBookId" class="line-input" onchange="handlePriceBookChange()" style="width:100%;margin-top:12px">
-              <option value="">Bảng giá chung</option>
-              <% priceBooks.forEach(bg => { %>
-                <option value="<%= bg._id %>"><%= bg.ten_bang_gia %></option>
-              <% }) %>
-            </select>
           </div>
         </div>
         <div class="section-line">
           <div class="marker green"><i class="fa-solid fa-location-dot"></i></div>
           <div>
             <div class="two"><select id="recipientCustomerId" class="line-input" onchange="selectRecipientCustomer(this.value)">
-                <option value="">Chọn khách hàng</option>
+                <option value="">Chọn khách hàng nhận</option>
                 <% customers.forEach(c=> {
                   const defaultAddress = (c.dia_chi_list || []).find(a => a.mac_dinh) || (c.dia_chi_list || [])[0] || {};
                   const optionPhone = c.sdt || c.sdt2 || '';
-                  const optionAddress = defaultAddress.dia_chi || defaultAddress.dia_chi_day_du || c.dia_chi_nhan || '';
+                  const optionAddress = defaultAddress.dia_chi_day_du || defaultAddress.dia_chi_chi_tiet || c.dia_chi_day_du || c.dia_chi_nhan || '';
                   const optionAddressId = defaultAddress._id || '';
-                  const optionArea = defaultAddress.quan_huyen || defaultAddress.tinh_thanh || c.quan_huyen || c.tinh_thanh || '';
+                  const optionArea = defaultAddress.tinh_thanh || c.tinh_thanh || '';
                   const optionWard = defaultAddress.phuong_xa || c.phuong_xa || '';
                 %><option value="<%= c._id %>" data-name="<%= c.ten_khach_hang || '' %>" data-phone="<%= optionPhone %>" data-address="<%= optionAddress %>" data-address-id="<%= optionAddressId %>" data-area="<%= optionArea %>" data-ward="<%= optionWard %>">
                     <%= c.ten_khach_hang %>
@@ -768,43 +899,23 @@
               style="width:100%;margin-top:12px" placeholder="Khu vực"><input id="recipientWard" class="line-input"
               style="width:100%;margin-top:12px" placeholder="Phường/Xã">
             <div class="middle-payment">
-              <div class="middle-payment-row">
-                <span>Tiền mặt khách đưa</span>
-                <span class="money-input-wrap">
-                  <input id="customerCashInput" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput()">
-                  <span class="money-unit">VNĐ</span>
-                </span>
-              </div>
-              <div class="middle-payment-row">
-                <span>Chuyển khoản khách đưa</span>
-                <span class="money-input-wrap">
-                  <input id="customerTransferInput" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput()">
-                  <span class="money-unit">VNĐ</span>
-                </span>
-              </div>
-              <div class="middle-payment-row">
-                <span>Tiền thừa trả khách</span>
-                <span class="money-input-wrap">
-                  <input id="customerChangeInput" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput()">
-                  <span class="money-unit">VNĐ</span>
-                </span>
-              </div>
-              <div class="middle-payment-row">
-                <span>Sổ quỹ</span>
-                <select id="cashBookId" class="payment-select">
-                  <option value="">Chọn sổ quỹ</option>
-                  <% (cashBooks || []).forEach(function(book) { %>
-                    <option value="<%= book._id %>"><%= book.ten_so_quy || 'Sổ quỹ' %></option>
-                  <% }) %>
+              <div class="payment-title">Chi tiết thanh toán</div>
+              <div class="middle-payment-row"><span>Tiền mặt</span><span class="money-input-wrap"><input id="cashCustomerGiven" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput(this, 'cash')"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillOrderPaymentAll('cash')">Tất cả</button></span></div>
+              <div class="middle-payment-row"><span>Sổ tiền mặt <span id="cashBookRequiredMark" class="required-mark" style="display:none">*</span></span>
+                <select id="cashBookId" class="payment-select" disabled>
+                  <option value="">Chọn sổ tiền mặt</option>
                 </select>
               </div>
-              <div class="middle-payment-row"><span>Tổng khách đưa</span><strong id="paymentTotalGiven">0 VNĐ</strong></div>
-              <div class="middle-payment-row"><span>Thực thu</span><strong id="paymentNetReceived">0 VNĐ</strong></div>
-              <div class="middle-payment-row middle-payment-total">
-                <span>Còn phải thu</span>
-                <strong id="remainingTotal">0 VNĐ</strong>
+              <div class="middle-payment-row"><span>Chuyển khoản</span><span class="money-input-wrap"><input id="transferCustomerGiven" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput(this, 'transfer')"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillOrderPaymentAll('transfer')">Tất cả</button></span></div>
+              <div class="middle-payment-row"><span>Tài khoản ngân hàng <span id="bankBookRequiredMark" class="required-mark" style="display:none">*</span></span>
+                <select id="bankBookId" class="payment-select" disabled>
+                  <option value="">Chọn tài khoản</option>
+                </select>
               </div>
-              <div id="paymentValidationHint" class="delivery-help" style="color:#d92d20;display:none"></div>
+              <div class="middle-payment-row"><span>Tiền thừa</span><span class="money-input-wrap"><input id="changeReturnedToCustomer" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput(this, 'change')"><span class="money-unit">VNĐ</span></span></div>
+              <div class="middle-payment-row"><span>Khách cần trả</span><strong id="customerPayable">0 VNĐ</strong></div>
+              <div class="middle-payment-row"><span>Khách đã trả</span><strong id="customerPaid">0 VNĐ</strong></div>
+              <div class="middle-payment-row middle-payment-total"><span id="remainingTotalLabel">Còn phải thu</span><strong id="remainingTotal">0 VNĐ</strong></div>
             </div>
           </div>
         </div>
@@ -850,9 +961,22 @@
     <div id="qtyWarningTooltip" class="qty-warning-tooltip" aria-hidden="true"></div>
     <script>
       let cart = [];
-      let lastTotals = { khachCanTra: 0, tien_mat: 0, chuyen_khoan: 0, tien_thua: 0, tong_khach_dua: 0, thuc_thu: 0 };
+      let expandedLotKeyByItem = {};
+      let codEnabled = false;
+      let lastTotals = { khachCanTra: 0, khachThanhToan: 0, codAmount: 0, tienThuaTraKhach: 0, tongKhachDua: 0 };
       let availableProducts = [];
       let previousKhoId = '';
+      let paymentPriority = 'cash';
+      let isPayAllMode = false;
+      let payAllTarget = 'cash';
+      let cashBookOptions = [];
+      let bankBookOptions = [];
+      const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0, nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id._id || p.nha_cung_cap_id) : '', ten_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ten_ncc || p.nha_cung_cap_id.ten_cong_ty || '') : '', ma_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ma_ncc || '') : '' }))) %>;
+      const priceRows = <%- JSON.stringify((priceRows || []).map(r => ({ bang_gia_id: String(r.bang_gia_id || ''), hang_hoa_id: String(r.hang_hoa_id || ''), gia_ban: Number(r.gia_ban || 0) }))) %>;
+      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_day_du || c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi_day_du: a.dia_chi_day_du || a.dia_chi_chi_tiet || '', tinh_thanh: a.tinh_thanh || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
+      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi_day_du: s.dia_chi_day_du || s.dia_chi || s.dia_chi_chi_tiet || '', tinh_thanh: s.tinh_thanh || '', phuong_xa: s.phuong_xa || '' }))) %>;
+      const initialWarehouses = <%- JSON.stringify((warehouses || []).map(w => ({ _id: String(w._id), ten_kho: w.ten_kho || '', dia_chi_day_du: w.dia_chi_day_du || w.dia_chi || '' }))) %>;
+      const getStoreId = () => String(document.getElementById('storeId')?.value || '').trim();
       const sourceOrder = <%- JSON.stringify(sourceOrder || null) %>;
       const sourceOrderItems = <%- JSON.stringify((sourceOrderItems || []).map(row => ({ ct_don_hang_id: String(row._id || ''), hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong_da_giao || row.so_luong_dat || row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia_ban || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: row.kieu_chiet_khau || 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id) : '', gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id ? String(row.gia_tri_thuoc_tinh_id) : '', ten_quy_cach: row.ten_quy_cach || '', ten_thuoc_tinh: row.ten_thuoc_tinh || '', don_vi_tinh_id: row.don_vi_tinh_id ? String(row.don_vi_tinh_id) : '', ma_hang_snapshot: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang_snapshot: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', don_vi_tinh_snapshot: row.don_vi_tinh_snapshot || '', ghi_chu: row.ghi_chu || '' }))) %>;
       const sourceShipment = <%- JSON.stringify(sourceShipment || null) %>;
@@ -861,22 +985,15 @@
       const sourceInvoiceItems = <%- JSON.stringify((sourceInvoiceItems || []).map(row => ({ hang_hoa_id: String(row.hang_hoa_id?._id || row.hang_hoa_id || ''), ma_hang: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', so_luong: Number(row.so_luong || 0), ton_kho: 0, don_gia_ban: Number(row.don_gia || 0), chiet_khau: Number(row.chiet_khau || 0), kieu_chiet_khau: 'vnd', lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '', gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id ? String(row.gia_tri_thuoc_tinh_id) : '', ten_quy_cach: row.ten_quy_cach || '', ten_thuoc_tinh: row.ten_thuoc_tinh || '', don_vi_tinh_id: row.don_vi_tinh_id ? String(row.don_vi_tinh_id) : '', ma_hang_snapshot: row.ma_hang_snapshot || row.hang_hoa_id?.ma_hang || '', ten_hang_snapshot: row.ten_hang_snapshot || row.hang_hoa_id?.ten_hang || '', don_vi_tinh_snapshot: row.don_vi_tinh_snapshot || '', ghi_chu: row.ghi_chu || '' }))) %>;
       const sourceInvoiceShipment = <%- JSON.stringify(sourceInvoiceShipment || null) %>;
       const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
-      let customerPaidTouched = false;
-      const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0, nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id._id || p.nha_cung_cap_id) : '', ten_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ten_ncc || p.nha_cung_cap_id.ten_cong_ty || '') : '', ma_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ma_ncc || '') : '' }))) %>;
-      const priceRows = <%- JSON.stringify((priceRows || []).map(r => ({ bang_gia_id: String(r.bang_gia_id || ''), hang_hoa_id: String(r.hang_hoa_id || ''), gia_ban: Number(r.gia_ban || 0) }))) %>;
-      const customers = <%- JSON.stringify(customers.map(c => ({ _id: String(c._id), ma_khach_hang: c.ma_khach_hang || '', ten_khach_hang: c.ten_khach_hang || '', sdt: c.sdt || c.sdt2 || '', sdt2: c.sdt2 || '', email: c.email || '', dia_chi_nhan: c.dia_chi_nhan || '', tinh_thanh: c.tinh_thanh || '', quan_huyen: c.quan_huyen || '', phuong_xa: c.phuong_xa || '', dia_chi_list: (c.dia_chi_list || []).map(a => ({ _id: String(a._id || ''), dia_chi: a.dia_chi || a.dia_chi_day_du || '', tinh_thanh: a.tinh_thanh || '', quan_huyen: a.quan_huyen || '', phuong_xa: a.phuong_xa || '', mac_dinh: !!a.mac_dinh })) }))) %>;
-      const stores = <%- JSON.stringify(stores.map(s => ({ _id: String(s._id), ten_cua_hang: s.ten_cua_hang || '', sdt: s.sdt || '', dia_chi: s.dia_chi_day_du || s.dia_chi || '', tinh_thanh: s.tinh_thanh || '', phuong_xa: s.phuong_xa || '' }))) %>;
-      const initialWarehouses = <%- JSON.stringify((warehouses || []).map(w => ({ _id: String(w._id), ten_kho: w.ten_kho || '', dia_chi_day_du: w.dia_chi_day_du || w.dia_chi || '' }))) %>;
-      const getStoreId = () => String(document.getElementById('storeId')?.value || '').trim();
       const fmt = n => Number(n || 0).toLocaleString('vi-VN');
       const moneyFmt = n => `${fmt(n)} VNĐ`;
       const num = v => Number(String(v || '').replace(/[^\d-]/g, '')) || 0;
-      const qtyWarningTooltip = document.getElementById('qtyWarningTooltip');
-      let qtyWarningHideTimer = null;
       const formatDateVi = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
       const stockByProduct = new Map();
+      const qtyWarningTooltip = document.getElementById('qtyWarningTooltip');
+      let qtyWarningHideTimer = null;
       const productSearch = document.getElementById('productSearch'), productResults = document.getElementById('productResults');
-      const selectedPriceBookId = () => document.getElementById('priceBookId')?.value || '';
+      const selectedPriceBookId = () => '';
       function escapeHtml(value) {
         return String(value ?? '').replace(/[&<>"']/g, char => ({
           '&': '&amp;',
@@ -895,30 +1012,16 @@
         const product = products.find(p => p._id === productId);
         return Number(product?.gia_co_dinh || 0) || 0;
       }
-      function stockFor(productId) { return Number(stockByProduct.get(productId) || 0); }
-      function clearProductState(resetDiscount = true) {
-        cart = [];
-        availableProducts = [];
-        stockByProduct.clear();
-        productSearch.value = '';
-        productResults.innerHTML = '';
-        productResults.style.display = 'none';
-        if (resetDiscount) {
-          discount.value = 0;
-          orderDiscountType.value = 'vnd';
-          shippingFee.value = 0;
-        }
-        renderCart();
-      }
-      function discountAmount(value, type, baseAmount) {
-        const base = Math.max(0, Number(baseAmount || 0));
-        const raw = Math.max(0, Number(value || 0));
-        const amount = type === 'phan_tram' ? base * Math.min(raw, 100) / 100 : raw;
-        return Math.min(amount, base);
-      }
       const salePriceCache = new Map();
       function salePriceCacheKey(productId, ctx) {
-        return [productId, ctx.lo_hang_id || '', ctx.gia_tri_thuoc_tinh_id || '', ctx.ten_quy_cach || '', ctx.loai_gia_ban || '', selectedPriceBookId()].join('|');
+        return [
+          productId,
+          ctx.lo_hang_id || '',
+          ctx.gia_tri_thuoc_tinh_id || '',
+          ctx.ten_quy_cach || '',
+          ctx.loai_gia_ban || '',
+          selectedPriceBookId()
+        ].join('|');
       }
       async function fetchSalePriceMeta(productId, ctx = {}) {
         const key = salePriceCacheKey(productId, ctx);
@@ -932,10 +1035,11 @@
         if (ctx.loai_gia_ban) params.set('loai_gia_ban', String(ctx.loai_gia_ban));
         let data = { gia_ban: priceFor(productId), cho_phep_sua_gia: true, loai_ap_dung: null };
         try {
-          const res = await fetch('/api/kho/hang-hoa/' + encodeURIComponent(productId) + '/gia?' + params.toString());
+          const res = await fetch('/api/hang-hoa/' + encodeURIComponent(productId) + '/gia?' + params.toString());
+          if (!res.ok) throw new Error('price fetch failed');
           const json = await res.json();
           if (json && json.success && json.data) data = json.data;
-        } catch (err) { /* fallback */ }
+        } catch (err) { /* fallback priceFor */ }
         if (data.gia_ban == null || data.gia_ban === '') data.gia_ban = priceFor(productId);
         salePriceCache.set(key, data);
         return data;
@@ -950,23 +1054,40 @@
         row.don_gia_ban = Number(meta.gia_ban || 0) || priceFor(productId);
         row.cho_phep_sua_gia = meta.cho_phep_sua_gia !== false;
         row.loai_ap_dung = meta.loai_ap_dung || null;
+        row.gia_mac_dinh = meta.gia_mac_dinh || null;
         if (!row.loai_gia_ban && meta.loai_ap_dung === 'ca_hai') {
           row.loai_gia_ban = meta.gia_mac_dinh === 'thi_truong' ? 'thi_truong' : 'co_dinh';
         }
         return row;
       }
-      async function handlePriceBookChange() {
-        if (sourceOrder) return;
-        salePriceCache.clear();
-        for (const item of cart) {
-          const meta = await fetchSalePriceMeta(item.hang_hoa_id, {});
-          item.don_gia_ban = Number(meta.gia_ban || 0) || priceFor(item.hang_hoa_id);
-          item.cho_phep_sua_gia = meta.cho_phep_sua_gia !== false;
-          if (item.has_quy_cach) await Promise.all((item.quy_cach_items || []).map(qc => applyPriceToDetailRow(item.hang_hoa_id, qc)));
-          if (item.has_lot_items) await Promise.all((item.lot_items || []).map(lot => applyPriceToDetailRow(item.hang_hoa_id, lot)));
+      function stockFor(productId) { return Number(stockByProduct.get(productId) || 0); }
+      function clearProductState(resetDiscount = true) {
+        cart = [];
+        expandedLotKeyByItem = {};
+        availableProducts = [];
+        stockByProduct.clear();
+        productSearch.value = '';
+        productResults.innerHTML = '';
+        productResults.style.display = 'none';
+        if (resetDiscount) {
+          discount.value = 0;
+          orderDiscountType.value = 'vnd';
+          shippingFee.value = 0;
+          codEnabled = false;
+          cashCustomerGiven.value = 0;
+          transferCustomerGiven.value = 0;
+          changeReturnedToCustomer.value = 0;
+          if (cashBookId) cashBookId.value = '';
+          if (bankBookId) bankBookId.value = '';
+          isPayAllMode = false;
         }
-        if (productResults.style.display === 'block') renderProductSuggestions();
         renderCart();
+      }
+      function discountAmount(value, type, baseAmount) {
+        const base = Math.max(0, Number(baseAmount || 0));
+        const raw = Math.max(0, Number(value || 0));
+        const amount = type === 'phan_tram' ? base * Math.min(raw, 100) / 100 : raw;
+        return Math.min(amount, base);
       }
       function lineQty(item) {
         if (item.has_quy_cach && Array.isArray(item.quy_cach_items)) {
@@ -976,6 +1097,15 @@
           return item.lot_items.reduce((sum, lot) => sum + Number(lot.so_luong_dat || lot.so_luong || 0), 0);
         }
         return Number(item.so_luong || 0);
+      }
+      function lineStock(item) {
+        if (item.has_quy_cach && Array.isArray(item.quy_cach_items)) {
+          return item.quy_cach_items.reduce((sum, qc) => sum + inventoryMetrics(qc).tonThucTe, 0);
+        }
+        if (item.has_lot_items && Array.isArray(item.lot_items)) {
+          return item.lot_items.reduce((sum, lot) => sum + inventoryMetrics(lot).tonThucTe, 0);
+        }
+        return inventoryMetrics(item, stockFor(item.hang_hoa_id)).tonThucTe;
       }
       function firstNumber(...values) {
         for (const value of values) {
@@ -1002,13 +1132,20 @@
           }, { tonThucTe: 0, soLuongKhachDat: 0, soLuongKhaDung: 0 });
         }
         if (item.has_lot_items && Array.isArray(item.lot_items)) {
-          return item.lot_items.reduce((sum, lot) => {
+          const lotMetrics = item.lot_items.reduce((sum, lot) => {
             const metrics = inventoryMetrics(lot);
             sum.tonThucTe += metrics.tonThucTe;
             sum.soLuongKhachDat += metrics.soLuongKhachDat;
             sum.soLuongKhaDung += metrics.soLuongKhaDung;
             return sum;
           }, { tonThucTe: 0, soLuongKhachDat: 0, soLuongKhaDung: 0 });
+          const productReserved = Math.max(0, firstNumber(item.so_luong_khach_dat, 0));
+          const reserved = Math.max(lotMetrics.soLuongKhachDat, productReserved);
+          return {
+            tonThucTe: lotMetrics.tonThucTe,
+            soLuongKhachDat: reserved,
+            soLuongKhaDung: lotMetrics.tonThucTe - reserved
+          };
         }
         return inventoryMetrics(item, stockFor(item.hang_hoa_id));
       }
@@ -1018,13 +1155,13 @@
         if (quantity > metrics.tonThucTe) {
           return {
             level: 'danger',
-            message: `Số lượng bán đang vượt tồn thực tế trong kho. Tồn thực tế: ${fmt(metrics.tonThucTe)}, Khách khác đã đặt: ${fmt(metrics.soLuongKhachDat)}, Khả dụng: ${fmt(metrics.soLuongKhaDung)}.`
+            message: `Số lượng đặt đang vượt tồn thực tế trong kho. Có thể sẽ thiếu hàng khi giao. Tồn thực tế: ${fmt(metrics.tonThucTe)}, Khách khác đã đặt: ${fmt(metrics.soLuongKhachDat)}, Khả dụng: ${fmt(metrics.soLuongKhaDung)}.`
           };
         }
         if (quantity > metrics.soLuongKhaDung) {
           return {
             level: 'warn',
-            message: `Số lượng bán đang vượt mức khả dụng. Hiện còn khả dụng ${fmt(metrics.soLuongKhaDung)}, vì đã có khách khác đặt ${fmt(metrics.soLuongKhachDat)}.`
+            message: `Số lượng đặt đang vượt mức khả dụng. Hiện còn khả dụng ${fmt(metrics.soLuongKhaDung)}, vì đã có khách khác đặt ${fmt(metrics.soLuongKhachDat)}.`
           };
         }
         return null;
@@ -1037,9 +1174,6 @@
         if (!warning) return '';
         const dangerClass = warning.level === 'danger' ? ' is-danger' : '';
         return `<span class="warning-icon-trigger js-warning-icon${dangerClass}" data-warning-message="${escapeHtml(warning.message)}" aria-label="Cảnh báo tồn kho">⚠</span>`;
-      }
-      function lineStock(item) {
-        return lineInventoryMetrics(item).tonThucTe;
       }
       function renderProductSuggestions() {
         if (!document.getElementById('khoId').value) {
@@ -1059,7 +1193,6 @@
       productSearch.addEventListener('focus', renderProductSuggestions);
       productSearch.addEventListener('input', renderProductSuggestions);
       async function addProduct(id) {
-        if (sourceOrder) return alert('Hóa đơn tạo từ đơn hàng gốc không cho sửa danh sách hàng.');
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho trước khi thêm hàng.');
         const p = availableProducts.find(x => x._id === id);
         if (!p) return;
@@ -1070,7 +1203,7 @@
             alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
           } else {
             ex.so_luong += 1;
-            if (ex.so_luong > stock) alert('Hóa đơn này đang bán vượt tồn hiện có.');
+            if (ex.so_luong > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
           }
         } else {
           const hasQuyCach = Boolean(p.has_quy_cach && (p.quy_cach_items || []).length);
@@ -1094,155 +1227,462 @@
             quy_cach_items: hasQuyCach ? (p.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_dat: '', chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : [],
             lot_items: hasLotItems ? (p.lot_items || []).map(lot => Object.assign({}, lot, { so_luong_dat: '', chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : []
           };
-          if (hasQuyCach) await Promise.all(newItem.quy_cach_items.map(qc => applyPriceToDetailRow(id, qc)));
-          if (hasLotItems) await Promise.all(newItem.lot_items.map(lot => applyPriceToDetailRow(id, lot)));
+          if (hasQuyCach) {
+            await Promise.all(newItem.quy_cach_items.map(qc => applyPriceToDetailRow(id, qc)));
+          }
+          if (hasLotItems) {
+            await Promise.all(newItem.lot_items.map(lot => applyPriceToDetailRow(id, lot)));
+          }
           cart.push(newItem);
-          if (!hasQuyCach && !hasLotItems && stock < 1) alert('Hóa đơn này đang bán vượt tồn hiện có.');
+          if (!hasQuyCach && !hasLotItems && stock < 1) alert('Đơn này đang đặt vượt tồn hiện có.');
         }
         productSearch.value = '';
         productResults.style.display = 'none';
         renderCart();
       }
-      function renderQuyCachBlock(item, idx) {
-        const detailRows = item.has_quy_cach ? (item.quy_cach_items || []) : (item.has_lot_items ? (item.lot_items || []) : []);
-        if (!detailRows.length) return '';
-        const rows = detailRows.map((qc, qcIdx) => {
-          const qty = Number(qc.so_luong_dat || qc.so_luong || 0);
-          const metrics = inventoryMetrics(qc);
-          const qcWarning = sourceOrder ? null : availabilityWarning(qty, metrics);
-          const unitPrice = Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
-          const base = qty * unitPrice;
-          const discount = discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', base);
-          const total = Math.max(base - discount, 0);
-          const disabled = sourceOrder ? ' disabled' : '';
-          const lotName = [qc.ten_lo || qc.ma_lo || '', qc.han_su_dung ? `HSD ${formatDateVi(qc.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '--';
-          return `<tr>
-            <th>${escapeHtml(lotName)}</th>
-            <th>${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '--')}</th>
-            <td class="num">${fmt(metrics.tonThucTe)}</td>
-            <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
-            <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
-            <td class="num"><span class="qty-input-wrap"><input class="qc-input${warningInputClass(qcWarning)}" type="number" min="0" value="${qty || ''}" onchange="updQuyCachQty(${idx}, ${qcIdx}, this.value)"${disabled}>${warningIconHtml(qcWarning)}</span></td>
-            <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}" onchange="updQuyCachPrice(${idx}, ${qcIdx}, this.value)"${disabled}><span class="money-unit">VNĐ</span></span></td>
-            <td class="num"><span class="discount-pair"><input class="qc-input" value="${qc.chiet_khau || 0}" onchange="updQuyCachDiscount(${idx}, ${qcIdx}, this.value)"${disabled}><select onchange="updQuyCachDiscountType(${idx}, ${qcIdx}, this.value)"${disabled}><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
-            <td class="num"><b>${moneyFmt(total)}</b></td>
+      function itemDetailRows(item) {
+        if (item.has_quy_cach) return item.quy_cach_items || [];
+        if (item.has_lot_items) return item.lot_items || [];
+        return [];
+      }
+      function itemHasLotGrid(item) {
+        if (!item || (!item.has_lot_items && !item.has_quy_cach)) return false;
+        const rows = itemDetailRows(item);
+        if (!rows.length) return false;
+        if (item.has_lot_items) return true;
+        return rows.some(row => row.lo_hang_id || row.ma_lo || row.ten_lo);
+      }
+      function parseLotDate(value) {
+        const time = value ? new Date(value).getTime() : 0;
+        return Number.isFinite(time) ? time : 0;
+      }
+      function groupLotsForItem(item) {
+        const map = new Map();
+        const upsertLotGroup = (row, qcIdx) => {
+          const lotKey = String(row.lo_hang_id || row.ma_lo || row.ten_lo || `row-${qcIdx}`);
+          if (!map.has(lotKey)) {
+            map.set(lotKey, {
+              lotKey,
+              lo_hang_id: row.lo_hang_id || '',
+              ma_lo: row.ma_lo || '',
+              ten_lo: row.ten_lo || '',
+              ngay_nhap: row.ngay_nhap || '',
+              han_su_dung: row.han_su_dung || '',
+              items: []
+            });
+          }
+          const group = map.get(lotKey);
+          if (!group.items.some(entry => entry.qcIdx === qcIdx)) {
+            group.items.push({ row, qcIdx });
+          }
+          return group;
+        };
+        if (item.has_lot_items && !item.has_quy_cach) {
+          (item.lot_items || []).forEach((row, qcIdx) => upsertLotGroup(row, qcIdx));
+        } else {
+          itemDetailRows(item).forEach((row, qcIdx) => upsertLotGroup(row, qcIdx));
+        }
+        return Array.from(map.values()).sort((a, b) => {
+          const dateA = parseLotDate(a.ngay_nhap) || parseLotDate(a.han_su_dung);
+          const dateB = parseLotDate(b.ngay_nhap) || parseLotDate(b.han_su_dung);
+          if (dateA !== dateB) return dateA - dateB;
+          return String(a.lotKey).localeCompare(String(b.lotKey), 'vi');
+        });
+      }
+      function lotGroupSummary(lot) {
+        const ton = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).tonThucTe, 0);
+        const khaDung = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).soLuongKhaDung, 0);
+        const dat = lot.items.reduce((sum, entry) => sum + Number(entry.row.so_luong_dat || entry.row.so_luong || 0), 0);
+        const datePart = [lot.ten_lo || lot.ma_lo || '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
+        return { ton, khaDung, dat, datePart };
+      }
+      function maxLotColumnsInCart() {
+        return cart.reduce((max, item) => {
+          if (!itemHasLotGrid(item)) return max;
+          return Math.max(max, groupLotsForItem(item).length);
+        }, 0);
+      }
+      function renderCartThead(maxLots) {
+        const thead = document.getElementById('cartHead');
+        if (!thead) return;
+        if (maxLots <= 0) {
+          thead.innerHTML = `<tr>
+            <th>STT</th>
+            <th>Mã hàng</th>
+            <th>Tên hàng</th>
+            <th class="num">SL</th>
+            <th class="num">Tồn</th>
+            <th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th>
+            <th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th>
+            <th class="num">Đơn giá</th>
+            <th class="num">Giảm giá</th>
+            <th class="num">Thành tiền</th>
+            <th></th>
           </tr>`;
-        }).join('');
-        return `<tr class="qc-row"><td colspan="11">
+          return;
+        }
+        const lotHeaders = Array.from({ length: maxLots }, (_, index) => `<th class="num lot-col">Lô ${index + 1}</th>`).join('');
+        thead.innerHTML = `<tr>
+          <th>STT</th>
+          <th>Mã hàng</th>
+          <th>Tên hàng</th>
+          ${lotHeaders}
+          <th class="num">Thành tiền</th>
+          <th></th>
+        </tr>`;
+      }
+      function toggleLotExpand(hangHoaId, lotKey) {
+        if (expandedLotKeyByItem[hangHoaId] === lotKey) {
+          delete expandedLotKeyByItem[hangHoaId];
+        } else {
+          expandedLotKeyByItem[hangHoaId] = lotKey;
+        }
+        renderCart();
+      }
+      function handleLotCellClick(cell) {
+        if (!cell || !cell.dataset) return;
+        const hangHoaId = cell.dataset.hangHoaId || '';
+        const lotKey = cell.dataset.lotKey || '';
+        if (!hangHoaId || !lotKey) return;
+        toggleLotExpand(hangHoaId, lotKey);
+      }
+      function renderDetailRowHtml(item, qc, qcIdx, itemIdx, options = {}) {
+        const showLotColumn = options.showLotColumn === true;
+        const showAttrColumn = options.showAttrColumn !== false;
+        const qty = Number(qc.so_luong_dat || qc.so_luong || 0);
+        const metrics = inventoryMetrics(qc);
+        const qcWarning = availabilityWarning(qty, metrics);
+        const unitPrice = Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
+        const base = qty * unitPrice;
+        const discount = discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', base);
+        const total = Math.max(base - discount, 0);
+        const lotName = [qc.ten_lo || qc.ma_lo || '', qc.han_su_dung ? `HSD ${formatDateVi(qc.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '--';
+        const priceLocked = qc.cho_phep_sua_gia === false;
+        const loaiGiaCell = qc.loai_ap_dung === 'ca_hai'
+          ? `<select class="qc-input" onchange="updQuyCachLoaiGia(${itemIdx}, ${qcIdx}, this.value)"><option value="co_dinh"${qc.loai_gia_ban !== 'thi_truong' ? ' selected' : ''}>Cố định</option><option value="thi_truong"${qc.loai_gia_ban === 'thi_truong' ? ' selected' : ''}>Thị trường</option></select>`
+          : '<span class="stock-text">—</span>';
+        return `<tr>
+          ${showLotColumn ? `<th>${escapeHtml(lotName)}</th>` : ''}
+          ${showAttrColumn ? `<th>${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '--')}</th>` : ''}
+          <td class="num">${fmt(metrics.tonThucTe)}</td>
+          <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
+          <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
+          <td class="num"><span class="qty-input-wrap"><input class="qc-input${warningInputClass(qcWarning)}" type="number" min="0" value="${qty || ''}" onchange="updQuyCachQty(${itemIdx}, ${qcIdx}, this.value)">${warningIconHtml(qcWarning)}</span></td>
+          <td class="num">${loaiGiaCell}</td>
+          <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}"${priceLocked ? ' readonly title="Giá đã khóa"' : ''} onchange="updQuyCachPrice(${itemIdx}, ${qcIdx}, this.value)"><span class="money-unit">VNĐ</span></span></td>
+          <td class="num"><span class="discount-pair"><input class="qc-input" value="${qc.chiet_khau || 0}" onchange="updQuyCachDiscount(${itemIdx}, ${qcIdx}, this.value)"><select onchange="updQuyCachDiscountType(${itemIdx}, ${qcIdx}, this.value)"><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
+          <td class="num"><b>${moneyFmt(total)}</b></td>
+        </tr>`;
+      }
+      function renderQuyCachBlockForLot(item, itemIdx, lotGroup, colspan) {
+        if (!lotGroup || !lotGroup.items.length) return '';
+        const showAttr = item.has_quy_cach;
+        const rows = lotGroup.items.map(({ row, qcIdx }) => renderDetailRowHtml(item, row, qcIdx, itemIdx, {
+          showLotColumn: false,
+          showAttrColumn: showAttr
+        })).join('');
+        const headerCols = showAttr
+          ? '<th>Thuộc tính</th>'
+          : '';
+        return `<tr class="qc-row"><td colspan="${colspan}">
           <table class="qc-table">
-            <thead><tr><th>Lô</th><th>Thuộc tính</th><th class="num">Tồn</th><th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th><th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th><th class="num">SL bán</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead>
+            <thead><tr>${headerCols}<th class="num">Tồn</th><th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th><th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th><th class="num">SL đặt</th><th class="num">Loại giá</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
         </td></tr>`;
       }
+      function renderQuyCachBlock(item, idx) {
+        if (itemHasLotGrid(item)) return '';
+        const detailRows = item.has_quy_cach ? (item.quy_cach_items || []) : (item.has_lot_items ? (item.lot_items || []) : []);
+        if (!detailRows.length) return '';
+        const rows = detailRows.map((qc, qcIdx) => renderDetailRowHtml(item, qc, qcIdx, idx, {
+          showLotColumn: item.has_lot_items || item.has_quy_cach,
+          showAttrColumn: item.has_quy_cach
+        })).join('');
+        const lotHeader = (item.has_lot_items || item.has_quy_cach) ? '<th>Lô</th>' : '';
+        const attrHeader = item.has_quy_cach ? '<th>Thuộc tính</th>' : '';
+        return `<tr class="qc-row"><td colspan="12">
+          <table class="qc-table">
+            <thead><tr>${lotHeader}${attrHeader}<th class="num">Tồn</th><th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th><th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th><th class="num">SL đặt</th><th class="num">Loại giá</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </td></tr>`;
+      }
+      function computeLineTotals(item) {
+        const detailRows = itemDetailRows(item);
+        const lineBase = detailRows.length
+          ? detailRows.reduce((sum, qc) => sum + Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0), 0)
+          : lineQty(item) * Number(item.don_gia_ban || 0);
+        const lineDiscount = detailRows.length
+          ? detailRows.reduce((sum, qc) => {
+              const qcBase = Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
+              return sum + discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', qcBase);
+            }, 0)
+          : discountAmount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
+        return Math.max(lineBase - lineDiscount, 0);
+      }
+      function renderLotProductRow(item, idx, maxLots, line) {
+        const lots = groupLotsForItem(item);
+        const expandedLotKey = expandedLotKeyByItem[item.hang_hoa_id];
+        const expandedLot = lots.find(lot => lot.lotKey === expandedLotKey);
+        const lotCells = Array.from({ length: maxLots }, (_, columnIndex) => {
+          const lot = lots[columnIndex];
+          if (!lot) return '<td class="num lot-cell lot-cell-empty"></td>';
+          const summary = lotGroupSummary(lot);
+          const active = expandedLotKey === lot.lotKey;
+          const mainText = summary.dat > 0 ? `Đặt: ${fmt(summary.dat)}` : `KD: ${fmt(summary.khaDung)}`;
+          return `<td class="num lot-cell${active ? ' is-active' : ''}" data-hang-hoa-id="${escapeHtml(item.hang_hoa_id)}" data-lot-key="${escapeHtml(lot.lotKey)}" onclick="handleLotCellClick(this)">
+            <div class="lot-cell-main">${mainText}</div>
+            <div class="lot-cell-sub">${escapeHtml(summary.datePart)}</div>
+          </td>`;
+        }).join('');
+        const colspan = 3 + maxLots + 2;
+        return `<tr>
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(item.ma_hang || '')}</td>
+          <td>${escapeHtml(item.ten_hang || '')}</td>
+          ${lotCells}
+          <td class="num">${moneyFmt(line)}</td>
+          <td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${item.hang_hoa_id}')"></i></td>
+        </tr>${expandedLot ? renderQuyCachBlockForLot(item, idx, expandedLot, colspan) : ''}`;
+      }
+      function renderNormalProductRow(item, idx, maxLots, line) {
+        item.ton_kho = lineStock(item);
+        item.so_luong = lineQty(item);
+        const metrics = lineInventoryMetrics(item);
+        const lineWarning = availabilityWarning(lineQty(item), metrics);
+        const qtyCell = `<span class="qty-input-wrap"><input class="small${warningInputClass(lineWarning)}" value="${item.so_luong}" onchange="updQty('${item.hang_hoa_id}',this.value)">${warningIconHtml(lineWarning)}</span>`;
+        const priceCell = `<span class="money-input-wrap"><input class="small" value="${fmt(item.don_gia_ban)}"${item.cho_phep_sua_gia === false ? ' readonly title="Giá đã khóa"' : ''} onchange="updUnitPrice('${item.hang_hoa_id}',this.value)"><span class="money-unit">VNĐ</span></span>`;
+        const discountCell = `<span class="discount-pair"><input class="small" value="${item.chiet_khau || 0}" onchange="updLineDiscount('${item.hang_hoa_id}',this.value)"><select onchange="updLineDiscountType('${item.hang_hoa_id}',this.value)"><option value="vnd"${item.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${item.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
+        if (maxLots > 0) {
+          return `<tr>
+            <td>${idx + 1}</td>
+            <td>${escapeHtml(item.ma_hang || '')}<span class="stock-text">Tồn: ${fmt(metrics.tonThucTe)}</span></td>
+            <td>${escapeHtml(item.ten_hang || '')}</td>
+            <td colspan="${maxLots}" class="lot-inline-normal">
+              <div class="inline-detail-grid">
+                <div><div class="inline-label">SL</div><div class="num">${qtyCell}</div></div>
+                <div><div class="inline-label">Tồn</div><div class="num">${fmt(metrics.tonThucTe)}</div></div>
+                <div><div class="inline-label">Khách khác đã đặt</div><div class="num">${fmt(metrics.soLuongKhachDat)}</div></div>
+                <div><div class="inline-label">Khả dụng</div><div class="num">${fmt(metrics.soLuongKhaDung)}</div></div>
+                <div><div class="inline-label">Đơn giá</div><div class="num">${priceCell}</div></div>
+                <div><div class="inline-label">Giảm giá</div><div class="num">${discountCell}</div></div>
+              </div>
+            </td>
+            <td class="num">${moneyFmt(line)}</td>
+            <td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${item.hang_hoa_id}')"></i></td>
+          </tr>`;
+        }
+        return `<tr>
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(item.ma_hang || '')}<span class="stock-text">Tồn: ${fmt(metrics.tonThucTe)}</span></td>
+          <td>${escapeHtml(item.ten_hang || '')}</td>
+          <td class="num">${qtyCell}</td>
+          <td class="num">${fmt(metrics.tonThucTe)}</td>
+          <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
+          <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
+          <td class="num">${priceCell}</td>
+          <td class="num">${discountCell}</td>
+          <td class="num">${moneyFmt(line)}</td>
+          <td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${item.hang_hoa_id}')"></i></td>
+        </tr>`;
+      }
       function renderCart() {
+        const maxLots = maxLotColumnsInCart();
+        renderCartThead(maxLots);
         let subtotal = 0;
-        cartBody.innerHTML = cart.map((i, idx) => {
-          i.ton_kho = lineStock(i);
-          i.so_luong = lineQty(i);
-          const detailRows = i.has_quy_cach ? (i.quy_cach_items || []) : (i.has_lot_items ? (i.lot_items || []) : []);
-          const lineBase = detailRows.length
-            ? detailRows.reduce((sum, qc) => sum + Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? i.don_gia_ban ?? 0), 0)
-            : Number(i.so_luong || 0) * Number(i.don_gia_ban || 0);
-          const lineDiscount = detailRows.length
-            ? detailRows.reduce((sum, qc) => {
-                const qcBase = Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? i.don_gia_ban ?? 0);
-                return sum + discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', qcBase);
-              }, 0)
-            : discountAmount(i.chiet_khau, i.kieu_chiet_khau, lineBase);
-          const line = Math.max(lineBase - lineDiscount, 0);
-          const metrics = lineInventoryMetrics(i);
-          const lineWarning = sourceOrder ? null : availabilityWarning(lineQty(i), metrics);
+        cartBody.innerHTML = cart.map((item, idx) => {
+          const line = computeLineTotals(item);
           subtotal += line;
-          const qtyCell = sourceOrder || detailRows.length
-            ? `<span>${fmt(lineQty(i))}</span>`
-            : `<span class="qty-input-wrap"><input class="small${warningInputClass(lineWarning)}" value="${i.so_luong}" onchange="updQty('${i.hang_hoa_id}',this.value)">${warningIconHtml(lineWarning)}</span>`;
-          const priceCell = detailRows.length
-            ? '<span class="stock-text">Nhập theo thuộc tính</span>'
-            : `<span class="money-input-wrap"><input class="small" value="${fmt(i.don_gia_ban)}" onchange="updUnitPrice('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><span class="money-unit">VNĐ</span></span>`;
-          const discountCell = detailRows.length
-            ? `<span>${moneyFmt(lineDiscount)}</span>`
-            : `<span class="discount-pair"><input class="small" value="${i.chiet_khau || 0}" onchange="updLineDiscount('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><select onchange="updLineDiscountType('${i.hang_hoa_id}',this.value)"${sourceOrder ? ' disabled' : ''}><option value="vnd"${i.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${i.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
-          const deleteCell = sourceOrder
-            ? '<td></td>'
-            : `<td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeProduct('${i.hang_hoa_id}')"></i></td>`;
-          return `<tr><td>${idx + 1}</td><td>${i.ma_hang}<span class="stock-text">Tồn: ${fmt(metrics.tonThucTe)}</span></td><td>${i.ten_hang}</td><td class="num">${qtyCell}</td><td class="num">${fmt(metrics.tonThucTe)}</td><td class="num">${fmt(metrics.soLuongKhachDat)}</td><td class="num">${fmt(metrics.soLuongKhaDung)}</td><td class="num">${priceCell}</td><td class="num">${discountCell}</td><td class="num">${moneyFmt(line)}</td>${deleteCell}</tr>${renderQuyCachBlock(i, idx)}`;
+          if (itemHasLotGrid(item)) {
+            return renderLotProductRow(item, idx, maxLots, line);
+          }
+          return renderNormalProductRow(item, idx, maxLots, line) + renderQuyCachBlock(item, idx);
         }).join('');
         const orderDiscount = discountAmount(num(discount.value), orderDiscountType.value, subtotal);
         const shippingFeeValue = num(shippingFee.value);
-        const shippingFeeForCustomer = shippingFeePayer.value === 'cua_hang' ? 0 : shippingFeeValue;
+        const shippingFeeForCustomer = 0;
         const total = Math.max(subtotal - orderDiscount + shippingFeeForCustomer, 0);
         document.getElementById('subtotal').textContent = moneyFmt(subtotal);
         grandTotal.textContent = moneyFmt(total);
-        if (!customerPaidTouched) {
-          customerCashInput.value = fmt(total);
-          customerTransferInput.value = '0';
-          customerChangeInput.value = '0';
+        renderPaymentSummary();
+      }
+      function handleCustomerPaymentInput(input, mode) {
+        input.value = fmt(Math.max(0, num(input.value)));
+        if (mode === 'cash') paymentPriority = 'cash';
+        else if (mode === 'transfer') paymentPriority = 'transfer';
+        isPayAllMode = false;
+        renderPaymentSummary();
+      }
+      function cashBookLabel(book) {
+        const bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
+        const bankLabel = [bank.ten_ngan_hang, bank.so_tai_khoan].filter(Boolean).join(' - ');
+        return bankLabel || (book && book.ten_so_quy) || 'Sổ quỹ';
+      }
+      function autoSelectCashBook(list) {
+        const defaults = (list || []).filter(book => book.mac_dinh);
+        if (defaults.length === 1) return String(defaults[0]._id);
+        if (!defaults.length && list.length === 1) return String(list[0]._id);
+        return '';
+      }
+      function renderCashBookSelect(select, list, placeholder) {
+        if (!select) return;
+        select.innerHTML = `<option value="">${escapeHtml(placeholder || 'Chọn sổ quỹ')}</option>` + (list || []).map(book =>
+          `<option value="${escapeHtml(String(book._id))}">${escapeHtml(cashBookLabel(book))}</option>`
+        ).join('');
+        select.value = autoSelectCashBook(list);
+      }
+      async function loadPaymentCashBooks() {
+        try {
+          const [cashRes, bankRes] = await Promise.all([
+            fetch('/api/so-quy/active?loai_so_quy=tien_mat'),
+            fetch('/api/so-quy/active?loai_so_quy=chuyen_khoan')
+          ]);
+          const cashJson = cashRes.ok ? await cashRes.json() : { items: [] };
+          const bankJson = bankRes.ok ? await bankRes.json() : { items: [] };
+          const pickBooks = json => (json.items || json.data || []).filter(book => String(book.trang_thai || 'active') === 'active');
+          cashBookOptions = pickBooks(cashJson).filter(book => String(book.loai_so_quy || '') === 'tien_mat');
+          bankBookOptions = pickBooks(bankJson).filter(book => String(book.loai_so_quy || '') === 'chuyen_khoan');
+          renderCashBookSelect(cashBookId, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+          renderCashBookSelect(bankBookId, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+        } catch (_) {
+          cashBookOptions = [];
+          bankBookOptions = [];
+          renderCashBookSelect(cashBookId, [], 'Không tải được sổ tiền mặt');
+          renderCashBookSelect(bankBookId, [], 'Không tải được tài khoản');
         }
+        renderPaymentSummary();
+      }
+      function fillOrderPaymentAll(mode) {
+        const due = Math.max(0, num(grandTotal.textContent));
+        isPayAllMode = due > 0;
+        payAllTarget = mode === 'transfer' ? 'transfer' : 'cash';
+        paymentPriority = payAllTarget;
+        if (mode === 'cash') {
+          cashCustomerGiven.value = fmt(due);
+          transferCustomerGiven.value = '0';
+        } else if (mode === 'transfer') {
+          transferCustomerGiven.value = fmt(due);
+          cashCustomerGiven.value = '0';
+        }
+        changeReturnedToCustomer.value = '0';
         renderPaymentSummary();
       }
       function renderPaymentSummary() {
         const khachCanTra = num(grandTotal.textContent);
-        const tien_mat = Math.max(0, num(customerCashInput.value));
-        const chuyen_khoan = Math.max(0, num(customerTransferInput.value));
-        const tien_thua = Math.max(0, num(customerChangeInput.value));
-        const tong_khach_dua = tien_mat + chuyen_khoan;
-        const thuc_thu = Math.max(0, tong_khach_dua - tien_thua);
-        const tienConLai = Math.max(khachCanTra - thuc_thu, 0);
-        lastTotals = { khachCanTra, tien_mat, chuyen_khoan, tien_thua, tong_khach_dua, thuc_thu };
-        paymentTotalGiven.textContent = moneyFmt(tong_khach_dua);
-        paymentNetReceived.textContent = moneyFmt(thuc_thu);
-        remainingTotal.textContent = moneyFmt(tienConLai);
-        const hint = document.getElementById('paymentValidationHint');
-        const errors = [];
-        if (tien_thua > tong_khach_dua) errors.push('Tiền thừa không được vượt tổng khách đưa');
-        if (tong_khach_dua > 0 && thuc_thu <= 0) errors.push('Thực thu phải lớn hơn 0');
-        if (thuc_thu > khachCanTra) errors.push('Thực thu không được vượt số còn phải thu');
-        if (errors.length) {
-          hint.style.display = 'block';
-          hint.textContent = errors.join('. ');
-        } else {
-          hint.style.display = 'none';
-          hint.textContent = '';
+        let tienMat = Math.max(0, num(cashCustomerGiven.value));
+        let chuyenKhoan = Math.max(0, num(transferCustomerGiven.value));
+        if (isPayAllMode && khachCanTra > 0) {
+          if (payAllTarget === 'transfer') {
+            tienMat = 0;
+            chuyenKhoan = khachCanTra;
+          } else {
+            tienMat = khachCanTra;
+            chuyenKhoan = 0;
+          }
         }
+        const tongKhachDua = tienMat + chuyenKhoan;
+        cashCustomerGiven.value = fmt(tienMat);
+        transferCustomerGiven.value = fmt(chuyenKhoan);
+        const tienThuaTraKhach = Math.max(0, num(changeReturnedToCustomer.value));
+        const khachThanhToan = tongKhachDua - tienThuaTraKhach;
+        const tienConLai = khachCanTra - khachThanhToan;
+        lastTotals = { khachCanTra, khachThanhToan, codAmount: 0, tienThuaTraKhach, tongKhachDua };
+        const customerPayableEl = document.getElementById('customerPayable');
+        const customerPaidEl = document.getElementById('customerPaid');
+        if (customerPayableEl) customerPayableEl.textContent = moneyFmt(khachCanTra);
+        if (customerPaidEl) customerPaidEl.textContent = moneyFmt(khachThanhToan);
+        const remainingLabelEl = document.getElementById('remainingTotalLabel');
+        if (remainingLabelEl) remainingLabelEl.textContent = tienConLai < 0 ? 'Nợ khách' : 'Còn phải thu';
+        remainingTotal.textContent = tienConLai < 0 ? `-${fmt(Math.abs(tienConLai))} VNĐ` : moneyFmt(tienConLai);
+        const cashBookRequired = tienMat > 0 || tienThuaTraKhach > 0;
+        const bankBookRequired = chuyenKhoan > 0;
+        if (cashBookId) {
+          cashBookId.disabled = !cashBookRequired;
+          if (!cashBookRequired) cashBookId.value = '';
+          if (cashBookRequired && !cashBookId.value) cashBookId.value = autoSelectCashBook(cashBookOptions);
+          cashBookId.classList.toggle('field-invalid', cashBookRequired && !String(cashBookId.value || '').trim());
+        }
+        if (bankBookId) {
+          bankBookId.disabled = !bankBookRequired;
+          if (!bankBookRequired) bankBookId.value = '';
+          if (bankBookRequired && !bankBookId.value) bankBookId.value = autoSelectCashBook(bankBookOptions);
+          bankBookId.classList.toggle('field-invalid', bankBookRequired && !String(bankBookId.value || '').trim());
+        }
+        const cashBookRequiredMark = document.getElementById('cashBookRequiredMark');
+        if (cashBookRequiredMark) cashBookRequiredMark.style.display = cashBookRequired ? 'inline' : 'none';
+        const bankBookRequiredMark = document.getElementById('bankBookRequiredMark');
+        if (bankBookRequiredMark) bankBookRequiredMark.style.display = bankBookRequired ? 'inline' : 'none';
       }
-      function handleCustomerPaymentInput() {
-        customerPaidTouched = true;
-        customerCashInput.value = fmt(num(customerCashInput.value));
-        customerTransferInput.value = fmt(num(customerTransferInput.value));
-        customerChangeInput.value = fmt(num(customerChangeInput.value));
+      function validateCustomerPayment() {
         renderPaymentSummary();
+        const tienMat = num(cashCustomerGiven.value);
+        const chuyenKhoan = num(transferCustomerGiven.value);
+        const tienThua = num(changeReturnedToCustomer.value);
+        if (tienMat < 0 || chuyenKhoan < 0 || tienThua < 0) return 'Số tiền không được âm.';
+        if (tienThua > lastTotals.tongKhachDua) return 'Tiền thừa không được vượt tổng khách đưa.';
+        if ((tienMat > 0 || tienThua > 0) && !(cashBookId && String(cashBookId.value || '').trim())) {
+          return cashBookOptions.length ? 'Vui lòng chọn sổ tiền mặt.' : 'Chưa có sổ tiền mặt đang hoạt động. Hãy tạo trong phần Quản lý sổ quỹ.';
+        }
+        if (chuyenKhoan > 0 && !(bankBookId && String(bankBookId.value || '').trim())) {
+          return bankBookOptions.length ? 'Vui lòng chọn tài khoản chuyển khoản.' : 'Chưa có tài khoản chuyển khoản đang hoạt động. Hãy tạo trong phần Quản lý sổ quỹ.';
+        }
+        return '';
+      }
+      function buildPaymentSubmitFields() {
+        renderPaymentSummary();
+        return {
+          khach_can_tra: lastTotals.khachCanTra,
+          tien_mat_khach_dua: Math.max(0, num(cashCustomerGiven.value)),
+          chuyen_khoan_khach_dua: Math.max(0, num(transferCustomerGiven.value)),
+          tien_thua_tra_khach: Math.max(0, num(changeReturnedToCustomer.value)),
+          payment_v2: true,
+          so_quy_tien_mat_id: cashBookId?.value || '',
+          so_quy_chuyen_khoan_id: bankBookId?.value || '',
+          so_quy_id: cashBookId?.value || bankBookId?.value || ''
+        };
       }
       function updQty(id, v) {
-        if (sourceOrder) return renderCart();
         const i = cart.find(x => x.hang_hoa_id === id);
         if (!i) return;
         if (i.has_quy_cach || i.has_lot_items) return alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
         const stock = inventoryMetrics(i, stockFor(id)).tonThucTe;
         const nextQty = Math.max(1, num(v));
-        if (nextQty > stock) alert('Hóa đơn này đang bán vượt tồn hiện có.');
+        if (nextQty > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
         i.so_luong = nextQty;
         renderCart();
       }
       function updQuyCachQty(itemIdx, qcIdx, value) {
-        if (sourceOrder) return renderCart();
         const item = cart[itemIdx];
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
         const qc = rows[qcIdx];
-        const max = Number(qc.ton_hien_tai || qc.ton_kho || 0);
-        qc.so_luong_dat = Math.max(0, Math.min(num(value), max));
+        qc.so_luong_dat = Math.max(0, num(value));
         renderCart();
       }
       function updQuyCachPrice(itemIdx, qcIdx, value) {
         const item = cart[itemIdx];
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
+        if (rows[qcIdx].cho_phep_sua_gia === false) return alert('Dòng này không cho phép sửa giá.');
         rows[qcIdx].don_gia_ban = Math.max(0, num(value));
         renderCart();
       }
+      async function updQuyCachLoaiGia(itemIdx, qcIdx, value) {
+        const item = cart[itemIdx];
+        const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
+        if (!rows || !rows[qcIdx]) return;
+        rows[qcIdx].loai_gia_ban = value === 'thi_truong' ? 'thi_truong' : 'co_dinh';
+        salePriceCache.delete(salePriceCacheKey(item.hang_hoa_id, {
+          lo_hang_id: rows[qcIdx].lo_hang_id,
+          gia_tri_thuoc_tinh_id: rows[qcIdx].gia_tri_thuoc_tinh_id,
+          ten_quy_cach: rows[qcIdx].ten_quy_cach || rows[qcIdx].ten_thuoc_tinh,
+          loai_gia_ban: rows[qcIdx].loai_gia_ban
+        }));
+        await applyPriceToDetailRow(item.hang_hoa_id, rows[qcIdx], rows[qcIdx].loai_gia_ban);
+        renderCart();
+      }
       function updQuyCachDiscount(itemIdx, qcIdx, value) {
-        if (sourceOrder) return renderCart();
         const item = cart[itemIdx];
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
@@ -1250,7 +1690,6 @@
         renderCart();
       }
       function updQuyCachDiscountType(itemIdx, qcIdx, value) {
-        if (sourceOrder) return renderCart();
         const item = cart[itemIdx];
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
@@ -1260,26 +1699,30 @@
       function updUnitPrice(id, v) {
         const i = cart.find(x => x.hang_hoa_id === id);
         if (!i) return;
+        if (i.cho_phep_sua_gia === false) return alert('Dòng này không cho phép sửa giá.');
         i.don_gia_ban = Math.max(0, num(v));
         renderCart();
       }
-      function updLineDiscount(id, v) { if (sourceOrder) return renderCart(); const i = cart.find(x => x.hang_hoa_id === id); if (i) i.chiet_khau = num(v); renderCart(); }
-      function updLineDiscountType(id, v) { if (sourceOrder) return renderCart(); const i = cart.find(x => x.hang_hoa_id === id); if (i) i.kieu_chiet_khau = v === 'phan_tram' ? 'phan_tram' : 'vnd'; renderCart(); }
-      function removeProduct(id) { if (sourceOrder) return alert('Hóa đơn tạo từ đơn hàng gốc không cho xóa hàng.'); cart = cart.filter(i => i.hang_hoa_id !== id); renderCart() }
+      function updLineDiscount(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.chiet_khau = num(v); renderCart(); }
+      function updLineDiscountType(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.kieu_chiet_khau = v === 'phan_tram' ? 'phan_tram' : 'vnd'; renderCart(); }
+      function removeProduct(id) {
+        delete expandedLotKeyByItem[id];
+        cart = cart.filter(i => i.hang_hoa_id !== id);
+        renderCart();
+      }
       const customerSearch = document.getElementById('customerSearch'), customerResults = document.getElementById('customerResults');
       function renderCustomerSuggestions() { if (!customerSearch || !customerResults) return; const q = customerSearch.value.trim().toLowerCase(); const rows = (q ? customers.filter(c => c.ten_khach_hang.toLowerCase().includes(q) || c.sdt.includes(q) || c.ma_khach_hang.toLowerCase().includes(q)) : customers).slice(0, 30); customerResults.innerHTML = rows.map(c => `<div class="search-item" onclick="selectCustomer('${c._id}')"><span><b>${c.ma_khach_hang || ''}</b> - ${c.ten_khach_hang}</span><span>${c.sdt || ''}</span></div>`).join('') || '<div class="search-item"><span>Không có khách hàng phù hợp</span></div>'; customerResults.style.display = 'block'; }
       if (customerSearch) {
         customerSearch.addEventListener('focus', renderCustomerSuggestions);
         customerSearch.addEventListener('input', renderCustomerSuggestions);
       }
-      function addressText(a) { return [a.dia_chi, a.phuong_xa, a.quan_huyen, a.tinh_thanh].filter(Boolean).join(', ') }
+      function addressText(a) { return [a.dia_chi_day_du, a.phuong_xa, a.tinh_thanh].filter(Boolean).join(', ') }
       function getCustomerAddress(customer) {
         if (!customer) return {};
         const addresses = customer.dia_chi_list || [];
         return addresses.find(a => a.mac_dinh) || addresses[0] || {
           dia_chi: customer.dia_chi_nhan || '',
           tinh_thanh: customer.tinh_thanh || '',
-          quan_huyen: customer.quan_huyen || '',
           phuong_xa: customer.phuong_xa || ''
         };
       }
@@ -1311,9 +1754,9 @@
           id: customer._id,
           name: customer.ten_khach_hang || '',
           phone: customer.sdt || customer.sdt2 || '',
-          address: a.dia_chi || customer.dia_chi_nhan || '',
+          address: a.dia_chi_day_du || customer.dia_chi_nhan || '',
           addressId: a._id || '',
-          area: a.quan_huyen || a.tinh_thanh || customer.quan_huyen || customer.tinh_thanh || '',
+          area: a.tinh_thanh || customer.tinh_thanh || '',
           ward: a.phuong_xa || customer.phuong_xa || ''
         });
       }
@@ -1327,9 +1770,9 @@
           id: id || '',
           name: opt?.dataset?.name || c?.ten_khach_hang || '',
           phone: opt?.dataset?.phone || c?.sdt || c?.sdt2 || '',
-          address: opt?.dataset?.address || a.dia_chi || c?.dia_chi_nhan || '',
+          address: opt?.dataset?.address || a.dia_chi_day_du || c?.dia_chi_nhan || '',
           addressId: opt?.dataset?.addressId || a._id || '',
-          area: opt?.dataset?.area || a.quan_huyen || a.tinh_thanh || c?.quan_huyen || c?.tinh_thanh || '',
+          area: opt?.dataset?.area || a.tinh_thanh || c?.tinh_thanh || '',
           ward: opt?.dataset?.ward || a.phuong_xa || c?.phuong_xa || ''
         });
       }
@@ -1366,10 +1809,12 @@
         return document.getElementById('recipientAddressId')?.value || '';
       }
       function scheduleShippingFee() {
+        shippingFee.disabled = false;
         shippingFeeHelp.textContent = 'Nhập trực tiếp phí giao hàng.';
         renderCart();
       }
       function handleShippingFeePayerChange() {
+        shippingFee.disabled = false;
         shippingFeeHelp.textContent = shippingFeePayer.value === 'khach'
           ? 'Khách trả phí giao hàng trực tiếp, không cộng vào đơn.'
           : 'Cửa hàng trả phí giao hàng, lưu vào vận đơn.';
@@ -1391,10 +1836,9 @@
           return;
         }
         khoSelect.innerHTML = '<option value="">Chọn kho</option>' + list.map(k => `<option value="${k._id}" data-address="${escapeHtml(k.dia_chi_day_du || k.dia_chi || '')}">${escapeHtml(k.ten_kho || '')}</option>`).join('');
-        if (!sourceOrder) khoSelect.disabled = false;
+        khoSelect.disabled = false;
       }
       async function loadKhoByStore() {
-        if (sourceOrder) return;
         previousKhoId = '';
         clearProductState();
         const storeId = getStoreId();
@@ -1505,10 +1949,107 @@
       }
       function togglePartnerMenu() { partnerPicker.classList.toggle('open'); }
       function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); scheduleShippingFee(); }
-      function selectPartnerIfExists(id) {
-        if (!id) return;
-        const option = document.querySelector(`.partner-option[data-partner-id="${id}"]`);
-        if (option) selectPartner(id, option.textContent.trim());
+      async function saveOrder() {
+        const payButton = document.getElementById('payButton');
+        if (payButton && payButton.disabled) return;
+        if (existingInvoice) return alert('Đơn hàng này đã có hóa đơn ' + (existingInvoice.ma_hoa_don || ''));
+        if (sourceOrder) return alert('Hóa đơn từ đơn hàng chỉ tạo khi xác nhận giao.');
+        if (!cart.length) return alert('Hóa đơn chưa có sản phẩm');
+        if (!getStoreId()) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.');
+        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
+        if (!customerId.value) return alert('Vui lòng chọn khách hàng.');
+        const wantsShipping = Boolean(partnerId.value) || num(shippingFee.value) > 0;
+        if (wantsShipping && !partnerId.value) return alert('Vui lòng chọn đối tác giao hàng');
+        const shippingAddress = getShippingEndPoint();
+        if (wantsShipping && !shippingAddress) return alert('Vui lòng nhập địa chỉ nhận hàng của khách.');
+        if (num(shippingFee.value) < 0) return alert('Phí giao hàng không được âm.');
+        if (cart.some(item => lineQty(item) <= 0)) return alert('Vui lòng nhập số lượng bán cho từng hàng.');
+        if (cart.some(item => lineQty(item) > lineStock(item))) alert('Hóa đơn này đang vượt tồn hiện có. Hóa đơn không trừ kho trong flow này.');
+        const paymentError = validateCustomerPayment();
+        if (paymentError) return alert(paymentError);
+        const paymentFields = buildPaymentSubmitFields();
+        const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value);
+        const noteInput = document.getElementById('deliveryNote');
+        const data = {
+          khach_hang_id: customerId.value,
+          cua_hang_id: getStoreId(),
+          kho_id: document.getElementById('khoId').value,
+          bang_gia_id: selectedPriceBookId(),
+          don_hang_id: sourceOrder ? sourceOrder._id : undefined,
+          items: cart.map(item => ({
+            hang_hoa_id: item.hang_hoa_id,
+            ct_don_hang_id: item.ct_don_hang_id || '',
+            lo_hang_id: item.lo_hang_id || '',
+            gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || '',
+            ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh || '',
+            ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
+            don_vi_tinh_id: item.don_vi_tinh_id || '',
+            so_luong: lineQty(item),
+            don_gia_ban: item.don_gia_ban,
+            chiet_khau: item.chiet_khau || 0,
+            kieu_chiet_khau: item.kieu_chiet_khau || 'vnd',
+            ma_hang_snapshot: item.ma_hang_snapshot || item.ma_hang || '',
+            ten_hang_snapshot: item.ten_hang_snapshot || item.ten_hang || '',
+            don_vi_tinh_snapshot: item.don_vi_tinh_snapshot || '',
+            ghi_chu: item.ghi_chu || '',
+            quy_cach_items: (item.has_quy_cach || item.has_lot_items)
+              ? (item.has_quy_cach ? (item.quy_cach_items || []) : (item.lot_items || []))
+                  .filter(qc => Number(qc.so_luong_dat || qc.so_luong || 0) > 0)
+                  .map(qc => ({
+                    lo_hang_id: qc.lo_hang_id || '',
+                    gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
+                    ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                    ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+                    so_luong: Number(qc.so_luong_dat || qc.so_luong || 0),
+                    don_gia_ban: Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0),
+                    loai_gia_ban: qc.loai_gia_ban || '',
+                    chiet_khau: Number(qc.chiet_khau || 0),
+                    kieu_chiet_khau: qc.kieu_chiet_khau || 'vnd'
+                  }))
+              : []
+          })),
+          chiet_khau: num(discount.value),
+          kieu_giam_gia: orderDiscountType.value,
+          phi_van_chuyen: num(shippingFee.value),
+          diem_di: getShippingStartPoint(),
+          diem_den: shippingAddress,
+          khoang_cach_km: 0,
+          ghi_chu: '',
+          doi_tac_giao_hang_id: partnerId.value,
+          dia_chi_khach_hang_id: getRecipientAddressId(),
+          nguoi_tra_phi_giao_hang: shippingFeePayer.value,
+          ten_nguoi_nhan: recipientCustomer ? recipientCustomer.ten_khach_hang : '',
+          sdt_nguoi_nhan: recipientPhone.value,
+          dia_chi_nhan: shippingAddress,
+          ghi_chu_giao_hang: noteInput ? noteInput.value : '',
+          thu_ho_cod: false,
+          cod_enabled: false,
+          cod_amount: 0,
+          ...paymentFields
+        };
+        try {
+          if (payButton) {
+            payButton.disabled = true;
+            payButton.textContent = 'ĐANG TẠO...';
+          }
+          const res = await fetch('/don-hang/hoa-don/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+          const text = await res.text();
+          let result = {};
+          try {
+            result = text ? JSON.parse(text) : {};
+          } catch (_) {
+            result = { success: false, message: text || 'Máy chủ trả về dữ liệu không hợp lệ' };
+          }
+          if (!result.success) return alert(result.message || 'Không tạo được hóa đơn');
+          window.location.href = '/don-hang/hoa-don';
+        } catch (err) {
+          alert(err.message || 'Lỗi khi tạo hóa đơn');
+        } finally {
+          if (payButton) {
+            payButton.disabled = false;
+            payButton.textContent = 'THANH TOÁN';
+          }
+        }
       }
       async function prefillFromCopyInvoice() {
         if (!sourceInvoice || sourceOrder) return;
@@ -1548,20 +2089,14 @@
       }
       async function prefillFromSourceOrder() {
         if (!sourceOrder) return;
-        if (sourceOrder) {
-          alert('Hóa đơn từ đơn hàng được tạo khi xác nhận giao. Vui lòng quay lại đơn hàng và bấm Xác nhận giao.');
-          const payButton = document.getElementById('payButton');
-          if (payButton) payButton.disabled = true;
-          return;
-        }
+        alert('Hóa đơn từ đơn hàng được tạo khi xác nhận giao. Vui lòng quay lại đơn hàng và bấm Xác nhận giao.');
+        const payButton = document.getElementById('payButton');
+        if (payButton) payButton.disabled = true;
         if (existingInvoice) {
           alert('Đơn hàng này đã có hóa đơn ' + (existingInvoice.ma_hoa_don || ''));
-          const payButton = document.getElementById('payButton');
           if (payButton) payButton.disabled = true;
-          return;
         }
         productSearch.disabled = true;
-        priceBookId.disabled = true;
         discount.disabled = true;
         orderDiscountType.disabled = true;
         const khoId = String(sourceOrder.kho_id?._id || sourceOrder.kho_id || '');
@@ -1574,7 +2109,6 @@
         } else if (khoId) {
           alert('Kho của đơn hàng không thuộc cửa hàng đang làm việc. Vui lòng chọn cửa hàng phù hợp ở menu trên.');
         }
-        if (sourceOrder.bang_gia_id) priceBookId.value = String(sourceOrder.bang_gia_id);
         const customerIdValue = String(sourceOrder.khach_hang_id?._id || sourceOrder.khach_hang_id || '');
         if (customerIdValue) fillRecipientFromCustomer(customers.find(x => x._id === customerIdValue));
         if (sourceShipment) {
@@ -1590,10 +2124,9 @@
         discount.value = sourceOrder.giam_gia || 0;
         orderDiscountType.value = sourceOrder.kieu_giam_gia || 'vnd';
         if (sourceOrder.khach_thanh_toan !== undefined && sourceOrder.khach_thanh_toan !== null) {
-          customerCashInput.value = fmt(sourceOrder.khach_thanh_toan || 0);
-          customerTransferInput.value = '0';
-          customerChangeInput.value = '0';
-          customerPaidTouched = true;
+          cashCustomerGiven.value = fmt(sourceOrder.khach_thanh_toan || 0);
+          transferCustomerGiven.value = '0';
+          changeReturnedToCustomer.value = '0';
         }
         cart = sourceOrderItems.map(item => ({
           ...item,
@@ -1605,119 +2138,24 @@
         }));
         renderCart();
       }
-      async function saveOrder() {
-        const payButton = document.getElementById('payButton');
-        if (payButton && payButton.disabled) return;
-        if (existingInvoice) return alert('Đơn hàng này đã có hóa đơn ' + (existingInvoice.ma_hoa_don || ''));
-        if (sourceOrder) {
-          return alert('Hóa đơn từ đơn hàng chỉ tạo khi xác nhận giao.');
-        }
-        if (!cart.length) return alert('Hóa đơn chưa có sản phẩm');
-        if (!getStoreId()) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.');
-        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
-        const customerIdValue = document.getElementById('customerId').value;
-        if (!customerIdValue) return alert('Vui lòng chọn khách hàng.');
-        const wantsShipping = Boolean(partnerId.value) || num(shippingFee.value) > 0;
-        if (wantsShipping && !partnerId.value) return alert('Vui lòng chọn đối tác giao hàng');
-        const shippingAddress = getShippingEndPoint();
-        if (wantsShipping && !shippingAddress) return alert('Vui lòng nhập địa chỉ nhận hàng của khách.');
-        if (num(shippingFee.value) < 0) return alert('Phí giao hàng không được âm.');
-        if (!sourceOrder && cart.some(item => lineQty(item) <= 0)) return alert('Vui lòng nhập số lượng bán cho từng hàng.');
-        if (!sourceOrder && cart.some(item => lineQty(item) > lineStock(item))) alert('Hóa đơn này đang vượt tồn hiện có. Hóa đơn không trừ kho trong flow này.');
-        if (!sourceOrder && lastTotals.tong_khach_dua > 0) {
-          const cashBookId = document.getElementById('cashBookId')?.value || '';
-          if (!cashBookId) return alert('Vui lòng chọn sổ quỹ để thu tiền hóa đơn.');
-          if (lastTotals.tien_thua > lastTotals.tong_khach_dua) return alert('Tiền thừa không được vượt tổng khách đưa.');
-          if (lastTotals.thuc_thu <= 0) return alert('Thực thu phải lớn hơn 0.');
-          if (lastTotals.thuc_thu > lastTotals.khachCanTra) return alert('Thực thu không được vượt số còn phải thu.');
-        }
-        const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value);
-        const noteInput = document.getElementById('deliveryNote');
-        const payable = lastTotals.khachCanTra;
-        const data = {
-          khach_hang_id: customerIdValue,
-          cua_hang_id: getStoreId(),
-          kho_id: document.getElementById('khoId').value,
-          bang_gia_id: selectedPriceBookId(),
-          don_hang_id: sourceOrder ? sourceOrder._id : undefined,
-          items: cart.map(item => ({
-            hang_hoa_id: item.hang_hoa_id,
-            ct_don_hang_id: item.ct_don_hang_id || '',
-            lo_hang_id: item.lo_hang_id || '',
-            gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || '',
-            ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh || '',
-            ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
-            don_vi_tinh_id: item.don_vi_tinh_id || '',
-            so_luong: lineQty(item),
-            don_gia_ban: item.don_gia_ban,
-            chiet_khau: item.chiet_khau || 0,
-            kieu_chiet_khau: item.kieu_chiet_khau || 'vnd',
-            ma_hang_snapshot: item.ma_hang_snapshot || item.ma_hang || '',
-            ten_hang_snapshot: item.ten_hang_snapshot || item.ten_hang || '',
-            don_vi_tinh_snapshot: item.don_vi_tinh_snapshot || '',
-            ghi_chu: item.ghi_chu || '',
-            quy_cach_items: (item.has_quy_cach || item.has_lot_items)
-              ? (item.has_quy_cach ? (item.quy_cach_items || []) : (item.lot_items || []))
-                  .filter(qc => Number(qc.so_luong_dat || qc.so_luong || 0) > 0)
-                  .map(qc => ({
-                    lo_hang_id: qc.lo_hang_id || '',
-                    gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
-                    ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
-                    ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
-                    so_luong: Number(qc.so_luong_dat || qc.so_luong || 0),
-                    don_gia_ban: Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0),
-                    chiet_khau: Number(qc.chiet_khau || 0),
-                    kieu_chiet_khau: qc.kieu_chiet_khau || 'vnd'
-                  }))
-              : []
-          })),
-          chiet_khau: num(discount.value),
-          kieu_giam_gia: orderDiscountType.value,
-          phi_van_chuyen: num(shippingFee.value),
-          diem_di: getShippingStartPoint(),
-          diem_den: shippingAddress,
-          khoang_cach_km: 0,
-          ghi_chu: '',
-          doi_tac_giao_hang_id: partnerId.value,
-          dia_chi_khach_hang_id: getRecipientAddressId(),
-          nguoi_tra_phi_giao_hang: shippingFeePayer.value,
-          ten_nguoi_nhan: recipientCustomer ? recipientCustomer.ten_khach_hang : '',
-          sdt_nguoi_nhan: recipientPhone.value,
-          dia_chi_nhan: shippingAddress,
-          ghi_chu_giao_hang: noteInput ? noteInput.value : '',
-          thu_ho_cod: false,
-          cod_enabled: false,
-          cod_amount: 0,
-          khach_can_tra: lastTotals.khachCanTra,
-          tien_mat_khach_dua: lastTotals.tien_mat,
-          chuyen_khoan_khach_dua: lastTotals.chuyen_khoan,
-          tien_thua_tra_khach: lastTotals.tien_thua,
-          so_quy_id: document.getElementById('cashBookId')?.value || ''
-        };
-        try {
-          if (payButton) {
-            payButton.disabled = true;
-            payButton.textContent = 'ĐANG TẠO...';
-          }
-          const res = await fetch('/don-hang/hoa-don/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-          const text = await res.text();
-          let result = {};
-          try {
-            result = text ? JSON.parse(text) : {};
-          } catch (_) {
-            result = { success: false, message: text || 'Máy chủ trả về dữ liệu không hợp lệ' };
-          }
-          if (!result.success) return alert(result.message || 'Không tạo được hóa đơn');
-          window.location.href = '/don-hang/hoa-don';
-        } catch (err) {
-          alert(err.message || 'Lỗi khi tạo hóa đơn');
-        } finally {
-          if (payButton) {
-            payButton.disabled = false;
-            payButton.textContent = 'THANH TOÁN';
-          }
-        }
+      function selectPartnerIfExists(id) {
+        if (!id) return;
+        const option = document.querySelector(`.partner-option[data-partner-id="${id}"]`);
+        if (option) selectPartner(id, option.textContent.trim());
       }
+      document.addEventListener('DOMContentLoaded', async () => {
+        if (copyFromError) alert(copyFromError);
+        renderCurrentStore();
+        handleShippingFeePayerChange();
+        document.getElementById('khoId').addEventListener('change', handleWarehouseChange);
+        if (cashBookId) cashBookId.addEventListener('change', () => cashBookId.classList.remove('field-invalid'));
+        if (bankBookId) bankBookId.addEventListener('change', () => bankBookId.classList.remove('field-invalid'));
+        if (!sourceOrder) await loadKhoByStore();
+        await loadPaymentCashBooks();
+        await prefillFromSourceOrder();
+        await prefillFromCopyInvoice();
+        renderPaymentSummary();
+      });
       function hideQtyWarningTooltip() {
         if (!qtyWarningTooltip) return;
         qtyWarningTooltip.classList.remove('is-visible');
@@ -1756,18 +2194,6 @@
       });
       window.addEventListener('scroll', hideQtyWarningTooltip, true);
       window.addEventListener('resize', hideQtyWarningTooltip);
-      document.addEventListener('DOMContentLoaded', () => {
-        if (copyFromError) alert(copyFromError);
-        renderCurrentStore();
-        handleShippingFeePayerChange();
-        document.getElementById('khoId').addEventListener('change', handleWarehouseChange);
-        (async () => {
-          if (!sourceOrder) await loadKhoByStore();
-          await prefillFromSourceOrder();
-          await prefillFromCopyInvoice();
-          renderPaymentSummary();
-        })();
-      });
       document.addEventListener('click', e => { if (!partnerPicker.contains(e.target)) partnerPicker.classList.remove('open'); });
     </script>
 </body>

@@ -13,6 +13,45 @@
   const printUrl = '/chung-tu-kho/' + v.type + '/' + v.id;
   const pdfQs = v.inventoryPrintVariant ? ('?variant=' + encodeURIComponent(v.inventoryPrintVariant)) : '';
   const invoiceTotals = v.invoiceTotals || {};
+  const retailRowsWithNameRowspan = rows => {
+    const markSameValueRuns = (groupRows, field, showProp, spanProp) => {
+      let start = 0;
+      while (start < groupRows.length) {
+        const value = String(groupRows[start][field] || '').trim();
+        let end = start + 1;
+        while (end < groupRows.length && String(groupRows[end][field] || '').trim() === value) end += 1;
+        groupRows.forEach((row, index) => {
+          if (index >= start && index < end) {
+            row[showProp] = index === start;
+            row[spanProp] = end - start;
+          }
+        });
+        start = end;
+      }
+    };
+    const groups = [];
+    const byName = {};
+    (rows || []).forEach(row => {
+      const key = String(row.ten_hang || '').trim().toLowerCase() || ('__row_' + groups.length);
+      if (!byName[key]) {
+        byName[key] = { rows: [] };
+        groups.push(byName[key]);
+      }
+      byName[key].rows.push(row);
+    });
+    return groups.reduce((list, group) => {
+      const groupRows = group.rows.map((row, index) => (
+        Object.assign({}, row, {
+          _showTenHang: index === 0,
+          _tenHangRowspan: group.rows.length
+        })
+      ));
+      markSameValueRuns(groupRows, 'nha_cung_cap', '_showNhaCungCap', '_nhaCungCapRowspan');
+      markSameValueRuns(groupRows, 'lo', '_showLo', '_loRowspan');
+      groupRows.forEach(row => list.push(row));
+      return list;
+    }, []);
+  };
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -31,6 +70,8 @@
     th{text-align:center;background:#f1f5f9}
     .num{text-align:right}
     .note-cell{word-break:break-word}
+    .retail-invoice-table th,.retail-invoice-table td{font-size:10.5px;padding:4px 5px}
+    .supplier-cell{word-break:break-word}
     .summary{width:80mm;margin-left:auto;margin-top:12px;font-size:13px}
     .summary div{display:flex;justify-content:space-between;padding:4px 0;gap:16px}
     .sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:32px;text-align:center;font-size:13px}
@@ -112,7 +153,7 @@
         ? ['Cửa hàng']
         : (v.invoicePrintCopy === 'customer' ? ['Khách hàng'] : ['Cửa hàng', 'Khách hàng']);
     %>
-    <% retailCopies.forEach(function(copyType) { const isStoreCopy = copyType === 'Cửa hàng'; %>
+    <% retailCopies.forEach(function(copyType) { const isStoreCopy = copyType === 'Cửa hàng'; const retailRows = retailRowsWithNameRowspan(v.items || []); %>
       <main class="page">
         <div class="store">
           <strong><%= storeName %></strong><br>
@@ -130,21 +171,22 @@
           <div>Ghi chú: <strong><%= v.note || '' %></strong></div>
         </section>
 
-        <table>
+        <table class="retail-invoice-table">
           <thead>
             <% if (isStoreCopy) { %>
-              <tr><th>STT</th><th>Tên hàng</th><th>Lô</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr>
+              <tr><th>STT</th><th>Tên hàng</th><th>Nhà cung cấp</th><th>Lô</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr>
             <% } else { %>
-              <tr><th>STT</th><th>Tên hàng</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr>
+              <tr><th>STT</th><th>Tên hàng</th><th>Nhà cung cấp</th><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th></tr>
             <% } %>
           </thead>
           <tbody>
-            <% (v.items || []).forEach(function(row, index) { %>
+            <% retailRows.forEach(function(row, index) { %>
               <% if (isStoreCopy) { %>
                 <tr>
                   <td class="num"><%= index + 1 %></td>
-                  <td><%= row.ten_hang || '' %></td>
-                  <td><%= row.lo || '' %></td>
+                  <% if (row._showTenHang) { %><td<%- row._tenHangRowspan > 1 ? (' rowspan="' + row._tenHangRowspan + '"') : '' %>><%= row.ten_hang || '' %></td><% } %>
+                  <% if (row._showNhaCungCap) { %><td class="supplier-cell"<%- row._nhaCungCapRowspan > 1 ? (' rowspan="' + row._nhaCungCapRowspan + '"') : '' %>><%= row.nha_cung_cap || '' %></td><% } %>
+                  <% if (row._showLo) { %><td<%- row._loRowspan > 1 ? (' rowspan="' + row._loRowspan + '"') : '' %>><%= row.lo || '' %></td><% } %>
                   <td><%= row.thuoc_tinh || '' %></td>
                   <td class="num"><%= fmt(row.so_luong) %></td>
                   <td class="num"><%= fmt(row.don_gia) %></td>
@@ -154,7 +196,8 @@
               <% } else { %>
                 <tr>
                   <td class="num"><%= index + 1 %></td>
-                  <td><%= row.ten_hang || '' %></td>
+                  <% if (row._showTenHang) { %><td<%- row._tenHangRowspan > 1 ? (' rowspan="' + row._tenHangRowspan + '"') : '' %>><%= row.ten_hang || '' %></td><% } %>
+                  <% if (row._showNhaCungCap) { %><td class="supplier-cell"<%- row._nhaCungCapRowspan > 1 ? (' rowspan="' + row._nhaCungCapRowspan + '"') : '' %>><%= row.nha_cung_cap || '' %></td><% } %>
                   <td><%= row.thuoc_tinh || '' %></td>
                   <td class="num"><%= fmt(row.so_luong) %></td>
                   <td class="num"><%= fmt(row.don_gia) %></td>

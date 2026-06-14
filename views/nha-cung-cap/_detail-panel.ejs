@@ -1,4 +1,24 @@
 <div class="kv-detail-panel product-detail supplier-inline-detail">
+  <%
+    var receiptCategoryLabel = function(value) {
+      var map = {
+        'Chi tra nha cung cap': 'Chi trả nhà cung cấp',
+        'NCC hoan tien tra hang nhap': 'NCC hoàn tiền trả hàng nhập',
+        'Hoan tien tra hang': 'Hoàn tiền trả hàng',
+        'Thu tien hoa don': 'Thu tiền hóa đơn',
+        'Thu tien don hang': 'Thu tiền đơn hàng',
+        'Thu tien khi giao hang': 'Thu tiền khi giao hàng',
+        'Thu tien doi hang': 'Thu tiền đổi hàng',
+        'Thu khac': 'Thu khác',
+        'Chi khac': 'Chi khác',
+        thanh_toan_nhap_hang: 'Thanh toán nhập hàng',
+        thanh_toan_ncc: 'Thanh toán nhà cung cấp',
+        tra_luong_nhan_vien: 'Trả lương nhân viên',
+        thu_cod: 'Thu COD'
+      };
+      return value ? (map[value] || value) : '';
+    };
+  %>
   <div class="supplier-detail" data-supplier-detail>
                         <div class="detail-tabs">
                           <div class="detail-tab-list">
@@ -6,9 +26,9 @@
                             <button class="detail-tab" type="button" data-detail-tab="address">Danh sách địa chỉ</button>
                             <button class="detail-tab" type="button" data-detail-tab="history">Lịch sử nhập/trả hàng</button>
                             <button class="detail-tab" type="button" data-detail-tab="debt">Nợ cần trả nhà cung cấp</button>
+                            <button class="detail-tab" type="button" data-detail-tab="accounting-receipts">Phiếu thu/chi hạch toán</button>
             <button class="detail-tab" type="button" data-detail-tab="xnb">Xuất dùng nội bộ</button>
                           </div>
-                          <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
                         </div>
 
     <div class="supplier-detail-body">
@@ -269,7 +289,6 @@
             <strong class="supplier-debt-summary-value"><%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</strong>
           </div>
           <div class="supplier-debt-actions">
-            <button class="btn btn-light btn-sm" type="button">Điều chỉnh</button>
             <button
               class="btn btn-light btn-sm js-open-supplier-pay-modal"
               type="button"
@@ -352,9 +371,11 @@
               <form id="supplierPayForm_<%= selectedSupplier._id %>" class="supplier-pay-form" data-action="/nha-cung-cap/<%= selectedSupplier._id %>/pay-debt" data-current-debt="<%= Number(selectedSupplier.tong_no || 0) %>" data-has-debt-mismatch="<%= debtCheck.hasDebtMismatch ? '1' : '0' %>">
                 <input type="hidden" name="allocations_json" class="js-supplier-pay-allocations-json" value="[]">
                 <input type="hidden" name="overpayment_amount" class="js-supplier-pay-overpayment" value="0">
+                <input type="hidden" name="payment_v2" value="1">
+                <input type="hidden" name="chi_tiet_thanh_toan[tien_tra_khach]" value="0">
                 <% if (debtCheck.hasDebtMismatch) { %>
                   <div class="supplier-pay-mismatch-alert">
-                    <strong>Nợ theo phiếu nhập đang lệch với sổ công nợ. Nợ theo sổ công nợ là số tiền tối đa cần trả hiện tại; nợ theo phiếu nhập chỉ dùng để phân bổ vào hóa đơn.</strong>
+                    <strong>Nợ theo phiếu nhập đang lệch với sổ công nợ. Nợ hiện tại phía trên là số tiền tối đa cần trả; nợ theo phiếu nhập chỉ dùng để phân bổ vào hóa đơn.</strong>
                     <div class="supplier-pay-mismatch-grid">
                       <span>Nợ theo phiếu nhập</span><b><%= Number(debtCheck.debtByInvoices || 0).toLocaleString('vi-VN') %></b>
                       <span>Nợ theo sổ công nợ</span><b><%= Number(debtCheck.debtByLedger || 0).toLocaleString('vi-VN') %></b>
@@ -398,7 +419,34 @@
                   </label>
                   <label class="supplier-pay-field">
                     <span>Số tiền</span>
-                    <input class="js-supplier-pay-amount" name="gia_tri" inputmode="numeric" autocomplete="off" value="">
+                    <input class="js-supplier-pay-cash" name="chi_tiet_thanh_toan[tien_mat]" inputmode="numeric" autocomplete="off" value="" placeholder="Tiền mặt">
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Sổ tiền mặt</span>
+                    <select class="js-supplier-pay-cash-book" name="chi_tiet_thanh_toan[so_quy_tien_mat_id]">
+                      <option value="">— Chọn sổ tiền mặt —</option>
+                      <% (cashBooks || []).filter(function(cashBook) { return (cashBook.loai_so_quy || 'tien_mat') === 'tien_mat'; }).forEach(function(cashBook) { %>
+                        <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= cashBook.ten_so_quy || 'Sổ tiền mặt' %></option>
+                      <% }) %>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Chuyển khoản</span>
+                    <input class="js-supplier-pay-transfer" name="chi_tiet_thanh_toan[chuyen_khoan]" inputmode="numeric" autocomplete="off" value="" placeholder="Chuyển khoản">
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Tài khoản ngân hàng</span>
+                    <select class="js-supplier-pay-bank-book" name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]">
+                      <option value="">— Chọn tài khoản chuyển khoản —</option>
+                      <% (cashBooks || []).filter(function(cashBook) { return cashBook.loai_so_quy === 'chuyen_khoan'; }).forEach(function(cashBook) { %>
+                        <% var bankInfo = cashBook.thong_tin_ngan_hang || {}; %>
+                        <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= (bankInfo.ten_ngan_hang || cashBook.ten_so_quy || 'Tài khoản') + (bankInfo.so_tai_khoan ? (' - ' + bankInfo.so_tai_khoan) : '') %></option>
+                      <% }) %>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Tổng thanh toán</span>
+                    <input class="js-supplier-pay-amount" name="gia_tri" inputmode="numeric" autocomplete="off" value="" readonly>
                   </label>
                   <label class="supplier-pay-field">
                     <span>Nợ còn</span>
@@ -546,6 +594,49 @@
               <button class="btn btn-primary js-submit-supplier-discount-modal" type="button" data-form-id="supplierDiscountForm_<%= selectedSupplier._id %>">Tạo phiếu</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div class="detail-pane" data-detail-pane="accounting-receipts">
+        <div class="supplier-pane-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th class="text-center">Mã phiếu</th>
+                <th class="text-center">Thời gian</th>
+                <th class="text-center">Loại phiếu</th>
+                <th class="text-center">Loại thu</th>
+                <th class="text-center">Giá trị</th>
+                <th class="text-center">Chứng từ</th>
+                <th class="text-center">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if ((supplierAccountingReceipts || []).length === 0) { %>
+                <tr><td colspan="7" class="empty-cell">Chưa có phiếu thu/chi hạch toán công nợ.</td></tr>
+              <% } %>
+              <% (supplierAccountingReceipts || []).forEach(function(receipt) { %>
+                <%
+                  var relatedDocCode = '--';
+                  if (receipt.phieu_nhap_id) relatedDocCode = receipt.phieu_nhap_id.ma_phieu_nhap || '--';
+                  else if (receipt.phieu_tra_hang_nhap_id) relatedDocCode = receipt.phieu_tra_hang_nhap_id.ma_phieu_tra_nhap || '--';
+                  else if (receipt.don_hang_id) relatedDocCode = receipt.don_hang_id.ma_don_hang || '--';
+                  else if (receipt.hoa_don_id) relatedDocCode = receipt.hoa_don_id.ma_hoa_don || '--';
+                  else if (receipt.phieu_tra_hang_id) relatedDocCode = receipt.phieu_tra_hang_id.ma_phieu_tra || '--';
+                  else if (receipt.ma_chung_tu_goc) relatedDocCode = receipt.ma_chung_tu_goc;
+                %>
+                <tr>
+                  <td class="text-center"><%- refLink('receipt', receipt, receipt.ma_phieu || '--') %></td>
+                  <td class="supplier-muted-cell text-center"><%= formatDate(receipt.ngay_lap || receipt.created_at) %></td>
+                  <td class="text-center"><%= receipt.loai_phieu === 'thu' ? 'Phiếu thu' : (receipt.loai_phieu === 'chi' ? 'Phiếu chi' : '--') %></td>
+                  <td class="text-center"><%= receiptCategoryLabel(receipt.loai_thu_chi) || '--' %></td>
+                  <td class="text-center"><%= Number(receipt.gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                  <td class="text-center"><%= relatedDocCode %></td>
+                  <td class="text-center"><%= receipt.ghi_chu || '--' %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
         </div>
       </div>
 

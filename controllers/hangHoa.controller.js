@@ -1,4 +1,5 @@
 var mongoose = require('mongoose');
+const { getReservedQuantitiesByOrder } = require('../services/availability.service');
 var querystring = require('querystring');
 var path = require('path');
 var {
@@ -555,9 +556,49 @@ function labelStockTransactionType(type, quantity) {
         ban_hang: 'Bán hàng',
         xuat_huy: 'Xuất hủy',
         xuat_noi_bo: 'Xuất dùng nội bộ',
-        dieu_chinh: Number(quantity || 0) === 0 ? 'Cập nhật giá vốn' : 'Điều chỉnh tồn'
+        dieu_chinh: Number(quantity || 0) === 0 ? 'Cập nhật giá vốn' : 'Điều chỉnh tồn',
+        rollback_ban_hang: 'Hoàn tồn bán hàng',
+        huy_hoa_don: 'Hủy hóa đơn'
     };
     return labels[type] || type || '---';
+}
+
+function labelChungTuDocumentType(chungTuType, loaiPhieu, maPhieu) {
+    var byChungTuType = {
+        purchase: 'Phiếu nhập',
+        supplier_return: 'Trả hàng nhập',
+        order: 'Đơn hàng',
+        invoice: 'Hóa đơn',
+        customer_return: 'Trả hàng',
+        stock_check: 'Kiểm kho',
+        stock_disposal: 'Xuất hủy',
+        internal_issue: 'Xuất nội bộ'
+    };
+    if (chungTuType && byChungTuType[chungTuType]) return byChungTuType[chungTuType];
+
+    var code = String(maPhieu || '').trim().toUpperCase();
+    if (/^PN/.test(code)) return 'Phiếu nhập';
+    if (/^THN/.test(code)) return 'Trả hàng nhập';
+    if (/^HD/.test(code)) return 'Hóa đơn';
+    if (/^DH/.test(code)) return 'Đơn hàng';
+    if (/^TH/.test(code)) return 'Trả hàng';
+    if (/^KK/.test(code)) return 'Kiểm kho';
+    if (/^XH/.test(code)) return 'Xuất hủy';
+    if (/^XN/.test(code)) return 'Xuất nội bộ';
+
+    var byLoaiPhieu = {
+        nhap_hang: 'Phiếu nhập',
+        tra_hang_nhap: 'Trả hàng nhập',
+        ban_hang: 'Bán hàng',
+        tra_hang: 'Trả hàng',
+        kiem_kho: 'Kiểm kho',
+        xuat_huy: 'Xuất hủy',
+        xuat_noi_bo: 'Xuất nội bộ',
+        dieu_chinh: 'Điều chỉnh tồn',
+        rollback_ban_hang: 'Hoàn tồn bán hàng',
+        huy_hoa_don: 'Hủy hóa đơn'
+    };
+    return byLoaiPhieu[loaiPhieu] || labelStockTransactionType(loaiPhieu) || 'Chứng từ';
 }
 
 function partnerName(doc, fallback) {
@@ -576,7 +617,15 @@ function unitPriceFromValue(value, quantity) {
 async function enrichStockCardRows(rows, productId) {
     rows = rows || [];
     var codes = uniqueValues(rows, 'ma_phieu');
-    if (!codes.length) return rows.map(function(row) { return Object.assign({}, row, { loai_giao_dich: labelStockTransactionType(row.loai_phieu, row.so_luong_thay_doi) }); });
+    if (!codes.length) {
+        return rows.map(function(row) {
+            var code = String(row.ma_phieu || '').trim();
+            return Object.assign({}, row, {
+                loai_giao_dich: labelStockTransactionType(row.loai_phieu, row.so_luong_thay_doi),
+                ten_loai_chung_tu: labelChungTuDocumentType('', row.loai_phieu, code)
+            });
+        });
+    }
 
     var productObjectId = productId instanceof mongoose.Types.ObjectId
         ? productId
@@ -722,7 +771,16 @@ async function enrichStockCardRows(rows, productId) {
             card.gia_von_the_kho = Number(detail && detail.gia_von || card.gia_von_the_kho || 0);
             card.chung_tu_type = 'internal_issue';
             card.chung_tu_doc = doc;
+        } else if (row.loai_phieu === 'rollback_ban_hang' || row.loai_phieu === 'huy_hoa_don') {
+            doc = invoiceMap[code] || orderMap[code];
+            if (doc) {
+                card.doi_tac = partnerName(doc, 'Khách lẻ');
+                card.chung_tu_type = invoiceMap[code] ? 'invoice' : 'order';
+                card.chung_tu_doc = doc;
+            }
         }
+
+        card.ten_loai_chung_tu = labelChungTuDocumentType(card.chung_tu_type, row.loai_phieu, code);
 
         return card;
     });
@@ -1067,29 +1125,24 @@ async function loadProductDetailById(productId, req) {
     if (hasStoreScope) stockQuery.cua_hang_id = storeId;
     var selectedProductInventory = await TonKho.find(stockQuery).sort({ updated_at: -1 }).lean();
 
-    var openOrderQuery = {
-        trang_thai_giao_hang: { $ne: 'giao_du' },
-        trang_thai: { $ne: 'cancelled' }
-    };
-    if (hasStoreScope) openOrderQuery.cua_hang_id = storeId;
-    var openOrders = await DonHang.find(openOrderQuery).select('_id kho_id').lean();
-    var orderWarehouseMap = openOrders.reduce(function(map, order) {
-        map[String(order._id)] = order.kho_id;
-        return map;
-    }, {});
-    var orderDetails = openOrders.length
-        ? await CTDonHang.find({ don_hang_id: { $in: openOrders.map(function(order) { return order._id; }) }, hang_hoa_id: item._id }).lean()
-        : [];
-    var orderedQtyMap = orderDetails.reduce(function(map, row) {
-        var missingQty = Number(row.so_luong_con_thieu || 0);
-        if (missingQty <= 0) {
-            missingQty = Math.max(Number(row.so_luong_dat || row.so_luong || 0) - Number(row.so_luong_da_giao || 0), 0);
-        }
-        if (missingQty <= 0) return map;
-        var warehouseId = String(orderWarehouseMap[String(row.don_hang_id)] || '');
-        map[warehouseId] = Number(map[warehouseId] || 0) + missingQty;
-        return map;
-    }, {});
+    var reservedByWarehouse = {};
+    if (selectedProductInventory.length) {
+        var reservedRows = await Promise.all(selectedProductInventory.map(function(row) {
+            return getReservedQuantitiesByOrder({
+                kho_id: row.kho_id,
+                hang_hoa_ids: [item._id]
+            }).then(function(reserved) {
+                return {
+                    khoId: String(row.kho_id || ''),
+                    qty: Number(reserved.byProduct[String(item._id)]?.so_luong_khach_dat || 0)
+                };
+            });
+        }));
+        reservedByWarehouse = reservedRows.reduce(function(map, row) {
+            map[row.khoId] = row.qty;
+            return map;
+        }, {});
+    }
 
     var expiryRows = item.quan_ly_theo_lo
         ? await LoHang.aggregate([
@@ -1117,7 +1170,7 @@ async function loadProductDetailById(productId, req) {
 
     selectedProductInventory = selectedProductInventory.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
-        row.khach_dat = orderedQtyMap[String(row.kho_id || '')] || 0;
+        row.khach_dat = reservedByWarehouse[String(row.kho_id || '')] || 0;
         row.du_kien_het_hang = expiryMap[String(row.kho_id || '')] || productDefaultExpiry || null;
         row.trang_thai_kho = warehouseStatusMap[String(row.kho_id || '')] || '---';
         return row;
@@ -1272,7 +1325,8 @@ async function loadProductDetailById(productId, req) {
     selectedProductInventory = selectedProductInventory.map(function(row) {
         var summary = stockSummaryByWarehouse[String(row.kho_id || '')] || null;
         row.ton_thuc_te = normalizeStockNumber(row.so_luong);
-        row.ton_co_the_giao = item.quan_ly_theo_lo && summary ? summary.sellable : row.ton_thuc_te;
+        var rawSellable = item.quan_ly_theo_lo && summary ? summary.sellable : row.ton_thuc_te;
+        row.ton_co_the_giao = Math.max(rawSellable - Number(row.khach_dat || 0), 0);
         row.ton_het_han = item.quan_ly_theo_lo && summary ? summary.expired : 0;
         row.ly_do_khong_the_giao = row.ton_thuc_te > 0 && row.ton_co_the_giao <= 0 && row.ton_het_han < row.ton_thuc_te
             ? 'Tồn kho còn nhưng không đủ điều kiện giao (ngoài lô hết hạn).'

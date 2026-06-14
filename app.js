@@ -228,6 +228,7 @@ app.post('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.q
 app.put('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
 app.post('/api/hang-hoa/:id/inactive', isAuthenticated, nhapHangController.inactiveProduct);
 
+app.use('/api/so-quy', apiSoQuyRouter);
 app.use('/api', apiKhoRouter);
 app.use('/api/address', apiAddressRouter);
 app.use('/api/don-hang', donHangRouter);
@@ -243,7 +244,6 @@ app.use('/api/ngay-le-tet', apiNgayLeTetRouter);
 app.use('/api/lich-lam-viec', apiLichLamViecRouter);
 app.use('/api/cham-cong', apiChamCongRouter);
 app.use('/api/bang-luong', apiBangLuongRouter);
-app.use('/api/so-quy', apiSoQuyRouter);
 app.use('/phong-ban', phongBanRouter);
 app.use('/chuc-danh', chucDanhRouter);
 app.use('/ca-lam-viec', caLamViecRouter);

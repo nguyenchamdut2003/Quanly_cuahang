@@ -689,7 +689,9 @@ const PhieuTraHangNhapSchema = new Schema({
   so_quy_id: { type: ObjectId, ref: 'SoQuy' },
   chi_tiet_thanh_toan: {
     tien_mat: { type: Number, default: 0, min: 0 },
+    so_quy_tien_mat_id: { type: ObjectId, ref: 'SoQuy', default: null },
     chuyen_khoan: { type: Number, default: 0, min: 0 },
+    so_quy_chuyen_khoan_id: { type: ObjectId, ref: 'SoQuy', default: null },
     tien_tra_khach: { type: Number, default: 0, min: 0 }
   },
   tinh_vao_cong_no: { type: Boolean, default: true },
@@ -1218,7 +1220,8 @@ const HoaDonBanHangSchema = new Schema({
   kho_id: { type: ObjectId, ref: 'Kho' },
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
-  nguoi_ban_id: { type: ObjectId, ref: 'NguoiDung' }
+  nguoi_ban_id: { type: ObjectId, ref: 'NguoiDung' },
+  da_tru_ton_kho: { type: Boolean, default: false }
 }, { collection: "hoa_don_ban_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 // Một đơn có thể có nhiều hóa đơn (mỗi lần xác nhận giao). Chạy scripts/migrate-hoa-don-don-hang-index.js nếu DB còn unique cũ.
 HoaDonBanHangSchema.index({ don_hang_id: 1 });
@@ -1560,37 +1563,103 @@ const CTPhieuKiemKhoSchema = new Schema({
   nguyen_nhan_lech: { type: String }
 }, { collection: "ct_phieu_kiem_kho" });
 
-// SO_QUY — danh mục tên sổ; số dư tính từ PhieuThuChi (không lưu so_du trên SoQuy).
+// SO_QUY — danh mục tên sổ dùng chung toàn hệ thống; số dư tính từ PhieuThuChi (không lưu so_du trên SoQuy).
 // Migration DB (thủ công, sau backup):
-// 1) db.so_quy.aggregate([{ $group: { _id: { cua_hang_id: "$cua_hang_id", ten_so_quy: "$ten_so_quy" }, count: { $sum: 1 }, ids: { $push: "$_id" } } }, { $match: { count: { $gt: 1 } } }]);
-// 2) Nếu không trùng: db.so_quy.createIndex({ cua_hang_id: 1, ten_so_quy: 1 }, { unique: true });
-// 3) db.so_quy.updateMany({}, { $unset: { loai: "", so_du: "", cho_phep_am: "" } });
-// 4) db.so_quy.getIndexes() — drop index cũ có loai / unique kèm trang_thai nếu còn (xác nhận tên trước khi drop).
+// 1) Gộp sổ trùng (nhiều "Tiền mặt" theo cửa hàng cũ) trước khi tạo index mới.
+// 2) db.so_quy.updateMany({}, { $unset: { cua_hang_id: "", chi_nhanh_id: "" } });
+// 3) Drop index cũ: uq_so_quy_store_branch_type_name, uq_so_quy_bank_account, uq_so_quy_default_per_type, idx_so_quy_list (nếu còn).
+// 4) Khởi động lại app để Mongoose tạo index mới.
 const SoQuySchema = new Schema({
   ten_so_quy: {
     type: String,
     required: true,
     trim: true
   },
+  loai_so_quy: {
+    type: String,
+    enum: ['tien_mat', 'chuyen_khoan'],
+    default: 'tien_mat',
+    required: true,
+    index: true
+  },
+  mac_dinh: {
+    type: Boolean,
+    default: false,
+    index: true
+  },
+  thong_tin_ngan_hang: {
+    ten_ngan_hang: {
+      type: String,
+      trim: true
+    },
+    so_tai_khoan: {
+      type: String,
+      trim: true
+    },
+    chu_tai_khoan: {
+      type: String,
+      trim: true
+    },
+    chi_nhanh_ngan_hang: {
+      type: String,
+      trim: true
+    }
+  },
   trang_thai: {
     type: String,
     enum: ['active', 'inactive'],
     default: 'active',
     index: true
-  },
-  cua_hang_id: {
-    type: ObjectId,
-    ref: 'CuaHang',
-    required: true,
-    index: true
-  },
-  chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' }
+  }
 }, { collection: "so_quy", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 SoQuySchema.index(
-  { cua_hang_id: 1, ten_so_quy: 1 },
-  { unique: true }
+  {
+    loai_so_quy: 1,
+    ten_so_quy: 1
+  },
+  {
+    unique: true,
+    name: 'uq_so_quy_type_name'
+  }
 );
-SoQuySchema.index({ cua_hang_id: 1, trang_thai: 1, ten_so_quy: 1 });
+SoQuySchema.index(
+  {
+    'thong_tin_ngan_hang.so_tai_khoan': 1
+  },
+  {
+    unique: true,
+    name: 'uq_so_quy_bank_account',
+    partialFilterExpression: {
+      loai_so_quy: 'chuyen_khoan',
+      'thong_tin_ngan_hang.so_tai_khoan': {
+        $type: 'string'
+      }
+    }
+  }
+);
+SoQuySchema.index(
+  {
+    loai_so_quy: 1,
+    mac_dinh: 1
+  },
+  {
+    unique: true,
+    name: 'uq_so_quy_default_per_type',
+    partialFilterExpression: {
+      mac_dinh: true
+    }
+  }
+);
+SoQuySchema.index(
+  {
+    loai_so_quy: 1,
+    trang_thai: 1,
+    mac_dinh: -1
+  },
+  {
+    name: 'idx_so_quy_list'
+  }
+);
 
 // PHIEU_THU_CHI
 const PhieuThuChiSchema = new Schema({
@@ -1641,7 +1710,9 @@ const PhieuThuChiSchema = new Schema({
   },
   chi_tiet_thanh_toan: {
     tien_mat: { type: Number, default: 0, min: 0 },
+    so_quy_tien_mat_id: { type: ObjectId, ref: 'SoQuy', default: null },
     chuyen_khoan: { type: Number, default: 0, min: 0 },
+    so_quy_chuyen_khoan_id: { type: ObjectId, ref: 'SoQuy', default: null },
     tien_tra_khach: { type: Number, default: 0, min: 0 }
   },
   nguoi_huy_id: { type: ObjectId, ref: 'NguoiDung' },
@@ -1652,6 +1723,26 @@ const PhieuThuChiSchema = new Schema({
 PhieuThuChiSchema.index({ cua_hang_id: 1, nhan_vien_id: 1, ngay_lap: -1 });
 PhieuThuChiSchema.index({ cua_hang_id: 1, bang_luong_id: 1 });
 PhieuThuChiSchema.index({ cua_hang_id: 1, ct_bang_luong_id: 1 });
+PhieuThuChiSchema.index(
+  {
+    cua_hang_id: 1,
+    'chi_tiet_thanh_toan.so_quy_tien_mat_id': 1,
+    ngay_lap: -1
+  },
+  {
+    name: 'idx_phieu_thu_chi_cash_book'
+  }
+);
+PhieuThuChiSchema.index(
+  {
+    cua_hang_id: 1,
+    'chi_tiet_thanh_toan.so_quy_chuyen_khoan_id': 1,
+    ngay_lap: -1
+  },
+  {
+    name: 'idx_phieu_thu_chi_bank_book'
+  }
+);
 
 // CONG_NO_KHACH_HANG
 const CongNoKhachHangSchema = new Schema({

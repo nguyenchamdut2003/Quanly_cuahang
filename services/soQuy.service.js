@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { CHANGE_RECEIPT_LOAI_THU_CHI } = require('../utils/customerPayment');
+const { buildReceiptPaymentInfo } = require('./paymentCashBook.service');
 
 const {
 
@@ -217,9 +218,9 @@ function sanitizeDocumentRefs(data) {
 
 
 
-async function makeReceiptCode(loaiPhieu) {
+async function makeReceiptCode(loaiPhieu, session) {
 
-  const count = await PhieuThuChi.countDocuments({ loai_phieu: loaiPhieu });
+  const count = await PhieuThuChi.countDocuments({ loai_phieu: loaiPhieu }).session(session || null);
 
   return (loaiPhieu === 'thu' ? 'PT' : 'PC') + String(count + 1).padStart(6, '0');
 
@@ -325,21 +326,21 @@ async function resolvePartner(data) {
 
 
 
-async function ghiCongNoKhachHang(receipt, amount, data) {
+async function ghiCongNoKhachHang(receipt, amount, data, session) {
 
   if (!receipt.khach_hang_id) return;
 
   if (receipt.loai_phieu === 'thu') {
 
-    const customer = await KhachHang.findById(receipt.khach_hang_id).select('tong_no').lean();
+    const customer = await KhachHang.findById(receipt.khach_hang_id).select('tong_no').session(session || null).lean();
 
     if (customer && typeof customer.tong_no === 'number') {
 
-      await KhachHang.updateOne({ _id: receipt.khach_hang_id }, { $inc: { tong_no: -amount } });
+      await KhachHang.updateOne({ _id: receipt.khach_hang_id }, { $inc: { tong_no: -amount } }, withSession({}, session));
 
     }
 
-    await CongNoKhachHang.create({
+    await CongNoKhachHang.create([{
 
       khach_hang_id: receipt.khach_hang_id,
 
@@ -357,19 +358,19 @@ async function ghiCongNoKhachHang(receipt, amount, data) {
 
       ngay: receipt.ngay_lap
 
-    });
+    }], withSession({}, session));
 
   } else {
 
-    const customer = await KhachHang.findById(receipt.khach_hang_id).select('tong_no').lean();
+    const customer = await KhachHang.findById(receipt.khach_hang_id).select('tong_no').session(session || null).lean();
 
     if (customer && typeof customer.tong_no === 'number') {
 
-      await KhachHang.updateOne({ _id: receipt.khach_hang_id }, { $inc: { tong_no: amount } });
+      await KhachHang.updateOne({ _id: receipt.khach_hang_id }, { $inc: { tong_no: amount } }, withSession({}, session));
 
     }
 
-    await CongNoKhachHang.create({
+    await CongNoKhachHang.create([{
 
       khach_hang_id: receipt.khach_hang_id,
 
@@ -387,7 +388,7 @@ async function ghiCongNoKhachHang(receipt, amount, data) {
 
       ngay: receipt.ngay_lap
 
-    });
+    }], withSession({}, session));
 
   }
 
@@ -395,7 +396,7 @@ async function ghiCongNoKhachHang(receipt, amount, data) {
 
 
 
-async function ghiCongNoNhaCungCap(receipt, amount, data) {
+async function ghiCongNoNhaCungCap(receipt, amount, data, session) {
 
   if (!receipt.nha_cung_cap_id) return;
 
@@ -407,15 +408,15 @@ async function ghiCongNoNhaCungCap(receipt, amount, data) {
 
   if (receipt.loai_phieu === 'chi') {
 
-    const supplier = await NhaCungCap.findById(receipt.nha_cung_cap_id).select('tong_no').lean();
+    const supplier = await NhaCungCap.findById(receipt.nha_cung_cap_id).select('tong_no').session(session || null).lean();
 
     if (supplier && typeof supplier.tong_no === 'number') {
 
-      await NhaCungCap.updateOne({ _id: receipt.nha_cung_cap_id }, { $inc: { tong_no: -amount } });
+      await NhaCungCap.updateOne({ _id: receipt.nha_cung_cap_id }, { $inc: { tong_no: -amount } }, withSession({}, session));
 
     }
 
-    await CongNoNhaCungCap.create({
+    await CongNoNhaCungCap.create([{
 
       cua_hang_id: storeId,
 
@@ -435,19 +436,19 @@ async function ghiCongNoNhaCungCap(receipt, amount, data) {
 
       ngay: receipt.ngay_lap
 
-    });
+    }], withSession({}, session));
 
   } else {
 
-    const supplier = await NhaCungCap.findById(receipt.nha_cung_cap_id).select('tong_no').lean();
+    const supplier = await NhaCungCap.findById(receipt.nha_cung_cap_id).select('tong_no').session(session || null).lean();
 
     if (supplier && typeof supplier.tong_no === 'number') {
 
-      await NhaCungCap.updateOne({ _id: receipt.nha_cung_cap_id }, { $inc: { tong_no: amount } });
+      await NhaCungCap.updateOne({ _id: receipt.nha_cung_cap_id }, { $inc: { tong_no: amount } }, withSession({}, session));
 
     }
 
-    await CongNoNhaCungCap.create({
+    await CongNoNhaCungCap.create([{
 
       cua_hang_id: storeId,
 
@@ -461,13 +462,13 @@ async function ghiCongNoNhaCungCap(receipt, amount, data) {
 
       so_tien: amount,
 
-      loai: 'giam_no',
+      loai: 'tang_no',
 
       ghi_chu: data.ghi_chu || `NCC hoan tien ${receipt.ma_phieu}`,
 
       ngay: receipt.ngay_lap
 
-    });
+    }], withSession({}, session));
 
   }
 
@@ -475,7 +476,7 @@ async function ghiCongNoNhaCungCap(receipt, amount, data) {
 
 
 
-async function taoPhieuThuChi(data = {}) {
+async function taoPhieuThuChi(data = {}, options = {}) {
 
   const loaiPhieu = data.loai_phieu;
 
@@ -483,37 +484,19 @@ async function taoPhieuThuChi(data = {}) {
 
 
 
-  const amount = parseMoney(data.gia_tri ?? data.so_tien);
-
-  if (amount <= 0) throw new Error('gia_tri phai lon hon 0');
-
-
-
-  const session = data.session;
+  const session = options.session || data.session;
 
   const storeIdFromData = optionalId(data.cua_hang_id);
 
-  if (!data.so_quy_id || !isObjectId(data.so_quy_id)) throw new Error('Vui lòng chọn sổ quỹ.');
-
   if (!storeIdFromData) throw new Error('Thieu cua_hang_id khi tao phieu thu chi');
 
-
-
-  const cashBook = await SoQuy.findOne({
-
-    _id: data.so_quy_id,
-
-    cua_hang_id: storeIdFromData,
-
-    trang_thai: 'active'
-
-  }).session(session || null);
-
-  if (!cashBook) throw new Error('Sổ quỹ không tồn tại hoặc đã ngừng sử dụng.');
-
-
-
-  const paymentMethod = resolvePaymentMethod(data, cashBook);
+  const paymentInfo = data._paymentInfo || await buildReceiptPaymentInfo(data, {
+    cuaHangId: storeIdFromData,
+    chiNhanhId: data.chi_nhanh_id,
+    session
+  });
+  const amount = paymentInfo.gia_tri;
+  const paymentMethod = paymentInfo.phuong_thuc_thanh_toan;
 
   const partner = await resolvePartner(data);
 
@@ -521,9 +504,9 @@ async function taoPhieuThuChi(data = {}) {
 
   const displayName = String(data.doi_tuong || '').trim() || partner.displayName;
 
-  const code = String(data.ma_phieu || '').trim() || await makeReceiptCode(loaiPhieu);
+  const code = String(data.ma_phieu || '').trim() || await makeReceiptCode(loaiPhieu, session);
 
-  const storeId = storeIdFromData || cashBook.cua_hang_id || undefined;
+  const storeId = storeIdFromData;
 
   const allocations = normalizeAllocations(data.allocations);
 
@@ -577,7 +560,7 @@ async function taoPhieuThuChi(data = {}) {
 
     chi_nhanh_id: optionalId(data.chi_nhanh_id),
 
-    so_quy_id: cashBook._id,
+    so_quy_id: paymentInfo.so_quy_id,
 
     nguoi_tao_id: optionalId(data.nguoi_tao_id),
 
@@ -617,7 +600,7 @@ async function taoPhieuThuChi(data = {}) {
 
     phuong_thuc_thanh_toan: paymentMethod,
 
-    chi_tiet_thanh_toan: normalizeChiTietThanhToan(data.chi_tiet_thanh_toan, amount)
+    chi_tiet_thanh_toan: paymentInfo.chi_tiet_thanh_toan
 
   }], withSession({}, session));
 
@@ -627,9 +610,9 @@ async function taoPhieuThuChi(data = {}) {
 
   if (receipt.hach_toan) {
 
-    if (partner.khach_hang_id) await ghiCongNoKhachHang(receipt, amount, data);
+    if (partner.khach_hang_id) await ghiCongNoKhachHang(receipt, amount, data, session);
 
-    if (partner.nha_cung_cap_id) await ghiCongNoNhaCungCap(receipt, amount, data);
+    if (partner.nha_cung_cap_id) await ghiCongNoNhaCungCap(receipt, amount, data, session);
 
   }
 
@@ -655,22 +638,41 @@ async function taoPhieuThuKhachHang(data = {}) {
   const results = { thu: null, chi: null };
 
   if (payment.tong_khach_dua > 0) {
+    const detail = {
+      tien_mat: payment.tien_mat,
+      chuyen_khoan: payment.chuyen_khoan,
+      tien_tra_khach: 0
+    };
+    if (data.so_quy_tien_mat_id) detail.so_quy_tien_mat_id = data.so_quy_tien_mat_id;
+    if (data.so_quy_chuyen_khoan_id) detail.so_quy_chuyen_khoan_id = data.so_quy_chuyen_khoan_id;
+    const useV2 = data.payment_v2 === true
+      || data.payment_v2 === 'true'
+      || detail.so_quy_tien_mat_id
+      || detail.so_quy_chuyen_khoan_id
+      || (payment.tien_mat > 0 && payment.chuyen_khoan > 0);
     results.thu = await taoPhieuThuChi(Object.assign({}, base, {
       loai_phieu: 'thu',
       gia_tri: payment.tong_khach_dua,
-      chi_tiet_thanh_toan: {
-        tien_mat: payment.tien_mat,
-        chuyen_khoan: payment.chuyen_khoan
-      }
+      payment_v2: useV2,
+      chi_tiet_thanh_toan: detail
     }));
   }
 
   if (payment.tien_thua > 0) {
+    const cashBookId = data.so_quy_tien_mat_id || data.so_quy_id || '';
     results.chi = await taoPhieuThuChi(Object.assign({}, base, {
       loai_phieu: 'chi',
       loai_thu_chi: CHANGE_RECEIPT_LOAI_THU_CHI,
       gia_tri: payment.tien_thua,
-      hach_toan: false
+      hach_toan: false,
+      payment_v2: Boolean(cashBookId || data.payment_v2),
+      so_quy_tien_mat_id: cashBookId,
+      chi_tiet_thanh_toan: {
+        tien_mat: payment.tien_thua,
+        chuyen_khoan: 0,
+        tien_tra_khach: 0,
+        so_quy_tien_mat_id: cashBookId
+      }
     }));
   }
 
@@ -687,5 +689,3 @@ module.exports = {
   paymentMethodFromCashBookName,
   resolvePaymentMethod
 };
-
-

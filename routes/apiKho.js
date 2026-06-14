@@ -35,7 +35,8 @@ const {
 } = require('../utils/kiemKhoDisplay');
 const {
     buildVariantKey,
-    getReservedQuantitiesByOrder
+    buildLotKey,
+    getReservedQuantitiesForSale
 } = require('../services/availability.service');
 
 router.use(isAuthenticated);
@@ -212,9 +213,10 @@ router.get('/kho/:id/ton-kho-lo', async (req, res, next) => {
     }
 });
 
-router.get('/hang-hoa/:id/gia', async (req, res, next) => {
+async function getHangHoaGiaHandler(req, res, next) {
     try {
-        const product = await HangHoa.findById(req.params.id)
+        const productId = req.params.id;
+        const product = await HangHoa.findById(productId)
             .select('ma_hang ten_hang loai_gia gia_co_dinh gia_von gia_nhap_cuoi')
             .lean();
         if (!product) return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
@@ -256,7 +258,10 @@ router.get('/hang-hoa/:id/gia', async (req, res, next) => {
     } catch (error) {
         next(error);
     }
-});
+}
+
+router.get('/hang-hoa/:id/gia', getHangHoaGiaHandler);
+router.get('/kho/hang-hoa/:id/gia', getHangHoaGiaHandler);
 
 router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
     try {
@@ -394,7 +399,7 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
             product.has_quy_cach = true;
         });
         const productIds = Array.from(products.keys());
-        const reserved = await getReservedQuantitiesByOrder({
+        const reserved = await getReservedQuantitiesForSale({
             kho_id: khoId,
             hang_hoa_ids: productIds
         });
@@ -405,6 +410,20 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
             product.so_luong_khach_dat = soLuongKhachDat;
             product.so_luong_kha_dung = tonThucTe - soLuongKhachDat;
 
+            if (Array.isArray(product.lot_items)) {
+                product.lot_items = product.lot_items.map(lot => {
+                    const lotTonThucTe = Number(lot.ton_kho ?? lot.ton_hien_tai ?? lot.ton ?? 0);
+                    const lotKey = buildLotKey(productId, lot.lo_hang_id);
+                    const lotKhachDat = Number(reserved.byLot[lotKey]?.so_luong_khach_dat || 0);
+                    return Object.assign({}, lot, {
+                        ton_kho: lotTonThucTe,
+                        ton_thuc_te: lotTonThucTe,
+                        so_luong_khach_dat: lotKhachDat,
+                        so_luong_kha_dung: lotTonThucTe - lotKhachDat
+                    });
+                });
+            }
+
             if (Array.isArray(product.quy_cach_items)) {
                 product.quy_cach_items = product.quy_cach_items.map(qc => {
                     const qcTonThucTe = Number(qc.ton_kho ?? qc.ton_hien_tai ?? qc.ton ?? 0);
@@ -413,7 +432,13 @@ router.get('/kho/:id/hang-ban-hang', async (req, res, next) => {
                         gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
                         ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || ''
                     });
-                    const qcKhachDat = Number(reserved.byVariant[variantKey]?.so_luong_khach_dat || 0);
+                    const lotKey = qc.lo_hang_id
+                        ? buildLotKey(productId, qc.lo_hang_id)
+                        : '';
+                    const qcKhachDat = Math.max(
+                        Number(reserved.byVariant[variantKey]?.so_luong_khach_dat || 0),
+                        lotKey ? Number(reserved.byLot[lotKey]?.so_luong_khach_dat || 0) : 0
+                    );
                     return Object.assign({}, qc, {
                         ton_kho: qcTonThucTe,
                         ton_thuc_te: qcTonThucTe,

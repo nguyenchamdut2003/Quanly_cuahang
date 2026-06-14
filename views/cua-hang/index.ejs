@@ -76,12 +76,12 @@
       <h1>Cửa hàng</h1>
       <div class="store-search">
         <span>⌕</span>
-        <input type="search" placeholder="Theo mã, tên cửa hàng">
+        <input type="search" id="storeKeywordSearch" name="keyword" form="storeFilterForm" value="<%= filter.keyword || '' %>" placeholder="Theo mã, tên cửa hàng" aria-label="Tìm theo mã, tên cửa hàng">
       </div>
       <div class="page-actions">
         <button class="btn btn-primary" type="button" id="openAddStoreModal">+ Tạo mới</button>
         <button class="btn btn-danger" type="submit" form="bulkDeleteForm" onclick="return confirm('Xóa các cửa hàng đã chọn?')">Xóa đã chọn</button>
-        <a class="btn btn-light" href="/cua-hang/export.xlsx">Xuất file</a>
+        <a class="btn btn-light" href="/cua-hang/export.xlsx<%= filterQueryString ? '?' + filterQueryString : '' %>">Xuất file</a>
       </div>
     </div>
 
@@ -161,7 +161,7 @@
     <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
     <div class="store-layout">
       <aside class="store-filter-panel">
-        <form method="get" action="/cua-hang" class="store-filter-form">
+        <form method="get" action="/cua-hang" id="storeFilterForm" class="store-filter-form">
           <div class="filter-heading">
             <h3>Bộ lọc</h3>
             <div class="filter-heading-actions">
@@ -853,6 +853,17 @@
       if (createdFilterSelect) createdFilterSelect.addEventListener('change', toggleCustomDateRange);
 
       toggleCustomDateRange();
+
+      var storeFilterForm = document.getElementById('storeFilterForm');
+      var storeKeywordSearch = document.getElementById('storeKeywordSearch');
+      if (storeFilterForm && storeKeywordSearch) {
+        storeKeywordSearch.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            storeFilterForm.submit();
+          }
+        });
+      }
 
       if (storeCityFilterTrigger && storeCityFilterDropdown) {
         storeCityFilterTrigger.addEventListener('click', function () {

@@ -56,8 +56,9 @@ function getDebtDocumentInfo(row) {
         };
     }
     if (row.phieu_thu_chi_id) {
+        const receiptType = row.phieu_thu_chi_id.loai_phieu;
         return {
-            label: 'Phiếu thu/chi',
+            label: receiptType === 'thu' ? 'Phiếu thu' : (receiptType === 'chi' ? 'Phiếu chi' : 'Phiếu thu/chi'),
             code: row.phieu_thu_chi_id.ma_phieu || '--'
         };
     }

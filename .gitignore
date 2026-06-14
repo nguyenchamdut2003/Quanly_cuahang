@@ -6,4 +6,11 @@ build
 
 # Chrome temporary UI profile
 scripts/.chrome-ui-profile/
+
+# Local-only test scripts (không ảnh hưởng logic app)
+scripts/local-tests/
+
+# Tài liệu test case / ghi chú dev (không ảnh hưởng logic app)
+docs/
+
 Biểu mẫu Thông tư 58/

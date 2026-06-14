@@ -498,8 +498,23 @@ function buildReceiptPrintData(receipt, store, options = {}) {
     const relatedSummary = summarizeRelatedRows(relatedRows);
     const isThu = receipt.loai_phieu === 'thu';
     const amount = receiptPayAmount(receipt);
+    const receiptCategoryLabels = {
+        'Chi tra nha cung cap': 'Chi trả nhà cung cấp',
+        'NCC hoan tien tra hang nhap': 'NCC hoàn tiền trả hàng nhập',
+        'Hoan tien tra hang': 'Hoàn tiền trả hàng',
+        'Thu tien hoa don': 'Thu tiền hóa đơn',
+        'Thu tien don hang': 'Thu tiền đơn hàng',
+        'Thu tien khi giao hang': 'Thu tiền khi giao hàng',
+        'Thu tien doi hang': 'Thu tiền đổi hàng',
+        'Thu khac': 'Thu khác',
+        'Chi khac': 'Chi khác',
+        thanh_toan_nhap_hang: 'Thanh toán nhập hàng',
+        thanh_toan_ncc: 'Thanh toán nhà cung cấp',
+        tra_luong_nhan_vien: 'Trả lương nhân viên',
+        thu_cod: 'Thu COD'
+    };
     const loaiThuChiLabel = receipt.loai_thu_chi
-        ? String(receipt.loai_thu_chi).replace(/_/g, ' ')
+        ? (receiptCategoryLabels[receipt.loai_thu_chi] || String(receipt.loai_thu_chi).replace(/_/g, ' '))
         : '';
 
     return {

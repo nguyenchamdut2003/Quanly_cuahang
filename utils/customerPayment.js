@@ -50,12 +50,6 @@ function normalizeCustomerPaymentInput(body = {}, options = {}) {
   if (options.requirePayment && thuc_thu <= 0) {
     errors.push('Thực thu phải lớn hơn 0');
   }
-  if (options.so_tien_con_phai_thu !== undefined && thuc_thu > options.so_tien_con_phai_thu) {
-    errors.push(
-      `Thực thu không được vượt số còn phải thu (${Number(options.so_tien_con_phai_thu).toLocaleString('vi-VN')} VNĐ)`
-    );
-  }
-
   return {
     valid: errors.length === 0,
     errors,

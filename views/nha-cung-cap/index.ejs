@@ -70,7 +70,6 @@
       overflow: hidden;
     }
     .supplier-detail-body { padding: 14px 16px 16px; }
-    .supplier-detail.is-collapsed .supplier-detail-body { display: none; }
 
     .supplier-detail .detail-tabs {
       padding: 0 14px;
@@ -100,17 +99,6 @@
       color: #2563eb;
       background: transparent;
     }
-    .supplier-detail .detail-collapse-btn {
-      height: 30px;
-      padding: 0 12px;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-      background: #fff;
-      color: #334155;
-      font-size: 12px;
-      font-weight: 700;
-    }
-
     .supplier-info-block {
       display: flex;
       align-items: center;
@@ -696,17 +684,6 @@
         var wrap = rootEl.classList.contains('supplier-inline-detail') ? rootEl : rootEl.querySelector('.supplier-inline-detail');
         if (!wrap) return;
         if (window.KvDebtPeriodExport) window.KvDebtPeriodExport.bind(wrap);
-        var detailBlock = wrap.querySelector('[data-supplier-detail]');
-        if (!detailBlock) return;
-        var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
-        if (collapseBtn && !collapseBtn.getAttribute('data-kv-collapse-bound')) {
-          collapseBtn.setAttribute('data-kv-collapse-bound', '1');
-          collapseBtn.addEventListener('click', function () {
-            var isCollapsed = detailBlock.classList.toggle('is-collapsed');
-            collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
-            collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-          });
-        }
       }
       if (kvSupplierTable && typeof KvInlineDetail !== 'undefined') {
         kvSupplier = new KvInlineDetail({
@@ -743,6 +720,19 @@
       function setSupplierPayInputValue(input, value) {
         if (input) input.value = formatSupplierMoney(value);
       }
+      function syncSupplierPayV2Total(form) {
+        if (!form) return 0;
+        var cash = parseSupplierMoneyAmount((form.querySelector('.js-supplier-pay-cash') || {}).value);
+        var transfer = parseSupplierMoneyAmount((form.querySelector('.js-supplier-pay-transfer') || {}).value);
+        var total = cash + transfer;
+        var amountInput = form.querySelector('.js-supplier-pay-amount');
+        if (amountInput) amountInput.value = total ? formatSupplierMoney(total) : '';
+        var cashBook = form.querySelector('.js-supplier-pay-cash-book');
+        var bankBook = form.querySelector('.js-supplier-pay-bank-book');
+        if (cashBook) cashBook.disabled = cash <= 0;
+        if (bankBook) bankBook.disabled = transfer <= 0;
+        return total;
+      }
       function getSupplierPayRowAllocations(form) {
         var rows = [];
         Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
@@ -762,7 +752,7 @@
         var amountInput = form ? form.querySelector('.js-supplier-pay-amount') : null;
         var overpaymentInput = form ? form.querySelector('.js-supplier-pay-overpayment') : null;
         if (overpaymentInput) {
-          var amount = parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
+          var amount = syncSupplierPayV2Total(form) || parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
           var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
           overpaymentInput.value = String(Math.max(0, amount - payableDebt));
         }
@@ -773,7 +763,7 @@
         var payableDebt = Math.max(0, debt);
         var allowOverpayment = !!form.querySelector('.js-supplier-pay-allow-overpayment:checked');
         var amountInput = form.querySelector('.js-supplier-pay-amount');
-        var amount = parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
+        var amount = syncSupplierPayV2Total(form) || parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
         if (!allowOverpayment) amount = Math.min(amount, payableDebt);
         if (source === 'amount') {
           if (amountInput) amountInput.value = amount ? formatSupplierMoney(amount) : '';
@@ -945,12 +935,18 @@
         event.stopPropagation();
         var form = document.getElementById(submitBtn.getAttribute('data-form-id'));
         if (!form || submitBtn.disabled) return;
-        var amount = parseSupplierMoneyAmount((form.querySelector('[name="gia_tri"]') || {}).value);
+        var amount = syncSupplierPayV2Total(form) || parseSupplierMoneyAmount((form.querySelector('[name="gia_tri"]') || {}).value);
         var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
         var allowOverpayment = !!form.querySelector('.js-supplier-pay-allow-overpayment:checked');
         if (amount <= 0) return alert('Vui lòng nhập số tiền thanh toán.');
         if (!allowOverpayment && amount > payableDebt) return alert('Số tiền trả không được vượt quá nợ theo sổ công nợ. Bật trả dư / ứng trước NCC nếu muốn chi vượt.');
-        var cashBook = form.querySelector('[name="so_quy_id"]');
+        var cash = parseSupplierMoneyAmount((form.querySelector('.js-supplier-pay-cash') || {}).value);
+        var transfer = parseSupplierMoneyAmount((form.querySelector('.js-supplier-pay-transfer') || {}).value);
+        var v2CashBook = form.querySelector('.js-supplier-pay-cash-book');
+        var v2BankBook = form.querySelector('.js-supplier-pay-bank-book');
+        if (cash > 0 && (!v2CashBook || !v2CashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+        if (transfer > 0 && (!v2BankBook || !v2BankBook.value)) return alert('Vui lòng chọn tài khoản chuyển khoản.');
+        var cashBook = { value: 'v2' };
         if (!cashBook || !cashBook.value) return alert('Vui lòng chọn sổ quỹ.');
 
         syncSupplierPayAllocationJson(form);
@@ -1001,6 +997,12 @@
         if (amountInput) {
           var form = amountInput.closest('.supplier-pay-form');
           updateSupplierPayAllocation(form, 'amount');
+          return;
+        }
+        var v2PayInput = event.target.closest('.js-supplier-pay-cash,.js-supplier-pay-transfer');
+        if (v2PayInput) {
+          var v2Form = v2PayInput.closest('.supplier-pay-form');
+          updateSupplierPayAllocation(v2Form, 'amount');
           return;
         }
         var rowInput = event.target.closest('.js-supplier-pay-row-paid-input');

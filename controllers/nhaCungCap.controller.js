@@ -1,8 +1,9 @@
 var mongoose = require('mongoose');
 var querystring = require('querystring');
 var ExcelJS = require('exceljs');
-var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang, PhieuXuatNoiBo, CTXuatNoiBo, SoQuy, Counter } = require('../models/kiot.model');
+var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, CuaHang, DiaChiNcc, DiaChiDoiTuong, LoaiDiaChiKhachHang, PhieuXuatNoiBo, CTXuatNoiBo, SoQuy, PhieuThuChi, Counter } = require('../models/kiot.model');
 var { taoPhieuThuChi, parseMoney } = require('../services/soQuy.service');
+var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
 var { normalizeAddress } = require('../utils/address');
 var { buildSupplierHangHoaExportPack } = require('../services/supplierHangHoaExport.service');
 var { buildSupplierPurchaseInvoiceExportPack } = require('../services/supplierPurchaseInvoiceExport.service');
@@ -85,7 +86,7 @@ async function aggregateSupplierPurchaseTotals(storeId) {
             $group: {
                 _id: '$nha_cung_cap_id',
                 tong_mua: { $sum: { $ifNull: ['$tong_tien', 0] } },
-                da_tra_tong: { $sum: { $ifNull: ['$da_tra_ncc', 0] } }
+                da_tra_phieu_nhap: { $sum: { $ifNull: ['$da_tra_ncc', 0] } }
             }
         }
     ]);
@@ -116,6 +117,9 @@ async function aggregateSupplierPurchaseTotals(storeId) {
                 },
                 giam_no: {
                     $sum: { $cond: [{ $eq: ['$huong_cong_no', 'giam_no'] }, { $ifNull: ['$gia_tri', 0] }, 0] }
+                },
+                thanh_toan: {
+                    $sum: { $cond: [{ $eq: ['$loai_giao_dich', 'thanh_toan'] }, { $ifNull: ['$gia_tri', 0] }, 0] }
                 }
             }
         }
@@ -126,21 +130,28 @@ async function aggregateSupplierPurchaseTotals(storeId) {
         map[String(r._id)] = {
             tong_mua: Number(r.tong_mua || 0),
             tong_no: 0,
-            da_tra_tong: Number(r.da_tra_tong || 0)
+            da_tra_tong: 0,
+            da_tra_phieu_nhap: Number(r.da_tra_phieu_nhap || 0)
         };
     });
     debtRows.forEach(function(r) {
         if (!r._id) return;
         var key = String(r._id);
-        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0 };
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0, da_tra_phieu_nhap: 0 };
         map[key].tong_no = Number(r.tang_no || 0) - Number(r.giam_no || 0);
         map[key].da_tra_tong = Number(map[key].da_tra_tong || 0) + Number(r.thanh_toan || 0);
     });
     debtTransactionRows.forEach(function(r) {
         if (!r._id) return;
         var key = String(r._id);
-        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0 };
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0, da_tra_phieu_nhap: 0 };
         map[key].tong_no += Number(r.tang_no || 0) - Number(r.giam_no || 0);
+        map[key].da_tra_tong += Number(r.thanh_toan || 0);
+    });
+    Object.keys(map).forEach(function(key) {
+        if (Number(map[key].da_tra_tong || 0) <= 0) {
+            map[key].da_tra_tong = Number(map[key].da_tra_phieu_nhap || 0);
+        }
     });
     return map;
 }
@@ -155,9 +166,10 @@ function getDebtDocumentInfo(row) {
         };
     }
     if (row.phieu_thu_chi_id) {
+        var receiptType = row.phieu_thu_chi_id.loai_phieu;
         return {
             type: 'phieu_thu_chi',
-            label: 'Phiếu thu/chi',
+            label: receiptType === 'thu' ? 'Phiếu thu' : (receiptType === 'chi' ? 'Phiếu chi' : 'Phiếu thu/chi'),
             doc: row.phieu_thu_chi_id,
             code: row.phieu_thu_chi_id.ma_phieu || '--'
         };
@@ -200,6 +212,31 @@ function getSupplierDebtAmountInfo(row, amount, runningDebt) {
     };
 }
 
+function getLegacySupplierDebtDelta(row, amount) {
+    var value = Number(amount || 0);
+    var receiptType = row && row.phieu_thu_chi_id && row.phieu_thu_chi_id.loai_phieu;
+    if (receiptType === 'thu') return value;
+    if (row && row.loai === 'tang_no') return value;
+    if (row && (row.loai === 'giam_no' || row.loai === 'thanh_toan')) return -value;
+    return 0;
+}
+
+function getDebtEventTime(row) {
+    if (!row) return 0;
+    if (row.phieu_nhap_id) {
+        return new Date(row.phieu_nhap_id.ngay_nhap || row.phieu_nhap_id.created_at || row.ngay || row.created_at || 0).getTime();
+    }
+    if (row.phieu_tra_nhap_id) {
+        return new Date(row.created_at || row.phieu_tra_nhap_id.created_at || row.phieu_tra_nhap_id.ngay_tra || row.ngay || 0).getTime();
+    }
+    return new Date(row.ngay || row.created_at || 0).getTime();
+}
+
+function getDebtDisplayDate(row) {
+    if (!row || !row.phieu_tra_nhap_id) return row ? (row.ngay || row.created_at) : null;
+    return row.created_at || row.phieu_tra_nhap_id.created_at || row.phieu_tra_nhap_id.ngay_tra || row.ngay;
+}
+
 function mapSupplierDebtTransactionLabel(value) {
     if (value === 'nhap_hang') return 'Phiếu nhập';
     if (value === 'tra_hang_nhap') return 'Trả hàng nhập';
@@ -223,16 +260,18 @@ function resolveSupplierDaThanhToan(supplier) {
 
 function applySupplierTotalsFromMap(supplier, totalsMap) {
     if (!supplier) return;
+    var currentDebt = Number(supplier.tong_no || 0);
     var t = totalsMap[String(supplier._id)];
     if (t) {
         supplier.tong_mua = t.tong_mua;
-        supplier.tong_no = t.tong_no;
+        supplier.tong_no_theo_so = t.tong_no;
         supplier.da_tra_tong = t.da_tra_tong;
     } else {
         supplier.tong_mua = 0;
-        supplier.tong_no = 0;
+        supplier.tong_no_theo_so = 0;
         supplier.da_tra_tong = 0;
     }
+    supplier.tong_no = currentDebt;
     supplier.da_thanh_toan = resolveSupplierDaThanhToan(supplier);
 }
 
@@ -688,24 +727,73 @@ function sumInvoiceDebt(purchases) {
 
 function buildDebtReconciliation(invoiceDebt, ledgerDebt) {
     var debtByInvoices = Math.max(0, Number(invoiceDebt || 0));
-    var debtByLedger = Number(ledgerDebt || 0);
+    var currentDebt = Math.max(0, Number(ledgerDebt || 0));
+    var debtByLedger = Math.abs(debtByInvoices - currentDebt);
     var debtDiff = debtByInvoices - debtByLedger;
     return {
         debtByInvoices: debtByInvoices,
         debtByLedger: debtByLedger,
+        currentDebt: currentDebt,
         debtDiff: debtDiff,
-        hasDebtMismatch: Math.abs(debtDiff) > 1
+        hasDebtMismatch: debtByLedger > 1
     };
 }
 
-async function loadActiveCashBooks(storeId) {
-    var query = { trang_thai: 'active' };
-    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
-    var rows = await SoQuy.find(query).sort({ ten_so_quy: 1 }).lean();
-    if (!rows.length && query.cua_hang_id) {
-        rows = await SoQuy.find({ trang_thai: 'active' }).sort({ ten_so_quy: 1 }).lean();
+async function loadActiveCashBooks() {
+    return SoQuy.find({ trang_thai: 'active' }).sort({ ten_so_quy: 1 }).lean();
+}
+
+function supplierReadNestedPayment(body) {
+    body = body || {};
+    if (body.chi_tiet_thanh_toan && typeof body.chi_tiet_thanh_toan === 'object') return body.chi_tiet_thanh_toan;
+    return {};
+}
+
+function supplierReadPaymentValue(body, key) {
+    var nested = supplierReadNestedPayment(body);
+    if (nested[key] !== undefined) return nested[key];
+    var bracketKey = 'chi_tiet_thanh_toan[' + key + ']';
+    if (body && body[bracketKey] !== undefined) return body[bracketKey];
+    return body ? body[key] : undefined;
+}
+
+function supplierHasPaymentBookId(body, key) {
+    return String(supplierReadPaymentValue(body, key) || '').trim() !== '';
+}
+
+function supplierPaymentIsV2(body) {
+    var flag = body && body.payment_v2;
+    return flag === true
+        || flag === 'true'
+        || flag === '1'
+        || supplierHasPaymentBookId(body, 'so_quy_tien_mat_id')
+        || supplierHasPaymentBookId(body, 'so_quy_chuyen_khoan_id');
+}
+
+function normalizeSupplierPaymentInput(body) {
+    body = body || {};
+    var isV2 = supplierPaymentIsV2(body);
+    var tienMat = parseMoney(supplierReadPaymentValue(body, 'tien_mat'));
+    var chuyenKhoan = parseMoney(supplierReadPaymentValue(body, 'chuyen_khoan'));
+    var tienTraKhach = parseMoney(supplierReadPaymentValue(body, 'tien_tra_khach'));
+    var amount = tienMat + chuyenKhoan;
+    if (!isV2 && amount <= 0) {
+        amount = parseMoney(body.gia_tri);
+        tienMat = amount;
+        chuyenKhoan = 0;
     }
-    return rows;
+    if (isV2 && tienTraKhach > 0) {
+        throw new Error('Tiền trả khách không áp dụng cho thanh toán nhà cung cấp.');
+    }
+    return {
+        isV2: isV2,
+        amount: amount,
+        tien_mat: tienMat,
+        chuyen_khoan: chuyenKhoan,
+        tien_tra_khach: 0,
+        so_quy_tien_mat_id: String(supplierReadPaymentValue(body, 'so_quy_tien_mat_id') || '').trim(),
+        so_quy_chuyen_khoan_id: String(supplierReadPaymentValue(body, 'so_quy_chuyen_khoan_id') || '').trim()
+    };
 }
 
 function normalizeSupplierAddressPayload(body) {
@@ -796,7 +884,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
                 phieu_tra_hang_nhap_id: row._id,
                 phieu_nhap_id: row.phieu_nhap_id,
                 ma_phieu: row.ma_phieu_tra_nhap || '--',
-                thoi_gian: row.ngay_tra || row.created_at,
+                thoi_gian: row.created_at || row.ngay_tra,
                 nguoi_tao: row?.nguoi_tao_id?.ho_ten || row?.nguoi_tao_id?.email || '--',
                 tong_cong: Number(row.tong_tien_tra || 0),
                 trang_thai: row.trang_thai || 'completed'
@@ -812,8 +900,12 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         debtQuery.cua_hang_id = storeId;
     }
     var debtRows = await CongNoNhaCungCap.find(debtQuery)
-        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc' })
-        .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap tong_tien_tra ncc_can_tra ncc_da_tra' })
+        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc' })
+        .populate({
+            path: 'phieu_tra_nhap_id',
+            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id',
+            populate: { path: 'phieu_nhap_id', select: 'ngay_nhap created_at' }
+        })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
@@ -824,7 +916,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     }).sort({ ngay_giao_dich: -1, created_at: -1 }).lean() : [];
     var runningDebt = 0;
     var debtAsc = debtRows.map(function(row) {
-        return { source: 'legacy', row: row, date: row.ngay || row.created_at };
+        return { source: 'legacy', row: row, date: getDebtEventTime(row) };
     }).concat(debtTransactionRows.map(function(row) {
         return { source: 'giao_dich', row: row, date: row.ngay_giao_dich || row.created_at };
     })).sort(function(a, b) {
@@ -853,8 +945,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
             };
         }
         var soTien = Number(sourceRow.so_tien || 0);
-        if (sourceRow.loai === 'tang_no') runningDebt += soTien;
-        if (sourceRow.loai === 'giam_no' || sourceRow.loai === 'thanh_toan') runningDebt -= soTien;
+        runningDebt += getLegacySupplierDebtDelta(sourceRow, soTien);
         var docInfo = getDebtDocumentInfo(sourceRow);
         var amountInfo = getSupplierDebtAmountInfo(sourceRow, soTien, runningDebt);
         return {
@@ -863,7 +954,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
             phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
             ma_phieu: docInfo.code,
             loai_chung_tu: docInfo.label,
-            thoi_gian: sourceRow.ngay || sourceRow.created_at,
+            thoi_gian: getDebtDisplayDate(sourceRow),
             loai: sourceRow.loai || 'tang_no',
             gia_tri: amountInfo.gia_tri,
             da_thanh_toan: amountInfo.da_thanh_toan,
@@ -877,8 +968,24 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
 
     var supplierInternalExportHistory = await loadSupplierInternalExportHistory(selectedSupplier, storeId);
     var supplierUnpaidPurchases = await loadSupplierUnpaidPurchases(selectedSupplier._id, storeId);
+    var supplierAccountingReceiptQuery = {
+        nha_cung_cap_id: selectedSupplier._id,
+        hach_toan: true
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        supplierAccountingReceiptQuery.cua_hang_id = storeId;
+    }
+    var supplierAccountingReceipts = await PhieuThuChi.find(supplierAccountingReceiptQuery)
+        .populate({ path: 'so_quy_id', select: 'ten_so_quy loai_so_quy thong_tin_ngan_hang' })
+        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
+        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'ma_phieu_tra_nhap' })
+        .populate({ path: 'don_hang_id', select: 'ma_don_hang' })
+        .populate({ path: 'hoa_don_id', select: 'ma_hoa_don' })
+        .populate({ path: 'phieu_tra_hang_id', select: 'ma_phieu_tra' })
+        .sort({ ngay_lap: -1, created_at: -1 })
+        .lean();
     var debtReconciliation = buildDebtReconciliation(sumInvoiceDebt(supplierUnpaidPurchases), selectedSupplier.tong_no);
-    var cashBooks = await loadActiveCashBooks(storeId);
+    var cashBooks = await loadActiveCashBooks();
 
     var filter = normalizeFilterQuery(req?.query || {});
     var filterQueryString = buildFilterQueryString(filter);
@@ -890,6 +997,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         supplierPurchaseHistory: supplierPurchaseHistory,
         supplierDebtHistory: supplierDebtHistory,
         supplierInternalExportHistory: supplierInternalExportHistory,
+        supplierAccountingReceipts: supplierAccountingReceipts,
         supplierUnpaidPurchases: supplierUnpaidPurchases,
         debtReconciliation: debtReconciliation,
         cashBooks: cashBooks,
@@ -1226,6 +1334,7 @@ exports.exportSupplierDetail = async function(req, res, next) {
 };
 
 exports.payDebt = async function(req, res, next) {
+    var session = null;
     try {
         var storeId = await resolveStoreId(req);
         var supplierId = normalizeIdParam(req?.params?.id);
@@ -1233,149 +1342,166 @@ exports.payDebt = async function(req, res, next) {
             return res.status(400).json({ success: false, message: 'Nhà cung cấp không hợp lệ' });
         }
 
-        var supplier = await NhaCungCap.findById(supplierId).lean();
-        if (!supplier) return res.status(404).json({ success: false, message: 'Không tìm thấy nhà cung cấp' });
-        if (storeId && mongoose.Types.ObjectId.isValid(storeId) && supplier.cua_hang_id && String(supplier.cua_hang_id) !== String(storeId)) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy nhà cung cấp' });
-        }
-
-        var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
-        applySupplierTotalsFromMap(supplier, totalsMap);
-        var debt = Number(supplier.tong_no || 0);
-
-        var purchases = await loadSupplierUnpaidPurchases(supplier._id, storeId);
-
-        var amount = parseMoney(req?.body?.gia_tri);
-        if (amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền trả phải lớn hơn 0' });
+        var payment = normalizeSupplierPaymentInput(req.body || {});
+        if (payment.amount <= 0) return res.status(400).json({ success: false, message: 'Số tiền trả phải lớn hơn 0' });
         var allowOverpayment = req?.body?.enable_overpayment === 'on' || req?.body?.enable_overpayment === 'true' || req?.body?.enable_overpayment === true;
-        var payableDebt = Math.max(0, debt);
-        if (!allowOverpayment && amount > payableDebt) {
-            return res.status(400).json({
-                success: false,
-                message: 'Số tiền trả không được vượt quá nợ theo sổ công nợ. Bật trả dư / ứng trước NCC nếu muốn chi vượt.'
-            });
-        }
 
-        var cashBookId = String(req?.body?.so_quy_id || req?.body?.cashBookId || '').trim();
-        if (!mongoose.Types.ObjectId.isValid(cashBookId)) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thanh toán nhà cung cấp.' });
-        }
-        var paymentMethod = String(req?.body?.phuong_thuc_thanh_toan || '').trim();
-        if (['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].indexOf(paymentMethod) < 0) paymentMethod = 'tien_mat';
-        var note = String(req?.body?.ghi_chu || '').trim() || ('Thanh toán công nợ nhà cung cấp ' + (supplier.ten_ncc || supplier.ma_ncc || ''));
-
-        var allocationLimit = Math.min(amount, payableDebt);
-        var remaining = allocationLimit;
-        var allocations = [];
-        var manualAllocations = [];
-        if (req?.body?.allocations_json) {
-            try {
-                manualAllocations = JSON.parse(String(req.body.allocations_json || '[]'));
-                if (!Array.isArray(manualAllocations)) manualAllocations = [];
-            } catch (parseError) {
-                return res.status(400).json({ success: false, message: 'Phân bổ thanh toán không hợp lệ' });
+        var result;
+        session = await mongoose.startSession();
+        await session.withTransaction(async function() {
+            var supplier = await NhaCungCap.findById(supplierId).session(session).lean();
+            if (!supplier) throw new Error('Không tìm thấy nhà cung cấp');
+            if (storeId && mongoose.Types.ObjectId.isValid(storeId) && supplier.cua_hang_id && String(supplier.cua_hang_id) !== String(storeId)) {
+                throw new Error('Không tìm thấy nhà cung cấp');
             }
-        }
-        if (manualAllocations.length) {
-            var purchaseMap = {};
-            purchases.forEach(function(row) { purchaseMap[String(row._id)] = row; });
-            var manualTotal = 0;
-            for (var m = 0; m < manualAllocations.length; m++) {
-                var manual = manualAllocations[m] || {};
-                var manualPurchaseId = String(manual.phieu_nhap_id || '').trim();
-                var manualPurchase = purchaseMap[manualPurchaseId];
-                if (!manualPurchase) return res.status(400).json({ success: false, message: 'Phiếu nhập phân bổ không hợp lệ' });
-                var manualDebt = Math.max(0, Number(manualPurchase.con_no_ncc || 0));
-                var manualAmount = parseMoney(manual.so_tien);
-                if (manualAmount <= 0) continue;
-                if (manualAmount > manualDebt) return res.status(400).json({ success: false, message: 'Không được phân bổ vượt nợ phiếu nhập' });
-                manualTotal += manualAmount;
-                allocations.push({
-                    phieu_nhap_id: manualPurchase._id,
-                    ma_phieu_nhap: manualPurchase.ma_phieu_nhap || '',
-                    so_tien: manualAmount,
-                    con_no_truoc: manualDebt,
-                    con_no_sau: Math.max(0, manualDebt - manualAmount)
+
+            var purchaseQuery = {
+                nha_cung_cap_id: supplier._id,
+                trang_thai: 'completed',
+                con_no_ncc: { $gt: 0 }
+            };
+            if (storeId && mongoose.Types.ObjectId.isValid(storeId)) purchaseQuery.cua_hang_id = storeId;
+            var purchases = await PhieuNhap.find(purchaseQuery)
+                .session(session)
+                .sort({ ngay_nhap: 1, created_at: 1 })
+                .select('ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc')
+                .lean();
+            var invoiceDebt = sumInvoiceDebt(purchases);
+            var payableDebt = Math.max(0, Number(supplier.tong_no || 0));
+            if (!allowOverpayment && payment.amount > payableDebt) {
+                throw new Error('Số tiền trả không được vượt quá nợ theo sổ công nợ. Bật trả dư / ứng trước NCC nếu muốn chi vượt.');
+            }
+
+            var allocationLimit = Math.min(payment.amount, Math.max(0, payableDebt));
+            var remaining = allocationLimit;
+            var allocations = [];
+            var manualAllocations = [];
+            if (req?.body?.allocations_json) {
+                try {
+                    manualAllocations = JSON.parse(String(req.body.allocations_json || '[]'));
+                    if (!Array.isArray(manualAllocations)) manualAllocations = [];
+                } catch (parseError) {
+                    throw new Error('Phân bổ thanh toán không hợp lệ');
+                }
+            }
+            if (manualAllocations.length) {
+                var purchaseMap = {};
+                purchases.forEach(function(row) { purchaseMap[String(row._id)] = row; });
+                var manualTotal = 0;
+                for (var m = 0; m < manualAllocations.length; m++) {
+                    var manual = manualAllocations[m] || {};
+                    var manualPurchase = purchaseMap[String(manual.phieu_nhap_id || '').trim()];
+                    if (!manualPurchase) throw new Error('Phiếu nhập phân bổ không hợp lệ');
+                    var manualDebt = Math.max(0, Number(manualPurchase.con_no_ncc || 0));
+                    var manualAmount = parseMoney(manual.so_tien);
+                    if (manualAmount <= 0) continue;
+                    if (manualAmount > manualDebt) throw new Error('Không được phân bổ vượt nợ phiếu nhập');
+                    manualTotal += manualAmount;
+                    allocations.push({
+                        phieu_nhap_id: manualPurchase._id,
+                        ma_phieu_nhap: manualPurchase.ma_phieu_nhap || '',
+                        so_tien: manualAmount,
+                        con_no_truoc: manualDebt,
+                        con_no_sau: Math.max(0, manualDebt - manualAmount)
+                    });
+                }
+                if (manualTotal > allocationLimit) throw new Error('Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ');
+            } else {
+                for (var i = 0; i < purchases.length && remaining > 0; i++) {
+                    var purchase = purchases[i];
+                    var purchaseDebt = Math.max(0, Number(purchase.con_no_ncc || 0));
+                    var payForPurchase = Math.min(remaining, purchaseDebt);
+                    if (payForPurchase <= 0) continue;
+                    allocations.push({
+                        phieu_nhap_id: purchase._id,
+                        ma_phieu_nhap: purchase.ma_phieu_nhap || '',
+                        so_tien: payForPurchase,
+                        con_no_truoc: purchaseDebt,
+                        con_no_sau: Math.max(0, purchaseDebt - payForPurchase)
+                    });
+                    remaining -= payForPurchase;
+                }
+            }
+
+            var allocatedTotal = allocations.reduce(function(sum, row) { return sum + Number(row.so_tien || 0); }, 0);
+            if (allocatedTotal > allocationLimit) throw new Error('Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ');
+            var overpaymentAmount = Math.max(0, payment.amount - payableDebt);
+            var note = String(req?.body?.ghi_chu || '').trim() || ('Thanh toán công nợ nhà cung cấp ' + (supplier.ten_ncc || supplier.ma_ncc || ''));
+            var receiptPayload = {
+                loai_phieu: 'chi',
+                loai_thu_chi: 'thanh_toan_ncc',
+                gia_tri: payment.amount,
+                nha_cung_cap_id: supplier._id,
+                phieu_nhap_id: allocations.length === 1 ? allocations[0].phieu_nhap_id : undefined,
+                nhom_doi_tuong: 'nha_cung_cap',
+                doi_tuong: supplier.ten_ncc || supplier.ten_cong_ty || supplier.ma_ncc || '',
+                nguoi_tao_id: req.user && req.user._id,
+                cua_hang_id: storeId || supplier.cua_hang_id,
+                trang_thai: 'paid',
+                ghi_chu: overpaymentAmount > 0 ? (note + ' - Trả dư / ứng trước NCC: ' + overpaymentAmount.toLocaleString('vi-VN')) : note,
+                hach_toan: true,
+                allocation_type: 'thanh_toan_ncc',
+                overpayment_amount: overpaymentAmount,
+                allocations: allocations
+            };
+            if (payment.isV2) {
+                Object.assign(receiptPayload, {
+                    payment_v2: true,
+                    tien_mat: payment.tien_mat,
+                    so_quy_tien_mat_id: payment.so_quy_tien_mat_id,
+                    chuyen_khoan: payment.chuyen_khoan,
+                    so_quy_chuyen_khoan_id: payment.so_quy_chuyen_khoan_id,
+                    tien_tra_khach: 0
+                });
+                receiptPayload._paymentInfo = await buildReceiptPaymentInfo(receiptPayload, {
+                    cuaHangId: receiptPayload.cua_hang_id,
+                    chiNhanhId: req.session && req.session.chi_nhanh_id,
+                    session: session
+                });
+            } else {
+                var cashBookId = String(req?.body?.so_quy_id || req?.body?.cashBookId || '').trim();
+                if (!mongoose.Types.ObjectId.isValid(cashBookId)) throw new Error('Vui lòng chọn sổ quỹ để thanh toán nhà cung cấp.');
+                Object.assign(receiptPayload, {
+                    so_quy_id: cashBookId,
+                    phuong_thuc_thanh_toan: String(req?.body?.phuong_thuc_thanh_toan || '').trim() || 'tien_mat',
+                    chi_tiet_thanh_toan: { tien_mat: payment.tien_mat, chuyen_khoan: payment.chuyen_khoan, tien_tra_khach: 0 }
                 });
             }
-            if (manualTotal > allocationLimit) return res.status(400).json({ success: false, message: 'Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ' });
-        } else {
-            for (var i = 0; i < purchases.length && remaining > 0; i++) {
-                var purchase = purchases[i];
-                var purchaseDebt = Math.max(0, Number(purchase.con_no_ncc || 0));
-                var payForPurchase = Math.min(remaining, purchaseDebt);
-                if (payForPurchase <= 0) continue;
-                allocations.push({
-                    phieu_nhap_id: purchase._id,
-                    ma_phieu_nhap: purchase.ma_phieu_nhap || '',
-                    so_tien: payForPurchase,
-                    con_no_truoc: purchaseDebt,
-                    con_no_sau: Math.max(0, purchaseDebt - payForPurchase)
-                });
-                remaining -= payForPurchase;
-            }
-        }
-        var allocatedTotal = allocations.reduce(function(sum, row) {
-            return sum + Number(row.so_tien || 0);
-        }, 0);
-        if (allocatedTotal > allocationLimit) {
-            return res.status(400).json({ success: false, message: 'Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ' });
-        }
-        var overpaymentAmount = Math.max(0, amount - payableDebt);
-        var receiptNote = overpaymentAmount > 0
-            ? (note + ' - Trả dư / ứng trước NCC: ' + overpaymentAmount.toLocaleString('vi-VN'))
-            : note;
 
-        var receipt = await taoPhieuThuChi({
-            loai_phieu: 'chi',
-            loai_thu_chi: 'thanh_toan_ncc',
-            gia_tri: amount,
-            nha_cung_cap_id: supplier._id,
-            phieu_nhap_id: allocations.length === 1 ? allocations[0].phieu_nhap_id : undefined,
-            nhom_doi_tuong: 'nha_cung_cap',
-            phuong_thuc_thanh_toan: paymentMethod,
-            so_quy_id: cashBookId,
-            nguoi_tao_id: req.user && req.user._id,
-            cua_hang_id: storeId || supplier.cua_hang_id,
-            trang_thai: 'paid',
-            ghi_chu: receiptNote,
-            hach_toan: true,
-            allocation_type: 'thanh_toan_ncc',
-            overpayment_amount: overpaymentAmount,
-            allocations: allocations
+            var receipt = await taoPhieuThuChi(receiptPayload, { session: session });
+            for (var j = 0; j < allocations.length; j++) {
+                var allocation = allocations[j];
+                var matchingPurchase = purchases.find(function(item) { return String(item._id) === String(allocation.phieu_nhap_id); });
+                if (!matchingPurchase) continue;
+                var payable = Number(matchingPurchase.can_tra_ncc || matchingPurchase.tong_tien || 0);
+                if (!payable || payable < Number(matchingPurchase.da_tra_ncc || 0) + allocation.con_no_truoc) {
+                    payable = Number(matchingPurchase.da_tra_ncc || 0) + allocation.con_no_truoc;
+                }
+                await PhieuNhap.updateOne(
+                    { _id: allocation.phieu_nhap_id },
+                    { $set: { da_tra_ncc: Math.min(Number(matchingPurchase.da_tra_ncc || 0) + allocation.so_tien, payable), con_no_ncc: allocation.con_no_sau } },
+                    { session: session }
+                );
+            }
+            result = {
+                receipt: receipt,
+                paid: payment.amount,
+                debt: payableDebt - payment.amount,
+                invoice_debt: invoiceDebt,
+                allocated: allocatedTotal,
+                overpayment_amount: overpaymentAmount
+            };
         });
-
-        for (var j = 0; j < allocations.length; j++) {
-            var allocation = allocations[j];
-            var matchingPurchase = purchases.find(function(item) {
-                return String(item._id) === String(allocation.phieu_nhap_id);
-            });
-            if (!matchingPurchase) continue;
-            var payable = Number(matchingPurchase.can_tra_ncc || matchingPurchase.tong_tien || 0);
-            if (!payable || payable < Number(matchingPurchase.da_tra_ncc || 0) + allocation.con_no_truoc) {
-                payable = Number(matchingPurchase.da_tra_ncc || 0) + allocation.con_no_truoc;
-            }
-            var nextPaid = Math.min(Number(matchingPurchase.da_tra_ncc || 0) + allocation.so_tien, payable);
-            var nextDebt = allocation.con_no_sau;
-            await PhieuNhap.updateOne(
-                { _id: allocation.phieu_nhap_id },
-                { $set: { da_tra_ncc: nextPaid, con_no_ncc: nextDebt } }
-            );
-        }
 
         return res.json({
             success: true,
             message: 'Đã tạo phiếu chi thanh toán nhà cung cấp',
-            data: {
-                receipt: receipt,
-                paid: amount,
-                debt: debt - amount,
-                allocated: allocatedTotal,
-                overpayment_amount: overpaymentAmount
-            }
+            data: result
         });
     } catch (error) {
         return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu chi' });
+    } finally {
+        if (session) await session.endSession();
     }
 };
 

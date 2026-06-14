@@ -86,9 +86,8 @@ function paymentMethodLabel(value) {
     return map[value] || value || '';
 }
 
-async function loadS2dFilterOptions(store = null) {
-    const filter = { trang_thai: 'active', ...storeFilter(store) };
-    const cashBooks = await SoQuy.find(filter).select('ten_so_quy').sort({ ten_so_quy: 1 }).lean();
+async function loadS2dFilterOptions() {
+    const cashBooks = await SoQuy.find({ trang_thai: 'active' }).select('ten_so_quy').sort({ ten_so_quy: 1 }).lean();
     return { cashBooks };
 }
 

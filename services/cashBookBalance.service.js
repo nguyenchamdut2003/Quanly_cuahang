@@ -17,7 +17,6 @@ function emptyBalance() {
 
 async function calculateCashBookBalances(options) {
   options = options || {};
-  var storeId = toObjectId(options.cua_hang_id);
   var cashBookIds = Array.isArray(options.so_quy_ids)
     ? options.so_quy_ids.map(toObjectId).filter(Boolean)
     : [];
@@ -27,12 +26,11 @@ async function calculateCashBookBalances(options) {
     result[String(id)] = emptyBalance();
   });
 
-  if (!storeId || cashBookIds.length === 0) return result;
+  if (cashBookIds.length === 0) return result;
 
   var rows = await PhieuThuChi.aggregate([
     {
       $match: {
-        cua_hang_id: storeId,
         so_quy_id: { $in: cashBookIds },
         trang_thai: { $ne: 'cancelled' }
       }

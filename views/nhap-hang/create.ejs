@@ -39,6 +39,7 @@
     .empty-import p{font-size:13px;margin:0;color:#667085}
     .purchase-right{background:#fff;border-radius:6px;display:flex;flex-direction:column;padding:18px 12px 10px}
     .right-row{display:flex;gap:12px;margin-bottom:14px}
+    .kho-field-wrap .select-like{width:100%}
     .select-like,.date-input,.side-input{height:30px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;padding:0 10px;font-size:13px;outline:none}
     .select-like{flex:1}
     .date-input{flex:1;min-width:168px;max-width:220px}
@@ -103,6 +104,12 @@
     .discount-input{height:30px;border:1px solid #cfd8e3;border-radius:7px;text-align:right;padding:0 10px;font-size:13px}
     .side-input.field-invalid{border-color:#d92d20;box-shadow:0 0 0 1px #fda29b}
     .paid-combo{display:flex;gap:6px;justify-content:flex-end}
+    .payment-block{border-top:1px solid #e5e9ee;border-bottom:1px solid #e5e9ee;margin:8px 0 10px;padding:10px 0}
+    .payment-title{font-size:12px;font-weight:800;color:#344054;text-transform:uppercase;letter-spacing:.02em;margin-bottom:4px}
+    .payment-note{display:none;font-size:12px;color:#667085;margin:-6px 0 8px;text-align:right}
+    .form-error{display:none;margin:0 0 10px;padding:8px 10px;border:1px solid #fda29b;background:#fff1f3;color:#b42318;border-radius:7px;font-size:13px;line-height:1.35}
+    .field-error{display:none;margin:4px 0 0;padding:0;font-size:12px;line-height:1.35;color:#b42318}
+    .select-like.field-invalid{border-color:#d92d20;box-shadow:0 0 0 1px #fda29b}
     .btn-pay-all{height:30px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:7px;padding:0 10px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
     .discount-combo{display:flex;gap:6px;justify-content:flex-end}
     .discount-type{width:68px;height:30px;border:1px solid #cfd8e3;border-radius:7px;padding:0 6px;font-size:12px;background:#fff}
@@ -132,6 +139,9 @@
     <input type="hidden" name="can_tra_ncc" id="canTraNccInput" value="0">
     <input type="hidden" name="con_no_ncc" id="conNoNccInput" value="0">
     <input type="hidden" name="da_tra_ncc" id="paidToSupplier" value="0">
+    <input type="hidden" name="payment_v2" id="paymentV2Input" value="1">
+    <input type="hidden" name="chi_tiet_thanh_toan[tien_tra_khach]" id="paymentReturnInput" value="0">
+    <input type="hidden" name="so_quy_id" id="legacyCashBookId" value="">
     <main class="purchase-page">
       <section class="purchase-left">
         <div class="purchase-top">
@@ -179,13 +189,16 @@
             title="Ngày giờ nhập hàng"
           >
         </div>
-        <div class="right-row">
-          <select name="kho_id" id="khoId" class="select-like" required>
-            <option value="">Chọn kho nhập</option>
-            <% (warehouses || []).forEach(function(w) { %>
-              <option value="<%= w._id %>"><%= w.ten_kho || w.ma_kho || '---' %></option>
-            <% }) %>
-          </select>
+        <div class="right-row kho-field-wrap">
+          <div style="flex:1;min-width:0">
+            <select name="kho_id" id="khoId" class="select-like" required>
+              <option value="">Chọn kho nhập</option>
+              <% (warehouses || []).forEach(function(w) { %>
+                <option value="<%= w._id %>"><%= w.ten_kho || w.ma_kho || '---' %></option>
+              <% }) %>
+            </select>
+            <div id="khoIdError" class="field-error" role="alert"></div>
+          </div>
         </div>
         <section class="supplier-picker">
           <div class="supplier-search">
@@ -214,7 +227,7 @@
         </div>
         <div class="summary-line"><strong>Tổng tiền</strong><span class="num payable" id="grandTotal">0</span></div>
         <div class="summary-line"><span>Sổ quỹ <span id="cashBookRequiredMark" style="display:none;color:#d92d20">*</span></span>
-          <select id="cashBookId" class="side-input" name="so_quy_id">
+          <select id="cashBookId" class="side-input" name="chi_tiet_thanh_toan[so_quy_tien_mat_id]" disabled>
             <option value="">— Chọn sổ quỹ —</option>
             <% (cashBooks || []).forEach(function(book) { %>
               <option value="<%= book._id %>"><%= book.ten_so_quy || 'Sổ quỹ' %></option>
@@ -224,19 +237,28 @@
         <div class="summary-line">
           <span>Tiền mặt</span>
           <div class="paid-combo">
-            <input id="paymentCash" class="discount-input" name="chi_tiet_thanh_toan[tien_mat]" value="0">
+            <input id="paymentCash" class="discount-input" name="chi_tiet_thanh_toan[tien_mat]" value="0" inputmode="numeric">
             <button type="button" class="btn-pay-all" id="payAllBtn">Tất cả</button>
           </div>
         </div>
         <div class="summary-line">
           <span>Chuyển khoản</span>
           <div class="paid-combo">
-            <input id="paymentTransfer" class="discount-input" name="chi_tiet_thanh_toan[chuyen_khoan]" value="0">
+            <input id="paymentTransfer" class="discount-input" name="chi_tiet_thanh_toan[chuyen_khoan]" value="0" inputmode="numeric">
             <button type="button" class="btn-pay-all" id="payTransferAllBtn">Tất cả</button>
           </div>
         </div>
         <div class="summary-line"><strong>Nợ nhà cung cấp</strong><span class="num payable" id="debtToSupplier">0</span></div>
         <textarea id="note" class="note" name="ghi_chu" placeholder="Ghi chú"></textarea>
+        <div class="summary-line"><span>Tài khoản ngân hàng <span id="bankBookRequiredMark" style="display:none;color:#d92d20">*</span></span>
+          <select id="bankBookId" class="side-input" name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]" disabled>
+            <option value="">Đang tải tài khoản...</option>
+          </select>
+        </div>
+        <div class="payment-note" id="bankBookNote"></div>
+        <div id="purchaseFormError" class="form-error"></div>
+        <div class="summary-line"><span>Cần trả NCC</span><span class="num payable" id="supplierPayable">0</span></div>
+        <div class="summary-line"><span>Đã trả NCC</span><span class="num payable" id="supplierPaid">0</span></div>
         <div class="right-spacer"></div>
         <div class="bottom-actions">
           <button class="btn-draft" type="button" id="saveDraftBtn">Lưu tạm</button>
@@ -447,6 +469,12 @@
     const paymentCashInput = document.getElementById('paymentCash');
     const paymentTransferInput = document.getElementById('paymentTransfer');
     const cashBookIdInput = document.getElementById('cashBookId');
+    const bankBookIdInput = document.getElementById('bankBookId');
+    const purchaseFormError = document.getElementById('purchaseFormError');
+    const khoIdInput = document.getElementById('khoId');
+    const khoIdError = document.getElementById('khoIdError');
+    const paymentV2Input = document.getElementById('paymentV2Input');
+    const paymentReturnInput = document.getElementById('paymentReturnInput');
     const payAllBtn = document.getElementById('payAllBtn');
     const payTransferAllBtn = document.getElementById('payTransferAllBtn');
     const discountTypeInput = document.getElementById('discountType');
@@ -464,6 +492,86 @@
     const lotQcRows = document.getElementById('lotQcRows');
     const lotQcAllocated = document.getElementById('lotQcAllocated');
     const addLotQcBtn = document.getElementById('addLotQcBtn');
+    let cashBookOptions = [];
+    let bankBookOptions = [];
+
+    function isKhoErrorMessage(message) {
+      const text = String(message || '').trim().toLowerCase();
+      return text.includes('chon kho nhap') || text.includes('chọn kho nhập');
+    }
+
+    function showKhoError(message) {
+      if (khoIdError) {
+        khoIdError.textContent = message || '';
+        khoIdError.style.display = message ? 'block' : 'none';
+      }
+      if (khoIdInput) khoIdInput.classList.toggle('field-invalid', Boolean(message));
+      if (message && khoIdInput) {
+        khoIdInput.scrollIntoView({ block: 'nearest' });
+        khoIdInput.focus();
+      }
+    }
+
+    function clearKhoError() {
+      showKhoError('');
+    }
+
+    function showFormError(message) {
+      if (!purchaseFormError) {
+        alert(message);
+        return;
+      }
+      purchaseFormError.textContent = message || '';
+      purchaseFormError.style.display = message ? 'block' : 'none';
+      if (message) purchaseFormError.scrollIntoView({ block: 'nearest' });
+    }
+
+    function routeFormError(message) {
+      if (isKhoErrorMessage(message)) {
+        showFormError('');
+        showKhoError('Vui lòng chọn kho nhập.');
+        return;
+      }
+      clearKhoError();
+      showFormError(message);
+    }
+
+    function clearFormError() {
+      showFormError('');
+      clearKhoError();
+    }
+
+    function initKhoSelect() {
+      if (!khoIdInput) return;
+      const options = Array.from(khoIdInput.options).filter(function(opt) { return String(opt.value || '').trim(); });
+      if (options.length === 1 && !String(khoIdInput.value || '').trim()) {
+        khoIdInput.value = options[0].value;
+      }
+    }
+
+    function buildUrlEncodedBody(form) {
+      const params = new URLSearchParams();
+      if (!form) return params;
+      form.querySelectorAll('input, select, textarea').forEach(function(el) {
+        const name = String(el.name || '').trim();
+        if (!name) return;
+        if (el.type === 'checkbox' && !el.checked) return;
+        if (el.type === 'radio' && !el.checked) return;
+        if (el.type === 'file') return;
+        params.append(name, el.value);
+      });
+      return params;
+    }
+
+    function validateKhoNhap() {
+      const khoId = khoIdInput ? String(khoIdInput.value || '').trim() : '';
+      if (khoId) {
+        clearKhoError();
+        return true;
+      }
+      routeFormError('Vui lòng chọn kho nhập.');
+      return false;
+    }
 
     function escapeHtml(text) {
       return String(text || '')
@@ -472,6 +580,91 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    }
+
+    function cashBookLabel(book) {
+      const bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
+      const bankLabel = [bank.ten_ngan_hang, bank.so_tai_khoan].filter(Boolean).join(' - ');
+      return bankLabel || (book && book.ten_so_quy) || 'Sổ quỹ';
+    }
+
+    function autoSelectCashBook(list) {
+      const defaults = list.filter(book => book.mac_dinh);
+      if (defaults.length === 1) return String(defaults[0]._id);
+      if (!defaults.length && list.length === 1) return String(list[0]._id);
+      return '';
+    }
+
+    function renderCashBookSelect(select, list, placeholder) {
+      if (!select) return;
+      select.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>` + list.map(book => {
+        return `<option value="${escapeHtml(book._id)}">${escapeHtml(cashBookLabel(book))}</option>`;
+      }).join('');
+      select.value = autoSelectCashBook(list);
+    }
+
+    async function loadCashBooksByType(type) {
+      const response = await fetch('/api/so-quy/active?loai_so_quy=' + encodeURIComponent(type), {
+        headers: { 'Accept': 'application/json' }
+      });
+      const json = await response.json();
+      if (!json || !json.success) throw new Error((json && json.message) || 'Không tải được danh sách sổ quỹ.');
+      return (Array.isArray(json.items) ? json.items : [])
+        .filter(book => String(book.loai_so_quy || '') === type && String(book.trang_thai || 'active') === 'active')
+        .map(book => Object.assign({}, book, { _id: String(book._id || '') }))
+        .filter(book => book._id);
+    }
+
+    async function loadPaymentCashBooks() {
+      try {
+        const lists = await Promise.all([
+          loadCashBooksByType('tien_mat'),
+          loadCashBooksByType('chuyen_khoan')
+        ]);
+        cashBookOptions = lists[0];
+        bankBookOptions = lists[1];
+        renderCashBookSelect(cashBookIdInput, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+        renderCashBookSelect(bankBookIdInput, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+      } catch (error) {
+        cashBookOptions = [];
+        bankBookOptions = [];
+        renderCashBookSelect(cashBookIdInput, [], 'Không tải được sổ tiền mặt');
+        renderCashBookSelect(bankBookIdInput, [], 'Không tải được tài khoản');
+      }
+      renderItems();
+    }
+
+    function normalizePaymentLayout() {
+      const grandTotalRow = document.getElementById('grandTotal')?.closest('.summary-line');
+      const cashRow = paymentCashInput?.closest('.summary-line');
+      const cashBookRow = cashBookIdInput?.closest('.summary-line');
+      const transferRow = paymentTransferInput?.closest('.summary-line');
+      const bankRow = bankBookIdInput?.closest('.summary-line');
+      const debtRow = document.getElementById('debtToSupplier')?.closest('.summary-line');
+      const payableRow = document.getElementById('supplierPayable')?.closest('.summary-line');
+      const paidRow = document.getElementById('supplierPaid')?.closest('.summary-line');
+      const bankNote = document.getElementById('bankBookNote');
+      const noteEl = document.getElementById('note');
+      if (!grandTotalRow || !cashRow || !cashBookRow || !transferRow || !bankRow || !debtRow) return;
+      const title = document.createElement('div');
+      title.className = 'payment-title';
+      title.textContent = 'Chi tiết thanh toán';
+      const block = document.createElement('section');
+      block.className = 'payment-block';
+      grandTotalRow.after(block);
+      block.appendChild(title);
+      block.appendChild(cashRow);
+      block.appendChild(cashBookRow);
+      block.appendChild(transferRow);
+      block.appendChild(bankRow);
+      if (bankNote) block.appendChild(bankNote);
+      if (purchaseFormError) block.appendChild(purchaseFormError);
+      if (payableRow) block.appendChild(payableRow);
+      if (paidRow) block.appendChild(paidRow);
+      block.appendChild(debtRow);
+      if (noteEl) block.after(noteEl);
+      const cashLabel = cashBookRow.querySelector('span');
+      if (cashLabel) cashLabel.childNodes[0].nodeValue = 'Sổ tiền mặt ';
     }
 
     function renderProductResults(list) {
@@ -1022,6 +1215,10 @@
 
       document.getElementById('goodsTotal').textContent = fmt(goodsTotal);
       document.getElementById('grandTotal').textContent = fmt(grandTotal);
+      const supplierPayableEl = document.getElementById('supplierPayable');
+      const supplierPaidEl = document.getElementById('supplierPaid');
+      if (supplierPayableEl) supplierPayableEl.textContent = fmt(canTra);
+      if (supplierPaidEl) supplierPaidEl.textContent = fmt(daTra);
       document.getElementById('debtToSupplier').textContent = fmt(conNo);
       if (tongTienHangInput) tongTienHangInput.value = String(Math.floor(goodsTotal));
       if (canTraNccInput) canTraNccInput.value = String(Math.floor(canTra));
@@ -1031,14 +1228,24 @@
       if (paymentCashInput) paymentCashInput.value = fmt(tienMat);
       if (paymentTransferInput) paymentTransferInput.value = fmt(chuyenKhoan);
       if (paidToSupplierInput) paidToSupplierInput.value = String(Math.floor(daTra));
-      const cashBookRequired = daTra > 0;
+      const cashBookRequired = tienMat > 0;
+      const bankBookRequired = chuyenKhoan > 0;
       if (cashBookIdInput) {
         cashBookIdInput.disabled = !cashBookRequired;
         if (!cashBookRequired) cashBookIdInput.value = '';
+        if (cashBookRequired && !cashBookIdInput.value) cashBookIdInput.value = autoSelectCashBook(cashBookOptions);
         cashBookIdInput.classList.toggle('field-invalid', cashBookRequired && !String(cashBookIdInput.value || '').trim());
+      }
+      if (bankBookIdInput) {
+        bankBookIdInput.disabled = !bankBookRequired;
+        if (!bankBookRequired) bankBookIdInput.value = '';
+        if (bankBookRequired && !bankBookIdInput.value) bankBookIdInput.value = autoSelectCashBook(bankBookOptions);
+        bankBookIdInput.classList.toggle('field-invalid', bankBookRequired && !String(bankBookIdInput.value || '').trim());
       }
       const cashBookRequiredMark = document.getElementById('cashBookRequiredMark');
       if (cashBookRequiredMark) cashBookRequiredMark.style.display = cashBookRequired ? 'inline' : 'none';
+      const bankBookRequiredMark = document.getElementById('bankBookRequiredMark');
+      if (bankBookRequiredMark) bankBookRequiredMark.style.display = bankBookRequired ? 'inline' : 'none';
       if (payAllBtn) {
         payAllBtn.textContent = 'Tất cả';
         payAllBtn.title = 'Trả đủ';
@@ -1219,7 +1426,7 @@
     const exportConfirmModal = document.getElementById('exportConfirmModal');
     const exportAfterCompleteInput = document.getElementById('exportAfterComplete');
 
-    function validateCashBookForPayment() {
+    function validateCashBookForPaymentLegacy() {
       const daTra = numeric(paidToSupplierInput ? paidToSupplierInput.value : 0);
       if (daTra <= 0) return true;
       const cashBookId = cashBookIdInput ? String(cashBookIdInput.value || '').trim() : '';
@@ -1235,7 +1442,7 @@
       return false;
     }
 
-    function submitPurchaseForm(mode, exportAfter) {
+    function submitPurchaseFormLegacy(mode, exportAfter) {
       renderItems();
       const tienMat = numeric(paymentCashInput ? paymentCashInput.value : 0);
       const chuyenKhoan = numeric(paymentTransferInput ? paymentTransferInput.value : 0);
@@ -1251,6 +1458,7 @@
     }
 
     function validateBeforeComplete() {
+      if (!validateKhoNhap()) return false;
       const invalidLotItem = selectedItems.find(item => item.quan_ly_theo_lo && !item.lot_info);
       if (invalidLotItem) {
         alert('Hàng quản lý theo lô cần có thông tin lô hợp lệ trước khi Hoàn thành.');
@@ -1262,6 +1470,93 @@
       }
       if (!validateCashBookForPayment()) return false;
       return true;
+    }
+
+    function validateCashBookForPayment() {
+      showFormError('');
+      const rawCash = paymentCashInput ? String(paymentCashInput.value || '').trim() : '0';
+      const rawTransfer = paymentTransferInput ? String(paymentTransferInput.value || '').trim() : '0';
+      if (rawCash.includes('-')) {
+        showFormError('Số tiền mặt không hợp lệ.');
+        if (paymentCashInput) paymentCashInput.focus();
+        return false;
+      }
+      if (rawTransfer.includes('-')) {
+        showFormError('Số tiền chuyển khoản không hợp lệ.');
+        if (paymentTransferInput) paymentTransferInput.focus();
+        return false;
+      }
+      const tienMat = numeric(rawCash);
+      const chuyenKhoan = numeric(rawTransfer);
+      const canTra = numeric(canTraNccInput ? canTraNccInput.value : document.getElementById('grandTotal').textContent || 0);
+      const daTra = tienMat + chuyenKhoan;
+      if (daTra > canTra) {
+        showFormError('Số tiền thanh toán không được vượt số cần trả nhà cung cấp.');
+        return false;
+      }
+      if (tienMat > 0 && !(cashBookIdInput && String(cashBookIdInput.value || '').trim())) {
+        showFormError(cashBookOptions.length ? 'Vui lòng chọn sổ tiền mặt.' : 'Chưa có sổ tiền mặt đang hoạt động. Hãy tạo trong phần Quản lý sổ quỹ.');
+        if (cashBookIdInput) {
+          cashBookIdInput.classList.add('field-invalid');
+          cashBookIdInput.focus();
+        }
+        return false;
+      }
+      if (chuyenKhoan > 0 && !(bankBookIdInput && String(bankBookIdInput.value || '').trim())) {
+        showFormError(bankBookOptions.length ? 'Vui lòng chọn tài khoản chuyển khoản.' : 'Chưa có tài khoản chuyển khoản đang hoạt động. Hãy tạo trong phần Quản lý sổ quỹ.');
+        if (bankBookIdInput) {
+          bankBookIdInput.classList.add('field-invalid');
+          bankBookIdInput.focus();
+        }
+        return false;
+      }
+      if (cashBookIdInput) cashBookIdInput.classList.remove('field-invalid');
+      if (bankBookIdInput) bankBookIdInput.classList.remove('field-invalid');
+      return true;
+    }
+
+    async function submitPurchaseForm(mode, exportAfter) {
+      renderItems();
+      const tienMat = numeric(paymentCashInput ? paymentCashInput.value : 0);
+      const chuyenKhoan = numeric(paymentTransferInput ? paymentTransferInput.value : 0);
+      if (paymentCashInput) paymentCashInput.value = String(tienMat);
+      if (paymentTransferInput) paymentTransferInput.value = String(chuyenKhoan);
+      if (paidToSupplierInput) paidToSupplierInput.value = String(tienMat + chuyenKhoan);
+      if (paymentV2Input) paymentV2Input.value = '1';
+      if (paymentReturnInput) paymentReturnInput.value = '0';
+      if (!validateKhoNhap()) return;
+      if (!validateCashBookForPayment()) return;
+      submitModeInput.value = mode;
+      if (exportAfterCompleteInput) exportAfterCompleteInput.value = exportAfter ? '1' : '0';
+      const form = document.getElementById('nhapHangCreateForm');
+      const buttons = [document.getElementById('saveDraftBtn'), document.getElementById('completeBtn'), document.getElementById('exportConfirmNo'), document.getElementById('exportConfirmYes')].filter(Boolean);
+      buttons.forEach(btn => { btn.disabled = true; });
+      try {
+        const response = await fetch(form.action, {
+          method: 'POST',
+          body: buildUrlEncodedBody(form),
+          redirect: 'follow',
+          headers: {
+            'Accept': 'text/html,application/xhtml+xml',
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+          }
+        });
+        const finalUrl = response.url || '';
+        if (finalUrl.includes('/nhap-hang/create') && finalUrl.includes('error=')) {
+          const url = new URL(finalUrl, window.location.origin);
+          routeFormError(url.searchParams.get('error') || 'Không tạo được phiếu nhập.');
+          return;
+        }
+        if (finalUrl && finalUrl !== window.location.href) {
+          window.location.href = finalUrl;
+          return;
+        }
+        window.location.href = '/nhap-hang?success=created';
+      } catch (error) {
+        routeFormError(error.message || 'Không tạo được phiếu nhập.');
+      } finally {
+        buttons.forEach(btn => { btn.disabled = false; });
+      }
     }
 
     document.getElementById('saveDraftBtn').addEventListener('click', function() {
@@ -1295,9 +1590,21 @@
         renderItems();
       });
     }
+    if (khoIdInput) {
+      khoIdInput.addEventListener('change', function() {
+        clearKhoError();
+      });
+    }
     if (cashBookIdInput) {
       cashBookIdInput.addEventListener('change', function() {
         this.classList.remove('field-invalid');
+        showFormError('');
+      });
+    }
+    if (bankBookIdInput) {
+      bankBookIdInput.addEventListener('change', function() {
+        this.classList.remove('field-invalid');
+        showFormError('');
       });
     }
     if (lotModeNew) lotModeNew.addEventListener('change', toggleLotMode);
@@ -1431,7 +1738,16 @@
       discountTypeInput.addEventListener('change', renderItems);
     }
 
+    normalizePaymentLayout();
+    initKhoSelect();
     renderItems();
+    loadPaymentCashBooks();
+    (function showInitialErrorFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (!err) return;
+      routeFormError(err);
+    })();
     window.pickSupplierProduct = pickSupplierProduct;
     window.openQuickEditModal = openQuickEditModal;
     window.setInactiveProduct = setInactiveProduct;

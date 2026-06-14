@@ -151,7 +151,7 @@ async function ghiLichSuKho(params) {
     historyData.nguoi_tao_id = creatorId;
   }
 
-  return LichSuKho.create(historyData);
+  return LichSuKho.create([historyData], withSessionOptions({}, params.session)).then(rows => rows[0]);
 }
 
 async function resolveTenQuyCachFromParams(params) {
@@ -207,12 +207,21 @@ async function resolveQuyCachStock(khoId, hangHoaId, loHangId, tenQuyCach) {
   return rows[0];
 }
 
-async function syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost) {
-  const qcRows = await TonKhoLoQuyCach.find({
+function withSessionOptions(options = {}, session) {
+  return session ? Object.assign({}, options, { session }) : options;
+}
+
+function withSessionQuery(query, session) {
+  return session ? query.session(session) : query;
+}
+
+async function syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost, options = {}) {
+  const session = options.session;
+  const qcRows = await withSessionQuery(TonKhoLoQuyCach.find({
     kho_id: khoId,
     hang_hoa_id: hangHoaId,
     lo_hang_id: loHangId
-  }).lean();
+  }), session).lean();
   const lotTotal = qcRows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
   const weightedCost = qcRows.reduce((sum, row) => {
     return sum + Number(row.so_luong || 0) * Number(row.gia_von || 0);
@@ -237,22 +246,22 @@ async function syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost)
         gia_von: avgCost
       }
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    withSessionOptions({ upsert: true, new: true, setDefaultsOnInsert: true }, session)
   );
 
-  const lot = await LoHang.findById(loHangId);
+  const lot = await withSessionQuery(LoHang.findById(loHangId), session);
   if (lot) {
     lot.so_luong_con_lai = lotTotal;
     if (lot.trang_thai !== 'huy') {
       lot.trang_thai = lotTotal > 0 ? 'active' : 'het_hang';
     }
-    await lot.save();
+    await lot.save(withSessionOptions({}, session));
   }
 
-  const lotRows = await TonKhoLo.find({
+  const lotRows = await withSessionQuery(TonKhoLo.find({
     kho_id: khoId,
     hang_hoa_id: hangHoaId
-  }).lean();
+  }), session).lean();
   const productTotal = lotRows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
   const inventory = await TonKho.findOneAndUpdate(
     {
@@ -270,7 +279,7 @@ async function syncTonKhoSauQuyCach(khoId, hangHoaId, loHangId, warehouse, cost)
         so_luong: productTotal
       }
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    withSessionOptions({ upsert: true, new: true, setDefaultsOnInsert: true }, session)
   );
 
   return { lotTotal, productTotal, inventory };
@@ -416,13 +425,17 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
 }
 
 async function congTonKho(params) {
+  const session = params.session;
   const khoId = toObjectId(params.kho_id, 'kho_id');
   const hangHoaId = toObjectId(params.hang_hoa_id, 'hang_hoa_id');
   let loHangId = optionalObjectId(params.lo_hang_id, 'lo_hang_id');
   const quantity = normalizeQuantity(params.so_luong);
   const cost = Number(params.gia_von) || 0;
-  const warehouse = await getWarehouse(khoId);
-  const product = await HangHoa.findById(hangHoaId).select('quan_ly_theo_lo');
+  const warehouse = await withSessionQuery(Kho.findById(khoId), session);
+  if (!warehouse) {
+    throw new Error('KhÃ´ng tÃ¬m tháº¥y kho');
+  }
+  const product = await withSessionQuery(HangHoa.findById(hangHoaId).select('quan_ly_theo_lo'), session);
   const manageLots = Boolean(product && product.quan_ly_theo_lo);
   const tenQuyCach = await resolveTenQuyCachFromParams(params);
   const useQuyCach = Boolean(
@@ -459,7 +472,7 @@ async function congTonKho(params) {
         so_luong: quantity
       }
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    withSessionOptions({ upsert: true, new: true, setDefaultsOnInsert: true }, session)
   );
 
   if (loHangId) {
@@ -483,14 +496,14 @@ async function congTonKho(params) {
           so_luong: quantity
         }
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      withSessionOptions({ upsert: true, new: true, setDefaultsOnInsert: true }, session)
     );
 
     await LoHang.findByIdAndUpdate(loHangId, {
       $inc: {
         so_luong_con_lai: quantity
       }
-    });
+    }, withSessionOptions({}, session));
   }
 
   await ghiLichSuKho({
@@ -503,18 +516,20 @@ async function congTonKho(params) {
     so_luong_thay_doi: quantity,
     ton_kho_sau: inventory.so_luong,
     gia_tri_thay_doi: quantity * cost,
-    ghi_chu: params.ghi_chu
+    ghi_chu: params.ghi_chu,
+    session
   });
 
   return inventory;
 }
 
 async function truTonKho(params) {
+  const session = params.session;
   const khoId = toObjectId(params.kho_id, 'kho_id');
   const hangHoaId = toObjectId(params.hang_hoa_id, 'hang_hoa_id');
   let loHangId = optionalObjectId(params.lo_hang_id, 'lo_hang_id');
   const quantity = normalizeQuantity(params.so_luong);
-  const product = await HangHoa.findById(hangHoaId).select('quan_ly_theo_lo');
+  const product = await withSessionQuery(HangHoa.findById(hangHoaId).select('quan_ly_theo_lo'), session);
   const manageLots = Boolean(product && product.quan_ly_theo_lo);
   const tenQuyCach = await resolveTenQuyCachFromParams(params);
   const useQuyCach = Boolean(
@@ -525,10 +540,10 @@ async function truTonKho(params) {
     loHangId = null;
   }
 
-  const inventory = await TonKho.findOne({
+  const inventory = await withSessionQuery(TonKho.findOne({
     kho_id: khoId,
     hang_hoa_id: hangHoaId
-  });
+  }), session);
 
   if (!inventory || inventory.so_luong < quantity) {
     throw new Error('Tồn kho không đủ để trừ');
@@ -549,13 +564,13 @@ async function truTonKho(params) {
   if (manageLots && !loHangId) {
     let remaining = quantity;
     const allocations = [];
-    const lotRows = await TonKhoLo.find({
+    const lotRows = await withSessionQuery(TonKhoLo.find({
       kho_id: khoId,
       hang_hoa_id: hangHoaId,
       so_luong: { $gt: 0 }
     })
       .populate('lo_hang_id')
-      .sort({ updated_at: 1, created_at: 1 });
+      .sort({ updated_at: 1, created_at: 1 }), session);
 
     const sellableLotRows = lotRows.filter(row => isSellableLot(row.lo_hang_id)).sort(sortLotsFefo);
 
@@ -565,13 +580,13 @@ async function truTonKho(params) {
       if (take <= 0) continue;
 
       row.so_luong -= take;
-      await row.save();
+      await row.save(withSessionOptions({}, session));
 
       if (row.lo_hang_id) {
         const lot = row.lo_hang_id;
         lot.so_luong_con_lai = Math.max(0, Number(lot.so_luong_con_lai || 0) - take);
         lot.trang_thai = lot.so_luong_con_lai > 0 ? lot.trang_thai : 'het_hang';
-        await lot.save();
+        await lot.save(withSessionOptions({}, session));
         pushAllocation(allocations, lot, take);
       }
 
@@ -595,41 +610,41 @@ async function truTonKho(params) {
     }
 
     inventory.so_luong -= quantity;
-    await inventory.save();
+    await inventory.save(withSessionOptions({}, session));
     return finalizeTruTonKho(inventory, allocations);
   }
 
   let lotInventory = null;
   const allocations = [];
   if (manageLots && loHangId) {
-    lotInventory = await TonKhoLo.findOne({
+    lotInventory = await withSessionQuery(TonKhoLo.findOne({
       kho_id: khoId,
       hang_hoa_id: hangHoaId,
       lo_hang_id: loHangId
-    });
+    }), session);
 
     if (!lotInventory || lotInventory.so_luong < quantity) {
       throw new Error('Tồn kho theo lô không đủ để trừ');
     }
 
-    const lot = await LoHang.findById(loHangId);
+    const lot = await withSessionQuery(LoHang.findById(loHangId), session);
     if (lot) {
       if ((lot.so_luong_con_lai || 0) < quantity) {
         throw new Error('Số lượng còn lại của lô không đủ để trừ');
       }
 
       lotInventory.so_luong -= quantity;
-      await lotInventory.save();
+      await lotInventory.save(withSessionOptions({}, session));
 
       lot.so_luong_con_lai -= quantity;
       lot.trang_thai = lot.so_luong_con_lai > 0 ? lot.trang_thai : 'het_hang';
-      await lot.save();
+      await lot.save(withSessionOptions({}, session));
       pushAllocation(allocations, lot, quantity);
     }
   }
 
   inventory.so_luong -= quantity;
-  await inventory.save();
+  await inventory.save(withSessionOptions({}, session));
 
   const unitCost = lotInventory ? Number(lotInventory.gia_von) || 0 : Number(params.gia_von) || 0;
   await ghiLichSuKho({

@@ -1,6 +1,24 @@
 <div class="kv-detail-panel product-detail customer-inline-detail">
 <%
   var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+  var receiptCategoryLabel = function(value) {
+    var map = {
+      'Chi tra nha cung cap': 'Chi trả nhà cung cấp',
+      'NCC hoan tien tra hang nhap': 'NCC hoàn tiền trả hàng nhập',
+      'Hoan tien tra hang': 'Hoàn tiền trả hàng',
+      'Thu tien hoa don': 'Thu tiền hóa đơn',
+      'Thu tien don hang': 'Thu tiền đơn hàng',
+      'Thu tien khi giao hang': 'Thu tiền khi giao hàng',
+      'Thu tien doi hang': 'Thu tiền đổi hàng',
+      'Thu khac': 'Thu khác',
+      'Chi khac': 'Chi khác',
+      thanh_toan_nhap_hang: 'Thanh toán nhập hàng',
+      thanh_toan_ncc: 'Thanh toán nhà cung cấp',
+      tra_luong_nhan_vien: 'Trả lương nhân viên',
+      thu_cod: 'Thu COD'
+    };
+    return value ? (map[value] || value) : '';
+  };
 %>
                         <div class="customer-detail" data-customer-detail>
                           <div class="detail-tabs">
@@ -11,6 +29,7 @@
                               <button class="detail-tab" type="button" data-tab-target="invoices">Hóa đơn</button>
                               <button class="detail-tab" type="button" data-tab-target="returns">Trả hàng</button>
                               <button class="detail-tab" type="button" data-tab-target="debts">Công nợ</button>
+                              <button class="detail-tab" type="button" data-tab-target="accounting-receipts">Phiếu thu/chi hạch toán</button>
                             </div>
                             <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
                           </div>
@@ -452,6 +471,46 @@
                                       <td><%- debt.don_hang_id ? refLink('order', debt.don_hang_id, debt.don_hang_id.ma_don_hang || '---') : '---' %></td>
                                       <td><%- debt.phieu_thu_chi_id ? refLink('receipt', debt.phieu_thu_chi_id, debt.phieu_thu_chi_id.ma_phieu || debt.phieu_thu_chi_id.ma_phieu_thu_chi || '---') : '---' %></td>
                                       <td><%= debt.ghi_chu || '---' %></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="accounting-receipts">
+                              <table class="admin-table warehouse-table">
+                                <thead>
+                                  <tr>
+                                    <th>Mã phiếu</th>
+                                    <th>Thời gian</th>
+                                    <th>Loại phiếu</th>
+                                    <th>Loại thu</th>
+                                    <th>Giá trị</th>
+                                    <th>Chứng từ</th>
+                                    <th>Ghi chú</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if (!(customerAccountingReceipts || []).length) { %>
+                                    <tr><td colspan="7" class="empty-cell">Chưa có phiếu thu/chi hạch toán công nợ.</td></tr>
+                                  <% } %>
+                                  <% (customerAccountingReceipts || []).forEach(function(receipt) { %>
+                                    <%
+                                      var relatedDocCode = '---';
+                                      if (receipt.don_hang_id) relatedDocCode = receipt.don_hang_id.ma_don_hang || '---';
+                                      else if (receipt.hoa_don_id) relatedDocCode = receipt.hoa_don_id.ma_hoa_don || '---';
+                                      else if (receipt.phieu_tra_hang_id) relatedDocCode = receipt.phieu_tra_hang_id.ma_phieu_tra || '---';
+                                      else if (receipt.phieu_nhap_id) relatedDocCode = receipt.phieu_nhap_id.ma_phieu_nhap || '---';
+                                      else if (receipt.phieu_tra_hang_nhap_id) relatedDocCode = receipt.phieu_tra_hang_nhap_id.ma_phieu_tra_nhap || '---';
+                                      else if (receipt.ma_chung_tu_goc) relatedDocCode = receipt.ma_chung_tu_goc;
+                                    %>
+                                    <tr>
+                                      <td><%- refLink('receipt', receipt, receipt.ma_phieu || '---') %></td>
+                                      <td><%= formatDate(receipt.ngay_lap || receipt.created_at) %></td>
+                                      <td><%= receipt.loai_phieu === 'thu' ? 'Phiếu thu' : (receipt.loai_phieu === 'chi' ? 'Phiếu chi' : '---') %></td>
+                                      <td><%= receiptCategoryLabel(receipt.loai_thu_chi) || '---' %></td>
+                                      <td><%= money(receipt.gia_tri || 0) %></td>
+                                      <td><%= relatedDocCode %></td>
+                                      <td><%= receipt.ghi_chu || '---' %></td>
                                     </tr>
                                   <% }) %>
                                 </tbody>

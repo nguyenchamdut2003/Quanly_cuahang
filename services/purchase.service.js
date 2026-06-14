@@ -14,6 +14,7 @@ const {
   Kho
 } = require('../models/kiot.model');
 const { taoPhieuThuChi } = require('./soQuy.service');
+const { extractPaymentDetail } = require('./paymentCashBook.service');
 const { syncTonKhoSauQuyCach } = require('./kho.service');
 
 function logNhapHangOk(table, detail) {
@@ -44,12 +45,27 @@ function cleanId(value) {
   return isObjectId(id) ? id : undefined;
 }
 
+function withSessionOptions(options = {}, session) {
+  return session ? Object.assign({}, options, { session }) : options;
+}
+
+function withSessionQuery(query, session) {
+  return session ? query.session(session) : query;
+}
+
+async function createOne(model, doc, session) {
+  if (!session) return model.create(doc);
+  const rows = await model.create([doc], { session });
+  return rows[0];
+}
+
 function resolveCashBookId(value = {}) {
   return cleanId(value.so_quy_id || value.cashBookId || value.soQuyId);
 }
 
-function assertCashBookWhenPaying(daTra, data) {
-  if (parseMoney(daTra) > 0 && !resolveCashBookId(data)) {
+function assertCashBookWhenPaying(payment, data) {
+  if (!payment || payment.isV2) return;
+  if (parseMoney(payment.amount) > 0 && !resolveCashBookId(data)) {
     throw new Error('Vui lòng chọn sổ quỹ để thanh toán phiếu nhập.');
   }
 }
@@ -81,7 +97,36 @@ function parseMoney(value) {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
+function isPurchasePaymentV2(data = {}) {
+  const raw = data.chi_tiet_thanh_toan && typeof data.chi_tiet_thanh_toan === 'object'
+    ? data.chi_tiet_thanh_toan
+    : {};
+  const flag = data.payment_v2;
+  return flag === true
+    || flag === 'true'
+    || flag === '1'
+    || Boolean(String(raw.so_quy_tien_mat_id || data['chi_tiet_thanh_toan[so_quy_tien_mat_id]'] || data.so_quy_tien_mat_id || '').trim())
+    || Boolean(String(raw.so_quy_chuyen_khoan_id || data['chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]'] || data.so_quy_chuyen_khoan_id || '').trim());
+}
+
 function normalizePaymentDetail(data = {}, maxAmount) {
+  if (isPurchasePaymentV2(data)) {
+    const detail = extractPaymentDetail(data);
+    if (detail.tien_tra_khach > 0) {
+      throw new Error('Tiá»n tráº£ khÃ¡ch khÃ´ng Ã¡p dá»¥ng cho thanh toÃ¡n nhÃ  cung cáº¥p.');
+    }
+    const amount = detail.tien_mat + detail.chuyen_khoan;
+    const limit = Math.max(0, parseMoney(maxAmount));
+    if (amount > limit) {
+      throw new Error('Sá»‘ tiá»n thanh toÃ¡n khÃ´ng Ä‘Æ°á»£c vÆ°á»£t sá»‘ cáº§n tráº£ nhÃ  cung cáº¥p.');
+    }
+    return {
+      isV2: true,
+      amount,
+      detail: Object.assign({}, detail, { tien_tra_khach: 0 })
+    };
+  }
+
   const raw = data.chi_tiet_thanh_toan && typeof data.chi_tiet_thanh_toan === 'object'
     ? data.chi_tiet_thanh_toan
     : {};
@@ -105,6 +150,7 @@ function normalizePaymentDetail(data = {}, maxAmount) {
     amount = tienMat + chuyenKhoan;
   }
   return {
+    isV2: false,
     amount,
     detail: {
       tien_mat: tienMat,
@@ -276,18 +322,18 @@ function toAggregateObjectId(value) {
   return new mongoose.Types.ObjectId(value);
 }
 
-async function calculateMovingAverageCost(productId, quantity, unitCost) {
+async function calculateMovingAverageCost(productId, quantity, unitCost, session) {
   const hangHoaId = toAggregateObjectId(productId);
   const incomingQty = Number(quantity || 0);
   const incomingCost = Number(unitCost || 0);
   if (!hangHoaId || incomingQty <= 0) return Math.round(incomingCost);
 
   const [product, stockRows] = await Promise.all([
-    HangHoa.findById(hangHoaId).select('gia_von').lean(),
+    withSessionQuery(HangHoa.findById(hangHoaId).select('gia_von'), session).lean(),
     TonKho.aggregate([
       { $match: { hang_hoa_id: hangHoaId } },
       { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
-    ])
+    ]).session(session || null)
   ]);
 
   const currentStock = Number(stockRows && stockRows[0] ? stockRows[0].total : 0);
@@ -298,21 +344,21 @@ async function calculateMovingAverageCost(productId, quantity, unitCost) {
   return Math.round(((currentStock * currentCost) + (incomingQty * incomingCost)) / nextStock);
 }
 
-async function makeCode(model, field, prefix, width) {
+async function makeCode(model, field, prefix, width, session) {
   const regex = new RegExp('^' + prefix + '\\d+$');
-  const last = await model.findOne({ [field]: regex }).sort({ [field]: -1 }).lean();
+  const last = await withSessionQuery(model.findOne({ [field]: regex }).sort({ [field]: -1 }), session).lean();
   const next = last && last[field] ? Number(String(last[field]).replace(/\D/g, '')) + 1 : 1;
   return prefix + String(next).padStart(width, '0');
 }
 
-async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, product, productId, item, now, lotCache }) {
+async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, product, productId, item, now, lotCache, session }) {
   if (item.lo_hang_id) {
-    const existing = await LoHang.findOne({
+    const existing = await withSessionQuery(LoHang.findOne({
       _id: item.lo_hang_id,
       hang_hoa_id: productId,
       kho_id: khoId,
       trang_thai: { $ne: 'huy' }
-    });
+    }), session);
     if (!existing) throw new Error('Lo hang khong hop le');
     return existing._id;
   }
@@ -336,16 +382,17 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
           gia_von: item.don_gia_nhap,
           quy_cach_items: lotInfo.quy_cach_items
         }
-      }
+      },
+      withSessionOptions({}, session)
     ));
     return lotId;
   }
-  const existingByCode = await LoHang.findOne({
+  const existingByCode = await withSessionQuery(LoHang.findOne({
     ma_lo: maLo,
     hang_hoa_id: productId,
     phieu_nhap_id: purchase._id,
     trang_thai: { $ne: 'huy' }
-  });
+  }), session);
   if (existingByCode) {
     await withNhapHangLog('LoHang', `cap nhat lo trung ma ${maLo}`, () => LoHang.updateOne(
       { _id: existingByCode._id },
@@ -357,12 +404,13 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
           gia_von: item.don_gia_nhap,
           quy_cach_items: lotInfo.quy_cach_items
         }
-      }
+      },
+      withSessionOptions({}, session)
     ));
     if (lotCache) lotCache.set(maLo, existingByCode._id);
     return existingByCode._id;
   }
-  const created = await withNhapHangLog('LoHang', `tao lo ${maLo}`, () => LoHang.create({
+  const created = await withNhapHangLog('LoHang', `tao lo ${maLo}`, () => createOne(LoHang, {
     cua_hang_id: storeId,
     kho_id: khoId,
     hang_hoa_id: productId,
@@ -380,21 +428,22 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
     trang_thai: 'active',
     ghi_chu: lotInfo.ghi_chu || undefined,
     quy_cach_items: lotInfo.quy_cach_items
-  }));
+  }, session));
   if (lotCache) lotCache.set(maLo, created._id);
   return created._id;
 }
 
 async function applyCompletedEffects(purchase, rows, options = {}) {
+  const session = options.session;
   if (purchase.__effectsApplied) throw new Error('Phieu nhap da duoc hoan tat truoc do');
   purchase.__effectsApplied = true;
 
-  const warehouse = await Kho.findById(purchase.kho_id).lean();
+  const warehouse = await withSessionQuery(Kho.findById(purchase.kho_id), session).lean();
   if (!warehouse) throw new Error('Khong tim thay kho nhap');
 
   for (const row of rows) {
     const qty = Number(row.so_luong || 0);
-    const newProductCost = await calculateMovingAverageCost(row.hang_hoa_id, qty, row.don_gia_nhap);
+    const newProductCost = await calculateMovingAverageCost(row.hang_hoa_id, qty, row.don_gia_nhap, session);
     const quyCachItems = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
     let updatedStock = null;
 
@@ -416,7 +465,8 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
               { ten_quy_cach: '' }
             ]
           },
-          { $set: { ten_quy_cach: qc.ten_quy_cach } }
+          { $set: { ten_quy_cach: qc.ten_quy_cach } },
+          withSessionOptions({}, session)
         ));
         await withNhapHangLog('TonKhoLoQuyCach', `bo sung ten_thuoc_tinh qc=${qc.ten_quy_cach}`, () => TonKhoLoQuyCach.updateMany(
           {
@@ -430,7 +480,8 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
               { ten_thuoc_tinh: '' }
             ]
           },
-          { $set: { ten_thuoc_tinh: qc.ten_quy_cach } }
+          { $set: { ten_thuoc_tinh: qc.ten_quy_cach } },
+          withSessionOptions({}, session)
         ));
         await withNhapHangLog('TonKhoLoQuyCach', `upsert lo=${row.lo_hang_id} qc=${qc.ten_quy_cach} sl=${qc.so_luong}`, () => TonKhoLoQuyCach.findOneAndUpdate(
           {
@@ -452,7 +503,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
               gia_von: Number(qc.gia_von || qc.don_gia_nhap || 0)
             }
           },
-          { upsert: true, new: true }
+          withSessionOptions({ upsert: true, new: true }, session)
         ));
       }
       const synced = await withNhapHangLog('TonKho', `sync ton sau quy cach lo=${row.lo_hang_id}`, () => syncTonKhoSauQuyCach(
@@ -460,18 +511,20 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
         row.hang_hoa_id,
         row.lo_hang_id,
         warehouse,
-        row.don_gia_nhap
+        row.don_gia_nhap,
+        { session }
       ));
       updatedStock = synced.inventory;
       await withNhapHangLog('LoHang', `cap nhat trang thai lo=${row.lo_hang_id}`, () => LoHang.updateOne(
         { _id: row.lo_hang_id },
-        { $set: { trang_thai: synced.lotTotal > 0 ? 'active' : 'het_hang' } }
+        { $set: { trang_thai: synced.lotTotal > 0 ? 'active' : 'het_hang' } },
+        withSessionOptions({}, session)
       ));
     } else {
       updatedStock = await withNhapHangLog('TonKho', `cong ton hang=${row.hang_hoa_id} sl=${qty}`, () => TonKho.findOneAndUpdate(
         { cua_hang_id: purchase.cua_hang_id, kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id },
         { $inc: { so_luong: qty }, $setOnInsert: { cua_hang_id: purchase.cua_hang_id } },
-        { upsert: true, new: true }
+        withSessionOptions({ upsert: true, new: true }, session)
       ).lean());
 
       if (row.lo_hang_id) {
@@ -484,16 +537,17 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
             gia_tri_thuoc_tinh_id: null
           },
           { $inc: { so_luong: qty }, $set: { gia_von: row.don_gia_nhap } },
-          { upsert: true, new: true }
+          withSessionOptions({ upsert: true, new: true }, session)
         ));
         await withNhapHangLog('LoHang', `cap nhat ton con lai lo=${row.lo_hang_id} sl=${qty}`, () => LoHang.updateOne(
           { _id: row.lo_hang_id },
-          { $inc: { so_luong_con_lai: qty }, $set: { trang_thai: 'active' } }
+          { $inc: { so_luong_con_lai: qty }, $set: { trang_thai: 'active' } },
+          withSessionOptions({}, session)
         ));
       }
     }
 
-    await withNhapHangLog('LichSuKho', `ghi lich su hang=${row.hang_hoa_id} sl=${qty}`, () => LichSuKho.create({
+    await withNhapHangLog('LichSuKho', `ghi lich su hang=${row.hang_hoa_id} sl=${qty}`, () => createOne(LichSuKho, {
       cua_hang_id: purchase.cua_hang_id,
       kho_id: purchase.kho_id,
       hang_hoa_id: row.hang_hoa_id,
@@ -506,11 +560,12 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
       gia_tri_thay_doi: Number(row.thanh_tien || 0),
       ghi_chu: 'Nhap hang',
       ngay: purchase.ngay_nhap || new Date()
-    }));
+    }, session));
 
     await withNhapHangLog('HangHoa', `cap nhat gia hang=${row.hang_hoa_id}`, () => HangHoa.updateOne(
       { _id: row.hang_hoa_id },
-      { $set: { gia_nhap_cuoi: row.don_gia_nhap, gia_von: newProductCost } }
+      { $set: { gia_nhap_cuoi: row.don_gia_nhap, gia_von: newProductCost } },
+      withSessionOptions({}, session)
     ));
   }
 
@@ -520,7 +575,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
     const conNo = Number(purchase.con_no_ncc || 0);
     const includeDebt = options.includeDebt !== false;
     if (includeDebt && canTra > 0) {
-      await withNhapHangLog('CongNoNhaCungCap', `tao cong no phieu=${purchase.ma_phieu_nhap}`, () => CongNoNhaCungCap.create({
+      await withNhapHangLog('CongNoNhaCungCap', `tao cong no phieu=${purchase.ma_phieu_nhap}`, () => createOne(CongNoNhaCungCap, {
         cua_hang_id: purchase.cua_hang_id,
         nha_cung_cap_id: purchase.nha_cung_cap_id,
         phieu_nhap_id: purchase._id,
@@ -528,15 +583,45 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
         loai: 'tang_no',
         ghi_chu: 'Cong no phat sinh tu phieu nhap ' + purchase.ma_phieu_nhap,
         ngay: purchase.ngay_nhap || new Date()
-      }));
+      }, session));
     }
+    const paymentForDebt = options.payment || {};
+    const supplierDebtInc = paymentForDebt.isV2 ? canTra : conNo;
     await withNhapHangLog('NhaCungCap', `cap nhat mua/no ncc=${purchase.nha_cung_cap_id}`, () => NhaCungCap.updateOne(
       { _id: purchase.nha_cung_cap_id },
-      { $inc: { tong_mua: canTra, tong_no: includeDebt ? conNo : 0 } }
+      { $inc: { tong_mua: canTra, tong_no: includeDebt ? supplierDebtInc : 0 } },
+      withSessionOptions({}, session)
     ));
 
     if (daTra > 0) {
       const cashBookId = resolveCashBookId(options);
+      const paymentInput = options.payment || { isV2: false, detail: options.chi_tiet_thanh_toan };
+      if (paymentInput.isV2) {
+        const receiptPayload = {
+          loai_phieu: 'chi',
+          loai_thu_chi: 'Chi tra nha cung cap',
+          gia_tri: daTra,
+          ngay_lap: purchase.ngay_nhap || new Date(),
+          cua_hang_id: purchase.cua_hang_id,
+          chi_nhanh_id: options.chi_nhanh_id,
+          nguoi_tao_id: options.userId,
+          nha_cung_cap_id: purchase.nha_cung_cap_id,
+          phieu_nhap_id: purchase._id,
+          document_type: 'phieu_nhap',
+          ma_chung_tu_goc: purchase.ma_phieu_nhap,
+          nhom_doi_tuong: 'nha_cung_cap',
+          doi_tuong: options.supplierName,
+          payment_v2: true,
+          tien_mat: Number(paymentInput.detail.tien_mat || 0),
+          so_quy_tien_mat_id: paymentInput.detail.so_quy_tien_mat_id || '',
+          chuyen_khoan: Number(paymentInput.detail.chuyen_khoan || 0),
+          so_quy_chuyen_khoan_id: paymentInput.detail.so_quy_chuyen_khoan_id || '',
+          tien_tra_khach: 0,
+          hach_toan: includeDebt
+        };
+        await withNhapHangLog('PhieuThuChi', `tao phieu chi phieu=${purchase.ma_phieu_nhap}`, () => taoPhieuThuChi(receiptPayload, { session }));
+        return;
+      }
       if (!cashBookId) throw new Error('Vui lòng chọn sổ quỹ để thanh toán phiếu nhập.');
       await withNhapHangLog('PhieuThuChi', `tao phieu chi phieu=${purchase.ma_phieu_nhap}`, () => taoPhieuThuChi({
         loai_phieu: 'chi',
@@ -548,13 +633,14 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
         nguoi_tao_id: options.userId,
         nha_cung_cap_id: purchase.nha_cung_cap_id,
         phieu_nhap_id: purchase._id,
+        document_type: 'phieu_nhap',
         ma_chung_tu_goc: purchase.ma_phieu_nhap,
         nhom_doi_tuong: 'nha_cung_cap',
         phuong_thuc_thanh_toan: normalizePaymentMethod(paymentMethodFromDetail(options.chi_tiet_thanh_toan) || purchase.phuong_thuc_thanh_toan),
         chi_tiet_thanh_toan: options.chi_tiet_thanh_toan || { tien_mat: daTra, chuyen_khoan: 0, tien_tra_khach: 0 },
         hach_toan: false
-      }));
-      if (includeDebt) await withNhapHangLog('CongNoNhaCungCap', `ghi thanh toan phieu=${purchase.ma_phieu_nhap}`, () => CongNoNhaCungCap.create({
+      }, { session }));
+      if (includeDebt) await withNhapHangLog('CongNoNhaCungCap', `ghi thanh toan phieu=${purchase.ma_phieu_nhap}`, () => createOne(CongNoNhaCungCap, {
         cua_hang_id: purchase.cua_hang_id,
         nha_cung_cap_id: purchase.nha_cung_cap_id,
         phieu_nhap_id: purchase._id,
@@ -562,16 +648,17 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
         loai: 'thanh_toan',
         ghi_chu: 'Thanh toan NCC tu phieu nhap ' + purchase.ma_phieu_nhap,
         ngay: purchase.ngay_nhap || new Date()
-      }));
+      }, session));
     }
   }
 }
 
-async function createPurchase(data = {}) {
+async function createPurchase(data = {}, options = {}) {
+  const session = options.session || data.session;
   const storeId = cleanId(data.cua_hang_id);
   const khoId = cleanId(data.kho_id);
   if (!storeId) throw new Error('Cua hang khong hop le');
-  if (!khoId) throw new Error('Vui long chon kho nhap');
+  if (!khoId) throw new Error('Vui lòng chọn kho nhập');
 
   const items = normalizeItems(data.items_json ?? data.items);
   if (!items.length) throw new Error('Vui long chon hang hoa');
@@ -585,17 +672,19 @@ async function createPurchase(data = {}) {
   const daTra = payment.amount;
   const phuongThuc = purchasePaymentMethodFromDetail(payment.detail);
   const conNo = Math.max(0, canTra - daTra);
-  assertCashBookWhenPaying(daTra, data);
+  assertCashBookWhenPaying(payment, data);
   const now = new Date();
-  const maPhieu = data.ma_phieu_nhap || await makeCode(PhieuNhap, 'ma_phieu_nhap', 'PN', 6);
+  const maPhieu = data.ma_phieu_nhap || await makeCode(PhieuNhap, 'ma_phieu_nhap', 'PN', 6, session);
   const includeDebt = data.tinh_vao_cong_no !== false
     && data.tinh_vao_cong_no !== 'false'
     && data.tinh_vao_cong_no !== '0'
     && data.tinh_vao_cong_no !== 'off';
 
-  const productDocs = await HangHoa.find({ _id: { $in: items.map(x => x.hang_hoa_id) }, trang_thai: 'active' })
-    .select('_id ma_hang don_vi_tinh_id quan_ly_theo_lo')
-    .lean();
+  const productDocs = await withSessionQuery(
+    HangHoa.find({ _id: { $in: items.map(x => x.hang_hoa_id) }, trang_thai: 'active' })
+      .select('_id ma_hang don_vi_tinh_id quan_ly_theo_lo'),
+    session
+  ).lean();
   const productMap = new Map(productDocs.map(p => [String(p._id), p]));
   if (productMap.size !== new Set(items.map(x => String(x.hang_hoa_id))).size) {
     throw new Error('Co hang hoa khong hop le hoac da ngung kinh doanh');
@@ -616,7 +705,7 @@ async function createPurchase(data = {}) {
     }
   }
 
-  const purchase = await withNhapHangLog('PhieuNhap', `tao phieu ${maPhieu}`, () => PhieuNhap.create({
+  const purchase = await withNhapHangLog('PhieuNhap', `tao phieu ${maPhieu}`, () => createOne(PhieuNhap, {
     cua_hang_id: storeId,
     kho_id: khoId,
     nha_cung_cap_id: supplierId,
@@ -633,7 +722,7 @@ async function createPurchase(data = {}) {
     phuong_thuc_thanh_toan: phuongThuc,
     trang_thai: mode,
     ghi_chu: String(data.ghi_chu || '').trim()
-  }));
+  }, session));
 
   const rows = [];
   const lotCache = new Map();
@@ -643,7 +732,7 @@ async function createPurchase(data = {}) {
       throw new Error('Hang quan ly theo lo can chon hoac tao lo');
     }
     const total = lineTotal(item);
-    const ctDoc = await withNhapHangLog('CTPhieuNhap', `tao dong hang=${item.hang_hoa_id} sl=${item.so_luong}`, () => CTPhieuNhap.create({
+    const ctDoc = await withNhapHangLog('CTPhieuNhap', `tao dong hang=${item.hang_hoa_id} sl=${item.so_luong}`, () => createOne(CTPhieuNhap, {
       phieu_nhap_id: purchase._id,
       hang_hoa_id: item.hang_hoa_id,
       don_vi_tinh_id: product.don_vi_tinh_id || undefined,
@@ -653,7 +742,7 @@ async function createPurchase(data = {}) {
       kieu_giam_gia_dong: item.kieu_giam_gia_dong,
       thanh_tien: total,
       lot_info: item.lot_info || undefined
-    }));
+    }, session));
     let lotId;
     if (product.quan_ly_theo_lo && (item.lo_hang_id || item.lot_info)) {
       lotId = await createLotForLine({
@@ -666,9 +755,10 @@ async function createPurchase(data = {}) {
         productId: item.hang_hoa_id,
         item,
         now,
-        lotCache
+        lotCache,
+        session
       });
-      await withNhapHangLog('CTPhieuNhap', `gan lo=${lotId} cho dong=${ctDoc._id}`, () => CTPhieuNhap.updateOne({ _id: ctDoc._id }, { $set: { lo_hang_id: lotId } }));
+      await withNhapHangLog('CTPhieuNhap', `gan lo=${lotId} cho dong=${ctDoc._id}`, () => CTPhieuNhap.updateOne({ _id: ctDoc._id }, { $set: { lo_hang_id: lotId } }, withSessionOptions({}, session)));
     }
     rows.push({
       _id: ctDoc._id,
@@ -687,8 +777,11 @@ async function createPurchase(data = {}) {
       so_quy_id: data.so_quy_id,
       cashBookId: data.cashBookId,
       soQuyId: data.soQuyId,
+      chi_nhanh_id: data.chi_nhanh_id,
       includeDebt,
-      chi_tiet_thanh_toan: payment.detail
+      chi_tiet_thanh_toan: payment.detail,
+      payment,
+      session
     });
   }
 

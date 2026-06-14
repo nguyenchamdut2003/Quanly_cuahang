@@ -4,6 +4,13 @@
   const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
+  const purchaseRemainDue = ticket => {
+    if (!ticket) return 0;
+    if (ticket.con_no_ncc != null && ticket.con_no_ncc !== '') return Math.max(0, Number(ticket.con_no_ncc) || 0);
+    const payable = Number(ticket.can_tra_ncc ?? ticket.tong_tien ?? 0) || 0;
+    const paid = Number(ticket.da_tra_ncc ?? 0) || 0;
+    return Math.max(0, payable - paid);
+  };
   const statusBadge = status => status === 'draft' ? 'draft' : '';
   const formatDateOnly = value => {
     if (!value) return '';
@@ -182,6 +189,11 @@
     .quick-pay-grid textarea{height:76px;min-height:76px}
     .pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:8px 0}
     .pay-total-summary{font-size:13px;color:#475467;padding:4px 0}
+    .pay-error{display:none;grid-column:1/-1;border:1px solid #fecdca;background:#fffbfa;color:#b42318;border-radius:6px;padding:8px 10px;font-size:13px}
+    .pay-error.show{display:block}
+    .pay-info-line{display:flex;justify-content:space-between;gap:12px}
+    .pay-info-line b{color:#111827}
+    .quick-pay-grid select:disabled{background:#f2f4f7;color:#98a2b3}
     .edit-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
     .edit-field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
     .edit-field label{font-weight:700;color:#344054}
@@ -287,7 +299,7 @@
                     <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
                     <td class="num"><%= fmtMoney((t.tong_tien ?? t.can_tra_ncc ?? 0)) %></td>
                     <td class="num"><%= fmtMoney((t.da_tra_ncc ?? 0)) %></td>
-                    <td class="num"><%= fmtMoney((t.can_tra_ncc ?? t.tong_tien ?? 0)) %></td>
+                    <td class="num"><%= fmtMoney(purchaseRemainDue(t)) %></td>
                     <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
                   <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
@@ -482,6 +494,7 @@
     const suppliers = JSON.parse(document.getElementById('supplierData')?.textContent || '[]');
     const warehouses = JSON.parse(document.getElementById('warehouseData')?.textContent || '[]');
     const cashBooks = JSON.parse(document.getElementById('cashBookData')?.textContent || '[]');
+    const paySupplierBookCache = { tien_mat: null, chuyen_khoan: null };
     let currentPurchaseId = '';
     let currentPurchaseEdit = null;
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
@@ -523,11 +536,82 @@
         updatePaySupplierTotals();
       });
     }
+    function setPaySupplierError(message) {
+      const el = document.getElementById('paySupplierError');
+      if (!el) return;
+      el.textContent = message || '';
+      el.classList.toggle('show', Boolean(message));
+    }
+    function paymentBookLabel(book) {
+      const bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
+      if (String(book?.loai_so_quy || '') === 'chuyen_khoan') {
+        const parts = [
+          bank.ten_ngan_hang || book.ten_so_quy || 'Tài khoản ngân hàng',
+          bank.so_tai_khoan || ''
+        ].filter(Boolean);
+        return parts.join(' - ');
+      }
+      return book?.ten_so_quy || 'Sổ tiền mặt';
+    }
+    async function loadPaySupplierBooks(type) {
+      if (paySupplierBookCache[type]) return paySupplierBookCache[type];
+      const fallback = cashBooks
+        .filter(book => String(book.loai_so_quy || 'tien_mat') === type && String(book.trang_thai || 'active') === 'active');
+      try {
+        const response = await fetch('/api/so-quy/active?loai_so_quy=' + encodeURIComponent(type), {
+          headers: { 'Accept': 'application/json' }
+        });
+        const json = await response.json();
+        const items = json && Array.isArray(json.items) ? json.items : [];
+        paySupplierBookCache[type] = items
+          .filter(book => String(book.loai_so_quy || '') === type && String(book.trang_thai || 'active') === 'active');
+      } catch (_) {
+        paySupplierBookCache[type] = fallback;
+      }
+      return paySupplierBookCache[type];
+    }
+    function autoSelectedPayBookId(books) {
+      books = Array.isArray(books) ? books : [];
+      const defaults = books.filter(book => book.mac_dinh);
+      if (defaults.length) return String(defaults[0]._id || '');
+      if (books.length === 1) return String(books[0]._id || '');
+      return '';
+    }
+    function renderPayBookSelect(selectId, books, placeholder) {
+      const select = document.getElementById(selectId);
+      if (!select) return;
+      const selectedId = autoSelectedPayBookId(books);
+      const options = [`<option value="">${escapeHtml(placeholder)}</option>`]
+        .concat((books || []).map(book => {
+          const id = String(book._id || '');
+          const selected = selectedId && id === selectedId ? 'selected' : '';
+          return `<option value="${escapeHtml(id)}" ${selected}>${escapeHtml(paymentBookLabel(book))}</option>`;
+        }));
+      select.innerHTML = options.join('');
+      select.dataset.hasBooks = books && books.length ? '1' : '0';
+    }
     function updatePaySupplierTotals() {
       const tienMat = numberValue(document.getElementById('paySupplierTienMat')?.value || 0);
       const chuyenKhoan = numberValue(document.getElementById('paySupplierChuyenKhoan')?.value || 0);
+      const debt = numberValue(document.getElementById('paySupplierDebt')?.dataset.debt || 0);
+      const total = tienMat + chuyenKhoan;
+      const cashSelect = document.getElementById('paySupplierCashBook');
+      const bankSelect = document.getElementById('paySupplierBankBook');
       const totalEl = document.getElementById('paySupplierPayTotal');
-      if (totalEl) totalEl.textContent = moneyText(tienMat + chuyenKhoan);
+      const afterEl = document.getElementById('paySupplierDebtAfter');
+      if (cashSelect) {
+        cashSelect.disabled = tienMat <= 0 || cashSelect.dataset.hasBooks !== '1';
+      }
+      if (bankSelect) {
+        bankSelect.disabled = chuyenKhoan <= 0 || bankSelect.dataset.hasBooks !== '1';
+      }
+      if (totalEl) totalEl.textContent = moneyText(total);
+      if (afterEl) afterEl.textContent = moneyText(Math.max(0, debt - total));
+      if (total > debt) {
+        setPaySupplierError('Số tiền thanh toán không được vượt công nợ phiếu nhập.');
+      } else {
+        setPaySupplierError('');
+      }
     }
     function toDateInput(value){
       if (!value) return '';
@@ -778,6 +862,99 @@
         alert(error.message || 'Không tạo được phiếu chi');
       }
     }
+    async function openPaySupplierModal(id){
+      const p = findPurchase(id);
+      if (!p) return alert('Không tìm thấy phiếu nhập');
+      const debt = Number(p.con_no_ncc || 0);
+      if (debt <= 0) return alert('Phiếu nhập không còn nợ NCC');
+      currentPurchaseId = id;
+      const supplier = p.nha_cung_cap_id || {};
+      document.getElementById('paySupplierBody').innerHTML = `
+        <div class="quick-pay-grid">
+          <div id="paySupplierError" class="pay-error"></div>
+          <label><span>Loại phiếu</span><input value="Chi" readonly></label>
+          <label><span>Nhóm đối tượng</span><input value="Nhà cung cấp" readonly></label>
+          <label><span>Nhà cung cấp</span><input value="${escapeHtml((supplier.ma_ncc ? supplier.ma_ncc + ' - ' : '') + (supplier.ten_ncc || ''))}" readonly></label>
+          <label><span>Phiếu nhập</span><input value="${escapeHtml(p.ma_phieu_nhap || '')}" readonly></label>
+          <label class="full"><span>Còn nợ hiện tại</span><div class="pay-total-readonly" id="paySupplierDebt" data-debt="${debt}">${moneyText(debt)}</div></label>
+          <label class="full"><b>CHI TIẾT THANH TOÁN</b></label>
+          <label><span>Tiền mặt</span><input id="paySupplierTienMat" class="vn-pay-amount" inputmode="numeric" value="0" placeholder="0"></label>
+          <label><span>Sổ tiền mặt</span><select id="paySupplierCashBook"><option value="">Đang tải sổ tiền mặt...</option></select></label>
+          <label><span>Chuyển khoản</span><input id="paySupplierChuyenKhoan" class="vn-pay-amount" inputmode="numeric" value="0" placeholder="0"></label>
+          <label><span>Tài khoản ngân hàng</span><select id="paySupplierBankBook"><option value="">Đang tải tài khoản...</option></select></label>
+          <input id="paySupplierTienTraKhach" type="hidden" value="0">
+          <label class="full"><span>Tổng thanh toán</span><div class="pay-total-summary"><b id="paySupplierPayTotal">${moneyText(0)}</b></div></label>
+          <label class="full"><span>Còn nợ sau thanh toán</span><div class="pay-total-summary"><b id="paySupplierDebtAfter">${moneyText(debt)}</b></div></label>
+          <label class="full"><span>Ghi chú</span><textarea id="paySupplierNote">Thanh toán tiền nhập hàng cho phiếu ${escapeHtml(p.ma_phieu_nhap || '')}</textarea></label>
+        </div>
+      `;
+      bindPayAmountInput(document.getElementById('paySupplierTienMat'));
+      bindPayAmountInput(document.getElementById('paySupplierChuyenKhoan'));
+      updatePaySupplierTotals();
+      document.getElementById('paySupplierModal').classList.add('open');
+      try {
+        const lists = await Promise.all([
+          loadPaySupplierBooks('tien_mat'),
+          loadPaySupplierBooks('chuyen_khoan')
+        ]);
+        if (String(currentPurchaseId) !== String(id)) return;
+        renderPayBookSelect('paySupplierCashBook', lists[0], lists[0].length ? '— Chọn sổ tiền mặt —' : 'Chưa có sổ tiền mặt active');
+        renderPayBookSelect('paySupplierBankBook', lists[1], lists[1].length ? '— Chọn tài khoản chuyển khoản —' : 'Chưa có tài khoản active');
+        updatePaySupplierTotals();
+      } catch (error) {
+        setPaySupplierError(error.message || 'Không tải được danh sách sổ quỹ.');
+      }
+    }
+
+    async function submitPaySupplier(){
+      if (!currentPurchaseId) return;
+      const debt = numberValue(document.getElementById('paySupplierDebt')?.dataset.debt || 0);
+      const tienMat = numberValue(document.getElementById('paySupplierTienMat')?.value || 0);
+      const chuyenKhoan = numberValue(document.getElementById('paySupplierChuyenKhoan')?.value || 0);
+      const total = tienMat + chuyenKhoan;
+      if (total <= 0) {
+        setPaySupplierError('Số tiền thanh toán phải lớn hơn 0.');
+        document.getElementById('paySupplierTienMat')?.focus();
+        return;
+      }
+      if (total > debt) {
+        setPaySupplierError('Số tiền thanh toán không được vượt công nợ phiếu nhập.');
+        return;
+      }
+      const cashBookId = tienMat > 0 ? String(document.getElementById('paySupplierCashBook')?.value || '').trim() : '';
+      const bankBookId = chuyenKhoan > 0 ? String(document.getElementById('paySupplierBankBook')?.value || '').trim() : '';
+      if (tienMat > 0 && !cashBookId) {
+        setPaySupplierError('Vui lòng chọn sổ tiền mặt.');
+        document.getElementById('paySupplierCashBook')?.focus();
+        return;
+      }
+      if (chuyenKhoan > 0 && !bankBookId) {
+        setPaySupplierError('Vui lòng chọn tài khoản chuyển khoản.');
+        document.getElementById('paySupplierBankBook')?.focus();
+        return;
+      }
+      setPaySupplierError('');
+      try {
+        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/pay-supplier', {
+          payment_v2: '1',
+          chi_tiet_thanh_toan: {
+            tien_mat: tienMat,
+            so_quy_tien_mat_id: cashBookId,
+            chuyen_khoan: chuyenKhoan,
+            so_quy_chuyen_khoan_id: bankBookId,
+            tien_tra_khach: 0
+          },
+          so_quy_id: '',
+          ghi_chu: document.getElementById('paySupplierNote')?.value || ''
+        });
+        alert(data.message || 'Đã tạo phiếu chi');
+        closePaySupplierModal();
+        location.reload();
+      } catch (error) {
+        setPaySupplierError(error.message || 'Không tạo được phiếu chi');
+      }
+    }
+
     function openLabelModal(id){
       currentPurchaseId = id;
       const p = findPurchase(id);
@@ -857,4 +1034,3 @@
   </script>
 </body>
 </html>
-

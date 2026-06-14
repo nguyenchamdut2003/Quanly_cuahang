@@ -50,6 +50,7 @@ function attrName(attr) {
 function rowBase(row, options) {
   options = options || {};
   var product = row.hang_hoa_id || {};
+  var supplier = product.nha_cung_cap_id || row.nha_cung_cap_id || {};
   var qty = Number(options.qty != null ? options.qty : row.so_luong || 0);
   var price = Number(options.price != null ? options.price : row.don_gia || row.don_gia_ban || row.gia_tra_lai || row.gia_von || 0);
   var total = Number(options.total != null ? options.total : row.thanh_tien || (qty * price) || 0);
@@ -57,6 +58,7 @@ function rowBase(row, options) {
   return {
     ma_hang: product.ma_hang || '',
     ten_hang: product.ten_hang || '',
+    nha_cung_cap: supplier.ten_ncc || supplier.ten_cong_ty || supplier.ma_ncc || '',
     thuoc_tinh: attribute || 'Không có',
     lo: lotName(row.lo_hang_id),
     so_luong: qty,
@@ -124,7 +126,11 @@ async function loadRetailInvoice(id) {
     .lean();
   if (!invoice) return null;
   var items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id })
-    .populate('hang_hoa_id')
+    .populate({
+      path: 'hang_hoa_id',
+      select: 'ma_hang ten_hang nha_cung_cap_id',
+      populate: { path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty' }
+    })
     .populate('lo_hang_id')
     .lean();
   return {

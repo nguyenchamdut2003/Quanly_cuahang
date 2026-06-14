@@ -45,96 +45,6 @@
           <span><%= item.ly_do_khong_the_giao || 'T&#7891;n c&oacute; th&#7875; b&aacute;n/giao = 0.' %></span>
         </div>
       <% } %>
-
-      <% if (item.quan_ly_theo_lo) { %>
-        <div class="product-attribute-stock">
-          <div class="product-attribute-stock-title">
-            <%- refLink('product', item, item.ma_hang || '---') %> - <%= item.ten_hang || '---' %>
-          </div>
-          <table class="admin-table product-inner-table product-attribute-stock-table">
-            <thead>
-              <tr>
-                <th>Ng&agrave;y / L&ocirc;</th>
-                <th>Thu&#7897;c t&iacute;nh</th>
-                <th class="text-right">T&#7891;n kho/th&#7921;c t&#7871;</th>
-                <th class="text-right">T&#7891;n c&oacute; th&#7875; b&aacute;n/giao</th>
-                <th class="text-right">T&#7891;n h&#7871;t h&#7841;n</th>
-                <th class="text-right">&#272;&#417;n gi&aacute;</th>
-                <th class="text-right">Th&agrave;nh ti&#7873;n</th>
-                <th class="text-right">T&#7893;ng thu&#7897;c t&iacute;nh</th>
-                <th class="text-right">T&#7891;n l&ocirc;</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% if (!selectedProductLotAttributes || selectedProductLotAttributes.length === 0) { %>
-                <tr><td colspan="9" class="empty-cell">Ch&#432;a c&oacute; t&#7891;n kho theo thu&#7897;c t&iacute;nh.</td></tr>
-              <% } %>
-              <%
-                var grandQty = 0;
-                var grandSellableQty = 0;
-                var grandExpiredQty = 0;
-                var grandAmount = 0;
-              %>
-              <% (selectedProductLotAttributes || []).forEach(function(group) { %>
-                <%
-                  var lot = group.lot || {};
-                  var items = group.items || [];
-                  grandQty += Number(group.total_quantity || 0);
-                  grandSellableQty += Number(group.total_sellable_quantity || 0);
-                  grandExpiredQty += Number(group.total_expired_quantity || 0);
-                  grandAmount += Number(group.total_amount || 0);
-                %>
-                <% items.forEach(function(qc, index) { %>
-                  <tr>
-                    <% if (index === 0) { %>
-                      <td rowspan="<%= items.length %>">
-                        <div><%- lot && lot._id ? refLink('lot', lot, lot.ten_lo || lot.ma_lo || 'L&ocirc;') : '---' %></div>
-                        <% if (lot.han_su_dung) { %>
-                          <strong>HSD: <%= new Date(lot.han_su_dung).toLocaleDateString('vi-VN') %></strong>
-                        <% } %>
-                        <% if (qc.lo_da_het_han) { %>
-                          <div><span class="lot-expiry-badge is-expired">H&#7871;t h&#7841;n</span></div>
-                        <% } %>
-                        <div class="muted-line"><%= group.kho_ten || '---' %></div>
-                        <% if (group.has_reconcile_warning) { %>
-                          <div class="stock-warning-text"><%= group.reconcile_message %></div>
-                        <% } %>
-                      </td>
-                    <% } %>
-                    <td><%= qc.ten_quy_cach || '---' %></td>
-                    <td class="text-right"><%= Number(qc.ton_thuc_te || qc.so_luong || 0).toLocaleString('vi-VN') %></td>
-                    <td class="text-right">
-                      <%= Number(qc.ton_co_the_giao || 0).toLocaleString('vi-VN') %>
-                      <% if (qc.ly_do_khong_the_giao) { %>
-                        <div class="stock-reason-text"><%= qc.ly_do_khong_the_giao %></div>
-                      <% } %>
-                    </td>
-                    <td class="text-right"><%= Number(qc.ton_het_han || 0).toLocaleString('vi-VN') %></td>
-                    <td class="text-right"><%= Number(qc.don_gia || 0).toLocaleString('vi-VN') %> VN&#272;</td>
-                    <td class="text-right"><%= Number(qc.thanh_tien || 0).toLocaleString('vi-VN') %> VN&#272;</td>
-                    <% if (index === 0) { %>
-                      <td class="text-right lot-total-cell" rowspan="<%= items.length %>"><%= Number(group.total_quantity || 0).toLocaleString('vi-VN') %></td>
-                      <td class="text-right" rowspan="<%= items.length %>"><%= Number(group.lot_stock_quantity || 0).toLocaleString('vi-VN') %></td>
-                    <% } %>
-                  </tr>
-                <% }) %>
-              <% }) %>
-              <% if (selectedProductLotAttributes && selectedProductLotAttributes.length > 0) { %>
-                <tr class="product-attribute-stock-total">
-                  <td colspan="2" class="text-right">T&#7893;ng c&#7897;ng</td>
-                  <td class="text-right"><%= grandQty.toLocaleString('vi-VN') %></td>
-                  <td class="text-right"><%= grandSellableQty.toLocaleString('vi-VN') %></td>
-                  <td class="text-right"><%= grandExpiredQty.toLocaleString('vi-VN') %></td>
-                  <td></td>
-                  <td class="text-right"><%= grandAmount.toLocaleString('vi-VN') %> VN&#272;</td>
-                  <td></td>
-                  <td></td>
-                </tr>
-              <% } %>
-            </tbody>
-          </table>
-        </div>
-      <% } %>
     </section>
 
     <%
@@ -214,6 +124,9 @@
           <% (selectedProductHistories || []).forEach(function(row) { %>
             <tr>
               <td>
+                <% if (row.ten_loai_chung_tu) { %>
+                  <div class="muted-line" style="font-weight:700;color:#334155"><%= row.ten_loai_chung_tu %></div>
+                <% } %>
                 <% if (row.chung_tu_doc && row.chung_tu_type) { %>
                   <%- refLink(row.chung_tu_type, row.chung_tu_doc, row.ma_phieu || '---') %>
                 <% } else { %>

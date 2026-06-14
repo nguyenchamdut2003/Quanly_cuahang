@@ -2,6 +2,7 @@ var mongoose = require('mongoose');
 var path = require('path');
 var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc } = require('../models/kiot.model');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
+var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
 var purchaseService = require('../services/purchase.service');
 var pdfService = require('../services/pdf.service');
 
@@ -375,9 +376,7 @@ exports.index = async function(req, res, next) {
     )
       .sort({ ten_kho: 1, ma_kho: 1 })
       .lean();
-    var cashBooks = await SoQuy.find(
-      storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' }
-    )
+    var cashBooks = await SoQuy.find({ trang_thai: 'active' })
       .sort({ ten_so_quy: 1 })
       .lean();
 
@@ -497,6 +496,94 @@ function parseMoneyInput(raw) {
   var n = Number(normalized);
   if (!Number.isFinite(n) || n < 0) return 0;
   return Math.floor(n);
+}
+
+function normalizeMoneyOrThrow(raw, message) {
+  if (raw === undefined || raw === null || raw === '') return 0;
+  var normalized = String(raw).replace(/\s/g, '').replace(/\./g, '').replace(/,/g, '').trim();
+  if (!normalized) return 0;
+  var n = Number(normalized);
+  if (!Number.isFinite(n) || n < 0) throw new Error(message);
+  return Math.floor(n);
+}
+
+function normalizePaymentBody(body) {
+  body = Object.assign({}, body || {});
+  if (typeof body.chi_tiet_thanh_toan === 'string') {
+    try {
+      body.chi_tiet_thanh_toan = JSON.parse(body.chi_tiet_thanh_toan);
+    } catch (_) {
+      body.chi_tiet_thanh_toan = {};
+    }
+  }
+  if (!body.chi_tiet_thanh_toan || typeof body.chi_tiet_thanh_toan !== 'object') {
+    body.chi_tiet_thanh_toan = {};
+  }
+  return body;
+}
+
+function readPaymentValue(body, key) {
+  var nested = body && body.chi_tiet_thanh_toan && typeof body.chi_tiet_thanh_toan === 'object'
+    ? body.chi_tiet_thanh_toan
+    : {};
+  if (nested[key] !== undefined) return nested[key];
+  var bracketKey = 'chi_tiet_thanh_toan[' + key + ']';
+  if (body && body[bracketKey] !== undefined) return body[bracketKey];
+  return body ? body[key] : undefined;
+}
+
+function hasPaymentBookValue(body, key) {
+  return String(readPaymentValue(body, key) || '').trim() !== '';
+}
+
+function isPaySupplierPaymentV2(body) {
+  var flag = body && body.payment_v2;
+  return flag === true
+    || flag === 'true'
+    || flag === '1'
+    || hasPaymentBookValue(body, 'so_quy_tien_mat_id')
+    || hasPaymentBookValue(body, 'so_quy_chuyen_khoan_id');
+}
+
+function getCurrentBranchId(req) {
+  var sessionBranchId = req && req.session ? String(req.session.chi_nhanh_id || '').trim() : '';
+  if (sessionBranchId && mongoose.Types.ObjectId.isValid(sessionBranchId)) return sessionBranchId;
+  var userBranchId = req && req.user ? String(req.user.chi_nhanh_id || '').trim() : '';
+  if (userBranchId && mongoose.Types.ObjectId.isValid(userBranchId)) return userBranchId;
+  return '';
+}
+
+function normalizePaySupplierPayment(body, isV2) {
+  var tienMat = normalizeMoneyOrThrow(readPaymentValue(body, 'tien_mat'), 'Số tiền mặt không hợp lệ.');
+  var chuyenKhoan = normalizeMoneyOrThrow(readPaymentValue(body, 'chuyen_khoan'), 'Số tiền chuyển khoản không hợp lệ.');
+  var tienTraKhach = normalizeMoneyOrThrow(readPaymentValue(body, 'tien_tra_khach'), 'Số tiền trả khách không hợp lệ.');
+  var amount = tienMat + chuyenKhoan;
+
+  if (amount <= 0 && !isV2 && body && body.gia_tri !== undefined) {
+    amount = normalizeMoneyOrThrow(body.gia_tri, 'Số tiền thanh toán không hợp lệ.');
+    tienMat = amount;
+    chuyenKhoan = 0;
+  }
+  if (isV2 && tienTraKhach > 0) {
+    throw new Error('Tiền trả khách không áp dụng cho thanh toán nhà cung cấp.');
+  }
+  if (!isV2 && tienTraKhach > 0) {
+    console.warn('[NHAP_HANG][PAY_SUPPLIER_LEGACY_REFUND_IGNORED]', tienTraKhach);
+  }
+  return {
+    tien_mat: tienMat,
+    chuyen_khoan: chuyenKhoan,
+    tien_tra_khach: 0,
+    so_quy_tien_mat_id: String(readPaymentValue(body, 'so_quy_tien_mat_id') || '').trim(),
+    so_quy_chuyen_khoan_id: String(readPaymentValue(body, 'so_quy_chuyen_khoan_id') || '').trim(),
+    amount: amount
+  };
+}
+
+function legacyPaymentMethodFromDetail(detail) {
+  if (detail.chuyen_khoan > 0 && detail.tien_mat <= 0) return 'chuyen_khoan';
+  if (detail.tien_mat > 0 && detail.chuyen_khoan > 0) return 'khac';
+  return 'tien_mat';
 }
 
 async function loadPurchaseWithItems(id, storeId) {
@@ -630,9 +717,7 @@ exports.createPage = async function(req, res, next) {
     )
       .sort({ ten_don_vi: 1 })
       .lean();
-    var cashBooks = await SoQuy.find(
-      storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' }
-    )
+    var cashBooks = await SoQuy.find({ trang_thai: 'active' })
       .sort({ ten_so_quy: 1 })
       .lean();
 
@@ -902,21 +987,29 @@ exports.apiProductLots = async function(req, res, next) {
 };
 
 exports.createSubmit = async function(req, res, next) {
+  var session = null;
   try {
     var storeId = await resolveStoreId(req);
     if (!storeId || !mongoose.Types.ObjectId.isValid(storeId)) {
       return res.redirect('/nhap-hang?error=invalid_store');
     }
-    var purchase = await purchaseService.createPurchase(Object.assign({}, req.body || {}, {
-      cua_hang_id: storeId,
-      nguoi_tao_id: req.user && req.user._id ? req.user._id : undefined
-    }));
+    var purchase;
+    session = await mongoose.startSession();
+    await session.withTransaction(async function() {
+      purchase = await purchaseService.createPurchase(Object.assign({}, req.body || {}, {
+        cua_hang_id: storeId,
+        nguoi_tao_id: req.user && req.user._id ? req.user._id : undefined
+      }), { session: session });
+    });
     var redirectUrl = '/nhap-hang?success=created&purchase=' + encodeURIComponent(String(purchase._id));
     var wantExport = req.body && (req.body.exportAfterComplete === '1' || req.body.exportAfterComplete === 'true');
     if (wantExport) redirectUrl += '&export=1';
     return res.redirect(redirectUrl);
   } catch (error) {
+    console.error('[NHAP_HANG][TRANSACTION_FAIL]', error && error.message ? error.message : error);
     return res.redirect('/nhap-hang/create?error=' + encodeURIComponent(error.message || 'create_failed'));
+  } finally {
+    if (session) await session.endSession();
   }
 };
 exports.detail = async function(req, res, next) {
@@ -936,7 +1029,7 @@ exports.detail = async function(req, res, next) {
   }
 };
 
-exports.paySupplier = async function(req, res, next) {
+async function paySupplierLegacyUnused(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
     var filter = { _id: req.params.id };
@@ -1025,6 +1118,148 @@ exports.paySupplier = async function(req, res, next) {
     });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu chi' });
+  }
+}
+
+exports.paySupplier = async function(req, res, next) {
+  var session = null;
+  try {
+    var storeId = await resolveStoreId(req);
+    var branchId = getCurrentBranchId(req);
+    var body = normalizePaymentBody(req.body);
+    var isV2 = isPaySupplierPaymentV2(body);
+    var paymentInput = normalizePaySupplierPayment(body, isV2);
+    var amount = paymentInput.amount;
+
+    if (amount <= 0) {
+      return res.status(400).json({ success: false, message: 'Số tiền thanh toán phải lớn hơn 0.' });
+    }
+
+    var result;
+    session = await mongoose.startSession();
+    await session.withTransaction(async function() {
+      var filter = { _id: req.params.id };
+      if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
+      var purchase = await PhieuNhap.findOne(filter)
+        .session(session)
+        .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' });
+      if (!purchase) throw new Error('Không tìm thấy phiếu nhập');
+      if (!purchase.nha_cung_cap_id) throw new Error('Phiếu nhập chưa có nhà cung cấp');
+      if (purchase.trang_thai === 'cancelled') throw new Error('Phiếu nhập đã hủy');
+
+      var debt = Math.max(0, Number(purchase.con_no_ncc || 0));
+      if (debt <= 0) throw new Error('Phiếu nhập không còn công nợ cần thanh toán.');
+      if (amount > debt) throw new Error('Số tiền thanh toán không được vượt công nợ phiếu nhập.');
+
+      var nextPaid = Math.min(Number(purchase.da_tra_ncc || 0) + amount, Number(purchase.can_tra_ncc || 0));
+      var nextDebt = Math.max(0, debt - amount);
+      var allocations = [{
+        phieu_nhap_id: purchase._id,
+        ma_phieu_nhap: purchase.ma_phieu_nhap || purchase.ma_phieu || '',
+        so_tien: amount,
+        con_no_truoc: debt,
+        con_no_sau: nextDebt
+      }];
+      if (allocations[0].so_tien !== amount || allocations[0].con_no_sau < 0) {
+        throw new Error('Phân bổ thanh toán phiếu nhập không hợp lệ.');
+      }
+
+      var supplierId = purchase.nha_cung_cap_id._id || purchase.nha_cung_cap_id;
+      var supplierName = purchase.nha_cung_cap_id.ten_ncc || purchase.nha_cung_cap_id.ma_ncc || '';
+      var note = String(body.ghi_chu || '').trim() || ('Thanh toán tiền nhập hàng cho phiếu ' + purchase.ma_phieu_nhap);
+      var receiptPayload = {
+        loai_phieu: 'chi',
+        loai_thu_chi: 'thanh_toan_nhap_hang',
+        gia_tri: amount,
+        nha_cung_cap_id: supplierId,
+        phieu_nhap_id: purchase._id,
+        ma_chung_tu_goc: purchase.ma_phieu_nhap,
+        nhom_doi_tuong: 'nha_cung_cap',
+        doi_tuong: supplierName,
+        nguoi_tao_id: req.user && req.user._id,
+        cua_hang_id: purchase.cua_hang_id || storeId,
+        chi_nhanh_id: branchId || undefined,
+        trang_thai: 'paid',
+        ghi_chu: note,
+        hach_toan: true,
+        allocation_type: 'thanh_toan_ncc',
+        allocations: allocations,
+        overpayment_amount: 0
+      };
+
+      if (isV2) {
+        Object.assign(receiptPayload, {
+          payment_v2: true,
+          tien_mat: paymentInput.tien_mat,
+          so_quy_tien_mat_id: paymentInput.so_quy_tien_mat_id,
+          chuyen_khoan: paymentInput.chuyen_khoan,
+          so_quy_chuyen_khoan_id: paymentInput.so_quy_chuyen_khoan_id,
+          tien_tra_khach: 0
+        });
+        receiptPayload._paymentInfo = await buildReceiptPaymentInfo(receiptPayload, {
+          cuaHangId: receiptPayload.cua_hang_id,
+          chiNhanhId: receiptPayload.chi_nhanh_id,
+          session: session
+        });
+      } else {
+        var cashBookId = String((body && (body.so_quy_id || body.cashBookId)) || '').trim();
+        if (!mongoose.Types.ObjectId.isValid(cashBookId)) {
+          throw new Error('Vui lòng chọn sổ quỹ để thanh toán phiếu nhập.');
+        }
+        var cashBook = await SoQuy.findOne({
+          _id: cashBookId,
+          trang_thai: 'active'
+        }).session(session);
+        if (!cashBook) throw new Error('Sổ quỹ không hợp lệ.');
+
+        var legacyPaymentMethod = legacyPaymentMethodFromDetail(paymentInput);
+        var legacyDetail = {
+          tien_mat: paymentInput.tien_mat,
+          so_quy_tien_mat_id: paymentInput.tien_mat > 0 && cashBook.loai_so_quy !== 'chuyen_khoan' ? cashBook._id : null,
+          chuyen_khoan: paymentInput.chuyen_khoan,
+          so_quy_chuyen_khoan_id: paymentInput.chuyen_khoan > 0 && cashBook.loai_so_quy === 'chuyen_khoan' ? cashBook._id : null,
+          tien_tra_khach: 0
+        };
+        Object.assign(receiptPayload, {
+          so_quy_id: cashBook._id,
+          phuong_thuc_thanh_toan: legacyPaymentMethod,
+          chi_tiet_thanh_toan: legacyDetail,
+          _paymentInfo: {
+            isV2: false,
+            gia_tri: amount,
+            chi_tiet_thanh_toan: legacyDetail,
+            phuong_thuc_thanh_toan: legacyPaymentMethod,
+            so_quy_id: cashBook._id,
+            cashBook: cashBook
+          }
+        });
+      }
+
+      var receipt = await taoPhieuThuChi(receiptPayload, { session: session });
+
+      await PhieuNhap.updateOne(
+        { _id: purchase._id },
+        { $set: { da_tra_ncc: nextPaid, con_no_ncc: nextDebt } },
+        { session: session }
+      );
+
+      result = {
+        receipt: receipt,
+        receipt_id: receipt && receipt._id,
+        da_tra_ncc: nextPaid,
+        con_no_ncc: nextDebt
+      };
+    });
+
+    return res.json({
+      success: true,
+      message: 'Đã tạo phiếu chi trả NCC',
+      data: result
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu chi' });
+  } finally {
+    if (session) await session.endSession();
   }
 };
 
@@ -1762,4 +1997,3 @@ exports.traHangNhapSubmit = async function(req, res, next) {
     res.json({ success: false, message: error.message });
   }
 };
-

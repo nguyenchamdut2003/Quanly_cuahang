@@ -102,7 +102,7 @@
       <div class="mini-tools"><button class="tool">⌘</button><button class="tool">⎙</button><button class="tool">!</button></div>
       <div id="errorBox" class="error"<%= copyFromErrorMsg ? ' style="display:block"' : '' %>><%= copyFromErrorMsg %></div>
       <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
-      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayTra" type="datetime-local" value="<%= todayValue %>"></div>
+      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayTra" type="datetime-local" value="<%= todayValue %>" readonly></div>
       <div class="field">
         <label>Kho trả</label>
         <select id="khoId" class="control">
@@ -141,6 +141,18 @@
           <% (cashBooks || []).forEach(function(book) { %>
             <option value="<%= book._id %>"><%= book.ten_so_quy || 'Sổ quỹ' %></option>
           <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label>Sá»• tiá»n máº·t <span id="cashBookRequiredMarkV2" style="display:none;color:#d92d20">*</span></label>
+        <select id="cashBookCashId" class="control" disabled>
+          <option value="">-- Chon so tien mat --</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Tai khoan ngan hang <span id="bankBookRequiredMark" style="display:none;color:#d92d20">*</span></label>
+        <select id="cashBookBankId" class="control" disabled>
+          <option value="">-- Chon tai khoan ngan hang --</option>
         </select>
       </div>
       <input type="hidden" id="nccDaTra" value="0">
@@ -190,6 +202,15 @@
     let isPayAllMode = false;
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
     const money = raw => Math.max(0, Math.floor(Number(String(raw || '').replace(/\./g, '').replace(/,/g, '')) || 0));
+    function currentLocalDateTimeValue() {
+      const d = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    }
+    function updateCurrentReturnTime() {
+      const input = document.getElementById('ngayTra');
+      if (input) input.value = currentLocalDateTimeValue();
+    }
     function applyVNNumberFormat(el) {
       if (!el) return;
       const start = el.selectionStart == null ? el.value.length : el.selectionStart;
@@ -222,6 +243,37 @@
     const search = document.getElementById('productSearch');
     const pop = document.getElementById('productPop');
     const body = document.getElementById('itemsBody');
+    const legacyCashBookField = document.getElementById('cashBookId');
+    if (legacyCashBookField) {
+      legacyCashBookField.insertAdjacentHTML('beforeend', '<option value="v2">v2</option>');
+      if (legacyCashBookField.closest('.field')) legacyCashBookField.closest('.field').style.display = 'none';
+    }
+    function autoSelectBook(select, rows) {
+      if (!select) return;
+      rows = Array.isArray(rows) ? rows : [];
+      select.innerHTML = '<option value="">-- Chon so --</option>' + rows.map(row => {
+        const bank = row.thong_tin_ngan_hang || {};
+        const label = [row.ten_so_quy || 'So quy', bank.so_tai_khoan || ''].filter(Boolean).join(' - ');
+        return `<option value="${row._id}">${label}</option>`;
+      }).join('');
+      const defaults = rows.filter(row => row.mac_dinh);
+      if (defaults.length) select.value = defaults[0]._id;
+      else if (rows.length === 1) select.value = rows[0]._id;
+    }
+    async function loadPaymentBooks() {
+      try {
+        const [cashRes, bankRes] = await Promise.all([
+          fetch('/api/so-quy/active?loai_so_quy=tien_mat'),
+          fetch('/api/so-quy/active?loai_so_quy=chuyen_khoan')
+        ]);
+        const cashData = await cashRes.json();
+        const bankData = await bankRes.json();
+        autoSelectBook(document.getElementById('cashBookCashId'), cashData.items || []);
+        autoSelectBook(document.getElementById('cashBookBankId'), bankData.items || []);
+      } catch (error) {
+        showError('Khong tai duoc danh sach so quy dang hoat dong');
+      }
+    }
 
     function currentKho(){ return document.getElementById('khoId').value; }
     function showError(msg){ const box=document.getElementById('errorBox'); box.textContent=msg; box.style.display='block'; }
@@ -252,12 +304,13 @@
       document.getElementById('nccDaTra').value = 0;
       document.getElementById('paymentCash').value = 0;
       document.getElementById('paymentTransfer').value = 0;
-      const cashBook = document.getElementById('cashBookId');
-      if (cashBook) {
-        cashBook.value = '';
-        cashBook.disabled = true;
-        cashBook.classList.remove('field-invalid');
-      }
+      ['cashBookCashId', 'cashBookBankId'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.disabled = true;
+          el.classList.remove('field-invalid');
+        }
+      });
       isPayAllMode = false;
       renderItems();
       renderTotals();
@@ -470,14 +523,20 @@
       if (cashInput) cashInput.value = fmt(tienMat);
       if (transferInput) transferInput.value = fmt(chuyenKhoan);
       document.getElementById('nccDaTra').value = String(Math.floor(paid));
-      const cashBook = document.getElementById('cashBookId');
-      const requiredMark = document.getElementById('cashBookRequiredMark');
+      const cashBook = document.getElementById('cashBookCashId');
+      const bankBook = document.getElementById('cashBookBankId');
+      const requiredMark = document.getElementById('cashBookRequiredMarkV2');
+      const bankRequiredMark = document.getElementById('bankBookRequiredMark');
       if (cashBook) {
-        cashBook.disabled = paid <= 0;
-        if (paid <= 0) cashBook.value = '';
-        cashBook.classList.toggle('field-invalid', paid > 0 && !String(cashBook.value || '').trim());
+        cashBook.disabled = tienMat <= 0;
+        cashBook.classList.toggle('field-invalid', tienMat > 0 && !String(cashBook.value || '').trim());
       }
-      if (requiredMark) requiredMark.style.display = paid > 0 ? 'inline' : 'none';
+      if (bankBook) {
+        bankBook.disabled = chuyenKhoan <= 0;
+        bankBook.classList.toggle('field-invalid', chuyenKhoan > 0 && !String(bankBook.value || '').trim());
+      }
+      if (requiredMark) requiredMark.style.display = tienMat > 0 ? 'inline' : 'none';
+      if (bankRequiredMark) bankRequiredMark.style.display = chuyenKhoan > 0 ? 'inline' : 'none';
     }
 
     async function submitReturn(mode) {
@@ -491,8 +550,24 @@
       if (purchaseId && selectedPurchaseSupplierId && document.getElementById('nccId').value !== selectedPurchaseSupplierId) {
         return showError('Không cho chọn nhà cung cấp khác với phiếu nhập gốc');
       }
+      updateCurrentReturnTime();
       renderTotals();
       const paidAmount = money(document.getElementById('nccDaTra').value);
+      const cashAmount = money(document.getElementById('paymentCash') ? document.getElementById('paymentCash').value : 0);
+      const transferAmount = money(document.getElementById('paymentTransfer') ? document.getElementById('paymentTransfer').value : 0);
+      const v2CashBook = document.getElementById('cashBookCashId');
+      const v2BankBook = document.getElementById('cashBookBankId');
+      if (cashAmount > 0 && v2CashBook && !String(v2CashBook.value || '').trim()) {
+        v2CashBook.classList.add('field-invalid');
+        v2CashBook.focus();
+        return showError('Vui long chon so tien mat.');
+      }
+      if (transferAmount > 0 && v2BankBook && !String(v2BankBook.value || '').trim()) {
+        v2BankBook.classList.add('field-invalid');
+        v2BankBook.focus();
+        return showError('Vui long chon tai khoan ngan hang.');
+      }
+      if (document.getElementById('cashBookId')) document.getElementById('cashBookId').value = paidAmount > 0 ? 'v2' : '';
       const cashBook = document.getElementById('cashBookId');
       if (paidAmount > 0 && cashBook && !String(cashBook.value || '').trim()) {
         cashBook.classList.add('field-invalid');
@@ -500,19 +575,21 @@
         return showError('Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.');
       }
       const payload = {
+        payment_v2: '1',
         submitMode: mode,
         kho_id: document.getElementById('khoId').value,
         nha_cung_cap_id: document.getElementById('nccId').value,
         phieu_nhap_id: document.getElementById('phieuNhapId').value,
         ma_phieu_tra_nhap: document.getElementById('maPhieu').value,
-        ngay_tra: document.getElementById('ngayTra').value,
         giam_gia: document.getElementById('giamGia').value,
         kieu_giam_gia: document.getElementById('kieuGiamGia').value,
         ncc_da_tra: document.getElementById('nccDaTra').value,
         so_quy_id: document.getElementById('cashBookId') ? document.getElementById('cashBookId').value : '',
         chi_tiet_thanh_toan: {
-          tien_mat: money(document.getElementById('paymentCash') ? document.getElementById('paymentCash').value : 0),
-          chuyen_khoan: money(document.getElementById('paymentTransfer') ? document.getElementById('paymentTransfer').value : 0),
+          tien_mat: cashAmount,
+          so_quy_tien_mat_id: v2CashBook ? v2CashBook.value : '',
+          chuyen_khoan: transferAmount,
+          so_quy_chuyen_khoan_id: v2BankBook ? v2BankBook.value : '',
           tien_tra_khach: 0
         },
         ghi_chu: document.getElementById('ghiChu').value,
@@ -588,6 +665,12 @@
     document.getElementById('cashBookId').addEventListener('change', function() {
       this.classList.remove('field-invalid');
     });
+    ['cashBookCashId', 'cashBookBankId'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('change', function() {
+        this.classList.remove('field-invalid');
+      });
+    });
     document.getElementById('phieuNhapId').addEventListener('change', async function() {
       clearError();
       const purchaseId = this.value;
@@ -649,7 +732,7 @@
       window.__returnAllowNoPurchase = copyDraft.require_phieu_nhap === false;
       clearError();
       document.getElementById('maPhieu').value = '';
-      document.getElementById('ngayTra').value = '<%= todayValue %>';
+      updateCurrentReturnTime();
       const khoSelect = document.getElementById('khoId');
       khoSelect.value = copyDraft.kho_id || '';
       currentKhoId = khoSelect.value;
@@ -680,6 +763,8 @@
       renderTotals();
     }
     (async function boot() {
+      updateCurrentReturnTime();
+      await loadPaymentBooks();
       setPurchasePlaceholder('Chọn kho trước', true);
       if (copyDraft && copyDraft.items && copyDraft.items.length) {
         await initCopyDraft();

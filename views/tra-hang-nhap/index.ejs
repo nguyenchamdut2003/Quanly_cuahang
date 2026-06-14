@@ -6,6 +6,12 @@
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
+  const supplierRemainDue = ticket => {
+    if (!ticket) return 0;
+    const payable = Number(ticket.ncc_can_tra != null && ticket.ncc_can_tra !== '' ? ticket.ncc_can_tra : (ticket.tong_tien_tra ?? ticket.tong_tien_hang ?? 0)) || 0;
+    const paid = Number(ticket.ncc_da_tra ?? 0) || 0;
+    return Math.max(0, payable - paid);
+  };
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(function(key) {
@@ -273,7 +279,7 @@
                     <td class="ellipsis"><%= r.nha_cung_cap_id ? (r.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
                     <td class="num"><%= fmtMoney(r.tong_tien_hang || r.tong_tien_tra || 0) %></td>
                     <td class="num"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmtMoney(r.giam_gia || 0) %></td>
-                    <td class="num"><%= fmtMoney(r.ncc_can_tra || r.tong_tien_tra || 0) %></td>
+                    <td class="num"><%= fmtMoney(supplierRemainDue(r)) %></td>
                     <td class="num"><%= fmtMoney(r.ncc_da_tra || 0) %></td>
                     <td><span class="status-badge <%= badgeClass(r.trang_thai) %>"><%= statusLabel(r.trang_thai) %></span></td>
                   </tr>
@@ -383,7 +389,7 @@
                               <span>NCC đã trả</span>
                               <span class="summary-val"><%= fmtMoney(r.ncc_da_tra || 0) %></span>
                             </div>
-                            <% var nccRemain = Math.max(0, Number(r.ncc_can_tra != null ? r.ncc_can_tra : (r.tong_tien_tra || 0)) - Number(r.ncc_da_tra || 0)); %>
+                            <% var nccRemain = supplierRemainDue(r); %>
                             <% if (r.trang_thai === 'completed' && nccRemain > 0) { %>
                               <div class="receipt-pay-action">
                                 <button type="button" class="btn btn-primary js-return-receipt-pay" data-id="<%= r._id %>" data-due="<%= nccRemain %>">Tạo phiếu thu</button>
@@ -450,6 +456,45 @@
     document.addEventListener('DOMContentLoaded', function() {
       var pendingReturnReceiptId = '';
       var pendingReturnReceiptDue = 0;
+      var legacyReceiptCashBook = document.getElementById('returnReceiptPayCashBook');
+      if (legacyReceiptCashBook) {
+        legacyReceiptCashBook.insertAdjacentHTML('beforeend', '<option value="v2">v2</option>');
+        if (legacyReceiptCashBook.closest('label')) legacyReceiptCashBook.closest('label').style.display = 'none';
+      }
+      function insertReturnReceiptV2Books() {
+        var transferEl = document.getElementById('returnReceiptPayTransfer');
+        var grid = transferEl && transferEl.closest('.quick-pay-grid');
+        if (!grid || document.getElementById('returnReceiptPayCashBookV2')) return;
+        var cashLabel = document.createElement('label');
+        cashLabel.innerHTML = '<span>So tien mat</span><select id="returnReceiptPayCashBookV2"><option value="">-- Chon so tien mat --</option></select>';
+        var bankLabel = document.createElement('label');
+        bankLabel.innerHTML = '<span>Tai khoan ngan hang</span><select id="returnReceiptPayBankBookV2"><option value="">-- Chon tai khoan ngan hang --</option></select>';
+        var transferLabel = transferEl.closest('label');
+        transferLabel.insertAdjacentElement('afterend', bankLabel);
+        transferLabel.insertAdjacentElement('afterend', cashLabel);
+      }
+      function autoSelectReturnBook(select, rows) {
+        if (!select) return;
+        rows = Array.isArray(rows) ? rows : [];
+        select.innerHTML = '<option value="">-- Chon so --</option>' + rows.map(function(row) {
+          var bank = row.thong_tin_ngan_hang || {};
+          var label = [row.ten_so_quy || 'So quy', bank.so_tai_khoan || ''].filter(Boolean).join(' - ');
+          return '<option value="' + row._id + '">' + label + '</option>';
+        }).join('');
+        var defaults = rows.filter(function(row) { return row.mac_dinh; });
+        if (defaults.length) select.value = defaults[0]._id;
+        else if (rows.length === 1) select.value = rows[0]._id;
+      }
+      function loadReturnReceiptBooks() {
+        insertReturnReceiptV2Books();
+        return Promise.all([
+          fetch('/api/so-quy/active?loai_so_quy=tien_mat').then(function(res) { return res.json(); }),
+          fetch('/api/so-quy/active?loai_so_quy=chuyen_khoan').then(function(res) { return res.json(); })
+        ]).then(function(rows) {
+          autoSelectReturnBook(document.getElementById('returnReceiptPayCashBookV2'), rows[0].items || []);
+          autoSelectReturnBook(document.getElementById('returnReceiptPayBankBookV2'), rows[1].items || []);
+        }).catch(function() {});
+      }
       function numberValue(value) {
         return Number(String(value || '').replace(/[^\d]/g, '')) || 0;
       }
@@ -521,6 +566,7 @@
         if (cashEl) { cashEl.value = moneyInput(pendingReturnReceiptDue); delete cashEl.dataset.vnBound; }
         if (transferEl) { transferEl.value = ''; delete transferEl.dataset.vnBound; }
         if (cashBookEl) cashBookEl.value = '';
+        loadReturnReceiptBooks();
         bindReceiptPayInput(cashEl);
         bindReceiptPayInput(transferEl);
         balanceReturnReceiptPayment();
@@ -534,20 +580,27 @@
       };
       window.submitReturnReceiptPayModal = function() {
         var payment = readReturnReceiptPayment();
-        var cashBookId = document.getElementById('returnReceiptPayCashBook') && document.getElementById('returnReceiptPayCashBook').value || '';
+        var cashBookId = document.getElementById('returnReceiptPayCashBookV2') && document.getElementById('returnReceiptPayCashBookV2').value || '';
+        var bankBookId = document.getElementById('returnReceiptPayBankBookV2') && document.getElementById('returnReceiptPayBankBookV2').value || '';
         if (!pendingReturnReceiptId) return alert('Không xác định được phiếu trả hàng nhập.');
         if (payment.amount <= 0) return alert('Vui lòng nhập số tiền nhà cung cấp trả.');
         if (payment.amount > pendingReturnReceiptDue) return alert('Thực thu không được vượt số NCC còn phải trả.');
+        if (payment.tien_mat > 0 && !cashBookId) return alert('Vui long chon so tien mat.');
+        if (payment.chuyen_khoan > 0 && !bankBookId) return alert('Vui long chon tai khoan ngan hang.');
+        if (document.getElementById('returnReceiptPayCashBook')) document.getElementById('returnReceiptPayCashBook').value = payment.amount > 0 ? 'v2' : '';
+        cashBookId = cashBookId || (payment.amount > 0 ? 'v2' : '');
         if (!cashBookId) return alert('Vui lòng chọn sổ quỹ.');
         fetch('/tra-hang-nhap/' + pendingReturnReceiptId + '/phieu-thu', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           credentials: 'same-origin',
           body: JSON.stringify({
-            so_quy_id: cashBookId,
+            payment_v2: '1',
             chi_tiet_thanh_toan: {
               tien_mat: payment.tien_mat,
+              so_quy_tien_mat_id: cashBookId === 'v2' ? '' : cashBookId,
               chuyen_khoan: payment.chuyen_khoan,
+              so_quy_chuyen_khoan_id: bankBookId,
               tien_tra_khach: 0
             }
           })

@@ -16,10 +16,30 @@
     .results{display:none;position:absolute;top:39px;left:0;right:0;z-index:20;background:#fff;border:1px solid #dfe5ed;border-radius:6px;box-shadow:0 8px 18px rgba(0,0,0,.12);max-height:300px;overflow:auto}
     .result-item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #edf0f3;cursor:pointer;font-size:13px}
     .result-item:hover{background:#edf6ff}.top-tools{display:flex;gap:8px;margin-left:auto}.tool{width:32px;height:32px;border:1px solid #d5dde7;border-radius:6px;background:#fff;color:#4b5563;cursor:pointer}
-    .item-table-wrap{flex:1;overflow:auto}.item-table{width:100%;min-width:850px;border-collapse:collapse}
-    .item-table th{height:38px;background:#f1f4ff;color:#374151;font-size:13px;text-align:left;padding:0 12px}.item-table td{height:46px;border-bottom:1px solid #edf0f3;color:#374151;font-size:13px;padding:0 12px}
-    .num{text-align:right}.qty-input{width:78px;height:30px;border:1px solid #d5dde7;border-radius:4px;text-align:right;padding:0 8px}.remove{border:none;background:transparent;color:#9ca3af;cursor:pointer}
-    .qc-row td{height:auto;background:#f8fafc;padding:8px 14px 12px}.qc-table{width:100%;border-collapse:collapse}.qc-table th{height:30px;background:#eaf3ff;font-size:12px}.qc-table td{height:34px;background:#fff;font-size:12px}.qc-table .qty-input{width:96px}
+    .left{background:#e9edf2}
+    .cart-area{flex:1;overflow:auto;background:#e9edf2}
+    .cart-table{width:100%;min-width:850px;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden}
+    .cart-table th{height:36px;background:#e8f3ff;text-align:left;padding:0 10px;border-bottom:1px solid #bcd9ff;color:#374151;font-size:13px}
+    .cart-table td{height:40px;border-bottom:1px solid #e5e9ee;padding:0 10px;color:#374151;font-size:13px}
+    .num{text-align:right}
+    .small{width:74px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 6px}
+    .qty-input{width:74px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 6px}
+    .remove{border:none;background:transparent;color:#d92d20;cursor:pointer;font-size:14px}
+    .stock-text{display:block;margin-top:3px;color:#667085;font-size:12px}
+    .qc-row td{height:auto;padding:0 10px 10px 86px;background:#fbfdff}
+    .qc-table{width:100%;border-collapse:collapse;border:1px solid #dbe7f5;background:#fff}
+    .qc-table th,.qc-table td{height:32px;padding:0 8px;border-bottom:1px solid #edf2f7;font-size:13px}
+    .qc-table th{background:#f2f8ff;font-weight:700}
+    .qc-input{width:74px;height:26px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 6px}
+    .lot-cell{min-width:88px;cursor:pointer;vertical-align:middle;transition:background .15s}
+    .lot-cell:hover{background:#eef6ff}
+    .lot-cell.is-active{background:#dbeafe;box-shadow:inset 0 0 0 2px #3b82f6}
+    .lot-cell-empty{cursor:default;background:#fafbfc}
+    .lot-cell-main{font-weight:700;font-size:13px;line-height:1.3}
+    .lot-cell-sub{margin-top:2px;color:#667085;font-size:11px;line-height:1.25;text-align:right}
+    .lot-inline-normal{padding:6px 10px!important;height:auto!important}
+    .lot-inline-normal .inline-detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-items:center;font-size:13px}
+    .lot-inline-normal .inline-detail-grid .inline-label{color:#667085;font-size:11px;margin-bottom:2px}
     .muted{color:#667085;font-size:12px}
     .empty-hint{padding:48px 24px;text-align:center;color:#64748b;font-size:14px}
     .side-head{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;border-bottom:1px solid #e8edf3;color:#6b7280;font-size:13px}
@@ -55,9 +75,20 @@
         </div>
         <div class="top-tools"><button class="tool" type="button"><i class="fa-solid fa-barcode"></i></button><button class="tool" type="button"><i class="fa-solid fa-print"></i></button><button class="tool" type="button"><i class="fa-solid fa-eye"></i></button><button class="tool" type="button"><i class="fa-solid fa-exclamation"></i></button></div>
       </div>
-      <div class="item-table-wrap">
-        <table class="item-table">
-          <thead><tr><th style="width:60px">STT</th><th>Mã hàng hóa</th><th>Tên hàng hóa</th><th>Đơn vị tính</th><th>Thuộc tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th><th></th></tr></thead>
+      <div class="cart-area">
+        <table class="cart-table">
+          <thead id="itemHead">
+            <tr>
+              <th style="width:60px">STT</th>
+              <th>Mã hàng hóa</th>
+              <th>Tên hàng hóa</th>
+              <th>Đơn vị tính</th>
+              <th class="num">SL xuất</th>
+              <th class="num">Giá vốn</th>
+              <th class="num">Giá trị xuất</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
           <tbody id="itemBody"></tbody>
         </table>
         <div class="empty-hint" id="emptyHint">Tìm và chọn hàng hóa bằng ô tìm kiếm phía trên.</div>
@@ -132,6 +163,7 @@
     };
     let loaiXuatList = <%- JSON.stringify((loaiXuatList || []).map(l => ({ _id: String(l._id), ten_loai: l.ten_loai, ma_loai: l.ma_loai }))) %>;
     let items = [];
+    let expandedLotKeyByItem = {};
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
     const storeIdInput = document.getElementById('storeId');
@@ -149,6 +181,100 @@
 
     function escapeHtml(value) {
       return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(value) {
+      return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function itemHasLotGrid(item) {
+      if (!item || !item.has_quy_cach) return false;
+      const rows = item.quy_cach_items || [];
+      if (!rows.length) return false;
+      return rows.some(function(row) { return row.lo_hang_id || row.lot_label; });
+    }
+
+    function groupLotsForItem(item) {
+      const map = new Map();
+      (item.quy_cach_items || []).forEach(function(row, qcIdx) {
+        const lotKey = String(row.lo_hang_id || row.lot_label || ('row-' + qcIdx));
+        if (!map.has(lotKey)) {
+          map.set(lotKey, {
+            lotKey: lotKey,
+            lot_label: row.lot_label || '',
+            items: []
+          });
+        }
+        const group = map.get(lotKey);
+        if (!group.items.some(function(entry) { return entry.qcIdx === qcIdx; })) {
+          group.items.push({ row: row, qcIdx: qcIdx });
+        }
+      });
+      return Array.from(map.values());
+    }
+
+    function lotGroupSummary(lot) {
+      const ton = lot.items.reduce(function(sum, entry) {
+        return sum + Number(entry.row.ton_hien_tai || 0);
+      }, 0);
+      const xuat = lot.items.reduce(function(sum, entry) {
+        return sum + Number(entry.row.so_luong_xuat || 0);
+      }, 0);
+      const datePart = lot.lot_label || '—';
+      return { ton: ton, xuat: xuat, datePart: datePart };
+    }
+
+    function maxLotColumnsInItems() {
+      return items.reduce(function(max, item) {
+        if (!itemHasLotGrid(item)) return max;
+        return Math.max(max, groupLotsForItem(item).length);
+      }, 0);
+    }
+
+    function renderItemThead(maxLots) {
+      const thead = document.getElementById('itemHead');
+      if (!thead) return;
+      if (maxLots <= 0) {
+        thead.innerHTML = '<tr>' +
+          '<th style="width:60px">STT</th>' +
+          '<th>Mã hàng hóa</th>' +
+          '<th>Tên hàng hóa</th>' +
+          '<th>Đơn vị tính</th>' +
+          '<th class="num">SL xuất</th>' +
+          '<th class="num">Giá vốn</th>' +
+          '<th class="num">Giá trị xuất</th>' +
+          '<th style="width:40px"></th>' +
+        '</tr>';
+        return;
+      }
+      const lotHeaders = Array.from({ length: maxLots }, function(_, index) {
+        return '<th class="num lot-col">Lô ' + (index + 1) + '</th>';
+      }).join('');
+      thead.innerHTML = '<tr>' +
+        '<th style="width:60px">STT</th>' +
+        '<th>Mã hàng hóa</th>' +
+        '<th>Tên hàng hóa</th>' +
+        lotHeaders +
+        '<th class="num">Giá trị xuất</th>' +
+        '<th style="width:40px"></th>' +
+      '</tr>';
+    }
+
+    function toggleLotExpand(hangHoaId, lotKey) {
+      if (expandedLotKeyByItem[hangHoaId] === lotKey) {
+        delete expandedLotKeyByItem[hangHoaId];
+      } else {
+        expandedLotKeyByItem[hangHoaId] = lotKey;
+      }
+      renderItems();
+    }
+
+    function handleLotCellClick(cell) {
+      if (!cell || !cell.dataset) return;
+      const hangHoaId = cell.dataset.hangHoaId || '';
+      const lotKey = cell.dataset.lotKey || '';
+      if (!hangHoaId || !lotKey) return;
+      toggleLotExpand(hangHoaId, lotKey);
     }
 
     function renderReceiverOptions(){
@@ -447,39 +573,129 @@
       return Number(item.so_luong || 0) * Number(item.gia_von || 0);
     }
 
-    function renderQuyCachRows(item) {
-      if (!item.has_quy_cach || !(item.quy_cach_items || []).length) return '';
-      const rows = item.quy_cach_items.map(function(qc, qcIdx) {
-        const label = [qc.lot_label, qc.ten_quy_cach || qc.ten_thuoc_tinh].filter(Boolean).join(' - ');
-        const value = Number(qc.so_luong_xuat || 0) * Number(qc.gia_von || item.gia_von || 0);
-        return `<tr>
-          <td>${escapeHtml(label)}</td>
-          <td class="num">${Number(qc.ton_hien_tai || 0).toLocaleString('vi-VN')}</td>
-          <td class="num"><input class="qty-input" type="number" min="0" max="${qc.ton_hien_tai || 0}" value="${qc.so_luong_xuat || ''}" onchange="updateQuyCachQty('${item.hang_hoa_id}',${qcIdx},this.value)"></td>
-          <td class="num">${Number(qc.gia_von || item.gia_von || 0).toLocaleString('vi-VN')}</td>
-          <td class="num">${value.toLocaleString('vi-VN')}</td>
-        </tr>`;
+    function renderXnbDetailRowHtml(item, qc, qcIdx) {
+      const value = Number(qc.so_luong_xuat || 0) * Number(qc.gia_von || item.gia_von || 0);
+      const idAttr = escapeAttr(item.hang_hoa_id);
+      return '<tr>' +
+        '<th>' + escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '--') + '</th>' +
+        '<td class="num">' + Number(qc.ton_hien_tai || 0).toLocaleString('vi-VN') + '</td>' +
+        '<td class="num"><input class="qc-input" type="number" min="0" max="' + Number(qc.ton_hien_tai || 0) + '" value="' + (qc.so_luong_xuat || '') + '" onchange="updateQuyCachQty(\'' + idAttr + '\',' + qcIdx + ',this.value)"></td>' +
+        '<td class="num">' + Number(qc.gia_von || item.gia_von || 0).toLocaleString('vi-VN') + '</td>' +
+        '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
+      '</tr>';
+    }
+
+    function renderQuyCachBlockForLot(item, lotGroup, colspan) {
+      if (!lotGroup || !lotGroup.items.length) return '';
+      const rows = lotGroup.items.map(function(entry) {
+        return renderXnbDetailRowHtml(item, entry.row, entry.qcIdx);
       }).join('');
-      return `<tr class="qc-row"><td colspan="9">
-        <table class="qc-table">
-          <thead><tr><th>Thuộc tính / Lô</th><th class="num">Tồn thuộc tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </td></tr>`;
+      return '<tr class="qc-row"><td colspan="' + colspan + '">' +
+        '<table class="qc-table">' +
+          '<thead><tr><th>Thuộc tính</th><th class="num">Tồn thuộc tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</td></tr>';
+    }
+
+    function renderQuyCachBlock(item, maxLots) {
+      if (itemHasLotGrid(item)) return '';
+      if (!item.has_quy_cach || !(item.quy_cach_items || []).length) return '';
+      const colspan = maxLots > 0 ? (3 + maxLots + 2) : 8;
+      return '<tr class="qc-row"><td colspan="' + colspan + '">' +
+        '<table class="qc-table">' +
+          '<thead><tr><th>Lô / Thuộc tính</th><th class="num">Tồn thuộc tính</th><th class="num">SL xuất</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th></tr></thead>' +
+          '<tbody>' + item.quy_cach_items.map(function(qc, qcIdx) {
+            const label = [qc.lot_label, qc.ten_quy_cach || qc.ten_thuoc_tinh].filter(Boolean).join(' - ');
+            const value = Number(qc.so_luong_xuat || 0) * Number(qc.gia_von || item.gia_von || 0);
+            const idAttr = escapeAttr(item.hang_hoa_id);
+            return '<tr>' +
+              '<th>' + escapeHtml(label || '--') + '</th>' +
+              '<td class="num">' + Number(qc.ton_hien_tai || 0).toLocaleString('vi-VN') + '</td>' +
+              '<td class="num"><input class="qc-input" type="number" min="0" max="' + Number(qc.ton_hien_tai || 0) + '" value="' + (qc.so_luong_xuat || '') + '" onchange="updateQuyCachQty(\'' + idAttr + '\',' + qcIdx + ',this.value)"></td>' +
+              '<td class="num">' + Number(qc.gia_von || item.gia_von || 0).toLocaleString('vi-VN') + '</td>' +
+              '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
+            '</tr>';
+          }).join('') + '</tbody>' +
+        '</table>' +
+      '</td></tr>';
+    }
+
+    function renderLotProductRow(item, index, maxLots) {
+      const lots = groupLotsForItem(item);
+      const expandedLotKey = expandedLotKeyByItem[item.hang_hoa_id];
+      const expandedLot = lots.find(function(lot) { return lot.lotKey === expandedLotKey; });
+      const value = itemValue(item);
+      const lotCells = Array.from({ length: maxLots }, function(_, columnIndex) {
+        const lot = lots[columnIndex];
+        if (!lot) return '<td class="num lot-cell lot-cell-empty"></td>';
+        const summary = lotGroupSummary(lot);
+        const active = expandedLotKey === lot.lotKey;
+        const mainText = summary.xuat > 0 ? ('Xuất: ' + summary.xuat.toLocaleString('vi-VN')) : ('Tồn: ' + summary.ton.toLocaleString('vi-VN'));
+        return '<td class="num lot-cell' + (active ? ' is-active' : '') + '" data-hang-hoa-id="' + escapeHtml(item.hang_hoa_id) + '" data-lot-key="' + escapeHtml(lot.lotKey) + '" onclick="handleLotCellClick(this)">' +
+          '<div class="lot-cell-main">' + mainText + '</div>' +
+          '<div class="lot-cell-sub">' + escapeHtml(summary.datePart) + '</div>' +
+        '</td>';
+      }).join('');
+      const colspan = 3 + maxLots + 2;
+      const idAttr = escapeAttr(item.hang_hoa_id);
+      return '<tr>' +
+        '<td>' + (index + 1) + '</td>' +
+        '<td>' + escapeHtml(item.ma_hang) + '<span class="stock-text">Tồn: ' + Number(item.ton_kho || 0).toLocaleString('vi-VN') + '</span></td>' +
+        '<td>' + escapeHtml(item.ten_hang) + '</td>' +
+        lotCells +
+        '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
+        '<td><button class="remove" type="button" onclick="removeItem(\'' + idAttr + '\')"><i class="fa-solid fa-xmark"></i></button></td>' +
+      '</tr>' + (expandedLot ? renderQuyCachBlockForLot(item, expandedLot, colspan) : '');
+    }
+
+    function renderNormalProductRow(item, index, maxLots) {
+      const qty = itemQty(item);
+      const value = itemValue(item);
+      const cost = itemCost(item);
+      const idAttr = escapeAttr(item.hang_hoa_id);
+      const qtyCell = '<input class="qty-input" type="number" min="1" max="' + item.ton_kho + '" value="' + item.so_luong + '" onchange="updateQty(\'' + idAttr + '\',this.value)">';
+      if (maxLots > 0) {
+        return '<tr>' +
+          '<td>' + (index + 1) + '</td>' +
+          '<td>' + escapeHtml(item.ma_hang) + '<span class="stock-text">Tồn: ' + Number(item.ton_kho || 0).toLocaleString('vi-VN') + '</span></td>' +
+          '<td>' + escapeHtml(item.ten_hang) + '</td>' +
+          '<td colspan="' + maxLots + '" class="lot-inline-normal">' +
+            '<div class="inline-detail-grid">' +
+              '<div><div class="inline-label">ĐVT</div><div>' + escapeHtml(item.don_vi_tinh) + '</div></div>' +
+              '<div><div class="inline-label">SL xuất</div><div class="num">' + qtyCell + '</div></div>' +
+              '<div><div class="inline-label">Giá vốn</div><div class="num">' + Number(cost).toLocaleString('vi-VN') + '</div></div>' +
+              '<div><div class="inline-label">Giá trị xuất</div><div class="num"><b>' + value.toLocaleString('vi-VN') + '</b></div></div>' +
+            '</div>' +
+          '</td>' +
+          '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
+          '<td><button class="remove" type="button" onclick="removeItem(\'' + idAttr + '\')"><i class="fa-solid fa-xmark"></i></button></td>' +
+        '</tr>';
+      }
+      return '<tr>' +
+        '<td>' + (index + 1) + '</td>' +
+        '<td>' + escapeHtml(item.ma_hang) + '</td>' +
+        '<td>' + escapeHtml(item.ten_hang) + '</td>' +
+        '<td>' + escapeHtml(item.don_vi_tinh) + '</td>' +
+        '<td class="num">' + qtyCell + '</td>' +
+        '<td class="num">' + Number(cost).toLocaleString('vi-VN') + '</td>' +
+        '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
+        '<td><button class="remove" type="button" onclick="removeItem(\'' + idAttr + '\')"><i class="fa-solid fa-xmark"></i></button></td>' +
+      '</tr>';
     }
 
     function renderItems(){
+      const maxLots = maxLotColumnsInItems();
+      renderItemThead(maxLots);
       const body = document.getElementById('itemBody');
       let total = 0;
-      body.innerHTML = items.map((item,index)=>{
-        const qty = itemQty(item);
+      body.innerHTML = items.map(function(item, index) {
         const value = itemValue(item);
         total += value;
-        const qtyCell = item.has_quy_cach
-          ? `<span>${qty.toLocaleString('vi-VN')}</span>`
-          : `<input class="qty-input" type="number" min="1" max="${item.ton_kho}" value="${item.so_luong}" onchange="updateQty('${item.hang_hoa_id}',this.value)">`;
-        const attrCell = item.has_quy_cach ? '<span class="muted">Nhập theo thuộc tính bên dưới</span>' : '';
-        return `<tr><td>${index+1}</td><td>${escapeHtml(item.ma_hang)}</td><td>${escapeHtml(item.ten_hang)}</td><td>${escapeHtml(item.don_vi_tinh)}</td><td>${attrCell}</td><td class="num">${qtyCell}</td><td class="num">${Number(itemCost(item)).toLocaleString('vi-VN')}</td><td class="num">${value.toLocaleString('vi-VN')}</td><td><button class="remove" type="button" onclick="removeItem('${item.hang_hoa_id}')"><i class="fa-solid fa-xmark"></i></button></td></tr>` + renderQuyCachRows(item);
+        if (itemHasLotGrid(item)) {
+          return renderLotProductRow(item, index, maxLots);
+        }
+        return renderNormalProductRow(item, index, maxLots) + renderQuyCachBlock(item, maxLots);
       }).join('');
       if (emptyHint) emptyHint.style.display = items.length ? 'none' : 'block';
       document.getElementById('totalValue').textContent = total.toLocaleString('vi-VN');
@@ -511,7 +727,11 @@
       item.gia_von = itemCost(item);
       renderItems();
     }
-    function removeItem(id){items=items.filter(i=>i.hang_hoa_id!==id); renderItems();}
+    function removeItem(id){
+      delete expandedLotKeyByItem[id];
+      items = items.filter(function(i) { return i.hang_hoa_id !== id; });
+      renderItems();
+    }
 
     function buildPayloadItems() {
       return items.map(function(item) {
