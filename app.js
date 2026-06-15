@@ -14,6 +14,7 @@ var authRouter = require('./routes/auth');
 var profileRouter = require('./routes/profile');
 var cuaHangRouter = require('./routes/cuaHang');
 var hangHoaRouter = require('./routes/hangHoa');
+var vatChuaRouter = require('./routes/vatChua');
 var nhaCungCapRouter = require('./routes/nhaCungCap');
 var { isAuthenticated } = require('./middlewares/auth.middleware');
 var nhapHangRouter = require('./routes/nhapHang');
@@ -128,13 +129,14 @@ app.use(function(req, res, next) {
       cashbook: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       payroll: '/bang-luong/' + safeId,
-      bang_luong: '/bang-luong/' + safeId
+      bang_luong: '/bang-luong/' + safeId,
+      nhap_vat_chua: '/vat-chua?nhap_vat_chua=' + encodeURIComponent(safeId)
     };
     return map[type] || '';
   };
   res.locals.refLink = function(type, doc, text, attrs) {
     var id = doc && doc._id ? doc._id : doc;
-    var label = String(text || (doc && (doc.ma_hang || doc.ma_ncc || doc.ma_khach_hang || doc.ma_phieu_nhap || doc.ma_don_hang || doc.ma_hoa_don || doc.ma_lo || doc.ma_van_don || doc.ma_phieu || doc.ma_kho || doc.ten_so_quy)) || '--');
+    var label = String(text || (doc && (doc.ma_hang || doc.ma_ncc || doc.ma_khach_hang || doc.ma_phieu_nhap || doc.ma_nhap_vat_chua || doc.ma_don_hang || doc.ma_hoa_don || doc.ma_lo || doc.ma_van_don || doc.ma_phieu || doc.ma_kho || doc.ten_so_quy)) || '--');
     var escape = function(value) {
       return String(value).replace(/[&<>"']/g, function(char) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
@@ -190,6 +192,7 @@ app.use('/auth', authRouter);
 app.use('/profile', profileRouter);
 app.use('/cua-hang', cuaHangRouter);
 app.use('/hang-hoa', hangHoaRouter);
+app.use('/vat-chua', vatChuaRouter);
 app.use('/nha-cung-cap', nhaCungCapRouter);
 app.use('/nhap-hang', nhapHangRouter);
 app.use('/tra-hang-nhap', traHangNhapRouter);

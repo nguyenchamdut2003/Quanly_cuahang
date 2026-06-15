@@ -49,6 +49,9 @@
     .discount-combo .control{min-width:0}
     .discount-type{width:68px;min-width:68px;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 6px;font-size:13px;background:#fff}
     .btn-pay-all{height:31px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:7px;padding:0 10px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .vat-chua-combo{display:flex;gap:6px;justify-content:flex-end;align-items:center;width:100%}
+    .vat-chua-combo .control{min-width:0}
+    .vat-chua-qty{width:72px;text-align:right;flex:0 0 72px}
     .supplier-link{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#f8fafc;padding:0 9px;display:flex;align-items:center;color:#0070f4;text-decoration:none;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .supplier-link.is-empty{color:#667085;font-weight:400;pointer-events:none}
     .readonly{height:31px;display:flex;align-items:center;justify-content:flex-end;color:#111827}
@@ -168,6 +171,18 @@
         <div class="paid-combo">
           <input id="paymentTransfer" class="control" inputmode="numeric" value="0">
           <button type="button" class="btn-pay-all" id="payTransferAllBtn">Tất cả</button>
+        </div>
+      </div>
+      <div class="field" id="vatChuaRow">
+        <label>Vật chứa</label>
+        <div class="vat-chua-combo">
+          <select id="vatChuaId" class="control" name="vat_chua_id" title="Chọn vật chứa">
+            <option value="">— Chọn —</option>
+            <% (vatChuaList || []).forEach(function(vc) { %>
+              <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+            <% }) %>
+          </select>
+          <input id="vatChuaQty" class="control vat-chua-qty" name="vat_chua_so_luong" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
         </div>
       </div>
       <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
@@ -539,10 +554,33 @@
       if (bankRequiredMark) bankRequiredMark.style.display = chuyenKhoan > 0 ? 'inline' : 'none';
     }
 
+    function validateVatChuaExport(mode) {
+      if (mode !== 'completed') return true;
+      const id = String(document.getElementById('vatChuaId')?.value || '').trim();
+      const rawQty = String(document.getElementById('vatChuaQty')?.value || '').replace(/\./g, '').replace(/,/g, '').trim();
+      const qty = Math.floor(Number(rawQty || 0));
+      if (id && qty <= 0) {
+        document.getElementById('vatChuaQty')?.focus();
+        showError('Số lượng vật chứa phải lớn hơn 0.');
+        return false;
+      }
+      if (!id && rawQty && qty > 0) {
+        document.getElementById('vatChuaId')?.focus();
+        showError('Vui lòng chọn vật chứa.');
+        return false;
+      }
+      if (rawQty) {
+        const qtyInput = document.getElementById('vatChuaQty');
+        if (qtyInput) qtyInput.value = String(qty);
+      }
+      return true;
+    }
+
     async function submitReturn(mode) {
       clearError();
       const sendItems = items.filter(it => Number(it.so_luong || 0) > 0);
       if (!sendItems.length) return showError('Vui lòng nhập số lượng trả cho ít nhất một hàng hóa');
+      if (!validateVatChuaExport(mode)) return;
       if (!document.getElementById('khoId').value) return showError('Vui lòng chọn kho trả hàng');
       const purchaseId = document.getElementById('phieuNhapId').value;
       const allowNoPurchase = window.__returnAllowNoPurchase === true;
@@ -593,6 +631,8 @@
           tien_tra_khach: 0
         },
         ghi_chu: document.getElementById('ghiChu').value,
+        vat_chua_id: document.getElementById('vatChuaId')?.value || '',
+        vat_chua_so_luong: document.getElementById('vatChuaQty')?.value || '',
         items_json: JSON.stringify(sendItems.map(it => ({
           ct_phieu_nhap_id: it.ct_phieu_nhap_id,
           phieu_nhap_id: purchaseId || it.phieu_nhap_id || '',

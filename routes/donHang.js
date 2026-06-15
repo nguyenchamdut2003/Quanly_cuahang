@@ -29,7 +29,8 @@ const {
     TonKhoLo,
     TonKhoLoQuyCach,
     LoHang,
-    Counter
+    Counter,
+    VatChua
 } = require('../models/kiot.model');
 const { congTonKho, truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
@@ -48,6 +49,9 @@ const {
 const { normalizeAddress } = require('../utils/address');
 const { resolveStoreId } = require('../utils/storeScope');
 const { resolveSalePrice, normalizeUnitPrice } = require('../services/salePrice.service');
+const { parseVatChuaImportInput, parseVatChuaSignedInput, assertVatChuaImportInput, assertVatChuaSignedInput, importVatChuaWithSalesReturn, cancelNhapVatChuaBySource } = require('../services/vatChuaImport.service');
+const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaWithSalesReturn, cancelXuatVatChuaBySource } = require('../services/vatChuaExport.service');
+const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines } = require('../services/vatChuaDetail.service');
 
 async function resolveOrderLineUnitPrice(item, product, bangGiaId, storeId) {
     const resolved = await resolveSalePrice({
@@ -386,8 +390,8 @@ function optionalLineObjectId(value) {
 function copyLineMetadata(row = {}) {
     return {
         gia_tri_thuoc_tinh_id: optionalLineObjectId(row.gia_tri_thuoc_tinh_id),
-        ten_quy_cach: String(row.ten_quy_cach || '').trim(),
-        ten_thuoc_tinh: String(row.ten_thuoc_tinh || '').trim(),
+        ten_quy_cach: String(row.ten_quy_cach || row.ten_thuoc_tinh || '').trim(),
+        ten_thuoc_tinh: String(row.ten_thuoc_tinh || row.ten_quy_cach || '').trim(),
         don_vi_tinh_id: optionalLineObjectId(row.don_vi_tinh_id),
         ma_hang_snapshot: String(row.ma_hang_snapshot || ''),
         ten_hang_snapshot: String(row.ten_hang_snapshot || ''),
@@ -601,8 +605,131 @@ async function restoreStockLine(khoId, line, options = {}) {
     });
 }
 
+async function deductStockLine(khoId, line, options = {}) {
+    const qty = Number(line.so_luong || 0);
+    if (!qty || !khoId || !line.hang_hoa_id) return;
+
+    const base = {
+        kho_id: khoId,
+        hang_hoa_id: line.hang_hoa_id,
+        ten_quy_cach: line.ten_quy_cach || line.ten_thuoc_tinh || '',
+        gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id || undefined,
+        sync_quy_cach: Boolean(line.gia_tri_thuoc_tinh_id || line.ten_quy_cach || line.ten_thuoc_tinh),
+        nguoi_tao_id: options.nguoi_tao_id,
+        loai_phieu: options.loai_phieu,
+        ma_phieu: options.ma_phieu,
+        ghi_chu: options.ghi_chu
+    };
+
+    const allocs = Array.isArray(line.lot_allocations)
+        ? line.lot_allocations.filter(row => Number(row.so_luong) > 0 && row.lo_hang_id)
+        : [];
+
+    if (allocs.length) {
+        for (const alloc of allocs) {
+            await truTonKho({
+                ...base,
+                lo_hang_id: alloc.lo_hang_id,
+                so_luong: Number(alloc.so_luong || 0)
+            });
+        }
+        return;
+    }
+
+    await truTonKho({
+        ...base,
+        lo_hang_id: line.lo_hang_id || undefined,
+        so_luong: qty
+    });
+}
+
+function buildReturnStockLine(item, invoiceLineMeta = {}) {
+    const invoiceLine = item.invoiceLine || {};
+    return {
+        hang_hoa_id: item.hang_hoa_id,
+        lo_hang_id: item.lo_hang_id || invoiceLine.lo_hang_id || undefined,
+        so_luong: item.so_luong,
+        gia_tri_thuoc_tinh_id: invoiceLineMeta.gia_tri_thuoc_tinh_id || invoiceLine.gia_tri_thuoc_tinh_id,
+        ten_quy_cach: invoiceLineMeta.ten_quy_cach || invoiceLineMeta.ten_thuoc_tinh || invoiceLine.ten_quy_cach || invoiceLine.ten_thuoc_tinh || '',
+        ten_thuoc_tinh: invoiceLineMeta.ten_thuoc_tinh || invoiceLineMeta.ten_quy_cach || invoiceLine.ten_thuoc_tinh || invoiceLine.ten_quy_cach || '',
+        lot_allocations: invoiceLine.lot_allocations
+    };
+}
+
+async function recordSalesReturnRefundReceipt({
+    refund,
+    returnPayment,
+    paymentBooks,
+    refundCashBookId,
+    returnPaymentMethod,
+    returnSlip,
+    ma_phieu_tra,
+    storeId,
+    customerId,
+    hoa_don_id,
+    userId
+}) {
+    if (!refund || refund <= 0) return null;
+    if (!storeId) throw new Error('Thiếu cửa hàng để ghi phiếu chi hoàn tiền trả hàng.');
+
+    const refundBase = {
+        loai_phieu: 'chi',
+        loai_thu_chi: 'Hoan tien tra hang',
+        ngay_lap: returnSlip.ngay_tra || new Date(),
+        cua_hang_id: storeId,
+        nguoi_tao_id: userId,
+        khach_hang_id: customerId || undefined,
+        hoa_don_id: hoa_don_id || undefined,
+        phieu_tra_hang_id: returnSlip._id,
+        ma_chung_tu_goc: ma_phieu_tra,
+        doi_tuong: customerId ? undefined : 'Khách lẻ',
+        nhom_doi_tuong: 'khach_hang',
+        hach_toan: false,
+        ghi_chu: `Hoan tien tra hang ${ma_phieu_tra}`
+    };
+
+    const cashBookId = paymentBooks.so_quy_tien_mat_id || '';
+    const bankBookId = paymentBooks.so_quy_chuyen_khoan_id || '';
+    let tienMat = Math.min(Math.max(0, Number(returnPayment.tien_mat || 0)), refund);
+    let chuyenKhoan = Math.min(Math.max(0, Number(returnPayment.chuyen_khoan || 0)), Math.max(0, refund - tienMat));
+    if (tienMat + chuyenKhoan <= 0) {
+        tienMat = refund;
+        chuyenKhoan = 0;
+    }
+
+    const useSplitBooks = Boolean(cashBookId && bankBookId && tienMat > 0 && chuyenKhoan > 0);
+    if (useSplitBooks || (cashBookId && tienMat > 0) || (bankBookId && chuyenKhoan > 0)) {
+        return taoPhieuThuChi(Object.assign({}, refundBase, {
+            gia_tri: tienMat + chuyenKhoan,
+            payment_v2: true,
+            so_quy_tien_mat_id: cashBookId || undefined,
+            so_quy_chuyen_khoan_id: bankBookId || undefined,
+            tien_mat: tienMat,
+            chuyen_khoan: chuyenKhoan,
+            chi_tiet_thanh_toan: {
+                tien_mat: tienMat,
+                chuyen_khoan: chuyenKhoan,
+                tien_tra_khach: 0,
+                so_quy_tien_mat_id: cashBookId || undefined,
+                so_quy_chuyen_khoan_id: bankBookId || undefined
+            },
+            phuong_thuc_thanh_toan: tienMat > 0 && chuyenKhoan > 0
+                ? 'tien_mat_chuyen_khoan'
+                : (chuyenKhoan > 0 ? 'chuyen_khoan' : 'tien_mat')
+        }));
+    }
+
+    const bookId = refundCashBookId || cashBookId || bankBookId;
+    if (!bookId) throw new Error('Vui lòng chọn sổ quỹ để hoàn tiền trả hàng.');
+    return taoPhieuThuChi(Object.assign({}, refundBase, {
+        gia_tri: refund,
+        so_quy_id: bookId,
+        phuong_thuc_thanh_toan: returnPaymentMethod
+    }));
+}
+
 function returnStockLineKey(row) {
-    const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
+    const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id) || optionalLineObjectId(row._id);
     const lotId = row.lo_hang_id?._id || row.lo_hang_id || '';
     if (invoiceLineId && lotId) return `${invoiceLineId}::${lotId}`;
     if (invoiceLineId) return String(invoiceLineId);
@@ -635,11 +762,100 @@ function expandReturnableInvoiceItems(items) {
             object.lo_hang_id = allocs[0].lo_hang_id;
             object.lo_hang_display = formatLotAllocationLabel(allocs[0]);
             object.lot_allocations = allocs;
-            object.so_luong = Number(alloc.so_luong || object.so_luong || 0);
+            object.so_luong = Number(allocs[0].so_luong || object.so_luong || 0);
         }
         expanded.push(object);
     }
     return expanded;
+}
+
+async function loadReturnInvoiceContext(invoiceId) {
+    const id = String(invoiceId || '').trim();
+    if (!/^[0-9a-fA-F]{24}$/.test(id)) {
+        const err = new Error('ID hóa đơn không hợp lệ');
+        err.status = 400;
+        throw err;
+    }
+
+    const invoice = await HoaDonBanHang.findById(id)
+        .populate('khach_hang_id')
+        .populate('kho_id')
+        .populate('cua_hang_id')
+        .populate('don_hang_id')
+        .populate('nguoi_ban_id')
+        .lean();
+    if (!invoice) {
+        const err = new Error('Không tìm thấy hóa đơn');
+        err.status = 404;
+        throw err;
+    }
+    if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
+        const err = new Error('Hóa đơn đã hủy, không thể trả hàng');
+        err.status = 400;
+        throw err;
+    }
+
+    const items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id })
+        .populate('hang_hoa_id')
+        .populate('lo_hang_id')
+        .lean();
+    if (!items.length) {
+        const err = new Error('Hóa đơn chưa có chi tiết hàng hóa');
+        err.status = 400;
+        throw err;
+    }
+
+    const returns = await PhieuTraHang.find({
+        hoa_don_id: invoice._id,
+        trang_thai: { $ne: 'cancelled' }
+    }).select('_id').lean();
+    const returnedItems = returns.length
+        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } })
+            .select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong')
+            .lean()
+        : [];
+    const returnedByLineKey = {};
+    const returnedByLegacyLine = {};
+    returnedItems.forEach(row => {
+        const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
+        if (invoiceLineId) {
+            const key = returnStockLineKey(row);
+            returnedByLineKey[key] = (returnedByLineKey[key] || 0) + Number(row.so_luong || 0);
+            return;
+        }
+        const legacyKey = legacyReturnLineKey(row);
+        returnedByLegacyLine[legacyKey] = (returnedByLegacyLine[legacyKey] || 0) + Number(row.so_luong || 0);
+    });
+
+    const expandedItems = expandReturnableInvoiceItems(items);
+    const returnableItems = expandedItems
+        .map(item => {
+            const key = returnStockLineKey(item);
+            const legacyKey = legacyReturnLineKey(item);
+            const returnedQty = Number(returnedByLineKey[key] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
+            const originalQty = Number(item.so_luong || 0);
+            const remainingQty = Math.max(originalQty - returnedQty, 0);
+            return Object.assign({}, item, {
+                so_luong_da_tra: returnedQty,
+                so_luong_con_lai: remainingQty,
+                so_luong: remainingQty
+            });
+        })
+        .filter(item => Number(item.so_luong_con_lai || 0) > 0);
+    if (!returnableItems.length) {
+        const err = new Error('Hóa đơn đã được trả hết hàng');
+        err.status = 400;
+        throw err;
+    }
+
+    const hasMultiLotLines = returnableItems.some(item => item._return_from_multi_lot);
+    return {
+        invoice,
+        items: returnableItems,
+        return_multi_lot_note: hasMultiLotLines
+            ? 'Một số dòng hóa đơn xuất từ nhiều lô — trả hàng theo từng lô riêng.'
+            : ''
+    };
 }
 
 function buildOrderExportRow(order, detail, shipment) {
@@ -3070,10 +3286,14 @@ router.get('/', async (req, res, next) => {
         const cashBookQuery = storeId
             ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
             : { trang_thai: 'active' };
-        const [partners, users, cashBooks] = await Promise.all([
+        const vatChuaQuery = storeId
+            ? { cua_hang_id: storeId, trang_thai: 'active' }
+            : { trang_thai: 'active' };
+        const [partners, users, cashBooks, vatChuaList] = await Promise.all([
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
-            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean(),
+            VatChua.find(vatChuaQuery).sort({ ten_vat_chua: 1 }).select('ten_vat_chua ma_vat_chua').lean()
         ]);
         res.render('don-hang/index', {
             title: 'Đặt hàng',
@@ -3081,6 +3301,7 @@ router.get('/', async (req, res, next) => {
             partners,
             users,
             cashBooks,
+            vatChuaList,
             filters: req.query || {},
             exportColumnGroups: getOrderExportColumnGroupsForView()
         });
@@ -3564,12 +3785,15 @@ router.get('/hoa-don/create', async (req, res, next) => {
         const cashBookQuery = storeId
             ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
             : { trang_thai: 'active' };
-        const [data, warehouses, cashBooks] = await Promise.all([
+        const [data, warehouses, cashBooks, vatChuaList] = await Promise.all([
             getOrderCreateData(),
             storeId
                 ? Kho.find({ trang_thai: 'active', cua_hang_id: storeId }).sort({ ten_kho: 1 }).lean()
                 : [],
-            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
+            SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean(),
+            storeId
+                ? VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' }).sort({ ten_vat_chua: 1 }).select('ten_vat_chua ma_vat_chua').lean()
+                : []
         ]);
         let sourceOrder = null;
         let sourceOrderItems = [];
@@ -3635,6 +3859,7 @@ router.get('/hoa-don/create', async (req, res, next) => {
             currentStoreId: storeId || '',
             warehouses,
             cashBooks,
+            vatChuaList: vatChuaList || [],
             sourceOrder,
             sourceOrderItems,
             sourceShipment,
@@ -3704,8 +3929,13 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
         ]);
         const paid = computeNetPaidFromReceiptRows(receipts);
         const payable = Number(invoice.thanh_toan || 0);
+        const storeId = String(invoice.cua_hang_id?._id || invoice.cua_hang_id || '').trim();
+        const orderId = invoice.don_hang_id?._id || invoice.don_hang_id || null;
+        const vatChuaLines = storeId
+            ? await loadInvoiceLinkedVatChuaLines(invoice._id, orderId, storeId)
+            : [];
 
-        res.json({ success: true, data: { invoice, items, shipment, debtHistory, receipts, paid, debt: Math.max(0, payable - paid) } });
+        res.json({ success: true, data: { invoice, items, shipment, debtHistory, receipts, paid, debt: Math.max(0, payable - paid), vat_chua_lines: vatChuaLines } });
     } catch (error) {
         next(error);
     }
@@ -4067,6 +4297,30 @@ async function createInvoice(req, res, next) {
             });
         }
 
+        const parsedVatChua = parseVatChuaImportInput(req.body || {});
+        try {
+            assertVatChuaImportInput(parsedVatChua);
+        } catch (vatChuaInputError) {
+            return res.status(400).json({ success: false, message: vatChuaInputError.message });
+        }
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
+            const vatChuaRow = await VatChua.findOne({
+                _id: parsedVatChua.vatChuaId,
+                cua_hang_id: sessionStoreId,
+                trang_thai: 'active'
+            }).select('so_luong_ton ten_vat_chua').lean();
+            if (!vatChuaRow) {
+                return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng' });
+            }
+            const tonVatChua = Math.max(0, Number(vatChuaRow.so_luong_ton || 0));
+            if (tonVatChua < parsedVatChua.qty) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tồn vật chứa không đủ để xuất (còn ' + tonVatChua + ', cần ' + parsedVatChua.qty + ')'
+                });
+            }
+        }
+
         const discount = normalizeDiscount(chiet_khau ?? sourceOrder?.giam_gia, kieu_giam_gia || sourceOrder?.kieu_giam_gia, tong_tien_hang);
         const finalCustomerId = khach_hang_id || sourceOrder?.khach_hang_id || null;
         const finalStoreId = sessionStoreId;
@@ -4181,6 +4435,30 @@ async function createInvoice(req, res, next) {
                 return res.status(400).json({ success: false, message: stockError.message });
             }
             throw stockError;
+        }
+
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
+            const customerForVatChua = finalCustomerId
+                ? (await KhachHang.findById(finalCustomerId).select('ten_khach_hang').lean())?.ten_khach_hang
+                : '';
+            try {
+                await exportVatChuaWithInvoice(invoice, {
+                    vat_chua_id: parsedVatChua.vatChuaId,
+                    vat_chua_so_luong: parsedVatChua.qty,
+                    khach_hang_ten: customerForVatChua || ''
+                });
+            } catch (vatChuaError) {
+                await rollbackDeliveryInvoice(invoice._id, {
+                    kho_id: finalKhoId,
+                    nguoi_tao_id: req.user?._id,
+                    stockLines: stockAppliedLines,
+                    restoreStock: stockAppliedLines.length > 0
+                });
+                return res.status(400).json({
+                    success: false,
+                    message: vatChuaError.message || 'Không ghi nhận xuất vật chứa được'
+                });
+            }
         }
 
         let shipment = null;
@@ -4412,9 +4690,14 @@ async function loadSalesReturnCopyDraft(copyFromId) {
 
 router.get('/tra-hang/create', async (req, res, next) => {
     try {
-        const [products, partners] = await Promise.all([
+        const storeId = await resolveStoreId(req);
+        const vatChuaQuery = storeId
+            ? { trang_thai: 'active', cua_hang_id: storeId }
+            : { trang_thai: 'active' };
+        const [products, partners, vatChuaList] = await Promise.all([
             HangHoa.find({ trang_thai: 'active' }).sort({ ten_hang: 1 }),
-            DoiTacGiaoHang.find({}).sort({ ten_doi_tac: 1, ten: 1, created_at: -1 })
+            DoiTacGiaoHang.find({}).sort({ ten_doi_tac: 1, ten: 1, created_at: -1 }),
+            VatChua.find(vatChuaQuery).sort({ ten_vat_chua: 1 }).select('ten_vat_chua ma_vat_chua').lean()
         ]);
         const invoices = [];
         let copyDraft = null;
@@ -4425,13 +4708,27 @@ router.get('/tra-hang/create', async (req, res, next) => {
             if (!copyDraft) copyFromError = 'Không tải được phiếu trả hàng để sao chép.';
         }
         const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
+        let prefillInvoiceJson = '';
+        let prefillInvoiceError = '';
+        const prefillInvoiceId = String(req.query?.invoice_id || req.query?.hoa_don_id || '').trim();
+        if (prefillInvoiceId && !copyDraft) {
+            try {
+                const payload = await loadReturnInvoiceContext(prefillInvoiceId);
+                prefillInvoiceJson = JSON.stringify(payload).replace(/</g, '\\u003c');
+            } catch (prefillError) {
+                prefillInvoiceError = prefillError.message || 'Không tải được hóa đơn';
+            }
+        }
         res.render('don-hang/tra-hang-create', {
             title: 'Trả hàng',
             invoices,
             products,
             partners,
+            vatChuaList: vatChuaList || [],
             copyDraftJson,
-            copyFromError
+            copyFromError,
+            prefillInvoiceJson,
+            prefillInvoiceError
         });
     } catch (error) {
         next(error);
@@ -4646,28 +4943,25 @@ router.post('/tra-hang/:id/cancel', async (req, res, next) => {
         for (const item of items) {
             const qty = Number(item.so_luong || 0);
             if (!qty || !item.hang_hoa_id) continue;
+            const stockLine = {
+                hang_hoa_id: item.hang_hoa_id,
+                lo_hang_id: item.lo_hang_id || undefined,
+                so_luong: qty,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id,
+                ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh || '',
+                ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
+                lot_allocations: item.lot_allocations
+            };
+            const stockOptions = {
+                nguoi_tao_id: req.user?._id,
+                loai_phieu: 'tra_hang',
+                ma_phieu: maPhieu,
+                ghi_chu: item.loai_dong === 'hang_doi' ? `Huy doi hang ${maPhieu}` : `Huy tra hang ${maPhieu}`
+            };
             if (item.loai_dong === 'hang_doi') {
-                await congTonKho({
-                    kho_id: khoId,
-                    hang_hoa_id: item.hang_hoa_id,
-                    lo_hang_id: item.lo_hang_id || undefined,
-                    so_luong: qty,
-                    nguoi_tao_id: req.user?._id,
-                    loai_phieu: 'tra_hang',
-                    ma_phieu: maPhieu,
-                    ghi_chu: `Huy doi hang ${maPhieu}`
-                });
+                await restoreStockLine(khoId, stockLine, stockOptions);
             } else {
-                await truTonKho({
-                    kho_id: khoId,
-                    hang_hoa_id: item.hang_hoa_id,
-                    lo_hang_id: item.lo_hang_id || undefined,
-                    so_luong: qty,
-                    nguoi_tao_id: req.user?._id,
-                    loai_phieu: 'tra_hang',
-                    ma_phieu: maPhieu,
-                    ghi_chu: `Huy tra hang ${maPhieu}`
-                });
+                await deductStockLine(khoId, stockLine, stockOptions);
             }
         }
 
@@ -4695,6 +4989,13 @@ router.post('/tra-hang/:id/cancel', async (req, res, next) => {
 
         slip.trang_thai = 'cancelled';
         await slip.save();
+
+        const cancelStoreId = slip.cua_hang_id || (khoId ? (await Kho.findById(khoId).select('cua_hang_id').lean())?.cua_hang_id : null);
+        if (cancelStoreId) {
+            await cancelNhapVatChuaBySource(cancelStoreId, 'tra_hang_ban', slip._id);
+            await cancelXuatVatChuaBySource(cancelStoreId, 'tra_hang_ban', slip._id);
+        }
+
         res.json({ success: true, message: 'Đã hủy phiếu trả hàng' });
     } catch (error) {
         next(error);
@@ -4729,8 +5030,12 @@ router.get('/tra-hang/:id/detail', async (req, res, next) => {
         const invoice = returnSlip.hoa_don_id?._id
             ? await HoaDonBanHang.findById(returnSlip.hoa_don_id._id).populate('cua_hang_id').populate('nguoi_ban_id')
             : null;
+        const storeId = returnSlip.cua_hang_id?._id || returnSlip.cua_hang_id || invoice?.cua_hang_id?._id || invoice?.cua_hang_id || null;
+        const vat_chua_lines = storeId
+            ? await loadSalesReturnLinkedNhapVatChuaLines(returnSlip._id, storeId)
+            : [];
 
-        res.json({ success: true, data: { returnSlip, items, invoice } });
+        res.json({ success: true, data: { returnSlip, items, invoice, vat_chua_lines } });
     } catch (error) {
         next(error);
     }
@@ -4738,76 +5043,14 @@ router.get('/tra-hang/:id/detail', async (req, res, next) => {
 
 router.get('/tra-hang/invoice/:id', async (req, res, next) => {
     try {
-        const invoice = await HoaDonBanHang.findById(req.params.id)
-            .populate('khach_hang_id')
-            .populate('kho_id')
-            .populate('cua_hang_id')
-            .populate('don_hang_id')
-            .populate('nguoi_ban_id');
-        if (!invoice) {
-            return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
-        }
-        if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
-            return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể trả hàng' });
-        }
-        const items = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id })
-            .populate('hang_hoa_id')
-            .populate('lo_hang_id');
-        if (!items.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn chưa có chi tiết hàng hóa' });
-        }
-
-        const returns = await PhieuTraHang.find({
-            hoa_don_id: invoice._id,
-            trang_thai: { $ne: 'cancelled' }
-        }).select('_id').lean();
-        const returnedItems = returns.length
-            ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } })
-                .select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong')
-                .lean()
-            : [];
-        const returnedByLineKey = {};
-        const returnedByLegacyLine = {};
-        returnedItems.forEach(row => {
-            const invoiceLineId = optionalLineObjectId(row.ct_hoa_don_id);
-            if (invoiceLineId) {
-                const key = returnStockLineKey(row);
-                returnedByLineKey[key] = (returnedByLineKey[key] || 0) + Number(row.so_luong || 0);
-                return;
-            }
-            const legacyKey = legacyReturnLineKey(row);
-            returnedByLegacyLine[legacyKey] = (returnedByLegacyLine[legacyKey] || 0) + Number(row.so_luong || 0);
-        });
-        const expandedItems = expandReturnableInvoiceItems(items);
-        const returnableItems = expandedItems
-            .map(item => {
-                const key = returnStockLineKey(item);
-                const legacyKey = legacyReturnLineKey(item);
-                const returnedQty = Number(returnedByLineKey[key] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
-                const originalQty = Number(item.so_luong || 0);
-                const remainingQty = Math.max(originalQty - returnedQty, 0);
-                item.so_luong_da_tra = returnedQty;
-                item.so_luong_con_lai = remainingQty;
-                item.so_luong = remainingQty;
-                return item;
-            })
-            .filter(item => Number(item.so_luong_con_lai || 0) > 0);
-        if (!returnableItems.length) {
-            return res.status(400).json({ success: false, message: 'Hóa đơn đã được trả hết hàng' });
-        }
-        const hasMultiLotLines = returnableItems.some(item => item._return_from_multi_lot);
-        res.json({
-            success: true,
-            data: {
-                invoice,
-                items: returnableItems,
-                return_multi_lot_note: hasMultiLotLines
-                    ? 'Một số dòng hóa đơn xuất từ nhiều lô — trả hàng theo từng lô riêng.'
-                    : ''
-            }
-        });
+        const data = await loadReturnInvoiceContext(req.params.id);
+        res.json({ success: true, data });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message || 'Không tải được hóa đơn trả hàng' });
+        const status = Number(error.status || 0) || (error.message === 'Không tìm thấy hóa đơn' ? 404 : 500);
+        res.status(status >= 400 && status < 600 ? status : 500).json({
+            success: false,
+            message: error.message || 'Không tải được hóa đơn trả hàng'
+        });
     }
 });
 
@@ -4864,6 +5107,9 @@ router.post('/tra-hang/add', async (req, res, next) => {
             .map(item => ({
                 hang_hoa_id: item.hang_hoa_id,
                 lo_hang_id: item.lo_hang_id || null,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || null,
+                ten_quy_cach: String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim(),
+                ten_thuoc_tinh: String(item.ten_thuoc_tinh || item.ten_quy_cach || '').trim(),
                 so_luong: Number(item.so_luong || 0),
                 don_gia: Number(item.don_gia || 0)
             }))
@@ -4972,7 +5218,20 @@ router.post('/tra-hang/add', async (req, res, next) => {
         for (const item of cleanExchangeItems) {
             const product = await HangHoa.findById(item.hang_hoa_id).select('_id ten_hang quan_ly_theo_lo').lean();
             if (!product) return res.status(400).json({ success: false, message: 'Hàng đổi không tồn tại' });
-            const stock = await getSellableStock(warehouseId, product);
+            const tenQuyCach = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
+            let stock = 0;
+            if (tenQuyCach) {
+                stock = await getSellableQuyCachQuantity(warehouseId, item.hang_hoa_id, tenQuyCach, item.lo_hang_id);
+            } else if (item.lo_hang_id) {
+                const lotStock = await TonKhoLo.findOne({
+                    kho_id: warehouseId,
+                    hang_hoa_id: item.hang_hoa_id,
+                    lo_hang_id: item.lo_hang_id
+                }).lean();
+                stock = Number(lotStock?.so_luong || 0);
+            } else {
+                stock = await getSellableStock(warehouseId, product);
+            }
             if (stock < item.so_luong) {
                 return res.status(400).json({ success: false, message: `Tồn kho hàng đổi không đủ: ${product.ten_hang || item.hang_hoa_id}` });
             }
@@ -4989,34 +5248,85 @@ router.post('/tra-hang/add', async (req, res, next) => {
         const canTraKhach = Math.max(-chenhLech, 0);
         const customerId = khach_hang_id || invoice?.khach_hang_id || null;
         const storeId = invoice?.cua_hang_id || warehouse.cua_hang_id || null;
-        const cashBookId = resolveCashBookIdFromBody(req.body || {});
-        const refundCashBookId = resolveCashBookIdFromBody({
-            so_quy_id: req.body?.refund_so_quy_id || req.body?.refundCashBookId || req.body?.refund_cash_book_id || cashBookId
-        });
+        let parsedVatChua = { vatChuaId: '', qty: 0, hasQtyInput: false };
+        try {
+            parsedVatChua = parseVatChuaSignedInput(req.body || {});
+            assertVatChuaSignedInput(parsedVatChua);
+        } catch (vatChuaInputError) {
+            return res.status(400).json({ success: false, message: vatChuaInputError.message });
+        }
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty !== 0) {
+            if (!storeId) {
+                return res.status(400).json({ success: false, message: 'Thiếu cửa hàng để ghi nhận vật chứa' });
+            }
+            const vatChuaRow = await VatChua.findOne({
+                _id: parsedVatChua.vatChuaId,
+                cua_hang_id: storeId,
+                trang_thai: 'active'
+            }).lean();
+            if (!vatChuaRow) {
+                return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng' });
+            }
+            if (parsedVatChua.qty < 0) {
+                const tonVatChua = Math.max(0, Number(vatChuaRow.so_luong_ton || 0));
+                const exportQty = Math.abs(parsedVatChua.qty);
+                if (tonVatChua < exportQty) {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Tồn vật chứa không đủ để xuất (còn ' + tonVatChua + ', cần ' + exportQty + ')'
+                    });
+                }
+            }
+        }
+        const returnPayment = normalizeCustomerPaymentInput(Object.assign({}, req.body || {}, {
+            khach_thanh_toan: req.body?.khach_thanh_toan_them
+        }), { requirePayment: false });
+        if (!returnPayment.valid) {
+            return res.status(400).json({ success: false, message: returnPayment.errors.join('. ') });
+        }
+        const paymentBooks = resolvePaymentBooksFromBody(req.body || {});
+        const cashBookId = paymentBooks.so_quy_tien_mat_id || paymentBooks.so_quy_id || resolveCashBookIdFromBody(req.body || {});
+        const bankBookId = paymentBooks.so_quy_chuyen_khoan_id;
+        const refundCashBookId = paymentBooks.so_quy_tien_mat_id
+            || (isPaymentBookObjectId(req.body?.refund_so_quy_id) ? String(req.body.refund_so_quy_id).trim() : '')
+            || paymentBooks.so_quy_chuyen_khoan_id
+            || resolveCashBookIdFromBody({
+                so_quy_id: req.body?.refund_so_quy_id || req.body?.refundCashBookId || req.body?.refund_cash_book_id || cashBookId
+            });
         const returnPaymentMethod = normalizePaymentMethodValue(
             req.body?.phuong_thuc_thanh_toan || req.body?.payment_method || req.body?.paymentMethod
         );
         let paid = 0;
         let debt = 0;
         let refund = 0;
-        let debtReduction = 0;
         if (chenhLech > 0) {
-            paid = Math.min(Math.max(Number(khach_thanh_toan_them || 0), 0), chenhLech);
+            const legacyPaid = Math.max(Number(khach_thanh_toan_them || 0), 0);
+            paid = Math.min(returnPayment.thuc_thu > 0 ? returnPayment.thuc_thu : legacyPaid, chenhLech);
             debt = Math.max(chenhLech - paid, 0);
-            if (paid > 0 && !cashBookId) {
-                return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để thu tiền trả hàng/đổi hàng.' });
+            if (paid > 0) {
+                const bookErrors = validatePaymentBooksForCustomer(returnPayment, paymentBooks);
+                if (bookErrors.length) {
+                    return res.status(400).json({ success: false, message: bookErrors[0] });
+                }
             }
         } else if (chenhLech < 0) {
             refund = Math.abs(chenhLech);
-            if (customerId) {
-                const customer = await KhachHang.findById(customerId).select('tong_no').lean();
-                const currentDebt = Number(customer?.tong_no || 0);
-                debtReduction = Math.min(currentDebt, refund);
-                refund -= debtReduction;
+            if (refund > 0) {
+                const hasSplitPayout = returnPayment.thuc_thu > 0
+                    || returnPayment.tien_mat > 0
+                    || returnPayment.chuyen_khoan > 0;
+                if (hasSplitPayout) {
+                    const bookErrors = validatePaymentBooksForCustomer(returnPayment, paymentBooks);
+                    if (bookErrors.length) {
+                        return res.status(400).json({ success: false, message: bookErrors[0] });
+                    }
+                } else if (!refundCashBookId) {
+                    return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để hoàn tiền trả hàng.' });
+                }
             }
-            if (refund > 0 && !refundCashBookId) {
-                return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để hoàn tiền trả hàng.' });
-            }
+        }
+        if ((paid > 0 || refund > 0) && !storeId) {
+            return res.status(400).json({ success: false, message: 'Thiếu cửa hàng để ghi sổ quỹ thu/chi.' });
         }
         const count = await PhieuTraHang.countDocuments();
         const ma_phieu_tra = 'TH' + String(count + 1).padStart(6, '0');
@@ -5080,11 +5390,7 @@ router.post('/tra-hang/add', async (req, res, next) => {
                 thanh_tien: item.so_luong * item.don_gia,
                 ghi_chu: invoiceLineMeta.ghi_chu
             });
-            await congTonKho({
-                kho_id: warehouseId,
-                hang_hoa_id: item.hang_hoa_id,
-                lo_hang_id: item.lo_hang_id || undefined,
-                so_luong: item.so_luong,
+            await restoreStockLine(warehouseId, buildReturnStockLine(item, invoiceLineMeta), {
                 nguoi_tao_id: req.user?._id,
                 loai_phieu: 'tra_hang',
                 ma_phieu: ma_phieu_tra,
@@ -5093,10 +5399,15 @@ router.post('/tra-hang/add', async (req, res, next) => {
         }
 
         for (const item of cleanExchangeItems) {
+            const tenQuyCach = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
             await truTonKho({
                 kho_id: warehouseId,
                 hang_hoa_id: item.hang_hoa_id,
                 lo_hang_id: item.lo_hang_id || undefined,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || undefined,
+                ten_quy_cach: tenQuyCach || undefined,
+                ten_thuoc_tinh: String(item.ten_thuoc_tinh || tenQuyCach || '').trim() || undefined,
+                sync_quy_cach: Boolean(tenQuyCach || item.gia_tri_thuoc_tinh_id),
                 so_luong: item.so_luong,
                 nguoi_tao_id: req.user?._id,
                 loai_phieu: 'ban_hang',
@@ -5107,6 +5418,9 @@ router.post('/tra-hang/add', async (req, res, next) => {
                 phieu_tra_hang_id: returnSlip._id,
                 hang_hoa_id: item.hang_hoa_id,
                 lo_hang_id: item.lo_hang_id || undefined,
+                gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || undefined,
+                ten_quy_cach: tenQuyCach,
+                ten_thuoc_tinh: String(item.ten_thuoc_tinh || tenQuyCach || '').trim(),
                 loai_dong: 'hang_doi',
                 so_luong: item.so_luong,
                 don_gia: item.don_gia,
@@ -5116,12 +5430,25 @@ router.post('/tra-hang/add', async (req, res, next) => {
 
         if (chenhLech > 0) {
             if (paid > 0) {
+                const tienMatThu = Math.min(returnPayment.tien_mat, paid);
+                const chuyenKhoanThu = Math.min(returnPayment.chuyen_khoan, Math.max(0, paid - tienMatThu));
+                const useSplit = tienMatThu > 0 || chuyenKhoanThu > 0;
                 await taoPhieuThuChi({
                     loai_phieu: 'thu',
                     loai_thu_chi: 'Thu tien doi hang',
                     gia_tri: paid,
                     ngay_lap: returnSlip.ngay_tra || new Date(),
-                    so_quy_id: cashBookId,
+                    so_quy_id: cashBookId || bankBookId,
+                    so_quy_tien_mat_id: cashBookId,
+                    so_quy_chuyen_khoan_id: bankBookId,
+                    payment_v2: useSplit && Boolean(cashBookId || bankBookId),
+                    chi_tiet_thanh_toan: useSplit ? {
+                        tien_mat: tienMatThu,
+                        chuyen_khoan: chuyenKhoanThu,
+                        tien_tra_khach: 0,
+                        so_quy_tien_mat_id: cashBookId,
+                        so_quy_chuyen_khoan_id: bankBookId
+                    } : undefined,
                     cua_hang_id: storeId,
                     nguoi_tao_id: req.user?._id,
                     khach_hang_id: customerId || undefined,
@@ -5130,7 +5457,9 @@ router.post('/tra-hang/add', async (req, res, next) => {
                     ma_chung_tu_goc: ma_phieu_tra,
                     doi_tuong: customerId ? undefined : 'Khách lẻ',
                     nhom_doi_tuong: 'khach_hang',
-                    phuong_thuc_thanh_toan: returnPaymentMethod,
+                    phuong_thuc_thanh_toan: useSplit
+                        ? (tienMatThu > 0 && chuyenKhoanThu > 0 ? 'tien_mat_chuyen_khoan' : (chuyenKhoanThu > 0 ? 'chuyen_khoan' : 'tien_mat'))
+                        : returnPaymentMethod,
                     hach_toan: false
                 });
             }
@@ -5149,34 +5478,45 @@ router.post('/tra-hang/add', async (req, res, next) => {
                 }
             }
         } else if (chenhLech < 0) {
-            if (debtReduction > 0 && customerId) {
-                await KhachHang.updateOne({ _id: customerId }, { $inc: { tong_no: -debtReduction } });
-                await CongNoKhachHang.create({
-                    khach_hang_id: customerId,
-                    hoa_don_id: hoa_don_id || undefined,
-                    so_tien: debtReduction,
-                    loai: 'giam_no',
-                    ghi_chu: `Giảm công nợ trả/đổi hàng ${ma_phieu_tra}`,
-                    ngay: new Date()
-                });
+            await recordSalesReturnRefundReceipt({
+                refund,
+                returnPayment,
+                paymentBooks,
+                refundCashBookId,
+                returnPaymentMethod,
+                returnSlip,
+                ma_phieu_tra,
+                storeId,
+                customerId,
+                hoa_don_id,
+                userId: req.user?._id
+            });
+        }
+
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty !== 0) {
+            let customerName = '';
+            if (customerId) {
+                const customer = await KhachHang.findById(customerId).select('ten_khach_hang').lean();
+                customerName = customer?.ten_khach_hang || '';
             }
-            if (refund > 0) {
-                await taoPhieuThuChi({
-                    loai_phieu: 'chi',
-                    loai_thu_chi: 'Hoan tien tra hang',
-                    gia_tri: refund,
-                    ngay_lap: returnSlip.ngay_tra || new Date(),
-                    so_quy_id: refundCashBookId,
-                    cua_hang_id: storeId,
-                    nguoi_tao_id: req.user?._id,
-                    khach_hang_id: customerId || undefined,
-                    hoa_don_id: hoa_don_id || undefined,
-                    phieu_tra_hang_id: returnSlip._id,
-                    ma_chung_tu_goc: ma_phieu_tra,
-                    doi_tuong: customerId ? undefined : 'Khách lẻ',
-                    nhom_doi_tuong: 'khach_hang',
-                    phuong_thuc_thanh_toan: returnPaymentMethod,
-                    hach_toan: false
+            try {
+                if (parsedVatChua.qty > 0) {
+                    await importVatChuaWithSalesReturn(returnSlip, {
+                        vat_chua_id: parsedVatChua.vatChuaId,
+                        vat_chua_so_luong: parsedVatChua.qty,
+                        khach_hang_ten: customerName
+                    });
+                } else {
+                    await exportVatChuaWithSalesReturn(returnSlip, {
+                        vat_chua_id: parsedVatChua.vatChuaId,
+                        vat_chua_so_luong: Math.abs(parsedVatChua.qty),
+                        khach_hang_ten: customerName
+                    });
+                }
+            } catch (vatChuaError) {
+                return res.status(400).json({
+                    success: false,
+                    message: vatChuaError.message || 'Không ghi nhận vật chứa được'
                 });
             }
         }
@@ -5728,6 +6068,12 @@ router.get('/:id/detail', async (req, res, next) => {
             .sort({ ngay_lap: -1, created_at: -1 })
             .lean();
         const paymentBalance = await applyOrderPaymentBalance(order, order._id);
+        const storeId = await resolveStoreId(req);
+        const vatChuaLines = await loadOrderLinkedVatChuaLines(
+            order._id,
+            invoiceIds,
+            storeId || order.cua_hang_id
+        );
         res.json({
             success: true,
             data: {
@@ -5737,7 +6083,8 @@ router.get('/:id/detail', async (req, res, next) => {
                 invoices,
                 receipts,
                 invoice: invoices[0] || null,
-                payment_balance: paymentBalance
+                payment_balance: paymentBalance,
+                vat_chua_lines: vatChuaLines
             }
         });
     } catch (error) {
@@ -5893,6 +6240,30 @@ async function confirmOrderDelivery(req, res, next) {
             }
         }
 
+        const parsedVatChua = parseVatChuaImportInput(req.body || {});
+        try {
+            assertVatChuaImportInput(parsedVatChua);
+        } catch (vatChuaInputError) {
+            return res.status(400).json({ success: false, message: vatChuaInputError.message });
+        }
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
+            const vatChuaRow = await VatChua.findOne({
+                _id: parsedVatChua.vatChuaId,
+                cua_hang_id: sessionStoreId,
+                trang_thai: 'active'
+            }).select('so_luong_ton ten_vat_chua').lean();
+            if (!vatChuaRow) {
+                return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng' });
+            }
+            const tonVatChua = Math.max(0, Number(vatChuaRow.so_luong_ton || 0));
+            if (tonVatChua < parsedVatChua.qty) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Tồn vật chứa không đủ để xuất (còn ' + tonVatChua + ', cần ' + parsedVatChua.qty + ')'
+                });
+            }
+        }
+
         const ma_hoa_don = await generateInvoiceCode();
         const invoicePaidTotal = Math.min(
             payable,
@@ -5987,6 +6358,29 @@ async function confirmOrderDelivery(req, res, next) {
                 return res.status(400).json({ success: false, message: stockError.message });
             }
             throw stockError;
+        }
+
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
+            const customerForVatChua = order.khach_hang_id
+                ? (await KhachHang.findById(order.khach_hang_id).select('ten_khach_hang').lean())?.ten_khach_hang
+                : '';
+            try {
+                await exportVatChuaWithOrderDelivery(order, invoice, {
+                    vat_chua_id: parsedVatChua.vatChuaId,
+                    vat_chua_so_luong: parsedVatChua.qty,
+                    khach_hang_ten: customerForVatChua || ''
+                });
+            } catch (vatChuaError) {
+                await rollbackDeliveryInvoice(createdInvoiceId, {
+                    kho_id,
+                    nguoi_tao_id: req.user?._id,
+                    stockLines: stockAppliedLines,
+                    restoreStock: stockAppliedLines.length > 0
+                });
+                createdInvoiceId = null;
+                stockAppliedLines = [];
+                return res.status(400).json({ success: false, message: vatChuaError.message || 'Không ghi nhận xuất vật chứa được' });
+            }
         }
 
         for (const line of deliveryLines) {

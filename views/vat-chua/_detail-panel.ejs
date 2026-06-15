@@ -1,0 +1,166 @@
+<div class="kv-detail-panel product-detail" data-vat-chua-id="<%= item._id %>">
+  <div class="detail-tabs">
+    <div class="detail-tab-list">
+      <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin</button>
+      <button class="detail-tab" type="button" data-detail-tab="documents">Chứng từ liên quan</button>
+      <button class="detail-tab" type="button" data-detail-tab="payment-chi">Phiếu chi</button>
+    </div>
+  </div>
+
+  <div class="product-detail-body">
+    <section class="detail-pane is-active" data-detail-pane="info">
+      <div class="product-info-head">
+        <div class="product-thumb">VC</div>
+        <div>
+          <h2><%= item.ten_vat_chua || 'Vật chứa' %></h2>
+          <p><%= item.ma_vat_chua || '---' %></p>
+          <div class="tag-row">
+            <% if (item.trang_thai === 'inactive') { %>
+              <span class="vc-status-tag is-inactive">Ngừng sử dụng</span>
+            <% } else { %>
+              <span class="vc-status-tag is-active">Đang sử dụng</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <div class="product-info-grid">
+        <div><span>Mã vật chứa</span><strong><%= item.ma_vat_chua || '---' %></strong></div>
+        <div><span>Tên vật chứa</span><strong><%= item.ten_vat_chua || '---' %></strong></div>
+        <div><span>Tồn kho</span><strong><%= Number(item.so_luong_ton || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Giá vốn</span><strong><%= Number(item.gia_von_trung_binh || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
+        <div><span>Phiếu nhập</span><strong><%= Number(nhapCount || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Phiếu xuất</span><strong><%= Number(xuatCount || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Phiếu chi</span><strong><%= Number(chiCount || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Thời gian tạo</span><strong><%= formatDate(item.created_at) %></strong></div>
+      </div>
+    </section>
+
+    <section class="detail-pane" data-detail-pane="documents">
+      <div class="customer-table-wrap">
+        <table class="admin-table customer-table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Loại</th>
+              <th>Mã chứng từ</th>
+              <th>Nghiệp vụ</th>
+              <th>Đối tượng</th>
+              <th>Chứng từ liên kết</th>
+              <th class="text-right">Số lượng</th>
+              <th class="text-right">Giá vốn</th>
+              <th class="text-right">Thành tiền</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!documents || documents.length === 0) { %>
+              <tr>
+                <td colspan="10" class="empty-cell">Chưa có chứng từ liên quan.</td>
+              </tr>
+            <% } %>
+            <% (documents || []).forEach(function(doc) { %>
+              <tr>
+                <td><%= formatDate(doc.created_at) %></td>
+                <td><%= doc.doc_kind_label || '---' %></td>
+                <td>
+                  <% if (doc._id && (doc.doc_kind === 'nhap' || doc.doc_kind === 'xuat')) { %>
+                    <button type="button" class="table-code-link vc-doc-open-btn" data-vc-doc-open data-vc-doc-kind="<%= doc.doc_kind %>" data-vc-doc-id="<%= doc._id %>"><%= doc.ma_chung_tu || '---' %></button>
+                  <% } else { %>
+                    <strong><%= doc.ma_chung_tu || '---' %></strong>
+                  <% } %>
+                </td>
+                <td><%= doc.loai_label || '---' %></td>
+                <td><%= doc.doi_tuong_ten || '---' %></td>
+                <td>
+                  <% if (doc.source_href && doc.source_code) { %>
+                    <a class="table-code-link" href="<%= doc.source_href %>"><%= doc.source_code %></a>
+                  <% } else if (doc.source_code) { %>
+                    <%= doc.source_code %>
+                  <% } else { %>
+                    <%= doc.source_type_label || '---' %>
+                  <% } %>
+                </td>
+                <td class="text-right"><%= doc.so_luong ? Number(doc.so_luong).toLocaleString('vi-VN') : '—' %></td>
+                <td class="text-right"><%= doc.gia_von ? Number(doc.gia_von).toLocaleString('vi-VN') + ' VNĐ' : '—' %></td>
+                <td class="text-right"><%= Number(doc.thanh_tien || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                <td>
+                  <% if (doc.trang_thai === 'cancelled') { %>
+                    <span class="vc-status-tag is-inactive">Đã hủy</span>
+                  <% } else { %>
+                    <span class="vc-status-tag is-active"><%= doc.trang_thai_label || 'Hợp lệ' %></span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="detail-pane" data-detail-pane="payment-chi">
+      <div class="customer-table-wrap">
+        <table class="admin-table customer-table">
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>Mã phiếu chi</th>
+              <th>Loại thu chi</th>
+              <th>Đối tượng</th>
+              <th>Chứng từ liên kết</th>
+              <th class="text-right">Giá trị</th>
+              <th>Trạng thái</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (!chiDocuments || chiDocuments.length === 0) { %>
+              <tr>
+                <td colspan="8" class="empty-cell">Chưa có phiếu chi liên quan.</td>
+              </tr>
+            <% } %>
+            <% (chiDocuments || []).forEach(function(doc) { %>
+              <tr>
+                <td><%= formatDate(doc.created_at) %></td>
+                <td>
+                  <% if (doc._id) { %>
+                    <a class="table-code-link" href="/so-quy/phieu-thu-chi/<%= doc._id %>" target="_blank" rel="noopener"><%= doc.ma_phieu || '---' %></a>
+                  <% } else { %>
+                    <strong><%= doc.ma_phieu || '---' %></strong>
+                  <% } %>
+                </td>
+                <td><%= doc.loai_thu_chi_label || '---' %></td>
+                <td><%= doc.doi_tuong_ten || '---' %></td>
+                <td>
+                  <% if (doc.linked_href && doc.linked_code) { %>
+                    <a class="table-code-link" href="<%= doc.linked_href %>"><%= doc.linked_code %></a>
+                  <% } else if (doc.linked_code) { %>
+                    <%= doc.linked_code %>
+                  <% } else { %>
+                    —
+                  <% } %>
+                </td>
+                <td class="text-right"><%= Number(doc.gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                <td>
+                  <% if (doc.trang_thai === 'cancelled') { %>
+                    <span class="vc-status-tag is-inactive">Đã hủy</span>
+                  <% } else { %>
+                    <span class="vc-status-tag is-active"><%= doc.trang_thai_label || 'Đã thanh toán' %></span>
+                  <% } %>
+                </td>
+                <td><%= doc.ghi_chu || '—' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  (function() {
+    if (typeof kvInlineBindDetailTabs === 'function') {
+      kvInlineBindDetailTabs(document.querySelector('[data-vat-chua-id="<%= item._id %>"]'));
+    }
+  })();
+</script>

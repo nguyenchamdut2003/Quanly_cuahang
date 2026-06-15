@@ -27,6 +27,8 @@ const DOCUMENT_TYPE_TO_FIELD = {
 
   phieu_nhap: 'phieu_nhap_id',
 
+  nhap_vat_chua: 'nhap_vat_chua_id',
+
   phieu_tra_hang_nhap: 'phieu_tra_hang_nhap_id',
 
   phieu_tra_hang: 'phieu_tra_hang_id',
@@ -424,6 +426,8 @@ async function ghiCongNoNhaCungCap(receipt, amount, data, session) {
 
       phieu_nhap_id: receipt.phieu_nhap_id || undefined,
 
+      nhap_vat_chua_id: receipt.nhap_vat_chua_id || undefined,
+
       phieu_tra_nhap_id: receipt.phieu_tra_hang_nhap_id || undefined,
 
       phieu_thu_chi_id: receipt._id,
@@ -455,6 +459,8 @@ async function ghiCongNoNhaCungCap(receipt, amount, data, session) {
       nha_cung_cap_id: receipt.nha_cung_cap_id,
 
       phieu_nhap_id: receipt.phieu_nhap_id || undefined,
+
+      nhap_vat_chua_id: receipt.nhap_vat_chua_id || undefined,
 
       phieu_tra_nhap_id: receipt.phieu_tra_hang_nhap_id || undefined,
 
@@ -577,6 +583,8 @@ async function taoPhieuThuChi(data = {}, options = {}) {
     hoa_don_id: docRefs.hoa_don_id,
 
     phieu_nhap_id: docRefs.phieu_nhap_id,
+
+    nhap_vat_chua_id: docRefs.nhap_vat_chua_id,
 
     phieu_tra_hang_nhap_id: docRefs.phieu_tra_hang_nhap_id,
 

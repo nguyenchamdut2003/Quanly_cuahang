@@ -18,7 +18,8 @@
     "test:purchase-pay-supplier-v2": "node scripts/local-tests/smoke-purchase-pay-supplier-v2.js",
     "test:supplier-pay-debt-v2": "node scripts/local-tests/smoke-supplier-pay-debt-v2.js",
     "test:return-import-payment-v2": "node scripts/local-tests/smoke-return-import-payment-v2.js",
-    "test:so-quy-v2-ncc-full": "node scripts/local-tests/smoke-so-quy-v2-ncc-full.js"
+    "test:so-quy-v2-ncc-full": "node scripts/local-tests/smoke-so-quy-v2-ncc-full.js",
+    "test:vat-chua-schema": "node scripts/smoke-vat-chua-schema.js"
   },
   "dependencies": {
     "archiver": "^8.0.0",

@@ -31,61 +31,129 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
-    *{box-sizing:border-box}html,body{height:100%;margin:0}body{overflow:hidden;background:#e9edf2;color:#0f172a}.topbar{height:64px;background:#0070f4;color:#fff;display:flex;align-items:center;gap:18px;padding:0 8px}.topbar .search{width:524px;flex:0 0 524px}.search{position:relative;max-width:100%}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:44px;border:0;border-radius:6px;padding:0 12px 0 36px;font-size:16px;outline:none}.topbar-scan{height:32px;width:32px;border:0;background:transparent;color:#9dccff;font-size:20px}.tab{height:54px;background:#fff;color:#111827;padding:0 14px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:14px;font-weight:800;font-size:18px;align-self:flex-end;min-width:150px}.add-tab{height:32px;width:32px;border-radius:50%;border:1px solid rgba(255,255,255,.9);background:#0070f4;color:#fff;font-size:16px}.top-actions{margin-left:auto;display:flex;align-items:center;gap:24px;font-size:20px}.top-actions span{font-size:17px;font-weight:700}.return-app{height:calc(100vh - 64px);display:grid;grid-template-columns:minmax(0,1fr) 570px;gap:0;padding:0}.left{display:flex;flex-direction:column;min-width:0;min-height:0;background:#e9edf2}.right{margin:14px 10px 12px 0;background:#fff;border-radius:10px;display:flex;flex-direction:column;padding:16px 20px;min-height:0}.cart{flex:0 0 min(360px,42vh);min-height:0;overflow:auto;padding:14px 6px 0 12px}.return-row{height:96px;background:#fff;border:1px solid #d7dde5;border-radius:10px;margin-bottom:2px;display:grid;grid-template-columns:38px 150px minmax(220px,1fr) 110px 110px 110px 36px;align-items:center;padding:0 20px;box-shadow:0 2px 8px rgba(15,23,42,.12)}.code{font-size:18px}.name{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qty-wrap{text-align:center}.line-input{height:30px;border:0;border-bottom:1px solid #c2cad3;text-align:center;font-size:18px;outline:none;width:84px;background:transparent}.origin{font-size:15px;color:#475569;margin-top:6px}.num{text-align:right;font-weight:800}.return-swap{height:62px;background:#0070f4;display:flex;align-items:center;padding:0 8px;gap:18px}.return-swap .search{width:524px;flex:0 0 524px}.return-swap:after{content:'\f02a';font-family:'Font Awesome 6 Free';font-weight:900;color:#9dccff;font-size:22px}.swap-cart{flex:1;min-height:120px;padding-top:8px}.note{height:72px;background:#fff;border-radius:10px;margin:12px 12px 12px;padding:24px 32px;color:#667085;font-size:18px}.right-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:18px;align-items:center;font-size:18px;margin-bottom:16px}.right-head span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.customer{height:42px;background:#eef0f3;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 12px;color:#0070f4;font-weight:800;font-size:18px;margin-bottom:22px}.link-line{font-size:22px;font-weight:800;color:#00a651;margin-bottom:18px}.link-line a{color:#0070f4;text-decoration:none;font-weight:500}.sum-line{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px;gap:12px;align-items:center;margin:19px 0;font-size:18px}.sum-line input{height:32px;border:0;border-bottom:1px solid #c2cad3;text-align:right;font-size:20px;outline:none}.sum-line strong{font-weight:800}.payable{color:#0070f4;font-size:22px}.submit{margin-top:auto;height:66px;border:0;border-radius:10px;background:#0070f4;color:#fff;font-weight:900;font-size:22px;cursor:pointer}.product-results{display:none;position:absolute;top:48px;left:0;width:100%;background:#fff;color:#111827;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 12px 26px rgba(0,0,0,.18);z-index:80;max-height:320px;overflow:auto}.product-result{height:44px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer}.product-result:hover{background:#f0f7ff}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:22px;z-index:100}.modal-backdrop.open{display:flex}.modal{width:1404px;max-width:calc(100vw - 80px);height:618px;background:#fff;border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.35);padding:26px 36px;position:relative}.modal h2{margin:0 0 24px;font-size:20px}.close{position:absolute;right:34px;top:28px;border:0;background:#fff;font-size:28px;color:#6b7280;cursor:pointer}.modal-grid{display:grid;grid-template-columns:235px minmax(0,1fr);gap:38px}.filter-card{background:#fff;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:18px 20px;margin-bottom:28px}.filter-card h3{margin:0 0 20px;font-size:16px}.filter-input{width:100%;height:46px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none}.invoice-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-table table{width:100%;border-collapse:collapse}.invoice-table th{height:46px;background:#338cf2;color:#fff;text-align:left;padding:0 12px;font-size:16px}.invoice-table td{height:49px;border-bottom:1px solid #dde3ea;padding:0 12px;font-size:16px}.invoice-table a{color:#006dff;text-decoration:none}.choose{height:30px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.pager{height:66px;display:flex;align-items:center;justify-content:flex-end;gap:12px}.page-btn{width:38px;height:38px;border-radius:8px;border:0;background:#fff;color:#111827;font-weight:800;cursor:pointer}.page-btn.active{background:#0070f4;color:#fff}.page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick{position:absolute;right:36px;bottom:28px;height:44px;border:0;border-radius:7px;background:#0070f4;color:#fff;font-weight:800;font-size:16px;padding:0 26px}
-    .return-row{height:76px;grid-template-columns:34px 132px minmax(190px,1fr) 92px 96px 118px 24px;padding:0 16px;border-radius:8px}
-    .code,.name{font-size:15px}
-    .line-input{height:26px;width:72px;font-size:15px}
-    .origin{font-size:12px;margin-top:4px}
-    .num{font-size:15px}
+    :root{
+      --text-xs:12px;
+      --text-base:14px;
+      --text-lg:16px;
+      --text-xl:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-size:var(--text-base);line-height:1.4}
+    body{overflow:hidden;background:#e9edf2;color:#0f172a}.topbar{height:46px;background:#0070f4;color:#fff;display:flex;align-items:center;gap:10px;padding:0 10px}.topbar .search{width:460px;flex:0 0 460px}.search{position:relative;max-width:100%}.search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#667085;font-size:var(--text-base)}.search input{width:100%;height:34px;border:0;border-radius:6px;padding:0 10px 0 32px;font-size:var(--text-base);outline:none}.topbar-scan{height:28px;width:28px;border:0;background:transparent;color:#9dccff;font-size:var(--text-lg);cursor:pointer}.btn-pick-invoice{height:30px;border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:0 12px;font-size:var(--text-base);font-weight:700;cursor:pointer;white-space:nowrap}.btn-pick-invoice:hover{background:rgba(255,255,255,.22)}.top-actions{margin-left:auto;display:flex;align-items:center;gap:18px;font-size:var(--text-lg)}.top-actions span{font-size:var(--text-base);font-weight:700}.return-app{height:calc(100vh - 46px);display:grid;grid-template-columns:minmax(0,1fr) 570px;gap:0;padding:0}.left{display:flex;flex-direction:column;min-width:0;min-height:0;background:#e9edf2}.right{margin:10px 10px 10px 0;background:#fff;border-radius:10px;display:flex;flex-direction:column;padding:16px 20px;min-height:0}.cart{flex:0 0 min(360px,42vh);min-height:0;overflow:auto;padding:14px 6px 0 12px}.return-row{height:96px;background:#fff;border:1px solid #d7dde5;border-radius:10px;margin-bottom:2px;display:grid;grid-template-columns:38px 150px minmax(220px,1fr) 110px 110px 110px 36px;align-items:center;padding:0 20px;box-shadow:0 2px 8px rgba(15,23,42,.12)}.code{font-size:var(--text-xl)}.name{font-size:var(--text-xl);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.qty-wrap{text-align:center}.line-input{height:30px;border:0;border-bottom:1px solid #c2cad3;text-align:center;font-size:var(--text-xl);outline:none;width:84px;background:transparent}.origin{font-size:var(--text-base);color:#475569;margin-top:6px}.num{text-align:right;font-weight:800}.return-swap{height:42px;background:#0070f4;display:flex;align-items:center;padding:0 8px;gap:10px}.return-swap .search{width:460px;flex:0 0 460px}.return-swap .search input{height:32px;font-size:var(--text-base)}.return-swap:after{content:'\f02a';font-family:'Font Awesome 6 Free';font-weight:900;color:#9dccff;font-size:var(--text-lg)}.swap-cart{flex:1;min-height:120px;padding-top:8px}.note{height:72px;background:#fff;border-radius:10px;margin:12px 12px 12px;padding:24px 32px;color:#667085;font-size:var(--text-xl)}.right-head{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:18px;align-items:center;font-size:var(--text-xl);margin-bottom:16px}.right-head span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.customer{height:42px;background:#eef0f3;border-radius:6px;display:flex;align-items:center;gap:10px;padding:0 12px;color:#0070f4;font-weight:800;font-size:var(--text-xl);margin-bottom:22px}.link-line{font-size:var(--text-xl);font-weight:800;color:#00a651;margin-bottom:18px}.link-line a{color:#0070f4;text-decoration:none;font-weight:500}.sum-line{display:grid;grid-template-columns:minmax(0,1fr) 120px 110px;gap:12px;align-items:center;margin:19px 0;font-size:var(--text-xl)}.sum-line input{height:32px;border:0;border-bottom:1px solid #c2cad3;text-align:right;font-size:var(--text-lg);outline:none}.sum-line strong{font-weight:800}.product-results{display:none;position:absolute;top:38px;left:0;width:100%;background:#fff;color:#111827;border:1px solid #cfd8e3;border-radius:6px;box-shadow:0 12px 26px rgba(0,0,0,.18);z-index:80;max-height:320px;overflow:auto}.product-result{height:40px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:var(--text-base)}.product-result:hover{background:#f0f7ff}.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:22px;z-index:100}.modal-backdrop.open{display:flex}.modal{width:1404px;max-width:calc(100vw - 80px);height:618px;background:#fff;border-radius:16px;box-shadow:0 18px 40px rgba(0,0,0,.35);padding:26px 36px;position:relative}.modal h2{margin:0 0 24px;font-size:var(--text-lg)}.close{position:absolute;right:34px;top:28px;border:0;background:#fff;font-size:var(--text-xl);color:#6b7280;cursor:pointer}.modal-grid{display:grid;grid-template-columns:235px minmax(0,1fr);gap:38px}.filter-card{background:#fff;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:18px 20px;margin-bottom:28px}.filter-card h3{margin:0 0 20px;font-size:var(--text-lg)}.filter-input{width:100%;height:46px;border:0;border-bottom:1px solid #c2cad3;font-size:var(--text-lg);outline:none}.invoice-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-table table{width:100%;border-collapse:collapse}.invoice-table th{height:46px;background:#338cf2;color:#fff;text-align:left;padding:0 12px;font-size:var(--text-lg)}.invoice-table td{height:49px;border-bottom:1px solid #dde3ea;padding:0 12px;font-size:var(--text-lg)}.invoice-table a{color:#006dff;text-decoration:none}.choose{height:30px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:var(--text-lg);cursor:pointer}.pager{height:66px;display:flex;align-items:center;justify-content:flex-end;gap:12px}.page-btn{width:38px;height:38px;border-radius:8px;border:0;background:#fff;color:#111827;font-weight:800;cursor:pointer}.page-btn.active{background:#0070f4;color:#fff}.page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick{position:absolute;right:36px;bottom:28px;height:44px;border:0;border-radius:7px;background:#0070f4;color:#fff;font-weight:800;font-size:var(--text-lg);padding:0 26px}
+    .return-row{height:auto;min-height:76px;grid-template-columns:34px 132px minmax(190px,1fr) 92px 96px 118px 24px;padding:10px 16px;border-radius:8px;align-items:flex-start}
+    .code,.name{font-size:var(--text-base)}
+    .line-input{height:28px;width:72px;border:1px solid #cfd8e3;border-radius:6px;padding:0 6px;font-size:var(--text-base);background:#fff;text-align:center;outline:none}
+    .origin{font-size:var(--text-xs);margin-top:4px}
+    .num{font-size:var(--text-base)}
     .cart{flex-basis:min(300px,38vh);padding-top:8px}
-    .right{padding:14px 18px;overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 88px);min-height:0;scrollbar-gutter:stable}
+    .right{padding:14px 18px;overflow-y:auto;overflow-x:hidden;max-height:calc(100vh - 66px);min-height:0;scrollbar-gutter:stable}
     .right::-webkit-scrollbar{width:8px}
     .right::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
     .right::-webkit-scrollbar-track{background:transparent}
-    .right-head{font-size:15px;margin-bottom:10px}
-    .customer{height:34px;font-size:15px;margin-bottom:14px}
-    .link-line{font-size:18px;line-height:1.35;margin-bottom:16px}
-    .sum-line{grid-template-columns:minmax(0,1fr) 150px;gap:10px;margin:14px 0;font-size:15px}
-    .sum-line>span.num{display:none}
-    .sum-line>span:empty{display:none}
-    .sum-line input{height:28px;font-size:15px}
-    .payable{font-size:18px}
-    .submit{height:56px;font-size:18px}
+    .right-head{font-size:var(--text-base);margin-bottom:10px}
+    .customer{height:34px;font-size:var(--text-lg);font-weight:800;margin-bottom:14px}
+    .link-line{font-size:var(--text-xl);font-weight:800;line-height:1.35;margin-bottom:16px}
+    .sum-line{display:flex;align-items:center;gap:12px;margin:6px 0;font-size:var(--text-base);min-height:32px}
+    .sum-group{margin:8px 0 10px}
+    .sum-group .sum-line{margin:4px 0}
+    .sum-label{flex:1 1 auto;min-width:0;color:#344054}
+    .sum-value,.sum-line>strong{flex:0 0 148px;margin-left:auto;text-align:right;font-weight:700;white-space:nowrap}
+    .sum-line input{flex:0 0 148px;width:148px;margin-left:auto;height:28px;border:1px solid #cfd8e3;border-radius:6px;padding:0 8px;font-size:var(--text-base);background:#fff;text-align:right;outline:none}
+    .payment-input,.payment-select{height:32px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:var(--text-base);background:#fff;text-align:right}
+    .payment-select{text-align:left}
+    .middle-payment{margin-top:10px;padding-top:14px;border-top:1px solid #d7dde5}
+    .middle-payment-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;color:#667085;font-size:var(--text-base);font-weight:700}
+    .middle-payment-row .payment-input,.middle-payment-row .payment-select{width:148px}
+    .middle-payment-total{color:#0b172a;font-size:var(--text-lg);font-weight:800}
+    .payment-title{font-size:var(--text-xs);font-weight:800;color:#344054;text-transform:uppercase;letter-spacing:.02em;margin-bottom:8px}
+    .middle-payment-row .payment-select.field-invalid,.middle-payment-row .payment-input.field-invalid{border-color:#d92d20;box-shadow:0 0 0 1px #fda29b}
+    .required-mark{color:#d92d20}
+    .money-input-wrap{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;white-space:nowrap}
+    .money-unit{color:#667085;font-weight:700;font-size:var(--text-xs)}
+    .btn-pay-all{height:28px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:6px;padding:0 8px;font-size:var(--text-xs);font-weight:700;cursor:pointer;white-space:nowrap}
+    .submit-wrap{margin-top:auto;padding-top:12px}
+    .submit{width:100%;height:50px;border:0;border-radius:10px;background:linear-gradient(180deg,#1a8cff 0%,#0066e0 100%);color:#fff;font-weight:800;font-size:var(--text-lg);letter-spacing:.04em;cursor:pointer;box-shadow:0 4px 14px rgba(0,112,244,.35);transition:transform .12s ease,box-shadow .12s ease}
+    .submit:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,112,244,.42)}
+    .submit:active:not(:disabled){transform:translateY(0)}
+    .submit:disabled{opacity:.65;cursor:not-allowed;box-shadow:none}
     .return-section{border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:12px 0;margin:4px 0 10px}
-    .section-title{font-weight:800;margin-bottom:8px;font-size:15px}
+    .section-title{font-weight:800;margin-bottom:8px;font-size:var(--text-lg)}
     .receive-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
-    .receive-option{height:34px;border:1px solid #cbd5e1;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;cursor:pointer;background:#fff}
+    .receive-option{height:34px;border:1px solid #cbd5e1;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:var(--text-base);cursor:pointer;background:#fff}
     .receive-option input{margin:0}
     .transport-fields{display:none;grid-template-columns:1fr 1fr;gap:8px}
     .transport-field{display:flex;flex-direction:column;gap:4px}
     .transport-field.full{grid-column:1/-1}
-    .transport-field label{font-size:12px;font-weight:700;color:#475569}
-    .transport-field input,.transport-field select,.transport-field textarea{width:100%;border:1px solid #cbd5e1;border-radius:6px;min-height:34px;padding:6px 8px;font-size:14px;background:#fff}
+    .transport-field label{font-size:var(--text-xs);font-weight:700;color:#475569}
+    .transport-field input,.transport-field select,.transport-field textarea{width:100%;border:1px solid #cbd5e1;border-radius:6px;min-height:34px;padding:6px 8px;font-size:var(--text-base);background:#fff}
+    .transport-field input[type="number"],.transport-field input.num-input,#returnPickupFee{text-align:right}
     .transport-field textarea{min-height:48px;resize:vertical}
-    .fee-note{display:none;color:#64748b;font-size:12px;margin-top:-4px;margin-bottom:4px}
+    .fee-note{display:none;color:#64748b;font-size:var(--text-xs);margin-top:-4px;margin-bottom:4px}
+    .vat-chua-combo{display:grid;grid-template-columns:minmax(0,1fr) 88px;gap:8px}
+    .vat-chua-combo select,.vat-chua-combo input{width:100%;min-height:34px;border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:var(--text-base);background:#fff}
+    .vat-chua-combo input{text-align:right}
+    .vat-chua-title{display:flex;align-items:center;gap:8px}
+    .vat-chua-help{position:relative;display:inline-flex;align-items:center;justify-content:center;color:#d97706;cursor:help;font-size:var(--text-base);line-height:1}
+    .vat-chua-help-tip{display:none;position:absolute;left:0;top:calc(100% + 8px);width:min(280px,calc(100vw - 48px));padding:10px 12px;background:#1f2937;color:#fff;font-size:var(--text-xs);font-weight:400;line-height:1.45;border-radius:8px;z-index:30;box-shadow:0 10px 24px rgba(15,23,42,.22)}
+    .vat-chua-help-tip strong{display:block;margin-bottom:4px;color:#fde68a;font-weight:700}
+    .vat-chua-help:hover .vat-chua-help-tip,.vat-chua-help:focus-within .vat-chua-help-tip{display:block}
+    .search-item{height:42px;padding:0 12px;display:flex;align-items:center;justify-content:space-between;font-size:var(--text-base);cursor:pointer}
+    .search-item:hover{background:#f0f7ff}
+    .search-item.product-search-item{height:auto;min-height:52px;padding:7px 12px;gap:12px}
+    .search-item-info{min-width:0}
+    .search-item-main{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .search-item-meta{display:block;margin-top:3px;color:#667085;font-size:var(--text-xs);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .search-item-price{flex:0 0 auto}
+    .swap-cart-table-wrap{flex:1;min-height:120px;overflow:auto;padding:8px 12px 12px}
+    .cart-table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden}
+    .cart-table th{height:36px;background:#e8f3ff;text-align:left;padding:0 10px;border-bottom:1px solid #bcd9ff;font-size:var(--text-base)}
+    .cart-table td{height:40px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:var(--text-base)}
+    .cart-table .num{text-align:right}
+    .cart-table .small{width:74px;height:28px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 6px}
+    .discount-pair{display:inline-flex;gap:6px;align-items:center;justify-content:flex-end}
+    .discount-pair select{width:70px;height:28px;border:1px solid #cfd8e3;border-radius:5px;background:#fff}
+    .stock-text{display:block;margin-top:3px;color:#667085;font-size:var(--text-xs)}
+    .money-input-wrap{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;white-space:nowrap}
+    .lot-cell{min-width:88px;cursor:pointer;vertical-align:middle;transition:background .15s}
+    .lot-cell:hover{background:#eef6ff}
+    .lot-cell.is-active{background:#dbeafe;box-shadow:inset 0 0 0 2px #3b82f6}
+    .lot-cell-empty{cursor:default;background:#fafbfc}
+    .lot-cell-main{font-weight:700;font-size:var(--text-base);line-height:1.3}
+    .lot-cell-sub{margin-top:2px;color:#667085;font-size:var(--text-xs);line-height:1.25;text-align:right}
+    .lot-inline-normal{padding:6px 10px!important;height:auto!important}
+    .lot-inline-normal .inline-detail-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;align-items:center;font-size:var(--text-base)}
+    .lot-inline-normal .inline-detail-grid .inline-label{color:#667085;font-size:var(--text-xs);margin-bottom:2px}
+    .qc-row td{height:auto;padding:0 10px 10px 86px;background:#fbfdff}
+    .qc-table{width:100%;border-collapse:collapse;border:1px solid #dbe7f5;background:#fff}
+    .qc-table th,.qc-table td{height:32px;padding:0 8px;border-bottom:1px solid #edf2f7;font-size:var(--text-base)}
+    .qc-table th{background:#f2f8ff;font-weight:700}
+    .qc-input{width:74px;height:26px;border:1px solid #cfd8e3;border-radius:5px;text-align:right;padding:0 6px}
+    .qc-table .num{text-align:right}
+    .swap-cart-empty{height:120px;display:flex;align-items:center;justify-content:center;color:#667085;font-size:var(--text-base)}
+    .note{font-size:var(--text-base);height:auto;min-height:56px;padding:16px 20px}
+    .return-status{min-height:24px;margin-top:8px;color:#667085;font-size:var(--text-base)}
+    .top-actions{font-size:var(--text-base)}
+    .modal h2{font-size:var(--text-lg);font-weight:800}
+    .filter-card h3{font-size:var(--text-lg);font-weight:800}
+    .filter-input,.invoice-table th,.invoice-table td,.choose,.quick{font-size:var(--text-base)}
+    .close{font-size:var(--text-lg)}
   </style>
 </head>
 <body>
   <div class="topbar">
     <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="itemSearch" placeholder="Tìm hàng trả (F3)" onfocus="handleItemSearch(true)" oninput="handleItemSearch()"><div id="productResults" class="product-results"></div></div>
-    <button class="topbar-scan" type="button"><i class="fa-solid fa-barcode"></i></button>
-    <div class="tab">Trả hàng 1 <i class="fa-solid fa-xmark"></i></div>
-    <button class="add-tab" type="button" onclick="openInvoiceModal()"><i class="fa-solid fa-plus"></i></button>
-    <i class="fa-solid fa-caret-down"></i>
-    <div class="top-actions">
-      <i class="fa-solid fa-briefcase"></i>
-      <i class="fa-solid fa-reply"></i>
-      <i class="fa-solid fa-rotate"></i>
-      <i class="fa-solid fa-print"></i>
-      <span>0376946978</span>
-      <i class="fa-solid fa-bars"></i>
-    </div>
+    <button class="btn-pick-invoice" type="button" onclick="openInvoiceModal()"><i class="fa-solid fa-file-invoice"></i> Chọn hóa đơn</button>
   </div>
   <main class="return-app">
     <section class="left">
       <div id="returnItems" class="cart"></div>
       <div class="return-swap"><div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="swapSearch" placeholder="Tìm hàng đổi (F7)" onfocus="handleSwapSearch(true)" oninput="handleSwapSearch()"><div id="swapResults" class="product-results"></div></div></div>
-      <div id="swapItems" class="cart swap-cart"></div>
+      <div class="swap-cart-table-wrap">
+        <table class="cart-table">
+          <thead id="swapCartHead"></thead>
+          <tbody id="swapCartBody"></tbody>
+        </table>
+      </div>
       <div class="note"><i class="fa-solid fa-pen"></i> Ghi chú phiếu trả</div>
     </section>
     <section class="right">
@@ -100,9 +168,11 @@
         <label for="returnNote">Ghi chú</label>
         <input id="returnNote" placeholder="Ghi chú phiếu trả hàng">
       </div>
-      <div class="sum-line"><span>Tổng giá gốc hàng mua</span><span id="originTotal">0</span><span class="num">0</span></div>
-      <div class="sum-line"><span>Tổng tiền hàng trả</span><span id="returnTotal">0</span><span class="num">0</span></div>
-      <div class="sum-line"><span>Tổng tiền hàng đổi</span><span id="exchangeTotal">0</span><span class="num">0</span></div>
+      <div class="sum-group">
+        <div class="sum-line"><span class="sum-label">Tổng giá gốc hàng mua</span><span id="originTotal" class="sum-value">0</span></div>
+        <div class="sum-line"><span class="sum-label">Tổng tiền hàng trả</span><span id="returnTotal" class="sum-value">0</span></div>
+        <div class="sum-line"><span class="sum-label">Tổng tiền hàng đổi</span><span id="exchangeTotal" class="sum-value">0</span></div>
+      </div>
       <div class="return-section">
         <div class="section-title">Hình thức nhận hàng trả</div>
         <div class="receive-options">
@@ -134,7 +204,7 @@
           </div>
           <div class="transport-field">
             <label for="returnPickupFee">Phí lấy hàng trả</label>
-            <input id="returnPickupFee" value="0" oninput="renderTotals()">
+            <input id="returnPickupFee" class="num-input" value="0" inputmode="numeric" oninput="handleNumInput(this, renderTotals)">
           </div>
           <div class="transport-field">
             <label for="returnFeePayer">Người trả phí</label>
@@ -153,15 +223,57 @@
           </div>
         </div>
       </div>
-      <div class="sum-line"><span>Chênh lệch</span><span></span><strong id="differenceTotal" class="num">0</strong></div>
-      <div class="sum-line"><span>Giảm giá</span><span></span><input id="discount" value="0" oninput="renderTotals()"></div>
+      <div class="sum-line"><span class="sum-label">Chênh lệch</span><strong id="differenceTotal" class="sum-value">0</strong></div>
+      <div class="sum-line"><span class="sum-label">Giảm giá</span><input id="discount" class="num-input" value="0" inputmode="numeric" oninput="handleNumInput(this, renderTotals)"></div>
       <input id="discountType" type="hidden" value="vnd">
-      <div class="sum-line"><span>Phí trả hàng</span><span></span><input id="returnFee" value="0" oninput="renderTotals()"></div>
+      <div class="sum-line"><span class="sum-label">Phí trả hàng</span><input id="returnFee" class="num-input" value="0" inputmode="numeric" oninput="handleNumInput(this, renderTotals)"></div>
       <div id="pickupFeeNote" class="fee-note">Phí lấy hàng do cửa hàng trả, không trừ vào tiền trả khách.</div>
-      <div class="sum-line"><strong id="payableLabel">Cần trả khách</strong><span></span><strong id="payable" class="payable num">0</strong></div>
-      <div class="sum-line" id="customerPaidExtraRow" style="display:none"><span>Khách thanh toán thêm</span><input id="customerPaidExtra" value="0" oninput="customerPaidExtraTouched=true"></div>
-      <div id="returnStatus" style="min-height:24px;margin-top:auto;color:#667085;font-size:14px"></div>
-      <button id="submitReturnBtn" class="submit" type="button" onclick="submitReturn()">TRẢ HÀNG</button>
+      <div class="return-section">
+        <div class="section-title vat-chua-title">
+          <span>Vật chứa</span>
+          <span class="vat-chua-help" tabindex="0" aria-label="Giải thích số lượng vật chứa">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span class="vat-chua-help-tip">
+              <strong>Số lượng dương (+)</strong>
+              Khách trả lại vật chứa — hệ thống nhập kho vật chứa.
+              <strong style="margin-top:8px">Số lượng âm (-)</strong>
+              Khách đổi/lấy hàng cần vật chứa đựng — hệ thống xuất kho vật chứa.
+            </span>
+          </span>
+        </div>
+        <div class="vat-chua-combo">
+          <select id="returnVatChuaId" title="Chọn vật chứa">
+            <option value="">— Chọn vật chứa —</option>
+            <% (Array.isArray(locals.vatChuaList) ? locals.vatChuaList : []).forEach(function(vc) { %>
+              <option value="<%= vc._id %>"><%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %></option>
+            <% }) %>
+          </select>
+          <input id="returnVatChuaQty" class="num-input signed-num-input" value="" inputmode="numeric" placeholder="SL" title="Nhập dương để nhập kho, âm để xuất kho" data-allow-empty="1" data-allow-signed="1" oninput="handleSignedNumInput(this)">
+        </div>
+      </div>
+      <div id="returnPaymentSection" class="middle-payment" style="display:none">
+        <div class="payment-title">Chi tiết thanh toán</div>
+        <div class="middle-payment-row"><span>Tiền mặt</span><span class="money-input-wrap"><input id="cashCustomerGiven" class="payment-input" value="0" inputmode="numeric" oninput="handleReturnPaymentInput(this, 'cash')"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillReturnPaymentAll('cash')">Tất cả</button></span></div>
+        <div class="middle-payment-row"><span>Sổ tiền mặt <span id="cashBookRequiredMark" class="required-mark" style="display:none">*</span></span>
+          <select id="cashBookId" class="payment-select" disabled>
+            <option value="">Chọn sổ tiền mặt</option>
+          </select>
+        </div>
+        <div class="middle-payment-row"><span>Chuyển khoản</span><span class="money-input-wrap"><input id="transferCustomerGiven" class="payment-input" value="0" inputmode="numeric" oninput="handleReturnPaymentInput(this, 'transfer')"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillReturnPaymentAll('transfer')">Tất cả</button></span></div>
+        <div class="middle-payment-row"><span>Tài khoản ngân hàng <span id="bankBookRequiredMark" class="required-mark" style="display:none">*</span></span>
+          <select id="bankBookId" class="payment-select" disabled>
+            <option value="">Chọn tài khoản</option>
+          </select>
+        </div>
+        <div class="middle-payment-row"><span>Tiền thừa</span><span class="money-input-wrap"><input id="changeReturnedToCustomer" class="payment-input" value="0" inputmode="numeric" oninput="handleReturnPaymentInput(this, 'change')"><span class="money-unit">VNĐ</span></span></div>
+        <div class="middle-payment-row"><span id="returnPayableLabel">Cần trả khách</span><strong id="returnPayableAmount">0 VNĐ</strong></div>
+        <div class="middle-payment-row"><span id="returnPaidLabel">Đã trả khách</span><strong id="returnPaidAmount">0 VNĐ</strong></div>
+        <div class="middle-payment-row middle-payment-total"><span id="returnRemainingLabel">Còn phải trả</span><strong id="returnRemainingAmount">0 VNĐ</strong></div>
+      </div>
+      <div id="returnStatus" class="return-status"></div>
+      <div class="submit-wrap">
+        <button id="submitReturnBtn" class="submit" type="button" onclick="submitReturn()">TRẢ HÀNG</button>
+      </div>
     </section>
   </main>
   <div id="invoiceModal" class="modal-backdrop">
@@ -200,15 +312,25 @@
   <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
   <script id="copy-draft-embed" type="application/json"><%- copyDraftJson %></script>
   <% } %>
+  <% if (typeof prefillInvoiceJson === 'string' && prefillInvoiceJson) { %>
+  <script id="prefill-invoice-embed" type="application/json"><%- prefillInvoiceJson %></script>
+  <% } %>
   <script>
+    const $ = (id) => document.getElementById(id);
     let copyDraft = null;
+    let prefillInvoicePayload = null;
     (function() {
-      const el = document.getElementById('copy-draft-embed');
-      if (el) {
-        try { copyDraft = JSON.parse(el.textContent || 'null'); } catch (e) { copyDraft = null; }
+      const copyEl = document.getElementById('copy-draft-embed');
+      if (copyEl) {
+        try { copyDraft = JSON.parse(copyEl.textContent || 'null'); } catch (e) { copyDraft = null; }
+      }
+      const prefillEl = document.getElementById('prefill-invoice-embed');
+      if (prefillEl && String(prefillEl.textContent || '').trim()) {
+        try { prefillInvoicePayload = JSON.parse(prefillEl.textContent || 'null'); } catch (e) { prefillInvoicePayload = null; }
       }
     })();
     const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
+    const prefillInvoiceError = <%- JSON.stringify(prefillInvoiceError || '') %>;
     const invoices = <%- JSON.stringify(invoicePayload) %>;
     const products = <%- JSON.stringify(productPayload) %>;
     const partners = <%- JSON.stringify(partnerPayload) %>;
@@ -217,10 +339,614 @@
     let selectedInvoice = null;
     let returnItems = [];
     let swapItems = [];
-    let customerPaidExtraTouched = false;
+    let swapAvailableProducts = [];
+    let swapStockByProduct = new Map();
+    let swapProductsLoading = false;
+    let expandedSwapLotKeyByItem = {};
+    let returnPaymentTouched = false;
+    let returnIsPayAllMode = false;
+    let returnPayAllTarget = 'cash';
+    let returnPaymentPriority = 'cash';
+    let cashBookOptions = [];
+    let bankBookOptions = [];
+    let lastReturnPaymentTotals = { khachCanTra: 0, khachThanhToan: 0, tienThuaTraKhach: 0, tongKhachDua: 0, isRefund: true };
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
     const fmtMoney = n => fmt(n) + ' VNĐ';
     const num = v => Number(String(v || '').replace(/\./g, '').replace(/,/g, '')) || 0;
+    const numSigned = v => {
+      const raw = String(v || '').trim().replace(/\./g, '').replace(/,/g, '');
+      if (!raw || raw === '-') return 0;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const fmtSigned = n => {
+      const qty = Math.floor(Number(n) || 0);
+      if (!qty) return '0';
+      const abs = fmt(Math.abs(qty));
+      return qty < 0 ? '-' + abs : abs;
+    };
+    function handleNumInput(input, callback) {
+      if (!input) return;
+      const raw = String(input.value || '').trim();
+      if (raw === '' && input.dataset.allowEmpty === '1') {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      input.value = fmt(Math.max(0, num(raw)));
+      if (typeof callback === 'function') callback();
+    }
+    function handleSignedNumInput(input, callback) {
+      if (!input) return;
+      const raw = String(input.value || '').trim();
+      if (raw === '' && input.dataset.allowEmpty === '1') {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      if (raw === '-') {
+        if (typeof callback === 'function') callback();
+        return;
+      }
+      input.value = fmtSigned(numSigned(raw));
+      if (typeof callback === 'function') callback();
+    }
+    function formatNumInputValues(root) {
+      const scope = root && root.querySelectorAll ? root : document;
+      scope.querySelectorAll('input.num-input, input.line-input, input.payment-input, .cart-table input.small, .cart-table input.qc-input').forEach(el => {
+        if (el.readOnly || el.type === 'hidden') return;
+        const raw = String(el.value || '').trim();
+        if (raw === '' && el.dataset.allowEmpty === '1') return;
+        if (el.dataset.allowSigned === '1') {
+          if (raw === '-') return;
+          el.value = fmtSigned(numSigned(raw));
+          return;
+        }
+        el.value = fmt(Math.max(0, num(raw)));
+      });
+    }
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+    function firstNumber(...values) {
+      for (const value of values) {
+        if (value === undefined || value === null || value === '') continue;
+        const number = Number(value);
+        if (Number.isFinite(number)) return number;
+      }
+      return 0;
+    }
+    function inventoryMetrics(row = {}, fallbackStock = 0) {
+      const tonThucTe = firstNumber(row.ton_thuc_te, row.ton_hien_tai, row.ton_kho, row.ton, fallbackStock, 0);
+      const soLuongKhachDat = Math.max(0, firstNumber(row.so_luong_khach_dat, row.khach_dat, row.da_dat, 0));
+      const soLuongKhaDung = firstNumber(row.so_luong_kha_dung, row.kha_dung, tonThucTe - soLuongKhachDat);
+      return { tonThucTe, soLuongKhachDat, soLuongKhaDung };
+    }
+    function swapStockFor(productId) { return Number(swapStockByProduct.get(String(productId)) || 0); }
+    function swapProductMetrics(product = {}) {
+      if (product.has_quy_cach && Array.isArray(product.quy_cach_items) && product.quy_cach_items.length) {
+        return product.quy_cach_items.reduce((sum, qc) => {
+          const metrics = inventoryMetrics(qc);
+          sum.tonThucTe += metrics.tonThucTe;
+          sum.soLuongKhachDat += metrics.soLuongKhachDat;
+          sum.soLuongKhaDung += metrics.soLuongKhaDung;
+          return sum;
+        }, { tonThucTe: 0, soLuongKhachDat: 0, soLuongKhaDung: 0 });
+      }
+      if (product.quan_ly_theo_lo && Array.isArray(product.lot_items) && product.lot_items.length) {
+        const lotMetrics = product.lot_items.reduce((sum, lot) => {
+          const metrics = inventoryMetrics(lot);
+          sum.tonThucTe += metrics.tonThucTe;
+          sum.soLuongKhachDat += metrics.soLuongKhachDat;
+          sum.soLuongKhaDung += metrics.soLuongKhaDung;
+          return sum;
+        }, { tonThucTe: 0, soLuongKhachDat: 0, soLuongKhaDung: 0 });
+        const productReserved = Math.max(0, firstNumber(product.so_luong_khach_dat, 0));
+        const reserved = Math.max(lotMetrics.soLuongKhachDat, productReserved);
+        return {
+          tonThucTe: lotMetrics.tonThucTe,
+          soLuongKhachDat: reserved,
+          soLuongKhaDung: lotMetrics.tonThucTe - reserved
+        };
+      }
+      return inventoryMetrics(product, swapStockFor(product._id));
+    }
+    const swapSalePriceCache = new Map();
+    const formatDateVi = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
+    async function fetchSwapSalePrice(productId, ctx = {}) {
+      const key = [productId, ctx.lo_hang_id || '', ctx.gia_tri_thuoc_tinh_id || '', ctx.ten_quy_cach || ''].join('|');
+      if (swapSalePriceCache.has(key)) return swapSalePriceCache.get(key);
+      const product = swapAvailableProducts.find(p => String(p._id) === String(productId));
+      let data = { gia_ban: Number(product?.gia_ban || 0), cho_phep_sua_gia: true };
+      try {
+        const params = new URLSearchParams();
+        if (ctx.lo_hang_id) params.set('lo_hang_id', String(ctx.lo_hang_id));
+        if (ctx.gia_tri_thuoc_tinh_id) params.set('gia_tri_thuoc_tinh_id', String(ctx.gia_tri_thuoc_tinh_id));
+        if (ctx.ten_quy_cach) params.set('ten_quy_cach', String(ctx.ten_quy_cach));
+        const res = await fetch('/api/hang-hoa/' + encodeURIComponent(productId) + '/gia' + (params.toString() ? '?' + params.toString() : ''));
+        const json = await res.json();
+        if (json && json.success && json.data) data = json.data;
+      } catch (_) { /* fallback gia_co_dinh */ }
+      if (!Number(data.gia_ban)) data.gia_ban = Number(product?.gia_ban || 0);
+      swapSalePriceCache.set(key, data);
+      return data;
+    }
+    async function applySwapPriceToDetailRow(productId, row) {
+      const meta = await fetchSwapSalePrice(productId, {
+        lo_hang_id: row.lo_hang_id,
+        gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id,
+        ten_quy_cach: row.ten_quy_cach || row.ten_thuoc_tinh || ''
+      });
+      row.don_gia = Number(meta.gia_ban || 0);
+      row.cho_phep_sua_gia = meta.cho_phep_sua_gia !== false;
+      row.loai_ap_dung = meta.loai_ap_dung || null;
+      if (!row.loai_gia_ban && meta.loai_ap_dung === 'ca_hai') {
+        row.loai_gia_ban = meta.gia_mac_dinh === 'thi_truong' ? 'thi_truong' : 'co_dinh';
+      }
+      return row;
+    }
+    function swapItemMetrics(item) {
+      const product = swapAvailableProducts.find(p => String(p._id) === String(item.hang_hoa_id));
+      if (product) return swapProductMetrics(product);
+      return {
+        tonThucTe: firstNumber(item.ton_thuc_te, item.ton_kho, item.so_luong_goc, 0),
+        soLuongKhachDat: Math.max(0, firstNumber(item.so_luong_khach_dat, 0)),
+        soLuongKhaDung: firstNumber(item.so_luong_kha_dung, item.so_luong_goc, 0)
+      };
+    }
+    function swapItemMetaHtml(item) {
+      const product = swapAvailableProducts.find(p => String(p._id) === String(item.hang_hoa_id));
+      const metrics = swapItemMetrics(item);
+      const ncc = product ? swapSupplierName(product) : (item.ten_ncc || '—');
+      const qcCount = product?.has_quy_cach ? (product.quy_cach_items || []).length : 0;
+      const lotCount = product?.quan_ly_theo_lo ? (product.lot_items || []).length : 0;
+      let html = `<div class="origin">NCC: ${escapeHtml(ncc)}</div>`;
+      html += `<div class="origin">Tồn: ${fmt(metrics.tonThucTe)} · Khả dụng: ${fmt(metrics.soLuongKhaDung)}</div>`;
+      if (metrics.soLuongKhachDat > 0) {
+        html += `<div class="origin">Khách khác đã đặt: ${fmt(metrics.soLuongKhachDat)}</div>`;
+      }
+      if (qcCount) html += `<div class="origin">Thuộc tính: ${qcCount} mức</div>`;
+      if (lotCount) html += `<div class="origin">Lô: ${lotCount} lô có tồn</div>`;
+      return html;
+    }
+    function swapSupplierName(product = {}) {
+      return product.ten_ncc || product.ma_ncc || '—';
+    }
+    function swapItemDetailRows(item) {
+      if (item.has_quy_cach) return item.quy_cach_items || [];
+      if (item.has_lot_items) return item.lot_items || [];
+      return [];
+    }
+    function swapItemHasLotGrid(item) {
+      if (!item || (!item.has_lot_items && !item.has_quy_cach)) return false;
+      const rows = swapItemDetailRows(item);
+      if (!rows.length) return false;
+      if (item.has_lot_items) return true;
+      return rows.some(row => row.lo_hang_id || row.ma_lo || row.ten_lo);
+    }
+    function parseLotDate(value) {
+      const time = value ? new Date(value).getTime() : 0;
+      return Number.isFinite(time) ? time : 0;
+    }
+    function groupLotsForSwapItem(item) {
+      const map = new Map();
+      const upsertLotGroup = (row, qcIdx) => {
+        const lotKey = String(row.lo_hang_id || row.ma_lo || row.ten_lo || `row-${qcIdx}`);
+        if (!map.has(lotKey)) {
+          map.set(lotKey, {
+            lotKey,
+            lo_hang_id: row.lo_hang_id || '',
+            ma_lo: row.ma_lo || '',
+            ten_lo: row.ten_lo || '',
+            ngay_nhap: row.ngay_nhap || '',
+            han_su_dung: row.han_su_dung || '',
+            items: []
+          });
+        }
+        const group = map.get(lotKey);
+        if (!group.items.some(entry => entry.qcIdx === qcIdx)) group.items.push({ row, qcIdx });
+      };
+      if (item.has_lot_items && !item.has_quy_cach) {
+        (item.lot_items || []).forEach((row, qcIdx) => upsertLotGroup(row, qcIdx));
+      } else {
+        swapItemDetailRows(item).forEach((row, qcIdx) => upsertLotGroup(row, qcIdx));
+      }
+      return Array.from(map.values()).sort((a, b) => {
+        const dateA = parseLotDate(a.ngay_nhap) || parseLotDate(a.han_su_dung);
+        const dateB = parseLotDate(b.ngay_nhap) || parseLotDate(b.han_su_dung);
+        if (dateA !== dateB) return dateA - dateB;
+        return String(a.lotKey).localeCompare(String(b.lotKey), 'vi');
+      });
+    }
+    function swapLotGroupSummary(lot) {
+      const ton = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).tonThucTe, 0);
+      const khaDung = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).soLuongKhaDung, 0);
+      const dat = lot.items.reduce((sum, entry) => sum + Number(entry.row.so_luong_dat || entry.row.so_luong || 0), 0);
+      const datePart = [lot.ten_lo || lot.ma_lo || '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
+      return { ton, khaDung, dat, datePart };
+    }
+    function swapLineQty(item) {
+      const detailRows = swapItemDetailRows(item);
+      if (detailRows.length) {
+        return detailRows.reduce((sum, row) => sum + Number(row.so_luong_dat || row.so_luong || 0), 0);
+      }
+      return Number(item.so_luong || 0);
+    }
+    function discountAmount(value, type, baseAmount) {
+      const base = Math.max(0, Number(baseAmount || 0));
+      const raw = Math.max(0, Number(value || 0));
+      const amount = type === 'phan_tram' ? base * Math.min(raw, 100) / 100 : raw;
+      return Math.min(amount, base);
+    }
+    function swapComputeLineTotal(item) {
+      const detailRows = swapItemDetailRows(item);
+      if (detailRows.length) {
+        return detailRows.reduce((sum, row) => {
+          const qty = Number(row.so_luong_dat || row.so_luong || 0);
+          const price = Number(row.don_gia ?? item.don_gia ?? 0);
+          const base = qty * price;
+          return sum + Math.max(base - discountAmount(row.chiet_khau || 0, row.kieu_chiet_khau || 'vnd', base), 0);
+        }, 0);
+      }
+      const base = Number(item.so_luong || 0) * Number(item.don_gia || 0);
+      return Math.max(base - discountAmount(item.chiet_khau || 0, item.kieu_chiet_khau || 'vnd', base), 0);
+    }
+    function maxLotColumnsInSwapCart() {
+      return swapItems.reduce((max, item) => {
+        if (!swapItemHasLotGrid(item)) return max;
+        return Math.max(max, groupLotsForSwapItem(item).length);
+      }, 0);
+    }
+    function renderSwapCartThead(maxLots) {
+      const thead = document.getElementById('swapCartHead');
+      if (!thead) return;
+      if (maxLots <= 0) {
+        thead.innerHTML = `<tr>
+          <th>STT</th>
+          <th>Mã hàng</th>
+          <th>Tên hàng</th>
+          <th class="num">SL</th>
+          <th class="num">Tồn</th>
+          <th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th>
+          <th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th>
+          <th class="num">Đơn giá</th>
+          <th class="num">Giảm giá</th>
+          <th class="num">Thành tiền</th>
+          <th></th>
+        </tr>`;
+        return;
+      }
+      const lotHeaders = Array.from({ length: maxLots }, (_, index) => `<th class="num lot-col">Lô ${index + 1}</th>`).join('');
+      thead.innerHTML = `<tr>
+        <th>STT</th>
+        <th>Mã hàng</th>
+        <th>Tên hàng</th>
+        ${lotHeaders}
+        <th class="num">Thành tiền</th>
+        <th></th>
+      </tr>`;
+    }
+    function renderSwapDetailRowHtml(item, qc, qcIdx, itemIdx, options = {}) {
+      const showLotColumn = options.showLotColumn === true;
+      const showAttrColumn = options.showAttrColumn !== false;
+      const qty = Number(qc.so_luong_dat || qc.so_luong || 0);
+      const metrics = inventoryMetrics(qc);
+      const unitPrice = Number(qc.don_gia ?? item.don_gia ?? 0);
+      const base = qty * unitPrice;
+      const lineDiscount = discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', base);
+      const total = Math.max(base - lineDiscount, 0);
+      const lotName = [qc.ten_lo || qc.ma_lo || '', qc.han_su_dung ? `HSD ${formatDateVi(qc.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '--';
+      const priceLocked = qc.cho_phep_sua_gia === false;
+      const loaiGiaCell = qc.loai_ap_dung === 'ca_hai'
+        ? `<select class="qc-input" onchange="updSwapDetailLoaiGia(${itemIdx}, ${qcIdx}, this.value)"><option value="co_dinh"${qc.loai_gia_ban !== 'thi_truong' ? ' selected' : ''}>Cố định</option><option value="thi_truong"${qc.loai_gia_ban === 'thi_truong' ? ' selected' : ''}>Thị trường</option></select>`
+        : '<span class="stock-text">—</span>';
+      return `<tr>
+        ${showLotColumn ? `<th>${escapeHtml(lotName)}</th>` : ''}
+        ${showAttrColumn ? `<th>${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '--')}</th>` : ''}
+        <td class="num">${fmt(metrics.tonThucTe)}</td>
+        <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
+        <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
+        <td class="num"><input class="qc-input" inputmode="numeric" value="${qty > 0 ? fmt(qty) : ''}" oninput="handleNumInput(this)" onchange="updSwapDetailQty(${itemIdx}, ${qcIdx}, this.value)"></td>
+        <td class="num">${loaiGiaCell}</td>
+        <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}"${priceLocked ? ' readonly title="Giá đã khóa"' : ''} oninput="handleNumInput(this)" onchange="updSwapDetailPrice(${itemIdx}, ${qcIdx}, this.value)"><span class="money-unit">VNĐ</span></span></td>
+        <td class="num"><span class="discount-pair"><input class="qc-input" inputmode="numeric" value="${fmt(qc.chiet_khau || 0)}" oninput="handleNumInput(this)" onchange="updSwapDetailDiscount(${itemIdx}, ${qcIdx}, this.value)"><select onchange="updSwapDetailDiscountType(${itemIdx}, ${qcIdx}, this.value)"><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
+        <td class="num"><b>${fmtMoney(total)}</b></td>
+      </tr>`;
+    }
+    function renderSwapQuyCachBlockForLot(item, itemIdx, lotGroup, colspan) {
+      if (!lotGroup || !lotGroup.items.length) return '';
+      const showAttr = item.has_quy_cach;
+      const rows = lotGroup.items.map(({ row, qcIdx }) => renderSwapDetailRowHtml(item, row, qcIdx, itemIdx, {
+        showLotColumn: false,
+        showAttrColumn: showAttr
+      })).join('');
+      const headerCols = showAttr ? '<th>Thuộc tính</th>' : '';
+      return `<tr class="qc-row"><td colspan="${colspan}">
+        <table class="qc-table">
+          <thead><tr>${headerCols}<th class="num">Tồn</th><th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th><th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th><th class="num">SL đặt</th><th class="num">Loại giá</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td></tr>`;
+    }
+    function renderSwapQuyCachBlock(item, idx) {
+      if (swapItemHasLotGrid(item)) return '';
+      const detailRows = swapItemDetailRows(item);
+      if (!detailRows.length) return '';
+      const rows = detailRows.map((qc, qcIdx) => renderSwapDetailRowHtml(item, qc, qcIdx, idx, {
+        showLotColumn: item.has_lot_items || item.has_quy_cach,
+        showAttrColumn: item.has_quy_cach
+      })).join('');
+      const lotHeader = (item.has_lot_items || item.has_quy_cach) ? '<th>Lô</th>' : '';
+      const attrHeader = item.has_quy_cach ? '<th>Thuộc tính</th>' : '';
+      return `<tr class="qc-row"><td colspan="12">
+        <table class="qc-table">
+          <thead><tr>${lotHeader}${attrHeader}<th class="num">Tồn</th><th class="num" title="Số lượng đang được các đơn đặt hàng khác giữ nhưng chưa giao đủ.">Khách khác đã đặt</th><th class="num" title="Khả dụng = Tồn thực tế - Khách khác đã đặt.">Khả dụng</th><th class="num">SL đặt</th><th class="num">Loại giá</th><th class="num">Đơn giá</th><th class="num">Giảm giá</th><th class="num">Thành tiền</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </td></tr>`;
+    }
+    function renderSwapLotProductRow(item, idx, maxLots, line) {
+      const lots = groupLotsForSwapItem(item);
+      const expandedLotKey = expandedSwapLotKeyByItem[item.hang_hoa_id];
+      const expandedLot = lots.find(lot => lot.lotKey === expandedLotKey);
+      const lotCells = Array.from({ length: maxLots }, (_, columnIndex) => {
+        const lot = lots[columnIndex];
+        if (!lot) return '<td class="num lot-cell lot-cell-empty"></td>';
+        const summary = swapLotGroupSummary(lot);
+        const active = expandedLotKey === lot.lotKey;
+        const mainText = summary.dat > 0 ? `Đặt: ${fmt(summary.dat)}` : `KD: ${fmt(summary.khaDung)}`;
+        return `<td class="num lot-cell${active ? ' is-active' : ''}" data-hang-hoa-id="${escapeHtml(item.hang_hoa_id)}" data-lot-key="${escapeHtml(lot.lotKey)}" onclick="handleSwapLotCellClick(this)">
+          <div class="lot-cell-main">${mainText}</div>
+          <div class="lot-cell-sub">${escapeHtml(summary.datePart)}</div>
+        </td>`;
+      }).join('');
+      const colspan = 3 + maxLots + 2;
+      return `<tr>
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(item.ma_hang || '')}</td>
+        <td>${escapeHtml(item.ten_hang || '')}</td>
+        ${lotCells}
+        <td class="num">${fmtMoney(line)}</td>
+        <td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeSwapItem('${item.hang_hoa_id}')"></i></td>
+      </tr>${expandedLot ? renderSwapQuyCachBlockForLot(item, idx, expandedLot, colspan) : ''}`;
+    }
+    function renderSwapNormalProductRow(item, idx, maxLots, line) {
+      item.so_luong = swapLineQty(item);
+      const metrics = swapItemMetrics(item);
+      const priceReadonly = item.cho_phep_sua_gia === false ? ' readonly title="Giá đã khóa"' : '';
+      const discountCell = `<span class="discount-pair"><input class="small" inputmode="numeric" value="${fmt(item.chiet_khau || 0)}" oninput="handleNumInput(this)" onchange="updSwapLineDiscount('${item.hang_hoa_id}', this.value)"><select onchange="updSwapLineDiscountType('${item.hang_hoa_id}', this.value)"><option value="vnd"${item.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${item.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
+      if (maxLots > 0) {
+        return `<tr>
+          <td>${idx + 1}</td>
+          <td>${escapeHtml(item.ma_hang || '')}<span class="stock-text">Tồn: ${fmt(metrics.tonThucTe)}</span></td>
+          <td>${escapeHtml(item.ten_hang || '')}</td>
+          <td colspan="${maxLots}" class="lot-inline-normal">
+            <div class="inline-detail-grid">
+              <div><div class="inline-label">SL</div><div class="num"><input class="small" inputmode="numeric" value="${fmt(item.so_luong)}" oninput="handleNumInput(this)" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"></div></div>
+              <div><div class="inline-label">Tồn</div><div class="num">${fmt(metrics.tonThucTe)}</div></div>
+              <div><div class="inline-label">Khách khác đã đặt</div><div class="num">${fmt(metrics.soLuongKhachDat)}</div></div>
+              <div><div class="inline-label">Khả dụng</div><div class="num">${fmt(metrics.soLuongKhaDung)}</div></div>
+              <div><div class="inline-label">Đơn giá</div><div class="num"><span class="money-input-wrap"><input class="small" inputmode="numeric" value="${fmt(item.don_gia)}"${priceReadonly} oninput="handleNumInput(this)" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><span class="money-unit">VNĐ</span></span></div></div>
+              <div><div class="inline-label">Giảm giá</div><div class="num">${discountCell}</div></div>
+            </div>
+          </td>
+          <td class="num">${fmtMoney(line)}</td>
+          <td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeSwapItem('${item.hang_hoa_id}')"></i></td>
+        </tr>`;
+      }
+      return `<tr>
+        <td>${idx + 1}</td>
+        <td>${escapeHtml(item.ma_hang || '')}<span class="stock-text">Tồn: ${fmt(metrics.tonThucTe)}</span></td>
+        <td>${escapeHtml(item.ten_hang || '')}</td>
+        <td class="num"><input class="small" inputmode="numeric" value="${fmt(item.so_luong)}" oninput="handleNumInput(this)" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"></td>
+        <td class="num">${fmt(metrics.tonThucTe)}</td>
+        <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
+        <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
+        <td class="num"><span class="money-input-wrap"><input class="small" inputmode="numeric" value="${fmt(item.don_gia)}"${priceReadonly} oninput="handleNumInput(this)" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><span class="money-unit">VNĐ</span></span></td>
+        <td class="num">${discountCell}</td>
+        <td class="num">${fmtMoney(line)}</td>
+        <td><i class="fa-solid fa-trash" style="color:#d92d20;cursor:pointer" onclick="removeSwapItem('${item.hang_hoa_id}')"></i></td>
+      </tr>`;
+    }
+    function toggleSwapLotExpand(hangHoaId, lotKey) {
+      if (expandedSwapLotKeyByItem[hangHoaId] === lotKey) delete expandedSwapLotKeyByItem[hangHoaId];
+      else expandedSwapLotKeyByItem[hangHoaId] = lotKey;
+      renderSwapItems();
+    }
+    function handleSwapLotCellClick(cell) {
+      if (!cell || !cell.dataset) return;
+      const hangHoaId = cell.dataset.hangHoaId || '';
+      const lotKey = cell.dataset.lotKey || '';
+      if (!hangHoaId || !lotKey) return;
+      toggleSwapLotExpand(hangHoaId, lotKey);
+    }
+    function updSwapDetailQty(itemIdx, qcIdx, value) {
+      const item = swapItems[itemIdx];
+      if (!item) return;
+      const rows = swapItemDetailRows(item);
+      const row = rows[qcIdx];
+      if (!row) return;
+      row.so_luong_dat = Math.max(0, num(value));
+      item.so_luong = swapLineQty(item);
+      renderSwapItems();
+    }
+    function updSwapDetailDiscount(itemIdx, qcIdx, value) {
+      const item = swapItems[itemIdx];
+      const rows = item ? swapItemDetailRows(item) : [];
+      if (!rows[qcIdx]) return;
+      rows[qcIdx].chiet_khau = Math.max(0, num(value));
+      renderSwapItems();
+    }
+    function updSwapDetailDiscountType(itemIdx, qcIdx, value) {
+      const item = swapItems[itemIdx];
+      const rows = item ? swapItemDetailRows(item) : [];
+      if (!rows[qcIdx]) return;
+      rows[qcIdx].kieu_chiet_khau = value === 'phan_tram' ? 'phan_tram' : 'vnd';
+      renderSwapItems();
+    }
+    async function updSwapDetailLoaiGia(itemIdx, qcIdx, value) {
+      const item = swapItems[itemIdx];
+      const rows = item ? swapItemDetailRows(item) : [];
+      const row = rows[qcIdx];
+      if (!row) return;
+      row.loai_gia_ban = value === 'thi_truong' ? 'thi_truong' : 'co_dinh';
+      await applySwapPriceToDetailRow(item.hang_hoa_id, row);
+      renderSwapItems();
+    }
+    function updSwapLineDiscount(id, value) {
+      const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
+      if (!item) return;
+      item.chiet_khau = Math.max(0, num(value));
+      renderSwapItems();
+    }
+    function updSwapLineDiscountType(id, value) {
+      const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
+      if (!item) return;
+      item.kieu_chiet_khau = value === 'phan_tram' ? 'phan_tram' : 'vnd';
+      renderSwapItems();
+    }
+    function updSwapDetailPrice(itemIdx, qcIdx, value) {
+      const item = swapItems[itemIdx];
+      if (!item) return;
+      const rows = swapItemDetailRows(item);
+      const row = rows[qcIdx];
+      if (!row || row.cho_phep_sua_gia === false) return alert('Dòng này không cho phép sửa giá.');
+      row.don_gia = Math.max(0, num(value));
+      renderSwapItems();
+    }
+    function buildExchangeSubmitLines() {
+      const lines = [];
+      swapItems.forEach(item => {
+        const detailRows = swapItemDetailRows(item);
+        if (detailRows.length) {
+          detailRows.forEach(row => {
+            const qty = Number(row.so_luong_dat || row.so_luong || 0);
+            if (qty <= 0) return;
+            const donGia = Number(row.don_gia ?? item.don_gia ?? 0);
+            const base = qty * donGia;
+            const net = Math.max(base - discountAmount(row.chiet_khau || 0, row.kieu_chiet_khau || 'vnd', base), 0);
+            lines.push({
+              hang_hoa_id: item.hang_hoa_id,
+              lo_hang_id: row.lo_hang_id || '',
+              gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || '',
+              ten_quy_cach: row.ten_quy_cach || row.ten_thuoc_tinh || '',
+              ten_thuoc_tinh: row.ten_thuoc_tinh || row.ten_quy_cach || '',
+              so_luong: qty,
+              don_gia: donGia,
+              thanh_tien: net
+            });
+          });
+          return;
+        }
+        if (Number(item.so_luong || 0) <= 0) return;
+        const base = item.so_luong * item.don_gia;
+        const net = Math.max(base - discountAmount(item.chiet_khau || 0, item.kieu_chiet_khau || 'vnd', base), 0);
+        lines.push({
+          hang_hoa_id: item.hang_hoa_id,
+          so_luong: item.so_luong,
+          don_gia: item.don_gia,
+          thanh_tien: net
+        });
+      });
+      return lines;
+    }
+    function getSwapWarehouseId() {
+      return selectedInvoice?.kho_id?._id || selectedInvoice?.kho_id || '';
+    }
+    function mapSwapProductRow(row) {
+      return {
+        _id: String(row._id),
+        ma_hang: row.ma_hang || '',
+        ten_hang: row.ten_hang || '',
+        gia_ban: Number(row.gia_co_dinh || row.gia_ban || 0),
+        quan_ly_theo_lo: !!row.quan_ly_theo_lo,
+        ton_kho: Number(row.ton_kho || 0),
+        ton_thuc_te: row.ton_thuc_te !== undefined ? Number(row.ton_thuc_te || 0) : undefined,
+        so_luong_khach_dat: row.so_luong_khach_dat ?? row.khach_dat ?? row.da_dat ?? undefined,
+        so_luong_kha_dung: row.so_luong_kha_dung ?? row.kha_dung ?? undefined,
+        has_quy_cach: Boolean(row.has_quy_cach && (row.quy_cach_items || []).length),
+        quy_cach_items: (row.quy_cach_items || []).map(qc => ({
+          lo_hang_id: qc.lo_hang_id || '',
+          ma_lo: qc.ma_lo || '',
+          ten_lo: qc.ten_lo || '',
+          ngay_nhap: qc.ngay_nhap || '',
+          han_su_dung: qc.han_su_dung || '',
+          gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
+          ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+          ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+          ton_hien_tai: Number(qc.ton_hien_tai || qc.ton_kho || 0),
+          ton_thuc_te: qc.ton_thuc_te !== undefined ? Number(qc.ton_thuc_te || 0) : undefined,
+          so_luong_khach_dat: qc.so_luong_khach_dat ?? qc.khach_dat ?? qc.da_dat ?? undefined,
+          so_luong_kha_dung: qc.so_luong_kha_dung ?? qc.kha_dung ?? undefined
+        })),
+        lot_items: (row.lot_items || []).map(lot => ({
+          lo_hang_id: lot.lo_hang_id || '',
+          ma_lo: lot.ma_lo || '',
+          ten_lo: lot.ten_lo || '',
+          ngay_nhap: lot.ngay_nhap || '',
+          han_su_dung: lot.han_su_dung || '',
+          ton_kho: Number(lot.ton_kho || lot.ton_hien_tai || 0),
+          ton_hien_tai: Number(lot.ton_hien_tai || lot.ton_kho || 0),
+          ton_thuc_te: lot.ton_thuc_te !== undefined ? Number(lot.ton_thuc_te || 0) : undefined,
+          so_luong_khach_dat: lot.so_luong_khach_dat ?? lot.khach_dat ?? lot.da_dat ?? undefined,
+          so_luong_kha_dung: lot.so_luong_kha_dung ?? lot.kha_dung ?? undefined
+        })),
+        ten_ncc: row.ten_ncc || '',
+        ma_ncc: row.ma_ncc || ''
+      };
+    }
+    function clearSwapProductState(clearItems = true) {
+      swapAvailableProducts = [];
+      swapStockByProduct.clear();
+      expandedSwapLotKeyByItem = {};
+      if (clearItems) swapItems = [];
+      const swapSearchEl = $('swapSearch');
+      const swapResultsEl = $('swapResults');
+      if (swapSearchEl) swapSearchEl.value = '';
+      if (swapResultsEl) {
+        swapResultsEl.innerHTML = '';
+        swapResultsEl.style.display = 'none';
+      }
+      if (clearItems) renderSwapItems();
+    }
+    async function loadSwapProductsByWarehouse() {
+      const khoId = getSwapWarehouseId();
+      if (!khoId) {
+        clearSwapProductState(false);
+        return;
+      }
+      swapProductsLoading = true;
+      try {
+        const res = await fetch('/api/kho/' + encodeURIComponent(khoId) + '/hang-ban-hang?kho_id=' + encodeURIComponent(khoId));
+        const result = await res.json();
+        if (!result.success) throw new Error(result.message || 'Không tải được hàng hóa trong kho');
+        swapAvailableProducts = (result.data || []).map(mapSwapProductRow);
+        swapStockByProduct.clear();
+        swapAvailableProducts.forEach(product => {
+          swapStockByProduct.set(product._id, Number(product.ton_kho || 0));
+        });
+        swapItems.forEach(item => {
+          const product = swapAvailableProducts.find(p => String(p._id) === String(item.hang_hoa_id));
+          if (!product) return;
+          const metrics = swapProductMetrics(product);
+          item.so_luong_goc = Math.max(0, metrics.soLuongKhaDung);
+          item.ton_thuc_te = metrics.tonThucTe;
+          item.so_luong_khach_dat = metrics.soLuongKhachDat;
+          item.so_luong_kha_dung = metrics.soLuongKhaDung;
+          item.ten_ncc = product.ten_ncc || '';
+          item.ma_ncc = product.ma_ncc || '';
+        });
+        renderSwapItems();
+      } catch (error) {
+        swapAvailableProducts = [];
+        swapStockByProduct.clear();
+        console.error(error);
+      } finally {
+        swapProductsLoading = false;
+      }
+    }
     function getReceiveMethod(){
       return document.querySelector('input[name="returnReceiveMethod"]:checked')?.value || 'tai_quay';
     }
@@ -241,9 +967,54 @@
     }
     function prefillReturnSender(){
       const customer = selectedInvoice?.khach_hang_id || {};
-      if (returnSenderName && !returnSenderName.value) returnSenderName.value = customer.ten_khach_hang || '';
-      if (returnSenderPhone && !returnSenderPhone.value) returnSenderPhone.value = customer.sdt || customer.sdt2 || '';
-      if (returnPickupAddress && !returnPickupAddress.value) returnPickupAddress.value = customer.dia_chi || customer.dia_chi_chi_tiet || '';
+      const senderNameEl = $('returnSenderName');
+      const senderPhoneEl = $('returnSenderPhone');
+      const pickupAddressEl = $('returnPickupAddress');
+      if (senderNameEl && !senderNameEl.value) senderNameEl.value = customer.ten_khach_hang || '';
+      if (senderPhoneEl && !senderPhoneEl.value) senderPhoneEl.value = customer.sdt || customer.sdt2 || '';
+      if (pickupAddressEl && !pickupAddressEl.value) pickupAddressEl.value = customer.dia_chi || customer.dia_chi_chi_tiet || customer.dia_chi_day_du || '';
+    }
+
+    function mapReturnItemsFromInvoiceLines(items) {
+      return (Array.isArray(items) ? items : []).map(item => ({
+        line_key: `${item._id || item.ct_hoa_don_id || ''}::${item.lo_hang_id?._id || item.lo_hang_id || ''}`,
+        ct_hoa_don_id: item._id || '',
+        hang_hoa_id: item.hang_hoa_id?._id || item.hang_hoa_id,
+        ma_hang: item.hang_hoa_id?.ma_hang || item.ma_hang_snapshot || '',
+        ten_hang: item.hang_hoa_id?.ten_hang || item.ten_hang_snapshot || '',
+        ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
+        so_luong_goc: Number(item.so_luong_con_lai != null ? item.so_luong_con_lai : (item.so_luong || 0)),
+        so_luong: Number(item.so_luong_con_lai != null ? item.so_luong_con_lai : (item.so_luong || 0)),
+        lo_hang_id: item.lo_hang_id?._id || item.lo_hang_id || '',
+        lo_hang: item.lo_hang_display || item.lo_hang_id?.ten_lo || item.lo_hang_id?.ma_lo || '',
+        chiet_khau: Number(item.chiet_khau || 0),
+        don_gia: Number(item.don_gia || 0),
+        thanh_tien_goc: Number(item.thanh_tien || 0)
+      }));
+    }
+
+    function applyInvoicePayload(payload) {
+      if (!payload || !payload.invoice) throw new Error('Không có dữ liệu hóa đơn');
+      selectedInvoice = payload.invoice;
+      if (payload.return_multi_lot_note) alert(payload.return_multi_lot_note);
+      returnItems = mapReturnItemsFromInvoiceLines(payload.items);
+      const sellerNameEl = $('sellerName');
+      const customerNameEl = $('customerName');
+      const returnInvoiceTitleEl = $('returnInvoiceTitle');
+      const invoiceLinkEl = $('invoiceLink');
+      const sellerLabel = selectedInvoice.nguoi_ban_id?.ho_ten || selectedInvoice.nguoi_ban_id?.username || 'Admin';
+      if (sellerNameEl) sellerNameEl.textContent = sellerLabel;
+      if (customerNameEl) customerNameEl.textContent = selectedInvoice.khach_hang_id?.ten_khach_hang || 'Khách lẻ';
+      if (returnInvoiceTitleEl) returnInvoiceTitleEl.textContent = 'Trả hàng từ hóa đơn';
+      if (invoiceLinkEl) invoiceLinkEl.textContent = `${selectedInvoice.ma_hoa_don || ''} - ${sellerLabel}`;
+      prefillReturnSender();
+      const itemSearchEl = $('itemSearch');
+      const productResultsEl = $('productResults');
+      if (itemSearchEl) itemSearchEl.value = '';
+      if (productResultsEl) productResultsEl.style.display = 'none';
+      clearSwapProductState(false);
+      renderItems();
+      loadSwapProductsByWarehouse();
     }
 
     function openInvoiceModal(){
@@ -264,33 +1035,46 @@
     }
     async function loadInvoices(page = invoicePage){
       invoicePage = page;
+      const invoiceSearchEl = $('invoiceSearch');
+      const shipmentSearchEl = $('shipmentSearch');
+      const customerSearchEl = $('customerSearch');
+      const itemCodeSearchEl = $('itemCodeSearch');
+      const itemNameSearchEl = $('itemNameSearch');
+      const fromDateSearchEl = $('fromDateSearch');
+      const toDateSearchEl = $('toDateSearch');
+      const invoiceRowsEl = $('invoiceRows');
+      const invoicePagerEl = $('invoicePager');
       const params = new URLSearchParams({
         page: String(page),
         limit: '7',
-        invoice_code: invoiceSearch.value.trim(),
-        shipment_code: shipmentSearch.value.trim(),
-        customer: customerSearch.value.trim(),
-        item_code: itemCodeSearch.value.trim(),
-        item_name: itemNameSearch.value.trim(),
-        from_date: fromDateSearch.value,
-        to_date: toDateSearch.value
+        invoice_code: invoiceSearchEl ? invoiceSearchEl.value.trim() : '',
+        shipment_code: shipmentSearchEl ? shipmentSearchEl.value.trim() : '',
+        customer: customerSearchEl ? customerSearchEl.value.trim() : '',
+        item_code: itemCodeSearchEl ? itemCodeSearchEl.value.trim() : '',
+        item_name: itemNameSearchEl ? itemNameSearchEl.value.trim() : '',
+        from_date: fromDateSearchEl ? fromDateSearchEl.value : '',
+        to_date: toDateSearchEl ? toDateSearchEl.value : ''
       });
-      invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">Đang tải dữ liệu...</td></tr>';
+      if (invoiceRowsEl) invoiceRowsEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#667085">Đang tải dữ liệu...</td></tr>';
       try {
         const res = await fetch('/don-hang/tra-hang/invoices/search?' + params.toString());
         const result = await res.json();
         if(!result.success) throw new Error(result.message || 'Không tải được danh sách hóa đơn');
         renderInvoices(result.data || [], result.pagination || { page: 1, limit: 7, total: 0, pages: 1 });
       } catch (error) {
-        invoiceRows.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Không tải được danh sách hóa đơn</td></tr>';
-        invoicePager.innerHTML = '';
+        if (invoiceRowsEl) invoiceRowsEl.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#d92d20">Không tải được danh sách hóa đơn</td></tr>';
+        if (invoicePagerEl) invoicePagerEl.innerHTML = '';
       }
     }
     function renderInvoices(rows, pagination){
-      invoiceRows.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmtMoney(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Chọn</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Không tìm thấy hóa đơn phù hợp</td></tr>';
+      const invoiceRowsEl = $('invoiceRows');
+      if (!invoiceRowsEl) return;
+      invoiceRowsEl.innerHTML = rows.length ? rows.map(i => `<tr><td><a href="#" onclick="selectInvoice('${i._id}');return false">${i.ma_hoa_don}</a></td><td>${new Date(i.ngay_ban).toLocaleString('vi-VN')}</td><td>${i.nguoi_ban}</td><td>${i.khach_hang}</td><td class="num">${fmtMoney(i.thanh_toan || i.tong_tien)}</td><td><button class="choose" onclick="selectInvoice('${i._id}')" type="button">Chọn</button></td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:#667085">Không tìm thấy hóa đơn phù hợp</td></tr>';
       renderInvoicePager(pagination);
     }
     function renderInvoicePager(pagination){
+      const invoicePagerEl = $('invoicePager');
+      if (!invoicePagerEl) return;
       const total = Number(pagination.total || 0);
       const limit = Number(pagination.limit || 7);
       const page = Number(pagination.page || 1);
@@ -301,7 +1085,7 @@
       const first = Math.max(1, Math.min(page - 2, pages - 4));
       const last = Math.min(pages, first + 4);
       for(let p = first; p <= last; p++) pageNumbers.push(p);
-      invoicePager.innerHTML = `
+      invoicePagerEl.innerHTML = `
         <button class="page-btn" type="button" onclick="loadInvoices(1)" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-angles-left"></i></button>
         <button class="page-btn" type="button" onclick="loadInvoices(${page - 1})" ${page <= 1 ? 'disabled' : ''}><i class="fa-solid fa-chevron-left"></i></button>
         ${pageNumbers.map(p => `<button class="page-btn ${p === page ? 'active' : ''}" type="button" onclick="loadInvoices(${p})">${p}</button>`).join('')}
@@ -310,88 +1094,137 @@
         <span>Hiển thị ${start} - ${end} trên tổng số ${total} hóa đơn</span>`;
     }
     async function selectInvoice(id){
-      const res = await fetch(`/don-hang/tra-hang/invoice/${id}`);
-      const result = await res.json();
-      if(!result.success) return alert(result.message || 'Không tải được hóa đơn');
-      selectedInvoice = result.data.invoice;
-      if (result.data.return_multi_lot_note) {
-        alert(result.data.return_multi_lot_note);
+      try {
+        const res = await fetch(`/don-hang/tra-hang/invoice/${id}`);
+        let result = {};
+        try {
+          result = await res.json();
+        } catch (_) {
+          throw new Error('Máy chủ trả về dữ liệu không hợp lệ');
+        }
+        if(!result.success) throw new Error(result.message || 'Không tải được hóa đơn');
+        applyInvoicePayload(result.data);
+        closeInvoiceModal();
+      } catch (error) {
+        alert(error.message || 'Không tải được hóa đơn');
       }
-      returnItems = result.data.items.map(item => ({
-        line_key: `${item._id || item.ct_hoa_don_id || ''}::${item.lo_hang_id?._id || item.lo_hang_id || ''}`,
-        ct_hoa_don_id: item._id || '',
-        hang_hoa_id: item.hang_hoa_id?._id || item.hang_hoa_id,
-        ma_hang: item.hang_hoa_id?.ma_hang || '',
-        ten_hang: item.hang_hoa_id?.ten_hang || '',
-        ten_thuoc_tinh: item.ten_thuoc_tinh || item.ten_quy_cach || '',
-        so_luong_goc: Number(item.so_luong_con_lai ?? item.so_luong || 0),
-        so_luong: Number(item.so_luong_con_lai ?? item.so_luong || 0),
-        lo_hang_id: item.lo_hang_id?._id || item.lo_hang_id || '',
-        lo_hang: item.lo_hang_display || item.lo_hang_id?.ten_lo || item.lo_hang_id?.ma_lo || '',
-        chiet_khau: Number(item.chiet_khau || 0),
-        don_gia: Number(item.don_gia || 0),
-        thanh_tien_goc: Number(item.thanh_tien || 0)
-      }));
-      sellerName.textContent = selectedInvoice.nguoi_ban_id?.ho_ten || selectedInvoice.nguoi_ban_id?.username || 'Hoang - Kinh Doanh';
-      customerName.textContent = selectedInvoice.khach_hang_id?.ten_khach_hang || 'Khách lẻ';
-      returnInvoiceTitle.textContent = `Trả hàng từ hóa đơn ${selectedInvoice.ma_hoa_don || ''}`;
-      invoiceLink.textContent = `${selectedInvoice.ma_hoa_don} - ${sellerName.textContent}`;
-      prefillReturnSender();
-      closeInvoiceModal();
-      itemSearch.value = '';
-      productResults.style.display = 'none';
-      renderItems();
     }
     function quickReturn(){
       closeInvoiceModal();
-      customerName.textContent = 'Khách lẻ';
-      invoiceLink.textContent = 'Trả nhanh';
+      const customerNameEl = $('customerName');
+      const invoiceLinkEl = $('invoiceLink');
+      if (customerNameEl) customerNameEl.textContent = 'Khách lẻ';
+      if (invoiceLinkEl) invoiceLinkEl.textContent = 'Trả nhanh';
       selectedInvoice = null;
       returnItems = [];
+      clearSwapProductState();
       renderItems();
     }
     function handleItemSearch(showAll = false){
+      const itemSearchEl = $('itemSearch');
+      const productResultsEl = $('productResults');
       if(selectedInvoice){
-        productResults.style.display = 'none';
+        if (productResultsEl) productResultsEl.style.display = 'none';
         renderItems();
         return;
       }
-      const q = itemSearch.value.trim().toLowerCase();
+      const q = itemSearchEl ? itemSearchEl.value.trim().toLowerCase() : '';
       if(!q && !showAll){
-        productResults.style.display = 'none';
+        if (productResultsEl) productResultsEl.style.display = 'none';
         renderItems();
         return;
       }
       const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 20);
-      productResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addQuickItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmtMoney(p.gia_ban)}</strong></div>`).join('');
-      productResults.style.display = rows.length ? 'block' : 'none';
+      if (productResultsEl) {
+        productResultsEl.innerHTML = rows.map(p => `<div class="product-result" onclick="addQuickItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmtMoney(p.gia_ban)}</strong></div>`).join('');
+        productResultsEl.style.display = rows.length ? 'block' : 'none';
+      }
     }
     function handleSwapSearch(showAll = false){
-      const q = swapSearch.value.trim().toLowerCase();
-      if(!q && !showAll){
-        swapResults.style.display = 'none';
+      const swapSearchEl = $('swapSearch');
+      const swapResultsEl = $('swapResults');
+      const q = swapSearchEl ? swapSearchEl.value.trim().toLowerCase() : '';
+      if (!selectedInvoice) {
+        if (swapResultsEl) {
+          swapResultsEl.innerHTML = '<div class="search-item"><span>Vui lòng chọn hóa đơn trước</span></div>';
+          swapResultsEl.style.display = 'block';
+        }
         return;
       }
-      const rows = (q ? products.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q)) : products).slice(0, 20);
-      swapResults.innerHTML = rows.map(p => `<div class="product-result" onclick="addSwapItem('${p._id}')"><span>${p.ma_hang} - ${p.ten_hang}</span><strong>${fmtMoney(p.gia_ban)}</strong></div>`).join('');
-      swapResults.style.display = rows.length ? 'block' : 'none';
+      if (swapProductsLoading) {
+        if (swapResultsEl) {
+          swapResultsEl.innerHTML = '<div class="search-item"><span>Đang tải tồn kho...</span></div>';
+          swapResultsEl.style.display = 'block';
+        }
+        return;
+      }
+      if(!q && !showAll){
+        if (swapResultsEl) swapResultsEl.style.display = 'none';
+        return;
+      }
+      const rows = (q
+        ? swapAvailableProducts.filter(p => p.ma_hang.toLowerCase().includes(q) || p.ten_hang.toLowerCase().includes(q))
+        : swapAvailableProducts
+      ).slice(0, 30);
+      if (swapResultsEl) {
+        swapResultsEl.innerHTML = rows.map(p => {
+          const metrics = swapProductMetrics(p);
+          const qcText = p.has_quy_cach ? ` - Thuộc tính: ${(p.quy_cach_items || []).length}` : '';
+          const metaText = metrics.soLuongKhachDat > 0
+            ? `NCC: ${escapeHtml(swapSupplierName(p))} - Tồn: ${fmt(metrics.tonThucTe)} - Khả dụng: ${fmt(metrics.soLuongKhaDung)}${qcText}`
+            : `NCC: ${escapeHtml(swapSupplierName(p))} - Tồn: ${fmt(metrics.tonThucTe)}${qcText}`;
+          return `<div class="search-item product-search-item" onclick="addSwapItem('${p._id}')"><span class="search-item-info"><span class="search-item-main"><b>${escapeHtml(p.ma_hang || '')}</b> - ${escapeHtml(p.ten_hang || '')}</span><span class="search-item-meta">${metaText}</span></span><b class="search-item-price">${fmtMoney(p.gia_ban)}</b></div>`;
+        }).join('') || '<div class="search-item"><span>Không có hàng hóa phù hợp</span></div>';
+        swapResultsEl.style.display = 'block';
+      }
     }
-    function addSwapItem(id){
-      const product = products.find(p => p._id === id);
+    async function addSwapItem(id){
+      if (!selectedInvoice) return alert('Vui lòng chọn hóa đơn trước khi thêm hàng đổi');
+      const product = swapAvailableProducts.find(p => String(p._id) === String(id));
       if(!product) return;
+      const metrics = swapProductMetrics(product);
       const existing = swapItems.find(i => String(i.hang_hoa_id) === String(id));
-      if(existing){
+      if (existing) {
+        if (existing.has_quy_cach || existing.has_lot_items) {
+          return alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
+        }
         existing.so_luong += 1;
+        existing.so_luong_goc = Math.max(0, metrics.soLuongKhaDung);
+        existing.ton_thuc_te = metrics.tonThucTe;
+        existing.so_luong_khach_dat = metrics.soLuongKhachDat;
+        existing.so_luong_kha_dung = metrics.soLuongKhaDung;
       } else {
-        swapItems.push({
+        const hasQuyCach = Boolean(product.has_quy_cach && (product.quy_cach_items || []).length);
+        const hasLotItems = Boolean(!hasQuyCach && product.quan_ly_theo_lo && (product.lot_items || []).length);
+        const priceMeta = await fetchSwapSalePrice(id, {});
+        const newItem = {
           hang_hoa_id: product._id,
           ma_hang: product.ma_hang,
           ten_hang: product.ten_hang,
-          so_luong_goc: Number(product.ton_kho || 999),
-          so_luong: 1,
-          don_gia: Number(product.gia_ban || 0),
-          thanh_tien_goc: Number(product.gia_ban || 0)
-        });
+          ten_ncc: product.ten_ncc || '',
+          ma_ncc: product.ma_ncc || '',
+          ton_thuc_te: metrics.tonThucTe,
+          so_luong_khach_dat: metrics.soLuongKhachDat,
+          so_luong_kha_dung: metrics.soLuongKhaDung,
+          so_luong_goc: Math.max(0, metrics.soLuongKhaDung),
+          so_luong: (hasQuyCach || hasLotItems) ? 0 : 1,
+          don_gia: Number(priceMeta.gia_ban || product.gia_ban || 0),
+          cho_phep_sua_gia: priceMeta.cho_phep_sua_gia !== false,
+          chiet_khau: 0,
+          kieu_chiet_khau: 'vnd',
+          thanh_tien_goc: Number(priceMeta.gia_ban || product.gia_ban || 0),
+          has_quy_cach: hasQuyCach,
+          has_lot_items: hasLotItems,
+          quy_cach_items: hasQuyCach ? (product.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_dat: '', don_gia: 0, chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : [],
+          lot_items: hasLotItems ? (product.lot_items || []).map(lot => Object.assign({}, lot, { so_luong_dat: '', don_gia: 0, chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : []
+        };
+        if (hasQuyCach) await Promise.all(newItem.quy_cach_items.map(qc => applySwapPriceToDetailRow(id, qc)));
+        if (hasLotItems) await Promise.all(newItem.lot_items.map(lot => applySwapPriceToDetailRow(id, lot)));
+        swapItems.push(newItem);
+        if (swapItemHasLotGrid(newItem)) {
+          const lots = groupLotsForSwapItem(newItem);
+          if (lots.length) expandedSwapLotKeyByItem[newItem.hang_hoa_id] = lots[0].lotKey;
+        }
       }
       swapSearch.value = '';
       swapResults.style.display = 'none';
@@ -424,16 +1257,31 @@
       renderItems();
     }
     function renderItems(){
-      const q = itemSearch.value.trim().toLowerCase();
+      const itemSearchEl = $('itemSearch');
+      const q = itemSearchEl ? itemSearchEl.value.trim().toLowerCase() : '';
       const rows = returnItems.filter(i => !q || i.ma_hang.toLowerCase().includes(q) || i.ten_hang.toLowerCase().includes(q));
       const returnItemsEl = document.getElementById('returnItems');
-      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.ten_thuoc_tinh ? `<div class="origin">Thuộc tính: ${item.ten_thuoc_tinh}</div>` : ''}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
+      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.ten_thuoc_tinh ? `<div class="origin">Thuộc tính: ${item.ten_thuoc_tinh}</div>` : ''}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" inputmode="numeric" value="${fmt(item.so_luong)}" oninput="handleNumInput(this)" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${fmt(item.so_luong_goc)}</div></div><input class="line-input" inputmode="numeric" value="${fmt(item.don_gia)}" oninput="handleNumInput(this)" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
       renderTotals();
     }
     function renderSwapItems(){
-      const rows = swapItems;
-      const swapItemsEl = document.getElementById('swapItems');
-      swapItemsEl.innerHTML = rows.length ? rows.map(item => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeSwapItem('${item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}</div><div class="qty-wrap"><input class="line-input" value="${item.so_luong}" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"><div class="origin">/ ${item.so_luong_goc}</div></div><input class="line-input" value="${fmt(item.don_gia)}" onchange="setSwapPrice('${item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '';
+      const swapCartBody = document.getElementById('swapCartBody');
+      if (!swapCartBody) return;
+      const maxLots = maxLotColumnsInSwapCart();
+      renderSwapCartThead(maxLots);
+      if (!swapItems.length) {
+        const colSpan = maxLots > 0 ? (5 + maxLots) : 11;
+        swapCartBody.innerHTML = `<tr><td colspan="${colSpan}"><div class="swap-cart-empty">Chưa có hàng đổi</div></td></tr>`;
+        renderTotals();
+        return;
+      }
+      swapCartBody.innerHTML = swapItems.map((item, idx) => {
+        const line = swapComputeLineTotal(item);
+        if (swapItemHasLotGrid(item)) {
+          return renderSwapLotProductRow(item, idx, maxLots, line);
+        }
+        return renderSwapNormalProductRow(item, idx, maxLots, line) + renderSwapQuyCachBlock(item, idx);
+      }).join('');
       renderTotals();
     }
     function setQty(id, value){
@@ -449,41 +1297,278 @@
       renderItems();
     }
     function removeItem(id){ returnItems = returnItems.filter(i => String(i.line_key || i.hang_hoa_id) !== String(id)); renderItems(); }
+    function validateSwapStock() {
+      for (const item of swapItems) {
+        const detailRows = swapItemDetailRows(item);
+        if (detailRows.length) {
+          for (const row of detailRows) {
+            const qty = Number(row.so_luong_dat || row.so_luong || 0);
+            if (qty <= 0) continue;
+            const metrics = inventoryMetrics(row);
+            if (qty > metrics.soLuongKhaDung) {
+              const label = row.ten_quy_cach || row.ten_thuoc_tinh || row.ten_lo || row.ma_lo || item.ten_hang || item.ma_hang || '';
+              return `Tồn kho hàng đổi không đủ: ${label}`;
+            }
+          }
+          continue;
+        }
+        if (Number(item.so_luong || 0) <= 0) continue;
+        const product = swapAvailableProducts.find(p => String(p._id) === String(item.hang_hoa_id));
+        if (!product) return `Tồn kho hàng đổi không đủ: ${item.ten_hang || item.ma_hang || ''}`;
+        const metrics = swapProductMetrics(product);
+        if (item.so_luong > metrics.soLuongKhaDung) {
+          return `Tồn kho hàng đổi không đủ: ${item.ten_hang || item.ma_hang || ''}`;
+        }
+      }
+      return '';
+    }
     function setSwapQty(id, value){
       const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
       if(!item) return;
+      const product = swapAvailableProducts.find(p => String(p._id) === String(id));
+      const maxQty = product ? swapProductMetrics(product).soLuongKhaDung : item.so_luong_goc;
+      item.so_luong_goc = Math.max(0, maxQty);
       item.so_luong = Math.max(0, Math.min(num(value), item.so_luong_goc));
       renderSwapItems();
     }
     function setSwapPrice(id, value){
       const item = swapItems.find(i => String(i.hang_hoa_id) === String(id));
       if(!item) return;
+      if (item.cho_phep_sua_gia === false) return alert('Dòng này không cho phép sửa giá.');
       item.don_gia = num(value);
       renderSwapItems();
     }
-    function removeSwapItem(id){ swapItems = swapItems.filter(i => String(i.hang_hoa_id) !== String(id)); renderSwapItems(); }
+    function removeSwapItem(id){
+      delete expandedSwapLotKeyByItem[id];
+      swapItems = swapItems.filter(i => String(i.hang_hoa_id) !== String(id));
+      renderSwapItems();
+    }
+    function getReturnDifferenceTotals() {
+      const total = returnItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
+      const exchange = swapItems.reduce((sum, item) => sum + swapComputeLineTotal(item), 0);
+      const discountEl = $('discount');
+      const returnFeeEl = $('returnFee');
+      const returnFeePayerEl = $('returnFeePayer');
+      const returnPickupFeeEl = $('returnPickupFee');
+      const discountValue = num(discountEl ? discountEl.value : 0);
+      const returnFeeValue = num(returnFeeEl ? returnFeeEl.value : 0);
+      const pickupFee = getReceiveMethod() !== 'tai_quay' && returnFeePayerEl && returnFeePayerEl.value === 'khach' ? num(returnPickupFeeEl ? returnPickupFeeEl.value : 0) : 0;
+      const difference = exchange + discountValue + returnFeeValue + pickupFee - total;
+      return { difference, payableValue: Math.abs(difference), isRefund: difference < 0, isCollect: difference > 0 };
+    }
+    function cashBookLabel(book) {
+      const bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
+      const bankLabel = [bank.ten_ngan_hang, bank.so_tai_khoan].filter(Boolean).join(' - ');
+      return bankLabel || (book && book.ten_so_quy) || 'Sổ quỹ';
+    }
+    function autoSelectCashBook(list) {
+      const defaults = (list || []).filter(book => book.mac_dinh);
+      if (defaults.length === 1) return String(defaults[0]._id);
+      if (!defaults.length && list.length === 1) return String(list[0]._id);
+      return '';
+    }
+    function renderCashBookSelect(select, list, placeholder) {
+      if (!select) return;
+      select.innerHTML = `<option value="">${placeholder || 'Chọn sổ quỹ'}</option>` + (list || []).map(book =>
+        `<option value="${String(book._id)}">${cashBookLabel(book)}</option>`
+      ).join('');
+      select.value = autoSelectCashBook(list);
+    }
+    async function loadReturnPaymentCashBooks() {
+      try {
+        const [cashRes, bankRes] = await Promise.all([
+          fetch('/api/so-quy/active?loai_so_quy=tien_mat'),
+          fetch('/api/so-quy/active?loai_so_quy=chuyen_khoan')
+        ]);
+        const cashJson = cashRes.ok ? await cashRes.json() : { items: [] };
+        const bankJson = bankRes.ok ? await bankRes.json() : { items: [] };
+        const pickBooks = json => (json.items || json.data || []).filter(book => String(book.trang_thai || 'active') === 'active');
+        cashBookOptions = pickBooks(cashJson).filter(book => String(book.loai_so_quy || '') === 'tien_mat');
+        bankBookOptions = pickBooks(bankJson).filter(book => String(book.loai_so_quy || '') === 'chuyen_khoan');
+        renderCashBookSelect($('cashBookId'), cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+        renderCashBookSelect($('bankBookId'), bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+      } catch (_) {
+        cashBookOptions = [];
+        bankBookOptions = [];
+        renderCashBookSelect($('cashBookId'), [], 'Không tải được sổ tiền mặt');
+        renderCashBookSelect($('bankBookId'), [], 'Không tải được tài khoản');
+      }
+      renderReturnPaymentSummary();
+    }
+    function handleReturnPaymentInput(input, mode) {
+      handleNumInput(input);
+      if (mode === 'cash') returnPaymentPriority = 'cash';
+      else if (mode === 'transfer') returnPaymentPriority = 'transfer';
+      returnIsPayAllMode = false;
+      returnPaymentTouched = true;
+      renderReturnPaymentSummary();
+    }
+    function fillReturnPaymentAll(mode) {
+      const { payableValue } = getReturnDifferenceTotals();
+      const due = Math.max(0, payableValue);
+      returnIsPayAllMode = due > 0;
+      returnPayAllTarget = mode === 'transfer' ? 'transfer' : 'cash';
+      returnPaymentPriority = returnPayAllTarget;
+      returnPaymentTouched = true;
+      const cashEl = $('cashCustomerGiven');
+      const transferEl = $('transferCustomerGiven');
+      const changeEl = $('changeReturnedToCustomer');
+      if (mode === 'cash') {
+        if (cashEl) cashEl.value = fmt(due);
+        if (transferEl) transferEl.value = '0';
+      } else if (mode === 'transfer') {
+        if (transferEl) transferEl.value = fmt(due);
+        if (cashEl) cashEl.value = '0';
+      }
+      if (changeEl) changeEl.value = '0';
+      renderReturnPaymentSummary();
+    }
+    function renderReturnPaymentSummary() {
+      const cashEl = $('cashCustomerGiven');
+      const transferEl = $('transferCustomerGiven');
+      const changeEl = $('changeReturnedToCustomer');
+      const cashBookEl = $('cashBookId');
+      const bankBookEl = $('bankBookId');
+      const sectionEl = $('returnPaymentSection');
+      const { payableValue, isRefund, isCollect } = getReturnDifferenceTotals();
+      const khachCanTra = Math.max(0, payableValue);
+      if (sectionEl) sectionEl.style.display = khachCanTra > 0 ? 'block' : 'none';
+      if (khachCanTra <= 0) {
+        if (cashEl) cashEl.value = '0';
+        if (transferEl) transferEl.value = '0';
+        if (changeEl) changeEl.value = '0';
+        lastReturnPaymentTotals = { khachCanTra: 0, khachThanhToan: 0, tienThuaTraKhach: 0, tongKhachDua: 0, isRefund };
+        return;
+      }
+      if (!returnPaymentTouched && !returnIsPayAllMode) {
+        if (cashEl) cashEl.value = fmt(khachCanTra);
+        if (transferEl) transferEl.value = '0';
+        if (changeEl) changeEl.value = '0';
+      }
+      let tienMat = Math.max(0, num(cashEl ? cashEl.value : 0));
+      let chuyenKhoan = Math.max(0, num(transferEl ? transferEl.value : 0));
+      if (returnIsPayAllMode && khachCanTra > 0) {
+        if (returnPayAllTarget === 'transfer') {
+          tienMat = 0;
+          chuyenKhoan = khachCanTra;
+        } else {
+          tienMat = khachCanTra;
+          chuyenKhoan = 0;
+        }
+      }
+      const tongKhachDua = tienMat + chuyenKhoan;
+      if (cashEl) cashEl.value = fmt(tienMat);
+      if (transferEl) transferEl.value = fmt(chuyenKhoan);
+      const tienThuaTraKhach = Math.max(0, num(changeEl ? changeEl.value : 0));
+      const khachThanhToan = tongKhachDua - tienThuaTraKhach;
+      const tienConLai = khachCanTra - khachThanhToan;
+      lastReturnPaymentTotals = { khachCanTra, khachThanhToan, tienThuaTraKhach, tongKhachDua, isRefund };
+      const payableLabelEl = $('returnPayableLabel');
+      const paidLabelEl = $('returnPaidLabel');
+      const remainingLabelEl = $('returnRemainingLabel');
+      const payableAmountEl = $('returnPayableAmount');
+      const paidAmountEl = $('returnPaidAmount');
+      const remainingAmountEl = $('returnRemainingAmount');
+      if (payableLabelEl) payableLabelEl.textContent = isCollect ? 'Khách cần trả thêm' : 'Cần trả khách';
+      if (paidLabelEl) paidLabelEl.textContent = isCollect ? 'Khách đã trả' : 'Đã trả khách';
+      if (remainingLabelEl) remainingLabelEl.textContent = isCollect
+        ? (tienConLai < 0 ? 'Nợ khách' : 'Còn phải thu')
+        : (tienConLai < 0 ? 'Trả thừa' : 'Còn phải trả');
+      if (payableAmountEl) payableAmountEl.textContent = fmtMoney(khachCanTra);
+      if (paidAmountEl) paidAmountEl.textContent = fmtMoney(khachThanhToan);
+      if (remainingAmountEl) {
+        remainingAmountEl.textContent = tienConLai < 0 ? `-${fmt(Math.abs(tienConLai))} VNĐ` : fmtMoney(tienConLai);
+      }
+      const cashBookRequired = tienMat > 0 || tienThuaTraKhach > 0;
+      const bankBookRequired = chuyenKhoan > 0;
+      if (cashBookEl) {
+        cashBookEl.disabled = !cashBookRequired;
+        if (!cashBookRequired) cashBookEl.value = '';
+        if (cashBookRequired && !cashBookEl.value) cashBookEl.value = autoSelectCashBook(cashBookOptions);
+        cashBookEl.classList.toggle('field-invalid', cashBookRequired && !String(cashBookEl.value || '').trim());
+      }
+      if (bankBookEl) {
+        bankBookEl.disabled = !bankBookRequired;
+        if (!bankBookRequired) bankBookEl.value = '';
+        if (bankBookRequired && !bankBookEl.value) bankBookEl.value = autoSelectCashBook(bankBookOptions);
+        bankBookEl.classList.toggle('field-invalid', bankBookRequired && !String(bankBookEl.value || '').trim());
+      }
+      const cashBookRequiredMark = $('cashBookRequiredMark');
+      if (cashBookRequiredMark) cashBookRequiredMark.style.display = cashBookRequired ? 'inline' : 'none';
+      const bankBookRequiredMark = $('bankBookRequiredMark');
+      if (bankBookRequiredMark) bankBookRequiredMark.style.display = bankBookRequired ? 'inline' : 'none';
+    }
+    function validateReturnPayment() {
+      renderReturnPaymentSummary();
+      const { payableValue } = getReturnDifferenceTotals();
+      if (payableValue <= 0) return '';
+      const tienMat = num($('cashCustomerGiven')?.value);
+      const chuyenKhoan = num($('transferCustomerGiven')?.value);
+      const tienThua = num($('changeReturnedToCustomer')?.value);
+      if (tienMat < 0 || chuyenKhoan < 0 || tienThua < 0) return 'Số tiền không được âm.';
+      if (tienThua > lastReturnPaymentTotals.tongKhachDua) return 'Tiền thừa không được vượt tổng tiền thanh toán.';
+      if ((tienMat > 0 || tienThua > 0) && !String($('cashBookId')?.value || '').trim()) {
+        return cashBookOptions.length ? 'Vui lòng chọn sổ tiền mặt.' : 'Chưa có sổ tiền mặt đang hoạt động.';
+      }
+      if (chuyenKhoan > 0 && !String($('bankBookId')?.value || '').trim()) {
+        return bankBookOptions.length ? 'Vui lòng chọn tài khoản chuyển khoản.' : 'Chưa có tài khoản chuyển khoản đang hoạt động.';
+      }
+      return '';
+    }
+    function buildReturnPaymentSubmitFields() {
+      renderReturnPaymentSummary();
+      const cashBookEl = $('cashBookId');
+      const bankBookEl = $('bankBookId');
+      return {
+        khach_thanh_toan_them: lastReturnPaymentTotals.khachThanhToan,
+        tien_mat_khach_dua: Math.max(0, num($('cashCustomerGiven')?.value)),
+        chuyen_khoan_khach_dua: Math.max(0, num($('transferCustomerGiven')?.value)),
+        tien_thua_tra_khach: Math.max(0, num($('changeReturnedToCustomer')?.value)),
+        payment_v2: true,
+        so_quy_tien_mat_id: cashBookEl?.value || '',
+        so_quy_chuyen_khoan_id: bankBookEl?.value || '',
+        so_quy_id: cashBookEl?.value || bankBookEl?.value || '',
+        refund_so_quy_id: cashBookEl?.value || bankBookEl?.value || '',
+        vat_chua_id: $('returnVatChuaId')?.value || '',
+        vat_chua_so_luong: $('returnVatChuaQty')?.value || ''
+      };
+    }
+    function validateReturnVatChuaInput() {
+      const vatChuaId = String($('returnVatChuaId')?.value || '').trim();
+      const qtyRaw = String($('returnVatChuaQty')?.value || '').trim();
+      if (!vatChuaId && !qtyRaw) return '';
+      if (!vatChuaId) return 'Vui lòng chọn vật chứa';
+      if (!qtyRaw || qtyRaw === '-') return 'Vui lòng nhập số lượng vật chứa';
+      const qty = numSigned(qtyRaw);
+      if (!qty) return 'Số lượng vật chứa không được bằng 0';
+      return '';
+    }
     function renderTotals(){
       const origin = returnItems.reduce((sum, item) => sum + item.thanh_tien_goc, 0);
       const total = returnItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
-      const exchange = swapItems.reduce((sum, item) => sum + item.so_luong * item.don_gia, 0);
-      const discountValue = num(discount.value);
-      const returnFeeValue = num(returnFee.value);
-      const pickupFee = getReceiveMethod() !== 'tai_quay' && returnFeePayer.value === 'khach' ? num(returnPickupFee.value) : 0;
-      const difference = exchange + discountValue + returnFeeValue + pickupFee - total;
-      const payableValue = Math.abs(difference);
-      originTotal.textContent = fmtMoney(origin);
-      returnTotal.textContent = fmtMoney(total);
-      exchangeTotal.textContent = fmtMoney(exchange);
-      differenceTotal.textContent = fmtMoney(difference);
-      payableLabel.textContent = difference > 0 ? 'Khách cần trả thêm' : 'Cần trả khách';
-      payable.textContent = fmtMoney(payableValue);
-      pickupFeeNote.style.display = getReceiveMethod() !== 'tai_quay' && num(returnPickupFee.value) > 0 && returnFeePayer.value === 'cua_hang' ? 'block' : 'none';
-      customerPaidExtraRow.style.display = difference > 0 ? 'grid' : 'none';
-      if (difference > 0 && !customerPaidExtraTouched) customerPaidExtra.value = fmt(payableValue);
-      if (difference <= 0) {
-        customerPaidExtra.value = '0';
-        customerPaidExtraTouched = false;
+      const exchange = swapItems.reduce((sum, item) => sum + swapComputeLineTotal(item), 0);
+      const discountEl = $('discount');
+      const returnFeeEl = $('returnFee');
+      const returnFeePayerEl = $('returnFeePayer');
+      const returnPickupFeeEl = $('returnPickupFee');
+      const discountValue = num(discountEl ? discountEl.value : 0);
+      const returnFeeValue = num(returnFeeEl ? returnFeeEl.value : 0);
+      const pickupFee = getReceiveMethod() !== 'tai_quay' && returnFeePayerEl && returnFeePayerEl.value === 'khach' ? num(returnPickupFeeEl ? returnPickupFeeEl.value : 0) : 0;
+      const { difference } = getReturnDifferenceTotals();
+      const originTotalEl = $('originTotal');
+      const returnTotalEl = $('returnTotal');
+      const exchangeTotalEl = $('exchangeTotal');
+      const differenceTotalEl = $('differenceTotal');
+      const pickupFeeNoteEl = $('pickupFeeNote');
+      if (originTotalEl) originTotalEl.textContent = fmtMoney(origin);
+      if (returnTotalEl) returnTotalEl.textContent = fmtMoney(total);
+      if (exchangeTotalEl) exchangeTotalEl.textContent = fmtMoney(exchange);
+      if (differenceTotalEl) differenceTotalEl.textContent = fmtMoney(difference);
+      if (pickupFeeNoteEl) pickupFeeNoteEl.style.display = getReceiveMethod() !== 'tai_quay' && num(returnPickupFeeEl ? returnPickupFeeEl.value : 0) > 0 && returnFeePayerEl && returnFeePayerEl.value === 'cua_hang' ? 'block' : 'none';
+      if (!returnPaymentTouched) {
+        returnIsPayAllMode = false;
       }
+      renderReturnPaymentSummary();
     }
     async function submitReturn(){
       const button = document.getElementById('submitReturnBtn');
@@ -500,21 +1585,21 @@
       const pickupAddress = (returnPickupAddress.value || '').trim();
       if(receiveMethod === 'lay_tai_nha' && !pickupAddress) return alert('Vui lòng nhập địa chỉ lấy hàng trả');
       if(receiveMethod === 'lay_tai_nha' && !senderName) return alert('Vui lòng nhập tên người gửi trả');
-      const exchangeItems = swapItems.filter(i => i.so_luong > 0).map(i => ({
-        hang_hoa_id: i.hang_hoa_id,
-        so_luong: i.so_luong,
-        don_gia: i.don_gia,
-        thanh_tien: i.so_luong * i.don_gia
-      }));
+      const exchangeItems = buildExchangeSubmitLines();
       const selectedCustomerId = selectedInvoice?.khach_hang_id?._id || selectedInvoice?.khach_hang_id || null;
       if(exchangeItems.length && !selectedCustomerId) return alert('Vui lòng chọn khách hàng trước khi đặt đơn đổi');
+      const swapStockError = validateSwapStock();
+      if (swapStockError) return alert(swapStockError);
+      const paymentError = validateReturnPayment();
+      if (paymentError) return alert(paymentError);
+      const vatChuaError = validateReturnVatChuaInput();
+      if (vatChuaError) return alert(vatChuaError);
       const payload = {
         hoa_don_id: selectedInvoice?._id || null,
         khach_hang_id: selectedCustomerId,
         kho_id: selectedInvoice?.kho_id?._id || selectedInvoice?.kho_id || null,
         items,
         exchangeItems,
-        khach_thanh_toan_them: num(customerPaidExtra.value),
         giam_gia: num(discount.value),
         kieu_giam_gia: discountType.value || 'vnd',
         phi_tra_hang: num(returnFee.value),
@@ -528,7 +1613,8 @@
         ma_van_don_tra_hang: receiveMethod === 'tai_quay' ? '' : (returnTrackingCode.value || '').trim(),
         ghi_chu_van_chuyen_tra: receiveMethod === 'tai_quay' ? '' : (returnTransportNote.value || '').trim(),
         ly_do: (returnReason.value || '').trim(),
-        ghi_chu: (returnNote.value || '').trim()
+        ghi_chu: (returnNote.value || '').trim(),
+        ...buildReturnPaymentSubmitFields()
       };
       button.disabled = true;
       button.textContent = 'ĐANG XỬ LÝ...';
@@ -568,17 +1654,23 @@
         });
       }
       if (copyDraft.exchange_items && copyDraft.exchange_items.length) {
+        await loadSwapProductsByWarehouse();
         swapItems = copyDraft.exchange_items.map(row => {
-          const product = products.find(p => p._id === row.hang_hoa_id) || {};
+          const product = swapAvailableProducts.find(p => String(p._id) === String(row.hang_hoa_id))
+            || products.find(p => String(p._id) === String(row.hang_hoa_id))
+            || {};
+          const metrics = product._id ? swapProductMetrics(product) : { soLuongKhaDung: Number(row.so_luong || 0) };
+          const maxQty = Math.max(metrics.soLuongKhaDung || 0, Number(row.so_luong || 0));
+          const qty = Math.min(Number(row.so_luong || 0), maxQty);
           return {
             hang_hoa_id: row.hang_hoa_id,
             ma_hang: product.ma_hang || '',
             ten_hang: product.ten_hang || '',
-            so_luong_goc: Number(row.so_luong || 0),
-            so_luong: Number(row.so_luong || 0),
+            so_luong_goc: maxQty,
+            so_luong: qty,
             don_gia: Number(row.don_gia || product.gia_ban || 0)
           };
-        });
+        }).filter(item => item.so_luong > 0);
       }
       returnReason.value = copyDraft.ly_do || 'Khách trả hàng';
       returnNote.value = copyDraft.ghi_chu || '';
@@ -597,16 +1689,35 @@
       renderItems();
       renderSwapItems();
     }
-    document.addEventListener('DOMContentLoaded', async () => {
-      renderReturnTransport();
-      loadInvoices(1);
-      if (copyFromError) alert(copyFromError);
-      if (initialInvoiceId) await selectInvoice(initialInvoiceId);
-      else if (copyDraft) await applyCopyDraft();
-    });
+    async function bootstrapReturnCreatePage() {
+      try {
+        formatNumInputValues();
+        renderSwapItems();
+        renderReturnTransport();
+        await loadReturnPaymentCashBooks();
+        if (copyFromError) alert(copyFromError);
+        if (prefillInvoiceError) alert(prefillInvoiceError);
+        if (prefillInvoicePayload) applyInvoicePayload(prefillInvoicePayload);
+        else if (initialInvoiceId) await selectInvoice(initialInvoiceId);
+        else if (copyDraft) await applyCopyDraft();
+        else loadInvoices(1);
+      } catch (error) {
+        console.error(error);
+        alert(error.message || 'Không tải được dữ liệu trả hàng');
+      }
+    }
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', bootstrapReturnCreatePage);
+    } else {
+      bootstrapReturnCreatePage();
+    }
     document.addEventListener('click', event => {
-      if (!itemSearch.contains(event.target) && !productResults.contains(event.target)) productResults.style.display = 'none';
-      if (!swapSearch.contains(event.target) && !swapResults.contains(event.target)) swapResults.style.display = 'none';
+      const itemSearchEl = $('itemSearch');
+      const productResultsEl = $('productResults');
+      const swapSearchEl = $('swapSearch');
+      const swapResultsEl = $('swapResults');
+      if (itemSearchEl && productResultsEl && !itemSearchEl.contains(event.target) && !productResultsEl.contains(event.target)) productResultsEl.style.display = 'none';
+      if (swapSearchEl && swapResultsEl && !swapSearchEl.contains(event.target) && !swapResultsEl.contains(event.target)) swapResultsEl.style.display = 'none';
     });
   </script>
 </body>

@@ -1,0 +1,60 @@
+<div class="vc-doc-modal" data-vc-doc-code="<%= ma_chung_tu || '' %>">
+  <div class="product-info-grid vc-doc-modal-grid">
+    <div><span>Loại chứng từ</span><strong><%= kind_label || '---' %></strong></div>
+    <div><span>Mã chứng từ</span><strong><%= ma_chung_tu || '---' %></strong></div>
+    <div><span>Nghiệp vụ</span><strong><%= loai_label || '---' %></strong></div>
+    <div><span>Đối tượng</span><strong><%= doi_tuong_ten || '---' %></strong></div>
+    <div><span>Chứng từ liên kết</span><strong>
+      <% if (source_href && source_code) { %>
+        <a class="table-code-link" href="<%= source_href %>" target="_blank" rel="noopener"><%= source_code %></a>
+      <% } else if (source_code) { %>
+        <%= source_code %>
+      <% } else { %>
+        <%= source_type_label || '---' %>
+      <% } %>
+    </strong></div>
+    <div><span>Thời gian</span><strong><%= formatDate(created_at) %></strong></div>
+    <div><span>Trạng thái</span><strong>
+      <% if (trang_thai === 'cancelled') { %>
+        <span class="vc-status-tag is-inactive">Đã hủy</span>
+      <% } else { %>
+        <span class="vc-status-tag is-active"><%= trang_thai_label || 'Hợp lệ' %></span>
+      <% } %>
+    </strong></div>
+    <div><span>Tổng số lượng</span><strong><%= Number(tong_so_luong || 0).toLocaleString('vi-VN') %></strong></div>
+    <div><span>Tổng tiền</span><strong><%= Number(tong_tien || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
+    <div class="span-2"><span>Ghi chú</span><strong><%= ghi_chu || '—' %></strong></div>
+  </div>
+
+  <div class="customer-table-wrap vc-doc-modal-table-wrap">
+    <table class="admin-table customer-table">
+      <thead>
+        <tr>
+          <th>Mã vật chứa</th>
+          <th>Tên vật chứa</th>
+          <th class="text-right">Số lượng</th>
+          <th class="text-right">Giá vốn</th>
+          <th class="text-right">Thành tiền</th>
+          <th>Ghi chú</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!items || items.length === 0) { %>
+          <tr>
+            <td colspan="6" class="empty-cell">Không có dòng chi tiết.</td>
+          </tr>
+        <% } %>
+        <% (items || []).forEach(function(line) { %>
+          <tr>
+            <td><%= line.ma_vat_chua || '---' %></td>
+            <td><%= line.ten_vat_chua || '---' %></td>
+            <td class="text-right"><%= Number(line.so_luong || 0).toLocaleString('vi-VN') %></td>
+            <td class="text-right"><%= Number(line.gia_von || 0) ? Number(line.gia_von).toLocaleString('vi-VN') : '—' %></td>
+            <td class="text-right"><%= Number(line.thanh_tien || 0).toLocaleString('vi-VN') %> VNĐ</td>
+            <td><%= line.ghi_chu || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

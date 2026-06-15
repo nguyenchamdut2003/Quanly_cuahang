@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    #addVatChuaModalOverlay,
+    #importVatChuaModalOverlay {
+      z-index: 4000 !important;
+    }
+    .customer-search i { color: #667085; font-size: 14px; flex: 0 0 auto; }
+    #addVatChuaModalOverlay:not(.is-visible),
+    #importVatChuaModalOverlay:not(.is-visible) {
+      display: none !important;
+      pointer-events: none !important;
+      visibility: hidden !important;
+    }
+    #addVatChuaModalOverlay.is-visible,
+    #importVatChuaModalOverlay.is-visible {
+      display: flex !important;
+      pointer-events: auto !important;
+      visibility: visible !important;
+    }
+    .vc-payment-block { border-top: 1px solid #e5e9ee; margin-top: 12px; padding-top: 10px; }
+    .vc-payment-title { font-size: 12px; font-weight: 800; color: #344054; text-transform: uppercase; letter-spacing: .02em; margin-bottom: 8px; }
+    .vc-summary-line { display: grid; grid-template-columns: 1fr 172px; align-items: center; min-height: 40px; font-size: 13px; color: #111827; gap: 8px; }
+    .vc-summary-line strong { font-weight: 700; }
+    .vc-summary-line .num { text-align: right; color: #006dff; font-weight: 700; }
+    .vc-paid-combo { display: flex; gap: 6px; justify-content: flex-end; }
+    .vc-discount-input { width: 100%; height: 30px; border: 1px solid #cfd8e3; border-radius: 7px; text-align: right; padding: 0 10px; font-size: 13px; }
+    .vc-side-input { width: 100%; height: 30px; border: 1px solid #cfd8e3; border-radius: 7px; padding: 0 8px; font-size: 13px; }
+    .vc-side-input.field-invalid { border-color: #d92d20; box-shadow: 0 0 0 1px #fda29b; }
+    .vc-btn-pay-all { height: 30px; border: 1px solid #0070f4; background: #fff; color: #0070f4; border-radius: 7px; padding: 0 10px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .vc-form-error { display: none; margin: 8px 0 0; padding: 8px 10px; border: 1px solid #fda29b; background: #fff1f3; color: #b42318; border-radius: 7px; font-size: 13px; line-height: 1.35; }
+    #vcDocumentModalOverlay { z-index: 4100 !important; }
+    #vcDocumentModalOverlay:not(.is-visible) {
+      display: none !important;
+      pointer-events: none !important;
+      visibility: hidden !important;
+    }
+    #vcDocumentModalOverlay.is-visible {
+      display: flex !important;
+      pointer-events: auto !important;
+      visibility: visible !important;
+    }
+    #vcDocumentModalOverlay .modal-content { width: min(920px, 96%); max-height: 88vh; }
+    .vc-doc-open-btn {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: #006dff;
+      text-align: left;
+    }
+    .vc-doc-open-btn:hover { text-decoration: underline; }
+    .vc-doc-modal-grid { margin-bottom: 12px; }
+    .vc-doc-modal-table-wrap { margin-top: 4px; }
+    .vc-doc-modal-loading,
+    .vc-doc-modal-error { padding: 20px 4px; color: #64748b; font-size: 14px; }
+    .vc-doc-modal-error { color: #b42318; }
+    #addVatChuaModalOverlay .product-create-modal,
+    #importVatChuaModalOverlay .product-create-modal { width: min(640px, 96vw); }
+    .vc-status-tag {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .vc-status-tag.is-active { background: #ecfdf3; color: #047857; }
+    .vc-status-tag.is-inactive { background: #f1f5f9; color: #64748b; }
+    .vc-money-suffix { margin-left: 4px; color: #667085; font-size: 12px; font-weight: 600; }
+    @media (max-width: 900px) {
+      .customer-toolbar { flex-wrap: wrap; }
+      .customer-toolbar-actions { width: 100%; justify-content: flex-end; }
+      .vc-summary-line { grid-template-columns: 1fr; gap: 4px; }
+      .vc-summary-line .num,
+      .vc-paid-combo,
+      .vc-side-input { justify-self: stretch; }
+    }
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+
+  <main class="admin-shell customer-page">
+    <% const vcFlash = typeof flash !== 'undefined' ? flash : {}; %>
+    <% const vcFlashForGeneric = Object.assign({}, vcFlash); %>
+    <% if (['created', 'imported', 'deleted'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
+    <% if (['missing_store', 'missing_name', 'duplicate_code', 'no_selection', 'import_failed'].indexOf(String(vcFlash.error || '')) >= 0) { delete vcFlashForGeneric.error; } %>
+    <%- include('../partials/flash-message', { flash: vcFlashForGeneric }) %>
+    <% if (vcFlash.error === 'missing_store') { %>
+      <div class="flash-message flash-error">Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở góc phải trên.</div>
+    <% } else if (vcFlash.error === 'missing_name') { %>
+      <div class="flash-message flash-error">Vui lòng nhập tên vật chứa.</div>
+    <% } else if (vcFlash.error === 'duplicate_code') { %>
+      <div class="flash-message flash-error">Mã vật chứa đã tồn tại. Vui lòng thử lại.</div>
+    <% } else if (vcFlash.error === 'no_selection') { %>
+      <div class="flash-message flash-error">Vui lòng chọn ít nhất một vật chứa.</div>
+    <% } else if (vcFlash.error === 'import_failed') { %>
+      <div class="flash-message flash-error">Nhập vật chứa thất bại. Vui lòng kiểm tra lại thông tin.</div>
+    <% } %>
+    <% if (vcFlash.success === 'created') { %>
+      <div class="flash-message flash-success">Đã tạo vật chứa mới.</div>
+    <% } else if (vcFlash.success === 'imported') { %>
+      <div class="flash-message flash-success">Đã nhập vật chứa thành công.</div>
+    <% } else if (vcFlash.success === 'deleted') { %>
+      <div class="flash-message flash-success">Đã ngừng sử dụng các vật chứa đã chọn.</div>
+    <% } %>
+
+    <div class="customer-shell">
+      <aside class="customer-filter">
+        <h2>Vật chứa</h2>
+        <form method="get" action="/vat-chua" id="vatChuaFilterForm">
+          <section class="customer-filter-section">
+            <h4>Tồn kho</h4>
+            <div class="range-stack">
+              <div class="range-row"><span>Từ</span><input type="number" min="0" name="stockFrom" value="<%= filter.stockFrom || '' %>" placeholder="Nhập giá trị"></div>
+              <div class="range-row"><span>Đến</span><input type="number" min="0" name="stockTo" value="<%= filter.stockTo || '' %>" placeholder="Nhập giá trị"></div>
+            </div>
+          </section>
+
+          <section class="customer-filter-section">
+            <h4>Thời gian tạo</h4>
+            <label class="filter-radio-row">
+              <input type="radio" name="created" value="all" <%= filter.created !== 'custom' ? 'checked' : '' %>>
+              <span>Toàn thời gian</span>
+            </label>
+            <label class="filter-radio-row">
+              <input type="radio" name="created" value="custom" <%= filter.created === 'custom' ? 'checked' : '' %>>
+              <span>Tùy chỉnh</span>
+            </label>
+            <div class="custom-date-range <%= filter.created === 'custom' ? 'is-visible' : '' %>" id="customDateRange">
+              <label><span>Từ ngày</span><input type="date" name="createdFrom" value="<%= filter.createdFrom || '' %>"></label>
+              <label><span>Đến ngày</span><input type="date" name="createdTo" value="<%= filter.createdTo || '' %>"></label>
+            </div>
+          </section>
+
+          <section class="customer-filter-section">
+            <h4>Trạng thái</h4>
+            <div class="pill-row">
+              <button class="pill-btn <%= filter.status === 'all' ? 'is-active' : '' %>" type="button" data-target-input="vatChuaStatusInput" data-value="all">Tất cả</button>
+              <button class="pill-btn <%= (filter.status === 'active' || !filter.status) ? 'is-active' : '' %>" type="button" data-target-input="vatChuaStatusInput" data-value="active">Đang sử dụng</button>
+              <button class="pill-btn <%= filter.status === 'inactive' ? 'is-active' : '' %>" type="button" data-target-input="vatChuaStatusInput" data-value="inactive">Ngừng sử dụng</button>
+            </div>
+            <input type="hidden" id="vatChuaStatusInput" name="status" value="<%= filter.status || 'active' %>">
+            <div class="customer-filter-actions">
+              <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
+              <a class="btn btn-light" href="/vat-chua">Xóa lọc</a>
+            </div>
+          </section>
+        </form>
+      </aside>
+
+      <section class="customer-content">
+        <% if (missingStore) { %>
+          <div class="flash-message flash-error">Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở góc phải trên.</div>
+        <% } %>
+
+        <div class="customer-toolbar">
+          <div class="customer-search">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" name="keyword" form="vatChuaFilterForm" value="<%= filter.keyword || '' %>" placeholder="Theo mã, tên vật chứa">
+          </div>
+          <div class="customer-toolbar-actions">
+            <button class="btn btn-primary" type="button" id="openAddVatChuaModal" <%= missingStore ? 'disabled' : '' %>>+ Tạo mới</button>
+            <button class="btn btn-light" type="button" id="openImportVatChuaModal" <%= missingStore ? 'disabled' : '' %>>Nhập vật chứa</button>
+            <button class="btn btn-danger" type="submit" form="bulkDeleteVatChuaForm" onclick="return confirm('Ngừng sử dụng các vật chứa đã chọn?')">Ngừng sử dụng</button>
+          </div>
+        </div>
+
+        <div class="customer-table-wrap">
+          <form id="bulkDeleteVatChuaForm" method="post" action="/vat-chua/delete-selected">
+            <table class="admin-table customer-table" data-kv-master="vat-chua">
+              <thead>
+                <tr>
+                  <th class="check-cell"><input id="selectAllVatChua" type="checkbox" aria-label="Chọn tất cả"></th>
+                  <th>Mã vật chứa</th>
+                  <th>Tên vật chứa</th>
+                  <th class="text-right">Giá vốn</th>
+                  <th class="text-right">Tồn kho</th>
+                  <th>Trạng thái</th>
+                  <th>Thời gian tạo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if (!items || items.length === 0) { %>
+                  <tr>
+                    <td colspan="7" class="empty-cell">Không có vật chứa phù hợp với bộ lọc.</td>
+                  </tr>
+                <% } %>
+                <% var listBase = '/vat-chua' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
+                <% (items || []).forEach(function(item) { %>
+                  <tr data-kv-detail-id="<%= item._id %>">
+                    <td class="check-cell"><input class="vat-chua-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn vật chứa"></td>
+                    <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_vat_chua || '---' %></a></td>
+                    <td><strong><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ten_vat_chua || '---' %></a></strong></td>
+                    <td class="text-right"><%= Number(item.gia_von_trung_binh || 0).toLocaleString('vi-VN') %></td>
+                    <td class="text-right"><%= Number(item.so_luong_ton || 0).toLocaleString('vi-VN') %></td>
+                    <td>
+                      <% if (item.trang_thai === 'inactive') { %>
+                        <span class="vc-status-tag is-inactive">Ngừng sử dụng</span>
+                      <% } else { %>
+                        <span class="vc-status-tag is-active">Đang sử dụng</span>
+                      <% } %>
+                    </td>
+                    <td><%= formatDate(item.created_at) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div id="addVatChuaModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'create' ? '1' : '0' %>">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3>Tạo vật chứa</h3>
+          <button type="button" class="modal-close" id="addVatChuaModalClose">×</button>
+        </div>
+        <form class="modal-body product-form-body" method="post" action="/vat-chua/add" id="vatChuaCreateForm">
+          <div class="product-form-grid">
+            <section class="product-form-section">
+              <h4>Thông tin</h4>
+              <div class="store-fields product-fields">
+                <div>
+                  <span>Mã vật chứa</span>
+                  <input name="ma_vat_chua" placeholder="Tự động sinh" readonly>
+                </div>
+                <div>
+                  <span>Tên vật chứa *</span>
+                  <input name="ten_vat_chua" placeholder="Két nhựa, túi nilon, sọt..." required>
+                </div>
+                <div>
+                  <span>Tồn ban đầu</span>
+                  <input type="number" min="0" step="1" name="so_luong_ton" value="0">
+                </div>
+                <div>
+                  <span>Trạng thái</span>
+                  <select name="trang_thai">
+                    <option value="active" selected>Đang sử dụng</option>
+                    <option value="inactive">Ngừng sử dụng</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+          </div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="addVatChuaModalCancel">Hủy</button>
+          <button class="btn btn-primary" type="submit" form="vatChuaCreateForm">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="importVatChuaModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'nhap' ? '1' : '0' %>">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3>Nhập vật chứa</h3>
+          <button type="button" class="modal-close" id="importVatChuaModalClose">×</button>
+        </div>
+        <form class="modal-body product-form-body" method="post" action="/vat-chua/nhap" id="vatChuaImportForm">
+          <input type="hidden" name="payment_v2" value="1">
+          <input type="hidden" name="chi_tiet_thanh_toan[tien_tra_khach]" value="0">
+          <div class="product-form-grid">
+            <section class="product-form-section">
+              <h4>Thông tin nhập</h4>
+              <div class="store-fields product-fields">
+                <div>
+                  <span>Nhà cung cấp *</span>
+                  <select name="nha_cung_cap_id" required>
+                    <option value="">— Chọn nhà cung cấp —</option>
+                    <% (suppliers || []).forEach(function(supplier) { %>
+                      <option value="<%= supplier._id %>"><%= supplier.ten_ncc || supplier.ma_ncc || '---' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <span>Vật chứa *</span>
+                  <select id="importVatChuaSelect" name="vat_chua_id" required>
+                    <option value="">— Chọn vật chứa —</option>
+                    <% (activeVatChuaList || []).forEach(function(vc) { %>
+                      <option value="<%= vc._id %>"><%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <span>Số lượng *</span>
+                  <input type="number" min="1" step="1" id="importSoLuongInput" name="so_luong" required placeholder="Nhập số lượng">
+                </div>
+                <div>
+                  <span>Giá vốn *</span>
+                  <input type="text" id="importGiaVonInput" class="vn-number-input" inputmode="numeric" name="gia_von" value="" placeholder="0" autocomplete="off" required>
+                </div>
+                <div class="span-2">
+                  <span>Ghi chú</span>
+                  <input name="ghi_chu" placeholder="Ghi chú nhập vật chứa (tùy chọn)">
+                </div>
+              </div>
+
+              <div class="vc-payment-block">
+                <div class="vc-payment-title">Chi tiết thanh toán</div>
+                <div class="vc-summary-line"><strong>Tổng tiền</strong><span class="num" id="importGrandTotal">0</span></div>
+                <div class="vc-summary-line">
+                  <span>Tiền mặt</span>
+                  <div class="vc-paid-combo">
+                    <input id="importPaymentCash" class="vc-discount-input" name="chi_tiet_thanh_toan[tien_mat]" value="0" inputmode="numeric">
+                    <button type="button" class="vc-btn-pay-all" id="importPayAllCashBtn">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Sổ tiền mặt <span id="importCashBookRequiredMark" style="display:none;color:#d92d20">*</span></span>
+                  <select id="importCashBookId" class="vc-side-input" name="chi_tiet_thanh_toan[so_quy_tien_mat_id]" disabled>
+                    <option value="">Chọn sổ tiền mặt</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Chuyển khoản</span>
+                  <div class="vc-paid-combo">
+                    <input id="importPaymentTransfer" class="vc-discount-input" name="chi_tiet_thanh_toan[chuyen_khoan]" value="0" inputmode="numeric">
+                    <button type="button" class="vc-btn-pay-all" id="importPayAllTransferBtn">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Tài khoản ngân hàng <span id="importBankBookRequiredMark" style="display:none;color:#d92d20">*</span></span>
+                  <select id="importBankBookId" class="vc-side-input" name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]" disabled>
+                    <option value="">Chọn tài khoản chuyển khoản</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line"><span>Cần trả NCC</span><span class="num" id="importSupplierPayable">0</span></div>
+                <div class="vc-summary-line"><span>Đã trả NCC</span><span class="num" id="importSupplierPaid">0</span></div>
+                <div class="vc-summary-line"><strong>Nợ nhà cung cấp</strong><span class="num" id="importSupplierDebt">0</span></div>
+                <div id="importPaymentFormError" class="vc-form-error"></div>
+              </div>
+            </section>
+          </div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="importVatChuaModalCancel">Hủy</button>
+          <button class="btn btn-primary" type="submit" form="vatChuaImportForm">Nhập</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="vcDocumentModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3 id="vcDocumentModalTitle">Chi tiết chứng từ</h3>
+          <button type="button" class="modal-close" id="vcDocumentModalClose" aria-label="Đóng">×</button>
+        </div>
+        <div class="modal-body product-form-body" id="vcDocumentModalBody">
+          <p class="vc-doc-modal-loading">Đang tải...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script id="vatChuaPageMeta" type="application/json"><%- JSON.stringify({
+    flashError: (flash && flash.error && ['missing_store', 'missing_name', 'duplicate_code', 'no_selection', 'import_failed'].indexOf(String(flash.error)) < 0) ? String(flash.error) : '',
+    formMode: formMode || '',
+    openDetailVatChuaId: openDetailVatChuaId || ''
+  }) %></script>
+  <script src="/js/kv-inline-detail.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var pageMeta = {};
+      try {
+        var metaEl = document.getElementById('vatChuaPageMeta');
+        pageMeta = metaEl && metaEl.textContent ? JSON.parse(metaEl.textContent) : {};
+      } catch (_) {
+        pageMeta = {};
+      }
+
+      var masterTable = document.querySelector('table[data-kv-master="vat-chua"]');
+      var kvVatChuaDetail = null;
+      if (masterTable && typeof KvInlineDetail !== 'undefined') {
+        kvVatChuaDetail = new KvInlineDetail({
+          table: masterTable,
+          colspan: 7,
+          buildUrl: function(id) {
+            return '/vat-chua/api/' + encodeURIComponent(id) + '/detail';
+          }
+        });
+      }
+      if (pageMeta.openDetailVatChuaId && kvVatChuaDetail) {
+        kvVatChuaDetail.openById(pageMeta.openDetailVatChuaId);
+        try {
+          var detailUrl = new URL(window.location.href);
+          if (detailUrl.searchParams.has('nhap_vat_chua')) {
+            detailUrl.searchParams.delete('nhap_vat_chua');
+            window.history.replaceState({}, '', detailUrl.pathname + (detailUrl.searchParams.toString() ? '?' + detailUrl.searchParams.toString() : ''));
+          }
+        } catch (_) {}
+      }
+
+      var overlay = document.getElementById('addVatChuaModalOverlay');
+      var importOverlay = document.getElementById('importVatChuaModalOverlay');
+      var openBtn = document.getElementById('openAddVatChuaModal');
+      var openImportBtn = document.getElementById('openImportVatChuaModal');
+      var closeBtn = document.getElementById('addVatChuaModalClose');
+      var cancelBtn = document.getElementById('addVatChuaModalCancel');
+      var importCloseBtn = document.getElementById('importVatChuaModalClose');
+      var importCancelBtn = document.getElementById('importVatChuaModalCancel');
+      var createForm = document.getElementById('vatChuaCreateForm');
+      var importForm = document.getElementById('vatChuaImportForm');
+      var importGiaVonInput = document.getElementById('importGiaVonInput');
+      var importSoLuongInput = document.getElementById('importSoLuongInput');
+      var importGrandTotal = document.getElementById('importGrandTotal');
+      var importPaymentCash = document.getElementById('importPaymentCash');
+      var importPaymentTransfer = document.getElementById('importPaymentTransfer');
+      var importCashBookId = document.getElementById('importCashBookId');
+      var importBankBookId = document.getElementById('importBankBookId');
+      var importPayAllCashBtn = document.getElementById('importPayAllCashBtn');
+      var importPayAllTransferBtn = document.getElementById('importPayAllTransferBtn');
+      var importPaymentFormError = document.getElementById('importPaymentFormError');
+      var importCashBookRequiredMark = document.getElementById('importCashBookRequiredMark');
+      var importBankBookRequiredMark = document.getElementById('importBankBookRequiredMark');
+      var importSupplierPayable = document.getElementById('importSupplierPayable');
+      var importSupplierPaid = document.getElementById('importSupplierPaid');
+      var importSupplierDebt = document.getElementById('importSupplierDebt');
+      var cashBookOptions = [];
+      var bankBookOptions = [];
+      var selectAll = document.getElementById('selectAllVatChua');
+      var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.vat-chua-checkbox'));
+      var customDateRange = document.getElementById('customDateRange');
+      var createdRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="created"]'));
+
+      var fmt = function(n) {
+        return Number(n || 0).toLocaleString('vi-VN');
+      };
+      var fmtMoney = function(n) {
+        return fmt(n) + ' VNĐ';
+      };
+      var numeric = function(value) {
+        return Math.max(0, Number(String(value || '').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '').trim()) || 0);
+      };
+      function applyLiveVNFormat(el) {
+        if (!el) return;
+        var start = el.selectionStart == null ? el.value.length : el.selectionStart;
+        var digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
+        var raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
+        if (!raw) {
+          el.value = '';
+          return;
+        }
+        var formatted = fmt(Number(raw));
+        el.value = formatted;
+        var pos = formatted.length;
+        if (digitsBefore > 0) {
+          var digits = 0;
+          for (var i = 0; i < formatted.length; i++) {
+            if (/\d/.test(formatted[i])) {
+              digits++;
+              if (digits === digitsBefore) {
+                pos = i + 1;
+                break;
+              }
+            }
+          }
+        } else {
+          pos = 0;
+        }
+        try { el.setSelectionRange(pos, pos); } catch (_) {}
+      }
+      function bindVNNumberInput(el) {
+        if (!el || el.dataset.vnBound === '1') return;
+        el.dataset.vnBound = '1';
+        el.addEventListener('input', function() {
+          applyLiveVNFormat(el);
+        });
+        el.addEventListener('blur', function() {
+          var n = numeric(el.value);
+          el.value = n ? fmt(n) : '';
+        });
+      }
+
+      function escapeHtml(value) {
+        return String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+      function cashBookLabel(book) {
+        var bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
+        var bankLabel = [bank.ten_ngan_hang, bank.so_tai_khoan].filter(Boolean).join(' - ');
+        return bankLabel || (book && book.ten_so_quy) || 'Sổ quỹ';
+      }
+      function autoSelectCashBook(list) {
+        var defaults = list.filter(function(book) { return book.mac_dinh; });
+        if (defaults.length === 1) return String(defaults[0]._id);
+        if (!defaults.length && list.length === 1) return String(list[0]._id);
+        return '';
+      }
+      function renderCashBookSelect(select, list, placeholder) {
+        if (!select) return;
+        select.innerHTML = '<option value="">' + escapeHtml(placeholder) + '</option>' + list.map(function(book) {
+          return '<option value="' + escapeHtml(book._id) + '">' + escapeHtml(cashBookLabel(book)) + '</option>';
+        }).join('');
+        select.value = autoSelectCashBook(list);
+      }
+      async function loadCashBooksByType(type) {
+        var response = await fetch('/api/so-quy/active?loai_so_quy=' + encodeURIComponent(type), {
+          headers: { 'Accept': 'application/json' }
+        });
+        var json = await response.json();
+        if (!json || !json.success) throw new Error((json && json.message) || 'Không tải được danh sách sổ quỹ.');
+        return (Array.isArray(json.items) ? json.items : [])
+          .filter(function(book) { return String(book.loai_so_quy || '') === type && String(book.trang_thai || 'active') === 'active'; })
+          .map(function(book) { return Object.assign({}, book, { _id: String(book._id || '') }); })
+          .filter(function(book) { return book._id; });
+      }
+      async function loadImportPaymentCashBooks() {
+        try {
+          var lists = await Promise.all([
+            loadCashBooksByType('tien_mat'),
+            loadCashBooksByType('chuyen_khoan')
+          ]);
+          cashBookOptions = lists[0];
+          bankBookOptions = lists[1];
+          renderCashBookSelect(importCashBookId, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+          renderCashBookSelect(importBankBookId, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+        } catch (error) {
+          cashBookOptions = [];
+          bankBookOptions = [];
+          renderCashBookSelect(importCashBookId, [], 'Không tải được sổ tiền mặt');
+          renderCashBookSelect(importBankBookId, [], 'Không tải được tài khoản');
+        }
+        renderImportPaymentSummary();
+      }
+      function getImportGrandTotal() {
+        var qty = Math.max(0, Math.floor(Number(importSoLuongInput ? importSoLuongInput.value : 0) || 0));
+        var gia = numeric(importGiaVonInput ? importGiaVonInput.value : 0);
+        return Math.round(gia * qty);
+      }
+      function showImportPaymentError(message) {
+        if (!importPaymentFormError) return;
+        if (!message) {
+          importPaymentFormError.style.display = 'none';
+          importPaymentFormError.textContent = '';
+          return;
+        }
+        importPaymentFormError.style.display = 'block';
+        importPaymentFormError.textContent = message;
+      }
+      function renderImportPaymentSummary() {
+        var grandTotal = getImportGrandTotal();
+        if (importGrandTotal) importGrandTotal.textContent = fmtMoney(grandTotal);
+        var tienMat = numeric(importPaymentCash ? importPaymentCash.value : 0);
+        var chuyenKhoan = numeric(importPaymentTransfer ? importPaymentTransfer.value : 0);
+        if (tienMat + chuyenKhoan > grandTotal && grandTotal > 0) {
+          var overflow = tienMat + chuyenKhoan - grandTotal;
+          if (chuyenKhoan >= overflow) chuyenKhoan -= overflow;
+          else {
+            tienMat = Math.max(0, tienMat - (overflow - chuyenKhoan));
+            chuyenKhoan = 0;
+          }
+        }
+        var daTra = tienMat + chuyenKhoan;
+        if (importPaymentCash) importPaymentCash.value = fmt(tienMat);
+        if (importPaymentTransfer) importPaymentTransfer.value = fmt(chuyenKhoan);
+        var cashRequired = tienMat > 0;
+        var bankRequired = chuyenKhoan > 0;
+        if (importCashBookId) {
+          importCashBookId.disabled = !cashRequired;
+          if (!cashRequired) importCashBookId.value = '';
+          if (cashRequired && !importCashBookId.value) importCashBookId.value = autoSelectCashBook(cashBookOptions);
+          importCashBookId.classList.toggle('field-invalid', cashRequired && !String(importCashBookId.value || '').trim());
+        }
+        if (importBankBookId) {
+          importBankBookId.disabled = !bankRequired;
+          if (!bankRequired) importBankBookId.value = '';
+          if (bankRequired && !importBankBookId.value) importBankBookId.value = autoSelectCashBook(bankBookOptions);
+          importBankBookId.classList.toggle('field-invalid', bankRequired && !String(importBankBookId.value || '').trim());
+        }
+        if (importCashBookRequiredMark) importCashBookRequiredMark.style.display = cashRequired ? 'inline' : 'none';
+        if (importBankBookRequiredMark) importBankBookRequiredMark.style.display = bankRequired ? 'inline' : 'none';
+        var conNo = Math.max(grandTotal - daTra, 0);
+        if (importSupplierPayable) importSupplierPayable.textContent = fmtMoney(grandTotal);
+        if (importSupplierPaid) importSupplierPaid.textContent = fmtMoney(daTra);
+        if (importSupplierDebt) importSupplierDebt.textContent = fmtMoney(conNo);
+      }
+      function validateImportPayment() {
+        showImportPaymentError('');
+        var grandTotal = getImportGrandTotal();
+        if (grandTotal <= 0) {
+          showImportPaymentError('Vui lòng nhập giá vốn và số lượng hợp lệ.');
+          return false;
+        }
+        var tienMat = numeric(importPaymentCash ? importPaymentCash.value : 0);
+        var chuyenKhoan = numeric(importPaymentTransfer ? importPaymentTransfer.value : 0);
+        var daTra = tienMat + chuyenKhoan;
+        if (daTra > grandTotal) {
+          showImportPaymentError('Số tiền thanh toán không được vượt tổng tiền.');
+          return false;
+        }
+        if (tienMat > 0 && !String(importCashBookId ? importCashBookId.value : '').trim()) {
+          showImportPaymentError('Vui lòng chọn sổ tiền mặt.');
+          if (importCashBookId) importCashBookId.focus();
+          return false;
+        }
+        if (chuyenKhoan > 0 && !String(importBankBookId ? importBankBookId.value : '').trim()) {
+          showImportPaymentError('Vui lòng chọn tài khoản chuyển khoản.');
+          if (importBankBookId) importBankBookId.focus();
+          return false;
+        }
+        return true;
+      }
+
+      function clearUrlMode(mode) {
+        if (window.location.search.indexOf('mode=' + mode) < 0) return;
+        var url = new URL(window.location.href);
+        url.searchParams.delete('mode');
+        url.searchParams.delete('error');
+        window.history.replaceState({}, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams.toString() : ''));
+      }
+
+      function openModal() {
+        if (!overlay) return;
+        if (importOverlay) importOverlay.classList.remove('is-visible');
+        overlay.classList.add('is-visible');
+      }
+      function closeModal() {
+        if (!overlay) return;
+        overlay.classList.remove('is-visible');
+        clearUrlMode('create');
+      }
+      function openImportModal() {
+        if (!importOverlay) return;
+        if (overlay) overlay.classList.remove('is-visible');
+        importOverlay.classList.add('is-visible');
+        loadImportPaymentCashBooks();
+        renderImportPaymentSummary();
+      }
+      function closeImportModal() {
+        if (!importOverlay) return;
+        importOverlay.classList.remove('is-visible');
+        clearUrlMode('nhap');
+      }
+
+      if (openBtn) openBtn.addEventListener('click', openModal);
+      if (openImportBtn) openImportBtn.addEventListener('click', openImportModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (importCloseBtn) importCloseBtn.addEventListener('click', closeImportModal);
+      if (importCancelBtn) importCancelBtn.addEventListener('click', closeImportModal);
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeModal();
+        });
+        if (overlay.getAttribute('data-auto-open') === '1') openModal();
+      }
+      if (importOverlay) {
+        var importModalContent = importOverlay.querySelector('.modal-content');
+        if (importModalContent) {
+          importModalContent.addEventListener('click', function(e) {
+            e.stopPropagation();
+          });
+        }
+        if (importOverlay.getAttribute('data-auto-open') === '1') openImportModal();
+      }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          closeModal();
+          closeImportModal();
+          var vcDocOverlay = document.getElementById('vcDocumentModalOverlay');
+          if (vcDocOverlay) vcDocOverlay.classList.remove('is-visible');
+        }
+      });
+
+      if (importGiaVonInput) bindVNNumberInput(importGiaVonInput);
+      if (importGiaVonInput) importGiaVonInput.addEventListener('input', renderImportPaymentSummary);
+      if (importGiaVonInput) importGiaVonInput.addEventListener('blur', renderImportPaymentSummary);
+      if (importSoLuongInput) importSoLuongInput.addEventListener('input', renderImportPaymentSummary);
+      if (importPaymentCash) importPaymentCash.addEventListener('input', renderImportPaymentSummary);
+      if (importPaymentTransfer) importPaymentTransfer.addEventListener('input', renderImportPaymentSummary);
+      if (importPayAllCashBtn) {
+        importPayAllCashBtn.addEventListener('click', function() {
+          var total = getImportGrandTotal();
+          if (importPaymentCash) importPaymentCash.value = fmt(total);
+          if (importPaymentTransfer) importPaymentTransfer.value = '0';
+          renderImportPaymentSummary();
+        });
+      }
+      if (importPayAllTransferBtn) {
+        importPayAllTransferBtn.addEventListener('click', function() {
+          var total = getImportGrandTotal();
+          if (importPaymentTransfer) importPaymentTransfer.value = fmt(total);
+          if (importPaymentCash) importPaymentCash.value = '0';
+          renderImportPaymentSummary();
+        });
+      }
+      if (importForm) {
+        importForm.addEventListener('submit', function(e) {
+          renderImportPaymentSummary();
+          if (!validateImportPayment()) {
+            e.preventDefault();
+            return;
+          }
+          if (importCashBookId && importCashBookId.disabled) importCashBookId.disabled = false;
+          if (importBankBookId && importBankBookId.disabled) importBankBookId.disabled = false;
+          if (importGiaVonInput) {
+            importGiaVonInput.value = String(numeric(importGiaVonInput.value));
+          }
+          if (importPaymentCash) importPaymentCash.value = String(numeric(importPaymentCash.value));
+          if (importPaymentTransfer) importPaymentTransfer.value = String(numeric(importPaymentTransfer.value));
+        });
+      }
+
+      if (importPaymentCash) bindVNNumberInput(importPaymentCash);
+      if (importPaymentTransfer) bindVNNumberInput(importPaymentTransfer);
+
+      if (pageMeta.flashError && pageMeta.formMode === 'nhap') {
+        showImportPaymentError(pageMeta.flashError);
+      }
+
+      if (selectAll && checkboxes.length > 0) {
+        selectAll.addEventListener('change', function() {
+          checkboxes.forEach(function(item) { item.checked = selectAll.checked; });
+        });
+        checkboxes.forEach(function(item) {
+          item.addEventListener('change', function() {
+            selectAll.checked = checkboxes.length > 0 && checkboxes.every(function(row) { return row.checked; });
+          });
+        });
+      }
+
+      createdRadios.forEach(function(radio) {
+        radio.addEventListener('change', function() {
+          if (!customDateRange) return;
+          customDateRange.classList.toggle('is-visible', radio.value === 'custom' && radio.checked);
+        });
+      });
+
+      Array.prototype.slice.call(document.querySelectorAll('.pill-btn[data-target-input]')).forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var targetId = btn.getAttribute('data-target-input');
+          var value = btn.getAttribute('data-value');
+          var input = targetId ? document.getElementById(targetId) : null;
+          if (input) input.value = value;
+          var row = btn.closest('.pill-row');
+          if (row) {
+            Array.prototype.slice.call(row.querySelectorAll('.pill-btn')).forEach(function(item) {
+              item.classList.toggle('is-active', item === btn);
+            });
+          }
+        });
+      });
+
+      var vcDocumentOverlay = document.getElementById('vcDocumentModalOverlay');
+      var vcDocumentBody = document.getElementById('vcDocumentModalBody');
+      var vcDocumentTitle = document.getElementById('vcDocumentModalTitle');
+      var vcDocumentClose = document.getElementById('vcDocumentModalClose');
+
+      function closeVcDocumentModal() {
+        if (vcDocumentOverlay) vcDocumentOverlay.classList.remove('is-visible');
+      }
+      function openVcDocumentModal(kind, id) {
+        if (!vcDocumentOverlay || !vcDocumentBody || !kind || !id) return;
+        if (vcDocumentTitle) vcDocumentTitle.textContent = 'Chi tiết chứng từ';
+        vcDocumentBody.innerHTML = '<p class="vc-doc-modal-loading">Đang tải chi tiết...</p>';
+        vcDocumentOverlay.classList.add('is-visible');
+        fetch('/vat-chua/api/document/' + encodeURIComponent(kind) + '/' + encodeURIComponent(id), {
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+          .then(function(res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.text();
+          })
+          .then(function(html) {
+            vcDocumentBody.innerHTML = html;
+            var codeEl = vcDocumentBody.querySelector('[data-vc-doc-code]');
+            if (codeEl && vcDocumentTitle) {
+              vcDocumentTitle.textContent = 'Chi tiết ' + String(codeEl.textContent || '').trim();
+            }
+          })
+          .catch(function() {
+            vcDocumentBody.innerHTML = '<div class="vc-doc-modal-error"><p>Không tải được chi tiết chứng từ.</p></div>';
+          });
+      }
+
+      document.addEventListener('click', function(e) {
+        var openBtn = e.target.closest('[data-vc-doc-open]');
+        if (openBtn) {
+          e.preventDefault();
+          openVcDocumentModal(openBtn.getAttribute('data-vc-doc-kind'), openBtn.getAttribute('data-vc-doc-id'));
+          return;
+        }
+        if (vcDocumentOverlay && e.target === vcDocumentOverlay) closeVcDocumentModal();
+      });
+      if (vcDocumentClose) vcDocumentClose.addEventListener('click', closeVcDocumentModal);
+    });
+  </script>
+</body>
+</html>

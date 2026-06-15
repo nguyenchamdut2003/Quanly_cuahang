@@ -1,0 +1,248 @@
+const mongoose = require('mongoose');
+const { VatChua, XuatVatChua } = require('../models/kiot.model');
+const {
+  parseVatChuaImportInput,
+  assertVatChuaImportInput,
+  loadAverageCostByVatChuaIds
+} = require('./vatChuaImport.service');
+
+function cleanId(value) {
+  const id = String(value || '').trim();
+  return mongoose.Types.ObjectId.isValid(id) ? id : undefined;
+}
+
+function withSessionQuery(query, session) {
+  return session ? query.session(session) : query;
+}
+
+async function createOne(model, doc, session) {
+  if (!session) return model.create(doc);
+  const rows = await model.create([doc], { session });
+  return rows[0];
+}
+
+async function makeXuatVatChuaCode(storeId, session) {
+  const regex = /^XVC\d+$/;
+  const last = await withSessionQuery(
+    XuatVatChua.findOne({ cua_hang_id: storeId, ma_xuat_vat_chua: regex }).sort({ ma_xuat_vat_chua: -1 }),
+    session
+  ).lean();
+  const next = last && last.ma_xuat_vat_chua
+    ? Number(String(last.ma_xuat_vat_chua).replace(/\D/g, '')) + 1
+    : 1;
+  return 'XVC' + String(next).padStart(6, '0');
+}
+
+async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
+  const storeId = cleanId(options.storeId);
+  const vatChuaId = cleanId(options.vatChuaId);
+  const qty = Math.floor(Number(options.qty || 0));
+  if (!storeId || !vatChuaId || qty <= 0) {
+    throw new Error('Thiếu thông tin xuất vật chứa');
+  }
+
+  const vatChua = await withSessionQuery(
+    VatChua.findOne({
+      _id: vatChuaId,
+      cua_hang_id: storeId,
+      trang_thai: 'active'
+    }),
+    session
+  ).lean();
+  if (!vatChua) throw new Error('Vật chứa không hợp lệ hoặc đã ngừng sử dụng');
+
+  const tonKho = Math.max(0, Number(vatChua.so_luong_ton || 0));
+  if (tonKho < qty) {
+    throw new Error('Tồn vật chứa không đủ để xuất (còn ' + tonKho + ', cần ' + qty + ')');
+  }
+
+  const costMap = await loadAverageCostByVatChuaIds(storeId, [vatChuaId], session);
+  const giaVon = Math.max(0, Number(costMap[String(vatChuaId)] || 0));
+  const thanhTien = Math.round(giaVon * qty);
+  const maXuat = await makeXuatVatChuaCode(storeId, session);
+
+  const xuatDoc = await createOne(XuatVatChua, {
+    ma_xuat_vat_chua: maXuat,
+    loai_xuat: options.loaiXuat || 'ban_hang',
+    doi_tuong_type: options.doiTuongType || 'none',
+    doi_tuong_id: options.doiTuongId || undefined,
+    doi_tuong_ten: options.doiTuongTen || undefined,
+    source_type: options.sourceType || 'manual',
+    source_id: options.sourceId || undefined,
+    source_code: options.sourceCode || undefined,
+    items: [{
+      vat_chua_id: vatChua._id,
+      ma_vat_chua: vatChua.ma_vat_chua || '',
+      ten_vat_chua: vatChua.ten_vat_chua || '',
+      so_luong: qty,
+      gia_von: giaVon,
+      thanh_tien: thanhTien
+    }],
+    tong_so_luong: qty,
+    tong_tien: thanhTien,
+    ghi_chu: String(options.ghiChu || '').trim(),
+    trang_thai: 'active',
+    cua_hang_id: storeId
+  }, session);
+
+  await withSessionQuery(
+    VatChua.updateOne({ _id: vatChua._id }, { $inc: { so_luong_ton: -qty } }),
+    session
+  );
+
+  return xuatDoc;
+}
+
+/**
+ * Ghi nhận xuất vật chứa kèm xác nhận giao đơn hàng (két giao cho khách).
+ */
+async function exportVatChuaWithOrderDelivery(order, invoice, data = {}, session) {
+  if (!order || !order._id || !order.cua_hang_id) return null;
+
+  const parsed = parseVatChuaImportInput(data);
+  assertVatChuaImportInput(parsed);
+  if (!parsed.vatChuaId || parsed.qty <= 0) return null;
+
+  const customerName = String(data.khach_hang_ten || data.doi_tuong_ten || '').trim();
+  const orderCode = order.ma_don_hang || '';
+  const invoiceCode = invoice && invoice.ma_hoa_don ? String(invoice.ma_hoa_don).trim() : '';
+
+  return createXuatVatChuaAndDecreaseStock({
+    storeId: order.cua_hang_id,
+    vatChuaId: parsed.vatChuaId,
+    qty: parsed.qty,
+    loaiXuat: invoice && invoice._id ? 'hoa_don' : 'ban_hang',
+    doiTuongType: order.khach_hang_id ? 'khach_hang' : 'none',
+    doiTuongId: order.khach_hang_id || undefined,
+    doiTuongTen: customerName,
+    sourceType: invoice && invoice._id ? 'hoa_don' : 'don_hang',
+    sourceId: invoice && invoice._id ? invoice._id : order._id,
+    sourceCode: invoiceCode || orderCode,
+    ghiChu: 'Xuất két khi giao đơn ' + (orderCode || '') + (invoiceCode ? ' — HĐ ' + invoiceCode : '')
+  }, session);
+}
+
+/**
+ * Ghi nhận xuất vật chứa kèm phiếu trả hàng nhập (trả két cho NCC).
+ */
+async function exportVatChuaWithPurchaseReturn(returnDoc, data = {}, session) {
+  if (!returnDoc || !returnDoc._id || !returnDoc.cua_hang_id) return null;
+
+  const parsed = parseVatChuaImportInput(data);
+  assertVatChuaImportInput(parsed);
+  if (!parsed.vatChuaId || parsed.qty <= 0) return null;
+
+  const supplierName = String(data.doi_tuong_ten || data.nha_cung_cap_ten || '').trim();
+  const returnCode = returnDoc.ma_phieu_tra_nhap || '';
+
+  return createXuatVatChuaAndDecreaseStock({
+    storeId: returnDoc.cua_hang_id,
+    vatChuaId: parsed.vatChuaId,
+    qty: parsed.qty,
+    loaiXuat: 'tra_hang_nhap',
+    doiTuongType: returnDoc.nha_cung_cap_id ? 'nha_cung_cap' : 'none',
+    doiTuongId: returnDoc.nha_cung_cap_id || undefined,
+    doiTuongTen: supplierName,
+    sourceType: 'phieu_tra_hang_nhap',
+    sourceId: returnDoc._id,
+    sourceCode: returnCode,
+    ghiChu: 'Xuất két khi trả hàng nhập ' + (returnCode || '')
+  }, session);
+}
+
+/**
+ * Ghi nhận xuất vật chứa kèm tạo hóa đơn bán trực tiếp.
+ */
+async function exportVatChuaWithInvoice(invoice, data = {}, session) {
+  if (!invoice || !invoice._id || !invoice.cua_hang_id) return null;
+
+  const parsed = parseVatChuaImportInput(data);
+  assertVatChuaImportInput(parsed);
+  if (!parsed.vatChuaId || parsed.qty <= 0) return null;
+
+  const customerName = String(data.khach_hang_ten || data.doi_tuong_ten || '').trim();
+  const invoiceCode = invoice.ma_hoa_don || '';
+
+  return createXuatVatChuaAndDecreaseStock({
+    storeId: invoice.cua_hang_id,
+    vatChuaId: parsed.vatChuaId,
+    qty: parsed.qty,
+    loaiXuat: 'hoa_don',
+    doiTuongType: invoice.khach_hang_id ? 'khach_hang' : 'none',
+    doiTuongId: invoice.khach_hang_id || undefined,
+    doiTuongTen: customerName,
+    sourceType: 'hoa_don',
+    sourceId: invoice._id,
+    sourceCode: invoiceCode,
+    ghiChu: 'Xuất két khi tạo hóa đơn ' + (invoiceCode || '')
+  }, session);
+}
+
+async function exportVatChuaWithSalesReturn(returnSlip, data = {}, session) {
+  if (!returnSlip || !returnSlip._id || !returnSlip.cua_hang_id) return null;
+
+  const parsed = parseVatChuaImportInput(data);
+  assertVatChuaImportInput(parsed);
+  if (!parsed.vatChuaId || parsed.qty <= 0) return null;
+
+  const customerName = String(data.khach_hang_ten || data.doi_tuong_ten || '').trim();
+  const returnCode = returnSlip.ma_phieu_tra || '';
+
+  return createXuatVatChuaAndDecreaseStock({
+    storeId: returnSlip.cua_hang_id,
+    vatChuaId: parsed.vatChuaId,
+    qty: parsed.qty,
+    loaiXuat: 'doi_tra_hang',
+    doiTuongType: returnSlip.khach_hang_id ? 'khach_hang' : 'none',
+    doiTuongId: returnSlip.khach_hang_id || undefined,
+    doiTuongTen: customerName,
+    sourceType: 'tra_hang_ban',
+    sourceId: returnSlip._id,
+    sourceCode: returnCode,
+    ghiChu: 'Xuất két khi trả/đổi hàng bán ' + (returnCode || '')
+  }, session);
+}
+
+async function cancelXuatVatChuaBySource(storeId, sourceType, sourceId, session) {
+  const store = cleanId(storeId);
+  const source = cleanId(sourceId);
+  if (!store || !source || !sourceType) return;
+
+  const xuatRows = await withSessionQuery(
+    XuatVatChua.find({
+      cua_hang_id: store,
+      source_type: sourceType,
+      source_id: source,
+      trang_thai: 'active'
+    }),
+    session
+  );
+
+  for (const xuatDoc of xuatRows) {
+    const items = Array.isArray(xuatDoc.items) ? xuatDoc.items : [];
+    for (const item of items) {
+      const vatChuaId = cleanId(item.vat_chua_id);
+      const qty = Math.floor(Number(item.so_luong || 0));
+      if (!vatChuaId || qty <= 0) continue;
+      await withSessionQuery(
+        VatChua.updateOne({ _id: vatChuaId }, { $inc: { so_luong_ton: qty } }),
+        session
+      );
+    }
+    xuatDoc.trang_thai = 'cancelled';
+    await xuatDoc.save(withSessionOptions({}, session));
+  }
+}
+
+function withSessionOptions(options, session) {
+  return session ? Object.assign({}, options, { session }) : options;
+}
+
+module.exports = {
+  exportVatChuaWithOrderDelivery,
+  exportVatChuaWithPurchaseReturn,
+  exportVatChuaWithInvoice,
+  exportVatChuaWithSalesReturn,
+  cancelXuatVatChuaBySource,
+  createXuatVatChuaAndDecreaseStock
+};

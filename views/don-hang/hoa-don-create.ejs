@@ -732,6 +732,23 @@
       font-size: 11px;
     }
 
+    .delivery-vat-chua-combo {
+      display: flex;
+      gap: 8px;
+      align-items: center
+    }
+
+    .delivery-vat-chua-combo .delivery-input {
+      flex: 1;
+      min-width: 0
+    }
+
+    .delivery-vat-chua-qty {
+      width: 88px;
+      flex: 0 0 88px;
+      text-align: right
+    }
+
     .partner-picker {
       position: relative
     }
@@ -953,6 +970,18 @@
             <label>Phí giao hàng</label>
             <span class="money-input-wrap"><input id="shippingFee" class="delivery-input" value="0" inputmode="numeric" oninput="handleManualShippingFee()"><span class="money-unit">VNĐ</span></span>
             <div class="delivery-help" id="shippingFeeHelp">Nhập trực tiếp phí giao hàng.</div>
+          </div>
+          <div class="delivery-row" style="margin-top:16px">
+            <label>Vật chứa</label>
+            <div class="delivery-vat-chua-combo">
+              <select id="invoiceVatChuaId" class="delivery-input" name="vat_chua_id" title="Chọn vật chứa">
+                <option value="">— Chọn —</option>
+                <% (vatChuaList || []).forEach(function(vc) { %>
+                  <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+                <% }) %>
+              </select>
+              <input id="invoiceVatChuaQty" class="delivery-input delivery-vat-chua-qty" name="vat_chua_so_luong" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
+            </div>
           </div>
         </div>
         <div class="place-order"><button id="payButton" onclick="saveOrder()" type="button">THANH TOÁN</button></div>
@@ -1949,6 +1978,15 @@
       }
       function togglePartnerMenu() { partnerPicker.classList.toggle('open'); }
       function selectPartner(id, name) { partnerId.value = id; partnerLabel.textContent = name; document.querySelector('.partner-trigger').classList.remove('empty'); document.querySelectorAll('.partner-option').forEach(item => item.classList.toggle('active', item.dataset.partnerId === id)); partnerPicker.classList.remove('open'); scheduleShippingFee(); }
+      function validateInvoiceVatChuaExport() {
+        const vatChuaId = String(document.getElementById('invoiceVatChuaId')?.value || '').trim();
+        const qtyRaw = String(document.getElementById('invoiceVatChuaQty')?.value || '').trim();
+        if (!vatChuaId && !qtyRaw) return '';
+        if (!vatChuaId) return 'Vui lòng chọn vật chứa';
+        const qty = Number(qtyRaw);
+        if (!Number.isFinite(qty) || qty <= 0) return 'Số lượng vật chứa phải lớn hơn 0';
+        return '';
+      }
       async function saveOrder() {
         const payButton = document.getElementById('payButton');
         if (payButton && payButton.disabled) return;
@@ -1967,9 +2005,13 @@
         if (cart.some(item => lineQty(item) > lineStock(item))) alert('Hóa đơn này đang vượt tồn hiện có. Hóa đơn không trừ kho trong flow này.');
         const paymentError = validateCustomerPayment();
         if (paymentError) return alert(paymentError);
+        const vatChuaError = validateInvoiceVatChuaExport();
+        if (vatChuaError) return alert(vatChuaError);
         const paymentFields = buildPaymentSubmitFields();
         const recipientCustomer = customers.find(x => x._id === recipientCustomerId.value);
         const noteInput = document.getElementById('deliveryNote');
+        const invoiceVatChuaId = document.getElementById('invoiceVatChuaId');
+        const invoiceVatChuaQty = document.getElementById('invoiceVatChuaQty');
         const data = {
           khach_hang_id: customerId.value,
           cua_hang_id: getStoreId(),
@@ -2025,6 +2067,8 @@
           thu_ho_cod: false,
           cod_enabled: false,
           cod_amount: 0,
+          vat_chua_id: invoiceVatChuaId ? invoiceVatChuaId.value : '',
+          vat_chua_so_luong: invoiceVatChuaQty ? invoiceVatChuaQty.value : '',
           ...paymentFields
         };
         try {

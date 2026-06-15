@@ -836,6 +836,11 @@ const CongNoNhaCungCapSchema = new Schema({
     ref: 'PhieuNhap'
   },
 
+  nhap_vat_chua_id: {
+    type: ObjectId,
+    ref: 'NhapVatChua'
+  },
+
   phieu_tra_nhap_id: {
     type: ObjectId,
     ref: 'PhieuTraHangNhap'
@@ -1683,6 +1688,7 @@ const PhieuThuChiSchema = new Schema({
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
   phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
+  nhap_vat_chua_id: { type: ObjectId, ref: 'NhapVatChua' },
   phieu_tra_hang_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap' },
   phieu_tra_hang_id: { type: ObjectId, ref: 'PhieuTraHang' },
   van_don_id: { type: ObjectId, ref: 'VanDon' },
@@ -2271,6 +2277,254 @@ GiaoDichCongNoKhachHangSchema.index({
 GiaoDichCongNoKhachHangSchema.index({
   van_don_id: 1
 });
+
+/**
+ * VatChua — module vật chứa (két, túi, sọt, thùng...).
+ *
+ * Quy tắc tồn (phase sau — chưa implement service nhập/xuất):
+ * - Tạo NhapVatChua active: VatChua.so_luong_ton += tổng số lượng theo từng item.
+ * - Hủy NhapVatChua: VatChua.so_luong_ton -= tổng số lượng theo từng item.
+ * - Tạo XuatVatChua active: kiểm tra đủ tồn, rồi VatChua.so_luong_ton -= tổng số lượng theo từng item.
+ * - Hủy XuatVatChua: VatChua.so_luong_ton += tổng số lượng theo từng item.
+ *
+ * Chỉ dùng cua_hang_id; không dùng chi_nhanh_id.
+ * Tham chiếu mềm chứng từ cũ qua source_type, source_id, source_code.
+ */
+
+const VatChuaNhapXuatItemSchema = new Schema({
+  vat_chua_id: {
+    type: ObjectId,
+    ref: 'VatChua',
+    required: true
+  },
+  ma_vat_chua: { type: String, trim: true },
+  ten_vat_chua: { type: String, trim: true },
+  so_luong: {
+    type: Number,
+    required: true,
+    min: [1, 'so_luong must be greater than 0']
+  },
+  gia_von: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  thanh_tien: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  ghi_chu: { type: String }
+}, { _id: true });
+
+const VatChuaSchema = new Schema({
+  ma_vat_chua: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  ten_vat_chua: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  so_luong_ton: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  trang_thai: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true
+  }
+}, {
+  collection: 'vat_chua',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+
+VatChuaSchema.index(
+  { cua_hang_id: 1, ma_vat_chua: 1 },
+  { unique: true, name: 'uq_vat_chua_store_code' }
+);
+VatChuaSchema.index(
+  { cua_hang_id: 1, ten_vat_chua: 1 },
+  { name: 'idx_vat_chua_store_name' }
+);
+VatChuaSchema.index(
+  { cua_hang_id: 1, trang_thai: 1 },
+  { name: 'idx_vat_chua_store_status' }
+);
+
+const NhapVatChuaSchema = new Schema({
+  ma_nhap_vat_chua: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  loai_nhap: {
+    type: String,
+    enum: ['mua_moi', 'kem_phieu_nhap_hang', 'khach_tra_lai', 'doi_tra_hang', 'dieu_chinh_tang', 'khac'],
+    required: true
+  },
+  doi_tuong_type: {
+    type: String,
+    enum: ['nha_cung_cap', 'khach_hang', 'khac', 'none'],
+    default: 'none'
+  },
+  doi_tuong_id: { type: ObjectId },
+  doi_tuong_ten: { type: String, trim: true },
+  source_type: {
+    type: String,
+    enum: ['phieu_nhap', 'don_hang', 'hoa_don', 'tra_hang_ban', 'manual', 'khac'],
+    default: 'manual'
+  },
+  source_id: { type: ObjectId },
+  source_code: { type: String, trim: true },
+  items: {
+    type: [VatChuaNhapXuatItemSchema],
+    required: true,
+    validate: {
+      validator: function(value) {
+        return Array.isArray(value) && value.length > 0;
+      },
+      message: 'items must contain at least 1 line'
+    }
+  },
+  tong_so_luong: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  tong_tien: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  ghi_chu: { type: String },
+  trang_thai: {
+    type: String,
+    enum: ['active', 'cancelled'],
+    default: 'active'
+  },
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true
+  }
+}, {
+  collection: 'nhap_vat_chua',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+
+NhapVatChuaSchema.index(
+  { cua_hang_id: 1, ma_nhap_vat_chua: 1 },
+  { unique: true, name: 'uq_nhap_vat_chua_store_code' }
+);
+NhapVatChuaSchema.index(
+  { cua_hang_id: 1, created_at: -1 },
+  { name: 'idx_nhap_vat_chua_store_created' }
+);
+NhapVatChuaSchema.index(
+  { cua_hang_id: 1, source_type: 1, source_id: 1 },
+  { name: 'idx_nhap_vat_chua_source' }
+);
+NhapVatChuaSchema.index(
+  { cua_hang_id: 1, doi_tuong_type: 1, doi_tuong_id: 1 },
+  { name: 'idx_nhap_vat_chua_partner' }
+);
+NhapVatChuaSchema.index(
+  { cua_hang_id: 1, trang_thai: 1 },
+  { name: 'idx_nhap_vat_chua_status' }
+);
+
+const XuatVatChuaSchema = new Schema({
+  ma_xuat_vat_chua: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  loai_xuat: {
+    type: String,
+    enum: ['ban_hang', 'hoa_don', 'tra_hang_nhap', 'doi_tra_hang', 'su_dung_noi_bo', 'hong_mat', 'dieu_chinh_giam', 'khac'],
+    required: true
+  },
+  doi_tuong_type: {
+    type: String,
+    enum: ['khach_hang', 'nha_cung_cap', 'khac', 'none'],
+    default: 'none'
+  },
+  doi_tuong_id: { type: ObjectId },
+  doi_tuong_ten: { type: String, trim: true },
+  source_type: {
+    type: String,
+    enum: ['don_hang', 'hoa_don', 'phieu_tra_hang_nhap', 'tra_hang_ban', 'manual', 'khac'],
+    default: 'manual'
+  },
+  source_id: { type: ObjectId },
+  source_code: { type: String, trim: true },
+  items: {
+    type: [VatChuaNhapXuatItemSchema],
+    required: true,
+    validate: {
+      validator: function(value) {
+        return Array.isArray(value) && value.length > 0;
+      },
+      message: 'items must contain at least 1 line'
+    }
+  },
+  tong_so_luong: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  tong_tien: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  ghi_chu: { type: String },
+  trang_thai: {
+    type: String,
+    enum: ['active', 'cancelled'],
+    default: 'active'
+  },
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true
+  }
+}, {
+  collection: 'xuat_vat_chua',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+
+XuatVatChuaSchema.index(
+  { cua_hang_id: 1, ma_xuat_vat_chua: 1 },
+  { unique: true, name: 'uq_xuat_vat_chua_store_code' }
+);
+XuatVatChuaSchema.index(
+  { cua_hang_id: 1, created_at: -1 },
+  { name: 'idx_xuat_vat_chua_store_created' }
+);
+XuatVatChuaSchema.index(
+  { cua_hang_id: 1, source_type: 1, source_id: 1 },
+  { name: 'idx_xuat_vat_chua_source' }
+);
+XuatVatChuaSchema.index(
+  { cua_hang_id: 1, doi_tuong_type: 1, doi_tuong_id: 1 },
+  { name: 'idx_xuat_vat_chua_partner' }
+);
+XuatVatChuaSchema.index(
+  { cua_hang_id: 1, trang_thai: 1 },
+  { name: 'idx_xuat_vat_chua_status' }
+);
+
 // Register models
 const CuaHang = mongoose.models.CuaHang || mongoose.model("CuaHang", CuaHangSchema);
 const Kho = mongoose.models.Kho || mongoose.model("Kho", KhoSchema);
@@ -2333,6 +2587,9 @@ const GiaoDichCongNoKhachHang = mongoose.models.GiaoDichCongNoKhachHang || mongo
   'GiaoDichCongNoKhachHang',
   GiaoDichCongNoKhachHangSchema
 );
+const VatChua = mongoose.models.VatChua || mongoose.model('VatChua', VatChuaSchema);
+const NhapVatChua = mongoose.models.NhapVatChua || mongoose.model('NhapVatChua', NhapVatChuaSchema);
+const XuatVatChua = mongoose.models.XuatVatChua || mongoose.model('XuatVatChua', XuatVatChuaSchema);
 module.exports = {
   CuaHang, Kho, NguoiDung, PhongBan, ChucDanh, NhanVien,
   NhomKhachHang, KhachHang, DiaChiKhachHang, LoaiDiaChiKhachHang, 
@@ -2351,5 +2608,8 @@ module.exports = {
   PhiVanChuyenKhachHang,
   Counter,
   GiaoDichCongNoNhaCungCap,
-  GiaoDichCongNoKhachHang
+  GiaoDichCongNoKhachHang,
+  VatChua,
+  NhapVatChua,
+  XuatVatChua
 };

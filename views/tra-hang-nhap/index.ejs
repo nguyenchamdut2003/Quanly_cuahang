@@ -150,6 +150,13 @@
     .info-line .info-value{display:block;min-width:0;word-break:break-word;font-weight:600;line-height:1.35;padding:5px 7px;border:1px solid #cfd8e3;border-radius:5px;background:#fff;box-sizing:border-box;font-size:11px}
     .mini-table-wrap{min-width:0;width:100%;max-width:100%;margin-top:6px}
     .return-detail-groups-wrap{overflow-x:auto;margin-top:6px;width:100%;min-width:0}
+    .return-vat-chua-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:10px 12px;margin:0 0 12px}
+    .return-vat-chua-title{font-size:13px;font-weight:800;color:#0f172a;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+    .return-vat-chua-table{width:100%;min-width:720px;border-collapse:collapse;table-layout:auto;margin:0}
+    .return-vat-chua-table th,.return-vat-chua-table td{border:1px solid #e4eaf2;padding:6px 8px;font-size:12px;word-break:normal;overflow-wrap:normal;vertical-align:top}
+    .return-vat-chua-table th{background:#f4f8fc;text-align:left;font-weight:700;white-space:nowrap}
+    .return-vat-chua-table td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .return-vat-chua-table .col-time{white-space:nowrap;min-width:120px}
     .lot-group-title{font-size:13px;font-weight:800;color:#111827;margin:10px 0 6px}
     .lot-group-title:first-child{margin-top:0}
     .grouped-lot-table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:640px}
@@ -313,6 +320,43 @@
                             <div class="return-detail-groups-wrap">
                               <% if (!(r.detail_rows || []).length) { %>
                                 <table class="mini-table"><tbody><tr><td>Chưa có chi tiết hàng trả.</td></tr></tbody></table>
+                              <% } %>
+                              <% if (r.trang_thai === 'completed' && (r.vat_chua_lines || []).length) { %>
+                                <div class="return-vat-chua-box">
+                                  <div class="return-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa đã xuất</div>
+                                  <table class="return-vat-chua-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Mã chứng từ</th>
+                                        <th>Loại</th>
+                                        <th>Mã vật chứa</th>
+                                        <th>Tên vật chứa</th>
+                                        <th class="num">Số lượng</th>
+                                        <th>Chứng từ liên kết</th>
+                                        <th class="col-time">Thời gian</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <% (r.vat_chua_lines || []).forEach(function(line) { %>
+                                        <tr>
+                                          <td><%= line.ma_chung_tu || '--' %></td>
+                                          <td><%= line.doc_kind_label || line.loai_label || '--' %></td>
+                                          <td><%= line.ma_vat_chua || '--' %></td>
+                                          <td><%= line.ten_vat_chua || '--' %></td>
+                                          <td class="num"><%= fmt(line.so_luong || 0) %></td>
+                                          <td>
+                                            <% if (line.source_href && line.source_code) { %>
+                                              <a class="ref-link" href="<%= line.source_href %>"><%= line.source_code %></a>
+                                            <% } else { %>
+                                              <%= line.source_code || '--' %>
+                                            <% } %>
+                                          </td>
+                                          <td class="col-time"><%= formatDate(line.created_at) %></td>
+                                        </tr>
+                                      <% }) %>
+                                    </tbody>
+                                  </table>
+                                </div>
                               <% } %>
                               <% detailGroupsReturn(r.detail_rows || []).forEach(function(group) { %>
                                 <div class="lot-group-title">

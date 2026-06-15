@@ -1,10 +1,11 @@
 var mongoose = require('mongoose');
 var path = require('path');
-var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc } = require('../models/kiot.model');
+var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc, VatChua } = require('../models/kiot.model');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
 var purchaseService = require('../services/purchase.service');
 var pdfService = require('../services/pdf.service');
+var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require('../services/vatChuaDetail.service');
 
 function normalizeNhapHangFilter(query) {
   query = query || {};
@@ -313,6 +314,8 @@ exports.index = async function(req, res, next) {
       }, {});
     }
 
+    var vatChuaBySlip = await loadPurchasesLinkedVatChuaMap(slipIds, storeId);
+
     importSlips = importSlips.map(function(slip) {
       var key = String(slip._id);
       var rows = detailsBySlip[key] || [];
@@ -354,6 +357,7 @@ exports.index = async function(req, res, next) {
       return Object.assign({}, slip, {
         detail_rows: rows,
         payment_rows: paymentRows,
+        vat_chua_lines: vatChuaBySlip[key] || [],
         detail_summary: {
           tong_mat_hang: tongMatHang,
           tong_so_luong: tongSoLuong
@@ -736,6 +740,14 @@ exports.createPage = async function(req, res, next) {
         .lean();
     }
 
+    var vatChuaList = [];
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+      vatChuaList = await VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
+        .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
+        .select('ma_vat_chua ten_vat_chua so_luong_ton')
+        .lean();
+    }
+
     res.render('nhap-hang/create', {
       title: 'Nhập hàng',
       pageTitle: 'Nhập hàng',
@@ -747,7 +759,8 @@ exports.createPage = async function(req, res, next) {
       products: products,
       groups: groups,
       units: units,
-      cashBooks: cashBooks
+      cashBooks: cashBooks,
+      vatChuaList: vatChuaList
     });
   } catch (error) {
     next(error);
@@ -1017,11 +1030,17 @@ exports.detail = async function(req, res, next) {
     var storeId = await resolveStoreId(req);
     var loaded = await loadPurchaseWithItems(req.params.id, storeId);
     if (!loaded) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
+    const ticketObj = loaded.ticket.toObject ? loaded.ticket.toObject() : loaded.ticket;
+    const vatChuaLines = await loadPurchaseLinkedVatChuaLines(
+      loaded.ticket._id,
+      storeId || ticketObj.cua_hang_id
+    );
     return res.json({
       success: true,
       data: {
-        ticket: loaded.ticket.toObject ? loaded.ticket.toObject() : loaded.ticket,
-        items: loaded.items.map(function(item) { return item.toObject ? item.toObject() : item; })
+        ticket: ticketObj,
+        items: loaded.items.map(function(item) { return item.toObject ? item.toObject() : item; }),
+        vat_chua_lines: vatChuaLines
       }
     });
   } catch (error) {

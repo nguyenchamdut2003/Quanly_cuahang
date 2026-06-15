@@ -19,9 +19,13 @@ const {
   CTPhieuTraHangNhap,
   CongNoNhaCungCap,
   SoQuy,
-  PhieuThuChi
+  PhieuThuChi,
+  VatChua
 } = require('../models/kiot.model');
 const { normalizeQuyCachItems } = require('../services/purchase.service');
+const { parseVatChuaImportInput, assertVatChuaImportInput } = require('../services/vatChuaImport.service');
+const { exportVatChuaWithPurchaseReturn } = require('../services/vatChuaExport.service');
+const { loadReturnsLinkedVatChuaMap } = require('../services/vatChuaDetail.service');
 const { truTonKho, congTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
@@ -733,7 +737,15 @@ async function loadCreateData(storeId) {
     lots: lotMapByProduct[String(product._id)] || []
   }));
 
-  return { warehouses, suppliers, users, productOptions, cashBooks, receipts: [] };
+  let vatChuaList = [];
+  if (isObjectId(storeId)) {
+    vatChuaList = await VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
+      .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
+      .select('ma_vat_chua ten_vat_chua so_luong_ton')
+      .lean();
+  }
+
+  return { warehouses, suppliers, users, productOptions, cashBooks, receipts: [], vatChuaList };
 }
 
 /**
@@ -1410,8 +1422,10 @@ exports.index = async function(req, res, next) {
       map[key].push(row);
       return map;
     }, {});
+    const vatChuaByReturn = await loadReturnsLinkedVatChuaMap(returnIds, storeId);
     returns.forEach(row => {
       row.detail_rows = detailsByReturn[String(row._id)] || [];
+      row.vat_chua_lines = vatChuaByReturn[String(row._id)] || [];
       const detailList = row.detail_rows || [];
       const uniqueProducts = new Set();
       detailList.forEach(item => {
@@ -1472,6 +1486,7 @@ exports.createPage = async function(req, res, next) {
       suppliers: data.suppliers,
       users: data.users,
       cashBooks: data.cashBooks || [],
+      vatChuaList: data.vatChuaList || [],
       productsJson: JSON.stringify(data.productOptions),
       receipts: data.receipts,
       selectedPurchaseId: copyDraft && copyDraft.phieu_nhap_id ? String(copyDraft.phieu_nhap_id) : (selectedPurchase ? String(selectedPurchase._id) : ''),
@@ -1954,6 +1969,36 @@ exports.createSubmit = async function(req, res, next) {
     if (nccDaTra > 0 && !payment.isV2 && !isObjectId(cashBookId)) {
       return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.' });
     }
+    const vatChuaParsed = parseVatChuaImportInput(body);
+    if (submitMode === 'completed') {
+      try {
+        assertVatChuaImportInput(vatChuaParsed);
+      } catch (vatChuaInputError) {
+        return res.status(400).json({ success: false, message: vatChuaInputError.message });
+      }
+      if (vatChuaParsed.vatChuaId && vatChuaParsed.qty > 0) {
+        const vatChuaRow = await VatChua.findOne({
+          _id: vatChuaParsed.vatChuaId,
+          cua_hang_id: storeId,
+          trang_thai: 'active'
+        }).select('so_luong_ton ten_vat_chua').lean();
+        if (!vatChuaRow) {
+          return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng' });
+        }
+        const tonVatChua = Math.max(0, Number(vatChuaRow.so_luong_ton || 0));
+        if (tonVatChua < vatChuaParsed.qty) {
+          return res.status(400).json({
+            success: false,
+            message: 'Tồn vật chứa không đủ để xuất (còn ' + tonVatChua + ', cần ' + vatChuaParsed.qty + ')'
+          });
+        }
+      }
+    }
+    let supplierName = '';
+    if (supplierId) {
+      const supplierRow = await NhaCungCap.findById(supplierId).select('ten_ncc').lean();
+      supplierName = supplierRow && supplierRow.ten_ncc ? String(supplierRow.ten_ncc).trim() : '';
+    }
     const maPhieu = String(body.ma_phieu_tra_nhap || '').trim() || await makeReturnCode();
     let returnDoc;
     const session = await mongoose.startSession();
@@ -1985,6 +2030,11 @@ exports.createSubmit = async function(req, res, next) {
 
         if (submitMode === 'completed') {
           await completeInventory(returnDoc, detailRows, req.user?._id, { session });
+          await exportVatChuaWithPurchaseReturn(returnDoc, {
+            vat_chua_id: vatChuaParsed.vatChuaId,
+            vat_chua_so_luong: vatChuaParsed.qty,
+            nha_cung_cap_ten: supplierName
+          }, session);
           await applySupplierDebt(returnDoc, { session });
           await requireSupplierRefundReceipt(returnDoc, req.user?._id, {
             so_quy_id: cashBookId,

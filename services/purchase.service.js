@@ -16,6 +16,11 @@ const {
 const { taoPhieuThuChi } = require('./soQuy.service');
 const { extractPaymentDetail } = require('./paymentCashBook.service');
 const { syncTonKhoSauQuyCach } = require('./kho.service');
+const {
+  assertVatChuaImportInput,
+  parseVatChuaImportInput,
+  importVatChuaWithPurchase
+} = require('./vatChuaImport.service');
 
 function logNhapHangOk(table, detail) {
   console.log(`[NHAP_HANG][OK] ${table}${detail ? ' - ' + detail : ''}`);
@@ -665,6 +670,8 @@ async function createPurchase(data = {}, options = {}) {
 
   const supplierId = cleanId(data.nha_cung_cap_id);
   const mode = data.submitMode === 'completed' ? 'completed' : 'draft';
+  const vatChuaImport = parseVatChuaImportInput(data);
+  if (mode === 'completed') assertVatChuaImportInput(vatChuaImport);
   const totals = calculateTotals(items, data.giam_gia, data.kieu_giam_gia);
   const canTra = parseMoney(data.can_tra_ncc || totals.tongTien);
   if (canTra > totals.tongTien) throw new Error('Can tra nha cung cap khong duoc lon hon tong tien');
@@ -783,6 +790,9 @@ async function createPurchase(data = {}, options = {}) {
       payment,
       session
     });
+    await withNhapHangLog('NhapVatChua', `nhap vat chua kem phieu=${purchase.ma_phieu_nhap}`, () =>
+      importVatChuaWithPurchase(purchase, data, session)
+    );
   }
 
   return purchase;

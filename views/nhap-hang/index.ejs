@@ -164,6 +164,9 @@
     .mini-table .lot-cell{width:140px;max-width:140px;font-size:11px;color:#475467;line-height:1.35}
     .lot-group-title{font-size:13px;font-weight:800;color:#111827;margin:10px 0 6px}
     .lot-group-title:first-child{margin-top:0}
+    .purchase-vat-chua-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:10px 12px;margin:0 0 12px}
+    .purchase-vat-chua-title{font-size:13px;font-weight:800;color:#0f172a;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+    .purchase-vat-chua-table{margin:0}
     .grouped-lot-table th,.grouped-lot-table td{vertical-align:top}
     .grouped-lot-table .lot-cell{width:170px;max-width:170px;color:#111827;font-weight:700}
     .grouped-lot-table .attr-cell{min-width:170px}
@@ -334,6 +337,49 @@
                           </div>
                           <div class="detail-body">
                             <div>
+                              <% if (t.trang_thai === 'completed' && (t.vat_chua_lines || []).length) { %>
+                                <div class="purchase-vat-chua-box">
+                                  <div class="purchase-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa đã nhập</div>
+                                  <table class="mini-table purchase-vat-chua-table">
+                                    <thead>
+                                      <tr>
+                                        <th>Mã chứng từ</th>
+                                        <th>Loại</th>
+                                        <th>Mã vật chứa</th>
+                                        <th>Tên vật chứa</th>
+                                        <th class="num">Số lượng</th>
+                                        <th>Chứng từ liên kết</th>
+                                        <th>Thời gian</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <% (t.vat_chua_lines || []).forEach(function(line) { %>
+                                        <tr>
+                                          <td>
+                                            <% if (line.doc_href && line.doc_id) { %>
+                                              <%- refLink('nhap_vat_chua', { _id: line.doc_id }, line.ma_chung_tu || '--') %>
+                                            <% } else { %>
+                                              <%= line.ma_chung_tu || '--' %>
+                                            <% } %>
+                                          </td>
+                                          <td><%= line.doc_kind_label || '--' %></td>
+                                          <td><%= line.ma_vat_chua || '--' %></td>
+                                          <td><%= line.ten_vat_chua || '--' %></td>
+                                          <td class="num"><%= fmt(line.so_luong || 0) %></td>
+                                          <td>
+                                            <% if (line.source_href && line.source_code) { %>
+                                              <a class="ref-link" href="<%= line.source_href %>"><%= line.source_code %></a>
+                                            <% } else { %>
+                                              <%= line.source_code || '--' %>
+                                            <% } %>
+                                          </td>
+                                          <td><%= formatDate(line.created_at) %></td>
+                                        </tr>
+                                      <% }) %>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              <% } %>
                               <% if (!(t.detail_rows || []).length) { %>
                                 <table class="mini-table"><tbody><tr><td>Không có chi tiết hàng.</td></tr></tbody></table>
                               <% } %>

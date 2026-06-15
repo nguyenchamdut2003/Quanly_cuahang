@@ -46,13 +46,14 @@
   const codeOf = locals.relatedCode || function(item) {
     const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
     const allocPn = firstAlloc?.phieu_nhap_id;
-    return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don || item.phieu_nhap_id?.ma_phieu_nhap || firstAlloc?.ma_phieu_nhap || (allocPn && typeof allocPn === 'object' ? allocPn.ma_phieu_nhap : '') || item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.phieu_tra_hang_id?.ma_phieu_tra || item.van_don_id?.ma_van_don || item.bang_luong_id?.ma_bang_luong || item.ct_bang_luong_id?.ma_nhan_vien || item.ma_chung_tu_goc || '';
+    return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don || item.phieu_nhap_id?.ma_phieu_nhap || firstAlloc?.ma_phieu_nhap || (allocPn && typeof allocPn === 'object' ? allocPn.ma_phieu_nhap : '') || item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.phieu_tra_hang_id?.ma_phieu_tra || item.van_don_id?.ma_van_don || item.bang_luong_id?.ma_bang_luong || item.ct_bang_luong_id?.ma_nhan_vien || item.nhap_vat_chua_id?.ma_nhap_vat_chua || item.ma_chung_tu_goc || '';
   };
   const relatedDocLink = function(item) {
     const code = codeOf(item);
     if (item.phieu_tra_hang_nhap_id) return refLink('supplier_return', item.phieu_tra_hang_nhap_id, code);
     if (item.phieu_tra_hang_id) return refLink('customer_return', item.phieu_tra_hang_id, code);
     if (item.phieu_nhap_id) return refLink('purchase', item.phieu_nhap_id, code);
+    if (item.nhap_vat_chua_id) return refLink('nhap_vat_chua', item.nhap_vat_chua_id, code);
     if (item.don_hang_id) return refLink('order', item.don_hang_id, code);
     if (item.hoa_don_id) return refLink('invoice', item.hoa_don_id, code);
     if (item.van_don_id) return refLink('shipment', item.van_don_id, code);
@@ -92,6 +93,7 @@
   const categoryLabel = value => {
     const map = {
       'Chi tra nha cung cap': 'Chi trả nhà cung cấp',
+      'Chi Nhập vật chứa': 'Chi nhập vật chứa',
       'NCC hoan tien tra hang nhap': 'NCC hoàn tiền trả hàng nhập',
       'Hoan tien tra hang': 'Hoàn tiền trả hàng',
       'Thu tien hoa don': 'Thu tiền hóa đơn',
@@ -705,7 +707,7 @@
     // TODO: cleanup dead showReceipt (alert + modal) — active handler is assigned below (inline panel).
     async function showReceipt(id){const item=receipts.find(x=>x._id===id);if(!item)return;try{const res=await fetch('/so-quy/'+id+'/detail');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được phiếu');const receipt=json.data.receipt||{};const rows=(json.data.items||[]).map(row=>`- ${(row.hang_hoa_id&&row.hang_hoa_id.ma_hang)||''} ${(row.hang_hoa_id&&row.hang_hoa_id.ten_hang)||''}: ${fmt(row.so_luong||0)} x ${fmt(row.don_gia_nhap||0)}`).join('\n');alert(`${item.ma_phieu}\n${categoryText(item.loai_thu_chi) || (item.loai_phieu==='thu'?'Phiếu thu':'Phiếu chi')}\nSổ quỹ: ${item.so_quy}\nNhà cung cấp: ${(receipt.nha_cung_cap_id&&receipt.nha_cung_cap_id.ten_ncc)||item.doi_tuong||''}\nPhiếu nhập: ${(receipt.phieu_nhap_id&&receipt.phieu_nhap_id.ma_phieu_nhap)||item.chung_tu||''}\nGiá trị: ${fmt(item.gia_tri)}\nGhi chú: ${item.ghi_chu||''}${rows?'\n\nHàng trong phiếu nhập:\n'+rows:''}`)}catch(error){alert(error.message||'Không tải được phiếu')}}
     function escapeHtml(value){return String(value ?? '').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-    function categoryText(value){const map={'Chi tra nha cung cap':'Chi trả nhà cung cấp','NCC hoan tien tra hang nhap':'NCC hoàn tiền trả hàng nhập','Hoan tien tra hang':'Hoàn tiền trả hàng','Thu tien hoa don':'Thu tiền hóa đơn','Thu tien don hang':'Thu tiền đơn hàng','Thu tien khi giao hang':'Thu tiền khi giao hàng','Thu tien doi hang':'Thu tiền đổi hàng','Thu khac':'Thu khác','Chi khac':'Chi khác',thanh_toan_nhap_hang:'Thanh toán nhập hàng',thanh_toan_ncc:'Thanh toán nhà cung cấp',tra_luong_nhan_vien:'Trả lương nhân viên',thu_cod:'Thu COD'};return map[value]||value||''}
+    function categoryText(value){const map={'Chi tra nha cung cap':'Chi trả nhà cung cấp','Chi Nhập vật chứa':'Chi nhập vật chứa','NCC hoan tien tra hang nhap':'NCC hoàn tiền trả hàng nhập','Hoan tien tra hang':'Hoàn tiền trả hàng','Thu tien hoa don':'Thu tiền hóa đơn','Thu tien don hang':'Thu tiền đơn hàng','Thu tien khi giao hang':'Thu tiền khi giao hàng','Thu tien doi hang':'Thu tiền đổi hàng','Thu khac':'Thu khác','Chi khac':'Chi khác',thanh_toan_nhap_hang:'Thanh toán nhập hàng',thanh_toan_ncc:'Thanh toán nhà cung cấp',tra_luong_nhan_vien:'Trả lương nhân viên',thu_cod:'Thu COD'};return map[value]||value||''}
     function closeReceiptDetailModal(){document.getElementById('receiptDetailModal').classList.remove('open')}
     showReceipt=async function(id){const item=receipts.find(x=>x._id===id);if(!item)return;try{const res=await fetch('/so-quy/'+id+'/detail');const json=await res.json();if(!json.success)throw new Error(json.message||'Không tải được phiếu');const receipt=json.data.receipt||{};const allocations=Array.isArray(receipt.allocations)?receipt.allocations:[];const rows=(json.data.items||[]).map(row=>`<div>- ${escapeHtml((row.hang_hoa_id&&row.hang_hoa_id.ma_hang)||'')} ${escapeHtml((row.hang_hoa_id&&row.hang_hoa_id.ten_hang)||'')}: ${fmt(row.so_luong||0)} x ${fmt(row.don_gia_nhap||0)}</div>`).join('');const allocationHtml=allocations.length?`<div class="receipt-allocation-note">Phiếu chi tự động được gắn với ${allocations.length} phiếu nhập hàng</div><table class="receipt-allocation-table"><thead><tr><th>Mã phiếu</th><th class="num">Giá trị chi</th><th class="num">Nợ trước</th><th class="num">Nợ sau</th></tr></thead><tbody>${allocations.map(row=>{const pn=row.phieu_nhap_id||{};const pnId=pn._id||row.phieu_nhap_id||'';const code=row.ma_phieu_nhap||(pn&&pn.ma_phieu_nhap)||'--';const link=pnId?`<a class="ref-link" href="/nhap-hang/${encodeURIComponent(String(pnId))}">${escapeHtml(code)}</a>`:escapeHtml(code);return `<tr><td>${link}</td><td class="num">${fmt(row.so_tien||0)}</td><td class="num">${fmt(row.con_no_truoc||0)}</td><td class="num">${fmt(row.con_no_sau||0)}</td></tr>`}).join('')}</tbody></table>`:'';document.getElementById('receiptDetailTitle').textContent=item.ma_phieu||'Chi tiết phiếu';document.getElementById('receiptDetailBody').innerHTML=`<div class="receipt-detail-grid"><span>Loại phiếu</span><b>${escapeHtml(categoryText(item.loai_thu_chi) || (item.loai_phieu==='thu'?'Phiếu thu':'Phiếu chi'))}</b><span>Sổ quỹ</span><b>${escapeHtml(item.so_quy||'')}</b><span>Nhà cung cấp</span><b>${escapeHtml((receipt.nha_cung_cap_id&&receipt.nha_cung_cap_id.ten_ncc)||item.doi_tuong||'')}</b><span>Phiếu nhập</span><b>${escapeHtml((receipt.phieu_nhap_id&&receipt.phieu_nhap_id.ma_phieu_nhap)||item.chung_tu||'')}</b><span>Giá trị</span><b>${fmt(item.gia_tri)}</b><span>Ghi chú</span><b>${escapeHtml(item.ghi_chu||'')}</b></div>${allocationHtml}${!allocationHtml&&rows?'<div class="receipt-allocation-note">Hàng trong phiếu nhập</div>'+rows:''}`;document.getElementById('receiptDetailModal').classList.add('open')}catch(error){alert(error.message||'Không tải được phiếu')}}
     function formatReceiptDate(value){if(!value)return'';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleDateString('vi-VN')}
@@ -816,7 +818,7 @@
     function closeInlineReceiptDetail(){document.querySelectorAll('.receipt-inline-row').forEach(row=>row.remove());document.querySelectorAll('.receipt-inline-main-row').forEach(row=>row.classList.remove('is-open'))}
     function openReceiptPrint(id){if(!id)return;window.open('/so-quy/'+encodeURIComponent(String(id))+'/in-tong-hop','_blank')}
     function receiptDocId(doc){if(!doc)return'';if(typeof doc==='string')return String(doc);return doc._id?String(doc._id):''}
-    function receiptDocHref(type,id){const safeId=String(id||'').trim();if(!safeId)return'';const map={order:'/don-hang?order=',invoice:'/don-hang/hoa-don?invoice=',purchase:'/nhap-hang?purchase=',supplier_return:'/tra-hang-nhap/',phieu_tra_hang_nhap:'/tra-hang-nhap/',customer_return:'/don-hang/tra-hang/',phieu_tra_hang:'/don-hang/tra-hang/',shipment:'/don-hang/van-don/',van_don:'/don-hang/van-don/',payroll:'/bang-luong/',bang_luong:'/bang-luong/'};const base=map[type];return base?base+encodeURIComponent(safeId):''}
+    function receiptDocHref(type,id){const safeId=String(id||'').trim();if(!safeId)return'';const map={order:'/don-hang?order=',invoice:'/don-hang/hoa-don?invoice=',purchase:'/nhap-hang?purchase=',nhap_vat_chua:'/vat-chua?nhap_vat_chua=',supplier_return:'/tra-hang-nhap/',phieu_tra_hang_nhap:'/tra-hang-nhap/',customer_return:'/don-hang/tra-hang/',phieu_tra_hang:'/don-hang/tra-hang/',shipment:'/don-hang/van-don/',van_don:'/don-hang/van-don/',payroll:'/bang-luong/',bang_luong:'/bang-luong/'};const base=map[type];return base?base+encodeURIComponent(safeId):''}
     function receiptDocLink(type,id,code){const label=escapeHtml(code||'—');const href=receiptDocHref(type,id);return href?`<a class="receipt-inline-link ref-link" href="${href}">${label}</a>`:label}
     function relDocObject(doc){return doc&&typeof doc==='object'?doc:null}
     function relMoneyCell(value){if(value==null||value===''||Number.isNaN(Number(value)))return '—';return fmtMoney(Math.abs(Number(value)||0))}
@@ -860,6 +862,11 @@
       if(pn){
         const docVal=Number(pn.can_tra_ncc||pn.tong_tien||0)||null;
         pushRow({type:'purchase',typeLabel:'Phiếu nhập',code:pn.ma_phieu_nhap,docId:receiptDocId(pn),docDate:pn.ngay_nhap,partner:relPartnerLabel(pn.nha_cung_cap_id),docValue:docVal,paidBefore:paidBeforeFromTotal(docVal,pn.da_tra_ncc,defaultReceiptValue),receiptValue:defaultReceiptValue,remainAfter:pn.con_no_ncc!=null?Number(pn.con_no_ncc):null,status:getRelatedDocumentStatus('purchase',pn,pn.con_no_ncc,docVal)});
+      }
+      const nvc=relDocObject(receipt.nhap_vat_chua_id);
+      if(nvc){
+        const docVal=Number(nvc.tong_tien||0)||null;
+        pushRow({type:'nhap_vat_chua',typeLabel:'Nhập vật chứa',code:nvc.ma_nhap_vat_chua,docId:receiptDocId(nvc),docDate:nvc.created_at,partner:relTextCell(nvc.doi_tuong_ten||receipt.doi_tuong),docValue:docVal,paidBefore:null,receiptValue:defaultReceiptValue,remainAfter:null,status:getRelatedDocumentStatus('nhap_vat_chua',nvc)});
       }
       const pth=relDocObject(receipt.phieu_tra_hang_id);
       if(pth){

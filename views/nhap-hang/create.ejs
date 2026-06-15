@@ -104,6 +104,9 @@
     .discount-input{height:30px;border:1px solid #cfd8e3;border-radius:7px;text-align:right;padding:0 10px;font-size:13px}
     .side-input.field-invalid{border-color:#d92d20;box-shadow:0 0 0 1px #fda29b}
     .paid-combo{display:flex;gap:6px;justify-content:flex-end}
+    .vat-chua-combo{display:flex;gap:6px;justify-content:flex-end;align-items:center;width:100%}
+    .vat-chua-combo .side-input{min-width:0}
+    .vat-chua-qty{width:72px;text-align:right}
     .payment-block{border-top:1px solid #e5e9ee;border-bottom:1px solid #e5e9ee;margin:8px 0 10px;padding:10px 0}
     .payment-title{font-size:12px;font-weight:800;color:#344054;text-transform:uppercase;letter-spacing:.02em;margin-bottom:4px}
     .payment-note{display:none;font-size:12px;color:#667085;margin:-6px 0 8px;text-align:right}
@@ -259,6 +262,18 @@
         <div id="purchaseFormError" class="form-error"></div>
         <div class="summary-line"><span>Cần trả NCC</span><span class="num payable" id="supplierPayable">0</span></div>
         <div class="summary-line"><span>Đã trả NCC</span><span class="num payable" id="supplierPaid">0</span></div>
+        <div class="summary-line" id="vatChuaRow">
+          <span>Vật chứa</span>
+          <div class="vat-chua-combo">
+            <select id="vatChuaId" class="side-input" name="vat_chua_id" title="Chọn vật chứa">
+              <option value="">— Chọn —</option>
+              <% (vatChuaList || []).forEach(function(vc) { %>
+                <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+              <% }) %>
+            </select>
+            <input id="vatChuaQty" class="side-input vat-chua-qty" name="vat_chua_so_luong" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
+          </div>
+        </div>
         <div class="right-spacer"></div>
         <div class="bottom-actions">
           <button class="btn-draft" type="button" id="saveDraftBtn">Lưu tạm</button>
@@ -475,6 +490,8 @@
     const khoIdError = document.getElementById('khoIdError');
     const paymentV2Input = document.getElementById('paymentV2Input');
     const paymentReturnInput = document.getElementById('paymentReturnInput');
+    const vatChuaIdInput = document.getElementById('vatChuaId');
+    const vatChuaQtyInput = document.getElementById('vatChuaQty');
     const payAllBtn = document.getElementById('payAllBtn');
     const payTransferAllBtn = document.getElementById('payTransferAllBtn');
     const discountTypeInput = document.getElementById('discountType');
@@ -643,6 +660,7 @@
       const debtRow = document.getElementById('debtToSupplier')?.closest('.summary-line');
       const payableRow = document.getElementById('supplierPayable')?.closest('.summary-line');
       const paidRow = document.getElementById('supplierPaid')?.closest('.summary-line');
+      const vatChuaRow = document.getElementById('vatChuaRow');
       const bankNote = document.getElementById('bankBookNote');
       const noteEl = document.getElementById('note');
       if (!grandTotalRow || !cashRow || !cashBookRow || !transferRow || !bankRow || !debtRow) return;
@@ -662,6 +680,7 @@
       if (payableRow) block.appendChild(payableRow);
       if (paidRow) block.appendChild(paidRow);
       block.appendChild(debtRow);
+      if (vatChuaRow) block.appendChild(vatChuaRow);
       if (noteEl) block.after(noteEl);
       const cashLabel = cashBookRow.querySelector('span');
       if (cashLabel) cashLabel.childNodes[0].nodeValue = 'Sổ tiền mặt ';
@@ -1457,6 +1476,26 @@
       document.getElementById('nhapHangCreateForm').submit();
     }
 
+    function validateVatChuaImport() {
+      const id = vatChuaIdInput ? String(vatChuaIdInput.value || '').trim() : '';
+      const rawQty = vatChuaQtyInput ? String(vatChuaQtyInput.value || '').replace(/\./g, '').replace(/,/g, '').trim() : '';
+      const qty = Math.floor(Number(rawQty || 0));
+      if (id && qty <= 0) {
+        showFormError('Số lượng vật chứa phải lớn hơn 0.');
+        if (vatChuaQtyInput) vatChuaQtyInput.focus();
+        return false;
+      }
+      if (!id && rawQty && qty > 0) {
+        showFormError('Vui lòng chọn vật chứa.');
+        if (vatChuaIdInput) vatChuaIdInput.focus();
+        return false;
+      }
+      if (vatChuaQtyInput && rawQty) {
+        vatChuaQtyInput.value = String(qty);
+      }
+      return true;
+    }
+
     function validateBeforeComplete() {
       if (!validateKhoNhap()) return false;
       const invalidLotItem = selectedItems.find(item => item.quan_ly_theo_lo && !item.lot_info);
@@ -1469,6 +1508,7 @@
         return false;
       }
       if (!validateCashBookForPayment()) return false;
+      if (!validateVatChuaImport()) return false;
       return true;
     }
 
@@ -1525,6 +1565,7 @@
       if (paymentV2Input) paymentV2Input.value = '1';
       if (paymentReturnInput) paymentReturnInput.value = '0';
       if (!validateKhoNhap()) return;
+      if (!validateVatChuaImport()) return;
       if (!validateCashBookForPayment()) return;
       submitModeInput.value = mode;
       if (exportAfterCompleteInput) exportAfterCompleteInput.value = exportAfter ? '1' : '0';

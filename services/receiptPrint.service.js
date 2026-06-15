@@ -500,6 +500,7 @@ function buildReceiptPrintData(receipt, store, options = {}) {
     const amount = receiptPayAmount(receipt);
     const receiptCategoryLabels = {
         'Chi tra nha cung cap': 'Chi trả nhà cung cấp',
+        'Chi Nhập vật chứa': 'Chi nhập vật chứa',
         'NCC hoan tien tra hang nhap': 'NCC hoàn tiền trả hàng nhập',
         'Hoan tien tra hang': 'Hoàn tiền trả hàng',
         'Thu tien hoa don': 'Thu tiền hóa đơn',
