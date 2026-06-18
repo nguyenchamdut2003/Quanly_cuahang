@@ -603,6 +603,14 @@
       <section class="store-table-panel supplier-list-panel">
         <div class="table-wrap">
           <form id="bulkDeleteSuppliersForm" method="post" action="/nha-cung-cap/delete-selected"></form>
+          <%
+            var supplierSummaryTotals = (suppliers || []).reduce(function(sum, s) {
+              sum.totalPurchase += Number(s.tong_mua || 0);
+              sum.totalPaid += Number(s.da_thanh_toan || 0);
+              sum.totalDebt += Number(s.tong_no || 0);
+              return sum;
+            }, { totalPurchase: 0, totalPaid: 0, totalDebt: 0 });
+          %>
           <table class="admin-table store-table" data-kv-master="nha-cung-cap">
             <thead>
               <tr>
@@ -611,6 +619,14 @@
               </tr>
             </thead>
             <tbody>
+              <tr class="customer-summary-row">
+                <td class="check-cell"></td>
+                <td colspan="4" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
+                <td><strong><%= Number(supplierSummaryTotals.totalPurchase || 0).toLocaleString('vi-VN') %></strong></td>
+                <td><strong><%= Number(supplierSummaryTotals.totalPaid || 0).toLocaleString('vi-VN') %></strong></td>
+                <td><strong><%= Number(supplierSummaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
+                <td></td>
+              </tr>
               <% if (suppliers.length === 0) { %>
                 <tr><td colspan="9" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr>
               <% } %>

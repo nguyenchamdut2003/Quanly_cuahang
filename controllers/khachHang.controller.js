@@ -8,7 +8,6 @@ var {
     PhieuTraHang,
     CongNoKhachHang,
     NguoiDung,
-    PhieuThuChi,
     Counter
 } = require('../models/kiot.model');
 var ExcelJS = require('exceljs');
@@ -726,18 +725,6 @@ async function loadCustomerDetailRenderLocals(req, customerId) {
     var historyInvoices = Array.isArray(customerHistory.invoices) ? customerHistory.invoices : [];
     var historyReturns = Array.isArray(customerHistory.returns) ? customerHistory.returns : [];
     var historyDebts = Array.isArray(customerHistory.debts) ? customerHistory.debts : [];
-    var customerAccountingReceipts = await PhieuThuChi.find({
-        khach_hang_id: selectedCustomer._id,
-        hach_toan: true
-    })
-        .populate({ path: 'so_quy_id', select: 'ten_so_quy loai_so_quy thong_tin_ngan_hang' })
-        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
-        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'ma_phieu_tra_nhap' })
-        .populate({ path: 'don_hang_id', select: 'ma_don_hang' })
-        .populate({ path: 'hoa_don_id', select: 'ma_hoa_don' })
-        .populate({ path: 'phieu_tra_hang_id', select: 'ma_phieu_tra' })
-        .sort({ ngay_lap: -1, created_at: -1 })
-        .lean();
 
     var filter = normalizeFilterQuery(req?.query || {});
     var filterQueryString = buildFilterQueryString(filter);
@@ -751,7 +738,6 @@ async function loadCustomerDetailRenderLocals(req, customerId) {
         historyInvoices: historyInvoices,
         historyReturns: historyReturns,
         historyDebts: historyDebts,
-        customerAccountingReceipts: customerAccountingReceipts,
         addressTypes: addressTypes,
         filterQueryString: filterQueryString,
         formatDate: formatDate,

@@ -12,6 +12,12 @@
     const paid = Number(ticket.da_tra_ncc ?? 0) || 0;
     return Math.max(0, payable - paid);
   };
+  const summaryTotals = safeTickets.reduce((sum, ticket) => {
+    sum.orderTotal += Number(ticket.tong_tien ?? ticket.can_tra_ncc ?? 0);
+    sum.paid += Number(ticket.da_tra_ncc ?? 0);
+    sum.debt += purchaseRemainDue(ticket);
+    return sum;
+  }, { orderTotal: 0, paid: 0, debt: 0 });
   const statusBadge = status => status === 'draft' ? 'draft' : (status === 'merged' ? 'merged' : '');
   const formatDateOnly = value => {
     if (!value) return '';
@@ -344,6 +350,15 @@
               </tr>
             </thead>
             <tbody>
+              <tr class="customer-summary-row">
+                <td class="check-col"></td>
+                <td class="star-col"></td>
+                <td colspan="4" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
+                <td class="num"><strong><%= fmtMoney(summaryTotals.orderTotal) %></strong></td>
+                <td class="num"><strong><%= fmtMoney(summaryTotals.paid) %></strong></td>
+                <td class="num"><strong><%= fmtMoney(summaryTotals.debt) %></strong></td>
+                <td></td>
+              </tr>
               <% if (safeTickets.length) { %>
                 <% safeTickets.forEach(function(t) { %>
                   <tr class="expand-row purchase-row"

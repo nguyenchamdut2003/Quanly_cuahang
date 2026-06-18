@@ -51,8 +51,8 @@
   const invoiceStatus = item => item.trang_thai_chuan || item.trang_thai || 'processing';
   const totalRow = safeInvoices.reduce((sum, item) => {
     sum.goods += Number(item.tong_tien || 0);
-    sum.debt += Number(item.con_no || 0);
     sum.paid += Number(item.khach_da_tra || 0);
+    sum.debt += invoiceRemainDue(item);
     return sum;
   }, { goods: 0, debt: 0, paid: 0 });
 %>
@@ -125,7 +125,15 @@
           <table class="table">
             <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th>Tổng tiền hàng</th><th>Đã trả</th><th>Còn nợ</th><th>Trạng thái</th></tr></thead>
             <tbody>
-              <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><strong><%= fmtMoney(totalRow.goods) %></strong></td><td><strong><%= fmtMoney(totalRow.paid) %></strong></td><td><strong><%= fmtMoney(totalRow.debt) %></strong></td><td></td></tr>
+              <tr class="customer-summary-row">
+                <td class="check-col"></td>
+                <td class="star-col"></td>
+                <td colspan="5" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
+                <td><strong><%= fmtMoney(totalRow.goods) %></strong></td>
+                <td><strong><%= fmtMoney(totalRow.paid) %></strong></td>
+                <td><strong><%= fmtMoney(totalRow.debt) %></strong></td>
+                <td></td>
+              </tr>
               <% if (safeInvoices.length) { %>
                 <% safeInvoices.forEach(i => { const st = invoiceStatus(i); const debtAmount = invoiceRemainDue(i); const shipStatus = i.van_don?.trang_thai || 'none'; %>
                   <tr class="invoice-row" data-invoice-row="<%= i._id %>" data-invoice-id="<%= i._id %>" data-invoice-code="<%= i.ma_hoa_don || '' %>" data-invoice-date="<%= new Date(i.ngay_ban || i.created_at).toISOString() %>" data-invoice-status="<%= st %>" data-delivery-status="<%= shipStatus %>" data-has-return="<%= i.phieu_tra_hang ? '1' : '0' %>" data-customer-id="<%= i.khach_hang_id ? i.khach_hang_id._id : '' %>" data-customer-code="<%= i.khach_hang_id ? (i.khach_hang_id.ma_khach_hang || '') : '' %>" data-customer-name="<%= i.khach_hang_id ? (i.khach_hang_id.ten_khach_hang || '') : 'Khách lẻ' %>" data-payable="<%= Number(i.thanh_toan || 0) %>" data-paid="<%= Number(i.khach_da_tra || 0) %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('invoice', i, i.ma_hoa_don || '', 'onclick="event.stopPropagation()"') %></td><td><%= i.ngay_ban ? new Date(i.ngay_ban).toLocaleString('vi-VN') : '' %></td><td><%= i.phieu_tra_hang?.ma_phieu_tra || '' %></td><td><%- i.khach_hang_id ? refLink('customer', i.khach_hang_id, i.khach_hang_id.ma_khach_hang || '', 'onclick="event.stopPropagation()"') : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td><%= fmtMoney(i.tong_tien) %></td><td><%= fmtMoney(i.khach_da_tra) %></td><td class="num"><div class="purchase-debt-cell"><span><%= fmtMoney(debtAmount) %></span><% if (i.debt_warning) { %><button type="button" class="purchase-debt-warn-btn js-purchase-debt-warn" onclick="event.stopPropagation()" aria-label="Cảnh báo nợ quá hạn">⚠️<span class="purchase-debt-warn-tip">Hóa đơn có khoản nợ quá hạn <strong><%= Number(i.so_ngay_no || 0).toLocaleString('vi-VN') %></strong> ngày.<br>Còn nợ: <strong><%= fmt(debtAmount) %> VNĐ</strong>.<br>Mã hóa đơn: <strong><%= i.ma_hoa_don || '--' %></strong>.</span></button><% } %></div></td><td><span class="status <%= statusClass(st) %>"><%= statusText(st) %></span></td></tr>
