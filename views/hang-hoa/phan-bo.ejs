@@ -1,0 +1,1154 @@
+<%
+  const safeLines = Array.isArray(locals.lines) ? locals.lines : [];
+  const safeFilter = locals.filter || {};
+  const safeCustomers = Array.isArray(locals.customers) ? locals.customers : [];
+  const safeVatChuaList = Array.isArray(locals.vatChuaList) ? locals.vatChuaList : [];
+%>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .alloc-page{min-height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
+    .alloc-top{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 20px;background:#fff;border-bottom:1px solid #e5e9ee;flex-wrap:wrap}
+    .alloc-back{color:#374151;text-decoration:none;font-size:18px;line-height:1}
+    .alloc-title{margin:0;font-size:20px;font-weight:800;color:#111827;white-space:nowrap}
+    .alloc-search{position:relative;flex:1;min-width:200px;max-width:360px}
+    .alloc-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8}
+    .alloc-search input{width:100%;height:38px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px 0 36px;font-size:14px;outline:none}
+    .alloc-search input:focus{border-color:#0070f4}
+    .alloc-customer{position:relative;min-width:220px;max-width:300px;flex:1}
+    .alloc-customer input{width:100%;height:38px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px 0 36px;font-size:14px;outline:none}
+    .alloc-customer input:focus{border-color:#0070f4}
+    .alloc-customer i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8}
+    .alloc-customer-results{display:none;position:absolute;top:42px;left:0;right:0;background:#fff;border:1px solid #cfd8e3;border-radius:8px;box-shadow:0 8px 22px rgba(0,0,0,.12);z-index:60;max-height:260px;overflow:auto}
+    .alloc-customer-item{padding:10px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f1f5f9}
+    .alloc-customer-item:hover{background:#f0f7ff}
+    .alloc-customer-item:last-child{border-bottom:none}
+    .alloc-customer-item b{color:#0070f4}
+    .alloc-display{display:inline-flex;align-items:center;gap:8px;color:#475569;font-size:13px;white-space:nowrap}
+    .alloc-display select{height:38px;border:1px solid #cfd8e3;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;outline:none;min-width:108px}
+    .alloc-count{color:#64748b;font-size:13px;white-space:nowrap}
+    .alloc-count strong{color:#0070f4;font-weight:800}
+    .alloc-top-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+    .alloc-filter-spinner{display:none;width:38px;height:38px;align-items:center;justify-content:center;color:#0070f4;font-size:18px}
+    .alloc-filter-spinner.is-active{display:inline-flex}
+    .alloc-table-wrap{flex:1;min-height:0;margin:0 20px 20px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:auto}
+    .alloc-table{width:100%;min-width:980px;border-collapse:collapse;font-size:13px;border:1px solid #c5d3e3}
+    .alloc-table th{position:sticky;top:0;z-index:2;height:40px;background:#eaf3ff;border:1px solid #c5d3e3;padding:0 10px;text-align:left;white-space:nowrap;font-weight:800;color:#1e293b}
+    .alloc-table td{height:40px;border:1px solid #d4dde8;padding:0 10px;color:#334155;vertical-align:middle}
+    .alloc-table td.is-merge-cell{vertical-align:middle;background:#f8fafc;border-left:2px solid #94a3b8;border-top:2px solid #94a3b8;border-bottom:2px solid #94a3b8}
+    .alloc-table tbody tr[data-alloc-row].is-group-start td:not(.is-merge-cell){border-top:2px solid #94a3b8}
+    .alloc-table tbody tr[data-alloc-row].is-group-end td:not(.is-merge-cell){border-bottom:2px solid #94a3b8}
+    .alloc-table tbody tr[data-alloc-row]:not(.is-group-end) td:not(.is-merge-cell){border-bottom:1px solid #e8edf3}
+    .alloc-table .num{text-align:right;white-space:nowrap}
+    .alloc-table .name{font-weight:700;color:#0f172a}
+    .alloc-table .empty{text-align:center;color:#94a3b8;padding:36px!important}
+    .alloc-input-cell{min-width:168px;padding:4px 8px!important}
+    .alloc-table th.alloc-input-cell{height:auto;min-height:40px;padding:6px 8px;vertical-align:top}
+    .alloc-customer-vat-chua{display:flex;gap:4px;margin-top:6px;width:100%}
+    .alloc-customer-vat-chua select,.alloc-customer-vat-chua input{height:30px;border:1px solid #cfd8e3;border-radius:6px;font-size:11px;background:#fff;outline:none}
+    .alloc-customer-vat-chua select{flex:1;min-width:0;padding:0 6px;max-width:100%}
+    .alloc-customer-vat-chua input{flex:0 0 52px;width:52px;padding:0 6px;text-align:right}
+    .alloc-customer-vat-chua select:focus,.alloc-customer-vat-chua input:focus{border-color:#0070f4}
+    .alloc-kh-dat-col{min-width:72px}
+    .alloc-kh-dat-cell{color:#0070f4;font-weight:700}
+    .alloc-input-group{display:flex;gap:6px}
+    .alloc-float-field{position:relative;flex:1;min-width:0}
+    .alloc-float-field input{width:100%;height:34px;border:1px solid #cfd8e3;border-radius:6px;padding:14px 8px 4px;font-size:13px;text-align:right;background:#fff;outline:none}
+    .alloc-float-field input:focus{border-color:#0070f4}
+    .alloc-float-label{position:absolute;left:8px;top:17px;transform:translateY(-50%);font-size:12px;color:#94a3b8;pointer-events:none;transition:all .15s ease;line-height:1;max-width:calc(100% - 16px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .alloc-float-field:focus-within .alloc-float-label,
+    .alloc-float-field.is-filled .alloc-float-label{top:0;font-size:10px;font-weight:700;color:#0070f4;background:#fff;padding:0 3px}
+    .alloc-qty-field-row{display:flex;align-items:center;gap:4px;width:100%}
+    .alloc-qty-field-row .alloc-qty-input{flex:1;min-width:0}
+    .alloc-stock-qty-cell{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;max-width:100%;vertical-align:middle}
+    .alloc-stock-qty-value{display:inline-block;min-width:0}
+    .alloc-overstock-warn{display:none;flex-shrink:0;width:22px;height:22px;border:none;border-radius:50%;background:#fff7ed;color:#ea580c;cursor:help;align-items:center;justify-content:center;font-size:12px;padding:0;line-height:1}
+    .alloc-overstock-warn.is-visible{display:inline-flex !important}
+    .alloc-overstock-warn:hover{background:#ffedd5;color:#c2410c}
+    .alloc-overstock-popover{display:none;position:fixed;z-index:300;width:min(320px,calc(100vw - 24px));background:#fff;border:1px solid #fdba74;border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:12px 14px;font-size:13px;color:#334155;line-height:1.5;pointer-events:none}
+    .alloc-overstock-popover.is-open{display:block;pointer-events:auto}
+    .alloc-overstock-popover strong{display:block;margin-bottom:6px;color:#c2410c;font-size:14px}
+    .alloc-modal-overstock{display:none;margin-bottom:12px;padding:10px 12px;border:1px solid #fdba74;background:#fff7ed;border-radius:8px;font-size:13px;color:#9a3412;line-height:1.5}
+    .alloc-modal-overstock.is-visible{display:block}
+    .alloc-customer-col-head{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:150px}
+    .alloc-customer-col-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+    .alloc-customer-col-remove{border:none;background:transparent;color:#94a3b8;cursor:pointer;font-size:14px;line-height:1;padding:0 2px;flex-shrink:0}
+    .alloc-customer-col-remove:hover{color:#dc2626}
+    .alloc-btn{height:38px;border-radius:8px;padding:0 16px;font-size:14px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;text-decoration:none;border:none}
+    .alloc-btn.primary{background:#0070f4;border:1px solid #0070f4;color:#fff}
+    .alloc-btn.primary:disabled{opacity:.55;cursor:not-allowed}
+    .alloc-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:200;align-items:center;justify-content:center;padding:20px}
+    .alloc-modal-overlay.is-open{display:flex}
+    .alloc-modal{width:min(720px,100%);max-height:90vh;background:#fff;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.2);display:flex;flex-direction:column;overflow:hidden}
+    .alloc-modal-head{padding:16px 20px;border-bottom:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between}
+    .alloc-modal-head h2{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .alloc-modal-close{border:none;background:transparent;font-size:20px;color:#64748b;cursor:pointer}
+    .alloc-modal-body{padding:16px 20px;overflow:auto}
+    .alloc-modal-meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;margin-bottom:14px;font-size:13px;color:#334155}
+    .alloc-modal-meta strong{color:#111827}
+    .alloc-modal-vat-chua{display:none;margin-bottom:14px;padding:10px 12px;border:1px solid #dbeafe;background:#f8fbff;border-radius:8px;font-size:13px;color:#334155;line-height:1.6}
+    .alloc-modal-vat-chua.is-visible{display:block}
+    .alloc-modal-vat-chua strong{color:#111827}
+    .alloc-mode-group{display:flex;gap:16px;margin-bottom:14px;font-size:13px}
+    .alloc-mode-group label{display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-weight:600}
+    .alloc-modal-table{width:100%;border-collapse:collapse;font-size:12px}
+    .alloc-modal-table th,.alloc-modal-table td{border:1px solid #e2e8f0;padding:8px;text-align:left}
+    .alloc-modal-table th{background:#f8fafc;font-weight:800}
+    .alloc-modal-table .num{text-align:right}
+    .alloc-modal-foot{padding:14px 20px;border-top:1px solid #e5e9ee;display:flex;justify-content:flex-end;gap:10px}
+    .alloc-btn.ghost{background:#fff;border:1px solid #cfd8e3;color:#334155}
+    @keyframes allocSpin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <%- include('../partials/flash-message', { flash: flash }) %>
+
+  <div class="alloc-page">
+    <div class="alloc-top">
+      <a class="alloc-back" href="/hang-hoa" title="Quay lại Hàng hóa"><i class="fa-solid fa-arrow-left"></i></a>
+      <h1 class="alloc-title">Phân bổ hàng tồn kho</h1>
+      <div class="alloc-customer">
+        <i class="fa-solid fa-user"></i>
+        <input type="search" id="allocCustomerSearch" placeholder="Thêm khách hàng..." autocomplete="off">
+        <div class="alloc-customer-results" id="allocCustomerResults"></div>
+      </div>
+      <div class="alloc-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="allocKeyword" value="<%= safeFilter.keyword || '' %>" placeholder="Theo tên hàng, lô, kho, thuộc tính..." autocomplete="off">
+      </div>
+      <label class="alloc-display">
+        <span>Hiển thị</span>
+        <select id="allocPageSize">
+          <option value="15" selected>15 dòng</option>
+          <option value="30">30 dòng</option>
+          <option value="50">50 dòng</option>
+          <option value="100">100 dòng</option>
+          <option value="0">Tất cả</option>
+        </select>
+      </label>
+      <span class="alloc-count" id="allocCountText">Hiển thị <strong>0</strong> / <strong><%= safeLines.length.toLocaleString('vi-VN') %></strong> dòng tồn có thể phân bổ</span>
+      <div class="alloc-top-actions">
+        <span class="alloc-filter-spinner" id="allocFilterSpinner" aria-hidden="true"><i class="fa-solid fa-circle-notch fa-spin"></i></span>
+        <button type="button" class="alloc-btn primary" id="allocSubmitBtn">Phân bổ <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <div class="alloc-table-wrap">
+      <table class="alloc-table">
+        <thead>
+          <tr id="allocTableHeadRow">
+            <th>Tên hàng</th>
+            <th>ĐVT</th>
+            <th>Tên lô</th>
+            <th>Kho</th>
+            <th>Thuộc tính</th>
+            <th class="num">Thực tế</th>
+            <th class="num alloc-kh-dat-col" title="Tổng SL trên các đơn hàng cũ chưa giao đủ">KH đặt</th>
+            <th class="num">Giá vốn</th>
+          </tr>
+        </thead>
+        <tbody id="allocTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="alloc-overstock-popover" id="allocOverstockPopover" role="tooltip" aria-hidden="true"></div>
+
+  <div class="alloc-modal-overlay" id="allocConfirmModal" aria-hidden="true">
+    <div class="alloc-modal" role="dialog" aria-labelledby="allocModalTitle">
+      <div class="alloc-modal-head">
+        <h2 id="allocModalTitle">Xác nhận phân bổ</h2>
+        <button type="button" class="alloc-modal-close" id="allocModalClose" aria-label="Đóng">&times;</button>
+      </div>
+      <div class="alloc-modal-body">
+        <div class="alloc-modal-overstock" id="allocModalOverstock"></div>
+        <div class="alloc-modal-meta">
+          <div>Số khách hàng: <strong id="allocModalCustomerCount">0</strong></div>
+          <div>Số dòng: <strong id="allocModalLineCount">0</strong></div>
+          <div>Tổng SL: <strong id="allocModalTotalQty">0</strong></div>
+          <div>Tổng tiền: <strong id="allocModalTotalAmount">0</strong></div>
+        </div>
+        <div class="alloc-modal-vat-chua" id="allocModalVatChua"></div>
+        <div class="alloc-mode-group">
+          <span>Chế độ tạo:</span>
+          <label><input type="radio" name="allocCreateMode" value="don_hang" checked> Đơn hàng (phiếu tạm)</label>
+          <label><input type="radio" name="allocCreateMode" value="hoa_don"> Hóa đơn (trừ tồn ngay)</label>
+        </div>
+        <table class="alloc-modal-table">
+          <thead>
+            <tr>
+              <th>Khách hàng</th>
+              <th>Hàng hóa</th>
+              <th>Lô / Kho</th>
+              <th>Thuộc tính</th>
+              <th class="num">SL</th>
+              <th class="num">Đơn giá</th>
+              <th class="num">Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody id="allocModalTableBody"></tbody>
+        </table>
+      </div>
+      <div class="alloc-modal-foot">
+        <button type="button" class="alloc-btn ghost" id="allocModalCancel">Hủy</button>
+        <button type="button" class="alloc-btn primary" id="allocModalConfirm">Xác nhận phân bổ</button>
+      </div>
+    </div>
+  </div>
+
+  <script id="allocLinesData" type="application/json"><%- JSON.stringify(safeLines).replace(/</g, '\\u003c') %></script>
+  <script id="allocCustomersData" type="application/json"><%- JSON.stringify(safeCustomers.map(function(c) {
+    return {
+      _id: String(c._id || ''),
+      ma_khach_hang: c.ma_khach_hang || '',
+      ten_khach_hang: c.ten_khach_hang || '',
+      sdt: c.sdt || c.sdt2 || ''
+    };
+  })).replace(/</g, '\\u003c') %></script>
+  <script id="allocVatChuaData" type="application/json"><%- JSON.stringify(safeVatChuaList.map(function(vc) {
+    return {
+      _id: String(vc._id || ''),
+      ma_vat_chua: vc.ma_vat_chua || '',
+      ten_vat_chua: vc.ten_vat_chua || '',
+      so_luong_ton: Number(vc.so_luong_ton || 0)
+    };
+  })).replace(/</g, '\\u003c') %></script>
+
+  <script>
+    (function() {
+      var keywordInput = document.getElementById('allocKeyword');
+      var pageSizeSelect = document.getElementById('allocPageSize');
+      var countText = document.getElementById('allocCountText');
+      var spinner = document.getElementById('allocFilterSpinner');
+      var tbody = document.getElementById('allocTableBody');
+      var tableHeadRow = document.getElementById('allocTableHeadRow');
+      var customerSearch = document.getElementById('allocCustomerSearch');
+      var customerResults = document.getElementById('allocCustomerResults');
+      var submitBtn = document.getElementById('allocSubmitBtn');
+      var confirmModal = document.getElementById('allocConfirmModal');
+      var modalClose = document.getElementById('allocModalClose');
+      var modalCancel = document.getElementById('allocModalCancel');
+      var modalConfirm = document.getElementById('allocModalConfirm');
+      var filterTimer = null;
+      var visibleRowCount = 0;
+      var allLines = [];
+      var linesMap = {};
+      var allocDraft = {};
+      var customers = [];
+      var selectedCustomers = [];
+      var pendingSubmitBatches = [];
+      var customerVatChuaDraft = {};
+      var vatChuaList = [];
+      var BASE_COL_COUNT = 8;
+      var overstockPopover = document.getElementById('allocOverstockPopover');
+      var overstockPopoverTimer = null;
+
+      function fmt(value) {
+        return Number(value || 0).toLocaleString('vi-VN');
+      }
+
+      function parseAllocNum(value) {
+        var raw = String(value == null ? '' : value).trim().replace(/\s/g, '');
+        if (!raw) return 0;
+        var lastComma = raw.lastIndexOf(',');
+        var lastDot = raw.lastIndexOf('.');
+        if (lastComma > lastDot && raw.length - lastComma <= 4) {
+          raw = raw.replace(/\./g, '').replace(',', '.');
+        } else {
+          raw = raw.replace(/[.,]/g, '');
+        }
+        var n = Number(raw);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      function displayAllocInputValue(value) {
+        var n = Number(value || 0);
+        if (!Number.isFinite(n) || n <= 0) return '';
+        return fmt(n);
+      }
+
+      function handleAllocNumInput(input) {
+        if (!input) return;
+        var raw = String(input.value || '').trim();
+        if (!raw) {
+          input.value = '';
+          return;
+        }
+        var parsed = parseAllocNum(raw);
+        if (parsed <= 0) {
+          input.value = '';
+          return;
+        }
+        input.value = fmt(parsed);
+      }
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+      }
+
+      function normalizeText(value) {
+        return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      }
+
+      function hasStock(line) {
+        return Number(line && line.ton_thuc_te != null ? line.ton_thuc_te : 0) > 0;
+      }
+
+      try {
+        allLines = JSON.parse(document.getElementById('allocLinesData').textContent || '[]');
+        allLines = allLines.filter(hasStock);
+        allLines.forEach(function(line) {
+          if (line && line.line_key) linesMap[line.line_key] = line;
+        });
+      } catch (error) {
+        allLines = [];
+      }
+
+      try {
+        customers = JSON.parse(document.getElementById('allocCustomersData').textContent || '[]');
+      } catch (error) {
+        customers = [];
+      }
+
+      try {
+        vatChuaList = JSON.parse(document.getElementById('allocVatChuaData').textContent || '[]');
+      } catch (error) {
+        vatChuaList = [];
+      }
+
+      function getVatChuaName(vatChuaId) {
+        if (!vatChuaId) return '';
+        var found = vatChuaList.find(function(item) { return String(item._id) === String(vatChuaId); });
+        return found ? (found.ten_vat_chua || found.ma_vat_chua || '') : '';
+      }
+
+      function buildVatChuaSelectOptions(selectedId) {
+        var html = '<option value="">— Vật chứa —</option>';
+        vatChuaList.forEach(function(item) {
+          var id = String(item._id || '');
+          if (!id) return;
+          var label = (item.ten_vat_chua || item.ma_vat_chua || '---')
+            + ' (tồn ' + fmt(item.so_luong_ton) + ')';
+          html += '<option value="' + escapeHtml(id) + '"' + (String(selectedId || '') === id ? ' selected' : '') + '>'
+            + escapeHtml(label) + '</option>';
+        });
+        return html;
+      }
+
+      function saveVatChuaFromDom() {
+        if (!tableHeadRow) return;
+        tableHeadRow.querySelectorAll('.alloc-vat-chua-select').forEach(function(select) {
+          var customerId = select.getAttribute('data-customer-id');
+          if (!customerId) return;
+          if (!customerVatChuaDraft[customerId]) customerVatChuaDraft[customerId] = {};
+          customerVatChuaDraft[customerId].vat_chua_id = String(select.value || '');
+          var qtyInput = tableHeadRow.querySelector('.alloc-vat-chua-qty[data-customer-id="' + customerId + '"]');
+          customerVatChuaDraft[customerId].vat_chua_so_luong = qtyInput ? parseAllocNum(qtyInput.value) : 0;
+        });
+      }
+
+      function getCustomerVatChuaDraft(customerId) {
+        return customerVatChuaDraft[String(customerId || '')] || { vat_chua_id: '', vat_chua_so_luong: 0 };
+      }
+
+      function validateCustomerVatChua(customer, label) {
+        var draft = getCustomerVatChuaDraft(customer.id);
+        var hasId = !!String(draft.vat_chua_id || '').trim();
+        var qty = Number(draft.vat_chua_so_luong || 0);
+        var name = label || customer.ten_khach_hang || 'khách hàng';
+        if (hasId && qty <= 0) {
+          throw new Error('Vui lòng nhập SL vật chứa cho ' + name + '.');
+        }
+        if (!hasId && qty > 0) {
+          throw new Error('Vui lòng chọn vật chứa cho ' + name + '.');
+        }
+      }
+
+      function getTableColCount() {
+        return BASE_COL_COUNT + selectedCustomers.length;
+      }
+
+      function getLineKhachDat(line) {
+        return Number(line && line.so_luong_khach_dat != null ? line.so_luong_khach_dat : 0);
+      }
+
+      function ensureDraft(line, customerId) {
+        var lineKey = line.line_key;
+        if (!lineKey || !customerId) return { qty: 0, price: 0 };
+        if (!allocDraft[lineKey]) allocDraft[lineKey] = {};
+        if (!allocDraft[lineKey][customerId]) {
+          allocDraft[lineKey][customerId] = {
+            qty: 0,
+            price: 0
+          };
+        }
+        return allocDraft[lineKey][customerId];
+      }
+
+      function saveDraftFromDom() {
+        if (!tbody) return;
+        tbody.querySelectorAll('[data-alloc-row]').forEach(function(row) {
+          var lineKey = row.getAttribute('data-line-key');
+          if (!lineKey) return;
+          if (!allocDraft[lineKey]) allocDraft[lineKey] = {};
+          row.querySelectorAll('.alloc-customer-cell').forEach(function(cell) {
+            var customerId = cell.getAttribute('data-customer-id');
+            var qtyInput = cell.querySelector('.alloc-qty-input');
+            var priceInput = cell.querySelector('.alloc-price-input');
+            if (!customerId || !qtyInput || !priceInput) return;
+            allocDraft[lineKey][customerId] = {
+              qty: parseAllocNum(qtyInput.value),
+              price: parseAllocNum(priceInput.value)
+            };
+          });
+        });
+      }
+
+      function renderTableHeader() {
+        if (!tableHeadRow) return;
+        saveVatChuaFromDom();
+        var fixedHtml = ''
+          + '<th>Tên hàng</th>'
+          + '<th>ĐVT</th>'
+          + '<th>Tên lô</th>'
+          + '<th>Kho</th>'
+          + '<th>Thuộc tính</th>'
+          + '<th class="num">Thực tế</th>'
+          + '<th class="num alloc-kh-dat-col" title="Tổng SL trên các đơn hàng cũ chưa giao đủ">KH đặt</th>'
+          + '<th class="num">Giá vốn</th>';
+        var customerHtml = selectedCustomers.map(function(customer) {
+          var vatDraft = getCustomerVatChuaDraft(customer.id);
+          return '<th class="alloc-input-cell">'
+            + '<div class="alloc-customer-col-head" title="' + escapeHtml(customer.ten_khach_hang || '') + '">'
+            + '<span class="alloc-customer-col-title">' + escapeHtml(customer.ten_khach_hang || '---') + '</span>'
+            + '<button type="button" class="alloc-customer-col-remove" data-customer-id="' + escapeHtml(customer.id) + '" title="Bỏ cột khách hàng">&times;</button>'
+            + '</div>'
+            + '<div class="alloc-customer-vat-chua" title="Xuất vật chứa cho khách này">'
+            + '<select class="alloc-vat-chua-select" data-customer-id="' + escapeHtml(customer.id) + '">'
+            + buildVatChuaSelectOptions(vatDraft.vat_chua_id)
+            + '</select>'
+            + '<input type="text" class="alloc-vat-chua-qty" data-customer-id="' + escapeHtml(customer.id) + '" inputmode="numeric" autocomplete="off" value="' + escapeHtml(displayAllocInputValue(vatDraft.vat_chua_so_luong)) + '" placeholder="SL" title="SL vật chứa">'
+            + '</div></th>';
+        }).join('');
+        tableHeadRow.innerHTML = fixedHtml + customerHtml;
+        tableHeadRow.querySelectorAll('.alloc-customer-col-remove').forEach(function(btn) {
+          btn.addEventListener('click', function(event) {
+            event.stopPropagation();
+            removeCustomerColumn(btn.getAttribute('data-customer-id'));
+          });
+        });
+        tableHeadRow.querySelectorAll('.alloc-vat-chua-select, .alloc-vat-chua-qty').forEach(function(input) {
+          input.addEventListener('change', function() {
+            if (input.classList.contains('alloc-vat-chua-qty')) handleAllocNumInput(input);
+            saveVatChuaFromDom();
+          });
+          input.addEventListener('input', function() {
+            if (input.classList.contains('alloc-vat-chua-qty')) handleAllocNumInput(input);
+            saveVatChuaFromDom();
+          });
+          input.addEventListener('blur', function() {
+            if (input.classList.contains('alloc-vat-chua-qty')) handleAllocNumInput(input);
+            saveVatChuaFromDom();
+          });
+        });
+      }
+
+      function removeCustomerColumn(customerId) {
+        if (!customerId) return;
+        saveDraftFromDom();
+        selectedCustomers = selectedCustomers.filter(function(item) { return item.id !== customerId; });
+        Object.keys(allocDraft).forEach(function(lineKey) {
+          if (allocDraft[lineKey] && allocDraft[lineKey][customerId]) {
+            delete allocDraft[lineKey][customerId];
+          }
+        });
+        delete customerVatChuaDraft[customerId];
+        renderTableHeader();
+        applyFilter();
+      }
+
+      function addCustomerColumn(customer) {
+        if (!customer || !customer._id) return;
+        var id = String(customer._id);
+        if (selectedCustomers.some(function(item) { return item.id === id; })) {
+          alert('Khách hàng này đã có cột phân bổ.');
+          return;
+        }
+        selectedCustomers.push({
+          id: id,
+          ma_khach_hang: customer.ma_khach_hang || '',
+          ten_khach_hang: customer.ten_khach_hang || ''
+        });
+        customerVatChuaDraft[id] = { vat_chua_id: '', vat_chua_so_luong: 0 };
+        if (customerSearch) customerSearch.value = '';
+        if (customerResults) customerResults.style.display = 'none';
+        renderTableHeader();
+        applyFilter();
+      }
+
+      function lineSearchText(line) {
+        return normalizeText([
+          line.ma_hang,
+          line.ten_hang,
+          line.don_vi_tinh_ten,
+          line.ma_lo,
+          line.ten_lo,
+          line.ten_quy_cach,
+          line.kho_ten,
+          line.ma_phieu_nhap
+        ].join(' '));
+      }
+
+      function groupKey(line) {
+        return [
+          String(line.product_id || ''),
+          String(line.ten_hang || '').trim(),
+          String(line.don_vi_tinh_ten || '').trim(),
+          String(line.ten_lo || '').trim(),
+          String(line.kho_ten || '').trim()
+        ].join('::');
+      }
+
+      function isFloatFieldFilled(input) {
+        if (!input) return false;
+        if (input.classList.contains('alloc-qty-input') || input.classList.contains('alloc-price-input')) {
+          return parseAllocNum(input.value) > 0;
+        }
+        var val = String(input.value || '').trim();
+        if (val === '') return false;
+        return Number.isFinite(Number(val)) && val !== '';
+      }
+
+      function syncFloatFieldState(field) {
+        if (!field) return;
+        var input = field.querySelector('input');
+        if (!input) return;
+        if (field.matches(':focus-within') || isFloatFieldFilled(input)) {
+          field.classList.add('is-filled');
+        } else {
+          field.classList.remove('is-filled');
+        }
+      }
+
+      function syncAllFloatFields(root) {
+        var scope = root || tbody;
+        if (!scope) return;
+        scope.querySelectorAll('.alloc-float-field').forEach(syncFloatFieldState);
+      }
+
+      function getLineActualQty(line) {
+        return Number(line && line.ton_thuc_te != null ? line.ton_thuc_te : 0);
+      }
+
+      function getRowAllocatedTotal(row) {
+        var total = 0;
+        if (!row) return 0;
+        row.querySelectorAll('.alloc-qty-input').forEach(function(input) {
+          total += parseAllocNum(input.value);
+        });
+        return total;
+      }
+
+      function getRowActualQty(row, line) {
+        if (line) return getLineActualQty(line);
+        return Number(row && row.getAttribute('data-actual-qty') ? row.getAttribute('data-actual-qty') : 0);
+      }
+
+      function getLineAllocatedTotal(lineKey) {
+        if (!lineKey) return 0;
+        if (tbody) {
+          var rows = tbody.querySelectorAll('[data-alloc-row]');
+          for (var i = 0; i < rows.length; i++) {
+            if (rows[i].getAttribute('data-line-key') === lineKey) {
+              return getRowAllocatedTotal(rows[i]);
+            }
+          }
+        }
+        if (!allocDraft[lineKey]) return 0;
+        return Object.keys(allocDraft[lineKey]).reduce(function(sum, customerId) {
+          var draft = allocDraft[lineKey][customerId];
+          return sum + Number(draft && draft.qty != null ? draft.qty : 0);
+        }, 0);
+      }
+
+      function buildOverstockNote(allocated, line) {
+        var lineLabel = [
+          line && line.ten_hang ? line.ten_hang : '',
+          line && line.ten_quy_cach && line.ten_quy_cach !== '---' ? line.ten_quy_cach : '',
+          line && line.ten_lo && line.ten_lo !== '---' ? line.ten_lo : ''
+        ].filter(Boolean).join(' - ');
+        var actual = getLineActualQty(line);
+        return '<strong>Cảnh báo vượt tồn kho</strong>'
+          + '<div>' + escapeHtml(lineLabel || 'Dòng hàng') + '</div>'
+          + '<div>Tổng SL phân bổ: <b>' + fmt(allocated) + '</b></div>'
+          + '<div>Thực tế: <b>' + fmt(actual) + '</b></div>'
+          + '<div style="margin-top:8px">Tổng phân bổ cho các khách vượt tồn thực tế của thuộc tính này. Bạn vẫn có thể tiếp tục; khi xuất hàng hoặc giao hàng hệ thống có thể báo thiếu tồn.</div>';
+      }
+
+      function hideOverstockPopover() {
+        if (!overstockPopover) return;
+        overstockPopover.classList.remove('is-open');
+        overstockPopover.setAttribute('aria-hidden', 'true');
+      }
+
+      function showOverstockPopover(anchor, html) {
+        if (!overstockPopover || !anchor) return;
+        overstockPopover.innerHTML = html;
+        overstockPopover.classList.add('is-open');
+        overstockPopover.setAttribute('aria-hidden', 'false');
+        overstockPopover.style.visibility = 'hidden';
+        overstockPopover.style.top = '0px';
+        overstockPopover.style.left = '0px';
+        var rect = anchor.getBoundingClientRect();
+        var popRect = overstockPopover.getBoundingClientRect();
+        var top = rect.bottom + 8;
+        var left = rect.left + (rect.width / 2) - (popRect.width / 2);
+        if (left < 12) left = 12;
+        if (left + popRect.width > window.innerWidth - 12) {
+          left = window.innerWidth - popRect.width - 12;
+        }
+        if (top + popRect.height > window.innerHeight - 12) {
+          top = Math.max(12, rect.top - popRect.height - 8);
+        }
+        overstockPopover.style.top = top + 'px';
+        overstockPopover.style.left = left + 'px';
+        overstockPopover.style.visibility = 'visible';
+      }
+
+      function updateRowStockWarning(row, line) {
+        if (!row) return;
+        var warnBtn = row.querySelector('.alloc-row-stock-warn');
+        if (!warnBtn) return;
+        var allocated = getRowAllocatedTotal(row);
+        var actual = getRowActualQty(row, line);
+        var isOver = allocated > actual;
+        warnBtn.classList.toggle('is-visible', isOver);
+        warnBtn.setAttribute('data-allocated', String(allocated));
+        warnBtn.setAttribute('data-actual', String(actual));
+      }
+
+      function syncAllOverstockWarnings(root) {
+        var scope = root || tbody;
+        if (!scope) return;
+        scope.querySelectorAll('[data-alloc-row]').forEach(function(row) {
+          var line = linesMap[row.getAttribute('data-line-key') || ''];
+          updateRowStockWarning(row, line);
+        });
+      }
+
+      function bindOverstockWarningHandlers() {
+        if (!tbody || tbody._allocOverstockBound) return;
+        tbody._allocOverstockBound = true;
+        tbody.addEventListener('mouseover', function(e) {
+          var btn = e.target.closest ? e.target.closest('.alloc-row-stock-warn') : null;
+          if (!btn || !tbody.contains(btn) || !btn.classList.contains('is-visible')) return;
+          if (overstockPopoverTimer) clearTimeout(overstockPopoverTimer);
+          var row = btn.closest('[data-alloc-row]');
+          if (!row) return;
+          var line = linesMap[row.getAttribute('data-line-key') || ''];
+          var allocated = Number(btn.getAttribute('data-allocated') || getRowAllocatedTotal(row));
+          showOverstockPopover(btn, buildOverstockNote(allocated, line || { ton_thuc_te: getRowActualQty(row, null) }));
+        });
+        tbody.addEventListener('mouseout', function(e) {
+          var btn = e.target.closest ? e.target.closest('.alloc-row-stock-warn') : null;
+          if (!btn || !tbody.contains(btn)) return;
+          var related = e.relatedTarget;
+          if (related && (btn.contains(related) || (overstockPopover && overstockPopover.contains(related)))) return;
+          overstockPopoverTimer = window.setTimeout(hideOverstockPopover, 120);
+        });
+      }
+
+      if (overstockPopover) {
+        overstockPopover.addEventListener('mouseenter', function() {
+          if (overstockPopoverTimer) clearTimeout(overstockPopoverTimer);
+        });
+        overstockPopover.addEventListener('mouseleave', hideOverstockPopover);
+      }
+
+      function groupLines(lines) {
+        var map = {};
+        var order = [];
+        lines.forEach(function(line) {
+          var key = groupKey(line);
+          if (!map[key]) {
+            map[key] = [];
+            order.push(key);
+          }
+          map[key].push(line);
+        });
+        return order.map(function(key) { return map[key]; });
+      }
+
+      function buildCustomerCells(line) {
+        if (!selectedCustomers.length) return '';
+        return selectedCustomers.map(function(customer) {
+          var draft = ensureDraft(line, customer.id);
+          var qtyFilled = Number(draft.qty || 0) > 0;
+          var priceFilled = Number(draft.price || 0) > 0;
+          return '<td class="alloc-input-cell alloc-customer-cell" data-customer-id="' + escapeHtml(customer.id) + '">'
+            + '<div class="alloc-input-group">'
+            + '<label class="alloc-float-field alloc-qty-field' + (qtyFilled ? ' is-filled' : '') + '">'
+            + '<div class="alloc-qty-field-row">'
+            + '<input type="text" class="alloc-qty-input" inputmode="decimal" autocomplete="off" value="' + escapeHtml(displayAllocInputValue(draft.qty)) + '">'
+            + '</div>'
+            + '<span class="alloc-float-label">Số lượng</span>'
+            + '</label>'
+            + '<label class="alloc-float-field' + (priceFilled ? ' is-filled' : '') + '">'
+            + '<input type="text" class="alloc-price-input" inputmode="numeric" autocomplete="off" value="' + escapeHtml(displayAllocInputValue(draft.price)) + '" title="Đơn giá bán">'
+            + '<span class="alloc-float-label">Giá</span>'
+            + '</label>'
+            + '</div></td>';
+        }).join('');
+      }
+
+      function buildDetailCells(line) {
+        var allocated = getLineAllocatedTotal(line.line_key);
+        var actual = getLineActualQty(line);
+        var showRowWarn = allocated > actual;
+        return ''
+          + '<td>' + escapeHtml(line.ten_quy_cach || '---') + '</td>'
+          + '<td class="num">'
+          + '<div class="alloc-stock-qty-cell">'
+          + '<span class="alloc-stock-qty-value">' + fmt(line.ton_thuc_te) + '</span>'
+          + '<button type="button" class="alloc-overstock-warn alloc-row-stock-warn' + (showRowWarn ? ' is-visible' : '') + '" data-allocated="' + allocated + '" data-actual="' + actual + '" tabindex="-1" aria-label="Cảnh báo vượt tồn thực tế">'
+          + '<i class="fa-solid fa-triangle-exclamation"></i>'
+          + '</button>'
+          + '</div>'
+          + '</td>'
+          + '<td class="num alloc-kh-dat-cell" title="Tổng SL trên các đơn hàng cũ chưa giao đủ">' + fmt(getLineKhachDat(line)) + '</td>'
+          + '<td class="num">' + fmt(line.gia_von) + '</td>'
+          + buildCustomerCells(line);
+      }
+
+      function buildRowHtml(line, options) {
+        var search = lineSearchText(line);
+        var classes = ['data-alloc-row'];
+        if (options.groupStart) classes.push('is-group-start');
+        if (options.groupEnd) classes.push('is-group-end');
+        var html = '<tr class="' + classes.join(' ') + '" data-alloc-row="1" data-search="' + escapeHtml(search) + '" data-group-key="' + escapeHtml(options.groupKey || '') + '" data-line-key="' + escapeHtml(line.line_key || '') + '" data-actual-qty="' + getLineActualQty(line) + '">';
+        if (options.showMerge) {
+          html += '<td class="name is-merge-cell" rowspan="' + options.rowspan + '">' + escapeHtml(line.ten_hang || '---') + '</td>';
+          html += '<td class="is-merge-cell" rowspan="' + options.rowspan + '">' + escapeHtml(line.don_vi_tinh_ten || '---') + '</td>';
+          html += '<td class="is-merge-cell" rowspan="' + options.rowspan + '">' + escapeHtml(line.ten_lo || '---') + '</td>';
+          html += '<td class="is-merge-cell" rowspan="' + options.rowspan + '">' + escapeHtml(line.kho_ten || '---') + '</td>';
+        }
+        html += buildDetailCells(line);
+        html += '</tr>';
+        return html;
+      }
+
+      function bindInputHandlers() {
+        if (!tbody) return;
+        tbody.querySelectorAll('.alloc-qty-input, .alloc-price-input').forEach(function(input) {
+          function onQtyChange() {
+            var cell = input.closest('.alloc-customer-cell');
+            var row = input.closest('[data-alloc-row]');
+            if (!cell || !row) return;
+            var lineKey = row.getAttribute('data-line-key');
+            var customerId = cell.getAttribute('data-customer-id');
+            var qtyInput = cell.querySelector('.alloc-qty-input');
+            var priceInput = cell.querySelector('.alloc-price-input');
+            if (!lineKey || !customerId || !qtyInput || !priceInput) return;
+            if (!allocDraft[lineKey]) allocDraft[lineKey] = {};
+            allocDraft[lineKey][customerId] = {
+              qty: parseAllocNum(qtyInput.value),
+              price: parseAllocNum(priceInput.value)
+            };
+            syncFloatFieldState(input.closest('.alloc-float-field'));
+            if (input.classList.contains('alloc-qty-input')) {
+              updateRowStockWarning(row, linesMap[lineKey]);
+            }
+          }
+          input.addEventListener('input', function() {
+            handleAllocNumInput(input);
+            onQtyChange();
+          });
+          input.addEventListener('change', function() {
+            handleAllocNumInput(input);
+            onQtyChange();
+          });
+          input.addEventListener('focus', function() {
+            syncFloatFieldState(input.closest('.alloc-float-field'));
+          });
+          input.addEventListener('blur', function() {
+            handleAllocNumInput(input);
+            onQtyChange();
+            syncFloatFieldState(input.closest('.alloc-float-field'));
+            if (input.classList.contains('alloc-qty-input')) {
+              var row = input.closest('[data-alloc-row]');
+              if (row) updateRowStockWarning(row, linesMap[row.getAttribute('data-line-key') || '']);
+            }
+          });
+        });
+        syncAllFloatFields(tbody);
+        syncAllOverstockWarnings(tbody);
+        bindOverstockWarningHandlers();
+      }
+
+      function getMatchedLines() {
+        var keyword = normalizeText(keywordInput ? keywordInput.value.trim() : '');
+        if (!keyword) return allLines.slice();
+        return allLines.filter(function(line) {
+          return lineSearchText(line).indexOf(keyword) !== -1;
+        });
+      }
+
+      function updateCount(visibleCount, matchedCount) {
+        if (!countText) return;
+        countText.innerHTML = 'Hiển thị <strong>' + visibleCount.toLocaleString('vi-VN') + '</strong> / <strong>' + matchedCount.toLocaleString('vi-VN') + '</strong> dòng tồn có thể phân bổ';
+      }
+
+      function renderTableBody(html) {
+        if (!tbody) return;
+        tbody.innerHTML = html;
+        visibleRowCount = tbody.querySelectorAll('[data-alloc-row]').length;
+        bindInputHandlers();
+      }
+
+      function renderMatchedLines(matched, limit) {
+        var groups = groupLines(matched);
+        var visibleLines = [];
+        groups.forEach(function(group) {
+          group.forEach(function(line) {
+            if (limit > 0 && visibleLines.length >= limit) return;
+            visibleLines.push({ line: line, groupKey: groupKey(line) });
+          });
+        });
+
+        var groupVisibleCount = {};
+        visibleLines.forEach(function(entry) {
+          groupVisibleCount[entry.groupKey] = (groupVisibleCount[entry.groupKey] || 0) + 1;
+        });
+
+        var groupRendered = {};
+        var htmlParts = [];
+        visibleLines.forEach(function(entry, idx) {
+          var isFirst = !groupRendered[entry.groupKey];
+          if (isFirst) groupRendered[entry.groupKey] = true;
+          var nextEntry = visibleLines[idx + 1];
+          var isLast = !nextEntry || nextEntry.groupKey !== entry.groupKey;
+          htmlParts.push(buildRowHtml(entry.line, {
+            showMerge: isFirst,
+            rowspan: groupVisibleCount[entry.groupKey] || 1,
+            groupStart: isFirst,
+            groupEnd: isLast,
+            groupKey: entry.groupKey
+          }));
+        });
+
+        return {
+          html: htmlParts.join(''),
+          count: visibleLines.length
+        };
+      }
+
+      function applyFilter() {
+        saveDraftFromDom();
+        if (spinner) spinner.classList.add('is-active');
+
+        var matched = getMatchedLines();
+        var pageSize = Number(pageSizeSelect ? pageSizeSelect.value : 15);
+        var limit = pageSize > 0 ? pageSize : matched.length;
+
+        if (!matched.length) {
+          renderTableBody('<tr id="allocEmptyRow"><td colspan="' + getTableColCount() + '" class="empty">Không có dòng tồn kho phù hợp.</td></tr>');
+          updateCount(0, 0);
+          if (spinner) spinner.classList.remove('is-active');
+          return;
+        }
+
+        var result = renderMatchedLines(matched, limit);
+        if (!result.count) {
+          renderTableBody('<tr id="allocEmptyRow"><td colspan="' + getTableColCount() + '" class="empty">Không có dòng tồn kho phù hợp.</td></tr>');
+          updateCount(0, matched.length);
+        } else {
+          renderTableBody(result.html);
+          updateCount(result.count, matched.length);
+        }
+        if (spinner) spinner.classList.remove('is-active');
+      }
+
+      function scheduleFilter() {
+        if (filterTimer) clearTimeout(filterTimer);
+        if (spinner) spinner.classList.add('is-active');
+        filterTimer = window.setTimeout(applyFilter, 220);
+      }
+
+      function renderCustomerSuggestions() {
+        if (!customerSearch || !customerResults) return;
+        var q = normalizeText(customerSearch.value.trim());
+        var selectedIds = selectedCustomers.map(function(item) { return item.id; });
+        var rows = (q
+          ? customers.filter(function(c) {
+            return normalizeText(c.ten_khach_hang).indexOf(q) !== -1
+              || normalizeText(c.ma_khach_hang).indexOf(q) !== -1
+              || String(c.sdt || '').indexOf(customerSearch.value.trim()) !== -1;
+          })
+          : customers
+        ).filter(function(c) { return selectedIds.indexOf(String(c._id)) === -1; }).slice(0, 30);
+        customerResults.innerHTML = rows.map(function(c) {
+          return '<div class="alloc-customer-item" data-id="' + escapeHtml(c._id) + '" data-name="' + escapeHtml(c.ten_khach_hang) + '">'
+            + '<div><b>' + escapeHtml(c.ma_khach_hang || '') + '</b> - ' + escapeHtml(c.ten_khach_hang || '') + '</div>'
+            + '<div style="color:#64748b;font-size:12px">' + escapeHtml(c.sdt || '') + '</div>'
+            + '</div>';
+        }).join('') || '<div class="alloc-customer-item">Không có khách hàng phù hợp</div>';
+        customerResults.style.display = 'block';
+      }
+
+      function selectCustomer(id) {
+        var found = customers.find(function(c) { return String(c._id) === String(id); });
+        if (!found) return;
+        addCustomerColumn(found);
+      }
+
+      if (customerSearch) {
+        customerSearch.addEventListener('focus', renderCustomerSuggestions);
+        customerSearch.addEventListener('input', renderCustomerSuggestions);
+      }
+      if (customerResults) {
+        customerResults.addEventListener('click', function(event) {
+          var item = event.target.closest('.alloc-customer-item');
+          if (!item || !item.dataset.id) return;
+          selectCustomer(item.dataset.id);
+        });
+      }
+      document.addEventListener('click', function(event) {
+        if (!event.target.closest('.alloc-customer')) {
+          if (customerResults) customerResults.style.display = 'none';
+        }
+      });
+
+      function collectSubmitBatches() {
+        saveDraftFromDom();
+        saveVatChuaFromDom();
+        if (!selectedCustomers.length) {
+          throw new Error('Vui lòng thêm ít nhất một khách hàng.');
+        }
+
+        var batches = selectedCustomers.map(function(customer) {
+          validateCustomerVatChua(customer);
+          var vatDraft = getCustomerVatChuaDraft(customer.id);
+          var items = [];
+          Object.keys(allocDraft).forEach(function(lineKey) {
+            var draft = allocDraft[lineKey] && allocDraft[lineKey][customer.id];
+            var line = linesMap[lineKey];
+            if (!line || !draft || Number(draft.qty || 0) <= 0) return;
+
+            var qty = Number(draft.qty || 0);
+            var price = Number(draft.price || 0);
+            if (price < 0) throw new Error('Đơn giá không hợp lệ.');
+
+            items.push({
+              line_key: lineKey,
+              hang_hoa_id: line.product_id,
+              kho_id: line.kho_id,
+              lo_hang_id: line.lo_hang_id,
+              gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id,
+              ten_quy_cach: line.ten_quy_cach,
+              don_vi_tinh_id: line.don_vi_tinh_id,
+              don_vi_tinh_ten: line.don_vi_tinh_ten,
+              so_luong: qty,
+              don_gia_ban: price,
+              vuot_ton: getLineAllocatedTotal(lineKey) > getLineActualQty(line)
+            });
+          });
+          return {
+            khach_hang_id: customer.id,
+            ten_khach_hang: customer.ten_khach_hang,
+            vat_chua_id: vatDraft.vat_chua_id || '',
+            vat_chua_ten: getVatChuaName(vatDraft.vat_chua_id),
+            vat_chua_so_luong: Number(vatDraft.vat_chua_so_luong || 0),
+            items: items
+          };
+        }).filter(function(batch) { return batch.items.length > 0; });
+
+        if (!batches.length) {
+          throw new Error('Vui lòng nhập số lượng phân bổ (> 0) cho ít nhất một dòng.');
+        }
+        return batches;
+      }
+
+      function openConfirmModal(batches) {
+        pendingSubmitBatches = batches.slice();
+        var totalQty = 0;
+        var totalAmount = 0;
+        var lineCount = 0;
+        var rowsHtml = [];
+        var overstockLineKeys = {};
+
+        batches.forEach(function(batch) {
+          batch.items.forEach(function(item) {
+            var line = linesMap[item.line_key] || {};
+            var isOver = item.vuot_ton || getLineAllocatedTotal(item.line_key) > getLineActualQty(line);
+            if (isOver) overstockLineKeys[item.line_key] = true;
+            lineCount += 1;
+            totalQty += Number(item.so_luong || 0);
+            var lineTotal = Number(item.so_luong || 0) * Number(item.don_gia_ban || 0);
+            totalAmount += lineTotal;
+            rowsHtml.push('<tr' + (isOver ? ' style="background:#fff7ed"' : '') + '>'
+              + '<td>' + escapeHtml(batch.ten_khach_hang || '---') + (isOver ? ' <i class="fa-solid fa-triangle-exclamation" style="color:#ea580c" title="Vượt tồn"></i>' : '') + '</td>'
+              + '<td>' + escapeHtml(line.ten_hang || '---') + '</td>'
+              + '<td>' + escapeHtml((line.ten_lo || '---') + ' / ' + (line.kho_ten || '---')) + '</td>'
+              + '<td>' + escapeHtml(line.ten_quy_cach || '---') + '</td>'
+              + '<td class="num">' + fmt(item.so_luong) + '</td>'
+              + '<td class="num">' + fmt(item.don_gia_ban) + '</td>'
+              + '<td class="num">' + fmt(lineTotal) + '</td>'
+              + '</tr>');
+          });
+        });
+
+        var overstockCount = Object.keys(overstockLineKeys).length;
+        document.getElementById('allocModalCustomerCount').textContent = String(batches.length);
+        document.getElementById('allocModalLineCount').textContent = String(lineCount);
+        document.getElementById('allocModalTotalQty').textContent = fmt(totalQty);
+        document.getElementById('allocModalTotalAmount').textContent = fmt(totalAmount) + ' đ';
+        document.getElementById('allocModalTableBody').innerHTML = rowsHtml.join('');
+        var vatChuaBox = document.getElementById('allocModalVatChua');
+        if (vatChuaBox) {
+          var vatChuaLines = batches.filter(function(batch) {
+            return batch.vat_chua_id && Number(batch.vat_chua_so_luong || 0) > 0;
+          }).map(function(batch) {
+            return '<div><strong>' + escapeHtml(batch.ten_khach_hang || '---') + ':</strong> '
+              + escapeHtml(batch.vat_chua_ten || 'Vật chứa') + ' × ' + fmt(batch.vat_chua_so_luong) + '</div>';
+          });
+          if (vatChuaLines.length) {
+            vatChuaBox.classList.add('is-visible');
+            vatChuaBox.innerHTML = '<strong>Xuất vật chứa</strong>' + vatChuaLines.join('');
+          } else {
+            vatChuaBox.classList.remove('is-visible');
+            vatChuaBox.innerHTML = '';
+          }
+        }
+        var overstockBox = document.getElementById('allocModalOverstock');
+        if (overstockBox) {
+          if (overstockCount > 0) {
+            overstockBox.classList.add('is-visible');
+            overstockBox.innerHTML = '<strong><i class="fa-solid fa-triangle-exclamation"></i> Có ' + overstockCount + ' dòng phân bổ vượt tồn có thể bán.</strong> '
+              + 'Hệ thống vẫn cho phép tạo chứng từ, nhưng khi xuất hàng hoặc giao hàng có thể báo thiếu tồn nếu kho không đủ.';
+          } else {
+            overstockBox.classList.remove('is-visible');
+            overstockBox.innerHTML = '';
+          }
+        }
+        confirmModal.classList.add('is-open');
+        confirmModal.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeConfirmModal() {
+        confirmModal.classList.remove('is-open');
+        confirmModal.setAttribute('aria-hidden', 'true');
+        pendingSubmitBatches = [];
+        var overstockBox = document.getElementById('allocModalOverstock');
+        var vatChuaBox = document.getElementById('allocModalVatChua');
+        if (vatChuaBox) {
+          vatChuaBox.classList.remove('is-visible');
+          vatChuaBox.innerHTML = '';
+        }
+        if (overstockBox) {
+          overstockBox.classList.remove('is-visible');
+          overstockBox.innerHTML = '';
+        }
+      }
+
+      async function submitAllocation() {
+        if (!pendingSubmitBatches.length) return;
+        var modeInput = document.querySelector('input[name="allocCreateMode"]:checked');
+        var mode = modeInput ? modeInput.value : 'don_hang';
+        if (modalConfirm) {
+          modalConfirm.disabled = true;
+          modalConfirm.textContent = 'Đang xử lý...';
+        }
+        try {
+          var res = await fetch('/hang-hoa/phan-bo/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({
+              mode: mode,
+              batches: pendingSubmitBatches.map(function(batch) {
+                return {
+                  khach_hang_id: batch.khach_hang_id,
+                  vat_chua_id: batch.vat_chua_id || '',
+                  vat_chua_so_luong: Number(batch.vat_chua_so_luong || 0),
+                  items: batch.items
+                };
+              })
+            })
+          });
+          var data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Không thể phân bổ hàng.');
+          }
+          closeConfirmModal();
+          var created = Array.isArray(data.created) ? data.created : [];
+          var links = created.map(function(doc) {
+            return (doc.ten_khach_hang ? doc.ten_khach_hang + ': ' : '') + (doc.ma || doc.id);
+          }).join('\n');
+          var redirectUrl = '';
+          if (created.length === 1 && created[0].url) {
+            redirectUrl = created[0].url;
+          } else if (mode === 'hoa_don') {
+            redirectUrl = '/don-hang/hoa-don';
+          } else {
+            redirectUrl = '/don-hang';
+          }
+          alert((data.message || 'Đã phân bổ thành công.') + (links ? '\n\n' + links : ''));
+          pendingSubmitBatches.forEach(function(batch) {
+            batch.items.forEach(function(item) {
+              if (allocDraft[item.line_key] && allocDraft[item.line_key][batch.khach_hang_id]) {
+                delete allocDraft[item.line_key][batch.khach_hang_id];
+              }
+            });
+          });
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+          applyFilter();
+        } catch (error) {
+          alert(error.message || 'Không thể phân bổ hàng.');
+        } finally {
+          if (modalConfirm) {
+            modalConfirm.disabled = false;
+            modalConfirm.textContent = 'Xác nhận phân bổ';
+          }
+        }
+      }
+
+      if (submitBtn) {
+        submitBtn.addEventListener('click', function() {
+          try {
+            var batches = collectSubmitBatches();
+            openConfirmModal(batches);
+          } catch (error) {
+            alert(error.message || 'Dữ liệu phân bổ không hợp lệ.');
+          }
+        });
+      }
+
+      if (modalClose) modalClose.addEventListener('click', closeConfirmModal);
+      if (modalCancel) modalCancel.addEventListener('click', closeConfirmModal);
+      if (modalConfirm) modalConfirm.addEventListener('click', submitAllocation);
+      if (confirmModal) {
+        confirmModal.addEventListener('click', function(event) {
+          if (event.target === confirmModal) closeConfirmModal();
+        });
+      }
+
+      if (keywordInput) keywordInput.addEventListener('input', scheduleFilter);
+      if (pageSizeSelect) pageSizeSelect.addEventListener('change', applyFilter);
+
+      renderTableHeader();
+      applyFilter();
+    })();
+  </script>
+</body>
+</html>

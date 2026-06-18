@@ -2530,6 +2530,23 @@ body {
   min-width: 0;
 }
 
+.product-detail [data-tab-panel="product-lots"] th.lot-col-ma-lo,
+.product-detail [data-tab-panel="product-lots"] td.lot-col-ma-lo {
+  max-width: 11ch;
+  width: 11ch;
+  white-space: nowrap;
+  word-break: normal;
+}
+
+.product-detail [data-tab-panel="product-lots"] td.lot-col-ma-lo .lot-ma-lo-clip,
+.product-detail [data-tab-panel="product-lots"] td.lot-col-ma-lo .ref-link {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .product-info-head {
   display: flex;
   align-items: center;

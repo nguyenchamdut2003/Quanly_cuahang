@@ -9,6 +9,8 @@ router.get('/api/:id/detail', hangHoaController.apiProductDetail);
 router.post('/api/:id/mo-ta-ghi-chu', hangHoaController.apiUpdateProductNotes);
 router.get('/api/:id/loi-lo-theo-lo/export.xlsx', hangHoaController.exportLotProfitReport);
 router.get('/api/:id/loi-lo-theo-lo', hangHoaController.apiLotProfitReport);
+router.get('/phan-bo', hangHoaController.allocationPage);
+router.post('/phan-bo/submit', hangHoaController.submitAllocation);
 router.get('/', hangHoaController.index);
 router.get('/hd-nguyen-tac', hangHoaController.printContract);
 router.get('/hd-nguyen-tac/pdf', hangHoaController.printContractPdf);

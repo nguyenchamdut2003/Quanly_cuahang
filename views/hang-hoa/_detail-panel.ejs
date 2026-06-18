@@ -29,9 +29,9 @@
 
       <div class="product-info-grid">
         <div><span>M&atilde; h&agrave;ng</span><strong><%- refLink('product', item, item.ma_hang || '---') %></strong></div>
-        <div><span>T&#7891;n kho/th&#7921;c t&#7871;</span><strong><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>T&#7891;n c&oacute; th&#7875; b&aacute;n/giao</span><strong><%= Number(item.ton_co_the_giao || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>T&#7891;n h&#7871;t h&#7841;n</span><strong><%= Number(item.ton_het_han || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Th&#7921;c t&#7871;</span><strong><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>C&oacute; th&#7875; b&aacute;n</span><strong><%= Number(item.ton_co_the_giao || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>H&#7871;t h&#7841;n</span><strong><%= Number(item.ton_het_han || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>&#272;&#7883;nh m&#7913;c t&#7891;n</span><strong><%= Number(item.dinh_muc_toi_thieu || 0).toLocaleString('vi-VN') %> - 0</strong></div>
         <div><span>Gi&aacute; v&#7889;n</span><strong><%= Number(item.gia_von || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>Gi&aacute; b&aacute;n</span><strong><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></strong></div>
@@ -42,7 +42,7 @@
       <% if (item.co_ton_nhung_khong_the_giao) { %>
         <div class="stock-warning-box">
           <strong>C&oacute; t&#7891;n th&#7921;c t&#7871; nh&#432;ng kh&ocirc;ng th&#7875; giao:</strong>
-          <span><%= item.ly_do_khong_the_giao || 'T&#7891;n c&oacute; th&#7875; b&aacute;n/giao = 0.' %></span>
+          <span><%= item.ly_do_khong_the_giao || 'C&oacute; th&#7875; b&aacute;n = 0.' %></span>
         </div>
       <% } %>
     </section>
@@ -159,9 +159,9 @@
         <thead>
           <tr>
             <th>Kho</th>
-            <th class="text-right">T&#7891;n kho/th&#7921;c t&#7871;</th>
-            <th class="text-right">T&#7891;n c&oacute; th&#7875; b&aacute;n/giao</th>
-            <th class="text-right">T&#7891;n h&#7871;t h&#7841;n</th>
+            <th class="text-right">Th&#7921;c t&#7871;</th>
+            <th class="text-right">C&oacute; th&#7875; b&aacute;n</th>
+            <th class="text-right">H&#7871;t h&#7841;n</th>
             <th class="text-right">KH &#273;&#7863;t</th>
             <th>D&#7921; ki&#7871;n h&#7871;t h&agrave;ng</th>
             <th>Tr&#7841;ng th&aacute;i</th>
@@ -211,16 +211,16 @@
           <thead>
             <tr>
               <th class="lot-col-expand"></th>
-              <th>M&atilde; l&ocirc;</th>
+              <th class="lot-col-ma-lo">M&atilde; l&ocirc;</th>
               <th>T&ecirc;n l&ocirc;</th>
               <th>Thu&#7897;c t&iacute;nh</th>
               <th>Kho</th>
               <th>Ng&agrave;y nh&#7853;p</th>
               <th>H&#7841;n s&#7917; d&#7909;ng</th>
               <th class="text-right">SL ban &#273;&#7847;u</th>
-              <th class="text-right">T&#7891;n kho/th&#7921;c t&#7871;</th>
-              <th class="text-right">T&#7891;n c&oacute; th&#7875; b&aacute;n/giao</th>
-              <th class="text-right">T&#7891;n h&#7871;t h&#7841;n</th>
+              <th class="text-right">Th&#7921;c t&#7871;</th>
+              <th class="text-right">C&oacute; th&#7875; b&aacute;n</th>
+              <th class="text-right">H&#7871;t h&#7841;n</th>
               <th class="text-right">Gi&aacute; v&#7889;n</th>
               <th>Ch&#7913;ng t&#7915; nh&#7853;p</th>
               <th>Tr&#7841;ng th&aacute;i</th>
@@ -271,7 +271,13 @@
                     <button type="button" class="lot-expand-btn" data-lot-expand="<%= lotId %>" aria-expanded="false" aria-label="Xem thuộc tính trong lô" title="Chi tiết lô">+</button>
                   <% } %>
                 </td>
-                <td><%- lot && lot._id ? refLink('lot', lot, lot.ma_lo || '---') : '---' %></td>
+                <td class="lot-col-ma-lo"<% if (lot && lot.ma_lo) { %> title="<%= lot.ma_lo %>"<% } %>>
+                  <% if (lot && lot._id) { %>
+                    <span class="lot-ma-lo-clip"><%- refLink('lot', lot, lot.ma_lo || '---') %></span>
+                  <% } else { %>
+                    ---
+                  <% } %>
+                </td>
                 <td><%= lot && lot.ten_lo ? lot.ten_lo : '---' %></td>
                 <td>
                   <% if (quyCachCount > 0) { %>
@@ -313,8 +319,8 @@
                         <thead>
                           <tr>
                             <th>Thu&#7897;c t&iacute;nh</th>
-                            <th class="text-right">Tồn thực tế</th>
-                            <th class="text-right">Có thể bán/giao</th>
+                            <th class="text-right">Thực tế</th>
+                            <th class="text-right">Có thể bán</th>
                             <th class="text-right">Hết hạn</th>
                             <th class="text-right">Đơn giá</th>
                             <th class="text-right">Thành tiền</th>
