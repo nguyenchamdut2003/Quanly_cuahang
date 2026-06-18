@@ -1,12 +1,20 @@
 var express = require('express');
+var multer = require('multer');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
 var cuaHangController = require('../controllers/cuaHang.controller');
+
+var upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 router.use(isAuthenticated);
 
 router.get('/', cuaHangController.index);
 router.get('/export.xlsx', cuaHangController.exportExcel);
+router.get('/import/template.xlsx', cuaHangController.downloadImportTemplate);
+router.post('/import', upload.single('file'), cuaHangController.importExcel);
 router.post('/add', cuaHangController.add);
 router.get('/:id/export/:section.xlsx', cuaHangController.exportSectionExcel);
 router.post('/:id/update', cuaHangController.update);

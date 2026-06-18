@@ -33,7 +33,8 @@
     }
 
     .left {
-      background: #e9edf2
+      background: #e9edf2;
+      min-height: 0
     }
 
     .top-search {
@@ -123,10 +124,14 @@
 
     .cart-area {
       flex: 1;
+      min-height: 0;
+      overflow-x: auto;
+      overflow-y: auto;
       background: #e9edf2
     }
 
     .summary-card {
+      flex: 0 0 auto;
       min-height: 168px;
       background: #fff;
       border-radius: 8px;
@@ -267,7 +272,10 @@
       background: #e8f3ff;
       text-align: left;
       padding: 0 10px;
-      border-bottom: 1px solid #bcd9ff
+      border-bottom: 1px solid #bcd9ff;
+      position: sticky;
+      top: 0;
+      z-index: 2
     }
 
     .cart-table td {

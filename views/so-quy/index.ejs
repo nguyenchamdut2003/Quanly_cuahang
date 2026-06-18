@@ -72,6 +72,9 @@
     if (/^THN/i.test(label)) return '<a href="/tra-hang-nhap?q=' + encodeURIComponent(label) + '" class="ref-link">' + label.replace(/[&<>"']/g, function(char) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
     }) + '</a>';
+    if (/^TH(?!N)/i.test(label)) return '<a href="/don-hang/tra-hang?q=' + encodeURIComponent(label) + '" class="ref-link">' + label.replace(/[&<>"']/g, function(char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+    }) + '</a>';
     return label ? String(label).replace(/[&<>"']/g, function(char) {
       return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
     }) : '';

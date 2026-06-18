@@ -1,0 +1,93 @@
+<%
+  const safeReport = locals.report || {};
+  const rows = Array.isArray(safeReport.rows) ? safeReport.rows : [];
+  const totals = safeReport.totals || {};
+  const range = safeReport.range || {};
+  const filters = safeReport.filters || {};
+  const fmt = value => Number(value || 0).toLocaleString('vi-VN');
+  const fmtPct = value => Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + '%';
+  const queryParts = [];
+  if (range.from) queryParts.push('from=' + encodeURIComponent(range.from));
+  if (range.to) queryParts.push('to=' + encodeURIComponent(range.to));
+  if (filters.keyword) queryParts.push('keyword=' + encodeURIComponent(filters.keyword));
+  const exportUrl = '/bao-cao/loi-nhuan-lo/export.csv?' + queryParts.join('&');
+%>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    body{background:#f3f6f9;color:#20242a}.page{height:calc(100vh - 112px);padding:22px 60px;display:grid;grid-template-columns:282px minmax(0,1fr);gap:14px;overflow:hidden}.title{grid-column:1 / -1;font-size:25px;font-weight:800;margin:0}.filters{background:#fff;border-radius:8px;padding:14px;overflow:auto}.filter-block{margin-bottom:18px}.filter-title{font-size:15px;font-weight:800;margin-bottom:8px}.input{height:36px;width:100%;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 12px;font-size:14px}.btn{height:36px;border:1px solid #cfd8e3;border-radius:8px;background:#fff;padding:0 14px;font-weight:800;cursor:pointer;text-decoration:none;color:#111827;display:inline-flex;align-items:center;gap:8px}.btn.primary{background:#0070f4;border-color:#0070f4;color:#fff}.content{background:#fff;overflow:auto}.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:14px;border-bottom:1px solid #e5e9ee}.summary-card{border:1px solid #e1e7ef;border-radius:6px;padding:10px}.summary-card label{display:block;color:#64748b;margin-bottom:6px;font-size:13px}.summary-card strong{font-size:18px}.note{padding:10px 14px;color:#64748b;font-size:13px;border-bottom:1px solid #e5e9ee}.warn{color:#b45309}.report-table{width:100%;border-collapse:collapse;font-size:14px}.report-table th{height:42px;background:#eaf3ff;text-align:left;border:1px solid #d8e8fb;padding:0 10px;white-space:nowrap}.report-table td{height:42px;border:1px solid #e5e7eb;padding:0 10px}.num{text-align:right}.empty{text-align:center;color:#777;padding:32px!important}.flag{color:#b45309;font-weight:700}@media print{.topbar,.nav-bar,.filters{display:none!important}.page{display:block;height:auto;padding:0}.title{display:none}.content{overflow:visible}.summary{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <form class="page" method="GET" action="/bao-cao/loi-nhuan-lo">
+    <h1 class="title">Báo cáo lợi nhuận theo lô hàng</h1>
+    <aside class="filters">
+      <div class="filter-block">
+        <div class="filter-title">Thời gian</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input class="input" type="date" name="from" value="<%= range.from || '' %>">
+          <input class="input" type="date" name="to" value="<%= range.to || '' %>">
+        </div>
+      </div>
+      <div class="filter-block">
+        <div class="filter-title">Tìm hàng / lô</div>
+        <input class="input" name="keyword" value="<%= filters.keyword || '' %>" placeholder="Mã hàng, tên, mã lô...">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn primary" type="submit">Lọc</button>
+        <a class="btn" href="/bao-cao/loi-nhuan-lo">Bỏ lọc</a>
+        <a class="btn" href="<%= exportUrl %>"><i class="fa-solid fa-file-export"></i> Xuất CSV</a>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="summary">
+        <div class="summary-card"><label>Doanh thu</label><strong><%= fmt(totals.doanh_thu) %></strong></div>
+        <div class="summary-card"><label>Giá vốn</label><strong><%= fmt(totals.gia_von) %></strong></div>
+        <div class="summary-card"><label>Lợi nhuận</label><strong style="color:#006dff"><%= fmt(totals.loi_nhuan) %></strong></div>
+        <div class="summary-card"><label>Lô thiếu giá vốn</label><strong class="warn"><%= fmt(totals.lo_thieu_gia_von) %></strong></div>
+      </div>
+      <% if (safeReport.meta && safeReport.meta.ghi_chu) { %>
+        <div class="note"><%= safeReport.meta.ghi_chu %></div>
+      <% } %>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>Mã hàng</th>
+            <th>Tên hàng</th>
+            <th>Lô</th>
+            <th>Quy cách</th>
+            <th class="num">SL bán</th>
+            <th class="num">Doanh thu</th>
+            <th class="num">Giá vốn</th>
+            <th class="num">Lợi nhuận</th>
+            <th class="num">% LN</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!rows.length) { %>
+            <tr><td class="empty" colspan="9">Không có dữ liệu bán hàng theo lô trong kỳ.</td></tr>
+          <% } %>
+          <% rows.forEach(function(row) { %>
+            <tr>
+              <td><%- refLink('product', row.hang_hoa_id, row.ma_hang) %></td>
+              <td><%= row.ten_hang %><% if (row.thieu_gia_von) { %> <span class="flag" title="Thiếu giá vốn">*</span><% } %></td>
+              <td><%- row.lo_hang_id ? refLink('lot', row.lo_hang_id, row.ma_lo || row.ten_lo) : (row.ma_lo || row.ten_lo || '—') %></td>
+              <td><%= row.ten_quy_cach %></td>
+              <td class="num"><%= fmt(row.so_luong) %></td>
+              <td class="num"><%= fmt(row.doanh_thu) %></td>
+              <td class="num"><%= fmt(row.gia_von) %></td>
+              <td class="num"><%= fmt(row.loi_nhuan) %></td>
+              <td class="num"><%= fmtPct(row.ty_le_loi_nhuan) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </main>
+  </form>
+</body>
+</html>

@@ -1,5 +1,13 @@
 <%
   const creatorName = user ? (user.ho_ten || user.email || 'Người dùng') : 'Người dùng';
+  const ngayTaoHienThi = new Date().toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -10,8 +18,10 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     body.admin-body{background:#f3f6f9}.create-page{height:calc(100vh - 98px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}.left{min-width:0;display:flex;flex-direction:column}.topline{height:52px;display:flex;align-items:center;gap:12px;position:relative}.back{width:28px;text-align:center;font-size:24px;color:#111827;text-decoration:none;line-height:1}.title{font-size:20px;font-weight:800;color:#111827;white-space:nowrap}.search{width:620px;height:32px;border:1px solid #0070f4;border-radius:6px;padding:0 12px;font-size:13px;outline:none;background:#fff}.grid-wrap{flex:1;min-height:0;background:#fff;border:1px solid #cfd8e3;overflow:auto}table{width:100%;table-layout:fixed;border-collapse:collapse}th{height:34px;background:#eef0f3;border-bottom:1px solid #cfd8e3;color:#111827;font-size:12px;font-weight:800;padding:0 8px;text-align:left}td{height:40px;border-bottom:1px solid #edf1f5;padding:0 8px;font-size:13px}.num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.lot{width:150px}.stock{width:120px}.qty{width:105px}.money{width:122px}.cell-input,.cell-select{width:100%;height:28px;border:1px solid #cfd8e3;border-radius:5px;padding:0 7px;font-size:13px}.cell-input{text-align:right}.cell-select{text-align:left}.qc-row td{background:#f8fafc;padding:8px 12px 12px}.qc-table{width:100%;table-layout:auto;margin-top:4px}.qc-table th,.qc-table td{height:32px;font-size:12px}.qc-table .cell-input{text-align:right}.empty{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#111827}.empty small{color:#0070f4;margin-top:12px}
-    .right{background:#fff;border-left:1px solid #dbe4ee;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}.mini-tools{display:flex;justify-content:flex-start;gap:6px}.tool{width:29px;height:29px;border:1px solid #cfd8e3;background:#fff;border-radius:5px}.field{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;font-size:13px}.field label{font-weight:600}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px;font-size:13px;background:#fff;outline:none}.readonly-box{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#f8fafc;padding:0 9px;display:flex;align-items:center;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.readonly{height:31px;display:flex;align-items:center;justify-content:flex-end}.readonly.blue{color:#0070f4;font-weight:800}.note{height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:none}.btn{height:56px;border:1px solid #0070f4;background:#0070f4;color:#fff;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer}.btn.primary{background:#08a83e;border-color:#08a83e}.error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
+    .right{background:#fff;border-left:1px solid #dbe4ee;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}.mini-tools{display:flex;justify-content:flex-start;gap:6px}.tool{width:29px;height:29px;border:1px solid #cfd8e3;background:#fff;border-radius:5px}.field{display:grid;grid-template-columns:118px minmax(0,1fr);align-items:center;gap:10px;font-size:13px}.field label{font-weight:600}.control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px;font-size:13px;background:#fff;outline:none}.readonly-box{height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#f8fafc;padding:0 9px;display:flex;align-items:center;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.readonly{height:31px;display:flex;align-items:center;justify-content:flex-end}.readonly.blue{color:#0070f4;font-weight:800}.note{height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:none}.btn{height:56px;border:1px solid #0070f4;background:#0070f4;color:#fff;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer}.btn.primary{background:#08a83e;border-color:#08a83e}.btn:disabled{opacity:.65;cursor:not-allowed}.error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
     @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}}
+    .footer-actions{display:flex;justify-content:flex-end;width:100%}
+    .footer-actions .btn.primary{width:100%;min-width:0}
   </style>
 </head>
 <body class="admin-body">
@@ -27,10 +37,9 @@
       </div>
     </section>
     <aside class="right">
-      <div class="mini-tools"><button class="tool" type="button">⌘</button><button class="tool" type="button">⎙</button><button class="tool" type="button">!</button></div>
       <div id="errorBox" class="error"></div>
       <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
-      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayXuat" type="datetime-local" value="<%= todayValue %>"></div>
+      <div class="field"><label>Ngày tạo</label><div class="readonly-box"><%= ngayTaoHienThi %></div></div>
       <div class="field"><label>Phiếu nhập gốc</label><select id="phieuNhapId" class="control"><option value="">Đang tải phiếu nhập...</option></select></div>
       <div class="field"><label>Kho hủy</label><input type="hidden" id="khoId"><div id="khoText" class="readonly-box">Tự động theo phiếu nhập</div></div>
       <div class="field"><label>Mã xuất hủy</label><input id="maPhieu" class="control" value="<%= nextCode %>" placeholder="Mã phiếu tự động"></div>
@@ -39,7 +48,7 @@
       <div class="field"><label>Tổng số lượng</label><div class="readonly blue" id="tongSoLuong">0</div></div>
       <div class="field"><label>Tổng giá trị</label><div class="readonly blue" id="tongGiaTri">0</div></div>
       <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
-      <div class="page-actions page-actions--grid2 footer-actions"><button class="btn" type="button" onclick="submitTicket('draft')">Lưu tạm</button><button class="btn primary" type="button" onclick="submitTicket('completed')">Hoàn thành</button></div>
+      <div class="page-actions footer-actions"><button class="btn primary" type="button" id="submitCompleteBtn" onclick="submitTicket()">Hoàn thành</button></div>
     </aside>
   </main>
   <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
@@ -53,6 +62,7 @@
         try { copyDraft = JSON.parse(el.textContent || 'null'); } catch (e) { copyDraft = null; }
       }
     })();
+    let isSubmitting = false;
     const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
     let items = [];
     let allItems = [];
@@ -298,7 +308,8 @@
       return Object.assign({}, base, { so_luong: Number(x.so_luong || 0) });
     }
 
-    async function submitTicket(mode) {
+    async function submitTicket() {
+      if (isSubmitting) return;
       clearError();
       const purchaseId = document.getElementById('phieuNhapId').value;
       const khoId = document.getElementById('khoId').value;
@@ -321,20 +332,45 @@
           if (!hasQcQty) return showError('Lô ' + (src.ten_lo || src.ma_lo || '') + ' có quy cách — vui lòng nhập SL theo quy cách');
         }
       }
+
+      const submitBtn = document.getElementById('submitCompleteBtn');
+      const originalText = submitBtn ? submitBtn.textContent : 'Hoàn thành';
+      isSubmitting = true;
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Đang tạo phiếu';
+      }
+
       const payload = {
-        submitMode: mode,
+        submitMode: 'completed',
         phieu_nhap_id: purchaseId,
         kho_id: khoId,
         ma_xuat_huy: document.getElementById('maPhieu').value,
-        ngay_xuat: document.getElementById('ngayXuat').value,
         ly_do_huy: reason,
         ghi_chu: document.getElementById('ghiChu').value,
         items_json: JSON.stringify(sendItems)
       };
-      const res = await fetch('/xuat-huy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const data = await res.json();
-      if (!data.success) return showError(data.message || 'Không thể lưu phiếu xuất hủy');
-      location.href = data.redirect || '/xuat-huy';
+
+      try {
+        const res = await fetch('/xuat-huy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (!data.success) {
+          isSubmitting = false;
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+          return showError(data.message || 'Không thể lưu phiếu xuất hủy');
+        }
+        location.href = data.redirect || '/xuat-huy';
+      } catch (error) {
+        isSubmitting = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        showError('Lỗi kết nối khi tạo phiếu xuất hủy');
+      }
     }
 
     async function applyCopyDraft() {

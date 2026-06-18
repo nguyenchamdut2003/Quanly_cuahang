@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    .store-import-wrap{position:relative;display:inline-flex}
+    .store-import-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:180px;display:none;z-index:20;border:1px solid #d0d5dd;border-radius:8px;background:#fff;box-shadow:0 14px 30px rgba(16,24,40,.15);overflow:hidden}
+    .store-import-menu.is-open{display:block}
+    .store-import-menu button,.store-import-menu a{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 14px;font-size:13px;color:#111827;text-decoration:none;cursor:pointer}
+    .store-import-menu button:hover,.store-import-menu a:hover{background:#f8fafc}
+    .store-import-menu button + button,.store-import-menu a + button{border-top:1px solid #f2f4f7}
+  </style>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
@@ -80,6 +88,16 @@
       </div>
       <div class="page-actions">
         <button class="btn btn-primary" type="button" id="openAddStoreModal">+ Tạo mới</button>
+        <div class="store-import-wrap">
+          <button class="btn btn-light" type="button" id="storeImportToggle" aria-haspopup="true" aria-expanded="false">Thêm bằng file ▾</button>
+          <div class="store-import-menu" id="storeImportMenu" role="menu" aria-label="Thêm bằng file">
+            <a href="/cua-hang/import/template.xlsx" role="menuitem">Lấy file mẫu</a>
+            <button type="button" id="storeImportPickBtn" role="menuitem">Thêm</button>
+          </div>
+        </div>
+        <form id="storeImportForm" method="post" action="/cua-hang/import" enctype="multipart/form-data" hidden>
+          <input type="file" name="file" id="storeImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </form>
         <button class="btn btn-danger" type="submit" form="bulkDeleteForm" onclick="return confirm('Xóa các cửa hàng đã chọn?')">Xóa đã chọn</button>
         <a class="btn btn-light" href="/cua-hang/export.xlsx<%= filterQueryString ? '?' + filterQueryString : '' %>">Xuất file</a>
       </div>
@@ -943,6 +961,62 @@
         if (storeCityFilterDropdown.contains(event.target)) return;
         if (storeCityFilterTrigger.contains(event.target)) return;
         storeCityFilterDropdown.classList.remove('is-open');
+      });
+
+      var storeImportToggle = document.getElementById('storeImportToggle');
+      var storeImportMenu = document.getElementById('storeImportMenu');
+      var storeImportPickBtn = document.getElementById('storeImportPickBtn');
+      var storeImportForm = document.getElementById('storeImportForm');
+      var storeImportFile = document.getElementById('storeImportFile');
+
+      function closeStoreImportMenu() {
+        if (!storeImportMenu || !storeImportToggle) return;
+        storeImportMenu.classList.remove('is-open');
+        storeImportToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      function isExcelFile(file) {
+        if (!file) return false;
+        var name = String(file.name || '').toLowerCase();
+        return /\.xlsx$/i.test(name);
+      }
+
+      if (storeImportToggle && storeImportMenu) {
+        storeImportToggle.addEventListener('click', function(event) {
+          event.stopPropagation();
+          var isOpen = storeImportMenu.classList.toggle('is-open');
+          storeImportToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+      }
+
+      if (storeImportPickBtn && storeImportFile) {
+        storeImportPickBtn.addEventListener('click', function() {
+          closeStoreImportMenu();
+          storeImportFile.value = '';
+          storeImportFile.click();
+        });
+      }
+
+      if (storeImportFile && storeImportForm) {
+        storeImportFile.addEventListener('change', function() {
+          var file = storeImportFile.files && storeImportFile.files[0];
+          if (!file) return;
+
+          if (!isExcelFile(file)) {
+            alert('Chỉ chấp nhận file Excel (.xlsx). Vui lòng dùng file mẫu.');
+            storeImportFile.value = '';
+            return;
+          }
+
+          storeImportForm.submit();
+        });
+      }
+
+      document.addEventListener('click', function(event) {
+        if (!storeImportMenu || !storeImportToggle) return;
+        if (storeImportMenu.contains(event.target)) return;
+        if (storeImportToggle.contains(event.target)) return;
+        closeStoreImportMenu();
       });
     });
   </script>

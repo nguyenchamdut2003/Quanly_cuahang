@@ -12,6 +12,7 @@
     .create-top{height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #e8edf3}
     .back{color:#374151;text-decoration:none;font-size:18px}.title{font-size:18px;font-weight:700;color:#374151;margin:0}
     .search{position:relative;max-width:520px;flex:1}.search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af}
+    .search-vat-chua{max-width:360px;flex:.75}
     .search input{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:0 12px 0 36px;font-size:14px;outline:none}
     .results{display:none;position:absolute;top:39px;left:0;right:0;z-index:20;background:#fff;border:1px solid #dfe5ed;border-radius:6px;box-shadow:0 8px 18px rgba(0,0,0,.12);max-height:300px;overflow:auto}
     .result-item{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #edf0f3;cursor:pointer;font-size:13px}
@@ -42,6 +43,11 @@
     .lot-inline-normal .inline-detail-grid .inline-label{color:#667085;font-size:11px;margin-bottom:2px}
     .muted{color:#667085;font-size:12px}
     .empty-hint{padding:48px 24px;text-align:center;color:#64748b;font-size:14px}
+    .vat-chua-panel{display:none;background:#fff;border-top:1px solid #d7e3ef}
+    .vat-chua-title{height:34px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px;font-weight:800;color:#374151;background:#f8fafc}
+    .vat-chua-table{width:100%;border-collapse:collapse}
+    .vat-chua-table th{height:32px;background:#eef7ff;text-align:left;padding:0 10px;border-bottom:1px solid #cde4ff;color:#374151;font-size:13px}
+    .vat-chua-table td{height:38px;border-bottom:1px solid #e5e9ee;padding:0 10px;color:#374151;font-size:13px}
     .side-head{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;border-bottom:1px solid #e8edf3;color:#6b7280;font-size:13px}
     .side-body{padding:18px;flex:1;overflow:auto}.field{margin-bottom:16px}.field label{display:block;color:#374151;font-size:13px;font-weight:700;margin-bottom:7px}
     .input{width:100%;height:34px;border:1px solid #dfe5ed;border-radius:6px;padding:0 10px;font-size:13px;outline:none;background:#fff}.textarea{height:38px;padding:9px 10px;resize:vertical}
@@ -73,7 +79,11 @@
           <input id="searchInput" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)" autocomplete="off">
           <div id="results" class="results"></div>
         </div>
-        <div class="top-tools"><button class="tool" type="button"><i class="fa-solid fa-barcode"></i></button><button class="tool" type="button"><i class="fa-solid fa-print"></i></button><button class="tool" type="button"><i class="fa-solid fa-eye"></i></button><button class="tool" type="button"><i class="fa-solid fa-exclamation"></i></button></div>
+        <div class="search search-vat-chua">
+          <i class="fa-solid fa-box"></i>
+          <input id="vatChuaSearchInput" placeholder="Tìm vật chứa" autocomplete="off">
+          <div id="vatChuaResults" class="results"></div>
+        </div>
       </div>
       <div class="cart-area">
         <table class="cart-table">
@@ -91,13 +101,29 @@
           </thead>
           <tbody id="itemBody"></tbody>
         </table>
-        <div class="empty-hint" id="emptyHint">Tìm và chọn hàng hóa bằng ô tìm kiếm phía trên.</div>
+        <div class="vat-chua-panel" id="vatChuaPanel">
+          <div class="vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa xuất dùng nội bộ</div>
+          <table class="vat-chua-table">
+            <thead>
+              <tr>
+                <th style="width:60px">STT</th>
+                <th>Mã vật chứa</th>
+                <th>Tên vật chứa</th>
+                <th class="num">Tồn</th>
+                <th class="num">SL xuất</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody id="vatChuaBody"></tbody>
+          </table>
+        </div>
+        <div class="empty-hint" id="emptyHint">Tìm và chọn hàng hóa hoặc vật chứa bằng ô tìm kiếm phía trên.</div>
       </div>
     </section>
     <aside class="right">
       <div class="side-head"><%= new Date().toLocaleString('vi-VN') %></div>
       <div class="side-body">
-        <div class="field"><label>Mã xuất dùng nội bộ</label><input class="input" disabled placeholder="Mã phiếu tự động"></div>
+        <div class="field"><label>Mã xuất dùng nội bộ</label><input class="input" disabled value="<%= typeof nextCode !== 'undefined' ? nextCode : '' %>" placeholder="Mã phiếu tự động"></div>
         <div class="field"><label>Trạng thái</label><div class="readonly">Phiếu tạm</div></div>
         <div class="field">
           <label>Loại xuất</label>
@@ -156,6 +182,7 @@
 
   <script>
     let products = [];
+    let vatChuaList = [];
     const receiverSources = {
       nhan_vien: <%- JSON.stringify(users.map(u => ({value: u.ho_ten || u.email || u.username || "", label: u.ho_ten || u.email || u.username || ""}))) %>,
       khach_hang: <%- JSON.stringify((customers || []).map(c => ({value: c.ten_khach_hang || c.ten || c.sdt || "", label: c.ten_khach_hang || c.ten || c.sdt || ""}))) %>,
@@ -163,9 +190,13 @@
     };
     let loaiXuatList = <%- JSON.stringify((loaiXuatList || []).map(l => ({ _id: String(l._id), ten_loai: l.ten_loai, ma_loai: l.ma_loai }))) %>;
     let items = [];
+    let vatChuaItems = [];
     let expandedLotKeyByItem = {};
     const searchInput = document.getElementById('searchInput');
     const results = document.getElementById('results');
+    const vatChuaSearchInput = document.getElementById('vatChuaSearchInput');
+    const vatChuaResults = document.getElementById('vatChuaResults');
+    const vatChuaPanel = document.getElementById('vatChuaPanel');
     const storeIdInput = document.getElementById('storeId');
     const khoSelect = document.getElementById('khoId');
     const emptyHint = document.getElementById('emptyHint');
@@ -471,8 +502,39 @@
       }
     }
 
+    async function loadVatChuaList() {
+      vatChuaList = [];
+      try {
+        const res = await fetch('/xuat-dung-noi-bo/api/vat-chua');
+        const result = await res.json();
+        if (!result.success) {
+          if (vatChuaResults) {
+            vatChuaResults.innerHTML = '<div class="result-item" style="cursor:default;color:#64748b">' + escapeHtml(result.message || 'Không tải được vật chứa.') + '</div>';
+            vatChuaResults.style.display = 'block';
+          }
+          return;
+        }
+        vatChuaList = (result.items || []).map(function(item) {
+          return {
+            _id: String(item._id),
+            ma_vat_chua: item.ma_vat_chua || '',
+            ten_vat_chua: item.ten_vat_chua || '',
+            so_luong_ton: Number(item.so_luong_ton || 0)
+          };
+        });
+        vatChuaItems.forEach(function(item) {
+          const matched = vatChuaList.find(function(row) { return row._id === item.vat_chua_id; });
+          if (matched) item.so_luong_ton = matched.so_luong_ton;
+        });
+        renderVatChuaItems();
+      } catch (e) {
+        vatChuaList = [];
+      }
+    }
+
     khoSelect.addEventListener('change', loadProductsByKho);
     document.addEventListener('DOMContentLoaded', renderReceiverOptions);
+    document.addEventListener('DOMContentLoaded', loadVatChuaList);
 
     function renderSearchResults(matched) {
       if (!matched.length) {
@@ -506,10 +568,49 @@
     searchInput.addEventListener('focus', openProductSearch);
     searchInput.addEventListener('click', openProductSearch);
 
+    function renderVatChuaSearchResults(matched) {
+      if (!vatChuaResults) return;
+      if (!matched.length) {
+        vatChuaResults.innerHTML = '<div class="result-item" style="cursor:default;color:#64748b">Không tìm thấy vật chứa.</div>';
+        vatChuaResults.style.display = 'block';
+        return;
+      }
+      vatChuaResults.innerHTML = matched.map(function(item) {
+        return '<div class="result-item" onclick="addVatChuaItem(\'' + item._id + '\')"><span><strong>' + escapeHtml(item.ma_vat_chua) + '</strong> - ' + escapeHtml(item.ten_vat_chua) + '</span><span>Tồn: ' + Number(item.so_luong_ton || 0).toLocaleString('vi-VN') + '</span></div>';
+      }).join('');
+      vatChuaResults.style.display = 'block';
+    }
+
+    async function openVatChuaSearch() {
+      if (!(storeIdInput && storeIdInput.value)) {
+        if (vatChuaResults) {
+          vatChuaResults.innerHTML = '<div class="result-item" style="cursor:default;color:#64748b">Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu trên.</div>';
+          vatChuaResults.style.display = 'block';
+        }
+        return;
+      }
+      if (!vatChuaList.length) await loadVatChuaList();
+      const q = String(vatChuaSearchInput.value || '').trim().toLowerCase();
+      const matched = vatChuaList.filter(function(item) {
+        if (!q) return true;
+        return String(item.ma_vat_chua || '').toLowerCase().includes(q)
+          || String(item.ten_vat_chua || '').toLowerCase().includes(q);
+      }).slice(0, 20);
+      renderVatChuaSearchResults(matched);
+    }
+
+    vatChuaSearchInput.addEventListener('input', openVatChuaSearch);
+    vatChuaSearchInput.addEventListener('focus', openVatChuaSearch);
+    vatChuaSearchInput.addEventListener('click', openVatChuaSearch);
+
     document.addEventListener('click', function(event) {
       const searchWrap = searchInput.closest('.search');
       if (searchWrap && !searchWrap.contains(event.target)) {
         results.style.display = 'none';
+      }
+      const vatChuaSearchWrap = vatChuaSearchInput.closest('.search');
+      if (vatChuaSearchWrap && !vatChuaSearchWrap.contains(event.target)) {
+        vatChuaResults.style.display = 'none';
       }
     });
 
@@ -544,6 +645,64 @@
         });
       }
       searchInput.value=''; results.style.display='none'; renderItems();
+    }
+
+    function addVatChuaItem(id) {
+      const row = vatChuaList.find(function(item) { return item._id === id; });
+      if (!row) return;
+      if (Number(row.so_luong_ton || 0) <= 0) return alert('Vật chứa không còn tồn.');
+      const existing = vatChuaItems.find(function(item) { return item.vat_chua_id === id; });
+      if (existing) {
+        if (existing.so_luong + 1 > Number(row.so_luong_ton || 0)) return alert('Số lượng vật chứa vượt tồn.');
+        existing.so_luong += 1;
+      } else {
+        vatChuaItems.push({
+          vat_chua_id: id,
+          ma_vat_chua: row.ma_vat_chua || '',
+          ten_vat_chua: row.ten_vat_chua || '',
+          so_luong_ton: Number(row.so_luong_ton || 0),
+          so_luong: 1
+        });
+      }
+      vatChuaSearchInput.value = '';
+      vatChuaResults.style.display = 'none';
+      renderVatChuaItems();
+    }
+
+    function renderVatChuaItems() {
+      const body = document.getElementById('vatChuaBody');
+      if (!body) return;
+      if (vatChuaPanel) vatChuaPanel.style.display = vatChuaItems.length ? 'block' : 'none';
+      body.innerHTML = vatChuaItems.map(function(item, index) {
+        const idAttr = escapeAttr(item.vat_chua_id);
+        return '<tr>' +
+          '<td>' + (index + 1) + '</td>' +
+          '<td>' + escapeHtml(item.ma_vat_chua) + '</td>' +
+          '<td>' + escapeHtml(item.ten_vat_chua) + '</td>' +
+          '<td class="num">' + Number(item.so_luong_ton || 0).toLocaleString('vi-VN') + '</td>' +
+          '<td class="num"><input class="qty-input" type="number" min="1" max="' + Number(item.so_luong_ton || 0) + '" value="' + Number(item.so_luong || 1) + '" onchange="updateVatChuaQty(\'' + idAttr + '\',this.value)"></td>' +
+          '<td><button class="remove" type="button" onclick="removeVatChuaItem(\'' + idAttr + '\')"><i class="fa-solid fa-xmark"></i></button></td>' +
+        '</tr>';
+      }).join('');
+      if (emptyHint) emptyHint.style.display = (items.length || vatChuaItems.length) ? 'none' : 'block';
+    }
+
+    function updateVatChuaQty(id, val) {
+      const item = vatChuaItems.find(function(row) { return row.vat_chua_id === id; });
+      if (!item) return;
+      const qty = Math.max(1, Math.floor(Number(val) || 1));
+      if (qty > Number(item.so_luong_ton || 0)) {
+        alert('Số lượng vật chứa vượt tồn.');
+        renderVatChuaItems();
+        return;
+      }
+      item.so_luong = qty;
+      renderVatChuaItems();
+    }
+
+    function removeVatChuaItem(id) {
+      vatChuaItems = vatChuaItems.filter(function(item) { return item.vat_chua_id !== id; });
+      renderVatChuaItems();
     }
 
     function itemQty(item) {
@@ -697,7 +856,7 @@
         }
         return renderNormalProductRow(item, index, maxLots) + renderQuyCachBlock(item, maxLots);
       }).join('');
-      if (emptyHint) emptyHint.style.display = items.length ? 'none' : 'block';
+      if (emptyHint) emptyHint.style.display = (items.length || vatChuaItems.length) ? 'none' : 'block';
       document.getElementById('totalValue').textContent = total.toLocaleString('vi-VN');
     }
     function updateQty(id,val){
@@ -754,8 +913,19 @@
       }).filter(item => Number(item.so_luong || 0) > 0);
     }
 
+    function buildPayloadVatChuaItems() {
+      return vatChuaItems.map(function(item) {
+        return {
+          vat_chua_id: item.vat_chua_id,
+          so_luong: Math.floor(Number(item.so_luong || 0))
+        };
+      }).filter(function(item) {
+        return item.vat_chua_id && Number(item.so_luong || 0) > 0;
+      });
+    }
+
     async function saveXnb(status){
-      if(!items.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa');
+      if(!items.length && !vatChuaItems.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa hoặc vật chứa');
       if(!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
       if(!(storeIdInput && storeIdInput.value)) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu trên.');
       const loaiXuat = (loaiXuatValue.value || '').trim();
@@ -764,8 +934,9 @@
       const receiverName = loaiNguoiNhan === 'khac' ? document.getElementById('nguoiNhanKhac').value : document.getElementById('nguoiNhan').value;
       if(!receiverName.trim()) return alert('Vui lòng chọn hoặc nhập người nhận.');
       const payloadItems = buildPayloadItems();
-      if (!payloadItems.length) return alert('Vui lòng nhập số lượng xuất cho ít nhất 1 hàng hóa.');
-      const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items:payloadItems};
+      const payloadVatChuaItems = buildPayloadVatChuaItems();
+      if (!payloadItems.length && !payloadVatChuaItems.length) return alert('Vui lòng nhập số lượng xuất cho ít nhất 1 hàng hóa hoặc vật chứa.');
+      const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items:payloadItems,vat_chua_items:payloadVatChuaItems};
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         const result = await res.json();

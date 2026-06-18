@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
+  <style>
+    #productCreateForm .product-vn-num { text-align: right; }
+  </style>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
@@ -72,7 +75,7 @@
               <div class="store-fields product-fields">
                 <div>
                   <span>Giá vốn</span>
-                  <input type="number" min="0" name="gia_von" value="0">
+                  <input type="text" inputmode="numeric" class="product-vn-num" name="gia_von" value="0" autocomplete="off">
                 </div>
                 <div>
                   <span>Loại giá</span>
@@ -83,7 +86,7 @@
                 </div>
                 <div id="fixedPriceWrap">
                   <span>Giá bán</span>
-                  <input type="number" min="0" name="gia_co_dinh" value="0">
+                  <input type="text" inputmode="numeric" class="product-vn-num" name="gia_co_dinh" value="0" autocomplete="off">
                 </div>
               </div>
             </section>
@@ -93,11 +96,11 @@
               <div class="store-fields product-fields">
                 <div>
                   <span>Tồn ban đầu</span>
-                  <input type="number" min="0" name="ton_ban_dau" value="0">
+                  <input type="text" inputmode="numeric" class="product-vn-num" name="ton_ban_dau" value="0" autocomplete="off">
                 </div>
                 <div>
                   <span>Định mức tối thiểu</span>
-                  <input type="number" min="0" name="dinh_muc_toi_thieu" value="0">
+                  <input type="text" inputmode="numeric" class="product-vn-num" name="dinh_muc_toi_thieu" value="0" autocomplete="off">
                 </div>
               </div>
             </section>
@@ -488,6 +491,78 @@
       var productModalTitle = document.getElementById('productModalTitle');
       var productModalSubmitBtn = document.getElementById('productModalSubmitBtn');
       var productCreateForm = document.getElementById('productCreateForm');
+      var PRODUCT_VN_NUM_FIELDS = ['gia_von', 'gia_co_dinh', 'ton_ban_dau', 'dinh_muc_toi_thieu'];
+
+      function parseProductNum(value) {
+        var raw = String(value || '').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
+        return raw === '' ? '' : String(Math.max(0, Math.floor(Number(raw) || 0)));
+      }
+
+      function formatProductNum(value) {
+        var parsed = parseProductNum(value);
+        if (parsed === '') return '';
+        return Number(parsed).toLocaleString('vi-VN');
+      }
+
+      function applyProductVNFormat(el) {
+        if (!el) return;
+        var start = el.selectionStart == null ? el.value.length : el.selectionStart;
+        var digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
+        var raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
+        if (!raw) {
+          el.value = '';
+          return;
+        }
+        var formatted = formatProductNum(raw);
+        el.value = formatted;
+        var pos = formatted.length;
+        if (digitsBefore > 0) {
+          var digits = 0;
+          for (var i = 0; i < formatted.length; i++) {
+            if (/\d/.test(formatted[i])) {
+              digits++;
+              if (digits === digitsBefore) {
+                pos = i + 1;
+                break;
+              }
+            }
+          }
+        } else {
+          pos = 0;
+        }
+        try { el.setSelectionRange(pos, pos); } catch (_) {}
+      }
+
+      function bindProductVNInput(el) {
+        if (!el || el.dataset.vnBound === '1') return;
+        el.dataset.vnBound = '1';
+        el.addEventListener('input', function() {
+          applyProductVNFormat(el);
+        });
+        el.addEventListener('blur', function() {
+          var parsed = parseProductNum(el.value);
+          el.value = parsed === '' ? '' : formatProductNum(parsed);
+        });
+      }
+
+      function initProductVNInputs() {
+        if (!productCreateForm) return;
+        PRODUCT_VN_NUM_FIELDS.forEach(function(name) {
+          var input = productCreateForm.querySelector('[name="' + name + '"]');
+          if (!input) return;
+          bindProductVNInput(input);
+          input.value = formatProductNum(input.value || 0);
+        });
+      }
+
+      function formatAllProductVNFields() {
+        if (!productCreateForm) return;
+        PRODUCT_VN_NUM_FIELDS.forEach(function(name) {
+          var input = productCreateForm.querySelector('[name="' + name + '"]');
+          if (!input) return;
+          input.value = formatProductNum(input.value || 0);
+        });
+      }
       var productPriceType = document.getElementById('productPriceType');
       var fixedPriceWrap = document.getElementById('fixedPriceWrap');
       var productManageLotCheckbox = document.getElementById('productManageLotCheckbox');
@@ -525,6 +600,10 @@
         if (!productCreateForm) return;
         var input = productCreateForm.querySelector('[name="' + name + '"]');
         if (!input) return;
+        if (PRODUCT_VN_NUM_FIELDS.indexOf(name) >= 0) {
+          input.value = formatProductNum(value == null ? 0 : value);
+          return;
+        }
         input.value = value == null ? '' : String(value);
       }
 
@@ -542,6 +621,7 @@
         if (productCreateForm) {
           productCreateForm.setAttribute('action', '/hang-hoa/add');
           productCreateForm.reset();
+          formatAllProductVNFields();
         }
         setProductFormValue('han_su_dung_mac_dinh_so_ngay', 5);
         if (typeof refreshProductFormGroup === 'function') refreshProductFormGroup('');
@@ -602,6 +682,17 @@
       if (addProductModalClose) addProductModalClose.addEventListener('click', closeAddProductModal);
       if (addProductModalCancel) addProductModalCancel.addEventListener('click', closeAddProductModal);
       if (addProductModalOverlay && addProductModalOverlay.getAttribute('data-auto-open') === '1') openAddProductModal();
+      initProductVNInputs();
+      if (productCreateForm) {
+        productCreateForm.addEventListener('submit', function() {
+          PRODUCT_VN_NUM_FIELDS.forEach(function(name) {
+            var input = productCreateForm.querySelector('[name="' + name + '"]');
+            if (!input) return;
+            var parsed = parseProductNum(input.value);
+            input.value = parsed === '' ? '0' : parsed;
+          });
+        });
+      }
       toggleFixedPrice();
       toggleInitialLotFields();
 

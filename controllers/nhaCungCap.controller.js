@@ -8,6 +8,7 @@ var { normalizeAddress } = require('../utils/address');
 var { buildSupplierHangHoaExportPack } = require('../services/supplierHangHoaExport.service');
 var { buildSupplierPurchaseInvoiceExportPack } = require('../services/supplierPurchaseInvoiceExport.service');
 var { handleSupplierDebtExport } = require('../services/supplierDebtExport.service');
+var nhaCungCapImportService = require('../services/nhaCungCapImport.service');
 var DiaChiNhaCungCap = DiaChiNcc || DiaChiDoiTuong;
 
 var SUPPLIER_EXPORT_COLUMNS = [
@@ -154,6 +155,150 @@ async function aggregateSupplierPurchaseTotals(storeId) {
         }
     });
     return map;
+}
+
+async function aggregateSupplierDebtDayInfo(storeId) {
+    var match = {
+        trang_thai: 'completed',
+        nha_cung_cap_id: { $exists: true, $ne: null },
+        con_no_ncc: { $gt: 0 }
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        match.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
+    }
+    var rows = await PhieuNhap.aggregate([
+        { $match: match },
+        { $sort: { ngay_nhap: 1, created_at: 1 } },
+        {
+            $group: {
+                _id: '$nha_cung_cap_id',
+                ngay_no_xa_nhat: { $first: { $ifNull: ['$ngay_nhap', '$created_at'] } },
+                no_xa_nhat_ma_phieu: { $first: '$ma_phieu_nhap' },
+                no_xa_nhat_tien: { $first: '$con_no_ncc' },
+                ngay_no_gan_nhat: { $last: { $ifNull: ['$ngay_nhap', '$created_at'] } }
+            }
+        }
+    ]);
+    var now = Date.now();
+    var map = {};
+    rows.forEach(function(row) {
+        if (!row || !row._id) return;
+        var oldestTs = new Date(row.ngay_no_xa_nhat || 0).getTime();
+        var newestTs = new Date(row.ngay_no_gan_nhat || 0).getTime();
+        map[String(row._id)] = {
+            ngay_no_xa_nhat: row.ngay_no_xa_nhat || null,
+            ngay_no_gan_nhat: row.ngay_no_gan_nhat || null,
+            no_xa_nhat_ma_phieu: String(row.no_xa_nhat_ma_phieu || '').trim(),
+            no_xa_nhat_tien: Math.max(0, Number(row.no_xa_nhat_tien || 0)),
+            so_ngay_no_xa: oldestTs > 0 ? Math.max(0, Math.floor((now - oldestTs) / 86400000)) : null,
+            so_ngay_no_gan: newestTs > 0 ? Math.max(0, Math.floor((now - newestTs) / 86400000)) : null
+        };
+    });
+    return map;
+}
+
+function applySupplierDebtDayInfo(supplier, debtDayMap) {
+    if (!supplier) return;
+    var info = debtDayMap ? debtDayMap[String(supplier._id)] : null;
+    supplier.ngay_no_xa_nhat = info ? info.ngay_no_xa_nhat : null;
+    supplier.ngay_no_gan_nhat = info ? info.ngay_no_gan_nhat : null;
+    supplier.so_ngay_no_xa = info && info.so_ngay_no_xa != null ? info.so_ngay_no_xa : null;
+    supplier.so_ngay_no_gan = info && info.so_ngay_no_gan != null ? info.so_ngay_no_gan : null;
+    supplier.no_xa_nhat_ma_phieu = info ? (info.no_xa_nhat_ma_phieu || '') : '';
+    supplier.no_xa_nhat_tien = info ? Number(info.no_xa_nhat_tien || 0) : 0;
+}
+
+var SUPPLIER_DEBT_WARN_DEFAULT_DAYS = 10;
+
+function normalizeDebtWarnSettings(filter) {
+    filter = filter || {};
+    var warnMinDaysRaw = parseInt(String(filter.warnMinDays != null ? filter.warnMinDays : SUPPLIER_DEBT_WARN_DEFAULT_DAYS), 10);
+    return {
+        warnOnly: String(filter.warnOnly || '') === '1',
+        warnMinDays: Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
+        warnMinAmount: hasFilterQueryValue(filter.warnMinAmount) ? Math.max(0, parseMoney(filter.warnMinAmount)) : 0
+    };
+}
+
+function evaluateSupplierDebtWarning(supplier, settings) {
+    var debt = Number(supplier && supplier.tong_no || 0);
+    if (debt <= 0) return false;
+    var days = Number(supplier.so_ngay_no_xa);
+    var hasDays = Number.isFinite(days);
+    var meetsDays = hasDays && days >= Number(settings.warnMinDays || SUPPLIER_DEBT_WARN_DEFAULT_DAYS);
+    var minAmount = Number(settings.warnMinAmount || 0);
+    var meetsAmount = minAmount > 0 && debt >= minAmount;
+    if (minAmount > 0 && settings.warnMinDays >= 0) return meetsDays || meetsAmount;
+    if (minAmount > 0) return meetsAmount;
+    return meetsDays;
+}
+
+function applySupplierDebtWarning(supplier, settings) {
+    if (!supplier) return;
+    supplier.debt_warning = evaluateSupplierDebtWarning(supplier, settings);
+}
+
+function filterSuppliersByDebtWarning(suppliers, settings) {
+    if (!settings || !settings.warnOnly) return suppliers;
+    return suppliers.filter(function(supplier) {
+        return evaluateSupplierDebtWarning(supplier, settings);
+    });
+}
+
+function enrichSupplierDebtHistory(rows, warnMinDays) {
+    var minDays = Number(warnMinDays) >= 0 ? Number(warnMinDays) : SUPPLIER_DEBT_WARN_DEFAULT_DAYS;
+    var now = Date.now();
+    return (rows || []).map(function(row) {
+        var copy = Object.assign({}, row);
+        var conLai = Number(copy.con_lai || 0);
+        var thoiGian = copy.thoi_gian;
+        var days = null;
+        if (thoiGian) {
+            var ts = new Date(thoiGian).getTime();
+            if (ts > 0) days = Math.max(0, Math.floor((now - ts) / 86400000));
+        }
+        copy.so_ngay_no = days;
+        copy.co_no_con_lai = conLai > 0;
+        copy.is_debt_overdue = conLai > 0 && days != null && days >= minDays;
+        return copy;
+    });
+}
+
+function sortSupplierDebtHistoryRows(rows) {
+    return rows.slice().sort(function(a, b) {
+        var aUnpaid = a.co_no_con_lai ? 1 : 0;
+        var bUnpaid = b.co_no_con_lai ? 1 : 0;
+        if (aUnpaid !== bUnpaid) return bUnpaid - aUnpaid;
+        if (aUnpaid) {
+            var daysA = Number(a.so_ngay_no != null ? a.so_ngay_no : -1);
+            var daysB = Number(b.so_ngay_no != null ? b.so_ngay_no : -1);
+            if (daysB !== daysA) return daysB - daysA;
+        }
+        return new Date(b.thoi_gian || 0).getTime() - new Date(a.thoi_gian || 0).getTime();
+    });
+}
+
+function sortSuppliersByDebtDaySort(suppliers, debtDaySort) {
+    if (debtDaySort !== 'oldest' && debtDaySort !== 'newest') return suppliers;
+    return suppliers.slice().sort(function(a, b) {
+        var debtA = Number(a.tong_no || 0);
+        var debtB = Number(b.tong_no || 0);
+        if (debtA <= 0 && debtB <= 0) {
+            return String(a.ma_ncc || '').localeCompare(String(b.ma_ncc || ''), 'vi');
+        }
+        if (debtA <= 0) return 1;
+        if (debtB <= 0) return -1;
+        if (debtDaySort === 'oldest') {
+            var daysOldestA = Number(a.so_ngay_no_xa != null ? a.so_ngay_no_xa : -1);
+            var daysOldestB = Number(b.so_ngay_no_xa != null ? b.so_ngay_no_xa : -1);
+            if (daysOldestB !== daysOldestA) return daysOldestB - daysOldestA;
+            return String(a.ma_ncc || '').localeCompare(String(b.ma_ncc || ''), 'vi');
+        }
+        var daysNewestA = Number(a.so_ngay_no_gan != null ? a.so_ngay_no_gan : 999999);
+        var daysNewestB = Number(b.so_ngay_no_gan != null ? b.so_ngay_no_gan : 999999);
+        if (daysNewestA !== daysNewestB) return daysNewestA - daysNewestB;
+        return String(a.ma_ncc || '').localeCompare(String(b.ma_ncc || ''), 'vi');
+    });
 }
 
 function getDebtDocumentInfo(row) {
@@ -375,6 +520,10 @@ function normalizeFilterQuery(query) {
     var created = ['all', 'today', '7days', '30days', 'custom'].indexOf(query.created) >= 0 ? query.created : 'all';
     var createdFrom = String(query.createdFrom || '').trim();
     var createdTo = String(query.createdTo || '').trim();
+    var debtDaySort = String(query.debtDaySort || '').trim();
+    if (['oldest', 'newest'].indexOf(debtDaySort) < 0) debtDaySort = '';
+    var warnMinDaysRaw = parseInt(String(query.warnMinDays != null && query.warnMinDays !== '' ? query.warnMinDays : SUPPLIER_DEBT_WARN_DEFAULT_DAYS), 10);
+    var warnMinDays = Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : SUPPLIER_DEBT_WARN_DEFAULT_DAYS;
 
     return {
         groupId: groupId,
@@ -385,7 +534,11 @@ function normalizeFilterQuery(query) {
         currentDebtTo: currentDebtTo,
         created: created,
         createdFrom: createdFrom,
-        createdTo: createdTo
+        createdTo: createdTo,
+        debtDaySort: debtDaySort,
+        warnOnly: String(query.warnOnly || '') === '1' ? '1' : '',
+        warnMinDays: String(warnMinDays),
+        warnMinAmount: normalizeFilterMoneyField(query.warnMinAmount)
     };
 }
 
@@ -456,6 +609,16 @@ function buildFilterQueryString(filter) {
     if (filter.created !== 'all') params.push('created=' + encodeURIComponent(filter.created));
     if (filter.created === 'custom' && filter.createdFrom) params.push('createdFrom=' + encodeURIComponent(filter.createdFrom));
     if (filter.created === 'custom' && filter.createdTo) params.push('createdTo=' + encodeURIComponent(filter.createdTo));
+    if (filter.debtDaySort === 'oldest' || filter.debtDaySort === 'newest') {
+        params.push('debtDaySort=' + encodeURIComponent(filter.debtDaySort));
+    }
+    if (filter.warnOnly === '1') params.push('warnOnly=1');
+    if (filter.warnMinDays && String(filter.warnMinDays) !== String(SUPPLIER_DEBT_WARN_DEFAULT_DAYS)) {
+        params.push('warnMinDays=' + encodeURIComponent(filter.warnMinDays));
+    }
+    if (hasFilterQueryValue(filter.warnMinAmount)) {
+        params.push('warnMinAmount=' + encodeURIComponent(filter.warnMinAmount));
+    }
     return params.join('&');
 }
 
@@ -843,6 +1006,10 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
     applySupplierTotalsFromMap(selectedSupplier, totalsMap);
 
+    var filter = normalizeFilterQuery(req?.query || {});
+    var debtWarnSettings = normalizeDebtWarnSettings(filter);
+    var filterQueryString = buildFilterQueryString(filter);
+
     var supplierAddresses = await DiaChiNhaCungCap.find({ nha_cung_cap_id: selectedSupplier._id }).sort({ created_at: -1 }).lean();
 
     var phieuNhapQuery = {
@@ -964,31 +1131,14 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
             ghi_chu: sourceRow.ghi_chu || ''
         };
     });
-    var supplierDebtHistory = mappedDebtAsc.reverse();
+    var supplierDebtHistory = sortSupplierDebtHistoryRows(
+        enrichSupplierDebtHistory(mappedDebtAsc.reverse(), debtWarnSettings.warnMinDays)
+    );
 
     var supplierInternalExportHistory = await loadSupplierInternalExportHistory(selectedSupplier, storeId);
     var supplierUnpaidPurchases = await loadSupplierUnpaidPurchases(selectedSupplier._id, storeId);
-    var supplierAccountingReceiptQuery = {
-        nha_cung_cap_id: selectedSupplier._id,
-        hach_toan: true
-    };
-    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
-        supplierAccountingReceiptQuery.cua_hang_id = storeId;
-    }
-    var supplierAccountingReceipts = await PhieuThuChi.find(supplierAccountingReceiptQuery)
-        .populate({ path: 'so_quy_id', select: 'ten_so_quy loai_so_quy thong_tin_ngan_hang' })
-        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
-        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'ma_phieu_tra_nhap' })
-        .populate({ path: 'don_hang_id', select: 'ma_don_hang' })
-        .populate({ path: 'hoa_don_id', select: 'ma_hoa_don' })
-        .populate({ path: 'phieu_tra_hang_id', select: 'ma_phieu_tra' })
-        .sort({ ngay_lap: -1, created_at: -1 })
-        .lean();
     var debtReconciliation = buildDebtReconciliation(sumInvoiceDebt(supplierUnpaidPurchases), selectedSupplier.tong_no);
     var cashBooks = await loadActiveCashBooks();
-
-    var filter = normalizeFilterQuery(req?.query || {});
-    var filterQueryString = buildFilterQueryString(filter);
     var addressTypes = await loadAddressTypes();
 
     return {
@@ -997,10 +1147,11 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         supplierPurchaseHistory: supplierPurchaseHistory,
         supplierDebtHistory: supplierDebtHistory,
         supplierInternalExportHistory: supplierInternalExportHistory,
-        supplierAccountingReceipts: supplierAccountingReceipts,
         supplierUnpaidPurchases: supplierUnpaidPurchases,
         debtReconciliation: debtReconciliation,
         cashBooks: cashBooks,
+        debtWarnMinDays: debtWarnSettings.warnMinDays,
+        debtWarnDefaultDays: SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
         currentUserName: getUserName(req?.user) || 'test',
         addressTypes: addressTypes,
         filterQueryString: filterQueryString,
@@ -1050,13 +1201,21 @@ exports.index = async function(req, res, next) {
 
         var filter = normalizeFilterQuery(requestQuery);
         var supplierQuery = buildSupplierQueryFromFilter(filter);
+        var debtWarnSettings = normalizeDebtWarnSettings(filter);
 
         var supplierGroups = await loadSupplierGroups();
         var addressTypes = await loadAddressTypes();
         var suppliers = await NhaCungCap.find(supplierQuery).sort({ created_at: 1, ma_ncc: 1 }).lean();
         var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
-        suppliers.forEach(function(s) { applySupplierTotalsFromMap(s, totalsMap); });
+        var debtDayMap = await aggregateSupplierDebtDayInfo(storeId);
+        suppliers.forEach(function(s) {
+            applySupplierTotalsFromMap(s, totalsMap);
+            applySupplierDebtDayInfo(s, debtDayMap);
+            applySupplierDebtWarning(s, debtWarnSettings);
+        });
         suppliers = filterSuppliersByComputedTotals(suppliers, filter);
+        suppliers = filterSuppliersByDebtWarning(suppliers, debtWarnSettings);
+        suppliers = sortSuppliersByDebtDaySort(suppliers, filter.debtDaySort);
 
         res.render('nha-cung-cap/index', {
             title: 'Nhà cung cấp',
@@ -1071,6 +1230,7 @@ exports.index = async function(req, res, next) {
             formatDate: formatDate,
             filter: filter,
             filterQueryString: buildFilterQueryString(filter),
+            debtWarnDefaultDays: SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
             formatFilterMoney: formatFilterMoneyDisplay,
             filterDebtRangeLabel: (function() {
                 if (!hasFilterQueryValue(filter.currentDebtFrom) && !hasFilterQueryValue(filter.currentDebtTo)) return '';
@@ -1097,14 +1257,22 @@ exports.exportExcel = async function(req, res, next) {
         var storeId = await resolveStoreId(req);
         var filter = normalizeFilterQuery(req?.query || {});
         var supplierQuery = buildSupplierQueryFromFilter(filter);
+        var debtWarnSettings = normalizeDebtWarnSettings(filter);
         var suppliers = await NhaCungCap.find(supplierQuery)
             .populate({ path: 'nhom_nha_cung_cap_id', select: 'ten_nhom_ncc ma_nhom_ncc' })
             .populate({ path: 'nguoi_tao_id', select: 'ho_ten username email' })
             .sort({ created_at: 1, ma_ncc: 1 })
             .lean();
         var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
-        suppliers.forEach(function(s) { applySupplierTotalsFromMap(s, totalsMap); });
+        var debtDayMap = await aggregateSupplierDebtDayInfo(storeId);
+        suppliers.forEach(function(s) {
+            applySupplierTotalsFromMap(s, totalsMap);
+            applySupplierDebtDayInfo(s, debtDayMap);
+            applySupplierDebtWarning(s, debtWarnSettings);
+        });
         suppliers = filterSuppliersByComputedTotals(suppliers, filter);
+        suppliers = filterSuppliersByDebtWarning(suppliers, debtWarnSettings);
+        suppliers = sortSuppliersByDebtDaySort(suppliers, filter.debtDaySort);
         var supplierIds = suppliers.map(function(supplier) { return supplier._id; });
         var addresses = supplierIds.length
             ? await DiaChiNhaCungCap.find({ nha_cung_cap_id: { $in: supplierIds } })
@@ -1939,6 +2107,89 @@ exports.removeAddress = async function(req, res, next) {
         await DiaChiNhaCungCap.findByIdAndDelete(addressId);
         res.redirect(buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, { success: 'deleted_address' }));
     } catch (error) {
+        next(error);
+    }
+};
+
+exports.downloadImportTemplate = async function(req, res, next) {
+    try {
+        var workbook = await nhaCungCapImportService.buildImportTemplateWorkbook();
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="mau-nhap-nha-cung-cap.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.importExcel = async function(req, res, next) {
+    try {
+        var file = req?.file;
+        if (!file || !file.buffer || !file.buffer.length) {
+            return res.redirect('/nha-cung-cap?error=import_missing_file');
+        }
+
+        var fileName = String(file.originalname || '').toLowerCase();
+        if (!/\.xlsx$/i.test(fileName)) {
+            return res.redirect('/nha-cung-cap?error=import_invalid_file_type');
+        }
+
+        var parsedRows = await nhaCungCapImportService.parseSupplierImportBuffer(file.buffer);
+        if (!parsedRows.length) {
+            return res.redirect('/nha-cung-cap?error=import_empty_file');
+        }
+
+        nhaCungCapImportService.validateImportRows(parsedRows);
+
+        var inserted = 0;
+        var skipped = 0;
+        var rowErrors = [];
+
+        for (var i = 0; i < parsedRows.length; i += 1) {
+            var item = parsedRows[i];
+            var body = nhaCungCapImportService.buildSupplierBodyFromImportRow(item.data);
+
+            try {
+                var payload = normalizeSupplierPayload(body);
+                if (!payload.ten_ncc) {
+                    skipped += 1;
+                    rowErrors.push('Dòng ' + item.rowNumber + ': thiếu tên nhà cung cấp.');
+                    continue;
+                }
+
+                payload.ma_ncc = await makeSupplierCode();
+                await NhaCungCap.create(payload);
+                inserted += 1;
+            } catch (error) {
+                skipped += 1;
+                rowErrors.push('Dòng ' + item.rowNumber + ': ' + (error && error.message ? error.message : 'không thể thêm.'));
+            }
+        }
+
+        if (inserted === 0) {
+            var failMessage = rowErrors.slice(0, 3).join(' ');
+            return res.redirect('/nha-cung-cap?error=' + encodeURIComponent(failMessage || 'import_failed'));
+        }
+
+        var successQuery = 'imported=' + inserted + '&import_label=' + encodeURIComponent('nhà cung cấp');
+        if (skipped > 0) successQuery += '&import_skipped=' + skipped;
+        if (rowErrors.length > 0) {
+            successQuery += '&import_warning=' + encodeURIComponent(rowErrors.slice(0, 2).join(' '));
+        }
+
+        res.redirect('/nha-cung-cap?success=imported&' + successQuery);
+    } catch (error) {
+        if (error && error.code === 'import_invalid_headers') {
+            return res.redirect('/nha-cung-cap?error=import_invalid_headers');
+        }
+        if (error && error.code === 'import_invalid_rows') {
+            return res.redirect('/nha-cung-cap?error=' + encodeURIComponent(error.message || 'import_invalid_rows'));
+        }
+        if (error && error.code === 'import_empty_file') {
+            return res.redirect('/nha-cung-cap?error=import_empty_file');
+        }
+
         next(error);
     }
 };

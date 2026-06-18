@@ -230,6 +230,7 @@ app.post('/api/hang-hoa/quick-create', isAuthenticated, nhapHangController.quick
 app.post('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
 app.put('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
 app.post('/api/hang-hoa/:id/inactive', isAuthenticated, nhapHangController.inactiveProduct);
+app.post('/api/nhap-hang/gop-phieu-nhap', isAuthenticated, nhapHangController.mergePurchases);
 
 app.use('/api/so-quy', apiSoQuyRouter);
 app.use('/api', apiKhoRouter);

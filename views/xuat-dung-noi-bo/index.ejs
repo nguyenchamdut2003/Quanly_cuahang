@@ -44,6 +44,8 @@
     .xnb-detail-total{display:flex;gap:18px;font-size:13px;color:#475467}.xnb-detail-total b{color:#111827;font-size:15px}
     .detail-table{width:100%;border-collapse:collapse}.detail-table th{background:#eaf3ff;color:#374151;text-align:left;font-size:13px;padding:9px 10px;border-bottom:1px solid #d8e8fb}.detail-table td{height:auto;padding:9px 10px;border-bottom:1px solid #edf0f3;font-size:13px;color:#374151}.detail-table .num{text-align:left}
     .xnb-detail-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+    .xnb-vat-chua-block{margin-top:14px}
+    .xnb-vat-chua-title{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;font-weight:800;color:#374151}
     .summary-actions{display:flex;align-items:center;gap:12px}
     .summary-modal{position:fixed;inset:0;background:rgba(15,23,42,.42);display:none;align-items:center;justify-content:center;z-index:1200;padding:24px}
     .summary-modal.is-open{display:flex}
@@ -174,9 +176,29 @@
         return result;
       }
 
+      function renderVatChuaDetailTable(rows) {
+        if (!rows.length) return '';
+        return '<div class="xnb-vat-chua-block">' +
+          '<div class="xnb-vat-chua-title"><i class="fa-solid fa-box"></i> Két xuất dùng nội bộ</div>' +
+          '<table class="detail-table">' +
+            '<thead><tr><th>Mã vật chứa</th><th>Tên vật chứa</th><th class="num">Số lượng</th><th class="num">Giá vốn</th><th class="num">Giá trị xuất</th></tr></thead>' +
+            '<tbody>' + rows.map(function(item) {
+              return '<tr>' +
+                '<td>' + escapeHtml(item.ma_vat_chua) + '</td>' +
+                '<td>' + escapeHtml(item.ten_vat_chua) + '</td>' +
+                '<td class="num">' + formatNumber(item.so_luong) + '</td>' +
+                '<td class="num">' + formatMoney(item.gia_von) + '</td>' +
+                '<td class="num">' + formatMoney(item.thanh_tien) + '</td>' +
+              '</tr>';
+            }).join('') + '</tbody>' +
+          '</table>' +
+        '</div>';
+      }
+
       function renderDetailContent(result) {
         const ticket = result.ticket || {};
         const rows = result.items || [];
+        const vatChuaRows = result.vatChuaItems || [];
         const ticketId = encodeURIComponent(ticket.id || '');
         const detailActions = ticketId
           ? '<div class="xnb-detail-actions">' +
@@ -204,6 +226,7 @@
               '</tr>';
             }).join('') : '<tr><td colspan="6">Phiếu chưa có hàng hóa.</td></tr>') + '</tbody>' +
           '</table>' +
+          renderVatChuaDetailTable(vatChuaRows) +
           detailActions +
         '</div>';
       }
@@ -295,6 +318,17 @@
       if (summaryModal) summaryModal.addEventListener('click', function(event) {
         if (event.target === summaryModal) closeSummaryModal();
       });
+
+      const openTicketId = String(new URLSearchParams(window.location.search).get('open') || '').trim();
+      if (openTicketId) {
+        const openRow = Array.prototype.find.call(table.querySelectorAll('.xnb-row'), function(row) {
+          return row.getAttribute('data-detail-id') === openTicketId;
+        });
+        if (openRow) {
+          openRow.scrollIntoView({ block: 'center' });
+          toggleDetail(openRow);
+        }
+      }
     });
   </script>
 </body>

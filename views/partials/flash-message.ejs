@@ -5,18 +5,31 @@
   <div class="flash-message flash-error">Vui l&#242;ng nh&#7853;p s&#7889; &#273;i&#7879;n tho&#7841;i.</div>
 <% } else if (currentFlash && currentFlash.error === 'invalid_phone') { %>
   <div class="flash-message flash-error">S&#7889; &#273;i&#7879;n tho&#7841;i ph&#7843;i &#273;&#7911; 10 s&#7889; v&#224; b&#7855;t &#273;&#7847;u b&#7857;ng 0. C&#243; th&#7875; nh&#7853;p d&#7845;u ch&#7845;m &#273;&#7875; ph&#226;n t&#225;ch.</div>
-<% } else if (currentFlash && currentFlash.error === 'missing_cccd') { %>
-  <div class="flash-message flash-error">Vui l&#242;ng nh&#7853;p CCCD.</div>
-<% } else if (currentFlash && currentFlash.error === 'invalid_cccd') { %>
-  <div class="flash-message flash-error">CCCD ph&#7843;i &#273;&#7911; 12 s&#7889;.</div>
+<% } else if (currentFlash && currentFlash.error === 'missing_mst') { %>
+  <div class="flash-message flash-error">Vui l&#242;ng nh&#7853;p MST.</div>
+<% } else if (currentFlash && currentFlash.error === 'invalid_mst') { %>
+  <div class="flash-message flash-error">MST ph&#7843;i t&#7915; 10 &#273;&#7871;n 13 s&#7889;.</div>
 <% } else if (currentFlash && currentFlash.error === 'missing_bang_gia_name') { %>
   <div class="flash-message flash-error">Vui lòng nhập tên bảng giá.</div>
+<% } else if (currentFlash && currentFlash.error === 'import_missing_file') { %>
+  <div class="flash-message flash-error">Vui lòng chọn file Excel để nhập.</div>
+<% } else if (currentFlash && currentFlash.error === 'import_invalid_file_type') { %>
+  <div class="flash-message flash-error">Chỉ chấp nhận file Excel định dạng .xlsx từ file mẫu.</div>
+<% } else if (currentFlash && currentFlash.error === 'import_invalid_headers') { %>
+  <div class="flash-message flash-error">File Excel sai tiêu đề cột. Vui lòng tải file mẫu và nhập đúng cấu trúc.</div>
+<% } else if (currentFlash && currentFlash.error === 'import_empty_file') { %>
+  <div class="flash-message flash-error">File Excel không có dữ liệu để nhập.</div>
 <% } else if (currentFlash && currentFlash.error) { %>
   <% const flashErrorText = String(currentFlash.error || '').trim(); %>
   <div class="flash-message flash-error"><%= flashErrorText.length > 80 || flashErrorText.includes(' ') ? flashErrorText : 'Thao tác không thành công. Vui lòng thử lại.' %></div>
 <% } %>
 <% if (currentFlash && currentFlash.success === 'created_bang_gia') { %>
   <div class="flash-message flash-success">Đã tạo bảng giá mới.</div>
+<% } else if (currentFlash && currentFlash.success === 'imported') { %>
+  <div class="flash-message flash-success">
+    Đã thêm <%= currentFlash.imported || 0 %> <%= currentFlash.import_label || 'cửa hàng' %> từ file Excel<% if (currentFlash.import_skipped) { %>. Bỏ qua <%= currentFlash.import_skipped %> dòng<% } %>.
+    <% if (currentFlash.import_warning) { %><br><span style="font-weight:600"><%= currentFlash.import_warning %></span><% } %>
+  </div>
 <% } else if (currentFlash && currentFlash.success) { %>
   <div class="flash-message flash-success">Thao tác đã được xử lý thành công.</div>
 <% } %>

@@ -1,12 +1,20 @@
 var express = require('express');
+var multer = require('multer');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
 var khachHangController = require('../controllers/khachHang.controller');
+
+var upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 }
+});
 
 router.use(isAuthenticated);
 
 router.get('/', khachHangController.index);
 router.get('/export.xlsx', khachHangController.exportExcel);
+router.get('/import/template.xlsx', khachHangController.downloadImportTemplate);
+router.post('/import', upload.single('file'), khachHangController.importExcel);
 router.get('/api/:id/detail', khachHangController.apiCustomerDetail);
 router.post('/add', khachHangController.add);
 router.post('/:id/update', khachHangController.update);

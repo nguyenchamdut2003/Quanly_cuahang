@@ -7,6 +7,20 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     .customer-address-toolbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px}
+    .customer-import-wrap{position:relative;display:inline-flex}
+    .customer-import-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:180px;display:none;z-index:20;border:1px solid #d0d5dd;border-radius:8px;background:#fff;box-shadow:0 14px 30px rgba(16,24,40,.15);overflow:hidden}
+    .customer-import-menu.is-open{display:block}
+    .customer-import-menu button,.customer-import-menu a{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 14px;font-size:13px;color:#111827;text-decoration:none;cursor:pointer}
+    .customer-import-menu button:hover,.customer-import-menu a:hover{background:#f8fafc}
+    .customer-import-menu a + button{border-top:1px solid #f2f4f7}
+    .customer-address-table{table-layout:fixed}
+    .customer-address-table th:nth-child(1),
+    .customer-address-table td:nth-child(1){width:78px;max-width:78px}
+    .customer-address-table th:nth-child(3),
+    .customer-address-table td:nth-child(3){width:104px;max-width:104px}
+    .customer-address-table td:nth-child(3) > input{letter-spacing:0;padding:0 8px}
+    .customer-address-table th:nth-child(6),
+    .customer-address-table td:nth-child(6){width:118px;max-width:118px;white-space:nowrap;font-size:12px;padding-left:8px;padding-right:8px}
     .address-type-list{display:grid;gap:8px;max-height:280px;overflow:auto}
     .address-type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:6px;padding:8px}
     .address-type-name{font-weight:700;color:#0f172a}
@@ -167,8 +181,8 @@
                 </div>
       
                 <div class="customer-form-field individual-field">
-                  <label>CCCD *</label>
-                  <input name="cccd" type="text" inputmode="numeric" pattern="[0-9]{12}" maxlength="12" placeholder="Nhập CCCD" required data-digits-only data-cccd-input>
+                  <label>MST *</label>
+                  <input name="mst" type="text" inputmode="numeric" pattern="[0-9]{10,13}" maxlength="13" placeholder="Nhập MST" required data-digits-only data-mst-input>
                 </div>
       
               </div>
@@ -230,11 +244,6 @@
                 </div>
       
                 <div class="customer-form-field">
-                  <label>Địa chỉ chi tiết</label>
-                  <input name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm">
-                </div>
-
-                <div class="customer-form-field">
                   <label>Tỉnh/Thành</label>
                   <select class="js-ghn-province" name="tinh_thanh" data-selected-name="">
                     <option value="">Chọn Tỉnh/Thành phố</option>
@@ -250,6 +259,11 @@
                   <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code">
                   <input type="hidden" name="quan_huyen" class="js-ghn-district-name">
                   <input type="hidden" name="quan_huyen_id" class="js-ghn-district-id">
+                </div>
+
+                <div class="customer-form-field">
+                  <label>Địa chỉ chi tiết</label>
+                  <input name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm">
                 </div>
       
                 <div class="customer-form-field form-row-full">
@@ -341,7 +355,7 @@
       
           function toggleCustomerType() {
             const selected = document.querySelector('input[name="loai_khach_hang"]:checked')?.value;
-            const cccdInput = document.querySelector('[data-cccd-input]');
+            const mstInput = document.querySelector('[data-mst-input]');
       
             companyFields.forEach(el => {
               el.style.display = selected === 'cong_ty' ? '' : 'none';
@@ -351,9 +365,9 @@
               el.style.display = selected === 'ca_nhan' ? '' : 'none';
             });
 
-            if (cccdInput) {
-              cccdInput.required = selected === 'ca_nhan';
-              if (selected !== 'ca_nhan') cccdInput.value = '';
+            if (mstInput) {
+              mstInput.required = selected === 'ca_nhan';
+              if (selected !== 'ca_nhan') mstInput.value = '';
             }
           }
           window.toggleCustomerType = toggleCustomerType;
@@ -454,6 +468,16 @@
           </div>
           <div class="customer-toolbar-actions">
             <button class="btn btn-primary" type="button" id="openAddCustomerModal">+ Khách hàng</button>
+            <div class="customer-import-wrap">
+              <button class="btn btn-light" type="button" id="customerImportToggle" aria-haspopup="true" aria-expanded="false">Thêm bằng file ▾</button>
+              <div class="customer-import-menu" id="customerImportMenu" role="menu" aria-label="Thêm bằng file">
+                <a href="/khach-hang/import/template.xlsx" role="menuitem">Lấy file mẫu</a>
+                <button type="button" id="customerImportPickBtn" role="menuitem">Thêm</button>
+              </div>
+            </div>
+            <form id="customerImportForm" method="post" action="/khach-hang/import" enctype="multipart/form-data" hidden>
+              <input type="file" name="file" id="customerImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+            </form>
             <a class="btn btn-light" href="/khach-hang/export.xlsx<%= filterQueryString ? '?' + filterQueryString : '' %>">Xuất file</a>
           </div>
 
@@ -1394,7 +1418,7 @@
         var title = document.getElementById('addCustomerModalTitle');
         if (title) title.textContent = 'Cập nhật khách hàng';
 
-        var fields = ['ten_khach_hang', 'ma_khach_hang', 'sdt', 'sdt2', 'cccd', 'ngay_sinh', 'gioi_tinh', 'email', 'facebook', 'nhom_khach_hang_id', 'ghi_chu', 'loai_khach_hang', 'ma_so_thue', 'ten_cong_ty', 'stk_ngan_hang', 'chu_tai_khoan', 'ngan_hang', 'trang_thai', 'ten_nguoi_nhan', 'sdt_nguoi_nhan', 'dia_chi_chi_tiet', 'tinh_thanh', 'tinh_thanh_id', 'quan_huyen', 'quan_huyen_id', 'phuong_xa', 'phuong_xa_code', 'ghi_chu_dia_chi'];
+        var fields = ['ten_khach_hang', 'ma_khach_hang', 'sdt', 'sdt2', 'mst', 'ngay_sinh', 'gioi_tinh', 'email', 'facebook', 'nhom_khach_hang_id', 'ghi_chu', 'loai_khach_hang', 'ma_so_thue', 'ten_cong_ty', 'stk_ngan_hang', 'chu_tai_khoan', 'ngan_hang', 'trang_thai', 'ten_nguoi_nhan', 'sdt_nguoi_nhan', 'dia_chi_chi_tiet', 'tinh_thanh', 'tinh_thanh_id', 'quan_huyen', 'quan_huyen_id', 'phuong_xa', 'phuong_xa_code', 'ghi_chu_dia_chi'];
 
         fields.forEach(function(field) {
           var input = customerCreateForm.querySelector('[name="' + field + '"]');
@@ -1444,16 +1468,16 @@
       if (customerCreateForm) {
         customerCreateForm.addEventListener('submit', function(event) {
           var phoneInput = customerCreateForm.querySelector('[name="sdt"]');
-          var cccdInput = customerCreateForm.querySelector('[name="cccd"]');
+          var mstInput = customerCreateForm.querySelector('[name="mst"]');
           var selectedTypeInput = customerCreateForm.querySelector('input[name="loai_khach_hang"]:checked');
           var selectedType = selectedTypeInput ? selectedTypeInput.value : 'ca_nhan';
           var phone = phoneInput ? String(phoneInput.value || '').trim() : '';
-          var cccd = cccdInput ? String(cccdInput.value || '').trim() : '';
+          var mst = mstInput ? String(mstInput.value || '').trim() : '';
 
           keepPhoneChars(phoneInput);
-          keepDigitsOnly(cccdInput);
+          keepDigitsOnly(mstInput);
           phone = phoneDigits(phoneInput ? phoneInput.value : phone);
-          cccd = cccdInput ? cccdInput.value : cccd;
+          mst = mstInput ? mstInput.value : mst;
 
           if (!phone) {
             event.preventDefault();
@@ -1470,17 +1494,17 @@
           }
 
           if (selectedType === 'ca_nhan') {
-            if (!cccd) {
+            if (!mst) {
               event.preventDefault();
-              alert('Vui lòng nhập CCCD.');
-              if (cccdInput) cccdInput.focus();
+              alert('Vui lòng nhập MST.');
+              if (mstInput) mstInput.focus();
               return;
             }
 
-            if (!/^\d{12}$/.test(cccd)) {
+            if (!/^\d{10,13}$/.test(mst)) {
               event.preventDefault();
-              alert('CCCD phải đủ 12 số.');
-              if (cccdInput) cccdInput.focus();
+              alert('MST phải từ 10 đến 13 số.');
+              if (mstInput) mstInput.focus();
             }
           }
         });
@@ -1554,6 +1578,62 @@
         radio.addEventListener('change', toggleCustomerTypePane);
       });
       toggleCustomerTypePane();
+
+      var customerImportToggle = document.getElementById('customerImportToggle');
+      var customerImportMenu = document.getElementById('customerImportMenu');
+      var customerImportPickBtn = document.getElementById('customerImportPickBtn');
+      var customerImportForm = document.getElementById('customerImportForm');
+      var customerImportFile = document.getElementById('customerImportFile');
+
+      function closeCustomerImportMenu() {
+        if (!customerImportMenu || !customerImportToggle) return;
+        customerImportMenu.classList.remove('is-open');
+        customerImportToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      function isCustomerExcelFile(file) {
+        if (!file) return false;
+        var name = String(file.name || '').toLowerCase();
+        return /\.xlsx$/i.test(name);
+      }
+
+      if (customerImportToggle && customerImportMenu) {
+        customerImportToggle.addEventListener('click', function(event) {
+          event.stopPropagation();
+          var isOpen = customerImportMenu.classList.toggle('is-open');
+          customerImportToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+      }
+
+      if (customerImportPickBtn && customerImportFile) {
+        customerImportPickBtn.addEventListener('click', function() {
+          closeCustomerImportMenu();
+          customerImportFile.value = '';
+          customerImportFile.click();
+        });
+      }
+
+      if (customerImportFile && customerImportForm) {
+        customerImportFile.addEventListener('change', function() {
+          var file = customerImportFile.files && customerImportFile.files[0];
+          if (!file) return;
+
+          if (!isCustomerExcelFile(file)) {
+            alert('Chỉ chấp nhận file Excel (.xlsx). Vui lòng dùng file mẫu.');
+            customerImportFile.value = '';
+            return;
+          }
+
+          customerImportForm.submit();
+        });
+      }
+
+      document.addEventListener('click', function(event) {
+        if (!customerImportMenu || !customerImportToggle) return;
+        if (customerImportMenu.contains(event.target)) return;
+        if (customerImportToggle.contains(event.target)) return;
+        closeCustomerImportMenu();
+      });
     });
   </script>
 

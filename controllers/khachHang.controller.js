@@ -15,6 +15,7 @@ var ExcelJS = require('exceljs');
 var querystring = require('querystring');
 var { buildFullAddress, normalizeAddress } = require('../utils/address');
 var { handleCustomerDebtExport } = require('../services/customerDebtExport.service');
+var khachHangImportService = require('../services/khachHangImport.service');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -105,7 +106,7 @@ function normalizeCustomerPayload(body) {
         ma_khach_hang: String(body.ma_khach_hang || '').trim(),
         ten_khach_hang: tenKhachHang,
         ten_ca_nhan: tenCaNhan,
-        cccd: String(body.cccd || '').trim(),
+        mst: String(body.mst || '').trim(),
         ngay_sinh: parsedNgaySinh && !isNaN(parsedNgaySinh.getTime()) ? parsedNgaySinh : null,
         ten_cong_ty: tenCongTy,
         ma_so_thue: String(body.ma_so_thue || '').trim(),
@@ -150,8 +151,8 @@ function validateCustomerPayload(payload) {
     if (!primaryPhone) return 'missing_phone';
     if (!/^0\d{9}$/.test(primaryPhone)) return 'invalid_phone';
     if (payload.loai_khach_hang === 'ca_nhan') {
-        if (!payload.cccd) return 'missing_cccd';
-        if (!/^\d{12}$/.test(payload.cccd)) return 'invalid_cccd';
+        if (!payload.mst) return 'missing_mst';
+        if (!/^\d{10,13}$/.test(payload.mst)) return 'invalid_mst';
     }
     return '';
 }
@@ -578,7 +579,7 @@ function addInfoSheet(workbook, customer) {
         ['Email', customer.email],
         ['Facebook', customer.facebook],
         ['Giới tính', exportGender(customer.gioi_tinh)],
-        ['CCCD', customer.cccd],
+        ['MST', customer.mst],
         ['Ngày sinh', exportDate(customer.ngay_sinh)],
         ['Tên công ty', customer.ten_cong_ty],
         ['Mã số thuế', customer.ma_so_thue],
@@ -926,7 +927,7 @@ exports.exportExcel = async function(req, res, next) {
             { header: 'Điện thoại', key: 'sdt', width: 16 },
             { header: 'Email', key: 'email', width: 28 },
             { header: 'Giới tính', key: 'gioi_tinh', width: 12 },
-            { header: 'CCCD', key: 'cccd', width: 16 },
+            { header: 'MST', key: 'mst', width: 16 },
             { header: 'Nợ hiện tại', key: 'tong_no', width: 16 },
             { header: 'Tổng bán', key: 'tong_ban', width: 16 },
             { header: 'Tổng bán trừ trả hàng', key: 'tong_ban_tru_tra_hang', width: 22 },
@@ -948,7 +949,7 @@ exports.exportExcel = async function(req, res, next) {
                 sdt: exportText(customer.sdt),
                 email: exportText(customer.email),
                 gioi_tinh: exportGender(customer.gioi_tinh),
-                cccd: exportText(customer.cccd),
+                mst: exportText(customer.mst),
                 tong_no: exportMoney(customer.tong_no),
                 tong_ban: exportMoney(customer.tong_ban),
                 tong_ban_tru_tra_hang: exportMoney(customer.tong_ban_tru_tra_hang),
@@ -1344,7 +1345,7 @@ exports.add = async function(req, res, next) {
             payload.chuc_vu_nguoi_dai_dien = '';
         } else {
             payload.ten_ca_nhan = '';
-            payload.cccd = '';
+            payload.mst = '';
             payload.ngay_sinh = null;
         }
 
@@ -1398,7 +1399,7 @@ exports.update = async function(req, res, next) {
             payload.chuc_vu_nguoi_dai_dien = '';
         } else {
             payload.ten_ca_nhan = '';
-            payload.cccd = '';
+            payload.mst = '';
             payload.ngay_sinh = null;
         }
 
@@ -1714,6 +1715,109 @@ exports.removeAddress = async function(req, res, next) {
         await DiaChiKhachHang.findOneAndDelete({ _id: addressId, khach_hang_id: customerId });
         res.redirect(appendQueryParam(buildCustomerReturnUrl(customerId, req?.body?.returnQuery), 'success', 'deleted'));
     } catch (error) {
+        next(error);
+    }
+};
+
+exports.downloadImportTemplate = async function(req, res, next) {
+    try {
+        var workbook = await khachHangImportService.buildImportTemplateWorkbook();
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="mau-nhap-khach-hang.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.importExcel = async function(req, res, next) {
+    try {
+        var file = req?.file;
+        if (!file || !file.buffer || !file.buffer.length) {
+            return res.redirect('/khach-hang?error=import_missing_file');
+        }
+
+        var fileName = String(file.originalname || '').toLowerCase();
+        if (!/\.xlsx$/i.test(fileName)) {
+            return res.redirect('/khach-hang?error=import_invalid_file_type');
+        }
+
+        var parsedRows = await khachHangImportService.parseCustomerImportBuffer(file.buffer);
+        if (!parsedRows.length) {
+            return res.redirect('/khach-hang?error=import_empty_file');
+        }
+
+        khachHangImportService.validateImportRows(parsedRows, validateCustomerPayload, normalizeCustomerPayload);
+
+        var inserted = 0;
+        var skipped = 0;
+        var rowErrors = [];
+
+        for (var i = 0; i < parsedRows.length; i += 1) {
+            var item = parsedRows[i];
+            var body = khachHangImportService.buildCustomerBodyFromImportRow(item.data);
+
+            try {
+                var payload = normalizeCustomerPayload(body);
+                if (payload.loai_khach_hang === 'ca_nhan') {
+                    payload.ten_cong_ty = '';
+                    payload.ma_so_thue = '';
+                    payload.nguoi_dai_dien = '';
+                    payload.chuc_vu_nguoi_dai_dien = '';
+                } else {
+                    payload.ten_ca_nhan = '';
+                    payload.mst = '';
+                    payload.ngay_sinh = null;
+                }
+
+                payload.ma_khach_hang = await makeCustomerCode();
+                if (req.user && req.user._id) {
+                    payload.nguoi_tao_id = req.user._id;
+                }
+                finalizeCustomerPayload(payload);
+
+                var customer = await KhachHang.create(payload);
+
+                var addressPayload = normalizeAddressPayload(body);
+                var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.dia_chi_chi_tiet || addressPayload.tinh_thanh || addressPayload.phuong_xa;
+                if (hasAddressData) {
+                    addressPayload.ma_dia_chi = await makeAddressCode();
+                    if (!addressPayload.loai_dia_chi) addressPayload.loai_dia_chi = 'khac';
+                    addressPayload.khach_hang_id = customer._id;
+                    await DiaChiKhachHang.create(addressPayload);
+                }
+
+                inserted += 1;
+            } catch (error) {
+                skipped += 1;
+                rowErrors.push('Dòng ' + item.rowNumber + ': ' + (error && error.message ? error.message : 'không thể thêm.'));
+            }
+        }
+
+        if (inserted === 0) {
+            var failMessage = rowErrors.slice(0, 3).join(' ');
+            return res.redirect('/khach-hang?error=' + encodeURIComponent(failMessage || 'import_failed'));
+        }
+
+        var successQuery = 'imported=' + inserted + '&import_label=' + encodeURIComponent('khách hàng');
+        if (skipped > 0) successQuery += '&import_skipped=' + skipped;
+        if (rowErrors.length > 0) {
+            successQuery += '&import_warning=' + encodeURIComponent(rowErrors.slice(0, 2).join(' '));
+        }
+
+        res.redirect('/khach-hang?success=imported&' + successQuery);
+    } catch (error) {
+        if (error && error.code === 'import_invalid_headers') {
+            return res.redirect('/khach-hang?error=import_invalid_headers');
+        }
+        if (error && error.code === 'import_invalid_rows') {
+            return res.redirect('/khach-hang?error=' + encodeURIComponent(error.message || 'import_invalid_rows'));
+        }
+        if (error && error.code === 'import_empty_file') {
+            return res.redirect('/khach-hang?error=import_empty_file');
+        }
+
         next(error);
     }
 };

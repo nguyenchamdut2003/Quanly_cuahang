@@ -22,6 +22,87 @@
     .status-pill.is-active { background: #dcfce7; color: #166534; }
     .status-pill.is-draft { background: #fef9c3; color: #854d0e; }
     .status-pill.is-cancelled { background: #fee2e2; color: #991b1b; }
+    .filter-check-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+      font-size: 13px;
+      color: #344054;
+      cursor: pointer;
+      user-select: none;
+    }
+    .filter-check-row input { width: 15px; height: 15px; accent-color: #0070f4; cursor: pointer; }
+    .supplier-debt-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; width: 100%; position: relative; }
+    .supplier-debt-warn-btn {
+      border: 0;
+      background: transparent;
+      color: #dc6803;
+      font-size: 15px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      position: relative;
+      flex: 0 0 auto;
+    }
+    .supplier-debt-warn-btn:hover { color: #b54708; }
+    .supplier-debt-warn-tip {
+      display: none;
+      position: fixed;
+      z-index: 12000;
+      width: min(300px, calc(100vw - 24px));
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid #fecdca;
+      background: #fff7ed;
+      color: #7a2e0e;
+      font-size: 12px;
+      line-height: 1.45;
+      text-align: left;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, .18);
+      font-weight: 500;
+      white-space: normal;
+      pointer-events: none;
+    }
+    .supplier-debt-warn-tip.is-visible { display: block; }
+    .supplier-debt-warn-tip strong { color: #b42318; font-weight: 800; }
+    .supplier-list-panel {
+      overflow: visible;
+    }
+    .supplier-list-panel > .table-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+    .supplier-list-panel .store-table td,
+    .supplier-list-panel .store-table th {
+      overflow: visible;
+    }
+    .filter-range-stack { display: grid; gap: 8px; margin-top: 8px; }
+    .filter-range-stack label span { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; }
+    .filter-range-stack input {
+      width: 100%;
+      height: 31px;
+      border: 1px solid #cfd8e3;
+      border-radius: 7px;
+      padding: 0 10px;
+      font-size: 13px;
+    }
+    .supplier-debt-row-overdue td { background: #fff1f0 !important; color: #b42318; }
+    .supplier-debt-row-overdue td strong { color: #b42318; }
+    .supplier-debt-row-paid td { color: #667085; }
+    .supplier-debt-sort-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 8px;
+      font-size: 12px;
+      color: #344054;
+      white-space: nowrap;
+      user-select: none;
+      cursor: pointer;
+    }
+    .supplier-debt-sort-check input { accent-color: #0070f4; }
+    .supplier-debt-actions { flex-wrap: wrap; }
     .table-code-link {
       color: #0070f4;
       text-decoration: none;
@@ -143,6 +224,12 @@
       gap: 10px;
       margin-bottom: 12px;
     }
+    .supplier-import-wrap{position:relative;display:inline-flex}
+    .supplier-import-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:180px;display:none;z-index:20;border:1px solid #d0d5dd;border-radius:8px;background:#fff;box-shadow:0 14px 30px rgba(16,24,40,.15);overflow:hidden}
+    .supplier-import-menu.is-open{display:block}
+    .supplier-import-menu button,.supplier-import-menu a{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 14px;font-size:13px;color:#111827;text-decoration:none;cursor:pointer}
+    .supplier-import-menu button:hover,.supplier-import-menu a:hover{background:#f8fafc}
+    .supplier-import-menu a + button{border-top:1px solid #f2f4f7}
     .supplier-debt-toolbar { margin-bottom: 14px; }
     .supplier-debt-summary {
       display: flex;
@@ -403,6 +490,16 @@
       </div>
       <div class="page-actions">
         <button class="btn btn-primary" type="button" id="openAddSupplierModal">+ Tạo mới</button>
+        <div class="supplier-import-wrap">
+          <button class="btn btn-light" type="button" id="supplierImportToggle" aria-haspopup="true" aria-expanded="false">Thêm bằng file ▾</button>
+          <div class="supplier-import-menu" id="supplierImportMenu" role="menu" aria-label="Thêm bằng file">
+            <a href="/nha-cung-cap/import/template.xlsx" role="menuitem">Lấy file mẫu</a>
+            <button type="button" id="supplierImportPickBtn" role="menuitem">Thêm</button>
+          </div>
+        </div>
+        <form id="supplierImportForm" method="post" action="/nha-cung-cap/import" enctype="multipart/form-data" hidden>
+          <input type="file" name="file" id="supplierImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </form>
         <a class="btn btn-light" href="/nha-cung-cap/export.xlsx?<%= filterQueryString || '' %>">Xuất file</a>
         <button class="btn btn-danger" type="submit" form="bulkDeleteSuppliersForm" onclick="return confirm('Xóa các nhà cung cấp đã chọn?')">Xóa đã chọn</button>
       </div>
@@ -474,62 +571,48 @@
                 <% }) %>
               </div>
             </div>
-            <h4>Tổng mua</h4>
-            <div class="range-stack">
-              <div class="range-row"><span>Từ</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="totalBuyFrom" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.totalBuyFrom) : (filter.totalBuyFrom || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
-              <div class="range-row"><span>Tới</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="totalBuyTo" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.totalBuyTo) : (filter.totalBuyTo || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
-            </div>
-            <h4>Thời gian</h4>
-            <label class="filter-radio-row">
-              <input type="radio" name="created" value="all" <%= filter.created !== 'custom' ? 'checked' : '' %>>
-              <span>Toàn thời gian</span>
+            <input type="hidden" name="debtDaySort" id="debtDaySortInput" value="<%= filter.debtDaySort || '' %>">
+            <h4 style="margin-top:16px">Sắp xếp theo ngày nợ</h4>
+            <label class="filter-check-row">
+              <input type="checkbox" id="debtSortOldest" value="oldest" <%= filter.debtDaySort === 'oldest' ? 'checked' : '' %>>
+              <span>Số ngày nợ xa nhất</span>
             </label>
-            <label class="filter-radio-row">
-              <input type="radio" name="created" value="custom" <%= filter.created === 'custom' ? 'checked' : '' %>>
-              <span>Tùy chỉnh</span>
+            <label class="filter-check-row">
+              <input type="checkbox" id="debtSortNewest" value="newest" <%= filter.debtDaySort === 'newest' ? 'checked' : '' %>>
+              <span>Số ngày nợ gần nhất</span>
             </label>
-            <div class="custom-date-range <%= filter.created === 'custom' ? 'is-visible' : '' %>" id="customDateRange">
-              <label><span>Từ ngày</span><input type="date" name="createdFrom" value="<%= filter.createdFrom || '' %>"></label>
-              <label><span>Đến ngày</span><input type="date" name="createdTo" value="<%= filter.createdTo || '' %>"></label>
-            </div>
-            <h4>Nợ hiện tại</h4>
-            <div class="range-stack">
-              <div class="range-row"><span>Từ</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="currentDebtFrom" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.currentDebtFrom) : (filter.currentDebtFrom || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
-              <div class="range-row"><span>Tới</span><input type="text" inputmode="numeric" class="js-vn-money-filter" name="currentDebtTo" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.currentDebtTo) : (filter.currentDebtTo || '') %>" placeholder="Nhập giá trị" autocomplete="off"></div>
-            </div>
-            <h4>Trạng thái</h4>
-            <div class="pill-row">
-              <button class="pill-btn <%= filter.status === 'all' ? 'is-active' : '' %>" type="button" data-target-input="supplierStatusInput" data-value="all">Tất cả</button>
-              <button class="pill-btn <%= filter.status === 'active' ? 'is-active' : '' %>" type="button" data-target-input="supplierStatusInput" data-value="active">Đang hoạt động</button>
-              <button class="pill-btn <%= filter.status === 'inactive' ? 'is-active' : '' %>" type="button" data-target-input="supplierStatusInput" data-value="inactive">Ngừng hoạt động</button>
-            </div>
-            <input type="hidden" id="supplierStatusInput" name="status" value="<%= filter.status || 'all' %>">
-            <div class="customer-filter-actions">
-              <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
-              <a class="btn btn-light" href="/nha-cung-cap">Xóa lọc</a>
+            <h4 style="margin-top:16px">Lọc cảnh báo nợ</h4>
+            <label class="filter-check-row">
+              <input type="checkbox" name="warnOnly" value="1" id="warnOnlyCheckbox" <%= filter.warnOnly === '1' ? 'checked' : '' %>>
+              <span>Chỉ hiện NCC có cảnh báo</span>
+            </label>
+            <div class="filter-range-stack">
+              <label>
+                <span>Quá số ngày</span>
+                <input type="number" min="0" step="1" name="warnMinDays" value="<%= filter.warnMinDays || debtWarnDefaultDays || 10 %>">
+              </label>
+              <label>
+                <span>Quá số tiền (VNĐ)</span>
+                <input type="text" inputmode="numeric" class="js-vn-money-filter" name="warnMinAmount" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(filter.warnMinAmount) : (filter.warnMinAmount || '') %>" placeholder="Không giới hạn" autocomplete="off">
+              </label>
             </div>
           </section>
         </form>
       </aside>
 
-      <section class="store-table-panel">
+      <section class="store-table-panel supplier-list-panel">
         <div class="table-wrap">
           <form id="bulkDeleteSuppliersForm" method="post" action="/nha-cung-cap/delete-selected"></form>
           <table class="admin-table store-table" data-kv-master="nha-cung-cap">
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllSuppliers" type="checkbox" aria-label="Chọn tất cả"></th>
-                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng nợ</th><th>Đã thanh toán</th><th>Tổng mua</th><th>Trạng thái</th>
+                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng mua</th><th>Đã thanh toán</th><th>Tổng nợ</th><th>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
               <% if (suppliers.length === 0) { %>
-                <tr><td colspan="9" class="empty-cell">
-                  Không có nhà cung cấp phù hợp với bộ lọc.
-                  <% if (typeof filterDebtRangeLabel === 'string' && filterDebtRangeLabel) { %>
-                    <div style="margin-top:6px;font-size:12px;color:#64748b;">Đang lọc nợ hiện tại từ <strong><%= filterDebtRangeLabel %></strong>. Kiểm tra cột <strong>Tổng nợ</strong> trên bảng khi bỏ lọc.</div>
-                  <% } %>
-                </td></tr>
+                <tr><td colspan="9" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr>
               <% } %>
               <% suppliers.forEach(function(supplier) { %>
                 <% var listBase = '/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
@@ -539,9 +622,29 @@
                   <td><strong><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= supplier.ten_ncc || '---' %></a></strong></td>
                   <td><%= supplier.sdt || '---' %></td>
                   <td><%= supplier.email || '---' %></td>
-                  <td><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></td>
-                  <td><%= Number(supplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
                   <td><%= Number(supplier.tong_mua || 0).toLocaleString('vi-VN') %></td>
+                  <td><%= Number(supplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
+                  <td>
+                    <div class="supplier-debt-cell">
+                      <span><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></span>
+                      <% if (supplier.debt_warning) { %>
+                        <button
+                          type="button"
+                          class="supplier-debt-warn-btn js-supplier-debt-warn"
+                          data-supplier-id="<%= supplier._id %>"
+                          aria-label="Cảnh báo nợ quá hạn"
+                        >⚠️
+                          <span class="supplier-debt-warn-tip">
+                            NCC có khoản nợ quá hạn <strong><%= Number(supplier.so_ngay_no_xa || 0).toLocaleString('vi-VN') %></strong> ngày.<br>
+                            Tổng nợ còn lại: <strong><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %> VNĐ</strong>.<br>
+                            <% if (supplier.no_xa_nhat_ma_phieu) { %>
+                              Khoản nợ lâu nhất: <strong><%= supplier.no_xa_nhat_ma_phieu %></strong> (<%= Number(supplier.no_xa_nhat_tien || 0).toLocaleString('vi-VN') %> VNĐ).
+                            <% } %>
+                          </span>
+                        </button>
+                      <% } %>
+                    </div>
+                  </td>
                   <td><span class="status-pill <%= supplier.trang_thai === 'active' ? 'is-active' : '' %>"><%= supplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></td>
                 </tr>
               <% }) %>
@@ -666,6 +769,87 @@
         });
       }
 
+      var debtDaySortInput = document.getElementById('debtDaySortInput');
+      var debtSortOldest = document.getElementById('debtSortOldest');
+      var debtSortNewest = document.getElementById('debtSortNewest');
+      function bindDebtSortCheckbox(box, otherBox, sortValue) {
+        if (!box) return;
+        box.addEventListener('change', function() {
+          if (box.checked) {
+            if (otherBox) otherBox.checked = false;
+            if (debtDaySortInput) debtDaySortInput.value = sortValue;
+          } else if (!otherBox || !otherBox.checked) {
+            if (debtDaySortInput) debtDaySortInput.value = '';
+          }
+          if (supplierFilterForm) supplierFilterForm.submit();
+        });
+      }
+      bindDebtSortCheckbox(debtSortOldest, debtSortNewest, 'oldest');
+      bindDebtSortCheckbox(debtSortNewest, debtSortOldest, 'newest');
+
+      var warnOnlyCheckbox = document.getElementById('warnOnlyCheckbox');
+      if (warnOnlyCheckbox && supplierFilterForm) {
+        warnOnlyCheckbox.addEventListener('change', function() {
+          supplierFilterForm.submit();
+        });
+      }
+      var warnMinDaysInput = supplierFilterForm ? supplierFilterForm.querySelector('input[name="warnMinDays"]') : null;
+      if (warnMinDaysInput && supplierFilterForm) {
+        warnMinDaysInput.addEventListener('change', function() {
+          supplierFilterForm.submit();
+        });
+      }
+
+      document.addEventListener('click', function(event) {
+        var warnBtn = event.target.closest('.js-supplier-debt-warn');
+        if (!warnBtn || !kvSupplier) return;
+        event.preventDefault();
+        event.stopPropagation();
+        var supplierId = warnBtn.getAttribute('data-supplier-id');
+        if (!supplierId) return;
+        window.__openSupplierDebtTab = true;
+        kvSupplier.openById(supplierId);
+      });
+
+      function positionSupplierDebtWarnTip(btn, tip) {
+        if (!btn || !tip) return;
+        var rect = btn.getBoundingClientRect();
+        var tipWidth = Math.min(300, window.innerWidth - 24);
+        var left = Math.max(12, rect.right - tipWidth);
+        var top = rect.bottom + 8;
+        if (top + tip.offsetHeight > window.innerHeight - 12) {
+          top = Math.max(12, rect.top - tip.offsetHeight - 8);
+        }
+        tip.style.width = tipWidth + 'px';
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+      }
+      function bindSupplierDebtWarnTips(root) {
+        var scope = root || document;
+        scope.querySelectorAll('.js-supplier-debt-warn').forEach(function(btn) {
+          if (btn.dataset.warnTipBound === '1') return;
+          btn.dataset.warnTipBound = '1';
+          var tip = btn.querySelector('.supplier-debt-warn-tip');
+          if (!tip) return;
+          function showTip() {
+            tip.classList.add('is-visible');
+            positionSupplierDebtWarnTip(btn, tip);
+          }
+          function hideTip() {
+            tip.classList.remove('is-visible');
+          }
+          btn.addEventListener('mouseenter', showTip);
+          btn.addEventListener('mouseleave', hideTip);
+          btn.addEventListener('focus', showTip);
+          btn.addEventListener('blur', hideTip);
+          window.addEventListener('scroll', hideTip, true);
+          window.addEventListener('resize', function() {
+            if (tip.classList.contains('is-visible')) positionSupplierDebtWarnTip(btn, tip);
+          });
+        });
+      }
+      bindSupplierDebtWarnTips(document);
+
       var selectAll = document.getElementById('selectAllSuppliers');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.supplier-checkbox'));
       if (selectAll) {
@@ -694,6 +878,11 @@
           },
           onOpen: function(id, root) {
             bindSupplierInlinePanel(root);
+            if (window.__openSupplierDebtTab) {
+              var debtTab = root.querySelector('[data-detail-tab="debt"]');
+              if (debtTab) debtTab.click();
+              window.__openSupplierDebtTab = false;
+            }
           }
         });
         if (/^#s-/.test(location.hash)) {
@@ -1027,15 +1216,16 @@
 
       var createdFilterRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="created"]'));
       var customDateRange = document.getElementById('customDateRange');
-      function toggleCustomDateRange() {
-        if (!customDateRange) return;
-        var selectedCreated = createdFilterRadios.find(function(radio) { return radio.checked; });
-        customDateRange.classList.toggle('is-visible', selectedCreated && selectedCreated.value === 'custom');
+      if (customDateRange && createdFilterRadios.length) {
+        function toggleCustomDateRange() {
+          var selectedCreated = createdFilterRadios.find(function(radio) { return radio.checked; });
+          customDateRange.classList.toggle('is-visible', selectedCreated && selectedCreated.value === 'custom');
+        }
+        createdFilterRadios.forEach(function(radio) {
+          radio.addEventListener('change', toggleCustomDateRange);
+        });
+        toggleCustomDateRange();
       }
-      createdFilterRadios.forEach(function(radio) {
-        radio.addEventListener('change', toggleCustomDateRange);
-      });
-      toggleCustomDateRange();
 
       var pillButtons = Array.prototype.slice.call(document.querySelectorAll('.pill-btn'));
       pillButtons.forEach(function(btn) {
@@ -1080,6 +1270,7 @@
               if (supplierGroupFilterValue) supplierGroupFilterValue.value = item.getAttribute('data-value') || 'all';
               if (supplierGroupFilterLabel) supplierGroupFilterLabel.textContent = item.getAttribute('data-name') || 'Tất cả các nhóm';
               if (supplierGroupFilterDropdown) supplierGroupFilterDropdown.classList.remove('is-open');
+              if (supplierFilterForm) supplierFilterForm.submit();
             });
           }
 
@@ -1464,6 +1655,62 @@
         if (supplierGroupFilterDropdown.contains(event.target)) return;
         if (supplierGroupFilterTrigger.contains(event.target)) return;
         supplierGroupFilterDropdown.classList.remove('is-open');
+      });
+
+      var supplierImportToggle = document.getElementById('supplierImportToggle');
+      var supplierImportMenu = document.getElementById('supplierImportMenu');
+      var supplierImportPickBtn = document.getElementById('supplierImportPickBtn');
+      var supplierImportForm = document.getElementById('supplierImportForm');
+      var supplierImportFile = document.getElementById('supplierImportFile');
+
+      function closeSupplierImportMenu() {
+        if (!supplierImportMenu || !supplierImportToggle) return;
+        supplierImportMenu.classList.remove('is-open');
+        supplierImportToggle.setAttribute('aria-expanded', 'false');
+      }
+
+      function isSupplierExcelFile(file) {
+        if (!file) return false;
+        var name = String(file.name || '').toLowerCase();
+        return /\.xlsx$/i.test(name);
+      }
+
+      if (supplierImportToggle && supplierImportMenu) {
+        supplierImportToggle.addEventListener('click', function(event) {
+          event.stopPropagation();
+          var isOpen = supplierImportMenu.classList.toggle('is-open');
+          supplierImportToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        });
+      }
+
+      if (supplierImportPickBtn && supplierImportFile) {
+        supplierImportPickBtn.addEventListener('click', function() {
+          closeSupplierImportMenu();
+          supplierImportFile.value = '';
+          supplierImportFile.click();
+        });
+      }
+
+      if (supplierImportFile && supplierImportForm) {
+        supplierImportFile.addEventListener('change', function() {
+          var file = supplierImportFile.files && supplierImportFile.files[0];
+          if (!file) return;
+
+          if (!isSupplierExcelFile(file)) {
+            alert('Chỉ chấp nhận file Excel (.xlsx). Vui lòng dùng file mẫu.');
+            supplierImportFile.value = '';
+            return;
+          }
+
+          supplierImportForm.submit();
+        });
+      }
+
+      document.addEventListener('click', function(event) {
+        if (!supplierImportMenu || !supplierImportToggle) return;
+        if (supplierImportMenu.contains(event.target)) return;
+        if (supplierImportToggle.contains(event.target)) return;
+        closeSupplierImportMenu();
       });
     });
   </script>

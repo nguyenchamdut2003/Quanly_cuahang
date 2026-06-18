@@ -7,6 +7,11 @@ const report58Excel = require('../services/report58Excel.service');
 const report58Data = require('../services/report58Data.service');
 const report58Pdf = require('../services/report58Pdf.service');
 const {
+    buildProfitByLotReport,
+    buildProfitByCustomerReport,
+    buildProfitBySupplierReport
+} = require('../services/profitReport.service');
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -281,6 +286,10 @@ async function buildOrderReport(query = {}) {
 }
 
 async function buildCustomerReport(query = {}) {
+    if (query.focus === 'loi-nhuan') {
+        const range = getSalesRange(query);
+        return buildProfitByCustomerReport(Object.assign({}, query, { range }));
+    }
     const range = getSalesRange(query);
     const customerSearch = query.customer?.trim();
     const customerFilter = {};
@@ -370,6 +379,10 @@ async function buildCustomerReport(query = {}) {
 }
 
 async function buildSupplierReport(query = {}) {
+    if (query.focus === 'loi-nhuan') {
+        const range = getSalesRange(query);
+        return buildProfitBySupplierReport(Object.assign({}, query, { range }));
+    }
     const range = getSalesRange(query);
     const supplierSearch = query.supplier?.trim();
     const supplierFilter = {};
@@ -467,8 +480,18 @@ const reportTitles = {
     'khach-hang': 'Báo cáo khách hàng',
     'nha-cung-cap': 'Báo cáo nhà cung cấp',
     'ton-kho-lo': 'Báo cáo tồn kho theo lô',
+    'loi-nhuan-lo': 'Báo cáo lợi nhuận theo lô hàng',
     '58': 'Báo cáo 58'
 };
+
+async function buildLotProfitAggregateReport(query = {}, store) {
+    const range = getSalesRange(query);
+    const storeId = query.cua_hang_id || (store && store._id ? String(store._id) : '');
+    return buildProfitByLotReport(Object.assign({}, query, {
+        range,
+        cua_hang_id: storeId
+    }));
+}
 
 const REPORT_58_MAU = report58Excel.REPORT_58_MAU;
 
@@ -845,20 +868,37 @@ router.get('/dat-hang/export.csv', async (req, res, next) => {
 
 router.get('/khach-hang/export.csv', async (req, res, next) => {
     try {
-        const report = await buildCustomerReport(req.query || {});
+        const report = await buildCustomerReport(Object.assign({}, req.query || {}, {
+            cua_hang_id: res.locals.currentStore?._id
+        }));
         const escape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-        const rows = [
-            ['ma_khach_hang', 'khach_hang', 'dien_thoai', 'doanh_thu', 'gia_tri_tra', 'doanh_thu_thuan', 'so_hoa_don'],
-            ...report.rows.map(item => [
-                item.code,
-                item.name,
-                item.phone,
-                item.revenue,
-                item.returned,
-                item.netRevenue,
-                item.invoiceCount
-            ])
-        ];
+        const isProfit = report.focus === 'loi-nhuan';
+        const rows = isProfit
+            ? [
+                ['ma_khach_hang', 'khach_hang', 'dien_thoai', 'doanh_thu', 'gia_von', 'loi_nhuan', 'ty_le_loi_nhuan', 'dong_thieu_gia_von'],
+                ...report.rows.map(item => [
+                    item.code,
+                    item.name,
+                    item.phone,
+                    item.doanh_thu,
+                    item.gia_von,
+                    item.loi_nhuan,
+                    item.ty_le_loi_nhuan,
+                    item.dong_thieu_gia_von
+                ])
+            ]
+            : [
+                ['ma_khach_hang', 'khach_hang', 'dien_thoai', 'doanh_thu', 'gia_tri_tra', 'doanh_thu_thuan', 'so_hoa_don'],
+                ...report.rows.map(item => [
+                    item.code,
+                    item.name,
+                    item.phone,
+                    item.revenue,
+                    item.returned,
+                    item.netRevenue,
+                    item.invoiceCount
+                ])
+            ];
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="bao-cao-khach-hang-${report.range.from}-${report.range.to}.csv"`);
         res.send('\uFEFF' + rows.map(row => row.map(escape).join(',')).join('\n'));
@@ -869,20 +909,37 @@ router.get('/khach-hang/export.csv', async (req, res, next) => {
 
 router.get('/nha-cung-cap/export.csv', async (req, res, next) => {
     try {
-        const report = await buildSupplierReport(req.query || {});
+        const report = await buildSupplierReport(Object.assign({}, req.query || {}, {
+            cua_hang_id: res.locals.currentStore?._id
+        }));
         const escape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-        const rows = [
-            ['ma_nha_cung_cap', 'ten_nha_cung_cap', 'dien_thoai', 'gia_tri_nhap', 'gia_tri_tra', 'gia_tri_thuan', 'so_phieu_nhap'],
-            ...report.rows.map(item => [
-                item.code,
-                item.name,
-                item.phone,
-                item.importValue,
-                item.returnValue,
-                item.netValue,
-                item.purchaseCount
-            ])
-        ];
+        const isProfit = report.focus === 'loi-nhuan';
+        const rows = isProfit
+            ? [
+                ['ma_nha_cung_cap', 'ten_nha_cung_cap', 'dien_thoai', 'doanh_thu', 'gia_von', 'loi_nhuan', 'ty_le_loi_nhuan', 'dong_thieu_gia_von'],
+                ...report.rows.map(item => [
+                    item.code,
+                    item.name,
+                    item.phone,
+                    item.doanh_thu,
+                    item.gia_von,
+                    item.loi_nhuan,
+                    item.ty_le_loi_nhuan,
+                    item.dong_thieu_gia_von
+                ])
+            ]
+            : [
+                ['ma_nha_cung_cap', 'ten_nha_cung_cap', 'dien_thoai', 'gia_tri_nhap', 'gia_tri_tra', 'gia_tri_thuan', 'so_phieu_nhap'],
+                ...report.rows.map(item => [
+                    item.code,
+                    item.name,
+                    item.phone,
+                    item.importValue,
+                    item.returnValue,
+                    item.netValue,
+                    item.purchaseCount
+                ])
+            ];
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="bao-cao-nha-cung-cap-${report.range.from}-${report.range.to}.csv"`);
         res.send('\uFEFF' + rows.map(row => row.map(escape).join(',')).join('\n'));
@@ -981,6 +1038,48 @@ router.get('/58/export.pdf', async (req, res, next) => {
     }
 });
 
+router.get('/loi-nhuan-lo/export.csv', async (req, res, next) => {
+    try {
+        const report = await buildLotProfitAggregateReport(req.query || {}, res.locals.currentStore || null);
+        const escape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const rows = [
+            ['ma_hang', 'ten_hang', 'ma_lo', 'ten_lo', 'quy_cach', 'so_luong', 'doanh_thu', 'gia_von', 'loi_nhuan', 'ty_le_loi_nhuan', 'thieu_gia_von'],
+            ...report.rows.map(item => [
+                item.ma_hang,
+                item.ten_hang,
+                item.ma_lo,
+                item.ten_lo,
+                item.ten_quy_cach,
+                item.so_luong,
+                item.doanh_thu,
+                item.gia_von,
+                item.loi_nhuan,
+                item.ty_le_loi_nhuan,
+                item.thieu_gia_von ? 1 : 0
+            ])
+        ];
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="bao-cao-loi-nhuan-lo-${report.range.from}-${report.range.to}.csv"`);
+        res.send('\uFEFF' + rows.map(row => row.map(escape).join(',')).join('\n'));
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.get('/loi-nhuan-lo', async (req, res, next) => {
+    try {
+        const report = await buildLotProfitAggregateReport(req.query || {}, res.locals.currentStore || null);
+        return res.render('bao-cao/loi-nhuan-lo', {
+            title: reportTitles['loi-nhuan-lo'],
+            heading: reportTitles['loi-nhuan-lo'],
+            reportType: 'loi-nhuan-lo',
+            report
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/58', async (req, res, next) => {
     try {
         const query = normalizeReport58Query(req.query || {});
@@ -1007,6 +1106,15 @@ router.get('/:reportType', async (req, res, next) => {
         if (reportType === 'ton-kho-lo') {
             const report = await buildLotStockReport(req.query || {});
             return res.render('bao-cao/ton-kho-lo', {
+                title: reportTitles[reportType],
+                heading: reportTitles[reportType],
+                reportType,
+                report
+            });
+        }
+        if (reportType === 'loi-nhuan-lo') {
+            const report = await buildLotProfitAggregateReport(req.query || {}, res.locals.currentStore || null);
+            return res.render('bao-cao/loi-nhuan-lo', {
                 title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
@@ -1041,7 +1149,9 @@ router.get('/:reportType', async (req, res, next) => {
             });
         }
         if (reportType === 'khach-hang') {
-            const report = await buildCustomerReport(req.query || {});
+            const report = await buildCustomerReport(Object.assign({}, req.query || {}, {
+                cua_hang_id: res.locals.currentStore?._id
+            }));
             return res.render('bao-cao/khach-hang', {
                 title: reportTitles[reportType],
                 heading: reportTitles[reportType],
@@ -1050,7 +1160,9 @@ router.get('/:reportType', async (req, res, next) => {
             });
         }
         if (reportType === 'nha-cung-cap') {
-            const report = await buildSupplierReport(req.query || {});
+            const report = await buildSupplierReport(Object.assign({}, req.query || {}, {
+                cua_hang_id: res.locals.currentStore?._id
+            }));
             return res.render('bao-cao/nha-cung-cap', {
                 title: reportTitles[reportType],
                 heading: reportTitles[reportType],

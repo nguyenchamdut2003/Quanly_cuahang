@@ -1,6 +1,7 @@
 <%
   const safeTickets = Array.isArray(locals.importSlips) ? locals.importSlips : [];
   const safeFilters = locals.filter || {};
+  const safeSuppliers = Array.isArray(locals.suppliers) ? locals.suppliers : [];
   const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
@@ -11,7 +12,7 @@
     const paid = Number(ticket.da_tra_ncc ?? 0) || 0;
     return Math.max(0, payable - paid);
   };
-  const statusBadge = status => status === 'draft' ? 'draft' : '';
+  const statusBadge = status => status === 'draft' ? 'draft' : (status === 'merged' ? 'merged' : '');
   const formatDateOnly = value => {
     if (!value) return '';
     const date = new Date(value);
@@ -108,6 +109,23 @@
     .filter-title{font-size:13px;font-weight:800;color:#111827;margin-bottom:10px}
     .check-line{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:#111827}
     .check-line input{width:14px;height:14px;accent-color:#0070f4}
+    .filter-check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:#111827;cursor:pointer}
+    .filter-check-row input{width:15px;height:15px;accent-color:#0070f4;cursor:pointer}
+    .filter-range-stack{display:grid;gap:8px;margin-top:8px}
+    .filter-range-stack label span{display:block;font-size:12px;color:#667085;margin-bottom:4px}
+    .filter-range-stack input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none}
+    .purchase-debt-cell{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;width:100%;position:relative}
+    .purchase-debt-warn-btn{
+      border:0;background:transparent;color:#dc6803;font-size:15px;line-height:1;cursor:pointer;padding:0;position:relative;flex:0 0 auto
+    }
+    .purchase-debt-warn-btn:hover{color:#b54708}
+    .purchase-debt-warn-tip{
+      display:none;position:fixed;z-index:12000;width:min(300px,calc(100vw - 24px));padding:10px 12px;border-radius:8px;
+      border:1px solid #fecdca;background:#fff7ed;color:#7a2e0e;font-size:12px;line-height:1.45;text-align:left;
+      box-shadow:0 10px 28px rgba(15,23,42,.18);font-weight:500;white-space:normal;pointer-events:none
+    }
+    .purchase-debt-warn-tip.is-visible{display:block}
+    .purchase-debt-warn-tip strong{color:#b42318;font-weight:800}
     .radio-line{display:flex;align-items:center;gap:9px;margin-top:9px}
     .radio-line input{accent-color:#0070f4}
     .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
@@ -124,10 +142,10 @@
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .supplier-code-link{color:#0070f4;text-decoration:none;font-weight:700}
     .supplier-code-link:hover{text-decoration:underline}
-    .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:hidden}
+    .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-x:auto;overflow-y:auto}
     .po-table{width:100%;table-layout:fixed;border-collapse:collapse}
-    .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap}
-    .po-table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}
+    .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap;overflow:visible}
+    .po-table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;overflow:visible}
     .po-table tbody tr:hover{background:#f7fbff}
     .po-table .num{text-align:right}
     .check-col,.star-col{width:36px;text-align:center}
@@ -135,6 +153,7 @@
     .star-col{color:#8b95a1}
     .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}
     .status-badge.draft{background:#fff4d6;color:#9a6700}
+    .status-badge.merged{background:#f2f4f7;color:#475467}
     .po-empty{height:260px;text-align:center;color:#7a8794}
     .col-code{width:130px}
     .col-time{width:160px}
@@ -203,6 +222,13 @@
     .edit-field input,.edit-field select,.edit-field textarea{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}
     .edit-field textarea{height:70px;min-height:70px}
     .edit-field.full{grid-column:1/-1}
+    .edit-vat-chua-box{margin-bottom:14px}
+    .edit-vat-chua-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+    .edit-vat-chua-row label{font-size:13px;color:#475467;min-width:72px}
+    .vat-chua-combo{display:flex;gap:6px;align-items:center;flex:1;min-width:220px}
+    .vat-chua-combo select,.vat-chua-combo input{height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}
+    .vat-chua-combo select{flex:1;min-width:0}
+    .vat-chua-combo .vat-chua-qty{width:88px;flex:0 0 88px}
     .edit-table-wrap{overflow-x:auto;border:1px solid #dbe4ee;border-radius:6px;margin-top:8px}
     .edit-table{width:100%;min-width:920px;border-collapse:collapse;font-size:13px}
     .edit-table th,.edit-table td{border-bottom:1px solid #e4e7ec;padding:7px;text-align:left;vertical-align:middle}
@@ -215,6 +241,28 @@
     .label-options{display:flex;gap:12px;margin:10px 0}.label-options select{height:32px;border:1px solid #cfd8e3;border-radius:6px}
     @media print{body>*:not(#labelPrintArea){display:none!important}#labelPrintArea{display:block!important}.label-sheet{display:grid;grid-template-columns:repeat(3,64mm);gap:3mm}.label-item{border:1px solid #111;padding:3mm;height:28mm;font-size:11px;break-inside:avoid}.label-code{font-weight:800;font-size:13px}.label-bar{font-family:monospace;letter-spacing:2px;margin-top:3px}}
     @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}.edit-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .purchase-merge-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:1400;align-items:flex-start;justify-content:center;padding:7px 12px}
+    .purchase-merge-modal{width:min(1200px,calc(100vw - 24px));max-height:calc(100vh - 14px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}
+    .purchase-merge-head{display:flex;align-items:center;justify-content:space-between;padding:24px 30px 20px}
+    .purchase-merge-head h3{margin:0;font-size:21px;font-weight:800;color:#202124}
+    .purchase-merge-close{border:0;background:transparent;color:#4b5563;font-size:28px;line-height:1;cursor:pointer}
+    .purchase-merge-body{padding:18px 30px 28px;overflow:auto}
+    .purchase-merge-desc{font-size:14px;line-height:1.45;color:#2f343b;margin:0 0 14px}
+    .purchase-merge-desc strong{color:#0070f4}
+    .purchase-merge-filter{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+    .purchase-merge-filter label{font-size:13px;font-weight:700;color:#111827}
+    .purchase-merge-filter select{height:31px;min-width:260px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 9px;font-size:13px;outline:none}
+    .purchase-merge-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .purchase-merge-table th{height:37px;background:#f0f1f3;border-bottom:1px solid #cfd4dc;text-align:left;padding:0 10px;color:#202124;font-size:13px;font-weight:800}
+    .purchase-merge-table td{height:38px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .purchase-merge-table .num{text-align:right}
+    .purchase-merge-check{width:38px;text-align:center}
+    .purchase-merge-empty{min-height:220px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:#202124;padding:16px}
+    .purchase-merge-empty .empty-icon{width:112px;height:112px;font-size:40px;margin:0 0 20px;background:#f1f7ff;box-shadow:inset 0 0 0 16px #dcecff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#0070f4}
+    .purchase-merge-empty strong{font-size:15px;line-height:1.45}
+    .purchase-merge-empty span{display:block;margin-top:8px;color:#667085;font-size:13px;line-height:1.4}
+    .purchase-merge-foot{display:none;align-items:center;justify-content:flex-end;gap:8px;padding:14px 30px 24px;border-top:1px solid #e5e9ee}
+    @media(max-width:760px){.purchase-merge-overlay{padding:8px}.purchase-merge-head{padding:18px 18px 12px}.purchase-merge-body{padding:14px 18px 22px}.purchase-merge-table{min-width:840px}}
   </style>
 </head>
 <body class="admin-body">
@@ -226,24 +274,34 @@
         <h1 class="po-title">Nhập hàng</h1>
         <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã nhập hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã nhập hàng</label>
           <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
         </div>
         <div class="filter-block">
-          <div class="filter-title">Thời gian</div>
-          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <span>›</span></span></label>
-          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
-          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
-          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
-        </div>
-        <div class="filter-block">
-          <div class="filter-title">Người tạo</div>
-          <input class="filter-control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo">
-        </div>
-        <div class="filter-block">
           <div class="filter-title">Nhà cung cấp</div>
-          <input class="filter-control" name="nha_cung_cap" value="<%= safeFilters.nha_cung_cap || '' %>" placeholder="Chọn nhà cung cấp">
+          <select class="filter-control" name="nha_cung_cap_id" aria-label="Lọc theo nhà cung cấp" onchange="this.form.submit()">
+            <option value="">Tất cả nhà cung cấp</option>
+            <% safeSuppliers.forEach(function(s) { %>
+              <option value="<%= s._id %>" <%= String(safeFilters.nha_cung_cap_id || '') === String(s._id) ? 'selected' : '' %>><%= (s.ma_ncc ? s.ma_ncc + ' - ' : '') + (s.ten_ncc || 'Không tên') %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="filter-block">
+          <div class="filter-title">Lọc cảnh báo nợ</div>
+          <label class="filter-check-row">
+            <input type="checkbox" name="warnOnly" value="1" id="warnOnlyCheckbox" <%= safeFilters.warnOnly === '1' ? 'checked' : '' %>>
+            <span>Chỉ hiện phiếu có cảnh báo</span>
+          </label>
+          <div class="filter-range-stack">
+            <label>
+              <span>Quá số ngày</span>
+              <input type="number" min="0" step="1" name="warnMinDays" value="<%= safeFilters.warnMinDays || debtWarnDefaultDays || 10 %>">
+            </label>
+            <label>
+              <span>Quá số tiền (VNĐ)</span>
+              <input type="text" inputmode="numeric" class="js-vn-money-filter" name="warnMinAmount" value="<%= typeof formatFilterMoney === 'function' ? formatFilterMoney(safeFilters.warnMinAmount) : (safeFilters.warnMinAmount || '') %>" placeholder="Không giới hạn" autocomplete="off">
+            </label>
+          </div>
         </div>
       </aside>
 
@@ -264,6 +322,7 @@
           </div>
           <div class="toolbar-actions">
             <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
+            <button type="button" class="kv-btn" id="openPurchaseMergeModal">Gộp đơn</button>
             <button class="kv-btn" type="button">Xuất file ▾</button>
           </div>
         </div>
@@ -287,8 +346,20 @@
             <tbody>
               <% if (safeTickets.length) { %>
                 <% safeTickets.forEach(function(t) { %>
-                  <tr class="expand-row" data-expand-id="<%= t._id %>">
-                    <td class="check-col"><input class="row-check" type="checkbox"></td>
+                  <tr class="expand-row purchase-row"
+                    data-expand-id="<%= t._id %>"
+                    data-purchase-id="<%= t._id %>"
+                    data-purchase-code="<%= t.ma_phieu_nhap || '' %>"
+                    data-purchase-date="<%= new Date(t.ngay_nhap || t.created_at).toISOString() %>"
+                    data-purchase-status="<%= t.trang_thai || '' %>"
+                    data-has-return="<%= t.has_return ? '1' : '0' %>"
+                    data-supplier-id="<%= t.nha_cung_cap_id ? t.nha_cung_cap_id._id : '' %>"
+                    data-supplier-code="<%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ma_ncc || '') : '' %>"
+                    data-supplier-name="<%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '') : '' %>"
+                    data-payable="<%= Number(t.can_tra_ncc ?? t.tong_tien ?? 0) %>"
+                    data-paid="<%= Number(t.da_tra_ncc ?? 0) %>"
+                  >
+                    <td class="check-col"><input class="row-check purchase-select-check" type="checkbox" onclick="event.stopPropagation()"></td>
                     <td class="star-col">☆</td>
                     <td class="cell-ellipsis"><%- refLink('purchase', t, t.ma_phieu_nhap || '') %></td>
                     <td class="cell-ellipsis"><%= formatDate(t.ngay_nhap || t.created_at) %></td>
@@ -302,7 +373,25 @@
                     <td class="cell-ellipsis"><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
                     <td class="num"><%= fmtMoney((t.tong_tien ?? t.can_tra_ncc ?? 0)) %></td>
                     <td class="num"><%= fmtMoney((t.da_tra_ncc ?? 0)) %></td>
-                    <td class="num"><%= fmtMoney(purchaseRemainDue(t)) %></td>
+                    <td class="num">
+                      <div class="purchase-debt-cell">
+                        <span><%= fmtMoney(purchaseRemainDue(t)) %></span>
+                        <% if (t.debt_warning) { %>
+                          <button
+                            type="button"
+                            class="purchase-debt-warn-btn js-purchase-debt-warn"
+                            onclick="event.stopPropagation()"
+                            aria-label="Cảnh báo nợ quá hạn"
+                          >⚠️
+                            <span class="purchase-debt-warn-tip">
+                              Phiếu nhập có khoản nợ quá hạn <strong><%= Number(t.so_ngay_no || 0).toLocaleString('vi-VN') %></strong> ngày.<br>
+                              Cần trả NCC: <strong><%= fmt(purchaseRemainDue(t)) %> VNĐ</strong>.<br>
+                              Mã phiếu: <strong><%= t.ma_phieu_nhap || '--' %></strong>.
+                            </span>
+                          </button>
+                        <% } %>
+                      </div>
+                    </td>
                     <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
                   <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
@@ -483,6 +572,44 @@
       </main>
     </div>
   </form>
+  <div id="purchaseMergeModalOverlay" class="purchase-merge-overlay">
+    <div class="purchase-merge-modal" role="dialog" aria-labelledby="purchaseMergeModalTitle" aria-modal="true">
+      <div class="purchase-merge-head">
+        <h3 id="purchaseMergeModalTitle">Gộp phiếu nhập hàng</h3>
+        <button type="button" class="purchase-merge-close" id="purchaseMergeModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="purchase-merge-body">
+        <p class="purchase-merge-desc">Chọn <strong>nhà cung cấp</strong> rồi gộp các phiếu nhập <strong>chưa phát sinh trả hàng</strong> của NCC đó thành 1 phiếu nhập hàng</p>
+        <div class="purchase-merge-filter">
+          <label for="purchaseMergeSupplierSelect">Nhà cung cấp</label>
+          <select id="purchaseMergeSupplierSelect"></select>
+        </div>
+        <table class="purchase-merge-table">
+          <thead>
+            <tr>
+              <th class="purchase-merge-check"><input id="purchaseMergeCheckAll" type="checkbox"></th>
+              <th>Mã nhập hàng</th>
+              <th>Thời gian</th>
+              <th class="num">Cần trả NCC</th>
+              <th class="num">Đã thanh toán</th>
+              <th>Mã NCC</th>
+              <th>Nhà cung cấp</th>
+            </tr>
+          </thead>
+          <tbody id="purchaseMergeRows"></tbody>
+        </table>
+        <div id="purchaseMergeEmpty" class="purchase-merge-empty">
+          <div class="empty-icon">📦</div>
+          <strong id="purchaseMergeEmptyTitle">Không có phiếu nhập có thể gộp</strong>
+          <span id="purchaseMergeEmptyDesc"></span>
+        </div>
+      </div>
+      <div id="purchaseMergeFoot" class="purchase-merge-foot">
+        <button type="button" class="kv-btn" id="purchaseMergeCancel">Bỏ qua</button>
+        <button type="button" class="kv-btn primary" id="purchaseMergeSubmit">Gộp đơn</button>
+      </div>
+    </div>
+  </div>
   <div id="purchaseModal" class="po-modal">
     <div class="po-modal-card">
       <div class="po-modal-head">
@@ -535,11 +662,13 @@
   <script id="supplierData" type="application/json"><%- JSON.stringify(locals.suppliers || []).replace(/</g, '\\u003c') %></script>
   <script id="warehouseData" type="application/json"><%- JSON.stringify(locals.warehouses || []).replace(/</g, '\\u003c') %></script>
   <script id="cashBookData" type="application/json"><%- JSON.stringify(locals.cashBooks || []).replace(/</g, '\\u003c') %></script>
+  <script id="vatChuaData" type="application/json"><%- JSON.stringify(locals.vatChuaList || []).replace(/</g, '\\u003c') %></script>
   <script>
     const purchases = JSON.parse(document.getElementById('purchaseData')?.textContent || '[]');
     const suppliers = JSON.parse(document.getElementById('supplierData')?.textContent || '[]');
     const warehouses = JSON.parse(document.getElementById('warehouseData')?.textContent || '[]');
     const cashBooks = JSON.parse(document.getElementById('cashBookData')?.textContent || '[]');
+    const vatChuaList = JSON.parse(document.getElementById('vatChuaData')?.textContent || '[]');
     const paySupplierBookCache = { tien_mat: null, chuyen_khoan: null };
     let currentPurchaseId = '';
     let currentPurchaseEdit = null;
@@ -720,6 +849,42 @@
           const selected = String(k._id) === String(ticket.kho_id?._id || ticket.kho_id || '');
           return `<option value="${k._id}" ${selected ? 'selected' : ''}>${escapeHtml(k.ten_kho || k.ma_kho || '')}</option>`;
         }).join('');
+        const vcEdit = data.data.vat_chua_edit || {};
+        const vcLines = data.data.vat_chua_lines || [];
+        const canEditVatChua = !readonly && ticket.trang_thai === 'completed' && (vatChuaList.length > 0 || vcLines.length > 0);
+        let vatChuaSection = '';
+        if (canEditVatChua) {
+          const vcIds = new Set(vatChuaList.map(vc => String(vc._id || '')));
+          const currentVcId = String(vcEdit.vat_chua_id || '');
+          let extraVcOption = '';
+          if (currentVcId && !vcIds.has(currentVcId)) {
+            const fromLine = vcLines.find(line => String(line.vat_chua_id || '') === currentVcId) || vcLines[0] || {};
+            const label = (fromLine.ma_vat_chua ? fromLine.ma_vat_chua + ' - ' : '') + (fromLine.ten_vat_chua || 'Vật chứa hiện tại');
+            extraVcOption = `<option value="${escapeHtml(currentVcId)}" selected>${escapeHtml(label)}</option>`;
+          }
+          const vatChuaOptions = ['<option value="">— Chọn —</option>']
+            .concat(extraVcOption ? [extraVcOption] : [])
+            .concat(vatChuaList.map(vc => {
+              const id = String(vc._id || '');
+              const selected = currentVcId && id === currentVcId ? 'selected' : '';
+              const label = (vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '') + (vc.ten_vat_chua || '---');
+              return `<option value="${escapeHtml(id)}" ${selected}>${escapeHtml(label)}</option>`;
+            }))
+            .join('');
+          const vcQty = Number(vcEdit.so_luong || 0) > 0 ? String(Math.floor(Number(vcEdit.so_luong || 0))) : '';
+          vatChuaSection = `
+          <div class="purchase-vat-chua-box edit-vat-chua-box">
+            <div class="purchase-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa</div>
+            <div class="edit-vat-chua-row">
+              <label for="editVatChuaId">Vật chứa</label>
+              <div class="vat-chua-combo">
+                <select id="editVatChuaId" title="Chọn vật chứa">${vatChuaOptions}</select>
+                <input id="editVatChuaQty" class="vat-chua-qty" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa" value="${escapeHtml(vcQty)}">
+              </div>
+            </div>
+            <p class="lot-note">Để trống nếu không nhập vật chứa. Khi lưu, tồn vật chứa được điều chỉnh theo thay đổi.</p>
+          </div>`;
+        }
         const itemRows = currentPurchaseEdit.items.map((row, index) => {
           const product = row.hang_hoa_id || {};
           const discountType = row.kieu_giam_gia_dong || 'vnd';
@@ -753,6 +918,7 @@
             <div class="edit-field"><label>Đã trả NCC</label><input id="editPaid" inputmode="numeric" value="${money(ticket.da_tra_ncc || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
             <div class="edit-field full"><label>Ghi chú phiếu</label><textarea id="purchaseNote" ${readonly ? 'disabled' : ''}>${escapeHtml(ticket.ghi_chu || '')}</textarea></div>
           </div>
+          ${vatChuaSection}
           <div class="edit-table-wrap">
             <table class="edit-table">
               <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>Số lượng</th><th>Đơn giá</th><th>Giảm dòng</th><th>Kiểu</th><th class="num">Thành tiền</th><th>Ghi chú</th></tr></thead>
@@ -804,8 +970,26 @@
       if (totalEl) totalEl.textContent = moneyText(total);
       if (debtEl) debtEl.textContent = moneyText(Math.max(0, payable - paid));
     }
+    function validateVatChuaEdit(){
+      const id = String(document.getElementById('editVatChuaId')?.value || '').trim();
+      const rawQty = String(document.getElementById('editVatChuaQty')?.value || '').replace(/\./g, '').replace(/,/g, '').trim();
+      if (!id && !rawQty) return true;
+      const qty = Math.floor(Number(rawQty || 0));
+      if (id && qty <= 0) {
+        alert('Số lượng vật chứa phải lớn hơn 0');
+        document.getElementById('editVatChuaQty')?.focus();
+        return false;
+      }
+      if (!id && rawQty && qty > 0) {
+        alert('Vui lòng chọn vật chứa');
+        document.getElementById('editVatChuaId')?.focus();
+        return false;
+      }
+      return true;
+    }
     async function savePurchaseNote(){
       if (!currentPurchaseId) return;
+      if (!validateVatChuaEdit()) return;
       try {
         const items = Array.from(document.querySelectorAll('[data-edit-row]')).map(rowEl => ({
           _id: rowEl.dataset.editRow,
@@ -815,7 +999,7 @@
           kieu_giam_gia_dong: rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd',
           ghi_chu: rowEl.querySelector('[data-edit-field="ghi_chu"]')?.value || ''
         }));
-        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', {
+        const payload = {
           nha_cung_cap_id: document.getElementById('editSupplier')?.value || '',
           kho_id: document.getElementById('editWarehouse')?.value || '',
           ngay_nhap: document.getElementById('editImportDate')?.value || '',
@@ -825,7 +1009,13 @@
           da_tra_ncc: document.getElementById('editPaid')?.value || 0,
           ghi_chu: document.getElementById('purchaseNote')?.value || '',
           items
-        });
+        };
+        const editVatChuaEl = document.getElementById('editVatChuaId');
+        if (editVatChuaEl) {
+          payload.vat_chua_id = editVatChuaEl.value || '';
+          payload.vat_chua_so_luong = document.getElementById('editVatChuaQty')?.value || '';
+        }
+        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', payload);
         alert(data.message || 'Đã lưu');
         location.reload();
       } catch (error) {
@@ -1030,10 +1220,100 @@
       window.print();
     }
     document.addEventListener('DOMContentLoaded', function() {
+      var poFilterForm = document.getElementById('poFilterForm');
+      function parseFilterMoney(value) {
+        var normalized = String(value || '').replace(/\./g, '').replace(/,/g, '').trim();
+        if (normalized === '') return '';
+        var number = Number(normalized);
+        return Number.isFinite(number) && number >= 0 ? Math.floor(number) : '';
+      }
+      function formatFilterMoney(value) {
+        if (value === '' || value == null) return '';
+        var number = Math.max(0, Math.floor(Number(value || 0)));
+        return number.toLocaleString('vi-VN');
+      }
+      function bindVnMoneyFilterInputs(root) {
+        var scope = root || document;
+        scope.querySelectorAll('.js-vn-money-filter').forEach(function(input) {
+          if (input.getAttribute('data-vn-money-bound') === '1') return;
+          input.setAttribute('data-vn-money-bound', '1');
+          input.addEventListener('input', function() {
+            var digits = String(input.value || '').replace(/\D/g, '');
+            input.value = digits === '' ? '' : formatFilterMoney(digits);
+          });
+        });
+      }
+      if (poFilterForm) {
+        bindVnMoneyFilterInputs(poFilterForm);
+        poFilterForm.addEventListener('submit', function() {
+          poFilterForm.querySelectorAll('.js-vn-money-filter').forEach(function(input) {
+            var parsed = parseFilterMoney(input.value);
+            input.value = parsed === '' ? '' : String(parsed);
+          });
+        });
+        var warnOnlyCheckbox = document.getElementById('warnOnlyCheckbox');
+        if (warnOnlyCheckbox) {
+          warnOnlyCheckbox.addEventListener('change', function() {
+            poFilterForm.submit();
+          });
+        }
+        var warnMinDaysInput = poFilterForm.querySelector('input[name="warnMinDays"]');
+        if (warnMinDaysInput) {
+          warnMinDaysInput.addEventListener('change', function() {
+            poFilterForm.submit();
+          });
+        }
+        var warnMinAmountInput = poFilterForm.querySelector('input[name="warnMinAmount"]');
+        if (warnMinAmountInput) {
+          warnMinAmountInput.addEventListener('change', function() {
+            poFilterForm.submit();
+          });
+        }
+      }
+      function positionPurchaseDebtWarnTip(btn, tip) {
+        if (!btn || !tip) return;
+        var rect = btn.getBoundingClientRect();
+        var tipWidth = Math.min(300, window.innerWidth - 24);
+        var left = Math.max(12, rect.right - tipWidth);
+        var top = rect.bottom + 8;
+        if (top + tip.offsetHeight > window.innerHeight - 12) {
+          top = Math.max(12, rect.top - tip.offsetHeight - 8);
+        }
+        tip.style.width = tipWidth + 'px';
+        tip.style.left = left + 'px';
+        tip.style.top = top + 'px';
+      }
+      function bindPurchaseDebtWarnTips(root) {
+        var scope = root || document;
+        scope.querySelectorAll('.js-purchase-debt-warn').forEach(function(btn) {
+          if (btn.dataset.warnTipBound === '1') return;
+          btn.dataset.warnTipBound = '1';
+          var tip = btn.querySelector('.purchase-debt-warn-tip');
+          if (!tip) return;
+          function showTip() {
+            tip.classList.add('is-visible');
+            positionPurchaseDebtWarnTip(btn, tip);
+          }
+          function hideTip() {
+            tip.classList.remove('is-visible');
+          }
+          btn.addEventListener('mouseenter', showTip);
+          btn.addEventListener('mouseleave', hideTip);
+          btn.addEventListener('focus', showTip);
+          btn.addEventListener('blur', hideTip);
+          window.addEventListener('scroll', hideTip, true);
+          window.addEventListener('resize', function() {
+            if (tip.classList.contains('is-visible')) positionPurchaseDebtWarnTip(btn, tip);
+          });
+        });
+      }
+      bindPurchaseDebtWarnTips(document);
+
       var rows = Array.prototype.slice.call(document.querySelectorAll('.expand-row'));
       rows.forEach(function(row) {
         row.addEventListener('click', function(e) {
           if (e.target && e.target.closest('input[type="checkbox"]')) return;
+          if (e.target && e.target.closest('.js-purchase-debt-warn')) return;
           var id = row.getAttribute('data-expand-id');
           var detail = document.getElementById('detail-' + id);
           if (!detail) return;
@@ -1077,6 +1357,210 @@
         });
       });
     });
+
+    (function initPurchaseMergeModal() {
+      var overlay = document.getElementById('purchaseMergeModalOverlay');
+      var openBtn = document.getElementById('openPurchaseMergeModal');
+      var closeBtn = document.getElementById('purchaseMergeModalClose');
+      var cancelBtn = document.getElementById('purchaseMergeCancel');
+      var rowsEl = document.getElementById('purchaseMergeRows');
+      var emptyEl = document.getElementById('purchaseMergeEmpty');
+      var emptyTitleEl = document.getElementById('purchaseMergeEmptyTitle');
+      var emptyDescEl = document.getElementById('purchaseMergeEmptyDesc');
+      var footEl = document.getElementById('purchaseMergeFoot');
+      var supplierSelect = document.getElementById('purchaseMergeSupplierSelect');
+      var modalCheckAll = document.getElementById('purchaseMergeCheckAll');
+      var submitBtn = document.getElementById('purchaseMergeSubmit');
+      var selectAll = document.querySelector('.po-table thead .row-check');
+      var purchaseChecks = Array.prototype.slice.call(document.querySelectorAll('.purchase-select-check'));
+      var modalPurchases = [];
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+        });
+      }
+      function moneyText(value) {
+        return Number(value || 0).toLocaleString('vi-VN') + ' VNĐ';
+      }
+      function readPurchase(row) {
+        return {
+          id: row.dataset.purchaseId || '',
+          code: row.dataset.purchaseCode || '',
+          date: new Date(row.dataset.purchaseDate || ''),
+          status: row.dataset.purchaseStatus || '',
+          hasReturn: row.dataset.hasReturn === '1',
+          supplierId: row.dataset.supplierId || '',
+          supplierCode: row.dataset.supplierCode || '',
+          supplierName: row.dataset.supplierName || '--',
+          supplierKey: row.dataset.supplierId || row.dataset.supplierCode || '',
+          payable: Number(row.dataset.payable || 0),
+          paid: Number(row.dataset.paid || 0)
+        };
+      }
+      function isMergeablePurchase(purchase) {
+        if (!purchase || !purchase.id) return false;
+        if (['cancelled', 'merged'].indexOf(purchase.status) >= 0) return false;
+        if (purchase.hasReturn) return false;
+        if (!purchase.supplierKey) return false;
+        return ['draft', 'completed'].indexOf(purchase.status) >= 0;
+      }
+      function getModalSuppliers(purchases) {
+        var map = {};
+        purchases.forEach(function(purchase) {
+          if (!purchase.supplierKey) return;
+          if (!map[purchase.supplierKey]) {
+            map[purchase.supplierKey] = {
+              key: purchase.supplierKey,
+              code: purchase.supplierCode,
+              name: purchase.supplierName || '--'
+            };
+          }
+        });
+        return Object.keys(map).map(function(key) { return map[key]; }).sort(function(a, b) {
+          return a.name.localeCompare(b.name, 'vi');
+        });
+      }
+      function getPageSupplierFilterKey() {
+        var pageSelect = document.querySelector('#poFilterForm select[name="nha_cung_cap_id"]');
+        return pageSelect ? String(pageSelect.value || '').trim() : '';
+      }
+      function resolveInitialSupplierKey(suppliers) {
+        var pageKey = getPageSupplierFilterKey();
+        if (pageKey && suppliers.some(function(supplier) { return supplier.key === pageKey; })) {
+          return pageKey;
+        }
+        if (suppliers.length === 1) return suppliers[0].key;
+        return '';
+      }
+      function renderSupplierOptions(purchases) {
+        if (!supplierSelect) return;
+        var suppliers = getModalSuppliers(purchases);
+        supplierSelect.innerHTML = '<option value="">— Chọn nhà cung cấp —</option>' + suppliers.map(function(supplier) {
+          var label = [supplier.code, supplier.name].filter(Boolean).join(' - ');
+          return '<option value="' + escapeHtml(supplier.key) + '">' + escapeHtml(label) + '</option>';
+        }).join('');
+      }
+      function getFilteredModalPurchases() {
+        var supplierKey = supplierSelect ? supplierSelect.value : '';
+        if (!supplierKey) return [];
+        return modalPurchases.filter(function(p) { return p.supplierKey === supplierKey; });
+      }
+      function updateModalCheckAll() {
+        if (!modalCheckAll) return;
+        var rowChecks = Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check'));
+        modalCheckAll.checked = rowChecks.length > 0 && rowChecks.every(function(cb) { return cb.checked; });
+        modalCheckAll.indeterminate = rowChecks.some(function(cb) { return cb.checked; }) && !modalCheckAll.checked;
+      }
+      function renderRows(purchases, emptyTitle, emptyDesc) {
+        if (!rowsEl || !emptyEl || !footEl) return;
+        var hasRows = purchases.length > 0;
+        rowsEl.innerHTML = hasRows ? purchases.map(function(purchase) {
+          return '<tr>' +
+            '<td class="purchase-merge-check"><input class="purchase-merge-row-check" type="checkbox" value="' + escapeHtml(purchase.id) + '" data-supplier-key="' + escapeHtml(purchase.supplierKey) + '"></td>' +
+            '<td>' + escapeHtml(purchase.code) + '</td>' +
+            '<td>' + escapeHtml(Number.isFinite(purchase.date.getTime()) ? purchase.date.toLocaleString('vi-VN') : '') + '</td>' +
+            '<td class="num">' + moneyText(purchase.payable) + '</td>' +
+            '<td class="num">' + moneyText(purchase.paid) + '</td>' +
+            '<td>' + escapeHtml(purchase.supplierCode) + '</td>' +
+            '<td>' + escapeHtml(purchase.supplierName) + '</td>' +
+          '</tr>';
+        }).join('') : '';
+        if (emptyTitleEl) emptyTitleEl.textContent = emptyTitle || 'Không có phiếu nhập có thể gộp';
+        if (emptyDescEl) emptyDescEl.textContent = emptyDesc || '';
+        emptyEl.style.display = hasRows ? 'none' : 'flex';
+        footEl.style.display = hasRows ? 'flex' : 'none';
+        updateModalCheckAll();
+        Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check')).forEach(function(cb) {
+          cb.addEventListener('change', updateModalCheckAll);
+        });
+      }
+      function refreshModalRows() {
+        var supplierKey = supplierSelect ? supplierSelect.value : '';
+        if (!supplierKey) {
+          renderRows([], 'Chưa chọn nhà cung cấp', 'Vui lòng chọn nhà cung cấp để xem danh sách phiếu nhập có thể gộp.');
+          return;
+        }
+        var filtered = getFilteredModalPurchases();
+        renderRows(filtered, 'Không có phiếu nhập có thể gộp', 'Nhà cung cấp này chưa có phiếu nhập hợp lệ trong danh sách hiện tại (đã loại phiếu hủy, đã gộp hoặc đã trả hàng).');
+      }
+      async function submitMergePurchases() {
+        var supplierKey = supplierSelect ? supplierSelect.value : '';
+        if (!supplierKey) {
+          return alert('Vui lòng chọn nhà cung cấp trước khi gộp phiếu nhập.');
+        }
+        var selectedIds = Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check:checked')).map(function(cb) { return cb.value; }).filter(Boolean);
+        if (selectedIds.length < 2) {
+          return alert('Vui lòng chọn ít nhất 2 phiếu nhập để gộp.');
+        }
+        var selectedSupplierKeys = {};
+        Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check:checked')).forEach(function(cb) {
+          var key = cb.dataset.supplierKey || '';
+          if (key) selectedSupplierKeys[key] = true;
+        });
+        if (Object.keys(selectedSupplierKeys).length > 1) {
+          return alert('Chỉ được gộp các phiếu thuộc cùng một nhà cung cấp.');
+        }
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+          var res = await fetch('/api/nhap-hang/gop-phieu-nhap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phieu_nhap_ids: selectedIds })
+          });
+          var data = await res.json();
+          if (!data.success) return alert(data.message || 'Không gộp được phiếu nhập.');
+          window.location.href = '/nhap-hang?purchase=' + encodeURIComponent(data.data && data.data.phieu_nhan_id ? data.data.phieu_nhan_id : selectedIds[0]);
+        } catch (error) {
+          alert('Không gộp được phiếu nhập.');
+        } finally {
+          if (submitBtn) submitBtn.disabled = false;
+        }
+      }
+      function openModal() {
+        if (!overlay) return;
+        var allRows = Array.prototype.slice.call(document.querySelectorAll('.purchase-row'));
+        modalPurchases = allRows.map(readPurchase).filter(isMergeablePurchase);
+        renderSupplierOptions(modalPurchases);
+        if (supplierSelect) {
+          supplierSelect.value = resolveInitialSupplierKey(getModalSuppliers(modalPurchases));
+        }
+        refreshModalRows();
+        overlay.style.display = 'flex';
+      }
+      function closeModal() {
+        if (overlay) overlay.style.display = 'none';
+      }
+      if (selectAll) {
+        selectAll.addEventListener('click', function(e) {
+          e.stopPropagation();
+          purchaseChecks.forEach(function(cb) { cb.checked = selectAll.checked; });
+        });
+      }
+      purchaseChecks.forEach(function(cb) {
+        cb.addEventListener('change', function() {
+          if (!selectAll) return;
+          selectAll.checked = purchaseChecks.length > 0 && purchaseChecks.every(function(item) { return item.checked; });
+          selectAll.indeterminate = purchaseChecks.some(function(item) { return item.checked; }) && !selectAll.checked;
+        });
+      });
+      if (openBtn) openBtn.addEventListener('click', openModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (submitBtn) submitBtn.addEventListener('click', submitMergePurchases);
+      if (supplierSelect) supplierSelect.addEventListener('change', refreshModalRows);
+      if (modalCheckAll) {
+        modalCheckAll.addEventListener('change', function() {
+          Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check')).forEach(function(cb) {
+            cb.checked = modalCheckAll.checked;
+          });
+          updateModalCheckAll();
+        });
+      }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay && overlay.style.display === 'flex') closeModal();
+      });
+    })();
   </script>
 </body>
 </html>

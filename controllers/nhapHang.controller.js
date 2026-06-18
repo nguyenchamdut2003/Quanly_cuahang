@@ -1,30 +1,118 @@
 var mongoose = require('mongoose');
 var path = require('path');
-var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc, VatChua } = require('../models/kiot.model');
+var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc, VatChua, NhapVatChua } = require('../models/kiot.model');
+var {
+  importVatChuaWithPurchase,
+  cancelNhapVatChuaBySource,
+  parseVatChuaImportInput,
+  assertVatChuaImportInput
+} = require('../services/vatChuaImport.service');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
 var purchaseService = require('../services/purchase.service');
+var { mergePurchasesInSession } = require('../services/purchaseMerge.service');
 var pdfService = require('../services/pdf.service');
 var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require('../services/vatChuaDetail.service');
+
+var PURCHASE_DEBT_WARN_DEFAULT_DAYS = 10;
+
+function hasFilterQueryValue(value) {
+  return String(value ?? '').trim() !== '';
+}
+
+function parseFilterMoney(value) {
+  var amount = Number(String(value ?? '').replace(/\./g, '').replace(/,/g, '').trim());
+  if (!Number.isFinite(amount) || amount < 0) return 0;
+  return Math.floor(amount);
+}
+
+function normalizeFilterMoneyField(value) {
+  var raw = String(value || '').trim();
+  if (raw === '') return '';
+  var amount = parseFilterMoney(raw);
+  if (!Number.isFinite(amount) || amount < 0) return '';
+  return String(amount);
+}
+
+function formatFilterMoneyDisplay(value) {
+  if (value === '' || value == null) return '';
+  var amount = parseFilterMoney(value);
+  if (!Number.isFinite(amount)) return '';
+  return amount.toLocaleString('vi-VN');
+}
+
+function purchaseRemainDue(ticket) {
+  if (!ticket) return 0;
+  if (ticket.con_no_ncc != null && ticket.con_no_ncc !== '') {
+    return Math.max(0, Number(ticket.con_no_ncc) || 0);
+  }
+  var payable = Number(ticket.can_tra_ncc ?? ticket.tong_tien ?? 0) || 0;
+  var paid = Number(ticket.da_tra_ncc ?? 0) || 0;
+  return Math.max(0, payable - paid);
+}
+
+function normalizePurchaseDebtWarnSettings(filter) {
+  filter = filter || {};
+  var warnMinDaysRaw = parseInt(String(filter.warnMinDays != null && filter.warnMinDays !== '' ? filter.warnMinDays : PURCHASE_DEBT_WARN_DEFAULT_DAYS), 10);
+  return {
+    warnOnly: String(filter.warnOnly || '') === '1',
+    warnMinDays: Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : PURCHASE_DEBT_WARN_DEFAULT_DAYS,
+    warnMinAmount: hasFilterQueryValue(filter.warnMinAmount) ? parseFilterMoney(filter.warnMinAmount) : 0
+  };
+}
+
+function enrichPurchaseDebtInfo(slip) {
+  if (!slip) return;
+  var debt = purchaseRemainDue(slip);
+  var ts = new Date(slip.ngay_nhap || slip.created_at || 0).getTime();
+  slip.so_ngay_no = debt > 0 && ts > 0 ? Math.max(0, Math.floor((Date.now() - ts) / 86400000)) : null;
+}
+
+function evaluatePurchaseDebtWarning(slip, settings) {
+  var debt = purchaseRemainDue(slip);
+  if (debt <= 0) return false;
+  var days = Number(slip.so_ngay_no);
+  var hasDays = Number.isFinite(days);
+  var meetsDays = hasDays && days >= Number(settings.warnMinDays || PURCHASE_DEBT_WARN_DEFAULT_DAYS);
+  var minAmount = Number(settings.warnMinAmount || 0);
+  var meetsAmount = minAmount > 0 && debt >= minAmount;
+  if (minAmount > 0 && settings.warnMinDays >= 0) return meetsDays || meetsAmount;
+  if (minAmount > 0) return meetsAmount;
+  return meetsDays;
+}
+
+function applyPurchaseDebtWarning(slip, settings) {
+  if (!slip) return;
+  slip.debt_warning = evaluatePurchaseDebtWarning(slip, settings);
+}
+
+function filterPurchasesByDebtWarning(slips, settings) {
+  if (!settings || !settings.warnOnly) return slips;
+  return (slips || []).filter(function(slip) {
+    return evaluatePurchaseDebtWarning(slip, settings);
+  });
+}
 
 function normalizeNhapHangFilter(query) {
   query = query || {};
   var statuses = Array.isArray(query.trang_thai) ? query.trang_thai : (query.trang_thai ? [query.trang_thai] : []);
   statuses = statuses.map(function(x) { return String(x || '').trim(); }).filter(Boolean);
-  statuses = statuses.filter(function(x) { return ['draft', 'completed', 'cancelled'].indexOf(x) >= 0; });
-  var timeType = String(query.time_type || '').trim();
-  if (['this_month', 'custom'].indexOf(timeType) < 0) timeType = '';
+  statuses = statuses.filter(function(x) { return ['completed', 'cancelled'].indexOf(x) >= 0; });
+  if (!statuses.length) statuses = ['completed'];
   var sort = String(query.sort || query.sort_cong_no || 'newest').trim();
   if (['newest', 'oldest', 'debt_high', 'debt_low', 'oldest_debt'].indexOf(sort) < 0) sort = 'newest';
+  var supplierId = String(query.nha_cung_cap_id || '').trim();
+  if (!mongoose.Types.ObjectId.isValid(supplierId)) supplierId = '';
+  var warnMinDaysRaw = parseInt(String(query.warnMinDays != null && query.warnMinDays !== '' ? query.warnMinDays : PURCHASE_DEBT_WARN_DEFAULT_DAYS), 10);
+  var warnMinDays = Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : PURCHASE_DEBT_WARN_DEFAULT_DAYS;
   return {
     q: String(query.q || '').trim(),
     statuses: statuses,
-    time_type: timeType,
-    date_from: String(query.date_from || '').trim(),
-    date_to: String(query.date_to || '').trim(),
-    nguoi_tao: String(query.nguoi_tao || '').trim(),
-    nha_cung_cap: String(query.nha_cung_cap || '').trim(),
-    sort: sort
+    nha_cung_cap_id: supplierId,
+    sort: sort,
+    warnOnly: String(query.warnOnly || '') === '1' ? '1' : '',
+    warnMinDays: String(warnMinDays),
+    warnMinAmount: normalizeFilterMoneyField(query.warnMinAmount)
   };
 }
 
@@ -85,6 +173,7 @@ function formatDate(value) {
 function statusLabel(value) {
   if (value === 'draft') return 'Phi\u1ebfu t\u1ea1m';
   if (value === 'cancelled') return '\u0110\u00e3 h\u1ee7y';
+  if (value === 'merged') return '\u0110\u00e3 g\u1ed9p';
   return '\u0110\u00e3 nh\u1eadp h\u00e0ng';
 }
 
@@ -243,44 +332,20 @@ exports.index = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
     var filter = normalizeNhapHangFilter(req.query);
+    var debtWarnSettings = normalizePurchaseDebtWarnSettings(filter);
     var query = {};
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
     if (filter.q) query.ma_phieu_nhap = { $regex: filter.q, $options: 'i' };
-    if (filter.statuses && filter.statuses.length > 0) query.trang_thai = { $in: filter.statuses };
-
-    var timeRange = null;
-    if (filter.time_type === 'this_month') {
-      timeRange = { $gte: toStartOfMonth(), $lte: toEndOfDay(new Date()) };
-    } else if (filter.time_type === 'custom' || filter.date_from || filter.date_to) {
-      var from = filter.date_from ? new Date(filter.date_from + 'T00:00:00') : null;
-      var to = filter.date_to ? new Date(filter.date_to + 'T00:00:00') : null;
-      if (from || to) {
-        timeRange = {};
-        if (from && !isNaN(from.getTime())) timeRange.$gte = from;
-        if (to && !isNaN(to.getTime())) timeRange.$lte = toEndOfDay(to);
-      }
-    }
-    if (timeRange && (timeRange.$gte || timeRange.$lte)) query.ngay_nhap = timeRange;
+    query.trang_thai = { $in: filter.statuses };
+    if (filter.nha_cung_cap_id) query.nha_cung_cap_id = filter.nha_cung_cap_id;
 
     var importSlips = await loadSortedPurchases(query, filter.sort);
 
-    if (filter.nguoi_tao) {
-      var creatorNeedle = filter.nguoi_tao.toLowerCase();
-      importSlips = importSlips.filter(function(item) {
-        var creatorName = String(item?.nguoi_tao_id?.ho_ten || '').toLowerCase();
-        var creatorEmail = String(item?.nguoi_tao_id?.email || '').toLowerCase();
-        return creatorName.indexOf(creatorNeedle) >= 0 || creatorEmail.indexOf(creatorNeedle) >= 0;
-      });
-    }
-
-    if (filter.nha_cung_cap) {
-      var supplierNeedle = filter.nha_cung_cap.toLowerCase();
-      importSlips = importSlips.filter(function(item) {
-        var supplierCode = String(item?.nha_cung_cap_id?.ma_ncc || '').toLowerCase();
-        var supplierName = String(item?.nha_cung_cap_id?.ten_ncc || '').toLowerCase();
-        return supplierName.indexOf(supplierNeedle) >= 0 || supplierCode.indexOf(supplierNeedle) >= 0;
-      });
-    }
+    importSlips.forEach(function(slip) {
+      enrichPurchaseDebtInfo(slip);
+      applyPurchaseDebtWarning(slip, debtWarnSettings);
+    });
+    importSlips = filterPurchasesByDebtWarning(importSlips, debtWarnSettings);
 
     var slipIds = importSlips.map(function(s) { return s._id; });
     var detailRows = [];
@@ -315,6 +380,18 @@ exports.index = async function(req, res, next) {
     }
 
     var vatChuaBySlip = await loadPurchasesLinkedVatChuaMap(slipIds, storeId);
+
+    var returnBySlip = {};
+    if (slipIds.length > 0 && mongoose.models.PhieuTraHangNhap) {
+      var returnRows = await mongoose.models.PhieuTraHangNhap.find({
+        phieu_nhap_id: { $in: slipIds },
+        trang_thai: { $ne: 'cancelled' }
+      }).select('phieu_nhap_id ma_phieu_tra_nhap').lean();
+      returnRows.forEach(function(row) {
+        var slipKey = String(row.phieu_nhap_id || '');
+        if (slipKey && !returnBySlip[slipKey]) returnBySlip[slipKey] = row;
+      });
+    }
 
     importSlips = importSlips.map(function(slip) {
       var key = String(slip._id);
@@ -358,6 +435,8 @@ exports.index = async function(req, res, next) {
         detail_rows: rows,
         payment_rows: paymentRows,
         vat_chua_lines: vatChuaBySlip[key] || [],
+        phieu_tra_hang_nhap: returnBySlip[key] || null,
+        has_return: Boolean(returnBySlip[key]),
         detail_summary: {
           tong_mat_hang: tongMatHang,
           tong_so_luong: tongSoLuong
@@ -384,6 +463,14 @@ exports.index = async function(req, res, next) {
       .sort({ ten_so_quy: 1 })
       .lean();
 
+    var vatChuaList = [];
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+      vatChuaList = await VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
+        .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
+        .select('ma_vat_chua ten_vat_chua so_luong_ton')
+        .lean();
+    }
+
     res.render('nhap-hang/index', {
       title: 'Nhập hàng',
       pageTitle: 'Nhập hàng',
@@ -391,9 +478,12 @@ exports.index = async function(req, res, next) {
       user: req.user,
       flash: req.query || {},
       filter: filter,
+      debtWarnDefaultDays: PURCHASE_DEBT_WARN_DEFAULT_DAYS,
+      formatFilterMoney: formatFilterMoneyDisplay,
       suppliers: suppliers,
       warehouses: warehouses,
       cashBooks: cashBooks,
+      vatChuaList: vatChuaList,
       importSlips: importSlips,
       formatDate: formatDate,
       statusLabel: statusLabel,
@@ -1035,12 +1125,30 @@ exports.detail = async function(req, res, next) {
       loaded.ticket._id,
       storeId || ticketObj.cua_hang_id
     );
+    var vatChuaEdit = { vat_chua_id: '', so_luong: 0 };
+    var storeOid = storeId || ticketObj.cua_hang_id;
+    if (storeOid && mongoose.Types.ObjectId.isValid(String(storeOid))) {
+      var nhapVatChua = await NhapVatChua.findOne({
+        cua_hang_id: storeOid,
+        source_type: 'phieu_nhap',
+        source_id: loaded.ticket._id,
+        trang_thai: 'active'
+      }).lean();
+      if (nhapVatChua && Array.isArray(nhapVatChua.items) && nhapVatChua.items.length) {
+        var vcItem = nhapVatChua.items[0];
+        vatChuaEdit = {
+          vat_chua_id: String(vcItem.vat_chua_id || ''),
+          so_luong: Number(vcItem.so_luong || 0)
+        };
+      }
+    }
     return res.json({
       success: true,
       data: {
         ticket: ticketObj,
         items: loaded.items.map(function(item) { return item.toObject ? item.toObject() : item; }),
-        vat_chua_lines: vatChuaLines
+        vat_chua_lines: vatChuaLines,
+        vat_chua_edit: vatChuaEdit
       }
     });
   } catch (error) {
@@ -1451,6 +1559,24 @@ exports.save = async function(req, res, next) {
         }
       });
     }
+
+    if (oldTicket.trang_thai === 'completed') {
+      var purchaseStoreId = oldTicket.cua_hang_id?._id || oldTicket.cua_hang_id || storeId;
+      var parsedVatChua = parseVatChuaImportInput(body);
+      try {
+        assertVatChuaImportInput(parsedVatChua);
+      } catch (vcErr) {
+        return res.status(400).json({ success: false, message: vcErr.message || 'Dữ liệu vật chứa không hợp lệ' });
+      }
+      await cancelNhapVatChuaBySource(purchaseStoreId, 'phieu_nhap', loaded.ticket._id);
+      if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
+        var updatedPurchase = await PhieuNhap.findById(loaded.ticket._id).lean();
+        if (updatedPurchase) {
+          await importVatChuaWithPurchase(updatedPurchase, body);
+        }
+      }
+    }
+
     return res.json({ success: true, message: 'Đã lưu thông tin phiếu nhập' });
   } catch (error) {
     next(error);
@@ -1939,6 +2065,22 @@ exports.traHangNhapPage = async function(req, res, next) {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+exports.mergePurchases = async function(req, res, next) {
+  var session = await mongoose.startSession();
+  try {
+    var result;
+    await session.withTransaction(async function() {
+      result = await mergePurchasesInSession(req, session);
+    });
+    res.json({ success: true, message: 'G\u1ed9p phi\u1ebfu nh\u1eadp th\u00e0nh c\u00f4ng', data: result });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
+    next(error);
+  } finally {
+    await session.endSession();
   }
 };
 

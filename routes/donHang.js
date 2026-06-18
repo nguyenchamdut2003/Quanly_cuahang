@@ -19,6 +19,7 @@ const {
     BangGiaVanChuyen,
     VanDon,
     GopDonHang,
+    GopHoaDon,
     PhieuThuChi,
     CongNoKhachHang,
     SoQuy,
@@ -30,7 +31,8 @@ const {
     TonKhoLoQuyCach,
     LoHang,
     Counter,
-    VatChua
+    VatChua,
+    XuatVatChua
 } = require('../models/kiot.model');
 const { congTonKho, truTonKho } = require('../services/kho.service');
 const { tinhPhiGiaoHang, luuPhiVanChuyenKhachHang } = require('../services/phiGiaoHang.service');
@@ -48,6 +50,7 @@ const {
 } = require('../services/availability.service');
 const { normalizeAddress } = require('../utils/address');
 const { resolveStoreId } = require('../utils/storeScope');
+const { resolveCashBookForPayment } = require('../services/paymentCashBook.service');
 const { resolveSalePrice, normalizeUnitPrice } = require('../services/salePrice.service');
 const { parseVatChuaImportInput, parseVatChuaSignedInput, assertVatChuaImportInput, assertVatChuaSignedInput, importVatChuaWithSalesReturn, cancelNhapVatChuaBySource } = require('../services/vatChuaImport.service');
 const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaWithSalesReturn, cancelXuatVatChuaBySource } = require('../services/vatChuaExport.service');
@@ -1815,10 +1818,43 @@ function dateRange(query = {}, fromKey, toKey, fallbackThisMonth) {
     return Object.keys(range).length ? range : null;
 }
 
+const INVOICE_TIME_PERIOD_MONTHS = {
+    '1m': 1,
+    '2m': 2,
+    '3m': 3,
+    '6m': 6,
+    '1y': 12
+};
+
+function normalizeInvoiceTimePeriod(value) {
+    const period = String(value || '').trim();
+    return Object.prototype.hasOwnProperty.call(INVOICE_TIME_PERIOD_MONTHS, period) ? period : '1m';
+}
+
+const INVOICE_STATUS_FILTER_VALUES = ['processing', 'completed', 'failed', 'cancelled', 'merged'];
+
+function normalizeInvoiceStatusFilter(value) {
+    const raw = Array.isArray(value) ? value.find(item => item && item !== 'all') : value;
+    const status = String(raw || '').trim();
+    if (!status || status === 'all') return 'all';
+    return INVOICE_STATUS_FILTER_VALUES.includes(status) ? status : 'all';
+}
+
+function resolveInvoiceTimePeriodRange(query = {}) {
+    const months = INVOICE_TIME_PERIOD_MONTHS[normalizeInvoiceTimePeriod(query.time_period)];
+    if (!months) return null;
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const start = new Date(end);
+    start.setMonth(start.getMonth() - months);
+    start.setHours(0, 0, 0, 0);
+    return { $gte: start, $lte: end };
+}
+
 function normalizeInvoiceStatus(value) {
     const status = String(value || '').trim();
     if (['paid', 'partial', 'unpaid'].includes(status)) return status;
-    if (['processing', 'completed', 'failed', 'cancelled'].includes(status)) return status;
+    if (['processing', 'completed', 'failed', 'cancelled', 'merged'].includes(status)) return status;
     if (status === 'draft' || status === 'shipping') return 'processing';
     if (status === 'done' || status === 'paid') return 'completed';
     return 'processing';
@@ -2456,6 +2492,377 @@ async function generateShipmentCode() {
     return 'VD' + String(counter.seq).padStart(6, '0');
 }
 
+async function generateMergeInvoiceCode(session = null) {
+    const lastMerge = await GopHoaDon.findOne({ ma_gop_hoa_don: /^GHD\d+$/ })
+        .sort({ ma_gop_hoa_don: -1 })
+        .select('ma_gop_hoa_don')
+        .session(session)
+        .lean();
+    const currentMax = Number(String(lastMerge?.ma_gop_hoa_don || '').replace(/^GHD/, '')) || 0;
+    await Counter.updateOne(
+        { _id: 'gop_hoa_don' },
+        { $max: { seq: currentMax } },
+        { upsert: true, session }
+    );
+    const counter = await Counter.findOneAndUpdate(
+        { _id: 'gop_hoa_don' },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true, session }
+    ).lean();
+    return 'GHD' + String(counter.seq).padStart(6, '0');
+}
+
+function invoiceCustomerPhone(invoice, shipment) {
+    return normalizePhone(
+        invoice?.khach_hang_id?.sdt
+        || invoice?.khach_hang_id?.sdt2
+        || invoice?.khach_hang_id?.dien_thoai
+        || shipment?.sdt_nguoi_nhan
+    );
+}
+
+function invoiceMergeLineKey(row = {}) {
+    const lotKey = Array.isArray(row.lot_allocations) && row.lot_allocations.length
+        ? row.lot_allocations
+            .map(item => `${String(item.lo_hang_id || '')}:${Number(item.so_luong || 0)}`)
+            .sort()
+            .join(',')
+        : String(row.lo_hang_id || '');
+    return [
+        String(row.hang_hoa_id || ''),
+        lotKey,
+        String(row.gia_tri_thuoc_tinh_id || ''),
+        String(row.ten_quy_cach || '').trim(),
+        Number(row.don_gia || 0),
+        Number(row.chiet_khau || 0)
+    ].join('|');
+}
+
+function mergeInvoiceLotAllocations(target = [], source = []) {
+    const map = new Map();
+    (target || []).forEach(item => {
+        const key = String(item.lo_hang_id || '');
+        map.set(key, {
+            lo_hang_id: item.lo_hang_id || null,
+            ma_lo: item.ma_lo || '',
+            ten_lo: item.ten_lo || '',
+            han_su_dung: item.han_su_dung || null,
+            so_luong: Number(item.so_luong || 0)
+        });
+    });
+    (source || []).forEach(item => {
+        const key = String(item.lo_hang_id || '');
+        const qty = Number(item.so_luong || 0);
+        if (!qty) return;
+        if (map.has(key)) {
+            map.get(key).so_luong += qty;
+        } else {
+            map.set(key, {
+                lo_hang_id: item.lo_hang_id || null,
+                ma_lo: item.ma_lo || '',
+                ten_lo: item.ten_lo || '',
+                han_su_dung: item.han_su_dung || null,
+                so_luong: qty
+            });
+        }
+    });
+    return Array.from(map.values()).filter(item => Number(item.so_luong || 0) > 0);
+}
+
+function recalcInvoiceLineTotal(line) {
+    const quantity = Math.max(0, Number(line.so_luong || 0));
+    const unitPrice = Number(line.don_gia || 0);
+    const discount = Math.max(0, Number(line.chiet_khau || 0));
+    line.thanh_tien = Math.max(quantity * unitPrice - discount, 0);
+    return line.thanh_tien;
+}
+
+function cloneMergedInvoiceLine(line, receivingInvoiceId) {
+    const quantity = Number(line.so_luong || 0);
+    const cloned = {
+        hoa_don_id: receivingInvoiceId,
+        ct_don_hang_id: line.ct_don_hang_id || null,
+        hang_hoa_id: line.hang_hoa_id,
+        lo_hang_id: line.lo_hang_id || null,
+        lot_allocations: Array.isArray(line.lot_allocations) ? line.lot_allocations.map(item => ({
+            lo_hang_id: item.lo_hang_id || null,
+            ma_lo: item.ma_lo || '',
+            ten_lo: item.ten_lo || '',
+            han_su_dung: item.han_su_dung || null,
+            so_luong: Number(item.so_luong || 0)
+        })) : [],
+        gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id || null,
+        ten_quy_cach: String(line.ten_quy_cach || '').trim(),
+        ten_thuoc_tinh: String(line.ten_thuoc_tinh || '').trim(),
+        don_vi_tinh_id: line.don_vi_tinh_id || null,
+        ma_hang_snapshot: String(line.ma_hang_snapshot || ''),
+        ten_hang_snapshot: String(line.ten_hang_snapshot || ''),
+        don_vi_tinh_snapshot: String(line.don_vi_tinh_snapshot || ''),
+        so_luong: quantity,
+        don_gia: Number(line.don_gia || 0),
+        chiet_khau: Number(line.chiet_khau || 0),
+        thanh_tien: 0,
+        ghi_chu: String(line.ghi_chu || '')
+    };
+    recalcInvoiceLineTotal(cloned);
+    return cloned;
+}
+
+function applyInvoiceTotals(invoice, lines, paidAmount) {
+    const goodsTotal = (lines || []).reduce((sum, line) => sum + Number(line.thanh_tien || 0), 0);
+    const discount = Math.max(0, Number(invoice.giam_gia || 0));
+    const payable = Math.max(goodsTotal - discount, 0);
+    const paid = Math.max(0, Number(paidAmount || 0));
+    invoice.tong_tien = goodsTotal;
+    invoice.thanh_toan = payable;
+    invoice.trang_thai = resolveInvoiceStatus(payable, paid);
+}
+
+async function loadInvoiceNetPaidMap(invoiceIds, session) {
+    const ids = (invoiceIds || []).filter(Boolean);
+    const paidMap = {};
+    if (!ids.length) return paidMap;
+    const receipts = await PhieuThuChi.find({
+        hoa_don_id: { $in: ids },
+        trang_thai: { $ne: 'cancelled' }
+    }).session(session).lean();
+    const grouped = {};
+    receipts.forEach(row => {
+        const key = String(row.hoa_don_id || '');
+        if (!grouped[key]) grouped[key] = [];
+        grouped[key].push(row);
+    });
+    Object.keys(grouped).forEach(key => {
+        paidMap[key] = computeNetPaidFromReceiptRows(grouped[key]);
+    });
+    return paidMap;
+}
+
+function invoiceShipmentBlocksMerge(shipment) {
+    if (!shipment) return false;
+    return ['shipping', 'completed'].includes(String(shipment.trang_thai || ''));
+}
+
+async function mergeInvoicesInSession(req, session) {
+    const body = req.body || {};
+    const invoiceIds = uniqueObjectIds(Array.isArray(body.hoa_don_ids) ? body.hoa_don_ids : [])
+        .map(id => String(id));
+    if (invoiceIds.length < 2) {
+        const error = new Error('Vui lòng chọn ít nhất 2 hóa đơn để gộp.');
+        error.status = 400;
+        throw error;
+    }
+    const receivingInvoiceId = body.hoa_don_nhan_id && invoiceIds.includes(String(body.hoa_don_nhan_id))
+        ? String(body.hoa_don_nhan_id)
+        : invoiceIds[0];
+    const sourceInvoiceIds = invoiceIds.filter(id => id !== receivingInvoiceId);
+    const note = String(body.ghi_chu || '').trim();
+
+    const invoices = await HoaDonBanHang.find({ _id: { $in: invoiceIds } })
+        .populate('khach_hang_id')
+        .session(session);
+    if (invoices.length !== invoiceIds.length) {
+        const error = new Error('Một hoặc nhiều hóa đơn không tồn tại.');
+        error.status = 400;
+        throw error;
+    }
+    const invoiceById = new Map(invoices.map(invoice => [String(invoice._id), invoice]));
+    const receivingInvoice = invoiceById.get(receivingInvoiceId);
+    const sourceInvoices = sourceInvoiceIds.map(id => invoiceById.get(id));
+
+    const storeIds = new Set(invoices.map(invoice => String(invoice.cua_hang_id || '')).filter(Boolean));
+    if (storeIds.size !== 1) {
+        const error = new Error('Không thể gộp các hóa đơn khác cửa hàng.');
+        error.status = 400;
+        throw error;
+    }
+
+    const warehouseIds = new Set(invoices.map(invoice => String(invoice.kho_id || '')).filter(Boolean));
+    if (warehouseIds.size > 1) {
+        const error = new Error('Không thể gộp các hóa đơn khác kho trong phase này.');
+        error.status = 400;
+        throw error;
+    }
+
+    const [shipments] = await Promise.all([
+        VanDon.find({
+            $or: [
+                { hoa_don_id: { $in: invoiceIds } },
+                { don_hang_id: { $in: invoices.map(item => item.don_hang_id).filter(Boolean) } }
+            ],
+            trang_thai: { $ne: 'cancelled' }
+        }).session(session)
+    ]);
+    const shipmentByInvoice = {};
+    shipments.forEach(shipment => {
+        if (shipment.hoa_don_id) shipmentByInvoice[String(shipment.hoa_don_id)] = shipment;
+    });
+    invoices.forEach(invoice => {
+        const orderId = String(invoice.don_hang_id || '');
+        if (!orderId) return;
+        const shipment = shipments.find(row => String(row.don_hang_id || '') === orderId);
+        if (shipment && !shipmentByInvoice[String(invoice._id)]) {
+            shipmentByInvoice[String(invoice._id)] = shipment;
+        }
+    });
+    const customerIds = new Set(invoices.map(invoice => String(invoice.khach_hang_id?._id || invoice.khach_hang_id || '')).filter(Boolean));
+    const phones = new Set(invoices.map(invoice => {
+        const shipment = shipmentByInvoice[String(invoice._id)];
+        return invoiceCustomerPhone(invoice, shipment);
+    }).filter(Boolean));
+    if (customerIds.size !== 1 && phones.size !== 1) {
+        const error = new Error('Không thể gộp các hóa đơn khác khách hàng hoặc khác số điện thoại.');
+        error.status = 400;
+        throw error;
+    }
+
+    const details = await CTHoaDonBanHang.find({ hoa_don_id: { $in: invoiceIds } }).session(session);
+    const detailMap = details.reduce((map, detail) => {
+        const key = String(detail.hoa_don_id || '');
+        if (!map[key]) map[key] = [];
+        map[key].push(detail);
+        return map;
+    }, {});
+
+    const returnRows = await PhieuTraHang.find({
+        hoa_don_id: { $in: invoiceIds },
+        trang_thai: { $ne: 'cancelled' }
+    }).select('hoa_don_id ma_phieu_tra').session(session).lean();
+    const returnInvoiceIds = new Set(returnRows.map(row => String(row.hoa_don_id || '')));
+
+    for (const invoice of invoices) {
+        const status = normalizeInvoiceStatus(invoice.trang_thai);
+        if (['cancelled', 'merged'].includes(status)) {
+            const message = status === 'merged'
+                ? `Hóa đơn ${invoice.ma_hoa_don} đã được gộp vào ${invoice.merged_to_ma_hoa_don || 'hóa đơn khác'}.`
+                : `Không thể gộp hóa đơn ${invoice.ma_hoa_don} ở trạng thái hiện tại.`;
+            const error = new Error(message);
+            error.status = 400;
+            throw error;
+        }
+        if (returnInvoiceIds.has(String(invoice._id))) {
+            const error = new Error(`Không thể gộp hóa đơn ${invoice.ma_hoa_don} vì đã phát sinh trả hàng.`);
+            error.status = 400;
+            throw error;
+        }
+    }
+
+    const paidMap = await loadInvoiceNetPaidMap(invoiceIds, session);
+    const allPaidBefore = invoices.reduce((sum, invoice) => sum + Number(paidMap[String(invoice._id)] || 0), 0);
+    const allGoodsBefore = invoices.reduce((sum, invoice) => sum + Number(invoice.tong_tien || 0), 0);
+    const allDiscountBefore = invoices.reduce((sum, invoice) => sum + Number(invoice.giam_gia || 0), 0);
+
+    const receivingLines = detailMap[receivingInvoiceId] || [];
+    const receivingLineByKey = new Map(receivingLines.map(line => [invoiceMergeLineKey(line), line]));
+
+    for (const sourceInvoice of sourceInvoices) {
+        const sourceLines = detailMap[String(sourceInvoice._id)] || [];
+        for (const sourceLine of sourceLines) {
+            const key = invoiceMergeLineKey(sourceLine);
+            const sourceQuantity = Number(sourceLine.so_luong || 0);
+            const targetLine = receivingLineByKey.get(key);
+            if (targetLine) {
+                targetLine.so_luong = Number(targetLine.so_luong || 0) + sourceQuantity;
+                targetLine.lot_allocations = mergeInvoiceLotAllocations(targetLine.lot_allocations, sourceLine.lot_allocations);
+                recalcInvoiceLineTotal(targetLine);
+                await targetLine.save({ session });
+            } else {
+                const clonedLine = await CTHoaDonBanHang.create([cloneMergedInvoiceLine(sourceLine, receivingInvoice._id)], { session });
+                receivingLines.push(clonedLine[0]);
+                receivingLineByKey.set(key, clonedLine[0]);
+            }
+        }
+    }
+
+    const updatedReceivingLines = await CTHoaDonBanHang.find({ hoa_don_id: receivingInvoice._id }).session(session);
+    receivingInvoice.giam_gia = allDiscountBefore;
+    applyInvoiceTotals(receivingInvoice, updatedReceivingLines, allPaidBefore);
+    receivingInvoice.is_merged_invoice = true;
+    receivingInvoice.merged_from_hoa_don_ids = uniqueObjectIds([
+        ...(receivingInvoice.merged_from_hoa_don_ids || []),
+        ...sourceInvoices.map(invoice => invoice._id)
+    ]);
+    receivingInvoice.merged_from_ma_hoa_dons = Array.from(new Set([
+        ...(receivingInvoice.merged_from_ma_hoa_dons || []),
+        ...sourceInvoices.map(invoice => invoice.ma_hoa_don).filter(Boolean)
+    ]));
+    receivingInvoice.merged_at = new Date();
+    receivingInvoice.merged_by = req.user?._id;
+    receivingInvoice.merge_note = note;
+    await receivingInvoice.save({ session });
+
+    await HoaDonBanHang.updateMany(
+        { _id: { $in: sourceInvoices.map(invoice => invoice._id) } },
+        {
+            $set: {
+                trang_thai: 'merged',
+                merged_to_hoa_don_id: receivingInvoice._id,
+                merged_to_ma_hoa_don: receivingInvoice.ma_hoa_don,
+                merged_at: receivingInvoice.merged_at,
+                merged_by: req.user?._id,
+                merge_note: note
+            }
+        },
+        { session }
+    );
+
+    await PhieuThuChi.updateMany(
+        { hoa_don_id: { $in: sourceInvoices.map(invoice => invoice._id) }, trang_thai: { $ne: 'cancelled' } },
+        { $set: { hoa_don_id: receivingInvoice._id } },
+        { session }
+    );
+    await CongNoKhachHang.updateMany(
+        { hoa_don_id: { $in: sourceInvoices.map(invoice => invoice._id) } },
+        { $set: { hoa_don_id: receivingInvoice._id } },
+        { session }
+    );
+    await VanDon.updateMany(
+        {
+            hoa_don_id: { $in: sourceInvoices.map(invoice => invoice._id) },
+            trang_thai: { $ne: 'cancelled' }
+        },
+        {
+            $set: {
+                trang_thai: 'cancelled',
+                ghi_chu: `Vận đơn bị ngưng do hóa đơn đã gộp vào ${receivingInvoice.ma_hoa_don}`
+            }
+        },
+        { session }
+    );
+
+    const maGopHoaDon = await generateMergeInvoiceCode(session);
+    const mergeRecord = await GopHoaDon.create([{
+        ma_gop_hoa_don: maGopHoaDon,
+        cua_hang_id: receivingInvoice.cua_hang_id,
+        hoa_don_nhan_id: receivingInvoice._id,
+        ma_hoa_don_nhan: receivingInvoice.ma_hoa_don,
+        khach_hang_id: receivingInvoice.khach_hang_id?._id || receivingInvoice.khach_hang_id || null,
+        sdt_khach_hang: invoiceCustomerPhone(receivingInvoice, shipmentByInvoice[receivingInvoiceId]),
+        hoa_don_nguon_ids: sourceInvoices.map(invoice => invoice._id),
+        ma_hoa_don_nguon: sourceInvoices.map(invoice => invoice.ma_hoa_don),
+        tong_tien_hang_truoc_gop: allGoodsBefore,
+        tong_khach_da_tra_truoc_gop: allPaidBefore,
+        tong_tien_hang_sau_gop: Number(receivingInvoice.tong_tien || 0),
+        tong_khach_da_tra_sau_gop: allPaidBefore,
+        so_luong_hoa_don_gop: invoices.length,
+        ghi_chu: note,
+        trang_thai: 'active',
+        nguoi_tao_id: req.user?._id,
+        ngay_gop: receivingInvoice.merged_at
+    }], { session });
+
+    return {
+        gop_hoa_don_id: mergeRecord[0]._id,
+        ma_gop_hoa_don: mergeRecord[0].ma_gop_hoa_don,
+        hoa_don_nhan_id: receivingInvoice._id,
+        ma_hoa_don_nhan: receivingInvoice.ma_hoa_don,
+        hoa_don_nguon_ids: sourceInvoices.map(invoice => invoice._id),
+        ma_hoa_don_nguon: sourceInvoices.map(invoice => invoice.ma_hoa_don),
+        tong_tien_hang_sau_gop: Number(receivingInvoice.tong_tien || 0),
+        tong_khach_da_tra_sau_gop: allPaidBefore
+    };
+}
+
 async function generateMergeOrderCode(session = null) {
     const lastMerge = await GopDonHang.findOne({ ma_gop_don: /^GDH\d+$/ })
         .sort({ ma_gop_don: -1 })
@@ -2788,6 +3195,143 @@ async function seedVanDonIfEmpty(userId) {
     }
 }
 
+const INVOICE_DEBT_WARN_DEFAULT_DAYS = 10;
+
+function hasInvoiceFilterValue(value) {
+    return String(value ?? '').trim() !== '';
+}
+
+function parseInvoiceFilterMoney(value) {
+    const amount = Number(String(value ?? '').replace(/\./g, '').replace(/,/g, '').trim());
+    if (!Number.isFinite(amount) || amount < 0) return 0;
+    return Math.floor(amount);
+}
+
+function normalizeInvoiceFilterMoneyField(value) {
+    const raw = String(value || '').trim();
+    if (raw === '') return '';
+    const amount = parseInvoiceFilterMoney(raw);
+    if (!Number.isFinite(amount) || amount < 0) return '';
+    return String(amount);
+}
+
+function formatInvoiceFilterMoneyDisplay(value) {
+    if (value === '' || value == null) return '';
+    const amount = parseInvoiceFilterMoney(value);
+    if (!Number.isFinite(amount)) return '';
+    return amount.toLocaleString('vi-VN');
+}
+
+function invoiceRemainDue(invoice) {
+    if (!invoice) return 0;
+    if (invoice.con_no != null && invoice.con_no !== '') {
+        return Math.max(0, Number(invoice.con_no) || 0);
+    }
+    const payable = Number(invoice.thanh_toan ?? invoice.tong_tien ?? 0) || 0;
+    const paid = Number(invoice.khach_da_tra ?? 0) || 0;
+    return Math.max(0, payable - paid);
+}
+
+function normalizeInvoiceDebtWarnSettings(filter = {}) {
+    const warnMinDaysRaw = parseInt(String(
+        filter.warnMinDays != null && filter.warnMinDays !== '' ? filter.warnMinDays : INVOICE_DEBT_WARN_DEFAULT_DAYS
+    ), 10);
+    return {
+        warnOnly: String(filter.warnOnly || '') === '1',
+        warnMinDays: Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : INVOICE_DEBT_WARN_DEFAULT_DAYS,
+        warnMinAmount: hasInvoiceFilterValue(filter.warnMinAmount) ? parseInvoiceFilterMoney(filter.warnMinAmount) : 0
+    };
+}
+
+function normalizeInvoicePageFilters(query = {}) {
+    const warnMinDaysRaw = parseInt(String(
+        query.warnMinDays != null && query.warnMinDays !== '' ? query.warnMinDays : INVOICE_DEBT_WARN_DEFAULT_DAYS
+    ), 10);
+    const warnMinDays = Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : INVOICE_DEBT_WARN_DEFAULT_DAYS;
+    return Object.assign({}, query, {
+        time_period: normalizeInvoiceTimePeriod(query.time_period),
+        trang_thai: normalizeInvoiceStatusFilter(query.trang_thai),
+        warnOnly: String(query.warnOnly || '') === '1' ? '1' : '',
+        warnMinDays: String(warnMinDays),
+        warnMinAmount: normalizeInvoiceFilterMoneyField(query.warnMinAmount)
+    });
+}
+
+function enrichInvoiceDebtInfo(invoice) {
+    if (!invoice) return;
+    const debt = invoiceRemainDue(invoice);
+    const ts = new Date(invoice.ngay_ban || invoice.created_at || 0).getTime();
+    invoice.so_ngay_no = debt > 0 && ts > 0 ? Math.max(0, Math.floor((Date.now() - ts) / 86400000)) : null;
+}
+
+function evaluateInvoiceDebtWarning(invoice, settings) {
+    const debt = invoiceRemainDue(invoice);
+    if (debt <= 0) return false;
+    const days = Number(invoice.so_ngay_no);
+    const hasDays = Number.isFinite(days);
+    const meetsDays = hasDays && days >= Number(settings.warnMinDays || INVOICE_DEBT_WARN_DEFAULT_DAYS);
+    const minAmount = Number(settings.warnMinAmount || 0);
+    const meetsAmount = minAmount > 0 && debt >= minAmount;
+    if (minAmount > 0 && settings.warnMinDays >= 0) return meetsDays || meetsAmount;
+    if (minAmount > 0) return meetsAmount;
+    return meetsDays;
+}
+
+function applyInvoiceDebtWarning(invoice, settings) {
+    if (!invoice) return;
+    invoice.debt_warning = evaluateInvoiceDebtWarning(invoice, settings);
+}
+
+function filterInvoicesByDebtWarning(invoices, settings) {
+    if (!settings || !settings.warnOnly) return invoices;
+    return (invoices || []).filter(invoice => evaluateInvoiceDebtWarning(invoice, settings));
+}
+
+function parseInvoiceMoneyInput(raw) {
+    return Number(String(raw ?? '').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
+}
+
+function calcInvoiceDetailLineTotal(line) {
+    const qty = Math.max(0, Math.floor(Number(line.so_luong || 0)));
+    const price = Number(line.don_gia || 0);
+    const base = qty * price;
+    const discount = Math.max(0, Number(line.chiet_khau || 0));
+    return Math.max(0, Math.floor(base - discount));
+}
+
+async function loadInvoiceVatChuaEditState(invoiceId, orderId, storeId) {
+    const store = storeId && mongoose.Types.ObjectId.isValid(String(storeId)) ? storeId : null;
+    const invoiceOid = invoiceId && mongoose.Types.ObjectId.isValid(String(invoiceId)) ? invoiceId : null;
+    if (!store || !invoiceOid) return { vat_chua_id: '', so_luong: 0 };
+
+    const sourceOr = [{ source_type: 'hoa_don', source_id: invoiceOid }];
+    const orderOid = orderId && mongoose.Types.ObjectId.isValid(String(orderId)) ? orderId : null;
+    if (orderOid) sourceOr.push({ source_type: 'don_hang', source_id: orderOid });
+
+    const xuatDoc = await XuatVatChua.findOne({
+        cua_hang_id: store,
+        trang_thai: 'active',
+        $or: sourceOr
+    }).sort({ created_at: -1 }).lean();
+
+    if (!xuatDoc || !Array.isArray(xuatDoc.items) || !xuatDoc.items.length) {
+        return { vat_chua_id: '', so_luong: 0 };
+    }
+    const item = xuatDoc.items[0];
+    return {
+        vat_chua_id: String(item.vat_chua_id || ''),
+        so_luong: Number(item.so_luong || 0)
+    };
+}
+
+function applyInvoiceDebtWarningList(invoices, settings) {
+    return (invoices || []).map(invoice => {
+        enrichInvoiceDebtInfo(invoice);
+        applyInvoiceDebtWarning(invoice, settings);
+        return invoice;
+    });
+}
+
 async function buildInvoiceFilter(query = {}) {
     const filter = {};
     if (query.q && query.q.trim() !== '') {
@@ -2796,7 +3340,7 @@ async function buildInvoiceFilter(query = {}) {
     const statuses = cleanArray(query.trang_thai);
     if (statuses.length) filter.trang_thai = { $in: statuses };
 
-    const saleRange = dateRange(query, 'date_from', 'date_to', query.time_type === 'this_month');
+    const saleRange = resolveInvoiceTimePeriodRange(query);
     if (saleRange) filter.ngay_ban = saleRange;
     if (query.phuong_thuc_tt && query.phuong_thuc_tt.trim() !== '') filter.phuong_thuc_tt = { $regex: query.phuong_thuc_tt.trim(), $options: 'i' };
 
@@ -3243,6 +3787,102 @@ router.post('/gop-don', async (req, res, next) => {
         res.json({
             success: true,
             message: 'Gộp đơn thành công',
+            data: result
+        });
+    } catch (error) {
+        if (error.status) {
+            return res.status(error.status).json({ success: false, message: error.message });
+        }
+        next(error);
+    } finally {
+        await session.endSession();
+    }
+});
+
+router.get('/gop-hoa-don/candidates', async (req, res, next) => {
+    try {
+        const days = Math.max(1, Math.min(90, Number(req.query.days || 7)));
+        const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const filter = {
+            ngay_ban: { $gte: fromDate },
+            trang_thai: { $nin: ['cancelled', 'merged'] }
+        };
+        if (req.query.khach_hang_id && mongoose.Types.ObjectId.isValid(String(req.query.khach_hang_id))) {
+            filter.khach_hang_id = req.query.khach_hang_id;
+        }
+
+        let invoices = await HoaDonBanHang.find(filter)
+            .populate('khach_hang_id')
+            .sort({ ngay_ban: -1 })
+            .lean();
+
+        const normalizedPhone = normalizePhone(req.query.sdt);
+        if (normalizedPhone) {
+            const invoiceIds = invoices.map(item => item._id);
+            const shipments = invoiceIds.length
+                ? await VanDon.find({
+                    $or: [
+                        { hoa_don_id: { $in: invoiceIds } },
+                        { don_hang_id: { $in: invoices.map(item => item.don_hang_id).filter(Boolean) } }
+                    ]
+                }).select('hoa_don_id don_hang_id sdt_nguoi_nhan').lean()
+                : [];
+            const shipmentByInvoice = {};
+            shipments.forEach(row => {
+                if (row.hoa_don_id) shipmentByInvoice[String(row.hoa_don_id)] = row;
+            });
+            invoices.forEach(invoice => {
+                const orderId = String(invoice.don_hang_id || '');
+                if (!orderId) return;
+                const shipment = shipments.find(row => String(row.don_hang_id || '') === orderId);
+                if (shipment && !shipmentByInvoice[String(invoice._id)]) {
+                    shipmentByInvoice[String(invoice._id)] = shipment;
+                }
+            });
+            invoices = invoices.filter(invoice => {
+                const shipment = shipmentByInvoice[String(invoice._id)];
+                return invoiceCustomerPhone(invoice, shipment) === normalizedPhone;
+            });
+        }
+
+        const invoiceIds = invoices.map(item => item._id);
+        const paidMap = await loadInvoiceNetPaidMap(invoiceIds);
+        const returnRows = invoiceIds.length
+            ? await PhieuTraHang.find({
+                hoa_don_id: { $in: invoiceIds },
+                trang_thai: { $ne: 'cancelled' }
+            }).select('hoa_don_id').lean()
+            : [];
+        const returnInvoiceIds = new Set(returnRows.map(row => String(row.hoa_don_id || '')));
+        invoices = invoices.filter(invoice => !returnInvoiceIds.has(String(invoice._id)));
+
+        const data = invoices.map(invoice => ({
+                _id: invoice._id,
+                ma_hoa_don: invoice.ma_hoa_don,
+                ngay_ban: invoice.ngay_ban,
+                khach_can_tra: Number(invoice.thanh_toan || 0),
+                khach_da_tra: Number(paidMap[String(invoice._id)] || 0),
+                ma_khach_hang: invoice.khach_hang_id?.ma_khach_hang || '',
+                ten_khach_hang: invoice.khach_hang_id?.ten_khach_hang || '',
+                sdt: invoice.khach_hang_id?.sdt || invoice.khach_hang_id?.sdt2 || '',
+                trang_thai: normalizeInvoiceStatus(invoice.trang_thai)
+            }));
+        res.json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/gop-hoa-don', async (req, res, next) => {
+    const session = await mongoose.startSession();
+    try {
+        let result;
+        await session.withTransaction(async () => {
+            result = await mergeInvoicesInSession(req, session);
+        });
+        res.json({
+            success: true,
+            message: 'Gộp hóa đơn thành công',
             data: result
         });
     } catch (error) {
@@ -3716,7 +4356,9 @@ router.post('/add', async (req, res, next) => {
 
 router.get('/hoa-don', async (req, res, next) => {
     try {
-        const filter = await buildInvoiceFilter(req.query);
+        const normalizedFilters = normalizeInvoicePageFilters(req.query);
+        const debtWarnSettings = normalizeInvoiceDebtWarnSettings(normalizedFilters);
+        const filter = await buildInvoiceFilter(normalizedFilters);
         const rawInvoices = await HoaDonBanHang.find(filter)
             .populate('khach_hang_id')
             .populate('don_hang_id')
@@ -3727,14 +4369,46 @@ router.get('/hoa-don', async (req, res, next) => {
         const cashBookQuery = storeId
             ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
             : { trang_thai: 'active' };
-        const [invoices, partners, users, priceBooks, cashBooks] = await Promise.all([
+        let vatChuaList = [];
+        let customers = [];
+        if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+            vatChuaList = await VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
+                .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
+                .select('ma_vat_chua ten_vat_chua so_luong_ton')
+                .lean();
+            customers = await KhachHang.find({ cua_hang_id: storeId, trang_thai: { $ne: 'inactive' } })
+                .sort({ ten_khach_hang: 1 })
+                .select('ma_khach_hang ten_khach_hang sdt sdt2')
+                .lean();
+        }
+        if (!customers.length) {
+            customers = await KhachHang.find({ trang_thai: { $ne: 'inactive' } })
+                .sort({ ten_khach_hang: 1 })
+                .select('ma_khach_hang ten_khach_hang sdt sdt2')
+                .lean();
+        }
+        const [decoratedInvoices, partners, users, priceBooks, cashBooks] = await Promise.all([
             decorateInvoices(rawInvoices),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
             BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }),
             SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
-        res.render('don-hang/hoa-don', { title: 'Hóa đơn', invoices, partners, users, priceBooks, cashBooks, filters: req.query || {} });
+        let invoices = applyInvoiceDebtWarningList(decoratedInvoices, debtWarnSettings);
+        invoices = filterInvoicesByDebtWarning(invoices, debtWarnSettings);
+        res.render('don-hang/hoa-don', {
+            title: 'Hóa đơn',
+            invoices,
+            partners,
+            users,
+            priceBooks,
+            cashBooks,
+            vatChuaList,
+            customers,
+            filters: normalizedFilters,
+            debtWarnDefaultDays: INVOICE_DEBT_WARN_DEFAULT_DAYS,
+            formatFilterMoney: formatInvoiceFilterMoneyDisplay
+        });
     } catch (error) {
         next(error);
     }
@@ -3934,8 +4608,245 @@ router.get('/hoa-don/:id/detail', async (req, res, next) => {
         const vatChuaLines = storeId
             ? await loadInvoiceLinkedVatChuaLines(invoice._id, orderId, storeId)
             : [];
+        const vatChuaEdit = storeId
+            ? await loadInvoiceVatChuaEditState(invoice._id, orderId, storeId)
+            : { vat_chua_id: '', so_luong: 0 };
 
-        res.json({ success: true, data: { invoice, items, shipment, debtHistory, receipts, paid, debt: Math.max(0, payable - paid), vat_chua_lines: vatChuaLines } });
+        res.json({
+            success: true,
+            data: {
+                invoice,
+                items,
+                shipment,
+                debtHistory,
+                receipts,
+                paid,
+                debt: Math.max(0, payable - paid),
+                vat_chua_lines: vatChuaLines,
+                vat_chua_edit: vatChuaEdit
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+router.post('/hoa-don/:id/save', async (req, res, next) => {
+    try {
+        const invoice = await HoaDonBanHang.findById(req.params.id);
+        if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
+        if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
+            return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể lưu' });
+        }
+
+        const body = req.body || {};
+        const oldItems = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).lean();
+        const rowsById = new Map(oldItems.map(row => [String(row._id), row]));
+        const incoming = Array.isArray(body.items) ? body.items : [];
+        const normalizedRows = [];
+
+        for (const raw of incoming) {
+            const oldRow = rowsById.get(String(raw._id || ''));
+            if (!oldRow) continue;
+            const qty = Math.max(0, Math.floor(Number(raw.so_luong || 0)));
+            const price = parseInvoiceMoneyInput(raw.don_gia);
+            const discount = parseInvoiceMoneyInput(raw.chiet_khau);
+            if (qty <= 0) {
+                return res.status(400).json({ success: false, message: 'Số lượng phải lớn hơn 0' });
+            }
+            const next = {
+                _id: oldRow._id,
+                so_luong: qty,
+                don_gia: price,
+                chiet_khau: discount,
+                thanh_tien: calcInvoiceDetailLineTotal({ so_luong: qty, don_gia: price, chiet_khau: discount })
+            };
+            normalizedRows.push({ oldRow, next });
+        }
+
+        if (!normalizedRows.length) {
+            return res.status(400).json({ success: false, message: 'Hóa đơn cần có ít nhất một dòng hàng' });
+        }
+
+        const khoId = invoice.kho_id;
+        const maPhieu = invoice.ma_hoa_don || String(invoice._id);
+        const stockOpts = {
+            nguoi_tao_id: req.user?._id,
+            loai_phieu: 'dieu_chinh_ban_hang',
+            ma_phieu: maPhieu,
+            ghi_chu: `Dieu chinh HD ${maPhieu}`
+        };
+
+        if (invoice.da_tru_ton_kho && khoId) {
+            for (const { oldRow, next } of normalizedRows) {
+                const oldQty = Number(oldRow.so_luong || 0);
+                const newQty = Number(next.so_luong || 0);
+                if (oldQty === newQty) continue;
+                try {
+                    if (oldQty > 0) {
+                        await restoreStockLine(khoId, oldRow, stockOpts);
+                    }
+                    let lotPatch = { lo_hang_id: null, lot_allocations: [] };
+                    if (newQty > 0) {
+                        const stockResult = await truTonKho({
+                            kho_id: khoId,
+                            hang_hoa_id: oldRow.hang_hoa_id,
+                            lo_hang_id: oldRow.lo_hang_id || undefined,
+                            ten_quy_cach: oldRow.ten_quy_cach || oldRow.ten_thuoc_tinh || '',
+                            gia_tri_thuoc_tinh_id: oldRow.gia_tri_thuoc_tinh_id || undefined,
+                            sync_quy_cach: Boolean(oldRow.gia_tri_thuoc_tinh_id || oldRow.ten_quy_cach || oldRow.ten_thuoc_tinh),
+                            so_luong: newQty,
+                            nguoi_tao_id: req.user?._id,
+                            loai_phieu: 'ban_hang',
+                            ma_phieu: maPhieu,
+                            ghi_chu: `Dieu chinh HD ${maPhieu}`
+                        });
+                        lotPatch = applyLotAllocationsToInvoiceLine(stockResult.allocations);
+                    }
+                    next.lotPatch = lotPatch;
+                } catch (stockError) {
+                    return res.status(400).json({
+                        success: false,
+                        message: stockError.message || 'Tồn kho không đủ để điều chỉnh số lượng dòng hàng'
+                    });
+                }
+            }
+        }
+
+        const tongTienHang = normalizedRows.reduce((sum, pair) => sum + Number(pair.next.thanh_tien || 0), 0);
+        const invoiceDiscount = Number(invoice.giam_gia || 0);
+        const thanhToan = Math.max(0, tongTienHang - invoiceDiscount);
+        const receipts = await PhieuThuChi.find({
+            trang_thai: { $ne: 'cancelled' },
+            $or: [
+                { hoa_don_id: invoice._id },
+                ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+            ]
+        }).lean();
+        const paid = computeNetPaidFromReceiptRows(receipts);
+        const status = resolveInvoiceStatus(thanhToan, paid);
+
+        const oldCustomerId = invoice.khach_hang_id ? String(invoice.khach_hang_id) : '';
+        let newCustomerId = body.khach_hang_id !== undefined
+            ? String(body.khach_hang_id || '').trim()
+            : oldCustomerId;
+        if (newCustomerId && !mongoose.Types.ObjectId.isValid(newCustomerId)) {
+            return res.status(400).json({ success: false, message: 'Khách hàng không hợp lệ' });
+        }
+        if (!newCustomerId) newCustomerId = '';
+
+        const oldPayable = Number(invoice.thanh_toan || 0);
+        const oldDebt = Math.max(0, oldPayable - paid);
+        const newDebt = Math.max(0, thanhToan - paid);
+
+        if (newCustomerId !== oldCustomerId) {
+            let newCustomer = null;
+            if (newCustomerId) {
+                newCustomer = await KhachHang.findById(newCustomerId).select('ten_khach_hang').lean();
+                if (!newCustomer) {
+                    return res.status(400).json({ success: false, message: 'Khách hàng không tồn tại' });
+                }
+            }
+            if (oldCustomerId && oldDebt > 0) {
+                await KhachHang.updateOne({ _id: oldCustomerId }, { $inc: { tong_no: -oldDebt } });
+            }
+            const customerName = newCustomer?.ten_khach_hang || 'Khách lẻ';
+            const receiptFilter = {
+                trang_thai: { $ne: 'cancelled' },
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                ]
+            };
+            await PhieuThuChi.updateMany(receiptFilter, {
+                $set: {
+                    khach_hang_id: newCustomerId || null,
+                    doi_tuong: customerName
+                }
+            });
+            await CongNoKhachHang.updateMany(
+                { hoa_don_id: invoice._id },
+                { $set: { khach_hang_id: newCustomerId || null } }
+            );
+            await VanDon.updateMany(
+                {
+                    trang_thai: { $ne: 'cancelled' },
+                    $or: [
+                        { hoa_don_id: invoice._id },
+                        ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                    ]
+                },
+                { $set: { khach_hang_id: newCustomerId || null } }
+            );
+            if (invoice.don_hang_id) {
+                await DonHang.updateOne(
+                    { _id: invoice.don_hang_id },
+                    { $set: { khach_hang_id: newCustomerId || null } }
+                );
+            }
+            if (newCustomerId && newDebt > 0) {
+                await KhachHang.updateOne({ _id: newCustomerId }, { $inc: { tong_no: newDebt } });
+            }
+            invoice.khach_hang_id = newCustomerId || null;
+        }
+
+        await HoaDonBanHang.updateOne({ _id: invoice._id }, {
+            $set: {
+                tong_tien: tongTienHang,
+                thanh_toan: thanhToan,
+                trang_thai: status,
+                khach_hang_id: newCustomerId || null
+            }
+        });
+
+        for (const { next } of normalizedRows) {
+            const updateSet = {
+                so_luong: next.so_luong,
+                don_gia: next.don_gia,
+                chiet_khau: next.chiet_khau,
+                thanh_tien: next.thanh_tien
+            };
+            if (next.lotPatch) {
+                updateSet.lo_hang_id = next.lotPatch.lo_hang_id;
+                updateSet.lot_allocations = next.lotPatch.lot_allocations;
+            }
+            await CTHoaDonBanHang.updateOne({ _id: next._id }, { $set: updateSet });
+        }
+
+        const parsedVatChua = parseVatChuaImportInput(body);
+        try {
+            assertVatChuaImportInput(parsedVatChua);
+        } catch (vcErr) {
+            return res.status(400).json({ success: false, message: vcErr.message || 'Dữ liệu vật chứa không hợp lệ' });
+        }
+
+        const storeId = invoice.cua_hang_id;
+        const orderId = invoice.don_hang_id || null;
+        await cancelXuatVatChuaBySource(storeId, 'hoa_don', invoice._id);
+        if (orderId) await cancelXuatVatChuaBySource(storeId, 'don_hang', orderId);
+
+        if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
+            const updatedInvoice = await HoaDonBanHang.findById(invoice._id).lean();
+            let customerName = '';
+            if (updatedInvoice?.khach_hang_id) {
+                const customer = await KhachHang.findById(updatedInvoice.khach_hang_id).select('ten_khach_hang').lean();
+                customerName = customer?.ten_khach_hang || '';
+            }
+            try {
+                await exportVatChuaWithInvoice(updatedInvoice, {
+                    vat_chua_id: parsedVatChua.vatChuaId,
+                    vat_chua_so_luong: parsedVatChua.qty,
+                    khach_hang_ten: customerName
+                });
+            } catch (vatChuaError) {
+                return res.status(400).json({
+                    success: false,
+                    message: vatChuaError.message || 'Không ghi nhận xuất vật chứa được'
+                });
+            }
+        }
+
+        return res.json({ success: true, message: 'Đã lưu thông tin hóa đơn' });
     } catch (error) {
         next(error);
     }
@@ -3975,6 +4886,17 @@ router.post('/hoa-don/:id/phieu-thu', async (req, res, next) => {
 
         const cashBookId = resolveCashBookIdFromBody(req.body || {});
         const paymentBooks = resolvePaymentBooksFromBody(req.body || {});
+        if ((payment.tien_mat > 0 || payment.tien_thua > 0) && !paymentBooks.so_quy_tien_mat_id) {
+            try {
+                const cashBook = await resolveCashBookForPayment({
+                    loaiSoQuy: 'tien_mat',
+                    requestedId: paymentBooks.so_quy_id || cashBookId || ''
+                });
+                paymentBooks.so_quy_tien_mat_id = String(cashBook._id || '');
+            } catch (bookErr) {
+                return res.status(400).json({ success: false, message: bookErr.message || 'Chưa có sổ tiền mặt active' });
+            }
+        }
         const bookErrors = validatePaymentBooksForCustomer(payment, paymentBooks);
         if (bookErrors.length) {
             return res.status(400).json({ success: false, message: bookErrors.join('. ') });
@@ -4112,6 +5034,12 @@ router.post('/hoa-don/:id/cancel', async (req, res, next) => {
         if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
         if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
             return res.json({ success: true, message: 'Hóa đơn đã hủy' });
+        }
+        if (normalizeInvoiceStatus(invoice.trang_thai) === 'merged') {
+            return res.status(400).json({
+                success: false,
+                message: `Hóa đơn này đã được gộp vào ${invoice.merged_to_ma_hoa_don || 'hóa đơn khác'}, không thể hủy riêng.`
+            });
         }
 
         const [receipts, debts, shipment] = await Promise.all([

@@ -40,11 +40,12 @@ const SOURCE_TYPE_LABEL = {
   hoa_don: 'Hóa đơn',
   tra_hang_ban: 'Trả hàng bán',
   phieu_tra_hang_nhap: 'Trả hàng nhập',
+  xuat_noi_bo: 'Xuất dùng nội bộ',
   manual: 'Thủ công',
   khac: 'Khác'
 };
 
-function buildSourceHref(sourceType, sourceId) {
+function buildSourceHref(sourceType, sourceId, loaiXuat) {
   const id = cleanId(sourceId);
   if (!id) return '';
   if (sourceType === 'phieu_nhap') return '/nhap-hang?purchase=' + encodeURIComponent(id);
@@ -52,6 +53,9 @@ function buildSourceHref(sourceType, sourceId) {
   if (sourceType === 'hoa_don') return '/don-hang/hoa-don/' + id;
   if (sourceType === 'phieu_tra_hang_nhap') return '/tra-hang-nhap/' + id;
   if (sourceType === 'tra_hang_ban') return '/don-hang/tra-hang?return=' + encodeURIComponent(id);
+  if (sourceType === 'xuat_noi_bo' || loaiXuat === 'su_dung_noi_bo') {
+    return '/xuat-dung-noi-bo?open=' + encodeURIComponent(id);
+  }
   return '';
 }
 
@@ -117,7 +121,7 @@ function mapXuatRows(rows, vatChuaId) {
       source_type: row.source_type || '',
       source_type_label: SOURCE_TYPE_LABEL[row.source_type] || row.source_type || '---',
       source_code: row.source_code || '',
-      source_href: buildSourceHref(row.source_type, row.source_id),
+      source_href: buildSourceHref(row.source_type, row.source_id, row.loai_xuat),
       so_luong: Number(line.so_luong || row.tong_so_luong || 0),
       gia_von: Number(line.gia_von || 0),
       thanh_tien: Number(line.thanh_tien || row.tong_tien || 0),
@@ -248,7 +252,7 @@ async function loadVatChuaDocumentDetail(kind, docId, storeId) {
       source_type: doc.source_type || '',
       source_type_label: SOURCE_TYPE_LABEL[doc.source_type] || doc.source_type || '---',
       source_code: doc.source_code || '',
-      source_href: buildSourceHref(doc.source_type, doc.source_id),
+      source_href: buildSourceHref(doc.source_type, doc.source_id, doc.loai_nhap),
       tong_so_luong: Number(doc.tong_so_luong || 0),
       tong_tien: Number(doc.tong_tien || 0),
       trang_thai: doc.trang_thai || 'active',
@@ -271,7 +275,7 @@ async function loadVatChuaDocumentDetail(kind, docId, storeId) {
       source_type: doc.source_type || '',
       source_type_label: SOURCE_TYPE_LABEL[doc.source_type] || doc.source_type || '---',
       source_code: doc.source_code || '',
-      source_href: buildSourceHref(doc.source_type, doc.source_id),
+      source_href: buildSourceHref(doc.source_type, doc.source_id, doc.loai_xuat),
       tong_so_luong: Number(doc.tong_so_luong || 0),
       tong_tien: Number(doc.tong_tien || 0),
       trang_thai: doc.trang_thai || 'active',
@@ -295,7 +299,11 @@ function flattenVatChuaDocLines(doc, kind) {
   const loaiLabel = kind === 'xuat'
     ? resolveXuatLoaiLabel(doc)
     : resolveNhapLoaiLabel(doc);
-  const sourceHref = buildSourceHref(doc.source_type, doc.source_id);
+  const sourceHref = buildSourceHref(
+    doc.source_type,
+    doc.source_id,
+    kind === 'xuat' ? doc.loai_xuat : doc.loai_nhap
+  );
   const createdAt = doc.created_at || null;
 
   return items.map(function(line) {
@@ -495,7 +503,7 @@ async function loadSalesReturnLinkedNhapVatChuaLines(returnId, storeId) {
         source_type: row.source_type || '',
         source_type_label: SOURCE_TYPE_LABEL[row.source_type] || row.source_type || '---',
         source_code: row.source_code || '',
-        source_href: buildSourceHref(row.source_type, row.source_id),
+        source_href: buildSourceHref(row.source_type, row.source_id, row.loai_xuat),
         created_at: row.created_at,
         ghi_chu: row.ghi_chu || ''
       });

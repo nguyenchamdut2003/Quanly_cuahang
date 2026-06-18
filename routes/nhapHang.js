@@ -9,6 +9,7 @@ router.get('/', nhapHangController.index);
 router.get('/create', nhapHangController.createPage);
 router.get('/api/nha-cung-cap/:id/hang-hoa', nhapHangController.apiSupplierProducts);
 router.post('/create', nhapHangController.createSubmit);
+router.post('/gop-phieu-nhap', nhapHangController.mergePurchases);
 router.get('/:id/in-tong-hop', nhapHangController.printPurchaseBundle);
 router.get('/:id/in', nhapHangController.printPurchase);
 router.get('/:id/in/pdf', nhapHangController.printPhieuNhapPdf);

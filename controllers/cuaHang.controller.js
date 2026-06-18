@@ -1,6 +1,7 @@
 var { CuaHang, Kho } = require('../models/kiot.model');
 var ExcelJS = require('exceljs');
 var { buildFullAddress, normalizeAddress } = require('../utils/address');
+var cuaHangImportService = require('../services/cuaHangImport.service');
 
 function formatDate(value) {
     if (!value) return '---';
@@ -700,6 +701,82 @@ exports.removeWarehouse = async function(req, res, next) {
         await Kho.findOneAndDelete({ _id: warehouseId, cua_hang_id: storeId });
         res.redirect('/cua-hang?store=' + storeId + '&success=deleted');
     } catch (error) {
+        next(error);
+    }
+};
+
+exports.downloadImportTemplate = async function(req, res, next) {
+    try {
+        var workbook = await cuaHangImportService.buildImportTemplateWorkbook();
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="mau-nhap-cua-hang.xlsx"');
+        await workbook.xlsx.write(res);
+        res.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.importExcel = async function(req, res, next) {
+    try {
+        var file = req?.file;
+        if (!file || !file.buffer || !file.buffer.length) {
+            return res.redirect('/cua-hang?error=import_missing_file');
+        }
+
+        var fileName = String(file.originalname || '').toLowerCase();
+        if (!/\.xlsx$/i.test(fileName)) {
+            return res.redirect('/cua-hang?error=import_invalid_file_type');
+        }
+
+        var parsedRows = await cuaHangImportService.parseStoreImportBuffer(file.buffer);
+        if (!parsedRows.length) {
+            return res.redirect('/cua-hang?error=import_empty_file');
+        }
+
+        cuaHangImportService.validateImportRows(parsedRows);
+
+        var inserted = 0;
+        var skipped = 0;
+        var rowErrors = [];
+
+        for (var i = 0; i < parsedRows.length; i += 1) {
+            var item = parsedRows[i];
+            var payload = cuaHangImportService.buildStorePayloadFromImportRow(item.data);
+
+            try {
+                payload.ma_cua_hang = await makeStoreCode();
+                await CuaHang.create(payload);
+                inserted += 1;
+            } catch (error) {
+                skipped += 1;
+                rowErrors.push('Dòng ' + item.rowNumber + ': ' + (error && error.message ? error.message : 'không thể thêm.'));
+            }
+        }
+
+        if (inserted === 0) {
+            var failMessage = rowErrors.slice(0, 3).join(' ');
+            return res.redirect('/cua-hang?error=' + encodeURIComponent(failMessage || 'import_failed'));
+        }
+
+        var successQuery = 'imported=' + inserted + '&import_label=' + encodeURIComponent('cửa hàng');
+        if (skipped > 0) successQuery += '&import_skipped=' + skipped;
+        if (rowErrors.length > 0) {
+            successQuery += '&import_warning=' + encodeURIComponent(rowErrors.slice(0, 2).join(' '));
+        }
+
+        res.redirect('/cua-hang?success=imported&' + successQuery);
+    } catch (error) {
+        if (error && error.code === 'import_invalid_headers') {
+            return res.redirect('/cua-hang?error=import_invalid_headers');
+        }
+        if (error && error.code === 'import_invalid_rows') {
+            return res.redirect('/cua-hang?error=' + encodeURIComponent(error.message || 'import_invalid_rows'));
+        }
+        if (error && error.code === 'import_empty_file') {
+            return res.redirect('/cua-hang?error=import_empty_file');
+        }
+
         next(error);
     }
 };

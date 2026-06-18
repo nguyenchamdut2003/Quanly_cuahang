@@ -13,6 +13,7 @@ const {
     HoaDonBanHang,
     PhieuNhap,
     PhieuTraHangNhap,
+    PhieuTraHang,
     DonHang,
     NhapVatChua
 } = require('../models/kiot.model');
@@ -184,6 +185,10 @@ async function loadPartnerLists(storeId) {
     return { employees, carriers };
 }
 
+function isCustomerReturnDocCode(code) {
+    return /^TH(?!N)/i.test(String(code || '').trim());
+}
+
 function relatedCode(item) {
     const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
     const allocPn = firstAlloc?.phieu_nhap_id;
@@ -239,6 +244,12 @@ async function attachMissingDocRefs(receipt) {
             .select('ma_nhap_vat_chua tong_tien created_at doi_tuong_ten trang_thai')
             .lean();
         if (row) receipt.nhap_vat_chua_id = row;
+    } else if (isCustomerReturnDocCode(code) && !receipt.phieu_tra_hang_id) {
+        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code })
+            .select('ma_phieu_tra ngay_tra tong_tien_tra can_tra_khach trang_thai khach_hang_id')
+            .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
+            .lean();
+        if (row) receipt.phieu_tra_hang_id = row;
     }
     return receipt;
 }
@@ -248,6 +259,7 @@ async function enrichReceiptListDocRefs(list) {
     const invoiceCodes = [];
     const purchaseCodes = [];
     const supplierReturnCodes = [];
+    const customerReturnCodes = [];
     const orderCodes = [];
     const nhapVatChuaCodes = [];
     list.forEach(item => {
@@ -257,11 +269,12 @@ async function enrichReceiptListDocRefs(list) {
         if (/^HD/i.test(code)) invoiceCodes.push(code);
         else if (/^PN/i.test(code)) purchaseCodes.push(code);
         else if (/^THN/i.test(code)) supplierReturnCodes.push(code);
+        else if (isCustomerReturnDocCode(code)) customerReturnCodes.push(code);
         else if (/^DH/i.test(code)) orderCodes.push(code);
         else if (/^NVC/i.test(code)) nhapVatChuaCodes.push(code);
     });
     const unique = arr => [...new Set(arr.filter(Boolean))];
-    const [invoices, purchases, supplierReturns, orders, nhapVatChuas] = await Promise.all([
+    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas] = await Promise.all([
         unique(invoiceCodes).length
             ? HoaDonBanHang.find({ ma_hoa_don: { $in: unique(invoiceCodes) } }).select('_id ma_hoa_don').lean()
             : [],
@@ -270,6 +283,9 @@ async function enrichReceiptListDocRefs(list) {
             : [],
         unique(supplierReturnCodes).length
             ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: unique(supplierReturnCodes) } }).select('_id ma_phieu_tra_nhap').lean()
+            : [],
+        unique(customerReturnCodes).length
+            ? PhieuTraHang.find({ ma_phieu_tra: { $in: unique(customerReturnCodes) } }).select('_id ma_phieu_tra').lean()
             : [],
         unique(orderCodes).length
             ? DonHang.find({ ma_don_hang: { $in: unique(orderCodes) } }).select('_id ma_don_hang').lean()
@@ -281,6 +297,7 @@ async function enrichReceiptListDocRefs(list) {
     const invoiceByCode = new Map(invoices.map(row => [row.ma_hoa_don, row._id]));
     const purchaseByCode = new Map(purchases.map(row => [row.ma_phieu_nhap, row._id]));
     const supplierReturnByCode = new Map(supplierReturns.map(row => [row.ma_phieu_tra_nhap, row._id]));
+    const customerReturnByCode = new Map(customerReturns.map(row => [row.ma_phieu_tra, row._id]));
     const orderByCode = new Map(orders.map(row => [row.ma_don_hang, row._id]));
     const nhapVatChuaByCode = new Map(nhapVatChuas.map(row => [row.ma_nhap_vat_chua, row._id]));
     list.forEach(item => {
@@ -295,6 +312,9 @@ async function enrichReceiptListDocRefs(list) {
         } else if (supplierReturnByCode.has(code)) {
             item._docLinkType = 'supplier_return';
             item._docLinkId = supplierReturnByCode.get(code);
+        } else if (customerReturnByCode.has(code)) {
+            item._docLinkType = 'customer_return';
+            item._docLinkId = customerReturnByCode.get(code);
         } else if (orderByCode.has(code)) {
             item._docLinkType = 'order';
             item._docLinkId = orderByCode.get(code);

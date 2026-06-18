@@ -87,8 +87,8 @@
                                     <strong><%= formatDetailText(c.ten_ca_nhan || c.ten_khach_hang) %></strong>
                                   </div>
                                   <div>
-                                    <span>CCCD</span>
-                                    <strong><%= formatDetailText(c.cccd) %></strong>
+                                    <span>MST</span>
+                                    <strong><%= formatDetailText(c.mst) %></strong>
                                   </div>
                                   <div>
                                     <span>Ngày sinh</span>
@@ -175,7 +175,7 @@
                               <div class="customer-address-toolbar">
                                 <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
                               </div>
-                              <table class="admin-table warehouse-table">
+                              <table class="admin-table warehouse-table customer-address-table">
                                 <thead>
                                   <tr>
                                     <th>Mã địa chỉ</th>
@@ -191,7 +191,7 @@
                                   <tr class="warehouse-edit-row warehouse-add-row">
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ma_dia_chi" placeholder="Tự động" readonly style="background: transparent; border: none;"></td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
-                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT" maxlength="10" inputmode="numeric"></td>
                                     <td>
                                       <input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết">
                                     </td>
@@ -220,7 +220,6 @@
                                   <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
                                     <td colspan="7">
                                       <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
                                         <div>
                                           <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label>
                                           <select class="form-control js-ghn-province" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" data-selected-name="">
@@ -237,6 +236,7 @@
                                           <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" class="js-ghn-district-name">
                                           <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen_id" class="js-ghn-district-id">
                                         </div>
+                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
                                         <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
                                         <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
                                       </div>
@@ -252,7 +252,7 @@
                                     <tr class="warehouse-edit-row">
                                       <td><input form="<%= addressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly style="background: transparent; border: none; cursor: default;"></td>
                                       <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
-                                      <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                                      <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>" maxlength="10" inputmode="numeric"></td>
                                       <td>
                                         <input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>">
                                       </td>
@@ -286,7 +286,6 @@
                                     <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
                                       <td colspan="7">
                                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
                                           <div>
                                             <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label>
                                             <select class="form-control js-ghn-province" form="<%= addressFormId %>" name="tinh_thanh" data-selected-id="<%= address.tinh_thanh_id || '' %>" data-selected-name="<%= address.tinh_thanh || '' %>">
@@ -311,6 +310,7 @@
                                             <input type="hidden" form="<%= addressFormId %>" name="quan_huyen" class="js-ghn-district-name" value="<%= address.quan_huyen || '' %>">
                                             <input type="hidden" form="<%= addressFormId %>" name="quan_huyen_id" class="js-ghn-district-id" value="<%= address.quan_huyen_id || '' %>">
                                           </div>
+                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
                                           <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
                                           <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
                                         </div>

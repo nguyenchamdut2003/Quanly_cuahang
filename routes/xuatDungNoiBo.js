@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
@@ -14,12 +14,26 @@ const {
     NhaCungCap,
     TonKho,
     TonKhoLo,
-    TonKhoLoQuyCach
+    TonKhoLoQuyCach,
+    VatChua
 } = require('../models/kiot.model');
 const { truTonKho } = require('../services/kho.service');
+const { createXuatVatChuaAndDecreaseStock } = require('../services/vatChuaExport.service');
+const { loadAverageCostByVatChuaIds } = require('../services/vatChuaImport.service');
 const { resolveStoreId } = require('../utils/storeScope');
 
 router.use(isAuthenticated);
+
+async function makeXnbCode() {
+    const last = await PhieuXuatNoiBo.findOne({ ma_xuat_noi_bo: /^XNB\d{6}$/ })
+        .sort({ ma_xuat_noi_bo: -1 })
+        .select('ma_xuat_noi_bo')
+        .lean();
+    const next = last && last.ma_xuat_noi_bo
+        ? Number(String(last.ma_xuat_noi_bo).replace(/\D/g, '')) + 1
+        : 1;
+    return 'XNB' + String(next).padStart(6, '0');
+}
 
 async function loadProductsForXnbKho(khoId, keyword) {
     const [products, tonKhoRows, tonKhoLoRows, quyCachRows] = await Promise.all([
@@ -185,6 +199,66 @@ function parseItems(rawItems) {
     return [];
 }
 
+function parseVatChuaItems(rawItems) {
+    const items = parseItems(rawItems);
+    const map = new Map();
+    items.forEach(function(item) {
+        const id = String(item.vat_chua_id || item._id || '').trim();
+        const qty = Math.floor(Number(item.so_luong || item.qty || 0));
+        if (!mongoose.Types.ObjectId.isValid(id) || qty <= 0) return;
+        map.set(id, Number(map.get(id) || 0) + qty);
+    });
+    return Array.from(map.entries()).map(function(entry) {
+        return { vat_chua_id: entry[0], so_luong: entry[1] };
+    });
+}
+
+async function normalizeVatChuaXnbItems(rawItems, storeId) {
+    const parsedItems = parseVatChuaItems(rawItems);
+    if (!parsedItems.length) return [];
+    const store = String(storeId || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(store)) {
+        throw Object.assign(new Error('Vui lòng chọn cửa hàng trước khi xuất vật chứa.'), { statusCode: 400 });
+    }
+
+    const ids = parsedItems.map(function(item) { return item.vat_chua_id; });
+    const vatChuaRows = await VatChua.find({
+        _id: { $in: ids },
+        cua_hang_id: store,
+        trang_thai: 'active'
+    }).lean();
+    const rowMap = vatChuaRows.reduce(function(map, row) {
+        map[String(row._id)] = row;
+        return map;
+    }, {});
+
+    const costMap = await loadAverageCostByVatChuaIds(store, ids);
+
+    return parsedItems.map(function(item) {
+        const row = rowMap[item.vat_chua_id];
+        if (!row) {
+            throw Object.assign(new Error('Vật chứa không hợp lệ hoặc đã ngừng sử dụng.'), { statusCode: 400 });
+        }
+        const ton = Math.max(0, Number(row.so_luong_ton || 0));
+        if (ton < item.so_luong) {
+            throw Object.assign(
+                new Error('Tồn vật chứa không đủ để xuất: ' + (row.ten_vat_chua || row.ma_vat_chua || '') + ' còn ' + ton + ', cần ' + item.so_luong),
+                { statusCode: 400 }
+            );
+        }
+        const giaVon = Math.max(0, Number(costMap[item.vat_chua_id] || 0));
+        const thanhTien = Math.round(giaVon * item.so_luong);
+        return {
+            vat_chua_id: row._id,
+            ma_vat_chua: row.ma_vat_chua || '',
+            ten_vat_chua: row.ten_vat_chua || '',
+            so_luong: item.so_luong,
+            gia_von: giaVon,
+            thanh_tien: thanhTien
+        };
+    });
+}
+
 function buildFilter(query) {
     const filter = {};
     const statuses = Array.isArray(query.trang_thai)
@@ -292,6 +366,24 @@ function buildDetailSummary(details) {
         totalQuantity,
         totalValue
     };
+}
+
+function buildVatChuaDetailItems(rawItems) {
+    const items = Array.isArray(rawItems) ? rawItems : [];
+    return items.map(function(item) {
+        const soLuong = Number(item.so_luong || 0);
+        const giaVon = Number(item.gia_von || 0);
+        const thanhTien = Number(item.thanh_tien != null ? item.thanh_tien : soLuong * giaVon);
+        return {
+            ma_vat_chua: item.ma_vat_chua || '',
+            ten_vat_chua: item.ten_vat_chua || '',
+            so_luong: soLuong,
+            gia_von: giaVon,
+            thanh_tien: thanhTien
+        };
+    }).filter(function(item) {
+        return item.so_luong > 0;
+    });
 }
 
 function sendDetailJsonError(res, error, fallbackMessage) {
@@ -434,6 +526,46 @@ router.get('/api/san-pham', async (req, res, next) => {
     }
 });
 
+router.get('/api/vat-chua', async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        if (!storeId) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn cửa hàng.' });
+        }
+        const keyword = String(req.query.keyword || '').trim();
+        const query = {
+            cua_hang_id: storeId,
+            trang_thai: 'active',
+            so_luong_ton: { $gt: 0 }
+        };
+        if (keyword) {
+            query.$or = [
+                { ma_vat_chua: { $regex: keyword, $options: 'i' } },
+                { ten_vat_chua: { $regex: keyword, $options: 'i' } }
+            ];
+        }
+        const items = await VatChua.find(query)
+            .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
+            .select('ma_vat_chua ten_vat_chua so_luong_ton')
+            .limit(100)
+            .lean();
+
+        return res.json({
+            success: true,
+            items: items.map(function(item) {
+                return {
+                    _id: String(item._id),
+                    ma_vat_chua: item.ma_vat_chua || '',
+                    ten_vat_chua: item.ten_vat_chua || '',
+                    so_luong_ton: Number(item.so_luong_ton || 0)
+                };
+            })
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.get('/create', async (req, res, next) => {
     try {
         const storeId = await resolveStoreId(req);
@@ -446,9 +578,11 @@ router.get('/create', async (req, res, next) => {
             NhaCungCap.find().sort({ ten_ncc: 1 })
         ]);
         const loaiXuatList = await loadLoaiXuatList();
+        const nextCode = await makeXnbCode();
         res.render('xuat-dung-noi-bo/create', {
             title: 'Xuất dùng nội bộ',
             currentStoreId: storeId || '',
+            nextCode,
             users,
             warehouses,
             customers,
@@ -567,6 +701,9 @@ router.post('/add', async (req, res, next) => {
             cong_don_vao_the
         } = req.body || {};
         const items = parseItems(req.body?.items);
+        const sessionStoreId = await resolveStoreId(req);
+        const effectiveStoreId = cua_hang_id || sessionStoreId;
+        let normalizedVatChuaItems = [];
 
         if (!kho_id) {
             return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
@@ -577,9 +714,6 @@ router.post('/add', async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Kho xuất không hợp lệ' });
         }
 
-        if (!items.length) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 hàng hóa' });
-        }
         const finalReceiverType = ['nhan_vien', 'khach_hang', 'nha_cung_cap', 'khac'].includes(loai_nguoi_nhan) ? loai_nguoi_nhan : 'khac';
         const finalReceiverName = String(nguoi_nhan || '').trim();
         if (!finalReceiverName) {
@@ -587,6 +721,11 @@ router.post('/add', async (req, res, next) => {
         }
 
         const finalStatus = trang_thai === 'completed' ? 'completed' : (trang_thai === 'cancelled' ? 'cancelled' : 'draft');
+        try {
+            normalizedVatChuaItems = await normalizeVatChuaXnbItems(req.body?.vat_chua_items, effectiveStoreId || kho.cua_hang_id);
+        } catch (error) {
+            return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Dữ liệu vật chứa không hợp lệ' });
+        }
         let tongGiaTri = 0;
         let tongSoLuong = 0;
         const normalizedItems = [];
@@ -632,22 +771,27 @@ router.post('/add', async (req, res, next) => {
             normalizedItems.push({ product, loHangId: item.lo_hang_id || null, tenQuyCach: '', soLuong, giaVon, thanhTien });
         }
 
-        if (!normalizedItems.length) {
-            return res.status(400).json({ success: false, message: 'Số lượng xuất không hợp lệ' });
+        if (!normalizedItems.length && !normalizedVatChuaItems.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 hàng hóa hoặc vật chứa' });
         }
 
-        const ma_xuat_noi_bo = 'XNB' + Date.now();
-        const sessionStoreId = await resolveStoreId(req);
+        normalizedVatChuaItems.forEach(function(item) {
+            tongSoLuong += Number(item.so_luong || 0);
+            tongGiaTri += Number(item.thanh_tien || 0);
+        });
+
+        const ma_xuat_noi_bo = await makeXnbCode();
         const phieu = await PhieuXuatNoiBo.create({
             ma_xuat_noi_bo,
             loai_xuat: loai_xuat || 'xuat_dung_noi_bo',
-            cua_hang_id: cua_hang_id || kho.cua_hang_id || sessionStoreId,
+            cua_hang_id: effectiveStoreId || kho.cua_hang_id,
             kho_id: kho._id,
             nguoi_tao_id: req.user?._id,
             nguoi_nhan: finalReceiverName,
             loai_nguoi_nhan: finalReceiverType,
             tong_so_luong: tongSoLuong,
             tong_gia_tri: tongGiaTri,
+            vat_chua_items: normalizedVatChuaItems,
             cong_don_vao_the: false,
             trang_thai: finalStatus,
             ghi_chu: ghi_chu || ''
@@ -684,6 +828,27 @@ router.post('/add', async (req, res, next) => {
                 }
 
                 await HangHoa.findByIdAndUpdate(item.product._id, { $inc: { ton_kho: -item.soLuong } });
+            }
+        }
+
+        if (finalStatus === 'completed' && normalizedVatChuaItems.length) {
+            for (const item of normalizedVatChuaItems) {
+                try {
+                    await createXuatVatChuaAndDecreaseStock({
+                        storeId: phieu.cua_hang_id,
+                        vatChuaId: item.vat_chua_id,
+                        qty: item.so_luong,
+                        loaiXuat: 'su_dung_noi_bo',
+                        doiTuongType: finalReceiverType === 'nha_cung_cap' ? 'nha_cung_cap' : (finalReceiverType === 'khach_hang' ? 'khach_hang' : 'khac'),
+                        doiTuongTen: finalReceiverName,
+                        sourceType: 'xuat_noi_bo',
+                        sourceId: phieu._id,
+                        sourceCode: ma_xuat_noi_bo,
+                        ghiChu: ghi_chu || 'Xuat vat chua dung noi bo'
+                    });
+                } catch (error) {
+                    return res.status(400).json({ success: false, message: error.message || 'Khong du ton vat chua de xuat' });
+                }
             }
         }
 
@@ -793,6 +958,11 @@ router.get('/:id/details', async (req, res, next) => {
             })
             .lean();
         const summary = buildDetailSummary(details);
+        const vatChuaItems = buildVatChuaDetailItems(ticket.vat_chua_items);
+        const vatChuaQty = vatChuaItems.reduce(function(sum, item) { return sum + Number(item.so_luong || 0); }, 0);
+        const vatChuaValue = vatChuaItems.reduce(function(sum, item) { return sum + Number(item.thanh_tien || 0); }, 0);
+        const totalQuantity = Number(ticket.tong_so_luong || summary.totalQuantity + vatChuaQty);
+        const totalValue = Number(ticket.tong_gia_tri || summary.totalValue + vatChuaValue);
 
         return res.json({
             success: true,
@@ -803,12 +973,13 @@ router.get('/:id/details', async (req, res, next) => {
                 ngay_xuat: ticket.ngay_xuat || ticket.created_at || null,
                 kho: ticket.kho_id ? ticket.kho_id.ten_kho : '',
                 chi_nhanh: ticket.cua_hang_id ? ticket.cua_hang_id.ten_cua_hang : '',
-                tong_so_luong: Number(ticket.tong_so_luong || summary.totalQuantity || 0),
-                tong_gia_tri: Number(ticket.tong_gia_tri || summary.totalValue || 0)
+                tong_so_luong: totalQuantity,
+                tong_gia_tri: totalValue
             },
             items: summary.items,
-            totalQuantity: summary.totalQuantity,
-            totalValue: summary.totalValue
+            vatChuaItems: vatChuaItems,
+            totalQuantity: totalQuantity,
+            totalValue: totalValue
         });
     } catch (error) {
         return sendDetailJsonError(res, error, 'Không tải được chi tiết phiếu xuất dùng nội bộ');

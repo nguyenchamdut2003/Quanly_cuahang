@@ -13,6 +13,7 @@
     "fix:ton-kho-lo-quy-cach": "node scripts/sync-ton-kho-lo-quy-cach.js",
     "seed:kho-flow": "node scripts/seed-kho-flow.js",
     "migrate:so-quy-v2-indexes": "node scripts/migrate-so-quy-v2-indexes.js",
+    "migrate:khach-hang-cccd-to-mst": "node scripts/migrate-khach-hang-cccd-to-mst.js",
     "test:so-quy-v2-schema": "node scripts/local-tests/smoke-so-quy-v2-schema.js",
     "test:so-quy-v2-api": "node scripts/local-tests/smoke-so-quy-v2-api.js",
     "test:purchase-pay-supplier-v2": "node scripts/local-tests/smoke-purchase-pay-supplier-v2.js",
