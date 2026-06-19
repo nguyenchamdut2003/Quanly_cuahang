@@ -65,6 +65,28 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <style>
     *{box-sizing:border-box}body{margin:0;background:#f5f7fa;color:#111827;overflow:auto}.page{min-height:calc(100vh - 98px);height:auto;display:flex;flex-direction:column}.shell{flex:1;min-height:calc(100vh - 98px);display:grid;grid-template-columns:206px minmax(0,1fr);gap:8px;padding:8px 30px 0}.sidebar{background:#fff;border-radius:4px;padding:10px 8px;overflow:auto;max-height:calc(100vh - 106px)}.title{font-size:18px;font-weight:800;margin:0 0 12px}.filter{margin-bottom:18px}.filter-title{font-size:12px;font-weight:800;margin-bottom:8px}.check,.radio{display:flex;align-items:center;gap:7px;margin:8px 0;font-size:12px}.check input,.radio input{accent-color:#0070f4}.pill{height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 8px;flex:1}.control{width:100%;height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;color:#667085;padding:0 8px;font-size:12px;margin-bottom:6px}.small-link{float:right;color:#0070f4;text-decoration:none;font-size:11px;font-weight:700}.main{min-width:0;display:flex;flex-direction:column;gap:8px;min-height:0}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}.search{position:relative;width:390px;max-width:100%}.search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#6b7280}.search input{width:100%;height:30px;border:1px solid #c8d1dc;border-radius:5px;padding:0 34px 0 30px;font-size:13px}.search button{position:absolute;right:4px;top:4px;width:22px;height:22px;border:0;background:#fff;color:#475467}.actions{display:flex;align-items:center;gap:7px}.btn{height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;padding:0 10px;color:#111827;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;text-decoration:none;cursor:pointer}.btn.primary{background:#fff;border-color:#0070f4;color:#0070f4}.btn.solid{background:#0070f4;border-color:#0070f4;color:#fff}.btn:disabled,.dropdown-item.disabled{opacity:.48;cursor:not-allowed}.icon{width:30px;height:30px;border:1px solid #c8d1dc;background:#fff;border-radius:5px;display:inline-flex;align-items:center;justify-content:center}.dropdown{position:relative}.dropdown-menu{display:none;position:absolute;top:34px;right:0;width:190px;background:#fff;border:1px solid #d7dde5;border-radius:5px;box-shadow:0 12px 28px rgba(15,23,42,.18);z-index:20;padding:6px 0}.dropdown.open .dropdown-menu{display:block}.dropdown-item{height:34px;padding:0 12px;display:flex;align-items:center;color:#111827;text-decoration:none;font-size:13px}.dropdown-item:hover{background:#f2f7ff}.table-wrap{flex:1;min-height:0;background:#fff;border-radius:5px;overflow:auto;max-height:none}.table{width:100%;min-width:1140px;border-collapse:collapse}.table th{height:32px;background:#e8f3ff;border-bottom:1px solid #b7d8ff;text-align:left;padding:0 8px;font-size:11px}.table td{height:39px;border-bottom:1px solid #e5e9ee;padding:0 8px;font-size:12px}.table tbody tr.invoice-row{cursor:pointer}.table tbody tr.invoice-row:hover td{background:#f8fbff}.invoice-row.active td{background:#f0f8ff;border-top:2px solid #0070f4}.check-col,.star-col{width:30px;text-align:center}.num{text-align:left}.link{color:#006dff;text-decoration:none;font-weight:700}.status{display:inline-flex;align-items:center;height:22px;border-radius:4px;padding:0 7px;font-weight:700;font-size:11px}.status.processing{background:#e8f3ff;color:#0058d4}.status.completed{background:#dcfce7;color:#15803d}.status.partial{background:#fff4d6;color:#9a6700}.status.unpaid{background:#e8f3ff;color:#0058d4}.status.failed{background:#fff1d6;color:#b45309}.status.cancelled{background:#fee2e2;color:#b91c1c}.status.merged{background:#f3e8ff;color:#6b21a8}.empty{height:560px;text-align:center;color:#667085}.invoice-merge-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:1400;align-items:flex-start;justify-content:center;padding:7px 12px}.invoice-merge-modal{width:min(1200px,calc(100vw - 24px));max-height:calc(100vh - 14px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}.invoice-merge-head{display:flex;align-items:center;justify-content:space-between;padding:24px 30px 20px}.invoice-merge-head h3{margin:0;font-size:21px;font-weight:800;color:#202124}.invoice-merge-close{border:0;background:transparent;color:#4b5563;font-size:28px;line-height:1;cursor:pointer}.invoice-merge-body{padding:18px 30px 28px;overflow:auto}.invoice-merge-desc{font-size:14px;line-height:1.45;color:#2f343b;margin:0 0 14px}.invoice-merge-desc strong{color:#0070f4}.invoice-merge-filter{display:flex;align-items:center;gap:10px;margin:0 0 14px}.invoice-merge-filter label{font-size:13px;font-weight:700;color:#111827}.invoice-merge-filter select{height:31px;min-width:260px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 9px;font-size:13px;outline:none}.invoice-merge-table{width:100%;border-collapse:collapse;table-layout:fixed}.invoice-merge-table th{height:37px;background:#f0f1f3;border-bottom:1px solid #cfd4dc;text-align:left;padding:0 10px;color:#202124;font-size:13px;font-weight:800}.invoice-merge-table td{height:38px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.invoice-merge-table .num{text-align:right}.invoice-merge-check{width:38px;text-align:center}.invoice-merge-empty{min-height:220px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:#202124;padding:16px}.invoice-merge-empty .empty-icon{width:112px;height:112px;font-size:40px;margin:0 0 20px;background:#f1f7ff;box-shadow:inset 0 0 0 16px #dcecff;display:flex;align-items:center;justify-content:center;border-radius:50%}.invoice-merge-empty strong{font-size:15px;line-height:1.45}.invoice-merge-empty span{display:block;margin-top:8px;color:#667085;font-size:13px;line-height:1.4}.invoice-merge-foot{display:none;align-items:center;justify-content:flex-end;gap:8px;padding:14px 30px 24px;border-top:1px solid #e5e9ee}.detail-row{display:none}.detail-row.open{display:table-row}.detail-cell{padding:0!important;border:2px solid #0070f4!important;border-top:0!important;background:#fff;overflow:visible}.invoice-detail{padding:0 16px 14px;min-height:230px;max-height:none;overflow:visible}.tabs{height:40px;display:flex;align-items:flex-end;gap:24px;border-bottom:1px solid #e5e9ee}.tab{height:40px;border:0;background:#fff;padding:0 0 8px;cursor:pointer}.tab.active{color:#0070f4;border-bottom:2px solid #0070f4;font-weight:800}.panel{display:none}.panel.active{display:block}.detail-head{display:flex;justify-content:space-between;gap:20px;padding:14px 0}.detail-title{font-size:16px;font-weight:800}.detail-meta{display:grid;grid-template-columns:repeat(3,minmax(150px,1fr));gap:10px 20px;margin-top:12px}.mini-field label{display:block;color:#667085;font-size:11px;margin-bottom:4px}.mini-field span{font-size:12px}.items-table{width:100%;border-collapse:collapse;margin-top:10px}.items-table th{height:30px;background:#f3f4f6;border-bottom:1px solid #d4d9e0;font-size:11px;text-align:left;padding:0 8px}.items-table td{height:36px;border-bottom:1px solid #e5e9ee;font-size:12px;padding:0 8px}.detail-bottom{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;margin-top:12px}.note{height:74px;border:1px solid #cfd8e3;border-radius:5px;padding:8px;color:#667085}.total-line{display:flex;justify-content:flex-start;align-items:baseline;gap:12px;margin-bottom:8px;font-size:12px;flex-wrap:wrap}.total-line strong,.total-line span:last-child{font-size:13px;font-weight:700}.totals-receipt-action{display:flex;justify-content:flex-end;margin-top:8px}.ship-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin-top:12px}.detail-actions{min-height:42px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;margin-top:12px}.detail-action-group{display:flex;gap:8px;flex-wrap:wrap}.pager{height:32px;display:flex;align-items:center;gap:8px;font-size:12px}.pager select{height:26px;border:1px solid #c8d1dc;border-radius:5px;background:#fff}.receipt-pay-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1350;align-items:center;justify-content:center;padding:20px}.receipt-pay-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);overflow:hidden}.receipt-pay-head,.receipt-pay-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}.receipt-pay-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}.receipt-pay-body{padding:18px 20px}.receipt-pay-due{padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;font-weight:800;margin-bottom:14px}.order-export-close{border:0;background:none;font-size:24px;line-height:1;cursor:pointer;color:#667085}.po-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1350;padding:16px}.po-modal.open{display:flex}.po-modal-card{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}.po-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.po-modal-head h3{margin:0;font-size:18px}.po-modal-close{border:0;background:#fff;font-size:24px;cursor:pointer;color:#667085}.quick-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick-pay-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}.quick-pay-grid label.full{grid-column:1/-1}.quick-pay-grid input,.quick-pay-grid select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}.pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:4px 0}.pay-total-summary{font-size:13px;font-weight:600;color:#111827;padding:4px 0}.pay-summary-error{font-size:12px;color:#b45309;font-weight:600;padding:4px 0}.invoice-receipt-pay-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}.kv-btn{height:37px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 13px;color:#111827;font-size:14px;font-weight:800;display:inline-flex;align-items:center;gap:8px;cursor:pointer}    .kv-btn.primary{color:#0070f4;border-color:#0070f4}.items-table th.num,.items-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.invoice-vat-chua-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:10px 12px;margin:12px 0 0}.invoice-vat-chua-title{font-size:13px;font-weight:800;color:#0f172a;margin:0 0 8px;display:flex;align-items:center;gap:8px}.invoice-vat-chua-box .items-table{margin-top:6px}.invoice-vat-chua-box .items-table th:last-child,.invoice-vat-chua-box .items-table td:last-child{white-space:nowrap;min-width:120px}.items-table th.num,.items-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.invoice-vat-chua-box{border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;padding:10px 12px;margin:12px 0 0}.invoice-vat-chua-title{font-size:13px;font-weight:800;color:#0f172a;margin:0 0 8px;display:flex;align-items:center;gap:8px}.invoice-vat-chua-box .items-table{margin-top:6px}.invoice-vat-chua-box .items-table th:last-child,.invoice-vat-chua-box .items-table td:last-child{white-space:nowrap;min-width:120px}.filter-check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:12px;color:#111827;cursor:pointer}.filter-check-row input{width:15px;height:15px;accent-color:#0070f4;cursor:pointer}.filter-range-stack{display:grid;gap:8px;margin-top:8px}.filter-range-stack label span{display:block;font-size:12px;color:#667085;margin-bottom:4px}.filter-range-stack input{width:100%;height:28px;border:1px solid #bfc9d5;border-radius:5px;background:#fff;color:#111827;padding:0 8px;font-size:12px;outline:none}.purchase-debt-cell{display:inline-flex;align-items:center;justify-content:flex-end;gap:6px;width:100%;position:relative}.purchase-debt-warn-btn{border:0;background:transparent;color:#dc6803;font-size:15px;line-height:1;cursor:pointer;padding:0;position:relative;flex:0 0 auto}.purchase-debt-warn-btn:hover{color:#b54708}.purchase-debt-warn-tip{display:none;position:fixed;z-index:12000;width:min(300px,calc(100vw - 24px));padding:10px 12px;border-radius:8px;border:1px solid #fecdca;background:#fff7ed;color:#7a2e0e;font-size:12px;line-height:1.45;text-align:left;box-shadow:0 10px 28px rgba(15,23,42,.18);font-weight:500;white-space:normal;pointer-events:none}.purchase-debt-warn-tip.is-visible{display:block}.purchase-debt-warn-tip strong{color:#b42318;font-weight:800}.table td.num{overflow:visible}.edit-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}.edit-vat-chua-box{margin-bottom:14px}.edit-vat-chua-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}.edit-vat-chua-row label{font-size:13px;color:#475467;min-width:72px}.vat-chua-combo{display:flex;gap:6px;align-items:center;flex:1;min-width:220px}.vat-chua-combo select,.vat-chua-combo input{height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}.vat-chua-combo select{flex:1;min-width:0}.vat-chua-combo .vat-chua-qty{width:88px;flex:0 0 88px}.edit-table-wrap{overflow-x:auto;border:1px solid #dbe4ee;border-radius:6px;margin-top:8px}.edit-table{width:100%;min-width:920px;border-collapse:collapse;font-size:13px}.edit-table th,.edit-table td{border-bottom:1px solid #e4e7ec;padding:7px;text-align:left;vertical-align:middle}.edit-table th{background:#f8fafc;font-weight:800;color:#344054}.edit-table input{width:100%;height:32px;border:1px solid #cfd8e3;border-radius:5px;padding:5px 6px}.edit-table .num{text-align:right}.edit-total-box{display:grid;grid-template-columns:1fr 220px;gap:8px;margin-top:12px;align-items:center}.edit-total-box span{color:#667085}.edit-total-box b{text-align:right}.invoice-edit-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}.invoice-edit-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px 16px;margin-bottom:14px}.invoice-edit-meta .item{font-size:12px;color:#475467}.invoice-edit-meta .item b{display:block;color:#111827;font-size:13px;margin-top:4px;font-weight:700}.invoice-edit-meta .item select{width:100%;height:32px;margin-top:4px;border:1px solid #cfd8e3;border-radius:6px;padding:0 8px;font-size:13px;background:#fff;color:#111827}
+    .btn.danger{border-color:#f04438;color:#b42318;background:#fff}
+    .btn.danger:disabled{opacity:.45;cursor:not-allowed}
+    .row-check{width:15px;height:15px;accent-color:#0070f4}
+    .invoice-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
+    .invoice-trash-overlay.is-open{display:flex}
+    .invoice-trash-modal{width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+    .invoice-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
+    .invoice-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .invoice-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
+    .invoice-trash-body{padding:14px 22px 18px;overflow:auto}
+    .invoice-trash-desc{margin:0 0 12px;font-size:13px;line-height:1.5;color:#475467}
+    .invoice-trash-alert{border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:12px}
+    .invoice-trash-alert.is-error{border:1px solid #fecdca;background:#fffbfa;color:#b42318}
+    .invoice-trash-alert.is-warn{border:1px solid #fedf89;background:#fffaeb;color:#93370d}
+    .invoice-trash-selected{margin:0 0 12px;padding:0;list-style:none}
+    .invoice-trash-selected li{font-size:13px;color:#111827;padding:4px 0;border-bottom:1px dashed #eef2f6}
+    .invoice-trash-table{width:100%;border-collapse:collapse;font-size:13px}
+    .invoice-trash-table th{background:#f8fafc;border-bottom:1px solid #e4eaf2;padding:8px 10px;text-align:left;font-size:12px;color:#475467}
+    .invoice-trash-table td{border-bottom:1px solid #eef2f6;padding:8px 10px;color:#111827}
+    .invoice-trash-table .num{text-align:right;font-weight:700}
+    .invoice-trash-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee}
+    .invoice-trash-loading{text-align:center;padding:28px 12px;color:#667085;font-size:13px}
   </style>
 </head>
 <body>
@@ -117,13 +139,14 @@
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã hóa đơn"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
             <div class="dropdown" id="createDropdown"><button class="btn primary" type="button" onclick="toggleCreateMenu(event)"><i class="fa-solid fa-plus"></i> Tạo mới <i class="fa-solid fa-chevron-down"></i></button><div class="dropdown-menu"><span class="dropdown-item disabled">Vận đơn KShip</span><a class="dropdown-item" href="/don-hang/hoa-don/create">Hóa đơn</a></div></div>
+            <button type="button" class="btn danger" id="openInvoiceTrashModal" disabled>Xóa</button>
             <button type="button" class="btn" id="openInvoiceMergeModal"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
             <a href="/don-hang/hoa-don/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
           </div>
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th class="check-col"><input type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th>Tổng tiền hàng</th><th>Đã trả</th><th>Còn nợ</th><th>Trạng thái</th></tr></thead>
+            <thead><tr><th class="check-col"><input class="row-check" type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã hóa đơn</th><th>Thời gian</th><th>Mã trả hàng</th><th>Mã KH</th><th>Khách hàng</th><th>Tổng tiền hàng</th><th>Đã trả</th><th>Còn nợ</th><th>Trạng thái</th></tr></thead>
             <tbody>
               <tr class="customer-summary-row">
                 <td class="check-col"></td>
@@ -136,7 +159,7 @@
               </tr>
               <% if (safeInvoices.length) { %>
                 <% safeInvoices.forEach(i => { const st = invoiceStatus(i); const debtAmount = invoiceRemainDue(i); const shipStatus = i.van_don?.trang_thai || 'none'; %>
-                  <tr class="invoice-row" data-invoice-row="<%= i._id %>" data-invoice-id="<%= i._id %>" data-invoice-code="<%= i.ma_hoa_don || '' %>" data-invoice-date="<%= new Date(i.ngay_ban || i.created_at).toISOString() %>" data-invoice-status="<%= st %>" data-delivery-status="<%= shipStatus %>" data-has-return="<%= i.phieu_tra_hang ? '1' : '0' %>" data-customer-id="<%= i.khach_hang_id ? i.khach_hang_id._id : '' %>" data-customer-code="<%= i.khach_hang_id ? (i.khach_hang_id.ma_khach_hang || '') : '' %>" data-customer-name="<%= i.khach_hang_id ? (i.khach_hang_id.ten_khach_hang || '') : 'Khách lẻ' %>" data-payable="<%= Number(i.thanh_toan || 0) %>" data-paid="<%= Number(i.khach_da_tra || 0) %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input type="checkbox" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('invoice', i, i.ma_hoa_don || '', 'onclick="event.stopPropagation()"') %></td><td><%= i.ngay_ban ? new Date(i.ngay_ban).toLocaleString('vi-VN') : '' %></td><td><%= i.phieu_tra_hang?.ma_phieu_tra || '' %></td><td><%- i.khach_hang_id ? refLink('customer', i.khach_hang_id, i.khach_hang_id.ma_khach_hang || '', 'onclick="event.stopPropagation()"') : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td><%= fmtMoney(i.tong_tien) %></td><td><%= fmtMoney(i.khach_da_tra) %></td><td class="num"><div class="purchase-debt-cell"><span><%= fmtMoney(debtAmount) %></span><% if (i.debt_warning) { %><button type="button" class="purchase-debt-warn-btn js-purchase-debt-warn" onclick="event.stopPropagation()" aria-label="Cảnh báo nợ quá hạn">⚠️<span class="purchase-debt-warn-tip">Hóa đơn có khoản nợ quá hạn <strong><%= Number(i.so_ngay_no || 0).toLocaleString('vi-VN') %></strong> ngày.<br>Còn nợ: <strong><%= fmt(debtAmount) %> VNĐ</strong>.<br>Mã hóa đơn: <strong><%= i.ma_hoa_don || '--' %></strong>.</span></button><% } %></div></td><td><span class="status <%= statusClass(st) %>"><%= statusText(st) %></span></td></tr>
+                  <tr class="invoice-row" data-invoice-row="<%= i._id %>" data-invoice-id="<%= i._id %>" data-invoice-code="<%= i.ma_hoa_don || '' %>" data-invoice-date="<%= new Date(i.ngay_ban || i.created_at).toISOString() %>" data-invoice-status="<%= st %>" data-delivery-status="<%= shipStatus %>" data-has-return="<%= i.phieu_tra_hang ? '1' : '0' %>" data-customer-id="<%= i.khach_hang_id ? i.khach_hang_id._id : '' %>" data-customer-code="<%= i.khach_hang_id ? (i.khach_hang_id.ma_khach_hang || '') : '' %>" data-customer-name="<%= i.khach_hang_id ? (i.khach_hang_id.ten_khach_hang || '') : 'Khách lẻ' %>" data-payable="<%= Number(i.thanh_toan || 0) %>" data-paid="<%= Number(i.khach_da_tra || 0) %>" onclick="toggleInvoiceDetail('<%= i._id %>')"><td class="check-col"><input class="row-check invoice-select-check" type="checkbox" value="<%= i._id %>" onclick="event.stopPropagation()"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><%- refLink('invoice', i, i.ma_hoa_don || '', 'onclick="event.stopPropagation()"') %></td><td><%= i.ngay_ban ? new Date(i.ngay_ban).toLocaleString('vi-VN') : '' %></td><td><%= i.phieu_tra_hang?.ma_phieu_tra || '' %></td><td><%- i.khach_hang_id ? refLink('customer', i.khach_hang_id, i.khach_hang_id.ma_khach_hang || '', 'onclick="event.stopPropagation()"') : '' %></td><td><%= i.khach_hang_id ? i.khach_hang_id.ten_khach_hang : 'Khách lẻ' %></td><td><%= fmtMoney(i.tong_tien) %></td><td><%= fmtMoney(i.khach_da_tra) %></td><td class="num"><div class="purchase-debt-cell"><span><%= fmtMoney(debtAmount) %></span><% if (i.debt_warning) { %><button type="button" class="purchase-debt-warn-btn js-purchase-debt-warn" onclick="event.stopPropagation()" aria-label="Cảnh báo nợ quá hạn">⚠️<span class="purchase-debt-warn-tip">Hóa đơn có khoản nợ quá hạn <strong><%= Number(i.so_ngay_no || 0).toLocaleString('vi-VN') %></strong> ngày.<br>Còn nợ: <strong><%= fmt(debtAmount) %> VNĐ</strong>.<br>Mã hóa đơn: <strong><%= i.ma_hoa_don || '--' %></strong>.</span></button><% } %></div></td><td><span class="status <%= statusClass(st) %>"><%= statusText(st) %></span></td></tr>
                   <tr class="detail-row" data-invoice-detail="<%= i._id %>"><td class="detail-cell" colspan="11"><div class="invoice-detail"><div class="loading-detail">Đang tải thông tin hóa đơn...</div></div></td></tr>
                 <% }) %>
               <% } else { %>
@@ -149,6 +172,35 @@
       </main>
     </div>
   </form>
+
+  <div id="invoiceTrashModalOverlay" class="invoice-trash-overlay" aria-hidden="true">
+    <div class="invoice-trash-modal" role="dialog" aria-labelledby="invoiceTrashModalTitle" aria-modal="true">
+      <div class="invoice-trash-head">
+        <h3 id="invoiceTrashModalTitle">Đưa vào thùng rác</h3>
+        <button type="button" class="invoice-trash-close" id="invoiceTrashModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-trash-body" id="invoiceTrashModalBody">
+        <p class="invoice-trash-desc">Các bảng/dữ liệu liên quan bên dưới sẽ được đưa vào thùng rác cùng hóa đơn (ẩn khỏi danh sách, có thể khôi phục sau).</p>
+        <div id="invoiceTrashAlert"></div>
+        <ul class="invoice-trash-selected" id="invoiceTrashSelectedList"></ul>
+        <table class="invoice-trash-table">
+          <thead>
+            <tr>
+              <th>Bảng / loại dữ liệu</th>
+              <th class="num">Số bản ghi</th>
+              <th>Ví dụ</th>
+            </tr>
+          </thead>
+          <tbody id="invoiceTrashImpactRows"></tbody>
+        </table>
+      </div>
+      <div class="invoice-trash-foot">
+        <button type="button" class="btn" id="invoiceTrashCancel">Hủy</button>
+        <button type="button" class="btn danger" id="invoiceTrashConfirm" disabled>Đưa vào thùng rác</button>
+      </div>
+    </div>
+  </div>
+
   <div id="invoiceMergeModalOverlay" class="invoice-merge-overlay">
     <div class="invoice-merge-modal" role="dialog" aria-labelledby="invoiceMergeModalTitle" aria-modal="true">
       <div class="invoice-merge-head">
@@ -1166,6 +1218,164 @@
         document.addEventListener('keydown', e => {
           if (e.key === 'Escape' && overlay?.style.display === 'flex') closeModal();
         });
+      })();
+
+      (function initInvoiceTrashModal() {
+        var openBtn = document.getElementById('openInvoiceTrashModal');
+        var overlay = document.getElementById('invoiceTrashModalOverlay');
+        var closeBtn = document.getElementById('invoiceTrashModalClose');
+        var cancelBtn = document.getElementById('invoiceTrashCancel');
+        var confirmBtn = document.getElementById('invoiceTrashConfirm');
+        var alertBox = document.getElementById('invoiceTrashAlert');
+        var selectedList = document.getElementById('invoiceTrashSelectedList');
+        var impactBody = document.getElementById('invoiceTrashImpactRows');
+        var invoiceChecks = Array.prototype.slice.call(document.querySelectorAll('.invoice-select-check'));
+        var pendingIds = [];
+        var previewData = null;
+
+        function escapeHtml(value) {
+          return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+          });
+        }
+
+        function getSelectedInvoiceIds() {
+          return invoiceChecks.filter(function(cb) { return cb.checked; }).map(function(cb) {
+            return String(cb.value || '').trim();
+          }).filter(Boolean);
+        }
+
+        function updateDeleteButtonState() {
+          if (!openBtn) return;
+          openBtn.disabled = getSelectedInvoiceIds().length === 0;
+        }
+
+        function closeTrashModal() {
+          if (!overlay) return;
+          overlay.classList.remove('is-open');
+          overlay.setAttribute('aria-hidden', 'true');
+          pendingIds = [];
+          previewData = null;
+          if (confirmBtn) confirmBtn.disabled = true;
+        }
+
+        function renderAlert(preview) {
+          if (!alertBox) return;
+          var html = '';
+          (preview.items || []).forEach(function(item) {
+            if (!item.can_trash && item.block_reason) {
+              html += '<div class="invoice-trash-alert is-error">' + escapeHtml(item.ma_hoa_don || item.hoa_don_id) + ': ' + escapeHtml(item.block_reason) + '</div>';
+            }
+            (item.warnings || []).forEach(function(warn) {
+              html += '<div class="invoice-trash-alert is-warn">' + escapeHtml(item.ma_hoa_don || '') + (item.ma_hoa_don ? ' — ' : '') + escapeHtml(warn) + '</div>';
+            });
+          });
+          alertBox.innerHTML = html;
+        }
+
+        function renderSelectedList(preview) {
+          if (!selectedList) return;
+          selectedList.innerHTML = (preview.items || []).map(function(item) {
+            var label = [item.ma_hoa_don, item.ten_khach].filter(Boolean).join(' — ');
+            return '<li>' + escapeHtml(label || item.hoa_don_id) + '</li>';
+          }).join('');
+        }
+
+        function renderImpactRows(preview) {
+          if (!impactBody) return;
+          var groups = preview.aggregate_groups || [];
+          if (!groups.length) {
+            impactBody.innerHTML = '<tr><td colspan="3">Không có dữ liệu liên quan đáng kể.</td></tr>';
+            return;
+          }
+          impactBody.innerHTML = groups.map(function(group) {
+            var samples = (group.samples || []).join(', ');
+            return '<tr>'
+              + '<td>' + escapeHtml(group.label || group.entity_type) + '</td>'
+              + '<td class="num">' + escapeHtml(String(group.count || 0)) + '</td>'
+              + '<td>' + escapeHtml(samples || '—') + '</td>'
+              + '</tr>';
+          }).join('');
+        }
+
+        function openTrashModal() {
+          var ids = getSelectedInvoiceIds();
+          if (!ids.length) {
+            alert('Vui lòng chọn ít nhất một hóa đơn.');
+            return;
+          }
+          pendingIds = ids.slice();
+          if (overlay) {
+            overlay.classList.add('is-open');
+            overlay.setAttribute('aria-hidden', 'false');
+          }
+          if (impactBody) impactBody.innerHTML = '<tr><td colspan="3" class="invoice-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
+          if (alertBox) alertBox.innerHTML = '';
+          if (selectedList) selectedList.innerHTML = '';
+          if (confirmBtn) confirmBtn.disabled = true;
+
+          fetch('/don-hang/hoa-don/trash/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hoa_don_ids: pendingIds })
+          })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (!data.success) throw new Error(data.message || 'Không tải được thông tin xóa');
+              previewData = data.data;
+              renderSelectedList(previewData);
+              renderAlert(previewData);
+              renderImpactRows(previewData);
+              if (confirmBtn) confirmBtn.disabled = !previewData.can_proceed;
+            })
+            .catch(function(err) {
+              if (impactBody) impactBody.innerHTML = '<tr><td colspan="3">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
+              alert(err.message || 'Không tải được thông tin xóa');
+            });
+        }
+
+        function confirmTrash() {
+          if (!previewData || !previewData.can_proceed || !pendingIds.length) return;
+          if (confirmBtn) confirmBtn.disabled = true;
+          fetch('/don-hang/hoa-don/trash/move', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hoa_don_ids: pendingIds })
+          })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (!data.success) throw new Error(data.message || 'Không đưa vào thùng rác được');
+              alert(data.message || 'Đã đưa vào thùng rác');
+              window.location.reload();
+            })
+            .catch(function(err) {
+              alert(err.message || 'Không đưa vào thùng rác được');
+              if (confirmBtn) confirmBtn.disabled = false;
+            });
+        }
+
+        invoiceChecks.forEach(function(cb) {
+          cb.addEventListener('change', updateDeleteButtonState);
+        });
+        var headerCheck = document.querySelector('.table thead .row-check');
+        if (headerCheck) {
+          headerCheck.addEventListener('click', function() {
+            window.setTimeout(updateDeleteButtonState, 0);
+          });
+        }
+        if (openBtn) openBtn.addEventListener('click', openTrashModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeTrashModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeTrashModal);
+        if (confirmBtn) confirmBtn.addEventListener('click', confirmTrash);
+        if (overlay) {
+          overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) closeTrashModal();
+          });
+        }
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'Escape' && overlay && overlay.classList.contains('is-open')) closeTrashModal();
+        });
+        updateDeleteButtonState();
       })();
 
       const invoiceId = new URLSearchParams(window.location.search).get('invoice');

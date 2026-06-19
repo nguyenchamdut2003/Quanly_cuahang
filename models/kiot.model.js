@@ -633,6 +633,18 @@ const PhieuNhapSchema = new Schema({
 
   ghi_chu: {
     type: String
+  },
+
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
   }
 }, {
   collection: 'phieu_nhap',
@@ -1175,7 +1187,19 @@ const DonHangSchema = new Schema({
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' },
   kho_id: { type: ObjectId, ref: 'Kho' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
-  nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' }
+  nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
+
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
+  }
 }, { collection: "don_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 // CT_DON_HANG
@@ -1270,7 +1294,19 @@ const HoaDonBanHangSchema = new Schema({
   }],
   merged_at: { type: Date, default: null },
   merged_by: { type: ObjectId, ref: 'NguoiDung', default: null },
-  merge_note: { type: String, default: '' }
+  merge_note: { type: String, default: '' },
+
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
+  }
 }, { collection: "hoa_don_ban_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 // Một đơn có thể có nhiều hóa đơn (mỗi lần xác nhận giao). Chạy scripts/migrate-hoa-don-don-hang-index.js nếu DB còn unique cũ.
 HoaDonBanHangSchema.index({ don_hang_id: 1 });

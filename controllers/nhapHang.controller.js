@@ -13,6 +13,7 @@ var purchaseService = require('../services/purchase.service');
 var { mergePurchasesInSession } = require('../services/purchaseMerge.service');
 var pdfService = require('../services/pdf.service');
 var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require('../services/vatChuaDetail.service');
+var { previewPurchaseTrash, movePurchasesToTrash } = require('../services/purchaseTrash.service');
 
 var PURCHASE_DEBT_WARN_DEFAULT_DAYS = 10;
 
@@ -338,6 +339,7 @@ exports.index = async function(req, res, next) {
     if (filter.q) query.ma_phieu_nhap = { $regex: filter.q, $options: 'i' };
     query.trang_thai = { $in: filter.statuses };
     if (filter.nha_cung_cap_id) query.nha_cung_cap_id = filter.nha_cung_cap_id;
+    query.$or = [{ deleted_at: null }, { deleted_at: { $exists: false } }];
 
     var importSlips = await loadSortedPurchases(query, filter.sort);
 
@@ -1590,6 +1592,35 @@ exports.cancel = async function(req, res, next) {
     return res.json({ success: true, message: 'Đã hủy phiếu nhập' });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không hủy được phiếu nhập' });
+  }
+};
+
+exports.previewTrash = async function(req, res, next) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var ids = req.body && req.body.phieu_nhap_ids;
+    var preview = await previewPurchaseTrash(ids, storeId);
+    return res.json({ success: true, data: preview });
+  } catch (error) {
+    var status = Number(error && error.statusCode) || 400;
+    return res.status(status).json({ success: false, message: error.message || 'Không xem trước được thùng rác' });
+  }
+};
+
+exports.moveToTrash = async function(req, res, next) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var ids = req.body && req.body.phieu_nhap_ids;
+    var userId = req.user && req.user._id;
+    var result = await movePurchasesToTrash(ids, storeId, userId);
+    return res.json({
+      success: true,
+      message: 'Đã đưa ' + result.moved_count + ' phiếu nhập vào thùng rác.',
+      data: result
+    });
+  } catch (error) {
+    var status = Number(error && error.statusCode) || 400;
+    return res.status(status).json({ success: false, message: error.message || 'Không đưa vào thùng rác được' });
   }
 };
 

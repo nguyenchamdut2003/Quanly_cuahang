@@ -4,6 +4,14 @@
   <div class="kv-topbar">
     <div></div>
     <div class="kv-top-actions">
+      <% if (locals.user) { %>
+        <a href="/thung-rac" class="kv-trash-link" title="Thùng rác" aria-label="Thùng rác">
+          <i class="fa-solid fa-trash-can"></i>
+          <% if (Number(locals.trashCount || 0) > 0) { %>
+            <span class="kv-trash-badge"><%= Number(locals.trashCount) > 99 ? '99+' : locals.trashCount %></span>
+          <% } %>
+        </a>
+      <% } %>
       <div class="kv-action-item user-dropdown-container">
         <% if (locals.user) { %>
           <%

@@ -53,6 +53,8 @@ var bangLuongRouter = require('./routes/bangLuong');
 var apiBangLuongRouter = require('./routes/apiBangLuong');
 var apiSoQuyRouter = require('./routes/apiSoQuy');
 var thietLapNhanVienRouter = require('./routes/thietLapNhanVien');
+var thungRacRouter = require('./routes/thungRac');
+var { countActiveTrashRoots } = require('./services/trashList.service');
 
 var app = express();
 
@@ -187,6 +189,19 @@ app.use(async (req, res, next) => {
   }
 });
 
+app.use(async function(req, res, next) {
+  res.locals.trashCount = 0;
+  if (!req.user || !res.locals.currentStore || !res.locals.currentStore._id) {
+    return next();
+  }
+  try {
+    res.locals.trashCount = await countActiveTrashRoots(res.locals.currentStore._id);
+  } catch (error) {
+    res.locals.trashCount = 0;
+  }
+  next();
+});
+
 app.use('/', indexRouter);
 app.use('/auth', authRouter);
 app.use('/profile', profileRouter);
@@ -256,6 +271,7 @@ app.use('/lich-lam-viec', lichLamViecRouter);
 app.use('/cham-cong', chamCongRouter);
 app.use('/bang-luong', bangLuongRouter);
 app.use('/thiet-lap-nhan-vien', thietLapNhanVienRouter);
+app.use('/thung-rac', thungRacRouter);
 app.use('/nhan-vien', nhanVienRouter);
 app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);

@@ -69,6 +69,44 @@ body {
   color: #4a4a4a;
 }
 
+.kv-trash-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #5c6a82;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.kv-trash-link:hover {
+  background-color: rgba(255, 255, 255, 0.16);
+  color: #1f2937;
+}
+
+.kv-trash-link i {
+  font-size: 16px;
+}
+
+.kv-trash-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #f5222d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
 .kv-action-item {
   display: flex;
   align-items: center;

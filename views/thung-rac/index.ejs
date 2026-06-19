@@ -1,0 +1,436 @@
+<%
+  const safeGroups = Array.isArray(locals.groups) ? locals.groups : [];
+  const labels = locals.entityLabels || {};
+  const entityLabel = type => labels[type] || 'Dữ liệu liên quan';
+  const childName = typeof locals.formatTrashChildName === 'function'
+    ? locals.formatTrashChildName
+    : (item => item && (item.ten_hien_thi || item.ma_chung_tu) || '---');
+  const childDesc = typeof locals.formatTrashChildDesc === 'function'
+    ? locals.formatTrashChildDesc
+    : (item => (item && item.mo_ta_phu) || '---');
+  const rootDesc = item => {
+    if (!item || !item.mo_ta_phu) return '---';
+    return String(item.mo_ta_phu).replace(/^KH:\s*/i, 'Khách hàng: ').replace(/^NCC:\s*/i, 'Nhà cung cấp: ');
+  };
+  const fmtDateTime = value => {
+    if (!value) return '---';
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return '---';
+    return d.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+  const deletedByName = user => {
+    if (!user) return '---';
+    return user.ho_ten || user.email || '---';
+  };
+  const retentionDays = Number(locals.retentionDays || 30);
+  const daysLeft = deletedAt => {
+    if (!deletedAt) return retentionDays;
+    const deleted = new Date(deletedAt);
+    if (Number.isNaN(deleted.getTime())) return retentionDays;
+    const expireAt = new Date(deleted.getTime());
+    expireAt.setDate(expireAt.getDate() + retentionDays);
+    const diffMs = expireAt.getTime() - Date.now();
+    return Math.max(0, Math.ceil(diffMs / 86400000));
+  };
+%>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thùng rác</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    .trash-page{padding:16px 20px 24px;max-width:1280px;margin:0 auto}
+    .trash-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
+    .trash-head h1{margin:0;font-size:22px;font-weight:800;color:#111827}
+    .trash-head p{margin:6px 0 0;font-size:13px;color:#667085;max-width:720px;line-height:1.45}
+    .trash-stats{display:flex;gap:10px;flex-wrap:wrap}
+    .trash-stat{border:1px solid #e4eaf2;border-radius:8px;background:#fff;padding:10px 14px;min-width:120px}
+    .trash-stat span{display:block;font-size:12px;color:#667085}
+    .trash-stat b{font-size:18px;color:#111827}
+    .trash-panel{border:1px solid #dbe4ee;border-radius:8px;background:#fff;overflow:hidden}
+    .trash-table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .trash-table thead th{background:#f8fafc;border-bottom:1px solid #e4eaf2;padding:10px 12px;text-align:left;font-size:12px;font-weight:800;color:#475467}
+    .trash-table tbody.trash-group{border-top:8px solid #f1f5f9}
+    .trash-table tbody.trash-group:first-of-type{border-top:0}
+    .trash-table td{padding:10px 12px;border-bottom:1px solid #eef2f6;font-size:13px;color:#111827;vertical-align:middle}
+    .trash-row--root td{background:#fff;font-weight:600}
+    .trash-row--root .trash-type-pill{font-weight:700}
+    .trash-row--child td{background:#fafbfc;font-size:12px;color:#475467;font-weight:400}
+    .trash-row--child .trash-code-cell{padding-left:28px;position:relative}
+    .trash-row--child .trash-code-cell::before{content:'';position:absolute;left:14px;top:50%;width:10px;height:1px;background:#cbd5e1}
+    .trash-row--child .trash-code-cell::after{content:'';position:absolute;left:14px;top:-8px;bottom:50%;width:1px;background:#cbd5e1}
+    .trash-type-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:12px}
+    .trash-row--child .trash-type-pill{background:#f2f4f7;color:#475467;font-size:11px;padding:2px 7px}
+    .trash-code{font-weight:700;color:#0070f4}
+    .trash-row--child .trash-code{font-weight:600;font-size:12px}
+    .trash-subtitle{font-size:12px;color:#667085;margin-top:2px}
+    .trash-datetime{white-space:nowrap;font-variant-numeric:tabular-nums}
+    .trash-empty{padding:56px 20px;text-align:center;color:#475467}
+    .trash-empty i{font-size:42px;color:#94a3b8;margin-bottom:14px}
+    .trash-empty h3{margin:0 0 8px;font-size:17px;color:#111827}
+    .trash-empty p{margin:0;font-size:13px;line-height:1.5}
+    .trash-col-type{width:18%}
+    .trash-col-check{width:42px}
+    .trash-col-code{width:22%}
+    .trash-col-desc{width:28%}
+    .trash-col-time{width:16%}
+    .trash-col-user{width:12%}
+    .trash-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid #e4eaf2;background:#f8fafc}
+    .trash-toolbar-left{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .trash-toolbar-note{font-size:12px;color:#667085}
+    .trash-toolbar-note strong{color:#475467}
+    .trash-purge-btn{height:34px;border:1px solid #fecaca;background:#fff5f5;color:#b42318;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer}
+    .trash-purge-btn:disabled{opacity:.45;cursor:not-allowed}
+    .trash-purge-btn:not(:disabled):hover{background:#fee2e2}
+    .trash-expire-note{display:block;font-size:11px;color:#94a3b8;margin-top:2px}
+    .trash-check-col{width:42px;text-align:center}
+    .trash-check-col input{width:16px;height:16px;cursor:pointer}
+    .trash-code-links{display:flex;flex-wrap:wrap;align-items:center;gap:2px}
+    .trash-code-link,.trash-code-more,.trash-detail-btn{border:0;background:transparent;padding:0;color:#0070f4;font-weight:700;font-size:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+    .trash-code-link:hover,.trash-code-more:hover,.trash-detail-btn:hover{color:#0058d4}
+    .trash-code-sep{color:#94a3b8;text-decoration:none}
+    .trash-detail-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1500;align-items:center;justify-content:center;padding:16px}
+    .trash-detail-overlay.is-open{display:flex}
+    .trash-detail-modal{width:min(920px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+    .trash-detail-head{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee;gap:12px}
+    .trash-detail-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .trash-detail-head p{margin:6px 0 0;font-size:13px;color:#667085}
+    .trash-detail-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
+    .trash-detail-body{padding:14px 22px 18px;overflow:auto;flex:1}
+    .trash-detail-table{width:100%;border-collapse:collapse;font-size:13px}
+    .trash-detail-table th{background:#f8fafc;border-bottom:1px solid #e4eaf2;padding:8px 10px;text-align:left;font-size:12px;color:#475467;white-space:nowrap}
+    .trash-detail-table td{border-bottom:1px solid #eef2f6;padding:8px 10px;color:#111827}
+    .trash-detail-table .num{text-align:right;font-variant-numeric:tabular-nums}
+    .trash-detail-table .stt-col{width:42px;text-align:center;color:#667085}
+    .trash-detail-loading,.trash-detail-empty{text-align:center;padding:32px 12px;color:#667085;font-size:13px}
+    .trash-detail-section{margin-bottom:18px}
+    .trash-detail-section:last-child{margin-bottom:0}
+    .trash-detail-section h4{margin:0 0 8px;font-size:14px;font-weight:800;color:#111827}
+    .trash-detail-foot{display:flex;align-items:center;justify-content:flex-end;padding:12px 22px 18px;border-top:1px solid #e5e9ee}
+    .trash-detail-foot .kv-btn{height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 14px;font-size:14px;font-weight:700;cursor:pointer}
+    @media(max-width:900px){
+      .trash-table{display:block;overflow-x:auto}
+      .trash-table{min-width:760px}
+    }
+  </style>
+</head>
+<body class="admin-body">
+  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+
+  <main class="trash-page">
+    <div class="trash-head">
+      <div>
+        <h1><i class="fa-solid fa-trash-can" style="color:#64748b;margin-right:8px"></i>Thùng rác</h1>
+        <p>Mỗi lần xóa một phiếu (nhập hàng, đơn đặt, hóa đơn…), hệ thống gom các dữ liệu đi kèm vào <strong>một cụm</strong>. Dòng thụt bên dưới là phần bị kéo theo khi xóa — không phải chứng từ riêng lẻ. Thùng rác chỉ giữ tối đa <strong><%= retentionDays %> ngày</strong>, sau đó tự xóa vĩnh viễn.</p>
+      </div>
+      <div class="trash-stats">
+        <div class="trash-stat">
+          <span>Phiếu / đơn đã xóa</span>
+          <b><%= Number(locals.totalRoots || 0).toLocaleString('vi-VN') %></b>
+        </div>
+        <div class="trash-stat">
+          <span>Tổng dòng (gồm liên quan)</span>
+          <b><%= Number(locals.totalItems || 0).toLocaleString('vi-VN') %></b>
+        </div>
+      </div>
+    </div>
+
+    <div class="trash-panel">
+      <% if (!safeGroups.length) { %>
+        <div class="trash-empty">
+          <i class="fa-regular fa-trash-can"></i>
+          <h3>Thùng rác đang trống</h3>
+          <p>Khi bạn xóa chứng từ hoặc danh mục, các mục liên quan sẽ hiển thị tại đây theo từng cụm.</p>
+        </div>
+      <% } else { %>
+        <div class="trash-toolbar">
+          <div class="trash-toolbar-left">
+            <button type="button" class="trash-purge-btn" id="trashPurgeBtn" disabled>Xóa vĩnh viễn</button>
+            <span class="trash-toolbar-note">Đã chọn: <strong id="trashSelectedCount">0</strong></span>
+          </div>
+          <span class="trash-toolbar-note">Tự xóa sau <strong><%= retentionDays %> ngày</strong> kể từ thời điểm đưa vào thùng rác</span>
+        </div>
+        <table class="trash-table">
+          <thead>
+            <tr>
+              <th class="trash-col-check trash-check-col"><input type="checkbox" id="trashCheckAll" aria-label="Chọn tất cả"></th>
+              <th class="trash-col-type">Loại chứng từ</th>
+              <th class="trash-col-code">Mã / tên</th>
+              <th class="trash-col-desc">Chi tiết</th>
+              <th class="trash-col-time">Thời gian xóa</th>
+              <th class="trash-col-user">Người xóa</th>
+            </tr>
+          </thead>
+          <% safeGroups.forEach(function(group) {
+            const root = group.root || {};
+            const children = Array.isArray(group.children) ? group.children : [];
+          %>
+            <tbody class="trash-group">
+              <tr class="trash-row trash-row--root">
+                <td class="trash-check-col">
+                  <input type="checkbox" class="js-trash-root-check" value="<%= root._id %>" aria-label="Chọn <%= root.ma_chung_tu || root.ten_hien_thi || 'chứng từ' %>">
+                </td>
+                <td><span class="trash-type-pill"><%= entityLabel(root.entity_type) %></span></td>
+                <td class="trash-code-cell">
+                  <% if (root.ma_chung_tu) { %>
+                    <button type="button" class="trash-code-link js-trash-detail" data-trash-id="<%= root._id %>"><%= root.ma_chung_tu %></button>
+                  <% } else { %>
+                    <div class="trash-code"><%= root.ten_hien_thi || '---' %></div>
+                  <% } %>
+                  <% if (root.ma_chung_tu && root.ten_hien_thi && root.ma_chung_tu !== root.ten_hien_thi) { %>
+                    <div class="trash-subtitle"><%= root.ten_hien_thi %></div>
+                  <% } %>
+                </td>
+                <td><%= rootDesc(root) %></td>
+                <td class="trash-datetime">
+                  <%= fmtDateTime(root.deleted_at) %>
+                  <span class="trash-expire-note">Còn <%= daysLeft(root.deleted_at) %> ngày</span>
+                </td>
+                <td><%= deletedByName(root.deleted_by) %></td>
+              </tr>
+              <% children.forEach(function(child) {
+                const summary = child.code_summary || {};
+                const codes = Array.isArray(summary.codes) ? summary.codes : [];
+                const extraCount = Math.max(0, Number(summary.count || 0) - codes.length);
+              %>
+                <tr class="trash-row trash-row--child">
+                  <td class="trash-check-col"></td>
+                  <td><span class="trash-type-pill">↳ <%= entityLabel(child.entity_type) %></span></td>
+                  <td class="trash-code-cell">
+                    <% if (codes.length) { %>
+                      <div class="trash-code-links">
+                        <% codes.forEach(function(code, idx) { %>
+                          <button type="button" class="trash-code-link js-trash-detail" data-trash-id="<%= child._id %>"><%= code %></button><% if (idx < codes.length - 1) { %><span class="trash-code-sep">, </span><% } %>
+                        <% }) %>
+                        <% if (summary.has_more || extraCount > 0) { %>
+                          <button type="button" class="trash-code-more js-trash-detail" data-trash-id="<%= child._id %>">+<%= extraCount || '…' %> khác</button>
+                        <% } %>
+                      </div>
+                    <% } else { %>
+                      <button type="button" class="trash-detail-btn js-trash-detail" data-trash-id="<%= child._id %>">Xem chi tiết<% if (summary.count) { %> (<%= summary.count %> mục)<% } %></button>
+                    <% } %>
+                  </td>
+                  <td><%= childDesc(child) %></td>
+                  <td class="trash-datetime"><%= fmtDateTime(child.deleted_at) %></td>
+                  <td><%= deletedByName(child.deleted_by) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          <% }) %>
+        </table>
+      <% } %>
+    </div>
+  </main>
+
+  <div id="trashDetailOverlay" class="trash-detail-overlay" aria-hidden="true">
+    <div class="trash-detail-modal" role="dialog" aria-labelledby="trashDetailTitle" aria-modal="true">
+      <div class="trash-detail-head">
+        <div>
+          <h3 id="trashDetailTitle">Chi tiết dữ liệu liên quan</h3>
+          <p id="trashDetailSubtitle"></p>
+        </div>
+        <button type="button" class="trash-detail-close" id="trashDetailClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="trash-detail-body" id="trashDetailBody">
+        <div class="trash-detail-loading">Đang tải...</div>
+      </div>
+      <div class="trash-detail-foot">
+        <button type="button" class="kv-btn" id="trashDetailCancel">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function initTrashDetailModal() {
+      var overlay = document.getElementById('trashDetailOverlay');
+      var closeBtn = document.getElementById('trashDetailClose');
+      var cancelBtn = document.getElementById('trashDetailCancel');
+      var titleEl = document.getElementById('trashDetailTitle');
+      var subtitleEl = document.getElementById('trashDetailSubtitle');
+      var bodyEl = document.getElementById('trashDetailBody');
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+        });
+      }
+
+      function closeModal() {
+        if (!overlay) return;
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+
+      function renderSectionTable(columns, rows) {
+        var html = '<table class="trash-detail-table"><thead><tr><th class="stt-col">#</th>';
+        columns.forEach(function(col) {
+          var cls = col.align === 'right' ? ' class="num"' : '';
+          html += '<th' + cls + '>' + escapeHtml(col.header || col.key) + '</th>';
+        });
+        html += '</tr></thead><tbody>';
+        rows.forEach(function(row) {
+          html += '<tr><td class="stt-col">' + escapeHtml(String(row.stt || '')) + '</td>';
+          columns.forEach(function(col) {
+            var cls = col.align === 'right' ? ' class="num"' : '';
+            html += '<td' + cls + '>' + escapeHtml(row[col.key] != null ? row[col.key] : '---') + '</td>';
+          });
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        return html;
+      }
+
+      function renderDetail(detail) {
+        if (!bodyEl) return;
+        var sections = Array.isArray(detail.sections) && detail.sections.length
+          ? detail.sections
+          : (Array.isArray(detail.rows) && detail.rows.length
+            ? [{ title: '', columns: detail.columns || [], rows: detail.rows }]
+            : []);
+
+        if (!sections.length) {
+          bodyEl.innerHTML = '<div class="trash-detail-empty">Không có dữ liệu chi tiết.</div>';
+          return;
+        }
+
+        var html = '';
+        sections.forEach(function(section) {
+          var columns = Array.isArray(section.columns) ? section.columns : [];
+          var rows = Array.isArray(section.rows) ? section.rows : [];
+          if (!rows.length) return;
+          html += '<div class="trash-detail-section">';
+          if (section.title) {
+            html += '<h4>' + escapeHtml(section.title) + '</h4>';
+          }
+          html += renderSectionTable(columns, rows);
+          html += '</div>';
+        });
+
+        bodyEl.innerHTML = html || '<div class="trash-detail-empty">Không có dữ liệu chi tiết.</div>';
+      }
+
+      function openDetail(trashId) {
+        if (!trashId || !overlay) return;
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        if (titleEl) titleEl.textContent = 'Chi tiết dữ liệu liên quan';
+        if (subtitleEl) subtitleEl.textContent = '';
+        if (bodyEl) bodyEl.innerHTML = '<div class="trash-detail-loading">Đang tải dữ liệu...</div>';
+
+        fetch('/thung-rac/detail/' + encodeURIComponent(trashId))
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data.success) throw new Error(data.message || 'Không tải được chi tiết');
+            var detail = data.data || {};
+            if (titleEl) titleEl.textContent = detail.title || 'Chi tiết';
+            if (subtitleEl) {
+              subtitleEl.textContent = (detail.subtitle || '')
+                + (detail.total != null ? (' · ' + detail.total + ' dòng') : '');
+            }
+            renderDetail(detail);
+          })
+          .catch(function(err) {
+            if (bodyEl) bodyEl.innerHTML = '<div class="trash-detail-empty">' + escapeHtml(err.message || 'Lỗi') + '</div>';
+          });
+      }
+
+      document.addEventListener('click', function(e) {
+        var btn = e.target && e.target.closest('.js-trash-detail');
+        if (!btn) return;
+        e.preventDefault();
+        openDetail(btn.getAttribute('data-trash-id'));
+      });
+
+      if (closeBtn) closeBtn.addEventListener('click', closeModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeModal();
+        });
+      }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay && overlay.classList.contains('is-open')) closeModal();
+      });
+    })();
+
+    (function initTrashPurge() {
+      var checkAll = document.getElementById('trashCheckAll');
+      var purgeBtn = document.getElementById('trashPurgeBtn');
+      var selectedCountEl = document.getElementById('trashSelectedCount');
+
+      function getRootChecks() {
+        return Array.prototype.slice.call(document.querySelectorAll('.js-trash-root-check'));
+      }
+
+      function getSelectedIds() {
+        return getRootChecks()
+          .filter(function(input) { return input.checked; })
+          .map(function(input) { return input.value; })
+          .filter(Boolean);
+      }
+
+      function updateToolbar() {
+        var selected = getSelectedIds();
+        if (selectedCountEl) selectedCountEl.textContent = String(selected.length);
+        if (purgeBtn) purgeBtn.disabled = selected.length === 0;
+        if (checkAll) {
+          var checks = getRootChecks();
+          checkAll.checked = checks.length > 0 && selected.length === checks.length;
+          checkAll.indeterminate = selected.length > 0 && selected.length < checks.length;
+        }
+      }
+
+      function bindChecks() {
+        getRootChecks().forEach(function(input) {
+          input.addEventListener('change', updateToolbar);
+        });
+      }
+
+      if (checkAll) {
+        checkAll.addEventListener('change', function() {
+          var checked = !!checkAll.checked;
+          getRootChecks().forEach(function(input) { input.checked = checked; });
+          updateToolbar();
+        });
+      }
+
+      if (purgeBtn) {
+        purgeBtn.addEventListener('click', function() {
+          var ids = getSelectedIds();
+          if (!ids.length) return;
+          var confirmText = 'Xóa vĩnh viễn ' + ids.length + ' chứng từ đã chọn khỏi thùng rác?\n\nHành động này không thể hoàn tác.';
+          if (!window.confirm(confirmText)) return;
+
+          purgeBtn.disabled = true;
+          fetch('/thung-rac/purge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ root_ids: ids })
+          })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (!data.success) throw new Error(data.message || 'Không xóa được');
+              window.location.reload();
+            })
+            .catch(function(err) {
+              alert(err.message || 'Không xóa được');
+              updateToolbar();
+            });
+        });
+      }
+
+      bindChecks();
+      updateToolbar();
+    })();
+  </script>
+</body>
+</html>

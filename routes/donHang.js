@@ -55,6 +55,8 @@ const { resolveSalePrice, normalizeUnitPrice } = require('../services/salePrice.
 const { parseVatChuaImportInput, parseVatChuaSignedInput, assertVatChuaImportInput, assertVatChuaSignedInput, importVatChuaWithSalesReturn, cancelNhapVatChuaBySource } = require('../services/vatChuaImport.service');
 const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaWithSalesReturn, cancelXuatVatChuaBySource } = require('../services/vatChuaExport.service');
 const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines } = require('../services/vatChuaDetail.service');
+const { previewOrderTrash, moveOrdersToTrash } = require('../services/orderTrash.service');
+const { previewInvoiceTrash, moveInvoicesToTrash } = require('../services/invoiceTrash.service');
 
 async function resolveOrderLineUnitPrice(item, product, bangGiaId, storeId) {
     const resolved = await resolveSalePrice({
@@ -434,7 +436,9 @@ function buildOrderFilter(query = {}) {
     if (query.nguoi_tao && /^[0-9a-fA-F]{24}$/.test(query.nguoi_tao)) {
         filter.nguoi_tao_id = query.nguoi_tao;
     }
-    return filter;
+    const deletedGuard = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    if (!Object.keys(filter).length) return deletedGuard;
+    return { $and: [filter, deletedGuard] };
 }
 
 function formatExportDate(value) {
@@ -3376,7 +3380,9 @@ async function buildInvoiceFilter(query = {}) {
         }
     }
 
-    return filter;
+    const deletedGuard = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    if (!Object.keys(filter).length) return deletedGuard;
+    return { $and: [filter, deletedGuard] };
 }
 
 async function decorateInvoices(invoices) {
@@ -3892,6 +3898,35 @@ router.post('/gop-hoa-don', async (req, res, next) => {
         next(error);
     } finally {
         await session.endSession();
+    }
+});
+
+router.post('/trash/preview', async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        const ids = req.body && req.body.don_hang_ids;
+        const preview = await previewOrderTrash(ids, storeId);
+        return res.json({ success: true, data: preview });
+    } catch (error) {
+        const status = Number(error && error.statusCode) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không xem trước được thùng rác' });
+    }
+});
+
+router.post('/trash/move', async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        const ids = req.body && req.body.don_hang_ids;
+        const userId = req.user && req.user._id;
+        const result = await moveOrdersToTrash(ids, storeId, userId);
+        return res.json({
+            success: true,
+            message: 'Đã đưa ' + result.moved_count + ' đơn đặt hàng vào thùng rác.',
+            data: result
+        });
+    } catch (error) {
+        const status = Number(error && error.statusCode) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không đưa vào thùng rác được' });
     }
 });
 
@@ -4545,6 +4580,35 @@ router.get('/hoa-don/create', async (req, res, next) => {
         });
     } catch (error) {
         next(error);
+    }
+});
+
+router.post('/hoa-don/trash/preview', async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        const ids = req.body && req.body.hoa_don_ids;
+        const preview = await previewInvoiceTrash(ids, storeId);
+        return res.json({ success: true, data: preview });
+    } catch (error) {
+        const status = Number(error && error.statusCode) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không xem trước được thùng rác' });
+    }
+});
+
+router.post('/hoa-don/trash/move', async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        const ids = req.body && req.body.hoa_don_ids;
+        const userId = req.user && req.user._id;
+        const result = await moveInvoicesToTrash(ids, storeId, userId);
+        return res.json({
+            success: true,
+            message: 'Đã đưa ' + result.moved_count + ' hóa đơn vào thùng rác.',
+            data: result
+        });
+    } catch (error) {
+        const status = Number(error && error.statusCode) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không đưa vào thùng rác được' });
     }
 });
 
