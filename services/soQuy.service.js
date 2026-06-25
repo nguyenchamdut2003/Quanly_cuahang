@@ -596,6 +596,8 @@ async function taoPhieuThuChi(data = {}, options = {}) {
 
     ct_bang_luong_id: docRefs.ct_bang_luong_id,
 
+    chamcongmoi_bang_luong_id: optionalId(data.chamcongmoi_bang_luong_id),
+
     ma_chung_tu_goc: docRefs.ma_chung_tu_goc,
 
     allocation_type: data.allocation_type,

@@ -1933,6 +1933,7 @@ const PhieuThuChiSchema = new Schema({
   van_don_id: { type: ObjectId, ref: 'VanDon' },
   bang_luong_id: { type: ObjectId, ref: 'BangLuong' },
   ct_bang_luong_id: { type: ObjectId, ref: 'ChiTietBangLuong' },
+  chamcongmoi_bang_luong_id: { type: ObjectId, ref: 'ChamCongMoiBangLuong' },
   ma_chung_tu_goc: { type: String },
   allocation_type: { type: String },
   overpayment_amount: { type: Number, default: 0 },
@@ -1968,6 +1969,7 @@ const PhieuThuChiSchema = new Schema({
 PhieuThuChiSchema.index({ cua_hang_id: 1, nhan_vien_id: 1, ngay_lap: -1 });
 PhieuThuChiSchema.index({ cua_hang_id: 1, bang_luong_id: 1 });
 PhieuThuChiSchema.index({ cua_hang_id: 1, ct_bang_luong_id: 1 });
+PhieuThuChiSchema.index({ cua_hang_id: 1, chamcongmoi_bang_luong_id: 1 });
 PhieuThuChiSchema.index(
   {
     cua_hang_id: 1,
