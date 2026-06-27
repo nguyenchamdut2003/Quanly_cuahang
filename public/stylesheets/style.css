@@ -2210,7 +2210,6 @@ body {
   display: grid;
   gap: 8px;
   padding-bottom: 16px;
-  margin-bottom: 16px;
   border-bottom: 1px solid #f1f5f9;
 }
 
@@ -3319,6 +3318,17 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+@media (max-width: 1200px) {
+  .customer-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-filter {
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
 }
 
 @media (max-width: 1200px) {

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
     #productCreateForm .product-vn-num { text-align: right; }
   </style>
@@ -189,46 +190,6 @@
               </div>
             </div>
           </section>
- 
-           <section class="customer-filter-section">
-             <h4>Bảng giá</h4>
-            <div class="filter-check-list">
-              <% (bangGiaList || []).forEach(function(bg) { %>
-                <% var isChecked = (filter.bangGiaIds || []).indexOf(String(bg._id)) >= 0; %>
-                <label class="filter-check-item <%= isChecked ? 'is-checked' : '' %>">
-                  <input type="checkbox" name="bangGia" value="<%= bg._id %>" <%= isChecked ? 'checked' : '' %> onchange="this.parentElement.classList.toggle('is-checked', this.checked)">
-                  <span class="filter-check-label"><%= bg.ten_bang_gia %></span>
-                </label>
-              <% }) %>
-              <% if (!bangGiaList || bangGiaList.length === 0) { %>
-                <span style="font-size:12px;color:#64748b;padding:4px 12px">Không có bảng giá hoạt động.</span>
-              <% } %>
-            </div>
-           </section>
-
-          <section class="customer-filter-section">
-            <h4>Tồn kho</h4>
-            <div class="range-stack">
-              <div class="range-row"><span>Từ</span><input type="number" min="0" name="stockFrom" value="<%= filter.stockFrom || '' %>" placeholder="Nhập giá trị"></div>
-              <div class="range-row"><span>Tới</span><input type="number" min="0" name="stockTo" value="<%= filter.stockTo || '' %>" placeholder="Nhập giá trị"></div>
-            </div>
-          </section>
-
-          <section class="customer-filter-section">
-            <h4>Thời gian tạo</h4>
-            <label class="filter-radio-row">
-              <input type="radio" name="created" value="all" <%= filter.created !== 'custom' ? 'checked' : '' %>>
-              <span>Toàn thời gian</span>
-            </label>
-            <label class="filter-radio-row">
-              <input type="radio" name="created" value="custom" <%= filter.created === 'custom' ? 'checked' : '' %>>
-              <span>Tùy chỉnh</span>
-            </label>
-            <div class="custom-date-range <%= filter.created === 'custom' ? 'is-visible' : '' %>" id="customDateRange">
-              <label><span>Từ ngày</span><input type="date" name="createdFrom" value="<%= filter.createdFrom || '' %>"></label>
-              <label><span>Đến ngày</span><input type="date" name="createdTo" value="<%= filter.createdTo || '' %>"></label>
-            </div>
-          </section>
 
           <section class="customer-filter-section">
             <h4>Nhà cung cấp</h4>
@@ -238,16 +199,6 @@
                 <option value="<%= supplier._id %>" <%= filter.supplierId === String(supplier._id) ? 'selected' : '' %>><%= supplier.ten_ncc || '---' %></option>
               <% }) %>
             </select>
-          </section>
-
-          <section class="customer-filter-section">
-            <h4>Liên kết bán</h4>
-            <div class="pill-row">
-              <button class="pill-btn <%= filter.salesLink === 'all' ? 'is-active' : '' %>" type="button" data-target-input="salesLinkInput" data-value="all">Tất cả</button>
-              <button class="pill-btn <%= filter.salesLink === 'yes' ? 'is-active' : '' %>" type="button" data-target-input="salesLinkInput" data-value="yes">Có</button>
-              <button class="pill-btn <%= filter.salesLink === 'no' ? 'is-active' : '' %>" type="button" data-target-input="salesLinkInput" data-value="no">Không</button>
-            </div>
-            <input type="hidden" id="salesLinkInput" name="salesLink" value="<%= filter.salesLink || 'all' %>">
           </section>
 
           <section class="customer-filter-section">

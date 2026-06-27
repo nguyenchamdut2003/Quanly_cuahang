@@ -120,9 +120,11 @@
 <html class="so-quy-page">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
     *{box-sizing:border-box}html.so-quy-page,body.so-quy-page{height:100%;overflow:hidden;margin:0}body.so-quy-page{background:#f3f6f9;display:flex;flex-direction:column}.so-quy-page .kv-header{flex-shrink:0}.page{display:flex;flex-direction:column;min-height:0;height:calc(100vh - 48px);padding:16px 20px 20px;min-width:0;overflow:hidden}.main{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}.toolbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.toolbar-left{display:flex;align-items:center;gap:16px;min-width:0;flex:1}.search{position:relative;width:500px;max-width:100%;flex:1}.search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:37px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px 0 38px;font-size:15px}.actions{display:flex;gap:8px;flex-wrap:wrap}.cash-time-filter{position:relative}.cash-time-filter-trigger.is-active{border-color:#0070f4;color:#0070f4}.cash-time-filter-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:20;min-width:280px;background:#fff;border:1px solid #cfd8e3;border-radius:8px;padding:14px;box-shadow:0 10px 24px rgba(15,23,42,.12)}.cash-time-filter-panel.is-open{display:block}.cash-time-filter-panel label{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px;font-weight:600;color:#111827;cursor:pointer}.cash-time-filter-panel input[type=radio]{accent-color:#0070f4}.cash-time-range{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}.cash-time-range input{height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 10px;font-size:14px}.cash-time-filter-panel .cashbook-specific-select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 10px;font-size:14px;margin:2px 0 12px;background:#fff}
 .cash-time-filter-panel .cashbook-specific-select:disabled{opacity:.55;background:#f8fafc}
@@ -136,6 +138,64 @@
   </style>
   <style>
     .receipt-payment-block{grid-column:1/-1;border:1px solid #d9e4f2;border-radius:8px;background:#fbfdff;padding:12px}.receipt-payment-title{font-weight:800;color:#111827;margin-bottom:10px}.receipt-payment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 16px}.receipt-payment-summary{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin-top:2px}.receipt-payment-summary-row{min-height:34px;border:1px solid #e5e9ee;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 12px;font-size:14px}.receipt-payment-summary-row span{color:#64748b}.receipt-payment-summary-row b{font-weight:800}.receipt-payment-message{display:none;grid-column:1/-1;border-radius:7px;padding:8px 10px;font-size:13px;font-weight:700}.receipt-payment-message.show{display:block}.receipt-payment-message.error{background:#fee2e2;color:#b91c1c}.receipt-payment-message.warn{background:#fff7ed;color:#9a3412}.receipt-payment-hidden{display:none!important}@media (max-width:900px){.receipt-payment-grid,.receipt-payment-summary{grid-template-columns:1fr 1fr}}@media (max-width:640px){.receipt-payment-grid,.receipt-payment-summary{grid-template-columns:1fr}}
+  </style>
+  <style>
+    /* Mobile: cho phép cuộn cả trang — inline CSS desktop dùng overflow:hidden */
+    @media (max-width: 900px) {
+      html.so-quy-page,
+      body.so-quy-page {
+        height: auto !important;
+        min-height: 100%;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+      }
+      body.so-quy-page .page {
+        height: auto !important;
+        min-height: 0 !important;
+        overflow: visible !important;
+        padding: 12px !important;
+      }
+      body.so-quy-page .main {
+        flex: none !important;
+        overflow: visible !important;
+        min-height: 0 !important;
+      }
+      body.so-quy-page .cash-list-panel {
+        flex: none !important;
+        overflow: visible !important;
+        min-height: 0 !important;
+      }
+      body.so-quy-page .table-wrap {
+        flex: none !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      body.so-quy-page .summary {
+        height: auto !important;
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px 8px;
+        padding: 12px 8px;
+      }
+      body.so-quy-page .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      body.so-quy-page .toolbar-left {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      body.so-quy-page .search {
+        width: 100% !important;
+      }
+    }
+    @media (max-width: 520px) {
+      body.so-quy-page .summary {
+        grid-template-columns: 1fr !important;
+      }
+    }
   </style>
 </head>
 <body class="so-quy-page">

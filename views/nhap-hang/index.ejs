@@ -106,6 +106,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %></title>
   <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
     .po-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
     .po-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 30px 0}
@@ -249,6 +250,33 @@
     .label-options{display:flex;gap:12px;margin:10px 0}.label-options select{height:32px;border:1px solid #cfd8e3;border-radius:6px}
     @media print{body>*:not(#labelPrintArea){display:none!important}#labelPrintArea{display:block!important}.label-sheet{display:grid;grid-template-columns:repeat(3,64mm);gap:3mm}.label-item{border:1px solid #111;padding:3mm;height:28mm;font-size:11px;break-inside:avoid}.label-code{font-weight:800;font-size:13px}.label-bar{font-family:monospace;letter-spacing:2px;margin-top:3px}}
     @media(max-width:1100px){.po-shell{padding:12px;grid-template-columns:220px minmax(0,1fr)}.edit-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:900px){
+      .po-page{height:auto!important;min-height:calc(100vh - 98px);overflow:visible!important}
+      .po-shell{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;padding:8px 10px 16px!important;gap:10px!important;min-height:0!important;flex:none!important}
+      .po-sidebar{width:100%;max-height:none;overflow:visible;border-radius:8px;border:1px solid #e2e8f0}
+      .po-title{font-size:18px;margin-bottom:12px}
+      .filter-block{margin-bottom:14px}
+      .po-main{flex:none!important;width:100%;min-width:0}
+      .po-toolbar{flex-direction:column;align-items:stretch;gap:10px}
+      .po-search-group{flex-direction:column;align-items:stretch;max-width:none!important;width:100%;gap:8px}
+      .po-search{min-width:0!important;width:100%}
+      .po-sort-label{margin-top:2px}
+      .po-sort-select{width:100%!important;max-width:none}
+      .toolbar-actions{width:100%;flex-wrap:wrap;justify-content:flex-start;gap:8px}
+      .toolbar-actions .kv-btn{flex:1 1 calc(50% - 4px);min-width:0;justify-content:center}
+      .po-table-wrap{flex:none!important;min-height:220px;max-height:none!important;overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch}
+      .po-table{min-width:920px;table-layout:auto}
+      .detail-grid{grid-template-columns:1fr 1fr!important}
+      .detail-grid .item[style*="grid-column"]{grid-column:auto!important}
+      .detail-body{grid-template-columns:1fr!important}
+      .edit-form-grid{grid-template-columns:1fr!important}
+      .edit-total-box{grid-template-columns:1fr!important}
+      .quick-pay-grid{grid-template-columns:1fr!important}
+    }
+    @media(max-width:520px){
+      .toolbar-actions .kv-btn{flex:1 1 100%}
+      .detail-grid{grid-template-columns:1fr!important}
+    }
     .purchase-merge-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);z-index:1400;align-items:flex-start;justify-content:center;padding:7px 12px}
     .purchase-merge-modal{width:min(1200px,calc(100vw - 24px));max-height:calc(100vh - 14px);background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;overflow:hidden}
     .purchase-merge-head{display:flex;align-items:center;justify-content:space-between;padding:24px 30px 20px}

@@ -6,6 +6,7 @@
   <title><%= title %></title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
     #addVatChuaModalOverlay,
     #importVatChuaModalOverlay {
@@ -85,6 +86,71 @@
       .vc-summary-line .num,
       .vc-paid-combo,
       .vc-side-input { justify-self: stretch; }
+
+      /* Vật chứa — mobile layout (desktop giữ nguyên) */
+      main.customer-page.admin-shell {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 8px !important;
+      }
+      main.customer-page .customer-shell {
+        display: flex !important;
+        flex-direction: column !important;
+        min-height: 0 !important;
+        grid-template-columns: none !important;
+      }
+      main.customer-page .customer-filter {
+        width: 100%;
+        padding: 12px;
+        border-right: 0;
+        border-bottom: 1px solid #e2e8f0;
+      }
+      main.customer-page .customer-filter-section {
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+      }
+      main.customer-page .customer-filter form {
+        gap: 6px;
+      }
+      main.customer-page .pill-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      main.customer-page .pill-btn {
+        width: 100%;
+        min-height: 36px;
+      }
+      main.customer-page .customer-content {
+        width: 100%;
+        min-width: 0;
+        padding: 10px 0 20px;
+      }
+      main.customer-page .customer-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      main.customer-page .customer-search {
+        width: 100% !important;
+        max-width: none;
+      }
+      main.customer-page .customer-toolbar-actions {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 8px;
+      }
+      main.customer-page .customer-toolbar-actions .btn {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+      }
+      main.customer-page .customer-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      main.customer-page .custom-date-range {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>

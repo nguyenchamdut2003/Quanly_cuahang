@@ -1,0 +1,775 @@
+/**
+ * Responsive styles — global UI only (no business logic).
+ * Loaded via style.css @import on all pages linking /stylesheets/style.css
+ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── Header / navigation ─────────────────────────────────────────── */
+
+.kv-nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin: 4px 8px 4px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kv-nav-toggle:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.kv-nav-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1190;
+}
+
+.kv-header.is-nav-open .kv-nav-backdrop {
+  display: block;
+}
+
+@media (max-width: 1100px) {
+  .kv-topbar {
+    position: relative;
+    top: auto;
+    right: auto;
+    height: auto;
+    min-height: 40px;
+    padding: 6px 12px;
+    justify-content: flex-end;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .kv-navbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    height: auto !important;
+    min-height: 48px;
+    padding: 0 8px 0 0;
+    position: relative;
+    z-index: 1201;
+  }
+
+  .kv-nav-toggle {
+    display: inline-flex !important;
+  }
+
+  .kv-nav-links {
+    display: none !important;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    height: auto !important;
+    max-height: min(70vh, calc(100vh - 120px));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: #0070f4;
+    padding-bottom: 8px;
+    order: 3;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .kv-header.is-nav-open .kv-nav-links {
+    display: flex !important;
+  }
+
+  .nav-item,
+  .nav-dropdown-trigger {
+    width: 100%;
+    height: auto !important;
+    min-height: 44px;
+    padding: 10px 16px;
+    justify-content: flex-start;
+  }
+
+  .nav-dropdown {
+    height: auto !important;
+    width: 100%;
+  }
+
+  .nav-mega-menu {
+    position: static !important;
+    display: none !important;
+    min-width: 0;
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #0062d6;
+    grid-template-columns: 1fr !important;
+  }
+
+  .nav-dropdown.open .nav-mega-menu {
+    display: grid !important;
+  }
+
+  .nav-dropdown:hover .nav-mega-menu {
+    display: none !important;
+  }
+
+  .nav-dropdown.open:hover .nav-mega-menu {
+    display: grid !important;
+  }
+
+  .nav-mega-col + .nav-mega-col {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .nav-mega-heading {
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .nav-mega-item {
+    color: #fff;
+    white-space: normal;
+    min-height: 40px;
+  }
+
+  .nav-mega-item:hover,
+  .nav-mega-item.active {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-store-select {
+    max-width: 100%;
+  }
+
+  .user-dropdown-menu {
+    right: 0;
+    left: auto;
+    min-width: min(280px, calc(100vw - 24px));
+  }
+}
+
+/* ── Admin / list layouts ────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .admin-shell {
+    padding: 12px !important;
+  }
+
+  .admin-content-grid,
+  .customer-shell,
+  .store-layout,
+  .shell,
+  .po-shell,
+  .order-shell,
+  .price-setup-shell,
+  .nhap-hang-create-grid,
+  .purchase-page {
+    grid-template-columns: 1fr !important;
+  }
+
+  .customer-filter,
+  .admin-sidebar,
+  .sidebar,
+  .po-sidebar,
+  .price-setup-filter {
+    position: static !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .page-heading,
+  .data-panel-header,
+  .table-tools {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .page-actions,
+  .table-tools,
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .customer-page.admin-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 8px 10px 16px !important;
+  }
+
+  .customer-page .customer-shell {
+    min-height: 0 !important;
+  }
+
+  .customer-search {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .customer-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .customer-toolbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start !important;
+  }
+
+  .customer-page .customer-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+  }
+
+  .customer-page .customer-table {
+    min-width: 980px;
+  }
+
+  .customer-page .range-stack {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+}
+
+/* ── Dashboard (Tổng quan) ───────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  .dashboard {
+    grid-template-columns: 1fr !important;
+    padding: 0 12px !important;
+    height: auto !important;
+    min-height: calc(100vh - 98px);
+    overflow: visible !important;
+  }
+
+  .dashboard .side {
+    margin-top: 0;
+    max-height: none;
+  }
+
+  .dashboard .lower {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard .summary-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .dashboard .summary-item + .summary-item {
+    border-left: 0 !important;
+    border-top: 1px solid #e5e9ee;
+    padding-left: 0 !important;
+    padding-top: 12px;
+  }
+
+  .dashboard .chart-card {
+    height: auto !important;
+    min-height: 280px;
+  }
+
+  .dashboard .chart-wrap {
+    height: min(50vh, 320px);
+  }
+
+  .dashboard .list-card {
+    height: auto !important;
+    min-height: 280px;
+  }
+}
+
+/* ── Báo cáo (sidebar filter + content) ──────────────────────────── */
+
+@media (max-width: 900px) {
+  form.page:has(.filters),
+  form.page:has(aside.filters),
+  .page:has(.filters) {
+    grid-template-columns: 1fr !important;
+    padding: 12px 16px 16px !important;
+    height: auto !important;
+    min-height: calc(100vh - 98px);
+    overflow: visible !important;
+  }
+
+  form.page .filters,
+  .page .filters {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .report-shell {
+    height: auto !important;
+    min-height: 400px;
+  }
+
+  .viewer-page {
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0 auto 16px !important;
+    padding: 12px !important;
+  }
+
+  .chart-card {
+    height: auto !important;
+    min-height: 320px;
+  }
+
+  .chart-wrap {
+    height: min(55vh, 420px) !important;
+  }
+
+  .loan-banner {
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 12px;
+    height: auto !important;
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .content .summary,
+  .summary-grid-inline {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .content .summary,
+  .summary-grid-inline {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Sổ quỹ ──────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  body.so-quy-page .page {
+    padding: 12px !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  html.so-quy-page,
+  body.so-quy-page {
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100%;
+  }
+
+  body.so-quy-page .main,
+  body.so-quy-page .cash-list-panel {
+    flex: none !important;
+    overflow: visible !important;
+    min-height: 0 !important;
+  }
+
+  body.so-quy-page .table-wrap {
+    flex: none !important;
+    max-height: none !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body.so-quy-page .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.so-quy-page .toolbar-left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.so-quy-page .search {
+    width: 100% !important;
+  }
+
+  body.so-quy-page .summary {
+    grid-template-columns: repeat(2, 1fr) !important;
+    height: auto !important;
+    gap: 8px;
+    padding: 12px 8px;
+  }
+
+  body.so-quy-page .cashbook-form-grid,
+  body.so-quy-page .receipt-payment-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  body.so-quy-page .receipt-payment-summary {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 520px) {
+  body.so-quy-page .summary {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Chấm công mới ───────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .cc-page {
+    padding: 12px !important;
+  }
+
+  .cc-shell {
+    min-height: auto;
+  }
+
+  .cc-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cc-tab {
+    flex-shrink: 0;
+  }
+
+  .cc-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .cc-field,
+  .cc-select {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .cc-week-label {
+    margin-left: 0 !important;
+    width: 100%;
+    text-align: left;
+  }
+
+  .cc-toolbar-status {
+    max-width: none;
+    text-align: left;
+  }
+
+  .cc-board-wrap {
+    padding: 12px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .cc-dialog-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .cc-dialog-body .span-2 {
+    grid-column: auto !important;
+  }
+}
+
+/* ── Chấm công (HR cũ) ───────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .attendance-page .admin-shell {
+    padding: 12px !important;
+  }
+
+  .attendance-app {
+    height: auto !important;
+    min-height: calc(100vh - 98px);
+  }
+
+  .attendance-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .attendance-title {
+    min-width: 0 !important;
+    width: 100%;
+  }
+}
+
+/* ── POS / create screens (đơn hàng, hóa đơn…) ───────────────────── */
+
+@media (max-width: 900px) {
+  .topbar {
+    flex-wrap: wrap;
+    height: auto !important;
+    min-height: 46px;
+    padding: 8px 10px !important;
+  }
+
+  .topbar .search {
+    width: 100% !important;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+  }
+
+  .top-actions {
+    margin-left: 0 !important;
+    width: 100%;
+    justify-content: flex-end;
+    gap: 10px !important;
+    font-size: 14px !important;
+  }
+
+  .pos-shell,
+  .invoice-shell,
+  .return-shell {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pos-left,
+  .pos-right,
+  .invoice-side {
+    min-height: auto;
+  }
+}
+
+/* ── Tables — horizontal scroll on small screens ─────────────────── */
+
+.table-wrap,
+.table-scroll,
+.cc-board-wrap,
+.receipt-related-docs-scroll,
+[class*="-table-wrap"],
+.data-panel,
+.report-table-wrap,
+.po-table-wrap,
+.alloc-table-wrap,
+.mini-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+main table,
+.table,
+.items-table,
+.cc-table,
+.po-table,
+.edit-table,
+.alloc-table,
+.employee-table {
+  max-width: none;
+}
+
+/* ── Modals & dialogs ────────────────────────────────────────────── */
+
+.modal-content,
+.modal-box,
+.box,
+.cashbook-manage-modal,
+.group-modal-overlay .group-modal,
+.product-create-modal,
+.cc-dialog,
+[class*="modal-content"],
+[class*="-modal"]:not(.modal-overlay) {
+  max-width: calc(100vw - 24px) !important;
+  width: auto !important;
+}
+
+.modal-overlay,
+.group-modal-overlay {
+  padding: 12px !important;
+}
+
+/* ── Forms & grids ───────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .product-form-grid,
+  .edit-form-grid,
+  .detail-meta,
+  .detail-bottom,
+  .grid-2,
+  .grid-3,
+  .grid-4,
+  [class*="form-grid"],
+  [class*="-form-grid"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  .date-pair {
+    grid-template-columns: 1fr !important;
+    margin-left: 0 !important;
+  }
+
+  .filter-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 760px) {
+  .detail-bottom {
+    grid-template-columns: 1fr !important;
+  }
+
+  .detail-meta {
+    grid-template-columns: 1fr !important;
+    max-width: none !important;
+  }
+}
+
+/* ── Misc page shells ────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .page:not(.so-quy-page .page) {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  form.page .shell,
+  .page .shell {
+    padding: 12px !important;
+  }
+
+  .chat {
+    right: 8px;
+    bottom: 8px;
+    font-size: 12px;
+    height: 32px;
+    padding: 0 10px;
+  }
+
+  .login-card {
+    width: min(400px, calc(100vw - 32px)) !important;
+    padding: 28px 20px !important;
+  }
+}
+
+/* ── Phân bổ / allocation ────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .alloc-toolbar,
+  .alloc-display {
+    flex-wrap: wrap;
+  }
+
+  .alloc-search,
+  .alloc-customer {
+    max-width: none !important;
+    min-width: 0 !important;
+    width: 100%;
+  }
+}
+
+/* ── Print preview pages (screen only) ───────────────────────────── */
+
+@media screen and (max-width: 900px) {
+  .page[style*="210mm"],
+  main.page {
+    width: 100% !important;
+    max-width: 100%;
+    padding: 12px !important;
+    min-height: auto !important;
+  }
+
+  .no-print-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* ── Utility ─────────────────────────────────────────────────────── */
+
+.u-hide-mobile {
+  display: revert;
+}
+
+@media (max-width: 760px) {
+  .u-hide-mobile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .xnb-page,
+  .xnb-create,
+  .kk-page,
+  .purchase-page,
+  .po-shell {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+    min-height: calc(100vh - 98px);
+    padding: 12px !important;
+    overflow: visible !important;
+  }
+
+  .po-page {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .po-sidebar {
+    border-right: 0 !important;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .po-search-group {
+    flex-direction: column;
+    align-items: stretch;
+    max-width: none !important;
+  }
+
+  .po-sort-select {
+    width: 100% !important;
+  }
+
+  .kk-top {
+    grid-template-columns: 1fr !important;
+  }
+
+  .purchase-right,
+  .xnb-create > :last-child,
+  .kk-sidebar {
+    position: static !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .modal .grid,
+  .box .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .meta,
+  .sign,
+  .signatures,
+  .footer-summary {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .store-form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
