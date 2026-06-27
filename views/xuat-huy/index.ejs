@@ -102,6 +102,134 @@
     .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
     @media(max-width:1100px){.xh-shell{padding:12px 30px;grid-template-columns:220px minmax(0,1fr)}}
     @media(max-width:1024px){.xh-detail-split{flex-direction:column;align-items:stretch;gap:20px}.xh-summary-box{flex:none;width:100%;max-width:100%;min-width:0}}
+
+    /* Mobile — Xuất hủy (desktop giữ nguyên) */
+    @media (max-width: 900px) {
+      .xh-page {
+        height: auto;
+        min-height: calc(100vh - 98px);
+        overflow: visible;
+      }
+      .xh-shell {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: none !important;
+        padding: 8px 10px 16px !important;
+        gap: 10px !important;
+        flex: none;
+        min-height: 0;
+      }
+      .sidebar {
+        width: 100%;
+        max-height: none;
+        overflow: visible;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 12px;
+      }
+      .title {
+        font-size: 18px;
+        margin-bottom: 12px;
+      }
+      .filter-block {
+        margin-bottom: 14px;
+      }
+      .filter-control {
+        min-height: 38px;
+        height: auto;
+      }
+      .check-line,
+      .radio-line {
+        min-height: 36px;
+      }
+      .main {
+        width: 100%;
+        min-width: 0;
+        flex: none;
+      }
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+      .search {
+        max-width: none;
+        width: 100%;
+      }
+      .search input {
+        min-height: 38px;
+        height: auto;
+      }
+      .actions {
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .actions .kv-btn {
+        flex: 1 1 calc(50% - 4px);
+        min-width: 0;
+        justify-content: center;
+        min-height: 38px;
+        height: auto;
+        padding: 8px 10px;
+      }
+      .table-wrap {
+        flex: none;
+        min-height: 220px;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+      }
+      .table-wrap > table {
+        min-width: 920px;
+        table-layout: auto;
+      }
+      .footer {
+        height: auto;
+        min-height: 36px;
+        flex-wrap: wrap;
+        padding: 4px 0;
+      }
+      .footer select {
+        flex: 1;
+        min-width: 0;
+        max-width: 140px;
+        min-height: 34px;
+      }
+      .detail-card {
+        padding: 10px;
+      }
+      .detail-head {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .detail-branch {
+        text-align: left;
+      }
+      .info-line {
+        grid-template-columns: 1fr;
+        gap: 4px;
+      }
+      .mini-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .mini-table {
+        min-width: 680px;
+      }
+      .detail-note {
+        min-height: 48px;
+      }
+    }
+    @media (max-width: 520px) {
+      .actions .kv-btn {
+        flex: 1 1 100%;
+      }
+      .xh-shell {
+        padding: 8px !important;
+      }
+    }
   </style>
 </head>
 <body class="admin-body">

@@ -108,6 +108,137 @@
     .viewer-panel{display:none;flex:1;flex-direction:column;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12);border-radius:2px;min-height:0}
     .viewer-panel.active{display:flex}
     .viewer-panel iframe{flex:1;width:100%;border:0;min-height:0;background:#fff}
+
+    /* Mobile — Báo cáo 58 (desktop giữ nguyên) */
+    @media (max-width: 900px) {
+      .page {
+        height: auto;
+        min-height: calc(100vh - 112px);
+        overflow: visible;
+        display: flex;
+        flex-direction: column;
+        grid-template-columns: none;
+        padding: 8px;
+        gap: 8px;
+      }
+      .report58-nav {
+        width: 100%;
+        max-height: none;
+        flex-shrink: 0;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0;
+        padding: 8px 8px 0;
+        overflow: visible;
+      }
+      .report58-nav .nav-section-title {
+        grid-column: 1 / -1;
+        padding: 6px 4px 8px;
+        font-size: 11px;
+      }
+      .report58-nav .mau-link {
+        padding: 8px 4px;
+        font-size: 11px;
+        text-align: center;
+        border-left: 0;
+        border-bottom: 3px solid transparent;
+        word-break: break-word;
+        line-height: 1.25;
+      }
+      .report58-nav .mau-link.active {
+        border-left-color: transparent;
+        border-bottom-color: #0070f4;
+      }
+      .report58-nav .nav-filter {
+        grid-column: 1 / -1;
+        margin-top: 0;
+        padding: 12px 4px 10px;
+        border-top: 1px solid #e5e9ee;
+      }
+      .report58-nav .nav-filter .btn {
+        min-height: 40px;
+      }
+      .content-shell {
+        flex: 1;
+        min-height: 0;
+        overflow: visible;
+      }
+      .report-shell {
+        min-height: min(70vh, 640px);
+        overflow: visible;
+      }
+      .viewer-bar {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: stretch;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 12px;
+      }
+      .viewer-bar .bar-label {
+        width: 100%;
+        margin: 0;
+        text-align: center;
+        font-size: 15px;
+      }
+      .viewer-bar .bar-filter {
+        display: none;
+      }
+      .viewer-bar .bar-divider {
+        display: none;
+      }
+      .viewer-bar .bar-tab {
+        flex: 1 1 calc(50% - 4px);
+        min-height: 42px;
+        display: inline-flex;
+        justify-content: center;
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+      .viewer-bar .bar-export {
+        flex: 1 1 calc(25% - 6px);
+        min-height: 40px;
+        min-width: 44px;
+        display: inline-flex;
+        justify-content: center;
+        padding: 8px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        border-radius: 8px;
+      }
+      .report58-notice {
+        margin: 8px 8px 0;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .viewer-panels {
+        margin: 8px;
+        min-height: 360px;
+        flex: 1;
+      }
+      .viewer-panel iframe {
+        min-height: 320px;
+      }
+    }
+    @media (max-width: 520px) {
+      .report58-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .report58-nav .mau-link {
+        font-size: 10px;
+        padding: 7px 3px;
+      }
+      .viewer-bar .bar-export {
+        flex: 1 1 calc(50% - 4px);
+      }
+      .viewer-panels {
+        min-height: 300px;
+      }
+      .viewer-panel iframe {
+        min-height: 260px;
+      }
+    }
+
     @media print{
       body{background:#fff}
       .kv-header,.report58-nav,.viewer-bar{display:none!important}
