@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Trash can">
+  <g fill="none" stroke="#111827" stroke-linecap="round" stroke-linejoin="round">
+    <path stroke-width="5" d="M18 20h28"/>
+    <path stroke-width="5" d="M27 14h10a4 4 0 0 1 4 4v2H23v-2a4 4 0 0 1 4-4Z"/>
+    <path stroke-width="5" d="m21 24 2.4 29.4A5 5 0 0 0 28.4 58h7.2a5 5 0 0 0 5-4.6L43 24"/>
+    <path stroke-width="4" d="M29 31v18M35 31v18"/>
+  </g>
+</svg>

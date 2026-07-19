@@ -453,6 +453,12 @@ function formatExportDate(value) {
     });
 }
 
+function parseOrderDateInput(value) {
+    if (!value) return new Date();
+    const date = new Date(String(value).trim());
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
 function exportUserName(user) {
     return user ? (user.ho_ten || user.username || user.email || '') : '';
 }
@@ -4131,6 +4137,7 @@ router.post('/add', async (req, res, next) => {
             thu_ho_cod,
             cod_enabled,
             nguoi_tra_phi_giao_hang,
+            ngay_dat,
             so_quy_id
         } = req.body || {};
 
@@ -4294,6 +4301,7 @@ router.post('/add', async (req, res, next) => {
         const codAmount = 0;
         const tienThuaTraKhach = orderPayment.tien_thua;
         const ma_don_hang = await generateOrderCode();
+        const orderDate = parseOrderDateInput(ngay_dat);
 
         const order = await DonHang.create({
             ma_don_hang,
@@ -4302,8 +4310,8 @@ router.post('/add', async (req, res, next) => {
             cua_hang_id: sessionStoreId,
             kho_id: kho_id || null,
             nguoi_tao_id: req.user?._id,
-            ngay_dat: new Date(),
-            ngay_tao: new Date(),
+            ngay_dat: orderDate,
+            ngay_tao: orderDate,
             tong_tien: tong_thanh_toan,
             tong_tien_hang,
             giam_gia: orderDiscountValue,
