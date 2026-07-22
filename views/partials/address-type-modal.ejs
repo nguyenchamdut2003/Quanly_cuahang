@@ -1,0 +1,25 @@
+<div id="addressTypeModalOverlay" class="group-modal-overlay">
+  <div class="group-modal">
+    <div class="group-modal-header">
+      <h3 id="addressTypeModalTitle">Thêm loại địa chỉ</h3>
+      <button type="button" class="group-modal-close" id="addressTypeModalClose">×</button>
+    </div>
+    <div class="group-modal-body">
+      <div class="address-type-list" id="<%= addressTypeListId || 'addressTypeList' %>"></div>
+      <div class="address-type-form-panel">
+        <label>
+          <span>Tên loại địa chỉ</span>
+          <input id="addressTypeNameInput" type="text" placeholder="Nhập tên loại địa chỉ">
+        </label>
+        <label>
+          <span>Mã loại (không bắt buộc)</span>
+          <input id="addressTypeCodeInput" type="text" placeholder="VD: nha_rieng">
+        </label>
+      </div>
+    </div>
+    <div class="page-actions group-modal-footer">
+      <button class="btn btn-light btn-sm" type="button" id="addressTypeModalCancel">Bỏ qua</button>
+      <button class="btn btn-primary btn-sm" type="button" id="addressTypeModalSubmit">Thêm</button>
+    </div>
+  </div>
+</div>

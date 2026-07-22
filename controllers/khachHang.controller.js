@@ -1544,7 +1544,10 @@ exports.addAddressType = async function(req, res, next) {
         var tenLoai = String(req.body.ten_loai || '').trim();
         var maLoai = String(req.body.ma_loai || '').trim().toLowerCase();
 
-        if (!tenLoai) return res.redirect('/khach-hang?error=missing_address_type');
+        if (!tenLoai) {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Vui lòng nhập tên loại địa chỉ.' });
+            return res.redirect('/khach-hang?error=missing_address_type');
+        }
         if (!maLoai) {
             maLoai = tenLoai
                 .normalize('NFD')
@@ -1552,6 +1555,22 @@ exports.addAddressType = async function(req, res, next) {
                 .replace(/[^a-zA-Z0-9]+/g, '_')
                 .replace(/^_+|_+$/g, '')
                 .toLowerCase();
+        }
+
+        if (!maLoai) {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Mã loại địa chỉ không hợp lệ.' });
+            return res.redirect('/khach-hang?error=invalid_address_type');
+        }
+
+        var existed = await LoaiDiaChiKhachHang.findOne({
+            $or: [
+                { ma_loai: maLoai },
+                { ten_loai: tenLoai }
+            ]
+        }).lean();
+        if (existed) {
+            if (shouldRespondJson(req)) return res.status(409).json({ success: false, message: 'Loại địa chỉ đã tồn tại.' });
+            return res.redirect('/khach-hang?error=duplicate_address_type');
         }
 
         var created = await LoaiDiaChiKhachHang.create({ ma_loai: maLoai, ten_loai: tenLoai, trang_thai: 'active' });
@@ -1567,6 +1586,7 @@ exports.addAddressType = async function(req, res, next) {
 
         res.redirect('/khach-hang?success=created');
     } catch (error) {
+        if (shouldRespondJson(req)) return res.status(500).json({ success: false, message: 'Không thể thêm loại địa chỉ.' });
         next(error);
     }
 };
@@ -1574,10 +1594,35 @@ exports.addAddressType = async function(req, res, next) {
 exports.updateAddressType = async function(req, res, next) {
     try {
         var addressTypeId = normalizeIdParam(req?.params?.addressTypeId);
-        if (!addressTypeId) return res.redirect('/khach-hang?error=invalid_address_type');
+        if (!addressTypeId) {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Loại địa chỉ không hợp lệ.' });
+            return res.redirect('/khach-hang?error=invalid_address_type');
+        }
 
         var tenLoai = String(req.body.ten_loai || '').trim();
-        if (!tenLoai) return res.redirect('/khach-hang?error=missing_address_type');
+        if (!tenLoai) {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Vui lòng nhập tên loại địa chỉ.' });
+            return res.redirect('/khach-hang?error=missing_address_type');
+        }
+
+        var current = await LoaiDiaChiKhachHang.findById(addressTypeId).lean();
+        if (!current) {
+            if (shouldRespondJson(req)) return res.status(404).json({ success: false, message: 'Không tìm thấy loại địa chỉ.' });
+            return res.redirect('/khach-hang?error=invalid_address_type');
+        }
+        if (String(current.ma_loai || '').toLowerCase() === 'khac') {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Không thể sửa loại địa chỉ mặc định.' });
+            return res.redirect('/khach-hang?error=default_address_type');
+        }
+
+        var duplicateName = await LoaiDiaChiKhachHang.findOne({
+            _id: { $ne: addressTypeId },
+            ten_loai: tenLoai
+        }).lean();
+        if (duplicateName) {
+            if (shouldRespondJson(req)) return res.status(409).json({ success: false, message: 'Tên loại địa chỉ đã tồn tại.' });
+            return res.redirect('/khach-hang?error=duplicate_address_type');
+        }
 
         await LoaiDiaChiKhachHang.findByIdAndUpdate(
             addressTypeId,
@@ -1596,6 +1641,7 @@ exports.updateAddressType = async function(req, res, next) {
 
         res.redirect('/khach-hang?success=updated');
     } catch (error) {
+        if (shouldRespondJson(req)) return res.status(500).json({ success: false, message: 'Không thể cập nhật loại địa chỉ.' });
         next(error);
     }
 };
@@ -1603,9 +1649,20 @@ exports.updateAddressType = async function(req, res, next) {
 exports.removeAddressType = async function(req, res, next) {
     try {
         var addressTypeId = normalizeIdParam(req?.params?.addressTypeId);
-        if (!addressTypeId) return res.redirect('/khach-hang?error=invalid_address_type');
+        if (!addressTypeId) {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Loại địa chỉ không hợp lệ.' });
+            return res.redirect('/khach-hang?error=invalid_address_type');
+        }
 
         var addressType = await LoaiDiaChiKhachHang.findById(addressTypeId).lean();
+        if (!addressType) {
+            if (shouldRespondJson(req)) return res.status(404).json({ success: false, message: 'Không tìm thấy loại địa chỉ.' });
+            return res.redirect('/khach-hang?error=invalid_address_type');
+        }
+        if (String(addressType.ma_loai || '').toLowerCase() === 'khac') {
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Không thể xóa loại địa chỉ mặc định.' });
+            return res.redirect('/khach-hang?error=default_address_type');
+        }
         if (addressType && addressType.ma_loai) {
             await DiaChiKhachHang.updateMany(
                 { loai_dia_chi: addressType.ma_loai },
@@ -1624,6 +1681,7 @@ exports.removeAddressType = async function(req, res, next) {
 
         res.redirect('/khach-hang?success=deleted');
     } catch (error) {
+        if (shouldRespondJson(req)) return res.status(500).json({ success: false, message: 'Không thể xóa loại địa chỉ.' });
         next(error);
     }
 };

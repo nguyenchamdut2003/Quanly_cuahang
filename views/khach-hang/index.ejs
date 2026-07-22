@@ -24,8 +24,24 @@
     .customer-address-table td:nth-child(6){width:118px;max-width:118px;white-space:nowrap;font-size:12px;padding-left:8px;padding-right:8px}
     .address-type-list{display:grid;gap:8px;max-height:280px;overflow:auto}
     .address-type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:6px;padding:8px}
+    .address-type-row.is-default{background:#f8fafc}
     .address-type-name{font-weight:700;color:#0f172a}
     .address-type-code{font-size:12px;color:#64748b;margin-top:2px}
+    .address-type-actions{display:flex;gap:6px}
+    .address-type-badge{display:inline-flex;align-items:center;height:24px;border-radius:999px;background:#eaf2ff;color:#0058d4;font-size:11px;font-weight:800;padding:0 8px}
+    #addressTypeModalOverlay .group-modal{width:min(760px,calc(100vw - 96px));max-width:calc(100vw - 96px)}
+    #addressTypeModalOverlay .group-modal-body{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);align-items:start;gap:14px 18px}
+    #addressTypeModalOverlay .address-type-list{grid-row:span 2;max-height:420px}
+    #addressTypeModalOverlay .address-type-row{padding:12px}
+    .address-type-form-panel{display:grid;gap:14px;align-self:start}
+    #addressTypeModalOverlay .group-modal-footer{justify-content:space-between}
+    @media (max-width:900px){
+      #addressTypeModalOverlay .group-modal{width:min(520px,calc(100vw - 24px));max-width:calc(100vw - 24px)}
+      #addressTypeModalOverlay .group-modal-body{grid-template-columns:1fr}
+      #addressTypeModalOverlay .address-type-list{grid-row:auto;max-height:280px}
+      .address-type-form-panel{gap:10px}
+      #addressTypeModalOverlay .group-modal-footer{justify-content:flex-end}
+    }
     .debt-period-modal-overlay {
       display: none;
       position: fixed;
@@ -90,6 +106,17 @@
       gap: 8px;
       padding: 12px 16px;
       border-top: 1px solid #e2e8f0;
+    }
+
+    #addCustomerModalOverlay .modal-content.customer-create-modal {
+      width: min(900px, calc(100vw - 96px)) !important;
+      max-width: calc(100vw - 96px) !important;
+    }
+    #addCustomerModalOverlay .customer-form-main {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    #addCustomerModalOverlay .customer-form-field.form-row-full {
+      grid-column: 1 / -1;
     }
 
     /* Mobile — Khách hàng (desktop giữ nguyên) */
@@ -222,6 +249,9 @@
       .customer-create-modal {
         width: min(640px, calc(100vw - 16px)) !important;
         max-width: calc(100vw - 16px) !important;
+      }
+      #addCustomerModalOverlay .customer-form-main {
+        grid-template-columns: 1fr;
       }
     }
     @media (max-width: 520px) {
@@ -695,29 +725,7 @@
       </div>
     </div>
   </div>
-  <div id="addressTypeModalOverlay" class="group-modal-overlay">
-    <div class="group-modal">
-      <div class="group-modal-header">
-        <h3 id="addressTypeModalTitle">Thêm loại địa chỉ</h3>
-        <button type="button" class="group-modal-close" id="addressTypeModalClose">×</button>
-      </div>
-      <div class="group-modal-body">
-        <div class="address-type-list" id="addressTypeManageList"></div>
-        <label>
-          <span>Tên loại địa chỉ</span>
-          <input id="addressTypeNameInput" type="text" placeholder="Nhập tên loại địa chỉ">
-        </label>
-        <label>
-          <span>Mã loại (không bắt buộc)</span>
-          <input id="addressTypeCodeInput" type="text" placeholder="VD: nha_rieng">
-        </label>
-      </div>
-      <div class="page-actions group-modal-footer">
-        <button class="btn btn-light btn-sm" type="button" id="addressTypeModalCancel">Bỏ qua</button>
-        <button class="btn btn-primary btn-sm" type="button" id="addressTypeModalSubmit">Lưu</button>
-      </div>
-    </div>
-  </div>
+  <%- include('../partials/address-type-modal', { addressTypeListId: 'addressTypeManageList' }) %>
   <script id="customerGroupsSeed" type="application/json"><%- JSON.stringify(customerGroups || []) %></script>
   <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
   <%- include('../partials/debt-period-export-modal') %>
@@ -1244,22 +1252,32 @@
       var addressTypesSeed = document.getElementById('addressTypesSeed');
       window.__addressTypes = addressTypesSeed ? JSON.parse(addressTypesSeed.textContent || '[]') : [];
 
-      function openAddressTypeModal(mode) {
+      function isDefaultAddressTypeCode(value) {
+        return String(value || '').toLowerCase() === 'khac';
+      }
+
+      function setAddressTypeFormMode(mode, item) {
         addressTypeModalMode = mode === 'edit' ? 'edit' : 'add';
+        activeAddressTypeItem = item || null;
+        if (addressTypeModalTitle) addressTypeModalTitle.textContent = addressTypeModalMode === 'edit' ? 'Sửa loại địa chỉ' : 'Thêm loại địa chỉ';
+        if (addressTypeModalSubmit) addressTypeModalSubmit.textContent = addressTypeModalMode === 'edit' ? 'Lưu' : 'Thêm';
+        if (addressTypeNameInput) addressTypeNameInput.value = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-name') || '') : '';
+        if (addressTypeCodeInput) {
+          addressTypeCodeInput.value = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-value') || '') : '';
+          if (addressTypeModalMode === 'edit') {
+            addressTypeCodeInput.setAttribute('disabled', 'disabled');
+          } else {
+            addressTypeCodeInput.removeAttribute('disabled');
+          }
+        }
+        if (addressTypeNameInput) addressTypeNameInput.focus();
+      }
+
+      function openAddressTypeModal(mode) {
         if (!addressTypeModalOverlay || !addressTypeModalTitle) return;
         renderAddressTypeManageList();
-        if (addressTypeModalMode === 'add') {
-          addressTypeModalTitle.textContent = 'Thêm loại địa chỉ';
-          if (addressTypeNameInput) addressTypeNameInput.value = '';
-          if (addressTypeCodeInput) addressTypeCodeInput.value = '';
-          if (addressTypeCodeInput) addressTypeCodeInput.removeAttribute('disabled');
-        } else {
-          addressTypeModalTitle.textContent = 'Sửa loại địa chỉ';
-          if (addressTypeNameInput) addressTypeNameInput.value = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-name') || '') : '';
-          if (addressTypeCodeInput) addressTypeCodeInput.value = activeAddressTypeItem ? (activeAddressTypeItem.getAttribute('data-value') || '') : '';
-          if (addressTypeCodeInput) addressTypeCodeInput.setAttribute('disabled', 'disabled');
-        }
         addressTypeModalOverlay.classList.add('is-open');
+        setAddressTypeFormMode(mode, mode === 'edit' ? activeAddressTypeItem : null);
       }
 
       function closeAddressTypeModal() {
@@ -1296,6 +1314,10 @@
           if (editBtn) {
             editBtn.addEventListener('click', function(event) {
               event.stopPropagation();
+              if (isDefaultAddressTypeCode(item.getAttribute('data-value'))) {
+                alert('Không thể sửa loại địa chỉ mặc định.');
+                return;
+              }
               activeAddressTypeItem = item;
               openAddressTypeModal('edit');
             });
@@ -1305,6 +1327,10 @@
             deleteBtn.addEventListener('click', function(event) {
               event.stopPropagation();
               var typeId = item.getAttribute('data-id') || '';
+              if (isDefaultAddressTypeCode(item.getAttribute('data-value'))) {
+                alert('Không thể xóa loại địa chỉ mặc định.');
+                return;
+              }
               if (!typeId) {
                 alert('Vui lòng chọn loại địa chỉ cần xóa.');
                 return;
@@ -1322,6 +1348,7 @@
           var current = selectedCode || select.value || 'khac';
           var html = '<option value="khac">Khác</option>';
           types.forEach(function(type) {
+            if (isDefaultAddressTypeCode(type.ma_loai)) return;
             html += '<option value="' + escapeHtml(type.ma_loai || '') + '">' + escapeHtml(type.ten_loai || '') + '</option>';
           });
           select.innerHTML = html;
@@ -1338,13 +1365,21 @@
           var deleteBtn = row.querySelector('.js-address-type-delete');
           if (editBtn) {
             editBtn.addEventListener('click', function() {
+              if (isDefaultAddressTypeCode(row.getAttribute('data-value'))) {
+                alert('Không thể sửa loại địa chỉ mặc định.');
+                return;
+              }
               activeAddressTypeItem = row;
-              openAddressTypeModal('edit');
+              setAddressTypeFormMode('edit', row);
             });
           }
           if (deleteBtn) {
             deleteBtn.addEventListener('click', function() {
               var typeId = row.getAttribute('data-id') || '';
+              if (isDefaultAddressTypeCode(row.getAttribute('data-value'))) {
+                alert('Không thể xóa loại địa chỉ mặc định.');
+                return;
+              }
               if (!typeId) return;
               if (!confirm('Xóa loại địa chỉ này? Các địa chỉ đang dùng sẽ chuyển về Khác.')) return;
               requestAddressType('/khach-hang/address-types/' + typeId + '/delete', {}, null, 'khac');
@@ -1361,11 +1396,11 @@
           return;
         }
         addressTypeManageList.innerHTML = types.map(function(type) {
-          return '<div class="address-type-row" data-id="' + escapeHtml(type._id || '') + '" data-value="' + escapeHtml(type.ma_loai || '') + '" data-name="' + escapeHtml(type.ten_loai || '') + '">' +
+          var isDefault = isDefaultAddressTypeCode(type.ma_loai);
+          return '<div class="address-type-row' + (isDefault ? ' is-default' : '') + '" data-id="' + escapeHtml(type._id || '') + '" data-value="' + escapeHtml(type.ma_loai || '') + '" data-name="' + escapeHtml(type.ten_loai || '') + '">' +
             '<div><div class="address-type-name">' + escapeHtml(type.ten_loai || '') + '</div><div class="address-type-code">' + escapeHtml(type.ma_loai || '') + '</div></div>' +
             '<div class="address-type-actions">' +
-              '<button class="btn btn-light btn-sm js-address-type-edit" type="button">Sửa</button>' +
-              '<button class="btn btn-danger btn-sm js-address-type-delete" type="button">Xóa</button>' +
+              (isDefault ? '<span class="address-type-badge">Mặc định</span>' : '<button class="btn btn-light btn-sm js-address-type-edit" type="button">Sửa</button><button class="btn btn-danger btn-sm js-address-type-delete" type="button">Xóa</button>') +
             '</div>' +
           '</div>';
         }).join('');
@@ -1385,12 +1420,12 @@
 
         addressTypeDropdown.innerHTML = addressTypes.map(function(type) {
           var isActive = selectedType && String(selectedType._id) === String(type._id);
+          var isDefault = isDefaultAddressTypeCode(type.ma_loai);
           return (
             '<div class="address-type-item ' + (isActive ? 'is-active' : '') + '" data-id="' + escapeHtml(type._id) + '" data-value="' + escapeHtml(type.ma_loai) + '" data-name="' + escapeHtml(type.ten_loai) + '">' +
               '<button class="address-type-option" type="button">' + escapeHtml(type.ten_loai) + '</button>' +
               '<div class="address-type-actions">' +
-                '<button class="address-type-action-edit" type="button">Sửa</button>' +
-                '<button class="address-type-action-delete" type="button">Xóa</button>' +
+                (isDefault ? '<span class="address-type-badge">Mặc định</span>' : '<button class="address-type-action-edit" type="button">Sửa</button><button class="address-type-action-delete" type="button">Xóa</button>') +
               '</div>' +
             '</div>'
           );
@@ -1425,7 +1460,7 @@
           .then(function(response) { return response.json(); })
           .then(function(data) {
             if (!data || !data.success) {
-              alert('Không thể xử lý loại địa chỉ.');
+              alert((data && data.message) || 'Không thể xử lý loại địa chỉ.');
               return;
             }
             var updatedTypes = Array.isArray(data.addressTypes) ? data.addressTypes : [];

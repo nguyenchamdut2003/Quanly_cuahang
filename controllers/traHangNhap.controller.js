@@ -1953,7 +1953,8 @@ exports.createSubmit = async function(req, res, next) {
       return res.status(400).json({ success: false, message: 'Vui lòng chọn nhà cung cấp hoặc phiếu nhập gốc' });
     }
     const discountType = ['vnd', 'percent'].includes(String(body.kieu_giam_gia || '').trim()) ? String(body.kieu_giam_gia).trim() : 'vnd';
-    const returnDate = new Date();
+    const requestedReturnDate = body.ngay_tra ? new Date(body.ngay_tra) : null;
+    const returnDate = requestedReturnDate && !isNaN(requestedReturnDate.getTime()) ? requestedReturnDate : new Date();
     const rawItems = parseItems(body.items_json || body.items);
     const detailRows = submitMode === 'completed'
       ? await validateReturnItems({ items: rawItems, storeId, khoId, phieuNhapId })
@@ -2112,6 +2113,8 @@ exports.complete = async function(req, res) {
     const payment = normalizePaymentDetail(req.body || {}, returnDoc.ncc_da_tra || 0);
     const paymentDetail = payment.amount > 0 ? payment.detail : (returnDoc.chi_tiet_thanh_toan || null);
     const paymentMethod = paymentMethodFromDetail(paymentDetail);
+    const requestedReturnDate = req.body && req.body.ngay_tra ? new Date(req.body.ngay_tra) : null;
+    const completeDate = requestedReturnDate && !isNaN(requestedReturnDate.getTime()) ? requestedReturnDate : new Date();
     if (Number(returnDoc.ncc_da_tra || 0) > 0 && !(payment && payment.isV2) && !isObjectId(cashBookId)) {
       return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.' });
     }
@@ -2120,7 +2123,7 @@ exports.complete = async function(req, res) {
       await session.withTransaction(async () => {
         await completeInventory(returnDoc, detailRows, req.user?._id, { session });
         returnDoc.trang_thai = 'completed';
-        returnDoc.ngay_tra = new Date();
+        returnDoc.ngay_tra = completeDate;
         returnDoc.nguoi_tra_id = req.user?._id || returnDoc.nguoi_tra_id;
         if (payment.amount > 0) {
           returnDoc.ncc_da_tra = payment.amount;

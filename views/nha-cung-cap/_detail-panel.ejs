@@ -114,7 +114,7 @@
                                     <td>
                                       <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
                                         <option value="khac">Khác</option>
-                                        <% (addressTypes || []).forEach(function(type) { %>
+                                        <% (addressTypes || []).filter(function(type) { return type.ma_loai !== 'khac'; }).forEach(function(type) { %>
                                           <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
                                         <% }) %>
                                       </select>
@@ -161,7 +161,7 @@
                                       <td>
                                         <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
                                           <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
-                                          <% (addressTypes || []).forEach(function(type) { %>
+                                          <% (addressTypes || []).filter(function(type) { return type.ma_loai !== 'khac'; }).forEach(function(type) { %>
                                             <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
                                           <% }) %>
                                         </select>

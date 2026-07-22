@@ -1,0 +1,96 @@
+/* buttons.css */
+
+/* Nền tảng chung */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  min-height: 38px;
+  padding: 8px 14px;
+
+  border: 1px solid transparent;
+  border-radius: 6px;
+
+  font: inherit;
+  font-weight: 500;
+  line-height: 1;
+
+  cursor: pointer;
+  text-decoration: none;
+  transition: 0.15s ease;
+}
+
+.btn:disabled,
+.btn.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Nút chính: thêm, lưu, xác nhận */
+.btn-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+/* Nút phụ: sửa, xem, thao tác phụ */
+.btn-secondary {
+  background: #64748b;
+  border-color: #64748b;
+  color: #fff;
+}
+
+/* Hủy, quay lại, đóng */
+.btn-light {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+/* In, xuất file, lọc */
+.btn-outline {
+  background: transparent;
+  border-color: #94a3b8;
+  color: #334155;
+}
+
+/* Xóa, hủy nghiệp vụ */
+.btn-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+/* Kích thước */
+.btn-sm {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.btn-md {
+  min-height: 38px;
+  padding: 8px 14px;
+}
+
+.btn-lg {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 16px;
+}
+
+/* Nút chỉ có icon */
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+/* Trạng thái loading */
+.btn-loading {
+  cursor: wait;
+  pointer-events: none;
+}

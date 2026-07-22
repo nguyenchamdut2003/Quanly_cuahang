@@ -64,7 +64,7 @@ body {
 .kv-top-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
   font-size: 13px;
   color: #4a4a4a;
 }
@@ -77,18 +77,31 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  color: #5c6a82;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  opacity: 1;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .kv-trash-link:hover {
-  background-color: rgba(255, 255, 255, 0.16);
-  color: #1f2937;
+  background-color: rgba(255, 255, 255, 0.24);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
-.kv-trash-link i {
+.kv-trash-link i,
+.kv-trash-icon {
   font-size: 16px;
+  line-height: 1;
+}
+
+.kv-trash-icon {
+  width: 17px;
+  height: 17px;
+  display: block;
+  fill: currentColor;
+  flex: 0 0 17px;
 }
 
 .kv-trash-badge {
@@ -3294,6 +3307,19 @@ body {
   font-weight: 500;
 }
 
+.customer-detail-facebook {
+  min-width: 0;
+}
+
+.customer-detail-facebook strong,
+.customer-detail-facebook a {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .customer-detail-fields a {
   color: #0070f4;
   text-decoration: none;
@@ -3320,6 +3346,84 @@ body {
   justify-content: center;
 }
 
+.customer-address-table .address-detail-row td {
+  padding: 0;
+  background: #f8fafc;
+}
+
+.customer-address-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px 18px;
+  padding: 18px;
+  border-top: 1px solid #dbe4f0;
+}
+
+.customer-address-detail-field {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.customer-address-detail-wide,
+.customer-address-detail-check {
+  grid-column: span 2;
+}
+
+.customer-address-detail-field label {
+  color: #1f2937;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.customer-address-detail-field .form-control,
+.customer-address-detail-field input,
+.customer-address-detail-field select {
+  width: 100%;
+  height: 38px;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 14px;
+  padding: 0 12px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.customer-address-detail-field .form-control:focus,
+.customer-address-detail-field input:focus,
+.customer-address-detail-field select:focus {
+  border-color: #0070f4;
+  box-shadow: 0 0 0 3px rgba(0, 112, 244, 0.12);
+  outline: none;
+}
+
+.customer-address-detail-check {
+  display: flex;
+  align-items: end;
+  min-height: 62px;
+}
+
+.customer-address-detail-check label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.customer-address-detail-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  accent-color: #0070f4;
+}
+
 @media (max-width: 1200px) {
   .customer-shell {
     grid-template-columns: 1fr;
@@ -3334,6 +3438,21 @@ body {
 @media (max-width: 1200px) {
   .customer-detail-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .customer-address-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .customer-address-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .customer-address-detail-wide,
+  .customer-address-detail-check {
+    grid-column: auto;
   }
 }
 
@@ -3391,7 +3510,7 @@ body {
 }
 
 .customer-create-modal {
-  max-width: 980px;
+  max-width: 1280px;
 }
 
 .customer-create-modal .group-modal-body {
@@ -3843,6 +3962,21 @@ body {
   font-size: 14px;
   color: #1e293b;
   transition: all 0.2s;
+}
+
+.customer-form-field label:has(input[type="checkbox"]) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customer-form-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: #0070f4;
 }
 
 .customer-form-field textarea {

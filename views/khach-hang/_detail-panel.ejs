@@ -92,7 +92,7 @@
                                   <span>Email</span>
                                   <strong><%= formatDetailText(c.email) %></strong>
                                 </div>
-                                <div>
+                                <div class="customer-detail-facebook">
                                   <span>Facebook</span>
                                   <strong>
                                     <% if (fbRaw) { %>
@@ -179,7 +179,7 @@
                                     <td>
                                       <select class="js-address-type-select" form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
                                         <option value="khac">Khác</option>
-                                        <% (addressTypes || []).forEach(function(type) { %>
+                                        <% (addressTypes || []).filter(function(type) { return type.ma_loai !== 'khac'; }).forEach(function(type) { %>
                                           <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
                                         <% }) %>
                                       </select>
@@ -198,18 +198,18 @@
                                       </div>
                                     </td>
                                   </tr>
-                                  <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                  <tr class="address-detail-row" style="display: none;">
                                     <td colspan="7">
-                                      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                        <div>
-                                          <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label>
+                                      <div class="customer-address-detail-grid">
+                                        <div class="customer-address-detail-field">
+                                          <label>Tỉnh/Thành</label>
                                           <select class="form-control js-ghn-province" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" data-selected-name="">
                                             <option value="">Chọn Tỉnh/Thành</option>
                                           </select>
                                           <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh_id" class="js-ghn-province-id">
                                         </div>
-                                        <div>
-                                          <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label>
+                                        <div class="customer-address-detail-field">
+                                          <label>Phường/Xã</label>
                                           <select class="form-control js-ghn-ward" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" data-selected-name="">
                                             <option value="">Chọn Phường/Xã</option>
                                           </select>
@@ -217,9 +217,9 @@
                                           <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" class="js-ghn-district-name">
                                           <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen_id" class="js-ghn-district-id">
                                         </div>
-                                        <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
-                                        <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
-                                        <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
+                                        <div class="customer-address-detail-field"><label>Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
+                                        <div class="customer-address-detail-field customer-address-detail-wide"><label>Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
+                                        <div class="customer-address-detail-check"><label><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
                                       </div>
                                     </td>
                                   </tr>
@@ -240,7 +240,7 @@
                                       <td>
                                         <select class="js-address-type-select" form="<%= addressFormId %>" name="loai_dia_chi">
                                           <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
-                                          <% (addressTypes || []).forEach(function(type) { %>
+                                          <% (addressTypes || []).filter(function(type) { return type.ma_loai !== 'khac'; }).forEach(function(type) { %>
                                             <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
                                           <% }) %>
                                         </select>
@@ -264,11 +264,11 @@
                                         </div>
                                       </td>
                                     </tr>
-                                    <tr class="address-detail-row" style="display: none; background-color: #f8fafc;">
+                                    <tr class="address-detail-row" style="display: none;">
                                       <td colspan="7">
-                                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; padding: 15px;">
-                                          <div>
-                                            <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Tỉnh/Thành</label>
+                                        <div class="customer-address-detail-grid">
+                                          <div class="customer-address-detail-field">
+                                            <label>Tỉnh/Thành</label>
                                             <select class="form-control js-ghn-province" form="<%= addressFormId %>" name="tinh_thanh" data-selected-id="<%= address.tinh_thanh_id || '' %>" data-selected-name="<%= address.tinh_thanh || '' %>">
                                               <% if (address.tinh_thanh) { %>
                                                 <option value="<%= address.tinh_thanh %>" selected><%= address.tinh_thanh %></option>
@@ -278,8 +278,8 @@
                                             </select>
                                             <input type="hidden" form="<%= addressFormId %>" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= address.tinh_thanh_id || '' %>">
                                           </div>
-                                          <div>
-                                            <label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Phường/Xã</label>
+                                          <div class="customer-address-detail-field">
+                                            <label>Phường/Xã</label>
                                             <select class="form-control js-ghn-ward" form="<%= addressFormId %>" name="phuong_xa" data-selected-id="<%= address.phuong_xa_code || '' %>" data-selected-name="<%= address.phuong_xa || '' %>">
                                               <% if (address.phuong_xa) { %>
                                                 <option value="<%= address.phuong_xa %>" selected><%= address.phuong_xa %></option>
@@ -291,9 +291,9 @@
                                             <input type="hidden" form="<%= addressFormId %>" name="quan_huyen" class="js-ghn-district-name" value="<%= address.quan_huyen || '' %>">
                                             <input type="hidden" form="<%= addressFormId %>" name="quan_huyen_id" class="js-ghn-district-id" value="<%= address.quan_huyen_id || '' %>">
                                           </div>
-                                          <div><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
-                                          <div style="grid-column: span 2;"><label style="display:block;margin-bottom:5px;font-weight:bold;font-size:12px;">Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
-                                          <div style="grid-column: span 2; display: flex; align-items: center;"><label style="font-size:13px;cursor:pointer;"><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
+                                          <div class="customer-address-detail-field"><label>Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
+                                          <div class="customer-address-detail-field customer-address-detail-wide"><label>Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
+                                          <div class="customer-address-detail-check"><label><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
                                         </div>
                                       </td>
                                     </tr>

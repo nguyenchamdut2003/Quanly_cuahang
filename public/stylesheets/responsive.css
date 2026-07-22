@@ -71,6 +71,16 @@ svg {
     border-bottom: 1px solid #e2e8f0;
   }
 
+  .kv-trash-link {
+    color: #0f172a;
+    background: #e8f3ff;
+  }
+
+  .kv-trash-link:hover {
+    color: #006dff;
+    background: #dbeafe;
+  }
+
   .kv-navbar {
     flex-wrap: wrap;
     align-items: flex-start;

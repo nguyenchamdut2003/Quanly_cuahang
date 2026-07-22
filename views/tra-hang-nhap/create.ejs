@@ -14,8 +14,8 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
-    body.admin-body{background:#f3f6f9}
-    .create-page{height:calc(100vh - 98px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}
+    body.admin-body{overflow:hidden;background:#f3f6f9}
+    .create-page{height:calc(100vh - 60px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}
     .left{min-width:0;display:flex;flex-direction:column}
     .topline{height:52px;display:flex;align-items:center;gap:12px;position:relative}
     .back{width:28px;text-align:center;font-size:24px;color:#111827;text-decoration:none;line-height:1}
@@ -39,7 +39,8 @@
     .lot-select{display:block;width:260px;max-width:100%;height:25px;margin-top:5px;border:1px solid #cfd8e3;border-radius:5px;font-size:12px;color:#475467}
     .empty{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#111827}
     .empty small{color:#0070f4;margin-top:12px}
-    .right{background:#fff;border-left:1px solid #dbe4ee;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}
+    .right{min-height:0;background:#fff;border-left:1px solid #dbe4ee;display:flex;flex-direction:column;overflow:hidden}
+    .right-scroll{flex:1;min-height:0;overflow-y:auto;padding:16px 14px 10px;display:flex;flex-direction:column;gap:12px}
     .mini-tools{display:flex;justify-content:flex-start;gap:6px}
     .tool{width:29px;height:29px;border:1px solid #cfd8e3;background:#fff;border-radius:5px}
     .field{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:10px;font-size:13px;color:#111827}
@@ -57,11 +58,12 @@
     .supplier-link.is-empty{color:#667085;font-weight:400;pointer-events:none}
     .readonly{height:31px;display:flex;align-items:center;justify-content:flex-end;color:#111827}
     .readonly.blue{color:#0070f4;font-weight:800}
-    .note{height:86px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:none}
+    .note{height:118px;min-height:118px;border:1px solid #cfd8e3;border-radius:6px;padding:8px 9px;font-size:13px;resize:vertical}
     .switch-line{display:flex;align-items:center;justify-content:space-between;font-size:13px}
     .switch-line input{accent-color:#0070f4}
     .btn{height:38px;border:1px solid #0070f4;background:#fff;color:#0070f4;border-radius:7px;font-size:13px;font-weight:800;cursor:pointer}
     .btn.primary{background:#0070f4;color:#fff}
+    .footer-actions{flex:0 0 auto;padding:12px 14px;background:#fff;border-top:1px solid #e5e9ee;box-shadow:0 -8px 18px rgba(15,23,42,.06)}
     .danger{color:#dc2626;border:0;background:transparent;cursor:pointer}
     .error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
     @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}.product-pop{left:120px;width:420px}}
@@ -103,9 +105,10 @@
       </div>
     </section>
     <aside class="right">
+      <div class="right-scroll">
       <div id="errorBox" class="error"<%= copyFromErrorMsg ? ' style="display:block"' : '' %>><%= copyFromErrorMsg %></div>
       <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
-      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayTra" type="datetime-local" value="<%= todayValue %>" readonly></div>
+      <div class="field"><label>Ngày tạo</label><input class="control" id="ngayTra" type="datetime-local" value="<%= todayValue %>"></div>
       <div class="field">
         <label>Kho trả</label>
         <select id="khoId" class="control">
@@ -147,7 +150,7 @@
         </select>
       </div>
       <div class="field">
-        <label>Sá»• tiá»n máº·t <span id="cashBookRequiredMarkV2" style="display:none;color:#d92d20">*</span></label>
+        <label>Sổ quỹ tiền mặt<span id="cashBookRequiredMarkV2" style="display:none;color:#d92d20">*</span></label>
         <select id="cashBookCashId" class="control" disabled>
           <option value="">-- Chon so tien mat --</option>
         </select>
@@ -186,6 +189,7 @@
         </div>
       </div>
       <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
+      </div>
       <div class="page-actions page-actions--grid2 footer-actions">
         <button class="btn" type="button" onclick="submitReturn('draft')">Lưu tạm</button>
         <button class="btn primary" type="button" onclick="submitReturn('completed')">Hoàn thành</button>
@@ -588,7 +592,6 @@
       if (purchaseId && selectedPurchaseSupplierId && document.getElementById('nccId').value !== selectedPurchaseSupplierId) {
         return showError('Không cho chọn nhà cung cấp khác với phiếu nhập gốc');
       }
-      updateCurrentReturnTime();
       renderTotals();
       const paidAmount = money(document.getElementById('nccDaTra').value);
       const cashAmount = money(document.getElementById('paymentCash') ? document.getElementById('paymentCash').value : 0);
@@ -619,6 +622,7 @@
         nha_cung_cap_id: document.getElementById('nccId').value,
         phieu_nhap_id: document.getElementById('phieuNhapId').value,
         ma_phieu_tra_nhap: document.getElementById('maPhieu').value,
+        ngay_tra: document.getElementById('ngayTra').value,
         giam_gia: document.getElementById('giamGia').value,
         kieu_giam_gia: document.getElementById('kieuGiamGia').value,
         ncc_da_tra: document.getElementById('nccDaTra').value,
