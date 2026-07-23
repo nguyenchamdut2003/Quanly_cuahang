@@ -59,6 +59,21 @@
       text-align: left;
     }
     .vc-doc-open-btn:hover { text-decoration: underline; }
+    .vc-doc-action-btn { border: 1px solid #cfd8e3; background: #fff; color: #344054; min-height: 30px; border-radius: 6px; padding: 0 9px; font-size: 12px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .vc-doc-action-btn.primary { border-color: #0070f4; color: #006dff; }
+    .vc-doc-action-btn.primary:hover { background: #eff6ff; }
+    .vc-doc-action-btn.danger { border-color: #fda29b; color: #b42318; }
+    .vc-doc-action-btn.danger:hover { background: #fff1f3; }
+    .vc-doc-action-menu { position: relative; display: inline-flex; justify-content: flex-end; width: 100%; }
+    .vc-doc-more-btn { width: 32px; height: 32px; border: 1px solid #cfd8e3; background: #fff; color: #344054; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .vc-doc-more-btn:hover,
+    .vc-doc-action-menu.is-open .vc-doc-more-btn { border-color: #0070f4; color: #006dff; background: #eff6ff; }
+    .vc-doc-action-dropdown { position: fixed; top: 0; left: 0; z-index: 4300; display: none; min-width: 160px; padding: 6px; border: 1px solid #d9e2ec; border-radius: 7px; background: #fff; box-shadow: 0 12px 24px rgba(15, 23, 42, .16); }
+    .vc-doc-action-menu.is-open .vc-doc-action-dropdown { display: block; }
+    .vc-doc-menu-item { width: 100%; min-height: 34px; border: 0; border-radius: 5px; background: transparent; color: #1f2937; padding: 0 9px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; white-space: nowrap; }
+    .vc-doc-menu-item:hover { background: #f1f5f9; color: #006dff; }
+    .vc-doc-menu-item.danger { color: #b42318; }
+    .vc-doc-menu-item.danger:hover { background: #fff1f3; color: #b42318; }
     .vc-doc-modal-grid { margin-bottom: 12px; }
     .vc-doc-modal-table-wrap { margin-top: 4px; }
     .vc-doc-modal-loading,
@@ -79,6 +94,72 @@
     .vc-status-tag.is-active { background: #ecfdf3; color: #047857; }
     .vc-status-tag.is-inactive { background: #f1f5f9; color: #64748b; }
     .vc-money-suffix { margin-left: 4px; color: #667085; font-size: 12px; font-weight: 600; }
+    #vcImportTrashModalOverlay { z-index: 4200 !important; }
+    #vcImportTrashModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
+    #vcImportTrashModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
+    #vcImportTrashModalOverlay .modal-content { width: min(760px, 96%); max-height: 88vh; }
+    #vcImportEditModalOverlay { z-index: 4210 !important; }
+    #vcImportEditModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
+    #vcImportEditModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
+    #vcImportEditModalOverlay .modal-content { width: min(720px, 96%); max-height: 90vh; }
+    #vcImportReturnModalOverlay { z-index: 4220 !important; }
+    #vcImportReturnModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
+    #vcImportReturnModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
+    #vcImportReturnModalOverlay .modal-content { width: min(620px, 96%); max-height: 88vh; }
+    .vc-trash-desc { margin: 0 0 12px; color: #475467; font-size: 13px; line-height: 1.45; }
+    .vc-trash-alert { border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; margin-bottom: 10px; }
+    .vc-trash-alert.is-warn { border: 1px solid #fedf89; background: #fffaeb; color: #93370d; }
+    .vc-trash-alert.is-error { border: 1px solid #fecdca; background: #fffbfa; color: #b42318; }
+    .vc-trash-list { margin: 0 0 12px; padding: 0; list-style: none; border: 1px solid #e5e9ee; border-radius: 8px; overflow: hidden; }
+    .vc-trash-list li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #eef2f6; font-size: 13px; }
+    .vc-trash-list li:last-child { border-bottom: 0; }
+    .vc-trash-groups { margin: 0; padding-left: 18px; color: #344054; font-size: 13px; }
+    .vc-trash-loading { text-align: center; padding: 24px 8px; color: #667085; font-size: 13px; }
+    .vc-documents-wrap { width: 100%; max-width: 100%; overflow-x: auto !important; overflow-y: hidden; padding-bottom: 8px; scrollbar-gutter: stable; }
+    .vc-documents-table { table-layout: fixed; width: 1320px; min-width: 1320px; }
+    .vc-documents-table th,
+    .vc-documents-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vc-documents-table td > a,
+    .vc-documents-table td > button:not(.vc-doc-action-btn),
+    .vc-documents-table td > strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+    .vc-documents-table td > button:not(.vc-doc-action-btn) { display: inline-block; }
+    .vc-documents-table td > a,
+    .vc-documents-table td > strong { display: inline-block; }
+    .vc-documents-table th:nth-child(1) { width: 132px; }
+    .vc-documents-table th:nth-child(2) { width: 70px; }
+    .vc-documents-table th:nth-child(3) { width: 126px; }
+    .vc-documents-table th:nth-child(4) { width: 104px; }
+    .vc-documents-table th:nth-child(5) { width: 150px; }
+    .vc-documents-table th:nth-child(6) { width: 136px; }
+    .vc-documents-table th:nth-child(7) { width: 86px; }
+    .vc-documents-table th:nth-child(8) { width: 112px; }
+    .vc-documents-table th:nth-child(9) { width: 130px; }
+    .vc-documents-table th:nth-child(10) { width: 142px; }
+    .vc-documents-table th:nth-child(11) { width: 128px; }
+    .vc-documents-table .vc-doc-actions-cell { overflow: visible; white-space: normal; }
+    table[data-kv-master="vat-chua"] .product-detail-row > td {
+      max-width: calc(100vw - 300px);
+      overflow: hidden;
+    }
+    table[data-kv-master="vat-chua"] .product-detail {
+      width: 100%;
+      max-width: calc(100vw - 300px);
+      min-width: 0;
+      overflow: hidden;
+    }
+    table[data-kv-master="vat-chua"] .product-detail-body,
+    table[data-kv-master="vat-chua"] .detail-pane {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    table[data-kv-master="vat-chua"] .vc-documents-wrap {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: scroll !important;
+      overflow-y: hidden;
+    }
     @media (max-width: 900px) {
       .customer-toolbar { flex-wrap: wrap; }
       .customer-toolbar-actions { width: 100%; justify-content: flex-end; }
@@ -160,7 +241,7 @@
   <main class="admin-shell customer-page">
     <% const vcFlash = typeof flash !== 'undefined' ? flash : {}; %>
     <% const vcFlashForGeneric = Object.assign({}, vcFlash); %>
-    <% if (['created', 'imported', 'deleted'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
+    <% if (['created', 'imported', 'deleted', 'import_deleted', 'import_updated', 'returned'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
     <% if (['missing_store', 'missing_name', 'duplicate_code', 'no_selection', 'import_failed'].indexOf(String(vcFlash.error || '')) >= 0) { delete vcFlashForGeneric.error; } %>
     <%- include('../partials/flash-message', { flash: vcFlashForGeneric }) %>
     <% if (vcFlash.error === 'missing_store') { %>
@@ -180,6 +261,12 @@
       <div class="flash-message flash-success">Đã nhập vật chứa thành công.</div>
     <% } else if (vcFlash.success === 'deleted') { %>
       <div class="flash-message flash-success">Đã ngừng sử dụng các vật chứa đã chọn.</div>
+    <% } else if (vcFlash.success === 'import_deleted') { %>
+      <div class="flash-message flash-success">Đã đưa phiếu nhập vật chứa vào thùng rác.</div>
+    <% } else if (vcFlash.success === 'import_updated') { %>
+      <div class="flash-message flash-success">Đã cập nhật phiếu nhập vật chứa.</div>
+    <% } else if (vcFlash.success === 'returned') { %>
+      <div class="flash-message flash-success">Đã trả vật chứa thành công.</div>
     <% } %>
 
     <div class="customer-shell">
@@ -429,6 +516,170 @@
         </div>
       </div>
     </div>
+
+    <div id="vcImportEditModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3 id="vcImportEditModalTitle">Chỉnh sửa phiếu nhập vật chứa</h3>
+          <button type="button" class="modal-close" id="vcImportEditModalClose" aria-label="Đóng">×</button>
+        </div>
+        <form class="modal-body product-form-body" id="vcImportEditForm">
+          <input type="hidden" id="editNhapVatChuaId">
+          <div class="product-form-grid">
+            <section class="product-form-section">
+              <h4>Thông tin nhập</h4>
+              <div class="store-fields product-fields">
+                <div>
+                  <span>Nhà cung cấp *</span>
+                  <select id="editNhapVatChuaSupplier" required>
+                    <option value="">— Chọn nhà cung cấp —</option>
+                    <% (suppliers || []).forEach(function(supplier) { %>
+                      <option value="<%= supplier._id %>"><%= supplier.ten_ncc || supplier.ma_ncc || '---' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <span>Vật chứa *</span>
+                  <select id="editNhapVatChuaVatChua" required>
+                    <option value="">— Chọn vật chứa —</option>
+                    <% (activeVatChuaList || []).forEach(function(vc) { %>
+                      <option value="<%= vc._id %>"><%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <span>Số lượng *</span>
+                  <input type="number" min="1" step="1" id="editNhapVatChuaQty" required>
+                </div>
+                <div>
+                  <span>Giá vốn *</span>
+                  <input type="text" id="editNhapVatChuaGiaVon" class="vn-number-input" inputmode="numeric" required autocomplete="off">
+                </div>
+                <div class="span-2">
+                  <span>Ghi chú</span>
+                  <input id="editNhapVatChuaNote" placeholder="Ghi chú nhập vật chứa">
+                </div>
+              </div>
+              <div class="vc-payment-block">
+                <div class="vc-payment-title">Thanh toán</div>
+                <div class="vc-summary-line"><span>Tổng tiền</span><span class="num" id="editNhapVatChuaGrandTotal">0</span></div>
+                <div class="vc-summary-line">
+                  <span>Tiền mặt</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="editNhapVatChuaCash" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="editNhapVatChuaPayAllCash">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Sổ tiền mặt <span id="editNhapVatChuaCashRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="editNhapVatChuaCashBook" class="vc-side-input" disabled>
+                    <option value="">Chọn sổ tiền mặt</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Chuyển khoản</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="editNhapVatChuaTransfer" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="editNhapVatChuaPayAllTransfer">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Tài khoản ngân hàng <span id="editNhapVatChuaBankRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="editNhapVatChuaBankBook" class="vc-side-input" disabled>
+                    <option value="">Chọn tài khoản chuyển khoản</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line"><strong>Nợ nhà cung cấp</strong><span class="num" id="editNhapVatChuaDebt">0</span></div>
+                <div id="editNhapVatChuaError" class="vc-form-error"></div>
+              </div>
+            </section>
+          </div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcImportEditModalCancel">Hủy</button>
+          <button class="btn btn-primary" type="submit" form="vcImportEditForm" id="vcImportEditModalSave">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="vcImportTrashModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3 id="vcImportTrashModalTitle">Xóa phiếu nhập vật chứa</h3>
+          <button type="button" class="modal-close" id="vcImportTrashModalClose" aria-label="Đóng">×</button>
+        </div>
+        <div class="modal-body product-form-body" id="vcImportTrashModalBody">
+          <p class="vc-trash-loading">Đang kiểm tra dữ liệu liên quan...</p>
+        </div>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcImportTrashModalCancel">Hủy</button>
+          <button class="btn btn-danger" type="button" id="vcImportTrashModalConfirm" disabled>Đưa vào thùng rác</button>
+        </div>
+      </div>
+    </div>
+    <div id="vcImportReturnModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3 id="vcImportReturnModalTitle">Trả vật chứa</h3>
+          <button type="button" class="modal-close" id="vcImportReturnModalClose" aria-label="Đóng">×</button>
+        </div>
+        <form class="modal-body product-form-body" id="vcImportReturnForm">
+          <input type="hidden" id="returnNhapVatChuaId">
+          <input type="hidden" id="returnVatChuaId">
+          <div class="product-form-grid">
+            <section class="product-form-section">
+              <h4 id="vcImportReturnCode">Phiếu nhập</h4>
+              <div class="store-fields product-fields">
+                <div>
+                  <span>Số lượng trả *</span>
+                  <input type="number" min="1" step="1" id="returnVatChuaQty" required>
+                </div>
+                <div>
+                  <span>Giá trả *</span>
+                  <input type="text" id="returnVatChuaPrice" class="vn-number-input" inputmode="numeric" required autocomplete="off">
+                </div>
+              </div>
+              <div class="vc-payment-block">
+                <div class="vc-payment-title">Thu tiền</div>
+                <div class="vc-summary-line"><span>Tổng giá trị trả</span><span class="num" id="returnVatChuaTotal">0</span></div>
+                <div class="vc-summary-line">
+                  <span>Tiền mặt</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="returnVatChuaCash" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="returnVatChuaPayAllCash">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Sổ tiền mặt <span id="returnVatChuaCashBookRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="returnVatChuaCashBook" class="vc-side-input" disabled>
+                    <option value="">Chọn sổ tiền mặt</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Chuyển khoản</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="returnVatChuaTransfer" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="returnVatChuaPayAllTransfer">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Tài khoản ngân hàng <span id="returnVatChuaBankRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="returnVatChuaBankBook" class="vc-side-input" disabled>
+                    <option value="">Chọn tài khoản chuyển khoản</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line"><strong>Chưa thu</strong><span class="num" id="returnVatChuaDebt">0</span></div>
+                <div id="returnVatChuaError" class="vc-form-error"></div>
+              </div>
+            </section>
+          </div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcImportReturnModalCancel">Hủy</button>
+          <button class="btn btn-primary" type="submit" form="vcImportReturnForm" id="vcImportReturnModalSave">Lưu</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script id="vatChuaPageMeta" type="application/json"><%- JSON.stringify({
@@ -494,6 +745,52 @@
       var importSupplierPayable = document.getElementById('importSupplierPayable');
       var importSupplierPaid = document.getElementById('importSupplierPaid');
       var importSupplierDebt = document.getElementById('importSupplierDebt');
+      var editImportOverlay = document.getElementById('vcImportEditModalOverlay');
+      var editImportForm = document.getElementById('vcImportEditForm');
+      var editImportClose = document.getElementById('vcImportEditModalClose');
+      var editImportCancel = document.getElementById('vcImportEditModalCancel');
+      var editImportSave = document.getElementById('vcImportEditModalSave');
+      var editImportId = document.getElementById('editNhapVatChuaId');
+      var editImportSupplier = document.getElementById('editNhapVatChuaSupplier');
+      var editImportVatChua = document.getElementById('editNhapVatChuaVatChua');
+      var editImportQty = document.getElementById('editNhapVatChuaQty');
+      var editImportGiaVon = document.getElementById('editNhapVatChuaGiaVon');
+      var editImportNote = document.getElementById('editNhapVatChuaNote');
+      var editImportGrandTotal = document.getElementById('editNhapVatChuaGrandTotal');
+      var editImportCash = document.getElementById('editNhapVatChuaCash');
+      var editImportTransfer = document.getElementById('editNhapVatChuaTransfer');
+      var editImportCashBook = document.getElementById('editNhapVatChuaCashBook');
+      var editImportBankBook = document.getElementById('editNhapVatChuaBankBook');
+      var editImportCashRequired = document.getElementById('editNhapVatChuaCashRequired');
+      var editImportBankRequired = document.getElementById('editNhapVatChuaBankRequired');
+      var editImportPayAllCash = document.getElementById('editNhapVatChuaPayAllCash');
+      var editImportPayAllTransfer = document.getElementById('editNhapVatChuaPayAllTransfer');
+      var editImportDebt = document.getElementById('editNhapVatChuaDebt');
+      var editImportError = document.getElementById('editNhapVatChuaError');
+      var returnImportOverlay = document.getElementById('vcImportReturnModalOverlay');
+      var returnImportForm = document.getElementById('vcImportReturnForm');
+      var vcImportReturnModalTitle = document.getElementById('vcImportReturnModalTitle');
+      var returnImportClose = document.getElementById('vcImportReturnModalClose');
+      var returnImportCancel = document.getElementById('vcImportReturnModalCancel');
+      var returnImportSave = document.getElementById('vcImportReturnModalSave');
+      var returnImportId = document.getElementById('returnNhapVatChuaId');
+      var returnVatChuaId = document.getElementById('returnVatChuaId');
+      var returnImportCode = document.getElementById('vcImportReturnCode');
+      var returnImportQty = document.getElementById('returnVatChuaQty');
+      var returnImportPrice = document.getElementById('returnVatChuaPrice');
+      var returnImportTotal = document.getElementById('returnVatChuaTotal');
+      var returnImportCash = document.getElementById('returnVatChuaCash');
+      var returnImportTransfer = document.getElementById('returnVatChuaTransfer');
+      var returnImportCashBook = document.getElementById('returnVatChuaCashBook');
+      var returnImportBankBook = document.getElementById('returnVatChuaBankBook');
+      var returnImportCashBookRequired = document.getElementById('returnVatChuaCashBookRequired');
+      var returnImportBankRequired = document.getElementById('returnVatChuaBankRequired');
+      var returnImportPayAllCash = document.getElementById('returnVatChuaPayAllCash');
+      var returnImportPayAllTransfer = document.getElementById('returnVatChuaPayAllTransfer');
+      var returnImportDebt = document.getElementById('returnVatChuaDebt');
+      var returnImportError = document.getElementById('returnVatChuaError');
+      var returnImportMode = 'create';
+      var returnEditSourceId = '';
       var cashBookOptions = [];
       var bankBookOptions = [];
       var selectAll = document.getElementById('selectAllVatChua');
@@ -586,6 +883,17 @@
           .map(function(book) { return Object.assign({}, book, { _id: String(book._id || '') }); })
           .filter(function(book) { return book._id; });
       }
+      async function loadActiveCashBooks() {
+        var response = await fetch('/api/so-quy/active', {
+          headers: { 'Accept': 'application/json' }
+        });
+        var json = await response.json();
+        if (!json || !json.success) throw new Error((json && json.message) || 'Không tải được danh sách sổ quỹ.');
+        return (Array.isArray(json.items) ? json.items : [])
+          .filter(function(book) { return String(book.trang_thai || 'active') === 'active'; })
+          .map(function(book) { return Object.assign({}, book, { _id: String(book._id || '') }); })
+          .filter(function(book) { return book._id; });
+      }
       async function loadImportPaymentCashBooks() {
         try {
           var lists = await Promise.all([
@@ -604,9 +912,48 @@
         }
         renderImportPaymentSummary();
       }
+      async function ensureEditPaymentCashBooks() {
+        if (!cashBookOptions.length || !bankBookOptions.length) {
+          try {
+            var lists = await Promise.all([
+              loadCashBooksByType('tien_mat'),
+              loadCashBooksByType('chuyen_khoan')
+            ]);
+            cashBookOptions = lists[0];
+            bankBookOptions = lists[1];
+          } catch (_) {
+            cashBookOptions = [];
+            bankBookOptions = [];
+          }
+        }
+        renderCashBookSelect(editImportCashBook, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+        renderCashBookSelect(editImportBankBook, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+      }
+      async function ensureReturnCashBooks() {
+        if (!cashBookOptions.length || !bankBookOptions.length) {
+          try {
+            var lists = await Promise.all([
+              loadCashBooksByType('tien_mat'),
+              loadCashBooksByType('chuyen_khoan')
+            ]);
+            cashBookOptions = lists[0];
+            bankBookOptions = lists[1];
+          } catch (_) {
+            cashBookOptions = [];
+            bankBookOptions = [];
+          }
+        }
+        renderCashBookSelect(returnImportCashBook, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+        renderCashBookSelect(returnImportBankBook, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+      }
       function getImportGrandTotal() {
         var qty = Math.max(0, Math.floor(Number(importSoLuongInput ? importSoLuongInput.value : 0) || 0));
         var gia = numeric(importGiaVonInput ? importGiaVonInput.value : 0);
+        return Math.round(gia * qty);
+      }
+      function getEditImportGrandTotal() {
+        var qty = Math.max(0, Math.floor(Number(editImportQty ? editImportQty.value : 0) || 0));
+        var gia = numeric(editImportGiaVon ? editImportGiaVon.value : 0);
         return Math.round(gia * qty);
       }
       function showImportPaymentError(message) {
@@ -618,6 +965,26 @@
         }
         importPaymentFormError.style.display = 'block';
         importPaymentFormError.textContent = message;
+      }
+      function showEditImportError(message) {
+        if (!editImportError) return;
+        if (!message) {
+          editImportError.style.display = 'none';
+          editImportError.textContent = '';
+          return;
+        }
+        editImportError.style.display = 'block';
+        editImportError.textContent = message;
+      }
+      function showReturnImportError(message) {
+        if (!returnImportError) return;
+        if (!message) {
+          returnImportError.style.display = 'none';
+          returnImportError.textContent = '';
+          return;
+        }
+        returnImportError.style.display = 'block';
+        returnImportError.textContent = message;
       }
       function renderImportPaymentSummary() {
         var grandTotal = getImportGrandTotal();
@@ -656,6 +1023,77 @@
         if (importSupplierPaid) importSupplierPaid.textContent = fmtMoney(daTra);
         if (importSupplierDebt) importSupplierDebt.textContent = fmtMoney(conNo);
       }
+      function renderEditImportPaymentSummary() {
+        var grandTotal = getEditImportGrandTotal();
+        if (editImportGrandTotal) editImportGrandTotal.textContent = fmtMoney(grandTotal);
+        var tienMat = numeric(editImportCash ? editImportCash.value : 0);
+        var chuyenKhoan = numeric(editImportTransfer ? editImportTransfer.value : 0);
+        if (tienMat + chuyenKhoan > grandTotal && grandTotal > 0) {
+          var overflow = tienMat + chuyenKhoan - grandTotal;
+          if (chuyenKhoan >= overflow) chuyenKhoan -= overflow;
+          else {
+            tienMat = Math.max(0, tienMat - (overflow - chuyenKhoan));
+            chuyenKhoan = 0;
+          }
+        }
+        if (editImportCash) editImportCash.value = fmt(tienMat);
+        if (editImportTransfer) editImportTransfer.value = fmt(chuyenKhoan);
+        var cashRequired = tienMat > 0;
+        var bankRequired = chuyenKhoan > 0;
+        if (editImportCashBook) {
+          editImportCashBook.disabled = !cashRequired;
+          if (!cashRequired) editImportCashBook.value = '';
+          if (cashRequired && !editImportCashBook.value) editImportCashBook.value = autoSelectCashBook(cashBookOptions);
+          editImportCashBook.classList.toggle('field-invalid', cashRequired && !String(editImportCashBook.value || '').trim());
+        }
+        if (editImportBankBook) {
+          editImportBankBook.disabled = !bankRequired;
+          if (!bankRequired) editImportBankBook.value = '';
+          if (bankRequired && !editImportBankBook.value) editImportBankBook.value = autoSelectCashBook(bankBookOptions);
+          editImportBankBook.classList.toggle('field-invalid', bankRequired && !String(editImportBankBook.value || '').trim());
+        }
+        if (editImportCashRequired) editImportCashRequired.style.display = cashRequired ? 'inline' : 'none';
+        if (editImportBankRequired) editImportBankRequired.style.display = bankRequired ? 'inline' : 'none';
+        if (editImportDebt) editImportDebt.textContent = fmtMoney(Math.max(grandTotal - tienMat - chuyenKhoan, 0));
+      }
+      function getReturnImportTotal() {
+        var qty = Math.max(0, Math.floor(Number(returnImportQty ? returnImportQty.value : 0) || 0));
+        var price = numeric(returnImportPrice ? returnImportPrice.value : 0);
+        return Math.round(qty * price);
+      }
+      function renderReturnImportSummary() {
+        var total = getReturnImportTotal();
+        if (returnImportTotal) returnImportTotal.textContent = fmtMoney(total);
+        var tienMat = numeric(returnImportCash ? returnImportCash.value : 0);
+        var chuyenKhoan = numeric(returnImportTransfer ? returnImportTransfer.value : 0);
+        if (tienMat + chuyenKhoan > total && total > 0) {
+          var overflow = tienMat + chuyenKhoan - total;
+          if (chuyenKhoan >= overflow) chuyenKhoan -= overflow;
+          else {
+            tienMat = Math.max(0, tienMat - (overflow - chuyenKhoan));
+            chuyenKhoan = 0;
+          }
+        }
+        if (returnImportCash) returnImportCash.value = fmt(tienMat);
+        if (returnImportTransfer) returnImportTransfer.value = fmt(chuyenKhoan);
+        var cashRequired = tienMat > 0;
+        var bankRequired = chuyenKhoan > 0;
+        if (returnImportCashBook) {
+          returnImportCashBook.disabled = !cashRequired;
+          if (!cashRequired) returnImportCashBook.value = '';
+          if (cashRequired && !returnImportCashBook.value) returnImportCashBook.value = autoSelectCashBook(cashBookOptions);
+          returnImportCashBook.classList.toggle('field-invalid', cashRequired && !String(returnImportCashBook.value || '').trim());
+        }
+        if (returnImportBankBook) {
+          returnImportBankBook.disabled = !bankRequired;
+          if (!bankRequired) returnImportBankBook.value = '';
+          if (bankRequired && !returnImportBankBook.value) returnImportBankBook.value = autoSelectCashBook(bankBookOptions);
+          returnImportBankBook.classList.toggle('field-invalid', bankRequired && !String(returnImportBankBook.value || '').trim());
+        }
+        if (returnImportCashBookRequired) returnImportCashBookRequired.style.display = cashRequired ? 'inline' : 'none';
+        if (returnImportBankRequired) returnImportBankRequired.style.display = bankRequired ? 'inline' : 'none';
+        if (returnImportDebt) returnImportDebt.textContent = fmtMoney(Math.max(total - tienMat - chuyenKhoan, 0));
+      }
       function validateImportPayment() {
         showImportPaymentError('');
         var grandTotal = getImportGrandTotal();
@@ -678,6 +1116,41 @@
         if (chuyenKhoan > 0 && !String(importBankBookId ? importBankBookId.value : '').trim()) {
           showImportPaymentError('Vui lòng chọn tài khoản chuyển khoản.');
           if (importBankBookId) importBankBookId.focus();
+          return false;
+        }
+        return true;
+      }
+      function validateEditImport() {
+        showEditImportError('');
+        var grandTotal = getEditImportGrandTotal();
+        if (!String(editImportSupplier ? editImportSupplier.value : '').trim()) {
+          showEditImportError('Vui lòng chọn nhà cung cấp.');
+          if (editImportSupplier) editImportSupplier.focus();
+          return false;
+        }
+        if (!String(editImportVatChua ? editImportVatChua.value : '').trim()) {
+          showEditImportError('Vui lòng chọn vật chứa.');
+          if (editImportVatChua) editImportVatChua.focus();
+          return false;
+        }
+        if (grandTotal <= 0) {
+          showEditImportError('Vui lòng nhập số lượng và giá vốn hợp lệ.');
+          return false;
+        }
+        var tienMat = numeric(editImportCash ? editImportCash.value : 0);
+        var chuyenKhoan = numeric(editImportTransfer ? editImportTransfer.value : 0);
+        if (tienMat + chuyenKhoan > grandTotal) {
+          showEditImportError('Số tiền thanh toán không được vượt tổng tiền.');
+          return false;
+        }
+        if (tienMat > 0 && !String(editImportCashBook ? editImportCashBook.value : '').trim()) {
+          showEditImportError('Vui lòng chọn sổ tiền mặt.');
+          if (editImportCashBook) editImportCashBook.focus();
+          return false;
+        }
+        if (chuyenKhoan > 0 && !String(editImportBankBook ? editImportBankBook.value : '').trim()) {
+          showEditImportError('Vui lòng chọn tài khoản chuyển khoản.');
+          if (editImportBankBook) editImportBankBook.focus();
           return false;
         }
         return true;
@@ -713,6 +1186,26 @@
         importOverlay.classList.remove('is-visible');
         clearUrlMode('nhap');
       }
+      function closeEditImportModal() {
+        if (!editImportOverlay) return;
+        editImportOverlay.classList.remove('is-visible');
+        if (editImportError) {
+          editImportError.style.display = 'none';
+          editImportError.textContent = '';
+        }
+      }
+      function closeReturnImportModal() {
+        if (!returnImportOverlay) return;
+        returnImportOverlay.classList.remove('is-visible');
+        returnImportMode = 'create';
+        returnEditSourceId = '';
+        if (vcImportReturnModalTitle) vcImportReturnModalTitle.textContent = 'Trả vật chứa';
+        if (returnImportError) {
+          returnImportError.style.display = 'none';
+          returnImportError.textContent = '';
+        }
+        if (returnImportSave) returnImportSave.disabled = false;
+      }
 
       if (openBtn) openBtn.addEventListener('click', openModal);
       if (openImportBtn) openImportBtn.addEventListener('click', openImportModal);
@@ -739,8 +1232,11 @@
         if (e.key === 'Escape') {
           closeModal();
           closeImportModal();
+          closeEditImportModal();
+          closeReturnImportModal();
           var vcDocOverlay = document.getElementById('vcDocumentModalOverlay');
           if (vcDocOverlay) vcDocOverlay.classList.remove('is-visible');
+          closeVcImportTrashModal();
         }
       });
 
@@ -790,6 +1286,130 @@
         showImportPaymentError(pageMeta.flashError);
       }
 
+      async function openEditImportModal(id) {
+        if (!editImportOverlay || !id) return;
+        showEditImportError('');
+        if (editImportSave) editImportSave.disabled = true;
+        if (editImportId) editImportId.value = id;
+        editImportOverlay.classList.add('is-visible');
+        try {
+          await ensureEditPaymentCashBooks();
+          var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/edit', {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không tải được phiếu nhập vật chứa.');
+          var row = json.data || {};
+          if (editImportSupplier) editImportSupplier.value = row.nha_cung_cap_id || '';
+          if (editImportVatChua) editImportVatChua.value = row.vat_chua_id || '';
+          if (editImportQty) editImportQty.value = row.so_luong || '';
+          if (editImportGiaVon) editImportGiaVon.value = row.gia_von ? fmt(row.gia_von) : '';
+          if (editImportNote) editImportNote.value = row.ghi_chu || '';
+          var payment = row.payment || {};
+          if (editImportCash) editImportCash.value = fmt(payment.tien_mat || 0);
+          if (editImportTransfer) editImportTransfer.value = fmt(payment.chuyen_khoan || 0);
+          if (editImportCashBook) editImportCashBook.value = payment.so_quy_tien_mat_id || '';
+          if (editImportBankBook) editImportBankBook.value = payment.so_quy_chuyen_khoan_id || '';
+          renderEditImportPaymentSummary();
+          if (editImportSave) editImportSave.disabled = false;
+        } catch (error) {
+          showEditImportError(error && error.message ? error.message : 'Không tải được phiếu nhập vật chứa.');
+        }
+      }
+
+      async function submitEditImport() {
+        renderEditImportPaymentSummary();
+        if (!validateEditImport()) return;
+        var id = String(editImportId ? editImportId.value : '').trim();
+        if (!id) return;
+        if (editImportSave) editImportSave.disabled = true;
+        var payload = {
+          nha_cung_cap_id: editImportSupplier ? editImportSupplier.value : '',
+          vat_chua_id: editImportVatChua ? editImportVatChua.value : '',
+          so_luong: editImportQty ? editImportQty.value : '',
+          gia_von: String(numeric(editImportGiaVon ? editImportGiaVon.value : 0)),
+          ghi_chu: editImportNote ? editImportNote.value : '',
+          payment_v2: '1',
+          chi_tiet_thanh_toan: {
+            tien_mat: numeric(editImportCash ? editImportCash.value : 0),
+            so_quy_tien_mat_id: editImportCashBook ? editImportCashBook.value : '',
+            chuyen_khoan: numeric(editImportTransfer ? editImportTransfer.value : 0),
+            so_quy_chuyen_khoan_id: editImportBankBook ? editImportBankBook.value : '',
+            tien_tra_khach: 0
+          }
+        };
+        try {
+          var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/edit', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(payload)
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không cập nhật được phiếu nhập vật chứa.');
+          window.location.href = '/vat-chua?success=import_updated&nhap_vat_chua=' + encodeURIComponent(id);
+        } catch (error) {
+          showEditImportError(error && error.message ? error.message : 'Không cập nhật được phiếu nhập vật chứa.');
+          if (editImportSave) editImportSave.disabled = false;
+        }
+      }
+
+      [editImportGiaVon, editImportCash, editImportTransfer].forEach(bindVNNumberInput);
+      [editImportQty, editImportGiaVon, editImportCash, editImportTransfer, editImportCashBook, editImportBankBook].forEach(function(el) {
+        if (el) el.addEventListener('input', renderEditImportPaymentSummary);
+        if (el) el.addEventListener('change', renderEditImportPaymentSummary);
+      });
+      if (editImportPayAllCash) {
+        editImportPayAllCash.addEventListener('click', function() {
+          if (editImportCash) editImportCash.value = fmt(getEditImportGrandTotal());
+          if (editImportTransfer) editImportTransfer.value = '0';
+          renderEditImportPaymentSummary();
+        });
+      }
+      if (editImportPayAllTransfer) {
+        editImportPayAllTransfer.addEventListener('click', function() {
+          if (editImportTransfer) editImportTransfer.value = fmt(getEditImportGrandTotal());
+          if (editImportCash) editImportCash.value = '0';
+          renderEditImportPaymentSummary();
+        });
+      }
+      if (editImportForm) {
+        editImportForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          submitEditImport();
+        });
+      }
+      if (editImportClose) editImportClose.addEventListener('click', closeEditImportModal);
+      if (editImportCancel) editImportCancel.addEventListener('click', closeEditImportModal);
+      [returnImportPrice, returnImportCash, returnImportTransfer].forEach(bindVNNumberInput);
+      [returnImportQty, returnImportPrice, returnImportCash, returnImportTransfer, returnImportCashBook, returnImportBankBook].forEach(function(el) {
+        if (el) el.addEventListener('input', renderReturnImportSummary);
+        if (el) el.addEventListener('change', renderReturnImportSummary);
+      });
+      if (returnImportPayAllCash) {
+        returnImportPayAllCash.addEventListener('click', function() {
+          if (returnImportCash) returnImportCash.value = fmt(getReturnImportTotal());
+          if (returnImportTransfer) returnImportTransfer.value = '0';
+          renderReturnImportSummary();
+        });
+      }
+      if (returnImportPayAllTransfer) {
+        returnImportPayAllTransfer.addEventListener('click', function() {
+          if (returnImportTransfer) returnImportTransfer.value = fmt(getReturnImportTotal());
+          if (returnImportCash) returnImportCash.value = '0';
+          renderReturnImportSummary();
+        });
+      }
+      if (returnImportForm) {
+        returnImportForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          submitReturnImport();
+        });
+      }
+      if (returnImportClose) returnImportClose.addEventListener('click', closeReturnImportModal);
+      if (returnImportCancel) returnImportCancel.addEventListener('click', closeReturnImportModal);
+
       if (selectAll && checkboxes.length > 0) {
         selectAll.addEventListener('change', function() {
           checkboxes.forEach(function(item) { item.checked = selectAll.checked; });
@@ -827,6 +1447,13 @@
       var vcDocumentBody = document.getElementById('vcDocumentModalBody');
       var vcDocumentTitle = document.getElementById('vcDocumentModalTitle');
       var vcDocumentClose = document.getElementById('vcDocumentModalClose');
+      var vcImportTrashOverlay = document.getElementById('vcImportTrashModalOverlay');
+      var vcImportTrashBody = document.getElementById('vcImportTrashModalBody');
+      var vcImportTrashClose = document.getElementById('vcImportTrashModalClose');
+      var vcImportTrashCancel = document.getElementById('vcImportTrashModalCancel');
+      var vcImportTrashConfirm = document.getElementById('vcImportTrashModalConfirm');
+      var vcImportTrashIds = [];
+      var vcImportTrashPreview = null;
 
       function closeVcDocumentModal() {
         if (vcDocumentOverlay) vcDocumentOverlay.classList.remove('is-visible');
@@ -848,7 +1475,8 @@
             vcDocumentBody.innerHTML = html;
             var codeEl = vcDocumentBody.querySelector('[data-vc-doc-code]');
             if (codeEl && vcDocumentTitle) {
-              vcDocumentTitle.textContent = 'Chi tiết ' + String(codeEl.textContent || '').trim();
+              var docCode = String(codeEl.getAttribute('data-vc-doc-code') || '').trim();
+              vcDocumentTitle.textContent = docCode ? ('Chi tiết ' + docCode) : 'Chi tiết chứng từ';
             }
           })
           .catch(function() {
@@ -856,16 +1484,348 @@
           });
       }
 
+      function closeVcImportTrashModal() {
+        if (vcImportTrashOverlay) vcImportTrashOverlay.classList.remove('is-visible');
+        vcImportTrashIds = [];
+        vcImportTrashPreview = null;
+        if (vcImportTrashConfirm) vcImportTrashConfirm.disabled = true;
+      }
+      function renderVcImportTrashPreview(preview) {
+        if (!vcImportTrashBody) return;
+        var items = Array.isArray(preview && preview.items) ? preview.items : [];
+        var groups = Array.isArray(preview && preview.aggregate_groups) ? preview.aggregate_groups : [];
+        if (vcImportTrashConfirm) vcImportTrashConfirm.disabled = !(preview && preview.can_proceed);
+        var html = '<p class="vc-trash-desc">Phiếu nhập vật chứa sẽ được đưa vào thùng rác. Tồn vật chứa được trừ lại và phiếu chi liên quan trong sổ quỹ sẽ bị đưa vào thùng rác cùng phiếu.</p>';
+        items.forEach(function(item) {
+          if (!item.can_trash && item.block_reason) {
+            html += '<div class="vc-trash-alert is-error">' + escapeHtml(item.ma_nhap_vat_chua || item.nhap_vat_chua_id) + ': ' + escapeHtml(item.block_reason) + '</div>';
+          }
+          (item.warnings || []).forEach(function(warn) {
+            html += '<div class="vc-trash-alert is-warn">' + escapeHtml(item.ma_nhap_vat_chua || '') + (item.ma_nhap_vat_chua ? ' - ' : '') + escapeHtml(warn) + '</div>';
+          });
+        });
+        html += '<ul class="vc-trash-list">' + items.map(function(item) {
+          var status = item.can_trash ? 'Có thể xóa' : escapeHtml(item.block_reason || 'Không thể xóa');
+          var label = [item.ma_nhap_vat_chua, item.doi_tuong_ten].filter(Boolean).join(' - ');
+          return '<li><span><strong>' + escapeHtml(label || item.nhap_vat_chua_id) + '</strong><br>Số lượng: ' + fmt(item.tong_so_luong || 0) + ' · Tổng tiền: ' + fmtMoney(item.tong_tien || 0) + '</span><b>' + status + '</b></li>';
+        }).join('') + '</ul>';
+        if (groups.length) {
+          html += '<ul class="vc-trash-groups">' + groups.map(function(group) {
+            var samples = Array.isArray(group.samples) && group.samples.length ? ' (' + escapeHtml(group.samples.join(', ')) + ')' : '';
+            return '<li>' + escapeHtml(group.label || 'Dữ liệu liên quan') + ': <strong>' + fmt(group.count || 0) + '</strong>' + samples + '</li>';
+          }).join('') + '</ul>';
+        } else {
+          html += '<p class="vc-trash-desc">Không có phiếu chi bị kéo theo.</p>';
+        }
+        vcImportTrashBody.innerHTML = html;
+      }
+      async function openVcImportTrashModal(id) {
+        if (!vcImportTrashOverlay || !vcImportTrashBody || !id) return;
+        vcImportTrashIds = [id];
+        vcImportTrashPreview = null;
+        if (vcImportTrashConfirm) vcImportTrashConfirm.disabled = true;
+        vcImportTrashBody.innerHTML = '<p class="vc-trash-loading">Đang kiểm tra dữ liệu liên quan...</p>';
+        vcImportTrashOverlay.classList.add('is-visible');
+        try {
+          var res = await fetch('/vat-chua/nhap/trash/preview', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ nhap_vat_chua_ids: vcImportTrashIds })
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không kiểm tra được dữ liệu liên quan.');
+          vcImportTrashPreview = json.data;
+          renderVcImportTrashPreview(vcImportTrashPreview);
+        } catch (error) {
+          vcImportTrashBody.innerHTML = '<div class="vc-trash-alert is-error">' + escapeHtml(error && error.message ? error.message : 'Không kiểm tra được dữ liệu liên quan.') + '</div>';
+        }
+      }
+      async function confirmVcImportTrash() {
+        if (!vcImportTrashPreview || !vcImportTrashPreview.can_proceed || !vcImportTrashIds.length || !vcImportTrashConfirm) return;
+        vcImportTrashConfirm.disabled = true;
+        try {
+          var res = await fetch('/vat-chua/nhap/trash/move', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ nhap_vat_chua_ids: vcImportTrashIds })
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không đưa được phiếu nhập vật chứa vào thùng rác.');
+          window.location.href = '/vat-chua?success=import_deleted';
+        } catch (error) {
+          vcImportTrashBody.innerHTML = '<div class="vc-trash-alert is-error">' + escapeHtml(error && error.message ? error.message : 'Không đưa được phiếu nhập vật chứa vào thùng rác.') + '</div>';
+          vcImportTrashConfirm.disabled = false;
+        }
+      }
+      function closeVcDocActionMenus(exceptMenu) {
+        document.querySelectorAll('.vc-doc-action-menu.is-open').forEach(function(menu) {
+          if (exceptMenu && menu === exceptMenu) return;
+          menu.classList.remove('is-open');
+          var toggle = menu.querySelector('[data-vc-doc-menu-toggle]');
+          if (toggle) toggle.setAttribute('aria-expanded', 'false');
+        });
+      }
+      function positionVcDocActionMenu(menu) {
+        if (!menu) return;
+        var toggle = menu.querySelector('[data-vc-doc-menu-toggle]');
+        var dropdown = menu.querySelector('.vc-doc-action-dropdown');
+        if (!toggle || !dropdown) return;
+        var rect = toggle.getBoundingClientRect();
+        var width = dropdown.offsetWidth || 160;
+        var height = dropdown.offsetHeight || 120;
+        var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
+        var top = rect.bottom + 4;
+        if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 4);
+        dropdown.style.left = left + 'px';
+        dropdown.style.top = top + 'px';
+      }
+      async function returnVcImport(btn) {
+        if (!btn) return;
+        var id = btn.getAttribute('data-vc-import-id') || '';
+        var vatChuaId = btn.getAttribute('data-vc-id') || '';
+        var maxQty = Math.max(0, Number(btn.getAttribute('data-vc-import-qty') || 0));
+        var answer = window.prompt('Nhập số lượng vật chứa cần trả', maxQty ? String(maxQty) : '');
+        if (answer == null) return;
+        var qty = Math.max(0, Math.floor(Number(String(answer).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '').trim()) || 0));
+        if (!id || !vatChuaId || qty <= 0) {
+          alert('Vui lòng nhập số lượng trả hợp lệ.');
+          return;
+        }
+        try {
+          var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/return', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ vat_chua_id: vatChuaId, so_luong: qty })
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không trả được vật chứa.');
+          window.location.href = '/vat-chua?nhap_vat_chua=' + encodeURIComponent(id) + '&success=returned';
+        } catch (error) {
+          alert(error && error.message ? error.message : 'Không trả được vật chứa.');
+        }
+      }
+
+      async function openReturnImportModal(btn) {
+        if (!returnImportOverlay || !btn) return;
+        var id = btn.getAttribute('data-vc-import-id') || '';
+        var vatChuaId = btn.getAttribute('data-vc-id') || '';
+        if (!id || !vatChuaId) return;
+        await ensureReturnCashBooks();
+        returnImportMode = 'create';
+        returnEditSourceId = id;
+        if (vcImportReturnModalTitle) vcImportReturnModalTitle.textContent = 'Trả vật chứa';
+        showReturnImportError('');
+        if (returnImportId) returnImportId.value = id;
+        if (returnVatChuaId) returnVatChuaId.value = vatChuaId;
+        if (returnImportCode) returnImportCode.textContent = 'Phiếu nhập ' + (btn.getAttribute('data-vc-import-code') || '');
+        if (returnImportQty) returnImportQty.value = Math.max(1, Math.floor(Number(btn.getAttribute('data-vc-import-qty') || 1) || 1));
+        if (returnImportPrice) returnImportPrice.value = fmt(Math.max(0, Number(btn.getAttribute('data-vc-import-price') || 0)));
+        if (returnImportCash) returnImportCash.value = '0';
+        if (returnImportTransfer) returnImportTransfer.value = '0';
+        renderReturnImportSummary();
+        returnImportOverlay.classList.add('is-visible');
+      }
+      async function openReturnEditModal(id) {
+        if (!returnImportOverlay || !id) return;
+        await ensureReturnCashBooks();
+        returnImportMode = 'edit';
+        returnEditSourceId = '';
+        showReturnImportError('');
+        if (returnImportSave) returnImportSave.disabled = true;
+        if (vcImportReturnModalTitle) vcImportReturnModalTitle.textContent = 'Chỉnh sửa trả vật chứa';
+        returnImportOverlay.classList.add('is-visible');
+        try {
+          var res = await fetch('/vat-chua/xuat/' + encodeURIComponent(id) + '/edit', {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không tải được phiếu trả vật chứa.');
+          var data = json.data || {};
+          returnEditSourceId = data.source_id || '';
+          if (returnImportId) returnImportId.value = data._id || id;
+          if (returnVatChuaId) returnVatChuaId.value = data.vat_chua_id || '';
+          if (returnImportCode) returnImportCode.textContent = 'Phiếu trả ' + (data.ma_xuat_vat_chua || '');
+          if (returnImportQty) returnImportQty.value = Math.max(1, Math.floor(Number(data.so_luong || 1) || 1));
+          if (returnImportPrice) returnImportPrice.value = fmt(Math.max(0, Number(data.gia_tra || 0)));
+          var payment = data.payment || {};
+          if (returnImportCash) returnImportCash.value = fmt(payment.tien_mat || 0);
+          if (returnImportTransfer) returnImportTransfer.value = fmt(payment.chuyen_khoan || 0);
+          if (returnImportCashBook) returnImportCashBook.value = payment.so_quy_tien_mat_id || '';
+          if (returnImportBankBook) returnImportBankBook.value = payment.so_quy_chuyen_khoan_id || '';
+          renderReturnImportSummary();
+          if (returnImportSave) returnImportSave.disabled = false;
+        } catch (error) {
+          showReturnImportError(error && error.message ? error.message : 'Không tải được phiếu trả vật chứa.');
+          if (returnImportSave) returnImportSave.disabled = false;
+        }
+      }
+      async function deleteReturnVatChua(btn) {
+        if (!btn) return;
+        var id = String(btn.getAttribute('data-vc-return-id') || '').trim();
+        var code = String(btn.getAttribute('data-vc-return-code') || '').trim();
+        if (!id) return;
+        if (!window.confirm('Xóa phiếu trả vật chứa ' + (code || '') + '? Tồn kho sẽ được hoàn lại và phiếu thu liên quan sẽ bị hủy.')) return;
+        try {
+          var res = await fetch('/vat-chua/xuat/' + encodeURIComponent(id) + '/delete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({})
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không xóa được phiếu trả vật chứa.');
+          window.location.href = '/vat-chua?success=returned';
+        } catch (error) {
+          alert(error && error.message ? error.message : 'Không xóa được phiếu trả vật chứa.');
+        }
+      }
+      function validateReturnImport() {
+        showReturnImportError('');
+        var total = getReturnImportTotal();
+        var qty = Math.max(0, Math.floor(Number(returnImportQty ? returnImportQty.value : 0) || 0));
+        var price = numeric(returnImportPrice ? returnImportPrice.value : 0);
+        var tienMat = numeric(returnImportCash ? returnImportCash.value : 0);
+        var chuyenKhoan = numeric(returnImportTransfer ? returnImportTransfer.value : 0);
+        var received = tienMat + chuyenKhoan;
+        if (qty <= 0) {
+          showReturnImportError('Vui lòng nhập số lượng trả hợp lệ.');
+          if (returnImportQty) returnImportQty.focus();
+          return false;
+        }
+        if (price <= 0 || total <= 0) {
+          showReturnImportError('Vui lòng nhập giá trả hợp lệ.');
+          if (returnImportPrice) returnImportPrice.focus();
+          return false;
+        }
+        if (received > total) {
+          showReturnImportError('Số tiền thu không được vượt tổng giá trị trả.');
+          if (returnImportTransfer && chuyenKhoan > 0) returnImportTransfer.focus();
+          else if (returnImportCash) returnImportCash.focus();
+          return false;
+        }
+        if (tienMat > 0 && !String(returnImportCashBook ? returnImportCashBook.value : '').trim()) {
+          showReturnImportError('Vui lòng chọn sổ tiền mặt.');
+          if (returnImportCashBook) returnImportCashBook.focus();
+          return false;
+        }
+        if (chuyenKhoan > 0 && !String(returnImportBankBook ? returnImportBankBook.value : '').trim()) {
+          showReturnImportError('Vui lòng chọn tài khoản chuyển khoản.');
+          if (returnImportBankBook) returnImportBankBook.focus();
+          return false;
+        }
+        return true;
+      }
+      async function submitReturnImport() {
+        renderReturnImportSummary();
+        if (!validateReturnImport()) return;
+        var id = String(returnImportId ? returnImportId.value : '').trim();
+        var vatChuaId = String(returnVatChuaId ? returnVatChuaId.value : '').trim();
+        if (!id || !vatChuaId) return;
+        if (returnImportSave) returnImportSave.disabled = true;
+        try {
+          var endpoint = returnImportMode === 'edit'
+            ? '/vat-chua/xuat/' + encodeURIComponent(id) + '/edit'
+            : '/vat-chua/nhap/' + encodeURIComponent(id) + '/return';
+          var res = await fetch(endpoint, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+              vat_chua_id: vatChuaId,
+              so_luong: returnImportQty ? returnImportQty.value : '',
+              gia_tra: numeric(returnImportPrice ? returnImportPrice.value : 0),
+              payment_v2: '1',
+              chi_tiet_thanh_toan: {
+                tien_mat: numeric(returnImportCash ? returnImportCash.value : 0),
+                so_quy_tien_mat_id: returnImportCashBook ? returnImportCashBook.value : '',
+                chuyen_khoan: numeric(returnImportTransfer ? returnImportTransfer.value : 0),
+                so_quy_chuyen_khoan_id: returnImportBankBook ? returnImportBankBook.value : '',
+                tien_tra_khach: 0
+              }
+            })
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không trả được vật chứa.');
+          var focusId = returnImportMode === 'edit' ? (returnEditSourceId || '') : id;
+          window.location.href = '/vat-chua' + (focusId ? ('?nhap_vat_chua=' + encodeURIComponent(focusId) + '&') : '?') + 'success=returned';
+        } catch (error) {
+          showReturnImportError(error && error.message ? error.message : 'Không trả được vật chứa.');
+          if (returnImportSave) returnImportSave.disabled = false;
+        }
+      }
+
       document.addEventListener('click', function(e) {
+        var menuToggle = e.target.closest('[data-vc-doc-menu-toggle]');
+        if (menuToggle) {
+          e.preventDefault();
+          var menu = menuToggle.closest('.vc-doc-action-menu');
+          var willOpen = menu && !menu.classList.contains('is-open');
+          closeVcDocActionMenus(menu);
+          if (menu && willOpen) {
+            menu.classList.add('is-open');
+            menuToggle.setAttribute('aria-expanded', 'true');
+            positionVcDocActionMenu(menu);
+          }
+          return;
+        }
+        var editBtn = e.target.closest('[data-vc-import-edit]');
+        if (editBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          openEditImportModal(editBtn.getAttribute('data-vc-import-id'));
+          return;
+        }
+        var trashBtn = e.target.closest('[data-vc-import-trash]');
+        if (trashBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          openVcImportTrashModal(trashBtn.getAttribute('data-vc-import-id'));
+          return;
+        }
+        var returnBtn = e.target.closest('[data-vc-import-return]');
+        if (returnBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          openReturnImportModal(returnBtn);
+          return;
+        }
+        var returnEditBtn = e.target.closest('[data-vc-return-edit]');
+        if (returnEditBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          openReturnEditModal(returnEditBtn.getAttribute('data-vc-return-id'));
+          return;
+        }
+        var returnDeleteBtn = e.target.closest('[data-vc-return-delete]');
+        if (returnDeleteBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          deleteReturnVatChua(returnDeleteBtn);
+          return;
+        }
         var openBtn = e.target.closest('[data-vc-doc-open]');
         if (openBtn) {
           e.preventDefault();
+          closeVcDocActionMenus();
           openVcDocumentModal(openBtn.getAttribute('data-vc-doc-kind'), openBtn.getAttribute('data-vc-doc-id'));
           return;
         }
+        closeVcDocActionMenus();
         if (vcDocumentOverlay && e.target === vcDocumentOverlay) closeVcDocumentModal();
+        if (editImportOverlay && e.target === editImportOverlay) closeEditImportModal();
+        if (returnImportOverlay && e.target === returnImportOverlay) closeReturnImportModal();
+        if (vcImportTrashOverlay && e.target === vcImportTrashOverlay) closeVcImportTrashModal();
       });
       if (vcDocumentClose) vcDocumentClose.addEventListener('click', closeVcDocumentModal);
+      if (vcImportTrashClose) vcImportTrashClose.addEventListener('click', closeVcImportTrashModal);
+      if (vcImportTrashCancel) vcImportTrashCancel.addEventListener('click', closeVcImportTrashModal);
+      if (vcImportTrashConfirm) vcImportTrashConfirm.addEventListener('click', confirmVcImportTrash);
+      window.addEventListener('resize', function() { closeVcDocActionMenus(); });
+      window.addEventListener('scroll', function() { closeVcDocActionMenus(); }, true);
     });
   </script>
 </body>

@@ -10,6 +10,8 @@ router.get('/export.csv', controller.exportCsv);
 router.get('/export.xlsx', controller.exportExcel);
 router.get('/create', controller.createPage);
 router.post('/', controller.createSubmit);
+router.post('/trash/preview', controller.previewTrash);
+router.post('/trash/move', controller.moveToTrash);
 router.get('/:id/export.xlsx', controller.exportOneExcel);
 router.get('/:id/in/pdf', controller.printPdf);
 router.get('/:id/in', controller.print);

@@ -272,7 +272,8 @@ async function cancelNhapVatChuaBySource(storeId, sourceType, sourceId, session)
       cua_hang_id: store,
       source_type: sourceType,
       source_id: source,
-      trang_thai: 'active'
+      trang_thai: 'active',
+      deleted_at: null
     }),
     session
   );
@@ -462,6 +463,7 @@ async function loadAverageCostByVatChuaIds(storeId, vatChuaIds = []) {
       $match: {
         cua_hang_id: new mongoose.Types.ObjectId(String(storeId)),
         trang_thai: 'active',
+        deleted_at: null,
         loai_nhap: { $ne: 'kem_phieu_nhap_hang' }
       }
     },

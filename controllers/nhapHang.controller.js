@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 var path = require('path');
-var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc, VatChua, NhapVatChua } = require('../models/kiot.model');
+var { PhieuNhap, CTPhieuNhap, NhaCungCap, Kho, CuaHang, HangHoa, TonKho, TonKhoLo, TonKhoLoQuyCach, LoHang, LichSuKho, CongNoNhaCungCap, NhomHang, DonViTinh, SoQuy, DiaChiNcc, VatChua, NhapVatChua } = require('../models/kiot.model');
 var {
   importVatChuaWithPurchase,
   cancelNhapVatChuaBySource,
@@ -9,6 +9,7 @@ var {
 } = require('../services/vatChuaImport.service');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
+var { syncTonKhoSauQuyCach } = require('../services/kho.service');
 var purchaseService = require('../services/purchase.service');
 var { mergePurchasesInSession } = require('../services/purchaseMerge.service');
 var pdfService = require('../services/pdf.service');
@@ -556,7 +557,68 @@ function parseDateOnly(value) {
   return d;
 }
 
+function normalizeEditQuyCachItems(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(function(item) {
+      var qty = Math.max(0, Number(item && item.so_luong || 0));
+      var price = parseMoneyInput(item && (item.don_gia_nhap != null ? item.don_gia_nhap : item.don_gia));
+      var name = String(item && (item.ten_quy_cach || item.ten_thuoc_tinh) || '').trim();
+      return {
+        ten_quy_cach: name,
+        ten_thuoc_tinh: name,
+        so_luong: qty,
+        don_gia_nhap: price,
+        gia_von: price,
+        thanh_tien: Math.floor(qty * price),
+        ghi_chu: String(item && item.ghi_chu || '').trim()
+      };
+    })
+    .filter(function(item) {
+      return item.ten_quy_cach || item.so_luong > 0 || item.don_gia_nhap > 0 || item.ghi_chu;
+    });
+}
+
+function sumEditQuyCachQty(items) {
+  return normalizeEditQuyCachItems(items).reduce(function(sum, item) {
+    return sum + Number(item.so_luong || 0);
+  }, 0);
+}
+
+function sumEditQuyCachAmount(items) {
+  return normalizeEditQuyCachItems(items).reduce(function(sum, item) {
+    return sum + Number(item.thanh_tien || 0);
+  }, 0);
+}
+
+function normalizeEditLotInfo(raw, fallback, qty, price) {
+  raw = raw && typeof raw === 'object' ? raw : {};
+  fallback = fallback && typeof fallback === 'object' ? fallback : {};
+  var quyCachItems = normalizeEditQuyCachItems(raw.quy_cach_items);
+  if (!Array.isArray(raw.quy_cach_items) && !quyCachItems.length && Array.isArray(fallback.quy_cach_items) && fallback.quy_cach_items.length) {
+    quyCachItems = normalizeEditQuyCachItems(fallback.quy_cach_items);
+  }
+  if (!quyCachItems.length && !fallback.ma_lo && !fallback.ten_lo && !raw.ma_lo && !raw.ten_lo) return undefined;
+  var totalQty = quyCachItems.length ? sumEditQuyCachQty(quyCachItems) : Number(qty || 0);
+  var totalAmount = quyCachItems.length ? sumEditQuyCachAmount(quyCachItems) : Math.floor(Number(qty || 0) * Number(price || 0));
+  return {
+    lo_hang_id: String(raw.lo_hang_id || fallback.lo_hang_id || '').trim(),
+    ma_lo: String(raw.ma_lo || fallback.ma_lo || '').trim(),
+    ten_lo: String(raw.ten_lo || fallback.ten_lo || '').trim(),
+    han_su_dung: String(raw.han_su_dung || fallback.han_su_dung || '').trim(),
+    ngay_nhap: String(raw.ngay_nhap || fallback.ngay_nhap || '').trim(),
+    ghi_chu: String(raw.ghi_chu || fallback.ghi_chu || '').trim(),
+    so_luong_tong: totalQty,
+    don_gia_nhap: quyCachItems.length && totalQty > 0 ? Math.round(totalAmount / totalQty) : Number(price || 0),
+    tong_tien_quy_cach: totalAmount,
+    quy_cach_items: quyCachItems
+  };
+}
+
 function calcLineTotal(item) {
+  var qcTotal = item && item.lot_info && Array.isArray(item.lot_info.quy_cach_items)
+    ? sumEditQuyCachAmount(item.lot_info.quy_cach_items)
+    : 0;
+  if (qcTotal > 0) return Math.floor(qcTotal);
   var soLuong = Number(item?.so_luong || 0);
   var donGia = Number(item?.don_gia || 0);
   var base = soLuong * donGia;
@@ -1392,6 +1454,101 @@ exports.paySupplier = async function(req, res, next) {
   }
 };
 
+function qcKey(name) {
+  return String(name || '').trim().toLowerCase();
+}
+
+function buildQcDeltaRows(oldItems, nextItems) {
+  var byKey = new Map();
+  function add(items, side) {
+    normalizeEditQuyCachItems(items).forEach(function(item) {
+      var name = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
+      if (!name) return;
+      var key = qcKey(name);
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          ten_quy_cach: name,
+          oldQty: 0,
+          nextQty: 0,
+          oldAmount: 0,
+          nextAmount: 0,
+          nextPrice: Number(item.don_gia_nhap || item.gia_von || 0)
+        });
+      }
+      var row = byKey.get(key);
+      if (side === 'old') {
+        row.oldQty += Number(item.so_luong || 0);
+        row.oldAmount += Number(item.thanh_tien || 0);
+      } else {
+        row.nextQty += Number(item.so_luong || 0);
+        row.nextAmount += Number(item.thanh_tien || 0);
+        row.nextPrice = Number(item.don_gia_nhap || item.gia_von || row.nextPrice || 0);
+        row.ten_quy_cach = name;
+      }
+    });
+  }
+  add(oldItems, 'old');
+  add(nextItems, 'next');
+  return Array.from(byKey.values()).map(function(row) {
+    row.deltaQty = row.nextQty - row.oldQty;
+    row.deltaAmount = row.nextAmount - row.oldAmount;
+    return row;
+  });
+}
+
+async function ensureCanDecreaseQuyCach(khoId, productId, lotId, deltas) {
+  for (var i = 0; i < deltas.length; i++) {
+    var row = deltas[i];
+    if (row.deltaQty >= 0) continue;
+    var stock = await TonKhoLoQuyCach.findOne({
+      kho_id: khoId,
+      hang_hoa_id: productId,
+      lo_hang_id: lotId,
+      ten_quy_cach: row.ten_quy_cach
+    }).lean();
+    if (!stock || Number(stock.so_luong || 0) < Math.abs(row.deltaQty)) {
+      throw new Error('Tồn kho quy cách trong lô không đủ để giảm số lượng dòng hàng');
+    }
+  }
+}
+
+async function applyQuyCachDelta(params) {
+  var storeId = params.storeId;
+  var khoId = params.khoId;
+  var productId = params.productId;
+  var lotId = params.lotId;
+  var deltas = params.deltas || [];
+  for (var i = 0; i < deltas.length; i++) {
+    var row = deltas[i];
+    if (!row.ten_quy_cach || (row.deltaQty === 0 && row.deltaAmount === 0)) continue;
+    await TonKhoLoQuyCach.findOneAndUpdate(
+      {
+        kho_id: khoId,
+        hang_hoa_id: productId,
+        lo_hang_id: lotId,
+        ten_quy_cach: row.ten_quy_cach
+      },
+      {
+        $setOnInsert: {
+          cua_hang_id: storeId
+        },
+        $inc: {
+          so_luong: row.deltaQty,
+          thanh_tien: row.deltaAmount
+        },
+        $set: {
+          ten_thuoc_tinh: row.ten_quy_cach,
+          don_gia_nhap: row.nextPrice,
+          gia_von: row.nextPrice
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+  var warehouse = await Kho.findById(khoId).lean();
+  if (warehouse) await syncTonKhoSauQuyCach(khoId, productId, lotId, warehouse, params.cost);
+}
+
 exports.save = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
@@ -1419,6 +1576,28 @@ exports.save = async function(req, res, next) {
       if (!oldRow) continue;
       var qty = Math.max(0, Math.floor(Number(raw.so_luong || 0)));
       var price = parseMoneyInput(raw.don_gia_nhap);
+      var lotInfo = normalizeEditLotInfo(raw.lot_info, oldRow.lot_info, qty, price);
+      var qcItems = lotInfo && Array.isArray(lotInfo.quy_cach_items) ? lotInfo.quy_cach_items : [];
+      var oldRowQcItems = normalizeEditQuyCachItems(oldRow.lot_info && oldRow.lot_info.quy_cach_items);
+      if (oldRowQcItems.length && raw.lot_info && Array.isArray(raw.lot_info.quy_cach_items) && !qcItems.length) {
+        return res.status(400).json({ success: false, message: 'Lô đang có thuộc tính/quy cách, cần giữ ít nhất một dòng thuộc tính' });
+      }
+      if (qcItems.length) {
+        for (var q = 0; q < qcItems.length; q++) {
+          if (!qcItems[q].ten_quy_cach) {
+            return res.status(400).json({ success: false, message: 'Tên thuộc tính/quy cách không được để trống' });
+          }
+          if (Number(qcItems[q].so_luong || 0) <= 0) {
+            return res.status(400).json({ success: false, message: 'Số lượng thuộc tính/quy cách phải lớn hơn 0' });
+          }
+        }
+        qty = Math.floor(sumEditQuyCachQty(qcItems));
+        var qcAmount = sumEditQuyCachAmount(qcItems);
+        price = qty > 0 ? Math.round(qcAmount / qty) : price;
+        lotInfo.so_luong_tong = qty;
+        lotInfo.don_gia_nhap = price;
+        lotInfo.tong_tien_quy_cach = qcAmount;
+      }
       var lineDiscount = Number(raw.giam_gia_dong || 0);
       if (!Number.isFinite(lineDiscount) || lineDiscount < 0) lineDiscount = 0;
       var lineDiscountType = ['vnd', 'percent'].indexOf(String(raw.kieu_giam_gia_dong || '').trim()) >= 0 ? String(raw.kieu_giam_gia_dong).trim() : 'vnd';
@@ -1434,7 +1613,8 @@ exports.save = async function(req, res, next) {
         don_gia_nhap: price,
         giam_gia_dong: Math.floor(lineDiscount),
         kieu_giam_gia_dong: lineDiscountType,
-        ghi_chu: String(raw.ghi_chu || '').trim()
+        ghi_chu: String(raw.ghi_chu || '').trim(),
+        lot_info: lotInfo
       };
       normalized.thanh_tien = calcLineTotal(normalized);
       normalizedRows.push({ oldRow: oldRow, next: normalized });
@@ -1449,6 +1629,58 @@ exports.save = async function(req, res, next) {
         var productId = pair.next.hang_hoa_id;
         var lotId = pair.next.lo_hang_id;
         var attributeValueId = pair.next.gia_tri_thuoc_tinh_id || undefined;
+        var oldQcItems = normalizeEditQuyCachItems(pair.oldRow.lot_info && pair.oldRow.lot_info.quy_cach_items);
+        var nextQcItems = normalizeEditQuyCachItems(pair.next.lot_info && pair.next.lot_info.quy_cach_items);
+        if (lotId && (oldQcItems.length || nextQcItems.length)) {
+          var qcDeltas = buildQcDeltaRows(oldQcItems, nextQcItems);
+          var purchaseStoreIdForQc = oldTicket.cua_hang_id?._id || oldTicket.cua_hang_id || storeId;
+          if (String(oldKhoId) === String(newKhoId)) {
+            await ensureCanDecreaseQuyCach(oldKhoId, productId, lotId, qcDeltas);
+            await applyQuyCachDelta({
+              storeId: purchaseStoreIdForQc,
+              khoId: oldKhoId,
+              productId: productId,
+              lotId: lotId,
+              deltas: qcDeltas,
+              cost: pair.next.don_gia_nhap
+            });
+          } else {
+            await ensureCanDecreaseQuyCach(oldKhoId, productId, lotId, qcDeltas.map(function(row) {
+              return Object.assign({}, row, { deltaQty: -row.oldQty });
+            }));
+            await applyQuyCachDelta({
+              storeId: purchaseStoreIdForQc,
+              khoId: oldKhoId,
+              productId: productId,
+              lotId: lotId,
+              deltas: oldQcItems.map(function(item) {
+                return {
+                  ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh,
+                  deltaQty: -Number(item.so_luong || 0),
+                  deltaAmount: -Number(item.thanh_tien || 0),
+                  nextPrice: Number(item.don_gia_nhap || item.gia_von || 0)
+                };
+              }),
+              cost: pair.next.don_gia_nhap
+            });
+            await applyQuyCachDelta({
+              storeId: purchaseStoreIdForQc,
+              khoId: newKhoId,
+              productId: productId,
+              lotId: lotId,
+              deltas: nextQcItems.map(function(item) {
+                return {
+                  ten_quy_cach: item.ten_quy_cach || item.ten_thuoc_tinh,
+                  deltaQty: Number(item.so_luong || 0),
+                  deltaAmount: Number(item.thanh_tien || 0),
+                  nextPrice: Number(item.don_gia_nhap || item.gia_von || 0)
+                };
+              }),
+              cost: pair.next.don_gia_nhap
+            });
+          }
+          continue;
+        }
         var oldQty = Number(pair.oldRow.so_luong || 0);
         var newQty = Number(pair.next.so_luong || 0);
         if (String(oldKhoId) === String(newKhoId)) {
@@ -1557,9 +1789,23 @@ exports.save = async function(req, res, next) {
           giam_gia_dong: normalizedRows[u].next.giam_gia_dong,
           kieu_giam_gia_dong: normalizedRows[u].next.kieu_giam_gia_dong,
           thanh_tien: normalizedRows[u].next.thanh_tien,
-          ghi_chu: normalizedRows[u].next.ghi_chu
+          ghi_chu: normalizedRows[u].next.ghi_chu,
+          lot_info: normalizedRows[u].next.lot_info
         }
       });
+      var nextLotId = normalizedRows[u].next.lo_hang_id;
+      var nextLotInfo = normalizedRows[u].next.lot_info;
+      var nextLotQcItems = normalizeEditQuyCachItems(nextLotInfo && nextLotInfo.quy_cach_items);
+      if (nextLotId && nextLotInfo && nextLotQcItems.length) {
+        await LoHang.updateOne({ _id: nextLotId }, {
+          $set: {
+            quy_cach_items: nextLotQcItems,
+            so_luong_ban_dau: normalizedRows[u].next.so_luong,
+            don_gia_nhap: normalizedRows[u].next.don_gia_nhap,
+            gia_von: normalizedRows[u].next.don_gia_nhap
+          }
+        });
+      }
     }
 
     if (oldTicket.trang_thai === 'completed') {

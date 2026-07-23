@@ -59,6 +59,7 @@ function receiptErrorMessage(error) {
 function buildFilter(query = {}, storeId) {
     const filter = {};
     if (storeId) filter.cua_hang_id = toObjectId(storeId);
+    filter.deleted_at = null;
     if (query.q && query.q.trim() !== '') filter.ma_phieu = { $regex: query.q.trim(), $options: 'i' };
     if (query.loai_phieu && ['thu', 'chi'].includes(query.loai_phieu)) filter.loai_phieu = query.loai_phieu;
     if (query.doi_tuong_search && query.doi_tuong_search.trim() !== '') filter.doi_tuong = { $regex: query.doi_tuong_search.trim(), $options: 'i' };
@@ -140,10 +141,10 @@ async function applyCashBookFilter(filter, query = {}) {
     if (soQuyId === 'unassigned') {
         bookClause = { $or: [{ so_quy_id: null }, { so_quy_id: { $exists: false } }] };
     } else if (soQuyId === 'tien_mat') {
-        const books = await SoQuy.find({ loai_so_quy: 'tien_mat' }).select('_id').lean();
+        const books = await SoQuy.find({ loai_so_quy: 'tien_mat', $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).select('_id').lean();
         bookClause = { $or: buildBookMatchConditions(books.map(book => book._id), 'tien_mat') };
     } else if (soQuyId === 'chuyen_khoan') {
-        const books = await SoQuy.find({ loai_so_quy: 'chuyen_khoan' }).select('_id').lean();
+        const books = await SoQuy.find({ loai_so_quy: 'chuyen_khoan', $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).select('_id').lean();
         bookClause = { $or: buildBookMatchConditions(books.map(book => book._id), 'chuyen_khoan') };
     } else if (isObjectId(soQuyId)) {
         const bookId = toObjectId(soQuyId);
@@ -402,8 +403,8 @@ router.get('/', async (req, res, next) => {
                 .populate('chamcongmoi_bang_luong_id', 'ma_bang_luong ma_nhan_vien ten_nhan_vien thang_bang_luong tong_tien trang_thai created_at')
                 .populate('allocations.phieu_nhap_id')
                 .sort({ ngay_lap: -1 }),
-            SoQuy.find({ trang_thai: 'active' }).sort({ ten_so_quy: 1 }),
-            SoQuy.find({}).sort({ trang_thai: 1, ten_so_quy: 1 }),
+            SoQuy.find({ trang_thai: 'active', $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).sort({ ten_so_quy: 1 }),
+            SoQuy.find({ $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).sort({ trang_thai: 1, ten_so_quy: 1 }),
             KhachHang.find({ trang_thai: { $ne: 'inactive' } }).sort({ ten_khach_hang: 1 }),
             NhaCungCap.find({ trang_thai: 'active' }).sort({ ten_ncc: 1 }),
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),

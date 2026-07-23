@@ -12,6 +12,7 @@ const {
   PhieuTraHang,
   CTPhieuTraHang,
   PhieuThuChi,
+  SoQuy,
   CongNoNhaCungCap,
   CongNoKhachHang,
   GiaoDichCongNoNhaCungCap,
@@ -200,6 +201,18 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       if (rootEntityType === 'PhieuNhap') filter.phieu_nhap_id = parentOid;
       else if (rootEntityType === 'DonHang') filter.don_hang_id = parentOid;
       else if (rootEntityType === 'HoaDonBanHang') filter.hoa_don_id = parentOid;
+      else if (rootEntityType === 'NhapVatChua') {
+        const doc = await NhapVatChua.findById(parentOid).select('ma_nhap_vat_chua').lean();
+        filter.$or = [{ nhap_vat_chua_id: parentOid }];
+        if (doc && doc.ma_nhap_vat_chua) filter.$or.push({ ma_chung_tu_goc: doc.ma_nhap_vat_chua });
+      }
+      else if (rootEntityType === 'SoQuy') {
+        filter.$or = [
+          { so_quy_id: parentOid },
+          { 'chi_tiet_thanh_toan.so_quy_tien_mat_id': parentOid },
+          { 'chi_tiet_thanh_toan.so_quy_chuyen_khoan_id': parentOid }
+        ];
+      }
       else return [];
       return PhieuThuChi.find(filter).sort({ ngay_lap: -1 }).lean();
     }
@@ -857,6 +870,63 @@ async function loadRootDocumentDetail(root) {
       root.ma_chung_tu || slip.ma_phieu_nhap || '',
       sections
     );
+    payload.entity_type = entityType;
+    return payload;
+  }
+
+  if (entityType === 'NhapVatChua') {
+    const doc = await NhapVatChua.findById(parentOid).lean();
+    if (!doc) {
+      return buildDetailPayload('Nhập vật chứa', root.ma_chung_tu || '', []);
+    }
+
+    const phieuThuChi = await loadRelatedRawRows('PhieuThuChi', parentOid, entityType);
+    const sections = [
+      makeSection('Thông tin phiếu nhập vật chứa', [
+        { key: 'ma_nhap_vat_chua', header: 'Mã phiếu' },
+        { key: 'doi_tuong', header: 'Đối tượng' },
+        { key: 'tong_so_luong', header: 'Số lượng', align: 'right' },
+        { key: 'tong_tien', header: 'Tổng tiền', align: 'right' },
+        { key: 'trang_thai', header: 'Trạng thái' },
+        { key: 'ngay_tao', header: 'Ngày tạo' }
+      ], [{
+        stt: 1,
+        ma_nhap_vat_chua: doc.ma_nhap_vat_chua || '---',
+        doi_tuong: doc.doi_tuong_ten || '---',
+        tong_so_luong: fmtNum(doc.tong_so_luong),
+        tong_tien: fmtMoney(doc.tong_tien),
+        trang_thai: doc.deleted_at ? 'Trong thùng rác' : (doc.trang_thai || '---'),
+        ngay_tao: fmtDateTime(doc.created_at)
+      }])
+    ];
+    appendSectionFromTable(sections, 'Dòng vật chứa nhập', buildVatChuaItemsTable([doc], 'nhap'));
+    appendSectionFromTable(sections, 'Phiếu thu / chi', buildDetailTable('PhieuThuChi', phieuThuChi));
+
+    const payload = buildDetailPayload('Nhập vật chứa', root.ma_chung_tu || doc.ma_nhap_vat_chua || '', sections);
+    payload.entity_type = entityType;
+    return payload;
+  }
+
+  if (entityType === 'SoQuy') {
+    const book = await SoQuy.findById(parentOid).lean();
+    const phieuThuChi = await loadRelatedRawRows('PhieuThuChi', parentOid, entityType);
+    const bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
+    const sections = [
+      makeSection('Thông tin sổ quỹ', [
+        { key: 'ten_so_quy', header: 'Tên sổ' },
+        { key: 'loai_so_quy', header: 'Loại sổ' },
+        { key: 'tai_khoan', header: 'Ngân hàng/Tài khoản' },
+        { key: 'trang_thai', header: 'Trạng thái' }
+      ], [{
+        stt: 1,
+        ten_so_quy: root.ten_hien_thi || root.ma_chung_tu || (book && book.ten_so_quy) || '---',
+        loai_so_quy: book && book.loai_so_quy === 'chuyen_khoan' ? 'Chuyển khoản' : 'Tiền mặt',
+        tai_khoan: [bank.ten_ngan_hang, bank.so_tai_khoan].filter(Boolean).join(' - ') || '---',
+        trang_thai: book && book.deleted_at ? 'Trong thùng rác' : (book && book.trang_thai) || '---'
+      }])
+    ];
+    appendSectionFromTable(sections, 'Phiếu thu / chi', buildDetailTable('PhieuThuChi', phieuThuChi));
+    const payload = buildDetailPayload('Sổ quỹ', root.ma_chung_tu || root.ten_hien_thi || '', sections);
     payload.entity_type = entityType;
     return payload;
   }

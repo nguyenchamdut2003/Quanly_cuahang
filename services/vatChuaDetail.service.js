@@ -75,12 +75,15 @@ function resolveXuatLoaiLabel(row) {
   return LOAI_XUAT_LABEL[row.loai_xuat] || row.loai_xuat || '---';
 }
 
-function mapNhapRows(rows, vatChuaId) {
+function mapNhapRows(rows, vatChuaId, paidMap) {
   const targetId = String(vatChuaId);
   return (Array.isArray(rows) ? rows : []).map(function(row) {
     const line = (Array.isArray(row.items) ? row.items : []).find(function(item) {
       return String(item.vat_chua_id || '') === targetId;
     }) || (row.items && row.items[0]) || {};
+    const rowId = String(row._id || '');
+    const paidAmount = Number((paidMap && paidMap[rowId]) || 0);
+    const thanhTien = Number(line.thanh_tien || row.tong_tien || 0);
     return {
       _id: row._id,
       doc_kind: 'nhap',
@@ -89,13 +92,19 @@ function mapNhapRows(rows, vatChuaId) {
       loai: row.loai_nhap || '',
       loai_label: resolveNhapLoaiLabel(row),
       doi_tuong_ten: row.doi_tuong_ten || '---',
+      doi_tuong_id: row.doi_tuong_id ? String(row.doi_tuong_id) : '',
+      supplier_href: row.doi_tuong_type === 'nha_cung_cap' && row.doi_tuong_id
+        ? '/nha-cung-cap?supplier=' + encodeURIComponent(String(row.doi_tuong_id))
+        : '',
       source_type: row.source_type || '',
       source_type_label: SOURCE_TYPE_LABEL[row.source_type] || row.source_type || '---',
       source_code: row.source_code || '',
       source_href: buildSourceHref(row.source_type, row.source_id),
       so_luong: Number(line.so_luong || row.tong_so_luong || 0),
       gia_von: Number(line.gia_von || 0),
-      thanh_tien: Number(line.thanh_tien || row.tong_tien || 0),
+      thanh_tien: thanhTien,
+      da_tra_ncc: paidAmount,
+      can_tra_ncc: Math.max(0, thanhTien - paidAmount),
       trang_thai: row.trang_thai || 'active',
       trang_thai_label: row.trang_thai === 'cancelled' ? 'Đã hủy' : 'Hợp lệ',
       created_at: row.created_at,
@@ -118,6 +127,10 @@ function mapXuatRows(rows, vatChuaId) {
       loai: row.loai_xuat || '',
       loai_label: resolveXuatLoaiLabel(row),
       doi_tuong_ten: row.doi_tuong_ten || '---',
+      doi_tuong_id: row.doi_tuong_id ? String(row.doi_tuong_id) : '',
+      supplier_href: row.doi_tuong_type === 'nha_cung_cap' && row.doi_tuong_id
+        ? '/nha-cung-cap?supplier=' + encodeURIComponent(String(row.doi_tuong_id))
+        : '',
       source_type: row.source_type || '',
       source_type_label: SOURCE_TYPE_LABEL[row.source_type] || row.source_type || '---',
       source_code: row.source_code || '',
@@ -125,6 +138,8 @@ function mapXuatRows(rows, vatChuaId) {
       so_luong: Number(line.so_luong || row.tong_so_luong || 0),
       gia_von: Number(line.gia_von || 0),
       thanh_tien: Number(line.thanh_tien || row.tong_tien || 0),
+      da_tra_ncc: 0,
+      can_tra_ncc: null,
       trang_thai: row.trang_thai || 'active',
       trang_thai_label: row.trang_thai === 'cancelled' ? 'Đã hủy' : 'Hợp lệ',
       created_at: row.created_at,
@@ -196,28 +211,40 @@ async function loadVatChuaDetailContext(vatChuaId, storeId) {
   const avgMap = await loadAverageCostByVatChuaIds(store, [item._id]);
   item.gia_von_trung_binh = avgMap[String(item._id)] || 0;
 
-  const itemMatch = { cua_hang_id: store, 'items.vat_chua_id': new mongoose.Types.ObjectId(id) };
+  const itemMatch = { cua_hang_id: store, 'items.vat_chua_id': new mongoose.Types.ObjectId(id), deleted_at: null };
+  const activeXuatMatch = Object.assign({}, itemMatch, { trang_thai: 'active' });
   const [nhapRows, xuatRows] = await Promise.all([
     NhapVatChua.find(itemMatch).sort({ created_at: -1 }).lean(),
-    XuatVatChua.find(itemMatch).sort({ created_at: -1 }).lean()
+    XuatVatChua.find(activeXuatMatch).sort({ created_at: -1 }).lean()
   ]);
 
   const nhapIds = nhapRows.map(function(row) { return row._id; }).filter(Boolean);
   const nhapCodes = nhapRows.map(function(r) { return r.ma_nhap_vat_chua; }).filter(Boolean);
   let chiDocuments = [];
+  const paidMap = {};
   if (nhapIds.length) {
     const chiRows = await PhieuThuChi.find({
       cua_hang_id: store,
       loai_phieu: 'chi',
+      deleted_at: null,
       $or: [
         { nhap_vat_chua_id: { $in: nhapIds } },
         { ma_chung_tu_goc: { $in: nhapCodes } }
       ]
     }).sort({ ngay_lap: -1, created_at: -1 }).lean();
+    const idByCode = nhapRows.reduce(function(map, row) {
+      if (row.ma_nhap_vat_chua) map[row.ma_nhap_vat_chua] = String(row._id);
+      return map;
+    }, {});
+    chiRows.forEach(function(row) {
+      const linkedId = cleanId(row.nhap_vat_chua_id) || idByCode[String(row.ma_chung_tu_goc || '').trim()] || '';
+      if (!linkedId) return;
+      paidMap[linkedId] = Number(paidMap[linkedId] || 0) + Number(row.gia_tri || 0);
+    });
     chiDocuments = mapChiReceiptRows(chiRows);
   }
 
-  const documents = mapNhapRows(nhapRows, id)
+  const documents = mapNhapRows(nhapRows, id, paidMap)
     .concat(mapXuatRows(xuatRows, id))
     .sort(function(a, b) {
       const ta = new Date(a.created_at || 0).getTime();
@@ -241,7 +268,7 @@ async function loadVatChuaDocumentDetail(kind, docId, storeId) {
   if (!id || !store) return null;
 
   if (kind === 'nhap') {
-    const doc = await NhapVatChua.findOne({ _id: id, cua_hang_id: store }).lean();
+    const doc = await NhapVatChua.findOne({ _id: id, cua_hang_id: store, deleted_at: null }).lean();
     if (!doc) return null;
     return {
       kind: 'nhap',
@@ -264,7 +291,7 @@ async function loadVatChuaDocumentDetail(kind, docId, storeId) {
   }
 
   if (kind === 'xuat') {
-    const doc = await XuatVatChua.findOne({ _id: id, cua_hang_id: store }).lean();
+    const doc = await XuatVatChua.findOne({ _id: id, cua_hang_id: store, deleted_at: null }).lean();
     if (!doc) return null;
     return {
       kind: 'xuat',
@@ -343,6 +370,7 @@ async function loadOrderLinkedVatChuaLines(orderId, invoiceIds, storeId) {
   const baseMatch = {
     cua_hang_id: new mongoose.Types.ObjectId(store),
     trang_thai: 'active',
+    deleted_at: null,
     $or: sourceOr
   };
 
@@ -381,6 +409,7 @@ async function loadPurchasesLinkedVatChuaMap(purchaseIds, storeId) {
   const nhapRows = await NhapVatChua.find({
     cua_hang_id: new mongoose.Types.ObjectId(store),
     trang_thai: 'active',
+    deleted_at: null,
     source_type: 'phieu_nhap',
     source_id: { $in: ids }
   }).sort({ created_at: -1 }).lean();
@@ -421,6 +450,7 @@ async function loadInvoiceLinkedVatChuaLines(invoiceId, orderId, storeId) {
   const xuatRows = await XuatVatChua.find({
     cua_hang_id: new mongoose.Types.ObjectId(store),
     trang_thai: 'active',
+    deleted_at: null,
     $or: sourceOr
   }).sort({ created_at: -1 }).lean();
 
@@ -447,6 +477,7 @@ async function loadSalesReturnLinkedNhapVatChuaLines(returnId, storeId) {
   const nhapRows = await NhapVatChua.find({
     cua_hang_id: new mongoose.Types.ObjectId(store),
     trang_thai: 'active',
+    deleted_at: null,
     source_type: 'tra_hang_ban',
     source_id: new mongoose.Types.ObjectId(id)
   }).sort({ created_at: -1 }).lean();
@@ -480,6 +511,7 @@ async function loadSalesReturnLinkedNhapVatChuaLines(returnId, storeId) {
   const xuatRows = await XuatVatChua.find({
     cua_hang_id: new mongoose.Types.ObjectId(store),
     trang_thai: 'active',
+    deleted_at: null,
     source_type: 'tra_hang_ban',
     source_id: new mongoose.Types.ObjectId(id)
   }).sort({ created_at: -1 }).lean();
@@ -524,6 +556,7 @@ async function loadReturnsLinkedVatChuaMap(returnIds, storeId) {
   const xuatRows = await XuatVatChua.find({
     cua_hang_id: new mongoose.Types.ObjectId(store),
     trang_thai: 'active',
+    deleted_at: null,
     source_type: 'phieu_tra_hang_nhap',
     source_id: { $in: ids }
   }).sort({ created_at: -1 }).lean();

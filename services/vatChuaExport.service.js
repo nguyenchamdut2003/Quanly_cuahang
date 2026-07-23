@@ -57,7 +57,10 @@ async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
   }
 
   const costMap = await loadAverageCostByVatChuaIds(storeId, [vatChuaId], session);
-  const giaVon = Math.max(0, Number(costMap[String(vatChuaId)] || 0));
+  const requestedGiaVon = options.giaVon != null ? Number(options.giaVon) : NaN;
+  const giaVon = Number.isFinite(requestedGiaVon) && requestedGiaVon >= 0
+    ? requestedGiaVon
+    : Math.max(0, Number(costMap[String(vatChuaId)] || 0));
   const thanhTien = Math.round(giaVon * qty);
   const maXuat = await makeXuatVatChuaCode(storeId, session);
 
@@ -85,10 +88,13 @@ async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
     cua_hang_id: storeId
   }, session);
 
-  await withSessionQuery(
+  const stockUpdate = await withSessionQuery(
     VatChua.updateOne({ _id: vatChua._id }, { $inc: { so_luong_ton: -qty } }),
     session
   );
+  if (!stockUpdate || Number(stockUpdate.modifiedCount || 0) < 1) {
+    throw new Error('Không trừ được tồn vật chứa khi xuất.');
+  }
 
   return xuatDoc;
 }
@@ -213,7 +219,8 @@ async function cancelXuatVatChuaBySource(storeId, sourceType, sourceId, session)
       cua_hang_id: store,
       source_type: sourceType,
       source_id: source,
-      trang_thai: 'active'
+      trang_thai: 'active',
+      deleted_at: null
     }),
     session
   );

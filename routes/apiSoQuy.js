@@ -4,6 +4,11 @@ var { isAuthenticated } = require('../middlewares/auth.middleware');
 var { calculateCashBookBalances } = require('../services/cashBookBalance.service');
 var hrLog = require('../utils/hrPayrollLogger');
 var catalog = require('../services/soQuyCatalog.service');
+var {
+  previewCashBookTrash,
+  moveCashBooksToTrash
+} = require('../services/cashBookTrash.service');
+var { resolveStoreId } = require('../utils/storeScope');
 
 router.use(isAuthenticated);
 
@@ -94,12 +99,44 @@ router.put('/:id', async function(req, res, next) {
   }
 });
 
-router.delete('/:id', function(req, res) {
-  if (!catalog.isObjectId(req.params.id)) return res.status(400).json({ success: false, message: 'Id so quy khong hop le' });
-  return res.status(400).json({
-    success: false,
-    message: 'Khong duoc xoa so quy. Chi co the ngung su dung.'
-  });
+router.post('/trash/preview', async function(req, res) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var ids = req.body && (req.body.so_quy_ids || req.body.ids || req.body.id);
+    var preview = await previewCashBookTrash(ids, storeId);
+    return res.json({ success: true, data: preview });
+  } catch (error) {
+    return jsonError(res, error);
+  }
+});
+
+router.post('/trash/move', async function(req, res) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var ids = req.body && (req.body.so_quy_ids || req.body.ids || req.body.id);
+    var result = await moveCashBooksToTrash(ids, storeId, req.user && req.user._id);
+    return res.json({
+      success: true,
+      message: 'Đã đưa ' + result.moved_count + ' sổ quỹ vào thùng rác.',
+      data: result
+    });
+  } catch (error) {
+    return jsonError(res, error);
+  }
+});
+
+router.delete('/:id', async function(req, res) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var result = await moveCashBooksToTrash([req.params.id], storeId, req.user && req.user._id);
+    return res.json({
+      success: true,
+      message: 'Đã đưa sổ quỹ vào thùng rác.',
+      data: result
+    });
+  } catch (error) {
+    return jsonError(res, error);
+  }
 });
 
 module.exports = router;

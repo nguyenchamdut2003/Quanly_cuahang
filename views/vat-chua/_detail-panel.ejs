@@ -36,42 +36,53 @@
     </section>
 
     <section class="detail-pane" data-detail-pane="documents">
-      <div class="customer-table-wrap">
-        <table class="admin-table customer-table">
+      <div class="customer-table-wrap vc-documents-wrap">
+        <table class="admin-table customer-table vc-documents-table">
           <thead>
             <tr>
               <th>Thời gian</th>
               <th>Loại</th>
               <th>Mã chứng từ</th>
               <th>Nghiệp vụ</th>
-              <th>Đối tượng</th>
+              <th title="Nhà cung cấp">Nhà cung cấp</th>
               <th>Chứng từ liên kết</th>
               <th class="text-right">Số lượng</th>
               <th class="text-right">Giá vốn</th>
               <th class="text-right">Thành tiền</th>
-              <th>Trạng thái</th>
+              <th class="text-right" title="Cần trả nhà cung cấp">Cần trả NCC</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <% if (!documents || documents.length === 0) { %>
               <tr>
-                <td colspan="10" class="empty-cell">Chưa có chứng từ liên quan.</td>
+                <td colspan="11" class="empty-cell">Chưa có chứng từ liên quan.</td>
               </tr>
             <% } %>
             <% (documents || []).forEach(function(doc) { %>
+              <%
+                var xuatLoai = doc.loai_xuat || doc.loai || '';
+                var isReturnDoc = doc.doc_kind === 'xuat' && (xuatLoai === 'tra_hang_nhap' || xuatLoai === 'tra_vat_chua' || String(doc.loai_label || '').toLowerCase().indexOf('trả') >= 0);
+              %>
               <tr>
-                <td><%= formatDate(doc.created_at) %></td>
-                <td><%= doc.doc_kind_label || '---' %></td>
-                <td>
+                <td title="<%= formatDate(doc.created_at) %>"><%= formatDate(doc.created_at) %></td>
+                <td title="<%= isReturnDoc ? 'Trả' : (doc.doc_kind_label || '---') %>"><%= isReturnDoc ? 'Trả' : (doc.doc_kind_label || '---') %></td>
+                <td title="<%= doc.ma_chung_tu || '---' %>">
                   <% if (doc._id && (doc.doc_kind === 'nhap' || doc.doc_kind === 'xuat')) { %>
                     <button type="button" class="table-code-link vc-doc-open-btn" data-vc-doc-open data-vc-doc-kind="<%= doc.doc_kind %>" data-vc-doc-id="<%= doc._id %>"><%= doc.ma_chung_tu || '---' %></button>
                   <% } else { %>
                     <strong><%= doc.ma_chung_tu || '---' %></strong>
                   <% } %>
                 </td>
-                <td><%= doc.loai_label || '---' %></td>
-                <td><%= doc.doi_tuong_ten || '---' %></td>
-                <td>
+                <td title="<%= doc.loai_label || '---' %>"><%= doc.loai_label || '---' %></td>
+                <td title="<%= doc.doi_tuong_ten || '---' %>">
+                  <% if (doc.supplier_href && doc.doi_tuong_ten) { %>
+                    <a class="table-code-link" href="<%= doc.supplier_href %>"><%= doc.doi_tuong_ten || '---' %></a>
+                  <% } else { %>
+                    <%= doc.doi_tuong_ten || '---' %>
+                  <% } %>
+                </td>
+                <td title="<%= doc.source_code || doc.source_type_label || '---' %>">
                   <% if (doc.source_href && doc.source_code) { %>
                     <a class="table-code-link" href="<%= doc.source_href %>"><%= doc.source_code %></a>
                   <% } else if (doc.source_code) { %>
@@ -83,11 +94,47 @@
                 <td class="text-right"><%= doc.so_luong ? Number(doc.so_luong).toLocaleString('vi-VN') : '—' %></td>
                 <td class="text-right"><%= doc.gia_von ? Number(doc.gia_von).toLocaleString('vi-VN') + ' VNĐ' : '—' %></td>
                 <td class="text-right"><%= Number(doc.thanh_tien || 0).toLocaleString('vi-VN') %> VNĐ</td>
-                <td>
-                  <% if (doc.trang_thai === 'cancelled') { %>
-                    <span class="vc-status-tag is-inactive">Đã hủy</span>
+                <td class="text-right" title="<%= doc.can_tra_ncc == null ? '—' : (Number(doc.can_tra_ncc || 0).toLocaleString('vi-VN') + ' VNĐ') %>">
+                  <% if (doc.can_tra_ncc == null) { %>
+                    —
                   <% } else { %>
-                    <span class="vc-status-tag is-active"><%= doc.trang_thai_label || 'Hợp lệ' %></span>
+                    <%= Number(doc.can_tra_ncc || 0).toLocaleString('vi-VN') %> VNĐ
+                  <% } %>
+                </td>
+                <td class="vc-doc-actions-cell">
+                  <% if (doc._id && doc.trang_thai !== 'cancelled' && (doc.doc_kind === 'nhap' || isReturnDoc)) { %>
+                    <div class="vc-doc-action-menu">
+                      <button type="button" class="vc-doc-more-btn" data-vc-doc-menu-toggle aria-label="Thao tác" aria-expanded="false">
+                        <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                      </button>
+                      <div class="vc-doc-action-dropdown" role="menu">
+                        <% if (doc.doc_kind === 'nhap') { %>
+                          <button type="button" class="vc-doc-menu-item" data-vc-import-edit data-vc-import-id="<%= doc._id %>" role="menuitem">
+                            <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                            Sửa
+                          </button>
+                          <button type="button" class="vc-doc-menu-item danger" data-vc-import-trash data-vc-import-id="<%= doc._id %>" data-vc-import-code="<%= doc.ma_chung_tu || '' %>" role="menuitem">
+                            <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                            Xóa
+                          </button>
+                          <button type="button" class="vc-doc-menu-item" data-vc-import-return data-vc-import-id="<%= doc._id %>" data-vc-id="<%= item._id %>" data-vc-import-code="<%= doc.ma_chung_tu || '' %>" data-vc-import-qty="<%= doc.so_luong || 0 %>" data-vc-import-price="<%= doc.gia_von || 0 %>" role="menuitem">
+                            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                            Trả vật chứa
+                          </button>
+                        <% } else if (isReturnDoc) { %>
+                          <button type="button" class="vc-doc-menu-item" data-vc-return-edit data-vc-return-id="<%= doc._id %>" role="menuitem">
+                            <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
+                            Sửa
+                          </button>
+                          <button type="button" class="vc-doc-menu-item danger" data-vc-return-delete data-vc-return-id="<%= doc._id %>" data-vc-return-code="<%= doc.ma_chung_tu || '' %>" role="menuitem">
+                            <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
+                            Xóa
+                          </button>
+                        <% } %>
+                      </div>
+                    </div>
+                  <% } else { %>
+                    —
                   <% } %>
                 </td>
               </tr>

@@ -743,7 +743,16 @@ const PhieuTraHangNhapSchema = new Schema({
   ly_do: { type: String },
   ghi_chu: { type: String },
   nguoi_tra_id: { type: ObjectId, ref: 'NguoiDung' },
-  nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' }
+  nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
+  deleted_at: {
+    type: Date,
+    default: null
+  },
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
+  }
 }, {
   collection: 'phieu_tra_hang_nhap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -1854,6 +1863,16 @@ const SoQuySchema = new Schema({
     enum: ['active', 'inactive'],
     default: 'active',
     index: true
+  },
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
   }
 }, { collection: "so_quy", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 SoQuySchema.index(
@@ -1963,7 +1982,17 @@ const PhieuThuChiSchema = new Schema({
   },
   nguoi_huy_id: { type: ObjectId, ref: 'NguoiDung' },
   ngay_huy: { type: Date },
-  ly_do_huy: { type: String }
+  ly_do_huy: { type: String },
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
+  }
 }, { collection: "phieu_thu_chi", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 PhieuThuChiSchema.index({ cua_hang_id: 1, nhan_vien_id: 1, ngay_lap: -1 });
@@ -2654,6 +2683,15 @@ const NhapVatChuaSchema = new Schema({
     enum: ['active', 'cancelled'],
     default: 'active'
   },
+  deleted_at: {
+    type: Date,
+    default: null
+  },
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
+  },
   cua_hang_id: {
     type: ObjectId,
     ref: 'CuaHang',
@@ -2735,6 +2773,15 @@ const XuatVatChuaSchema = new Schema({
     type: String,
     enum: ['active', 'cancelled'],
     default: 'active'
+  },
+  deleted_at: {
+    type: Date,
+    default: null
+  },
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
   },
   cua_hang_id: {
     type: ObjectId,

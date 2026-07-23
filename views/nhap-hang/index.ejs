@@ -244,6 +244,13 @@
     .edit-table th{background:#f8fafc;font-weight:800;color:#344054}
     .edit-table input,.edit-table select{width:100%;height:32px;border:1px solid #cfd8e3;border-radius:5px;padding:5px 6px}
     .edit-table .num{text-align:right}
+    .edit-qc-cell{background:#fbfdff;padding:10px 12px!important}
+    .edit-qc-box{border:1px solid #dbeafe;border-radius:6px;overflow:hidden}
+    .edit-qc-title{display:flex;justify-content:space-between;gap:12px;background:#eff6ff;color:#1d4ed8;font-size:12px;font-weight:800;padding:7px 9px}
+    .edit-qc-table{width:100%;border-collapse:collapse;font-size:12px}
+    .edit-qc-table th,.edit-qc-table td{border-bottom:1px solid #e4eaf2;padding:6px;text-align:left}
+    .edit-qc-table th{background:#f8fafc;color:#475467}
+    .edit-qc-table input{height:30px}
     .edit-total-box{display:grid;grid-template-columns:1fr 220px;gap:8px;margin-top:12px;align-items:center}
     .edit-total-box span{color:#667085}
     .edit-total-box b{text-align:right}
@@ -767,6 +774,63 @@
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
     function moneyText(value){ return money(value) + ' VNĐ'; }
     function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0; }
+    function normalizeEditQuyCachItems(items) {
+      return (Array.isArray(items) ? items : [])
+        .map(row => {
+          const name = String((row && (row.ten_quy_cach || row.ten_thuoc_tinh)) || '').trim();
+          const qty = Number(row && row.so_luong || 0) || 0;
+          const price = Number(row && (row.don_gia_nhap || row.gia_von) || 0) || 0;
+          return {
+            ten_quy_cach: name,
+            ten_thuoc_tinh: name,
+            so_luong: qty,
+            don_gia_nhap: price,
+            gia_von: price,
+            thanh_tien: Math.floor(qty * price),
+            ghi_chu: String(row && row.ghi_chu || '').trim()
+          };
+        })
+        .filter(row => row.ten_quy_cach || row.so_luong > 0 || row.don_gia_nhap > 0 || row.ghi_chu);
+    }
+    function editQcParentSelector(rowId) {
+      const escapedId = window.CSS && CSS.escape ? CSS.escape(String(rowId)) : String(rowId).replace(/"/g, '\\"');
+      return `[data-edit-qc-parent="${escapedId}"]`;
+    }
+    function collectEditQuyCachItems(rowId) {
+      return normalizeEditQuyCachItems(Array.from(document.querySelectorAll(editQcParentSelector(rowId))).map(rowEl => ({
+        ten_quy_cach: rowEl.querySelector('[data-edit-qc-field="ten_quy_cach"]')?.value || '',
+        so_luong: numberValue(rowEl.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0),
+        don_gia_nhap: numberValue(rowEl.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0),
+        ghi_chu: rowEl.querySelector('[data-edit-qc-field="ghi_chu"]')?.value || ''
+      })));
+    }
+    function editQuyCachRowHtml(rowId, qc, disabled) {
+      qc = qc || {};
+      return `
+        <tr data-edit-qc-parent="${escapeHtml(rowId)}">
+          <td><input data-edit-qc-field="ten_quy_cach" value="${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '')}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td><input data-edit-qc-field="so_luong" inputmode="numeric" value="${money(qc.so_luong || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td><input data-edit-qc-field="don_gia_nhap" inputmode="numeric" value="${money(qc.don_gia_nhap || qc.gia_von || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td class="num" data-edit-qc-total>${moneyText(qc.thanh_tien || ((qc.so_luong || 0) * (qc.don_gia_nhap || qc.gia_von || 0)))}</td>
+          <td><input data-edit-qc-field="ghi_chu" value="${escapeHtml(qc.ghi_chu || '')}" ${disabled ? 'disabled' : ''}></td>
+          <td><button type="button" class="kv-btn danger" style="height:28px;padding:0 8px" onclick="removeEditQuyCachRow(this)" ${disabled ? 'disabled' : ''}>Xóa</button></td>
+        </tr>`;
+    }
+    function addEditQuyCachRow(rowId) {
+      const box = document.querySelector(`[data-edit-qc-box="${editQcDataValue(rowId)}"] tbody`);
+      if (!box) return;
+      box.insertAdjacentHTML('beforeend', editQuyCachRowHtml(rowId, { so_luong: 1 }, false));
+      calculatePurchaseEditTotals();
+    }
+    function removeEditQuyCachRow(button) {
+      const row = button && button.closest('[data-edit-qc-parent]');
+      if (!row) return;
+      row.remove();
+      calculatePurchaseEditTotals();
+    }
+    function editQcDataValue(rowId) {
+      return String(rowId).replace(/"/g, '&quot;');
+    }
     function applyLiveVNFormat(el) {
       if (!el) return;
       const start = el.selectionStart == null ? el.value.length : el.selectionStart;
@@ -980,6 +1044,21 @@
         const itemRows = currentPurchaseEdit.items.map((row, index) => {
           const product = row.hang_hoa_id || {};
           const discountType = row.kieu_giam_gia_dong || 'vnd';
+          const qcItems = normalizeEditQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
+          const qcHtml = qcItems.length ? `
+            <tr>
+              <td class="edit-qc-cell" colspan="9">
+                <div class="edit-qc-box" data-edit-qc-box="${escapeHtml(row._id)}">
+                  <div class="edit-qc-title"><span>Thuộc tính / quy cách trong lô</span><button type="button" class="kv-btn primary" style="height:26px;padding:0 8px" onclick="addEditQuyCachRow('${escapeHtml(row._id)}')" ${readonly ? 'disabled' : ''}>Thêm</button></div>
+                  <table class="edit-qc-table">
+                    <thead><tr><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th><th></th></tr></thead>
+                    <tbody>
+                      ${qcItems.map(qc => editQuyCachRowHtml(row._id, qc, readonly)).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </td>
+            </tr>` : '';
           return `
             <tr data-edit-row="${row._id}">
               <td>${index + 1}</td>
@@ -991,7 +1070,7 @@
               <td><select data-edit-field="kieu_giam_gia_dong" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${discountType === 'vnd' ? 'selected' : ''}>VND</option><option value="percent" ${discountType === 'percent' ? 'selected' : ''}>%</option></select></td>
               <td class="num" data-edit-total>${moneyText(row.thanh_tien || 0)}</td>
               <td><input data-edit-field="ghi_chu" value="${escapeHtml(row.ghi_chu || '')}" ${readonly ? 'disabled' : ''}></td>
-            </tr>`;
+            </tr>${qcHtml}`;
         }).join('');
         body.innerHTML = `
           <div class="detail-grid">
@@ -1031,6 +1110,23 @@
     }
     function closePurchaseModal(){ document.getElementById('purchaseModal').classList.remove('open'); }
     function calcEditLineTotal(rowEl){
+      const rowId = rowEl.dataset.editRow;
+      const qcItems = collectEditQuyCachItems(rowId);
+      const qcTotal = qcItems.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
+      const qcQty = qcItems.reduce((sum, item) => sum + Number(item.so_luong || 0), 0);
+      if (qcItems.length) {
+        const qtyInput = rowEl.querySelector('[data-edit-field="so_luong"]');
+        const priceInput = rowEl.querySelector('[data-edit-field="don_gia_nhap"]');
+        if (qtyInput) qtyInput.value = String(Math.floor(qcQty));
+        if (priceInput) priceInput.value = qcQty > 0 ? money(Math.round(qcTotal / qcQty)) : '0';
+        document.querySelectorAll(editQcParentSelector(rowId)).forEach(qcRow => {
+          const qty = numberValue(qcRow.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0);
+          const price = numberValue(qcRow.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0);
+          const totalCell = qcRow.querySelector('[data-edit-qc-total]');
+          if (totalCell) totalCell.textContent = moneyText(qty * price);
+        });
+        return Math.max(0, Math.floor(qcTotal));
+      }
       const qty = Math.max(0, Math.floor(numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0)));
       const price = numberValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0);
       const discount = numberValue(rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0);
@@ -1083,14 +1179,32 @@
       if (!currentPurchaseId) return;
       if (!validateVatChuaEdit()) return;
       try {
-        const items = Array.from(document.querySelectorAll('[data-edit-row]')).map(rowEl => ({
-          _id: rowEl.dataset.editRow,
-          so_luong: rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0,
-          don_gia_nhap: rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0,
-          giam_gia_dong: rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0,
-          kieu_giam_gia_dong: rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd',
-          ghi_chu: rowEl.querySelector('[data-edit-field="ghi_chu"]')?.value || ''
-        }));
+        const items = Array.from(document.querySelectorAll('[data-edit-row]')).map(rowEl => {
+          const rowId = rowEl.dataset.editRow;
+          const source = (currentPurchaseEdit && Array.isArray(currentPurchaseEdit.items)
+            ? currentPurchaseEdit.items.find(row => String(row._id) === String(rowId))
+            : null) || {};
+          const qcItems = collectEditQuyCachItems(rowId);
+          const item = {
+            _id: rowId,
+            so_luong: rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0,
+            don_gia_nhap: rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0,
+            giam_gia_dong: rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0,
+            kieu_giam_gia_dong: rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd',
+            ghi_chu: rowEl.querySelector('[data-edit-field="ghi_chu"]')?.value || ''
+          };
+          if ((source.lot_info && typeof source.lot_info === 'object') || qcItems.length) {
+            item.lot_info = Object.assign({}, source.lot_info || {}, {
+              lo_hang_id: source.lo_hang_id?._id || source.lo_hang_id || source.lot_info?.lo_hang_id || '',
+              ma_lo: source.lo_hang_id?.ma_lo || source.lot_info?.ma_lo || '',
+              ten_lo: source.lo_hang_id?.ten_lo || source.lot_info?.ten_lo || '',
+              ngay_nhap: source.lo_hang_id?.ngay_nhap || source.lot_info?.ngay_nhap || '',
+              han_su_dung: source.lo_hang_id?.han_su_dung || source.lot_info?.han_su_dung || '',
+              quy_cach_items: qcItems
+            });
+          }
+          return item;
+        });
         const payload = {
           nha_cung_cap_id: document.getElementById('editSupplier')?.value || '',
           kho_id: document.getElementById('editWarehouse')?.value || '',

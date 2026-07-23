@@ -32,7 +32,8 @@ async function calculateCashBookBalances(options) {
     {
       $match: {
         so_quy_id: { $in: cashBookIds },
-        trang_thai: { $ne: 'cancelled' }
+        trang_thai: { $ne: 'cancelled' },
+        deleted_at: null
       }
     },
     {

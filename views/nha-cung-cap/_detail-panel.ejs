@@ -221,10 +221,19 @@
                 <tr><td colspan="5" class="empty-cell">Chưa có lịch sử nhập/trả hàng.</td></tr>
                                   <% } %>
                                   <% (supplierPurchaseHistory || []).forEach(function(row) { %>
+                                    <%
+                                      var isReturnHistory = row.loai === 'tra' || row.loai === 'tra_vat_chua';
+                                      var historyHref = '#';
+                                      if (row.loai === 'nhap' && row.phieu_nhap_id) historyHref = refUrl('purchase', row.phieu_nhap_id);
+                                      else if (row.loai === 'tra' && row.phieu_tra_hang_nhap_id) historyHref = '/tra-hang-nhap/' + row.phieu_tra_hang_nhap_id;
+                                      else if (row.loai === 'nhap_vat_chua' && row.nhap_vat_chua_id) historyHref = '/vat-chua?nhap_vat_chua=' + encodeURIComponent(String(row.nhap_vat_chua_id));
+                                      else if (row.loai === 'tra_vat_chua') historyHref = '/vat-chua';
+                                      var historyTypeLabel = typeof mapSupplierPurchaseHistoryType === 'function' ? mapSupplierPurchaseHistoryType(row.loai) : (isReturnHistory ? 'Trả hàng hóa' : 'Nhập hàng hóa');
+                                    %>
                                     <tr>
                                       <td class="text-center">
-                                        <a href="<%= row.loai === 'nhap' && row.phieu_nhap_id ? refUrl('purchase', row.phieu_nhap_id) : '/nhap-hang' %>" class="table-code-link ref-link">
-                                          <% if (row.loai === 'nhap') { %>
+                                        <a href="<%= historyHref %>" class="table-code-link ref-link">
+                                          <% if (!isReturnHistory) { %>
                                             <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
                                           <% } else { %>
                         <i class="fa-solid fa-arrow-rotate-left history-type-icon history-type-icon--return" title="Trả hàng"></i>
@@ -240,15 +249,16 @@
                                         </div>
                                       </td>
                                       <td class="text-center">
-                                        <span class="history-amount <%= row.loai === 'tra' ? 'is-return' : '' %>">
-                                          <%= row.loai === 'tra' ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ
+                                        <span class="history-amount <%= isReturnHistory ? 'is-return' : '' %>">
+                                          <%= isReturnHistory ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ
                                         </span>
                                       </td>
                                       <td class="text-center">
                                         <% 
                       var statusClass = 'status-pill';
-                      var statusLabelText = row.loai === 'tra' ? mapTraHangStatus(row.trang_thai) : mapNhapHangStatus(row.trang_thai);
+                      var statusLabelText = historyTypeLabel;
                                           if (row.trang_thai === 'completed') statusClass += ' is-active';
+                                          else if (row.trang_thai === 'active') statusClass += ' is-active';
                                           else if (row.trang_thai === 'draft') statusClass += ' is-draft';
                                           else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
                                         %>
@@ -269,7 +279,7 @@
           </div>
           <div class="supplier-debt-actions">
             <label class="supplier-debt-sort-check" title="Ưu tiên phiếu còn nợ, nợ lâu nhất lên đầu">
-              <input type="checkbox" class="js-supplier-debt-sort-oldest" checked>
+              <input type="checkbox" class="js-supplier-debt-sort-oldest" disabled>
               <span>Nợ lâu nhất trước</span>
             </label>
             <button
@@ -329,7 +339,7 @@
                                       data-debt-days="<%= row.so_ngay_no != null ? row.so_ngay_no : '' %>"
                                       data-debt-time="<%= row.thoi_gian ? new Date(row.thoi_gian).getTime() : 0 %>"
                                     >
-                                      <td class="text-center"><%- row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--')) %></td>
+                                      <td class="text-center"><%- row.phieu_tra_nhap_id ? ('<a class="table-code-link" href="/tra-hang-nhap/' + encodeURIComponent(String(row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id)) + '">' + (row.ma_phieu || '--') + '</a>') : (row.phieu_nhap_id ? refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') : (row.nhap_vat_chua_id ? ('<a class="table-code-link" href="/vat-chua?nhap_vat_chua=' + encodeURIComponent(String(row.nhap_vat_chua_id._id || row.nhap_vat_chua_id)) + '">' + (row.ma_phieu || '--') + '</a>') : (row.xuat_vat_chua_id ? (row.ma_phieu || '--') : (row.phieu_thu_chi_id ? refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') : (row.ma_phieu || '--'))))) %></td>
                   <td class="supplier-muted-cell text-center"><%= formatDate(row.thoi_gian) %><% if (row.co_no_con_lai && row.so_ngay_no != null) { %><div style="font-size:11px;color:#b42318;margin-top:2px"><%= row.so_ngay_no %> ngày</div><% } %></td>
                                       <td class="text-center"><%= row.loai_chung_tu || '--' %></td>
                   <td class="text-center"><%= Number(row.gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</td>
@@ -649,22 +659,6 @@
 </div>
 <script>
   (function() {
-    function sortSupplierDebtRows(tbody, enabled) {
-      if (!tbody) return;
-      var rows = Array.prototype.slice.call(tbody.querySelectorAll('.js-supplier-debt-row'));
-      rows.sort(function(a, b) {
-        var aUnpaid = a.getAttribute('data-has-debt') === '1' ? 1 : 0;
-        var bUnpaid = b.getAttribute('data-has-debt') === '1' ? 1 : 0;
-        if (aUnpaid !== bUnpaid) return bUnpaid - aUnpaid;
-        if (enabled && aUnpaid) {
-          var daysA = Number(a.getAttribute('data-debt-days') || -1);
-          var daysB = Number(b.getAttribute('data-debt-days') || -1);
-          if (daysB !== daysA) return daysB - daysA;
-        }
-        return Number(b.getAttribute('data-debt-time') || 0) - Number(a.getAttribute('data-debt-time') || 0);
-      });
-      rows.forEach(function(row) { tbody.appendChild(row); });
-    }
     document.querySelectorAll('[id^="supplierDebtHistoryTable_"]').forEach(function(table) {
       var tbody = table.querySelector('tbody');
       var warnDays = Number(table.getAttribute('data-warn-days') || 10);
@@ -672,10 +666,10 @@
       var sortCheck = panel ? panel.querySelector('.js-supplier-debt-sort-oldest') : null;
       if (sortCheck) {
         sortCheck.addEventListener('change', function() {
-          sortSupplierDebtRows(tbody, sortCheck.checked);
+          sortCheck.checked = false;
         });
+        sortCheck.checked = false;
       }
-      sortSupplierDebtRows(tbody, !sortCheck || sortCheck.checked);
       if (tbody) {
         tbody.querySelectorAll('.js-supplier-debt-row').forEach(function(row) {
           var days = Number(row.getAttribute('data-debt-days'));

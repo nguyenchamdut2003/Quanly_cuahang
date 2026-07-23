@@ -10,6 +10,7 @@ const ENTITY_LABELS = {
   HangHoa: 'Hàng hóa',
   CuaHang: 'Cửa hàng',
   Kho: 'Kho',
+  SoQuy: 'Sổ quỹ',
   PhieuThuChi: 'Phiếu thu / chi tiền',
   VanDon: 'Vận đơn giao hàng',
   PhieuKiemKho: 'Phiếu kiểm kho',

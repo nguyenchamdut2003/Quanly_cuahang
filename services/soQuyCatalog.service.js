@@ -108,7 +108,8 @@ function scopeFilter(loaiSoQuy) {
 
 async function clearOtherDefaultCashBooks(params) {
   var filter = Object.assign({}, scopeFilter(params.loaiSoQuy), {
-    mac_dinh: true
+    mac_dinh: true,
+    $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
   });
   if (params.excludeId) filter._id = { $ne: params.excludeId };
   var update = SoQuy.updateMany(filter, { $set: { mac_dinh: false } });
@@ -120,7 +121,8 @@ async function ensureNoDuplicateBankAccount(payload, excludeId) {
   if (payload.loai_so_quy !== 'chuyen_khoan') return;
   var query = {
     loai_so_quy: 'chuyen_khoan',
-    'thong_tin_ngan_hang.so_tai_khoan': payload.thong_tin_ngan_hang.so_tai_khoan
+    'thong_tin_ngan_hang.so_tai_khoan': payload.thong_tin_ngan_hang.so_tai_khoan,
+    $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
   };
   if (excludeId) query._id = { $ne: excludeId };
   var exists = await SoQuy.exists(query);
@@ -133,7 +135,8 @@ async function ensureNoDuplicateBankAccount(payload, excludeId) {
 
 async function ensureNoDuplicateCashBookName(payload, excludeId) {
   var query = Object.assign({}, scopeFilter(payload.loai_so_quy), {
-    ten_so_quy: payload.ten_so_quy
+    ten_so_quy: payload.ten_so_quy,
+    $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
   });
   if (excludeId) query._id = { $ne: excludeId };
   var exists = await SoQuy.exists(query);
@@ -190,6 +193,7 @@ function formatCashBook(row, balances) {
 function buildListFilter(query) {
   query = query || {};
   var filter = {};
+  filter.$or = [{ deleted_at: null }, { deleted_at: { $exists: false } }];
   var status = normalizeString(query.trang_thai || (query.activeOnly ? 'active' : 'all'));
   if (status && status !== 'all') {
     if (CASH_BOOK_STATUSES.indexOf(status) < 0) {
@@ -242,6 +246,12 @@ async function updateCashBook(params) {
     var notFound = new Error('Không tìm thấy sổ quỹ.');
     notFound.statusCode = 404;
     throw notFound;
+  }
+
+  if (current.deleted_at) {
+    var deletedError = new Error('Sổ quỹ đã nằm trong thùng rác, không thể cập nhật.');
+    deletedError.statusCode = 400;
+    throw deletedError;
   }
 
   var body = params.body || {};

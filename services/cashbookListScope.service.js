@@ -92,7 +92,7 @@ function resolveReceiptScopedAmount(receipt, scope, bookMeta = {}) {
 async function buildCashBookMeta(scope) {
   if (!scope || scope.mode !== 'specific' || !scope.bookId) return {};
   if (!isObjectId(scope.bookId)) return {};
-  const book = await SoQuy.findById(scope.bookId).select('loai_so_quy ten_so_quy').lean();
+  const book = await SoQuy.findOne({ _id: scope.bookId, deleted_at: null }).select('loai_so_quy ten_so_quy').lean();
   if (!book) return {};
   return {
     loai_so_quy: book.loai_so_quy || 'tien_mat',

@@ -29,6 +29,7 @@ const { loadReturnsLinkedVatChuaMap } = require('../services/vatChuaDetail.servi
 const { truTonKho, congTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
+const { previewReturnImportTrash, moveReturnImportToTrash } = require('../services/returnImportTrash.service');
 
 /** Số ngày được trả hàng nhập kể từ ngày nhập (khi phiếu không có hạn riêng). Có thể ghi đè bằng biến môi trường SO_NGAY_TRA_HANG_NHAP. */
 const DEFAULT_SO_NGAY_TRA_HANG_NHAP = (() => {
@@ -590,7 +591,7 @@ function applyWorksheetFormat(worksheet) {
 }
 
 async function buildListFilter(req, storeId) {
-  const query = {};
+  const query = { deleted_at: null };
   if (isObjectId(storeId)) query.cua_hang_id = storeId;
   const q = String(req.query.q || '').trim();
   if (q) query.ma_phieu_tra_nhap = { $regex: q, $options: 'i' };
@@ -858,13 +859,14 @@ async function validateReturnItems(params) {
       currentReturnFilter.phieu_tra_nhap_id = { $ne: returnId };
     }
     const completedReturns = await CTPhieuTraHangNhap.find(currentReturnFilter)
-      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
+      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai deleted_at' })
       .lean();
 
     completedReturns.forEach(row => {
       const ptId0 = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
       if (ptId0 && ignoreSet.has(String(ptId0))) return;
       if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
+      if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.deleted_at) return;
       if (!row.ct_phieu_nhap_id) return;
       const ctId = String(row.ct_phieu_nhap_id);
       const key = parseReturnLineSlotKey(ctId, row);
@@ -1102,14 +1104,13 @@ async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
     cua_hang_id: returnDoc.cua_hang_id,
     nguoi_tao_id: userId,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
-    phieu_nhap_id: returnDoc.phieu_nhap_id || undefined,
     phieu_tra_hang_nhap_id: returnDoc._id,
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
     phuong_thuc_thanh_toan: normalizePaymentMethod(options.phuong_thuc_thanh_toan || paymentMethodFromDetail(paymentDetail)),
     chi_tiet_thanh_toan: paymentDetail,
     ghi_chu: 'Trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
-    hach_toan: options.hach_toan !== undefined ? options.hach_toan : returnDoc.tinh_vao_cong_no
+    hach_toan: false
   });
 }
 
@@ -1134,14 +1135,13 @@ async function createSupplierRefundPaymentReceipt(returnDoc, userId, payment, ca
     cua_hang_id: returnDoc.cua_hang_id,
     nguoi_tao_id: userId,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
-    phieu_nhap_id: returnDoc.phieu_nhap_id || undefined,
     phieu_tra_hang_nhap_id: returnDoc._id,
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
     phuong_thuc_thanh_toan: normalizePaymentMethod(paymentMethodFromDetail(paymentDetail)),
     chi_tiet_thanh_toan: paymentDetail,
     ghi_chu: 'Nhận tiền trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
-    hach_toan: returnDoc.tinh_vao_cong_no
+    hach_toan: false
   });
 }
 
@@ -1176,14 +1176,13 @@ async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
     cua_hang_id: returnDoc.cua_hang_id,
     nguoi_tao_id: userId,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
-    phieu_nhap_id: returnDoc.phieu_nhap_id || undefined,
     phieu_tra_hang_nhap_id: returnDoc._id,
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
     phuong_thuc_thanh_toan: normalizePaymentMethod(options.phuong_thuc_thanh_toan || paymentMethodFromDetail(paymentDetail)),
     chi_tiet_thanh_toan: paymentDetail,
     ghi_chu: 'Trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
-    hach_toan: options.hach_toan !== undefined ? options.hach_toan : returnDoc.tinh_vao_cong_no
+    hach_toan: false
   };
   if (isV2) {
     Object.assign(payload, {
@@ -1221,14 +1220,13 @@ async function createSupplierRefundPaymentReceipt(returnDoc, userId, payment, ca
     cua_hang_id: returnDoc.cua_hang_id,
     nguoi_tao_id: userId,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
-    phieu_nhap_id: returnDoc.phieu_nhap_id || undefined,
     phieu_tra_hang_nhap_id: returnDoc._id,
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
     phuong_thuc_thanh_toan: normalizePaymentMethod(paymentMethodFromDetail(paymentDetail)),
     chi_tiet_thanh_toan: paymentDetail,
     ghi_chu: 'Nhận tiền trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
-    hach_toan: returnDoc.tinh_vao_cong_no
+    hach_toan: false
   };
   if (isV2) {
     Object.assign(payload, {
@@ -1452,6 +1450,35 @@ exports.index = async function(req, res, next) {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+exports.previewTrash = async function(req, res) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const ids = req.body && (req.body.phieu_tra_hang_nhap_ids || req.body.ids);
+    const data = await previewReturnImportTrash(ids, storeId);
+    return res.json({ success: true, data: data });
+  } catch (error) {
+    const status = Number(error && error.statusCode) || 400;
+    return res.status(status).json({ success: false, message: error.message || 'Không xem trước được dữ liệu xóa.' });
+  }
+};
+
+exports.moveToTrash = async function(req, res) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const ids = req.body && (req.body.phieu_tra_hang_nhap_ids || req.body.ids);
+    const userId = req.user && req.user._id ? req.user._id : null;
+    const data = await moveReturnImportToTrash(ids, storeId, userId);
+    return res.json({
+      success: true,
+      message: 'Đã đưa ' + data.moved_count + ' phiếu trả hàng nhập vào thùng rác.',
+      data: data
+    });
+  } catch (error) {
+    const status = Number(error && error.statusCode) || 400;
+    return res.status(status).json({ success: false, message: error.message || 'Không đưa vào thùng rác được.' });
   }
 };
 
@@ -1752,7 +1779,7 @@ async function buildReturnLinesOnlyGridItems(lines, khoId) {
 
 async function loadReturnCopyDraft(req, storeId, copyFromId) {
   if (!isObjectId(copyFromId) || !isObjectId(storeId)) return null;
-  const source = await PhieuTraHangNhap.findOne({ _id: copyFromId, cua_hang_id: storeId })
+  const source = await PhieuTraHangNhap.findOne({ _id: copyFromId, cua_hang_id: storeId, deleted_at: null })
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
     .lean();
   if (!source) return null;
@@ -2064,7 +2091,7 @@ exports.createSubmit = async function(req, res, next) {
 
 exports.detail = async function(req, res, next) {
   try {
-    const ret = await PhieuTraHangNhap.findById(req.params.id)
+    const ret = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null })
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .populate('kho_id')
@@ -2085,7 +2112,7 @@ exports.detail = async function(req, res, next) {
 
 exports.complete = async function(req, res) {
   try {
-    const returnDoc = await PhieuTraHangNhap.findById(req.params.id);
+    const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null });
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
     if (returnDoc.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (returnDoc.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
@@ -2155,7 +2182,7 @@ exports.createReceipt = async function(req, res) {
     session = await mongoose.startSession();
     let result;
     await session.withTransaction(async () => {
-      const returnDoc = await PhieuTraHangNhap.findById(req.params.id).session(session);
+      const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null }).session(session);
       if (!returnDoc) throw new Error('Không tìm thấy phiếu trả hàng nhập');
       if (returnDoc.trang_thai === 'cancelled') throw new Error('Phiếu đã hủy, không thể tạo phiếu thu');
       if (returnDoc.trang_thai !== 'completed') throw new Error('Chỉ tạo phiếu thu cho phiếu đã trả hàng');
@@ -2199,7 +2226,7 @@ exports.createReceipt = async function(req, res) {
 
 exports.cancel = async function(req, res) {
   try {
-    const returnDoc = await PhieuTraHangNhap.findById(req.params.id);
+    const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null });
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
     if (returnDoc.trang_thai === 'cancelled') {
       return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
@@ -2232,7 +2259,7 @@ exports.exportOneExcel = async function(req, res, next) {
       return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
     }
     const storeId = await resolveStoreId(req);
-    const query = { _id: req.params.id };
+    const query = { _id: req.params.id, deleted_at: null };
     if (isObjectId(storeId)) query.cua_hang_id = storeId;
     const ticket = await PhieuTraHangNhap.findOne(query)
       .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
@@ -2288,7 +2315,7 @@ exports.exportCsv = async function(req, res, next) {
 
 async function loadReturnWithItems(id, storeId) {
   if (!isObjectId(id)) return null;
-  const filter = { _id: id };
+  const filter = { _id: id, deleted_at: null };
   if (isObjectId(storeId)) filter.cua_hang_id = storeId;
   const ticket = await PhieuTraHangNhap.findOne(filter)
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du sdt email' })

@@ -113,6 +113,8 @@
     .actions{display:flex;align-items:center;gap:8px}
     .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
+    .kv-btn.danger{border-color:#ef4444;color:#ef4444}
+    .kv-btn:disabled{opacity:.5;cursor:not-allowed}
     .return-open-link{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#0070f4;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;white-space:nowrap}
     .return-open-link:hover{border-color:#0070f4;background:#f7fbff;text-decoration:none}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
@@ -205,6 +207,22 @@
     .pay-total-summary{font-size:13px;font-weight:600;color:#111827;padding:4px 0}
     .pay-summary-error{font-size:12px;color:#b45309;font-weight:600;padding:4px 0}
     .receipt-pay-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}
+    .return-trash-modal{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:center;justify-content:center;z-index:1400;padding:18px}
+    .return-trash-modal.is-open{display:flex}
+    .return-trash-card{width:min(720px,calc(100vw - 36px));max-height:calc(100vh - 48px);overflow:auto;background:#fff;border-radius:8px;box-shadow:0 20px 50px rgba(15,23,42,.28)}
+    .return-trash-head,.return-trash-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #e5e9ee}
+    .return-trash-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}
+    .return-trash-head h3{margin:0;font-size:18px;font-weight:800}
+    .return-trash-close{border:0;background:#fff;font-size:24px;line-height:1;cursor:pointer;color:#667085}
+    .return-trash-body{padding:16px 18px}
+    .return-trash-alert{border-radius:6px;padding:9px 10px;margin:7px 0;font-size:13px;line-height:1.4}
+    .return-trash-alert.is-warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+    .return-trash-alert.is-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+    .return-trash-list{margin:8px 0 12px;padding-left:20px;font-size:13px}
+    .return-trash-impact{width:100%;border-collapse:collapse;margin-top:10px}
+    .return-trash-impact th,.return-trash-impact td{border:1px solid #e4eaf2;padding:8px;font-size:13px;text-align:left}
+    .return-trash-impact th{background:#f4f8fc;font-weight:800}
+    .return-trash-impact .num{text-align:right}
     @media(max-width:1100px){.return-shell{padding:12px 24px 14px;grid-template-columns:200px minmax(0,1fr)}}
     @media(max-width:1024px){
       .return-detail-split{flex-direction:column;align-items:stretch;gap:20px}
@@ -256,6 +274,7 @@
         <div class="toolbar">
           <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"></div>
           <div class="actions">
+            <button type="button" class="kv-btn danger" id="returnTrashOpenBtn" disabled>Xóa</button>
             <a class="kv-btn primary" href="/tra-hang-nhap/create">+ Trả hàng nhập</a>
             <a class="kv-btn" href="/tra-hang-nhap/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
           </div>
@@ -264,7 +283,7 @@
           <table>
             <thead>
               <tr>
-                <th class="check-col"><input type="checkbox"></th>
+                <th class="check-col"><input type="checkbox" id="returnCheckAll"></th>
                 <th class="star-col">☆</th>
                 <th class="code-col">Mã trả hàng nhập</th>
                 <th class="time-col">Thời gian</th>
@@ -280,7 +299,7 @@
               <% if (safeReturns.length) { %>
                 <% safeReturns.forEach(function(r) { %>
                   <tr class="return-row" data-detail-id="<%= r._id %>">
-                    <td class="check-col"><input type="checkbox"></td>
+                    <td class="check-col"><input type="checkbox" class="return-select-check" value="<%= r._id %>"></td>
                     <td class="star-col">☆</td>
                     <td class="ellipsis"><%= r.ma_phieu_tra_nhap || '' %></td>
                     <td class="ellipsis"><%= formatDate(r.ngay_tra || r.created_at) %></td>
@@ -497,10 +516,191 @@
       </div>
     </div>
   </div>
+  <div id="returnTrashModal" class="return-trash-modal" role="dialog" aria-hidden="true" aria-labelledby="returnTrashTitle">
+    <div class="return-trash-card">
+      <div class="return-trash-head">
+        <h3 id="returnTrashTitle">Xóa phiếu trả hàng nhập</h3>
+        <button type="button" class="return-trash-close" id="returnTrashCloseBtn">&times;</button>
+      </div>
+      <div class="return-trash-body">
+        <div id="returnTrashAlerts"></div>
+        <div><strong>Phiếu đã chọn</strong></div>
+        <ul class="return-trash-list" id="returnTrashSelectedList"></ul>
+        <div><strong>Dữ liệu bị kéo theo</strong></div>
+        <table class="return-trash-impact">
+          <thead>
+            <tr>
+              <th>Dữ liệu</th>
+              <th class="num">Số lượng</th>
+              <th>Mã tham chiếu</th>
+            </tr>
+          </thead>
+          <tbody id="returnTrashImpactBody">
+            <tr><td colspan="3">Chưa có dữ liệu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="return-trash-foot">
+        <button type="button" class="kv-btn" id="returnTrashCancelBtn">Hủy</button>
+        <button type="button" class="kv-btn danger" id="returnTrashConfirmBtn" disabled>Đưa vào thùng rác</button>
+      </div>
+    </div>
+  </div>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var pendingReturnReceiptId = '';
       var pendingReturnReceiptDue = 0;
+      var returnTrashPendingIds = [];
+      var returnTrashPreview = null;
+      var returnTrashOpenBtn = document.getElementById('returnTrashOpenBtn');
+      var returnTrashModal = document.getElementById('returnTrashModal');
+      var returnTrashCloseBtn = document.getElementById('returnTrashCloseBtn');
+      var returnTrashCancelBtn = document.getElementById('returnTrashCancelBtn');
+      var returnTrashConfirmBtn = document.getElementById('returnTrashConfirmBtn');
+      var returnTrashAlerts = document.getElementById('returnTrashAlerts');
+      var returnTrashSelectedList = document.getElementById('returnTrashSelectedList');
+      var returnTrashImpactBody = document.getElementById('returnTrashImpactBody');
+      function escapeHtml(value) {
+        return String(value == null ? '' : value)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+      function getSelectedReturnIds() {
+        return Array.prototype.slice.call(document.querySelectorAll('.return-select-check:checked')).map(function(cb) {
+          return cb.value;
+        }).filter(Boolean);
+      }
+      function updateReturnTrashButtonState() {
+        var ids = getSelectedReturnIds();
+        if (returnTrashOpenBtn) returnTrashOpenBtn.disabled = ids.length === 0;
+        var all = document.querySelectorAll('.return-select-check');
+        var checked = document.querySelectorAll('.return-select-check:checked');
+        var header = document.getElementById('returnCheckAll');
+        if (header) {
+          header.checked = all.length > 0 && checked.length === all.length;
+          header.indeterminate = checked.length > 0 && checked.length < all.length;
+        }
+      }
+      function closeReturnTrashModal() {
+        if (!returnTrashModal) return;
+        returnTrashModal.classList.remove('is-open');
+        returnTrashModal.setAttribute('aria-hidden', 'true');
+        returnTrashPendingIds = [];
+        returnTrashPreview = null;
+        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = true;
+      }
+      function renderReturnTrashAlerts(preview) {
+        if (!returnTrashAlerts) return;
+        var html = '';
+        (preview.items || []).forEach(function(item) {
+          if (!item.can_trash && item.block_reason) {
+            html += '<div class="return-trash-alert is-error">' + escapeHtml(item.ma_phieu_tra_nhap || item.phieu_tra_hang_nhap_id) + ': ' + escapeHtml(item.block_reason) + '</div>';
+          }
+          (item.warnings || []).forEach(function(warn) {
+            html += '<div class="return-trash-alert is-warn">' + escapeHtml(item.ma_phieu_tra_nhap || '') + (item.ma_phieu_tra_nhap ? ' - ' : '') + escapeHtml(warn) + '</div>';
+          });
+        });
+        returnTrashAlerts.innerHTML = html;
+      }
+      function renderReturnTrashSelected(preview) {
+        if (!returnTrashSelectedList) return;
+        returnTrashSelectedList.innerHTML = (preview.items || []).map(function(item) {
+          var label = [item.ma_phieu_tra_nhap, item.ten_ncc].filter(Boolean).join(' - ');
+          return '<li>' + escapeHtml(label || item.phieu_tra_hang_nhap_id) + '</li>';
+        }).join('');
+      }
+      function renderReturnTrashImpact(preview) {
+        if (!returnTrashImpactBody) return;
+        var groups = preview.aggregate_groups || [];
+        if (!groups.length) {
+          returnTrashImpactBody.innerHTML = '<tr><td colspan="3">Không có dữ liệu liên quan đáng kể.</td></tr>';
+          return;
+        }
+        returnTrashImpactBody.innerHTML = groups.map(function(group) {
+          return '<tr>'
+            + '<td>' + escapeHtml(group.label || group.entity_type) + '</td>'
+            + '<td class="num">' + escapeHtml(String(group.count || 0)) + '</td>'
+            + '<td>' + escapeHtml((group.samples || []).join(', ') || '-') + '</td>'
+            + '</tr>';
+        }).join('');
+      }
+      function openReturnTrashModal() {
+        var ids = getSelectedReturnIds();
+        if (!ids.length) return alert('Vui lòng chọn ít nhất một phiếu trả hàng nhập.');
+        returnTrashPendingIds = ids.slice();
+        if (returnTrashModal) {
+          returnTrashModal.classList.add('is-open');
+          returnTrashModal.setAttribute('aria-hidden', 'false');
+        }
+        if (returnTrashImpactBody) returnTrashImpactBody.innerHTML = '<tr><td colspan="3">Đang kiểm tra dữ liệu liên quan...</td></tr>';
+        if (returnTrashAlerts) returnTrashAlerts.innerHTML = '';
+        if (returnTrashSelectedList) returnTrashSelectedList.innerHTML = '';
+        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = true;
+        fetch('/tra-hang-nhap/trash/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ phieu_tra_hang_nhap_ids: returnTrashPendingIds })
+        })
+          .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+          .then(function(result) {
+            if (!result.ok || !result.data.success) throw new Error((result.data && result.data.message) || 'Không tải được thông tin xóa');
+            returnTrashPreview = result.data.data;
+            renderReturnTrashSelected(returnTrashPreview);
+            renderReturnTrashAlerts(returnTrashPreview);
+            renderReturnTrashImpact(returnTrashPreview);
+            if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = !returnTrashPreview.can_proceed;
+          })
+          .catch(function(err) {
+            if (returnTrashImpactBody) returnTrashImpactBody.innerHTML = '<tr><td colspan="3">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
+            alert(err.message || 'Không tải được thông tin xóa');
+          });
+      }
+      function confirmReturnTrash() {
+        if (!returnTrashPreview || !returnTrashPreview.can_proceed || !returnTrashPendingIds.length) return;
+        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = true;
+        fetch('/tra-hang-nhap/trash/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ phieu_tra_hang_nhap_ids: returnTrashPendingIds })
+        })
+          .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
+          .then(function(result) {
+            if (!result.ok || !result.data.success) throw new Error((result.data && result.data.message) || 'Không đưa vào thùng rác được');
+            alert(result.data.message || 'Đã đưa vào thùng rác');
+            window.location.reload();
+          })
+          .catch(function(err) {
+            alert(err.message || 'Không đưa vào thùng rác được');
+            if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = false;
+          });
+      }
+      document.querySelectorAll('.return-select-check').forEach(function(cb) {
+        cb.addEventListener('change', updateReturnTrashButtonState);
+      });
+      var returnCheckAll = document.getElementById('returnCheckAll');
+      if (returnCheckAll) {
+        returnCheckAll.addEventListener('change', function() {
+          document.querySelectorAll('.return-select-check').forEach(function(cb) {
+            cb.checked = returnCheckAll.checked;
+          });
+          updateReturnTrashButtonState();
+        });
+      }
+      if (returnTrashOpenBtn) returnTrashOpenBtn.addEventListener('click', openReturnTrashModal);
+      if (returnTrashCloseBtn) returnTrashCloseBtn.addEventListener('click', closeReturnTrashModal);
+      if (returnTrashCancelBtn) returnTrashCancelBtn.addEventListener('click', closeReturnTrashModal);
+      if (returnTrashConfirmBtn) returnTrashConfirmBtn.addEventListener('click', confirmReturnTrash);
+      if (returnTrashModal) {
+        returnTrashModal.addEventListener('click', function(e) {
+          if (e.target === returnTrashModal) closeReturnTrashModal();
+        });
+      }
+      updateReturnTrashButtonState();
       var legacyReceiptCashBook = document.getElementById('returnReceiptPayCashBook');
       if (legacyReceiptCashBook) {
         legacyReceiptCashBook.insertAdjacentHTML('beforeend', '<option value="v2">v2</option>');

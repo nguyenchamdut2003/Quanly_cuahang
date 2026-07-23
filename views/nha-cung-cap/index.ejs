@@ -741,11 +741,6 @@
       if (openAddSupplierModalBtn) openAddSupplierModalBtn.addEventListener('click', openAddSupplierModal);
       if (addSupplierModalClose) addSupplierModalClose.addEventListener('click', closeAddSupplierModal);
       if (addSupplierModalCancel) addSupplierModalCancel.addEventListener('click', closeAddSupplierModal);
-      if (addSupplierModalOverlay) {
-        addSupplierModalOverlay.addEventListener('click', function(event) {
-          if (event.target === addSupplierModalOverlay) closeAddSupplierModal();
-        });
-      }
       if (addSupplierModalOverlay && addSupplierModalOverlay.getAttribute('data-auto-open') === '1') {
         openAddSupplierModal();
       }
