@@ -15,6 +15,7 @@ router.get('/', nhaCungCapController.index);
 router.get('/export.xlsx', nhaCungCapController.exportExcel);
 router.get('/import/template.xlsx', nhaCungCapController.downloadImportTemplate);
 router.post('/import', upload.single('file'), nhaCungCapController.importExcel);
+router.get('/api/table-metrics', nhaCungCapController.apiTableMetrics);
 router.get('/api/:id/detail', nhaCungCapController.apiSupplierDetail);
 router.get('/:id/export/:section', nhaCungCapController.exportSupplierDetail);
 router.post('/add', nhaCungCapController.add);

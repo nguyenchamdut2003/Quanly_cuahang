@@ -20,6 +20,8 @@
       .kk-actions{display:flex;align-items:center;gap:8px}
       .kk-btn{height:36px;border:1px solid #c7d0dc;background:#fff;border-radius:8px;color:#1f2937;padding:0 13px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
       .kk-btn.primary{border-color:#006dff;color:#006dff}
+      .kk-btn.danger{border-color:#fecdca;color:#b42318}
+      .kk-btn:disabled{opacity:.55;cursor:not-allowed}
       .filter-title{font-size:14px;font-weight:800;margin:0 0 10px;color:#050505}
       .filter-block{margin-bottom:20px}
       .radio-row,.check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px;color:#111827}
@@ -81,6 +83,25 @@
       .kk-export-grid label{display:flex;align-items:center;gap:8px;font-size:13px;color:#344054;cursor:pointer}
       .kk-export-foot{display:flex;align-items:center;justify-content:space-between;padding:14px 24px 20px;border-top:1px solid #e5e9ee}
       .kk-export-error{color:#d92d20;font-size:13px;margin:0 0 10px;display:none}
+      .kk-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
+      .kk-trash-overlay.is-open{display:flex}
+      .kk-trash-modal{width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+      .kk-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
+      .kk-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+      .kk-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
+      .kk-trash-body{padding:14px 22px 18px;overflow:auto}
+      .kk-trash-desc{margin:0 0 12px;font-size:13px;line-height:1.5;color:#475467}
+      .kk-trash-alert{border-radius:8px;padding:10px 12px;font-size:13px;line-height:1.45;margin-bottom:12px}
+      .kk-trash-alert.is-error{border:1px solid #fecdca;background:#fffbfa;color:#b42318}
+      .kk-trash-alert.is-warn{border:1px solid #fedf89;background:#fffaeb;color:#93370d}
+      .kk-trash-selected{margin:0 0 12px;padding:0;list-style:none}
+      .kk-trash-selected li{font-size:13px;color:#111827;padding:4px 0;border-bottom:1px dashed #eef2f6}
+      .kk-trash-table{width:100%;border-collapse:collapse;font-size:13px}
+      .kk-trash-table th{background:#f8fafc;border-bottom:1px solid #e4eaf2;padding:8px 10px;text-align:left;font-size:12px;color:#475467}
+      .kk-trash-table td{border-bottom:1px solid #eef2f6;padding:8px 10px;color:#111827}
+      .kk-trash-table .num{text-align:right;font-weight:700}
+      .kk-trash-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee}
+      .kk-trash-loading{text-align:center;padding:28px 12px;color:#667085;font-size:13px}
     </style>
   </head>
   <body>
@@ -139,6 +160,7 @@
           </div>
           <div></div>
           <div class="kk-actions">
+            <button type="button" class="kk-btn danger" id="openKkTrashModal" disabled><i class="fa-regular fa-trash-can"></i> Xóa</button>
             <a class="kk-btn primary" href="/kiem-kho/create"><i class="fa-solid fa-plus"></i> Kiểm kho</a>
             <button type="button" class="kk-btn" id="openKkExportModal"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></button>
           </div>
@@ -148,7 +170,7 @@
           <table class="kk-table">
             <thead>
               <tr>
-                <th class="select-col"><input class="row-check" type="checkbox"></th>
+                <th class="select-col"><input class="row-check" id="kkSelectAll" type="checkbox"></th>
                 <th style="width:36px"><i class="fa-regular fa-star star"></i></th>
                 <th>Mã kiểm kho</th>
                 <th>Thời gian</th>
@@ -173,7 +195,7 @@
                 const statusText = statusCompleted ? 'Đã cân bằng kho' : (t.trang_thai === 'cancelled' ? 'Đã hủy' : 'Phiếu tạm');
               %>
                 <tr class="ticket-row <%= index === 0 ? 'active' : '' %>" data-detail-id="detail-<%= t._id %>" onclick="toggleTicketDetail('<%= t._id %>')">
-                  <td class="select-col"><input class="row-check" type="checkbox" onclick="event.stopPropagation()"></td>
+                  <td class="select-col"><input class="row-check kk-select-check" type="checkbox" value="<%= t._id %>" onclick="event.stopPropagation()"></td>
                   <td><i class="fa-regular fa-star star"></i></td>
                   <td><%= t.ma_kiem_kho || '' %></td>
                   <td><%= fmtDateTime(t.ngay_kiem || t.created_at) %></td>
@@ -286,6 +308,35 @@
       </main>
     </form>
 
+    <div id="kkTrashModalOverlay" class="kk-trash-overlay" aria-hidden="true">
+      <div class="kk-trash-modal" role="dialog" aria-labelledby="kkTrashModalTitle" aria-modal="true">
+        <div class="kk-trash-head">
+          <h3 id="kkTrashModalTitle">Đưa phiếu kiểm kho vào thùng rác</h3>
+          <button type="button" class="kk-trash-close" id="kkTrashModalClose" aria-label="Đóng">×</button>
+        </div>
+        <div class="kk-trash-body">
+          <p class="kk-trash-desc">Phiếu kiểm kho được chọn sẽ được đưa vào thùng rác, coi như đã xóa khỏi hệ thống và không còn tính vào hàng hóa/tồn kho. Dữ liệu chỉ bị xóa khỏi DB khi quá 30 ngày hoặc khi xóa vĩnh viễn trong Thùng rác.</p>
+          <div id="kkTrashAlert"></div>
+          <ul class="kk-trash-selected" id="kkTrashSelectedList"></ul>
+          <table class="kk-trash-table">
+            <thead>
+              <tr>
+                <th>Dữ liệu liên quan</th>
+                <th class="num" style="width:110px">Số lượng</th>
+              </tr>
+            </thead>
+            <tbody id="kkTrashImpactRows">
+              <tr><td colspan="2" class="kk-trash-loading">Chưa tải dữ liệu</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="kk-trash-foot">
+          <button type="button" class="kk-btn" id="kkTrashCancel">Bỏ qua</button>
+          <button type="button" class="kk-btn danger" id="kkTrashConfirm" disabled>Đưa vào thùng rác</button>
+        </div>
+      </div>
+    </div>
+
     <div id="kkExportModalOverlay" class="kk-export-overlay">
       <div class="kk-export-modal" role="dialog" aria-labelledby="kkExportModalTitle">
         <div class="kk-export-head">
@@ -360,6 +411,168 @@
           row.classList.add('active');
         }
       }
+
+    (function initKkTrashModal() {
+      var openBtn = document.getElementById('openKkTrashModal');
+      var overlay = document.getElementById('kkTrashModalOverlay');
+      var closeBtn = document.getElementById('kkTrashModalClose');
+      var cancelBtn = document.getElementById('kkTrashCancel');
+      var confirmBtn = document.getElementById('kkTrashConfirm');
+      var alertBox = document.getElementById('kkTrashAlert');
+      var selectedList = document.getElementById('kkTrashSelectedList');
+      var impactBody = document.getElementById('kkTrashImpactRows');
+      var selectAll = document.getElementById('kkSelectAll');
+      var rowChecks = Array.prototype.slice.call(document.querySelectorAll('.kk-select-check'));
+      var pendingIds = [];
+      var previewData = null;
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+        });
+      }
+
+      function getSelectedIds() {
+        return rowChecks.filter(function(cb) { return cb.checked; }).map(function(cb) {
+          return String(cb.value || '').trim();
+        }).filter(Boolean);
+      }
+
+      function updateSelectionState() {
+        var selectedIds = getSelectedIds();
+        if (openBtn) openBtn.disabled = selectedIds.length === 0;
+        if (selectAll) {
+          selectAll.checked = rowChecks.length > 0 && rowChecks.every(function(cb) { return cb.checked; });
+          selectAll.indeterminate = rowChecks.some(function(cb) { return cb.checked; }) && !selectAll.checked;
+        }
+      }
+
+      function closeTrashModal() {
+        if (!overlay) return;
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        pendingIds = [];
+        previewData = null;
+        if (confirmBtn) confirmBtn.disabled = true;
+      }
+
+      function renderAlert(preview) {
+        if (!alertBox) return;
+        var html = '';
+        (preview.items || []).forEach(function(item) {
+          if (!item.can_trash && item.block_reason) {
+            html += '<div class="kk-trash-alert is-error">' + escapeHtml(item.ma_kiem_kho || item.phieu_kiem_kho_id) + ': ' + escapeHtml(item.block_reason) + '</div>';
+          }
+          (item.warnings || []).forEach(function(warn) {
+            html += '<div class="kk-trash-alert is-warn">' + escapeHtml(item.ma_kiem_kho || '') + (item.ma_kiem_kho ? ' - ' : '') + escapeHtml(warn) + '</div>';
+          });
+        });
+        alertBox.innerHTML = html;
+      }
+
+      function renderSelectedList(preview) {
+        if (!selectedList) return;
+        selectedList.innerHTML = (preview.items || []).map(function(item) {
+          var label = [item.ma_kiem_kho, item.kho].filter(Boolean).join(' - ');
+          return '<li>' + escapeHtml(label || item.phieu_kiem_kho_id) + '</li>';
+        }).join('');
+      }
+
+      function renderImpactRows(preview) {
+        if (!impactBody) return;
+        var groups = preview.aggregate_groups || [];
+        if (!groups.length) {
+          impactBody.innerHTML = '<tr><td colspan="2">Không có dữ liệu liên quan đáng kể.</td></tr>';
+          return;
+        }
+        impactBody.innerHTML = groups.map(function(group) {
+          return '<tr>'
+            + '<td>' + escapeHtml(group.label || group.entity_type) + '</td>'
+            + '<td class="num">' + escapeHtml(String(group.count || 0)) + '</td>'
+            + '</tr>';
+        }).join('');
+      }
+
+      function openTrashModal() {
+        var ids = getSelectedIds();
+        if (!ids.length) {
+          alert('Vui lòng chọn ít nhất một phiếu kiểm kho.');
+          return;
+        }
+        pendingIds = ids.slice();
+        if (overlay) {
+          overlay.classList.add('is-open');
+          overlay.setAttribute('aria-hidden', 'false');
+        }
+        if (impactBody) impactBody.innerHTML = '<tr><td colspan="2" class="kk-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
+        if (alertBox) alertBox.innerHTML = '';
+        if (selectedList) selectedList.innerHTML = '';
+        if (confirmBtn) confirmBtn.disabled = true;
+
+        fetch('/kiem-kho/trash/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phieu_kiem_kho_ids: pendingIds })
+        })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data.success) throw new Error(data.message || 'Không tải được thông tin xóa');
+            previewData = data.data;
+            renderSelectedList(previewData);
+            renderAlert(previewData);
+            renderImpactRows(previewData);
+            if (confirmBtn) confirmBtn.disabled = !previewData.can_proceed;
+          })
+          .catch(function(err) {
+            if (impactBody) impactBody.innerHTML = '<tr><td colspan="2">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
+            alert(err.message || 'Không tải được thông tin xóa');
+          });
+      }
+
+      function confirmTrash() {
+        if (!previewData || !previewData.can_proceed || !pendingIds.length) return;
+        if (confirmBtn) confirmBtn.disabled = true;
+        fetch('/kiem-kho/trash/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phieu_kiem_kho_ids: pendingIds })
+        })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data.success) throw new Error(data.message || 'Không xóa được phiếu kiểm kho');
+            alert(data.message || 'Đã xóa phiếu kiểm kho');
+            window.location.reload();
+          })
+          .catch(function(err) {
+            alert(err.message || 'Không xóa được phiếu kiểm kho');
+            if (confirmBtn) confirmBtn.disabled = false;
+          });
+      }
+
+      if (selectAll) {
+        selectAll.addEventListener('click', function(e) {
+          e.stopPropagation();
+          rowChecks.forEach(function(cb) { cb.checked = selectAll.checked; });
+          updateSelectionState();
+        });
+      }
+      rowChecks.forEach(function(cb) {
+        cb.addEventListener('change', updateSelectionState);
+      });
+      if (openBtn) openBtn.addEventListener('click', openTrashModal);
+      if (closeBtn) closeBtn.addEventListener('click', closeTrashModal);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeTrashModal);
+      if (confirmBtn) confirmBtn.addEventListener('click', confirmTrash);
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeTrashModal();
+        });
+      }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay && overlay.classList.contains('is-open')) closeTrashModal();
+      });
+      updateSelectionState();
+    })();
 
     (function initKkExportModal() {
       const overlay = document.getElementById('kkExportModalOverlay');

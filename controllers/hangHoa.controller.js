@@ -42,6 +42,8 @@ var {
 var pdfService = require('../services/pdf.service');
 var { buildLotProfitReport } = require('../services/lotProfitReport.service');
 var { submitStockAllocation } = require('../services/allocationSubmit.service');
+var { previewProductTrash, moveProductsToTrash } = require('../services/productTrash.service');
+var { measureAsync, isPerformanceEnabled } = require('../utils/performance.util');
 var {
     resolveSalePrice,
     buildPriceSetupLines,
@@ -98,6 +100,7 @@ function normalizeFilterQuery(query) {
 
 /** Danh sách mặc định: chỉ active; chỉ khi filter "Ngừng kinh doanh" mới lấy inactive. */
 function applyProductListStatusFilter(productQuery, filter) {
+    productQuery.$and = (productQuery.$and || []).concat([{ $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }]);
     if (filter && filter.status === 'inactive') {
         productQuery.trang_thai = 'inactive';
     } else {
@@ -679,7 +682,10 @@ async function enrichStockCardRows(rows, productId) {
         return map;
     }, {});
 
-    var checks = await PhieuKiemKho.find({ ma_kiem_kho: { $in: codes } }).lean();
+    var checks = await PhieuKiemKho.find({
+        ma_kiem_kho: { $in: codes },
+        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+    }).lean();
     var checkMap = mapBy(checks, 'ma_kiem_kho');
     var checkIds = checks.map(function(doc) { return doc._id; });
     var checkDetails = checkIds.length ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: checkIds }, hang_hoa_id: productObjectId }).lean() : [];
@@ -787,6 +793,30 @@ async function enrichStockCardRows(rows, productId) {
         card.ten_loai_chung_tu = labelChungTuDocumentType(card.chung_tu_type, row.loai_phieu, code);
 
         return card;
+    });
+}
+
+async function filterTrashedKiemKhoStockRows(rows) {
+    rows = rows || [];
+    var checkCodes = rows
+        .filter(function(row) { return row && row.loai_phieu === 'kiem_kho'; })
+        .map(function(row) { return String(row.ma_phieu || '').trim(); })
+        .filter(Boolean);
+    checkCodes = Array.from(new Set(checkCodes));
+    if (!checkCodes.length) return rows;
+
+    var activeChecks = await PhieuKiemKho.find({
+        ma_kiem_kho: { $in: checkCodes },
+        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+    }).select('ma_kiem_kho').lean();
+    var activeMap = activeChecks.reduce(function(map, doc) {
+        if (doc.ma_kiem_kho) map[String(doc.ma_kiem_kho)] = true;
+        return map;
+    }, {});
+
+    return rows.filter(function(row) {
+        if (!row || row.loai_phieu !== 'kiem_kho') return true;
+        return Boolean(activeMap[String(row.ma_phieu || '').trim()]);
     });
 }
 
@@ -1186,6 +1216,7 @@ async function loadProductDetailById(productId, req) {
         .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
+    selectedProductHistories = await filterTrashedKiemKhoStockRows(selectedProductHistories);
     selectedProductHistories = await enrichStockCardRows(selectedProductHistories, item._id);
     selectedProductHistories = selectedProductHistories.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
@@ -1877,6 +1908,7 @@ exports.submitAllocation = async function(req, res, next) {
 
 exports.index = async function(req, res, next) {
     try {
+        await measureAsync('hangHoa.index.total', async function() {
         var requestQuery = req?.query || {};
         if (Object.prototype.hasOwnProperty.call(requestQuery, 'product')) {
             var redirectQuery = Object.assign({}, requestQuery);
@@ -1905,15 +1937,19 @@ exports.index = async function(req, res, next) {
             if (dateRange.end) productQuery.created_at.$lte = dateRange.end;
         }
 
-        var products = await HangHoa.find(productQuery).sort({ created_at: -1, ma_hang: 1 }).lean();
+        var products = await measureAsync('hangHoa.index.loadProducts', function() {
+            return HangHoa.find(productQuery).sort({ created_at: -1, ma_hang: 1 }).lean();
+        });
         var productIds = products.map(function(item) { return item._id; });
 
-        var inventoryRows = productIds.length > 0
-            ? await TonKho.aggregate([
-                { $match: { hang_hoa_id: { $in: productIds } } },
-                { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
-            ])
-            : [];
+        var inventoryRows = await measureAsync('hangHoa.index.loadInventory', function() {
+            return productIds.length > 0
+                ? TonKho.aggregate([
+                    { $match: { hang_hoa_id: { $in: productIds } } },
+                    { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+                ])
+                : Promise.resolve([]);
+        });
         var inventoryMap = inventoryRows.reduce(function(map, row) {
             map[String(row._id)] = Number(row.total || 0);
             return map;
@@ -1929,10 +1965,18 @@ exports.index = async function(req, res, next) {
             });
         }
 
-        var storeId = await resolveStoreId(req);
-        var groups = await loadProductGroups(storeId);
-        var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
-        var units = await loadUnitOptions();
+        var storeId = await measureAsync('hangHoa.index.resolveStoreId', function() {
+            return resolveStoreId(req);
+        });
+        var groups = await measureAsync('hangHoa.index.loadGroups', function() {
+            return loadProductGroups(storeId);
+        });
+        var suppliers = await measureAsync('hangHoa.index.loadSuppliers', function() {
+            return NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
+        });
+        var units = await measureAsync('hangHoa.index.loadUnits', function() {
+            return loadUnitOptions();
+        });
         var groupMap = groups.reduce(function(map, group) {
             map[String(group._id)] = group.ten_nhom_hang || '---';
             return map;
@@ -1947,7 +1991,9 @@ exports.index = async function(req, res, next) {
         }, {});
 
         var finalProductIds = products.map(function(item) { return item._id; });
-        var priceMaps = await buildProductListPriceMaps(finalProductIds);
+        var priceMaps = await measureAsync('hangHoa.index.loadPriceMaps', function() {
+            return buildProductListPriceMaps(finalProductIds);
+        });
 
         products = products.map(function(item) {
             item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
@@ -1959,9 +2005,11 @@ exports.index = async function(req, res, next) {
         });
         var filterQueryString = buildFilterQueryString(filter);
 
-        var bangGiaList = await BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }).lean();
+        var bangGiaList = await measureAsync('hangHoa.index.loadBangGia', function() {
+            return BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }).lean();
+        });
 
-        res.render('hang-hoa/index', {
+        var locals = {
             title: 'Hàng hóa',
             pageTitle: 'Hàng hóa',
             activeMenu: 'hang-hoa',
@@ -1976,6 +2024,23 @@ exports.index = async function(req, res, next) {
             formatDate: formatDate,
             filterQueryString: filterQueryString,
             formMode: requestQuery.mode === 'create' ? 'create' : ''
+        };
+
+        if (!isPerformanceEnabled()) {
+            return res.render('hang-hoa/index', locals);
+        }
+
+        await new Promise(function(resolve, reject) {
+            var renderStartedAt = process.hrtime.bigint();
+
+            res.render('hang-hoa/index', locals, function(error, html) {
+                var renderDurationMs = Number(process.hrtime.bigint() - renderStartedAt) / 1000000;
+                console.log('[PERF] hangHoa.index.render: ' + renderDurationMs.toFixed(2) + ' ms');
+                if (error) return reject(error);
+                res.send(html);
+                resolve();
+            });
+        });
         });
     } catch (error) {
         next(error);
@@ -2123,7 +2188,8 @@ exports.remove = async function(req, res, next) {
         var productId = normalizeIdParam(req?.params?.id);
         if (!productId) return res.redirect('/hang-hoa?error=invalid_product');
 
-        await HangHoa.findByIdAndUpdate(productId, { trang_thai: 'inactive' });
+        var storeId = await resolveStoreId(req);
+        await moveProductsToTrash([productId], storeId, req.user?._id);
         res.redirect('/hang-hoa?success=deleted');
     } catch (error) {
         next(error);
@@ -2137,10 +2203,37 @@ exports.removeSelected = async function(req, res, next) {
         ids = ids.map(function(item) { return String(item || '').trim(); }).filter(Boolean);
         if (ids.length === 0) return res.redirect('/hang-hoa?error=no_selection');
 
-        await HangHoa.updateMany({ _id: { $in: ids } }, { $set: { trang_thai: 'inactive' } });
+        var storeId = await resolveStoreId(req);
+        await moveProductsToTrash(ids, storeId, req.user?._id);
         res.redirect('/hang-hoa?success=deleted');
     } catch (error) {
         next(error);
+    }
+};
+
+exports.previewTrash = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var result = await previewProductTrash(req.body && (req.body.ids || req.body.product_ids), storeId);
+        return res.json({ success: true, data: result });
+    } catch (error) {
+        var status = Number(error && (error.statusCode || error.status)) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không tải được thông tin xóa hàng hóa.' });
+    }
+};
+
+exports.moveToTrash = async function(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var result = await moveProductsToTrash(req.body && (req.body.ids || req.body.product_ids), storeId, req.user?._id);
+        return res.json({
+            success: true,
+            message: 'Đã đưa ' + result.moved_count + ' hàng hóa vào thùng rác.',
+            data: result
+        });
+    } catch (error) {
+        var status = Number(error && (error.statusCode || error.status)) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không xóa được hàng hóa.' });
     }
 };
 

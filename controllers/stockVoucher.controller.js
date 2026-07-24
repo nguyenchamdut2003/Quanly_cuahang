@@ -245,7 +245,10 @@ async function loadPurchaseReturn(id) {
 }
 
 async function loadInventoryCheck(id) {
-  var ticket = await PhieuKiemKho.findById(id)
+  var ticket = await PhieuKiemKho.findOne({
+    _id: id,
+    $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+  })
     .populate('cua_hang_id')
     .populate('kho_id')
     .populate('nguoi_tao_id')

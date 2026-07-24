@@ -56,8 +56,13 @@ var apiSoQuyRouter = require('./routes/apiSoQuy');
 var thietLapNhanVienRouter = require('./routes/thietLapNhanVien');
 var thungRacRouter = require('./routes/thungRac');
 var { countActiveTrashRoots } = require('./services/trashList.service');
+var { isPerformanceEnabled } = require('./utils/performance.util');
 
 var app = express();
+
+function isStaticAssetRequestPath(requestPath) {
+  return /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)$/i.test(requestPath || '');
+}
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
@@ -72,7 +77,11 @@ app.use(function(req, res, next) {
   next();
 });
 
-app.use(logger('dev'));
+app.use(logger('dev', {
+  skip: function(req) {
+    return isStaticAssetRequestPath(req.path);
+  }
+}));
 app.use(dbWriteRequestContext);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -88,6 +97,35 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
+
+if (isPerformanceEnabled()) {
+  app.use(function requestTiming(req, res, next) {
+    var startedAt = process.hrtime.bigint();
+
+    res.on('finish', function() {
+      var durationMs = Number(process.hrtime.bigint() - startedAt) / 1000000;
+      var isStaticAsset = isStaticAssetRequestPath(req.path);
+
+      if (isStaticAsset) return;
+
+      var level = durationMs >= 2000
+        ? 'VERY SLOW'
+        : durationMs >= 1000
+          ? 'SLOW'
+          : durationMs >= 500
+            ? 'WARN'
+            : 'OK';
+
+      console.log(
+        '[' + level + '] ' + req.method + ' ' + req.originalUrl +
+        ' | ' + res.statusCode +
+        ' | ' + durationMs.toFixed(2) + ' ms'
+      );
+    });
+
+    next();
+  });
+}
 
 app.get('/healthz', function(req, res) {
   res.status(200).json({ status: 'ok' });

@@ -67,6 +67,8 @@
     }
     .supplier-debt-warn-tip.is-visible { display: block; }
     .supplier-debt-warn-tip strong { color: #b42318; font-weight: 800; }
+    .supplier-metrics-loading { color: #64748b; }
+    .supplier-metrics-error { color: #b42318; font-weight: 700; }
     .supplier-list-panel {
       overflow: visible;
     }
@@ -638,9 +640,9 @@
               <tr class="customer-summary-row">
                 <td class="check-cell"></td>
                 <td colspan="4" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
-                <td><strong><%= Number(supplierSummaryTotals.totalPurchase || 0).toLocaleString('vi-VN') %></strong></td>
-                <td><strong><%= Number(supplierSummaryTotals.totalPaid || 0).toLocaleString('vi-VN') %></strong></td>
-                <td><strong><%= Number(supplierSummaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
+                <td data-summary-field="tong-mua"><strong><%= Number(supplierSummaryTotals.totalPurchase || 0).toLocaleString('vi-VN') %></strong></td>
+                <td data-summary-field="da-thanh-toan"><strong><%= Number(supplierSummaryTotals.totalPaid || 0).toLocaleString('vi-VN') %></strong></td>
+                <td data-summary-field="tong-no"><strong><%= Number(supplierSummaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
                 <td></td>
               </tr>
               <% if (suppliers.length === 0) { %>
@@ -648,17 +650,25 @@
               <% } %>
               <% suppliers.forEach(function(supplier) { %>
                 <% var listBase = '/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
-                <tr data-kv-detail-id="<%= supplier._id %>">
+                <tr
+                  class="supplier-row"
+                  data-kv-detail-id="<%= supplier._id %>"
+                  data-supplier-id="<%= supplier._id %>"
+                  data-metrics-loading="<%= supplier.metrics_pending ? 'true' : 'false' %>"
+                  data-metric-tong-mua="<%= Number(supplier.tong_mua || 0) %>"
+                  data-metric-da-thanh-toan="<%= Number(supplier.da_thanh_toan || 0) %>"
+                  data-metric-tong-no="<%= Number(supplier.tong_no || 0) %>"
+                >
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="supplier-checkbox" type="checkbox" name="ids" value="<%= supplier._id %>" form="bulkDeleteSuppliersForm" aria-label="Chọn nhà cung cấp"></td>
                   <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= supplier.ma_ncc || '---' %></a></td>
                   <td><strong><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= supplier.ten_ncc || '---' %></a></strong></td>
                   <td><%= supplier.sdt || '---' %></td>
                   <td><%= supplier.email || '---' %></td>
-                  <td><%= Number(supplier.tong_mua || 0).toLocaleString('vi-VN') %></td>
-                  <td><%= Number(supplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
-                  <td>
+                  <td data-field="tong-mua" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>"><%= Number(supplier.tong_mua || 0).toLocaleString('vi-VN') %></td>
+                  <td data-field="da-thanh-toan" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>"><%= Number(supplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
+                  <td data-field="tong-no" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>">
                     <div class="supplier-debt-cell">
-                      <span><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></span>
+                      <span data-debt-value><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></span>
                       <% if (supplier.debt_warning) { %>
                         <button
                           type="button"
@@ -858,6 +868,139 @@
         });
       }
       bindSupplierDebtWarnTips(document);
+
+      function setSupplierMetricsCell(row, field, value) {
+        var cell = row.querySelector('[data-field="' + field + '"]');
+        if (!cell) return;
+        cell.classList.remove('supplier-metrics-loading', 'supplier-metrics-error');
+        if (field === 'tong-no') {
+          var debtValue = cell.querySelector('[data-debt-value]');
+          if (debtValue) {
+            debtValue.textContent = formatSupplierMoney(value);
+            return;
+          }
+        }
+        cell.textContent = formatSupplierMoney(value);
+      }
+
+      function renderSupplierDebtWarning(row, metric) {
+        var cell = row.querySelector('[data-field="tong-no"]');
+        var wrap = cell ? cell.querySelector('.supplier-debt-cell') : null;
+        if (!wrap) return;
+        wrap.querySelectorAll('.js-supplier-debt-warn').forEach(function(btn) {
+          btn.remove();
+        });
+        if (!metric || !metric.debt_warning) return;
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'supplier-debt-warn-btn js-supplier-debt-warn';
+        button.setAttribute('data-supplier-id', metric.id || row.dataset.supplierId || '');
+        button.setAttribute('aria-label', 'Cảnh báo nợ quá hạn');
+        button.innerHTML = '&#9888;<span class="supplier-debt-warn-tip">NCC có khoản nợ quá hạn <strong>' +
+          formatSupplierMoney(metric.so_ngay_no_xa || 0) +
+          '</strong> ngày.<br>Tổng nợ còn lại: <strong>' +
+          formatSupplierMoney(metric.tong_no || 0) +
+          ' VNĐ</strong>.' +
+          (metric.no_xa_nhat_ma_phieu
+            ? '<br>Khoản nợ lâu nhất: <strong>' + escapeHtml(metric.no_xa_nhat_ma_phieu) + '</strong> (' + formatSupplierMoney(metric.no_xa_nhat_tien || 0) + ' VNĐ).'
+            : '') +
+          '</span>';
+        wrap.appendChild(button);
+        bindSupplierDebtWarnTips(wrap);
+      }
+
+      function updateSupplierSummaryTotals(rows) {
+        var totals = rows.reduce(function(sum, row) {
+          sum.tongMua += Number(row.dataset.metricTongMua || 0);
+          sum.daThanhToan += Number(row.dataset.metricDaThanhToan || 0);
+          sum.tongNo += Number(row.dataset.metricTongNo || 0);
+          return sum;
+        }, { tongMua: 0, daThanhToan: 0, tongNo: 0 });
+        var totalPurchaseCell = document.querySelector('[data-summary-field="tong-mua"] strong');
+        var totalPaidCell = document.querySelector('[data-summary-field="da-thanh-toan"] strong');
+        var totalDebtCell = document.querySelector('[data-summary-field="tong-no"] strong');
+        if (totalPurchaseCell) totalPurchaseCell.textContent = formatSupplierMoney(totals.tongMua);
+        if (totalPaidCell) totalPaidCell.textContent = formatSupplierMoney(totals.daThanhToan);
+        if (totalDebtCell) totalDebtCell.textContent = formatSupplierMoney(totals.tongNo);
+      }
+
+      function markSupplierMetricsError(rows) {
+        rows.forEach(function(row) {
+          row.dataset.metricsLoading = 'false';
+          row.dataset.metricsError = 'true';
+          ['tong-mua', 'da-thanh-toan', 'tong-no'].forEach(function(field) {
+            var cell = row.querySelector('[data-field="' + field + '"]');
+            if (!cell) return;
+            cell.classList.remove('supplier-metrics-loading');
+            cell.classList.add('supplier-metrics-error');
+          });
+        });
+      }
+
+      function loadSupplierTableMetrics() {
+        var pendingRows = Array.prototype.slice.call(document.querySelectorAll('.supplier-row[data-supplier-id][data-metrics-loading="true"]'));
+        if (!pendingRows.length) return;
+        var rowMap = new Map();
+        pendingRows.forEach(function(row) {
+          rowMap.set(row.dataset.supplierId, row);
+        });
+        function fetchMetricBatch(batchRows) {
+          var url = new URL('/nha-cung-cap/api/table-metrics' + window.location.search, window.location.origin);
+          url.searchParams.set('ids', batchRows.map(function(row) {
+            return row.dataset.supplierId;
+          }).join(','));
+          return fetch(url.toString(), { headers: { Accept: 'application/json' } })
+            .then(function(response) {
+              return response.text().then(function(text) {
+                var json = null;
+                try {
+                  json = text ? JSON.parse(text) : null;
+                } catch (err) {
+                  throw new Error('Response metrics khong phai JSON hop le.');
+                }
+                if (!response.ok || !json || json.success === false) {
+                  throw new Error((json && json.message) || 'Khong the tai so lieu tong hop NCC.');
+                }
+                return json;
+              });
+            })
+            .then(function(payload) {
+              (payload.rows || []).forEach(function(metric) {
+                var row = rowMap.get(String(metric.id || ''));
+                if (!row) return;
+                row.dataset.metricsLoading = 'false';
+                row.dataset.metricTongMua = String(Number(metric.tong_mua || 0));
+                row.dataset.metricDaThanhToan = String(Number(metric.da_thanh_toan || 0));
+                row.dataset.metricTongNo = String(Number(metric.tong_no || 0));
+                setSupplierMetricsCell(row, 'tong-mua', metric.tong_mua);
+                setSupplierMetricsCell(row, 'da-thanh-toan', metric.da_thanh_toan);
+                setSupplierMetricsCell(row, 'tong-no', metric.tong_no);
+                renderSupplierDebtWarning(row, metric);
+              });
+              batchRows.forEach(function(row) {
+                if (row.dataset.metricsLoading === 'true') {
+                  row.dataset.metricsLoading = 'false';
+                  ['tong-mua', 'da-thanh-toan', 'tong-no'].forEach(function(field) {
+                    var cell = row.querySelector('[data-field="' + field + '"]');
+                    if (cell) cell.classList.remove('supplier-metrics-loading');
+                  });
+                }
+              });
+            })
+            .catch(function(error) {
+              console.error('[SupplierMetrics]', error);
+              markSupplierMetricsError(batchRows);
+            });
+        }
+        var batches = [];
+        for (var i = 0; i < pendingRows.length; i += 100) {
+          batches.push(pendingRows.slice(i, i + 100));
+        }
+        Promise.all(batches.map(fetchMetricBatch)).then(function() {
+          updateSupplierSummaryTotals(Array.prototype.slice.call(document.querySelectorAll('.supplier-row[data-supplier-id]')));
+        });
+      }
+      loadSupplierTableMetrics();
 
       var selectAll = document.getElementById('selectAllSuppliers');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.supplier-checkbox'));

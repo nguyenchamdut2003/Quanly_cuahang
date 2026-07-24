@@ -407,7 +407,7 @@
   </div>
 
   <div class="page-actions product-detail-footer page-actions--sm">
-    <button class="btn btn-danger btn-sm" type="submit" form="deleteProductForm_<%= item._id %>" onclick="return confirm('Ban co chac muon xoa hang hoa nay khong?')">X&oacute;a</button>
+    <button class="btn btn-danger btn-sm btn-trash-product" type="button" data-product-id="<%= item._id %>" data-product-code="<%= item.ma_hang || '' %>" data-product-name="<%= item.ten_hang || '' %>">X&oacute;a</button>
     <button class="btn btn-light btn-sm btn-copy-product" type="button" data-product='<%- JSON.stringify(item) %>'>Sao ch&eacute;p</button>
     <button class="btn btn-primary btn-sm btn-edit-product" type="button" data-product='<%- JSON.stringify(item) %>'>Ch&#7881;nh s&#7917;a</button>
     <button class="btn btn-light btn-sm btn-print-label" type="button" data-product='<%- JSON.stringify(item) %>'>In tem m&atilde;</button>

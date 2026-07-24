@@ -551,11 +551,12 @@ function parseExportSource(query) {
 
 async function detectExportSource(id, store) {
     const sf = storeFilter(store);
+    const activeCheckFilter = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
     const [invoice, destroy, internal, check] = await Promise.all([
         HoaDonBanHang.exists({ _id: id, ...sf }),
         PhieuXuatHuy.exists({ _id: id, ...sf }),
         PhieuXuatNoiBo.exists({ _id: id, ...sf }),
-        PhieuKiemKho.exists({ _id: id, ...sf })
+        PhieuKiemKho.exists({ _id: id, ...sf, ...activeCheckFilter })
     ]);
     if (invoice) return 'hoa_don';
     if (destroy) return 'xuat_huy';
@@ -720,7 +721,11 @@ async function loadExportFromInternal(id, store) {
 }
 
 async function loadExportFromInventoryCheck(id, store) {
-    const ticket = await PhieuKiemKho.findOne({ _id: id, ...storeFilter(store) })
+    const ticket = await PhieuKiemKho.findOne({
+        _id: id,
+        ...storeFilter(store),
+        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+    })
         .populate('kho_id', 'ten_kho')
         .populate('nguoi_tao_id', 'ho_ten email')
         .lean();
@@ -2208,7 +2213,12 @@ async function loadExportVoucherOptions(store = null) {
         PhieuXuatNoiBo.find({ ...sf, trang_thai: { $nin: ['cancelled', 'draft'] } })
             .select('ma_xuat_noi_bo ngay_xuat tong_gia_tri')
             .sort({ ngay_xuat: -1 }).limit(50).lean(),
-        PhieuKiemKho.find({ ...sf, trang_thai: 'completed', tong_so_luong_lech: { $lt: 0 } })
+        PhieuKiemKho.find({
+            ...sf,
+            trang_thai: 'completed',
+            tong_so_luong_lech: { $lt: 0 },
+            $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+        })
             .select('ma_kiem_kho ngay_kiem tong_gia_tri_lech')
             .sort({ ngay_kiem: -1 }).limit(50).lean()
     ]);

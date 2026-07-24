@@ -5,11 +5,17 @@ var { NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap,
 var { taoPhieuThuChi, parseMoney } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
 var { normalizeAddress } = require('../utils/address');
+var {
+    measureAsync,
+    measureSync,
+    isPerformanceEnabled
+} = require('../utils/performance.util');
 var { buildSupplierHangHoaExportPack } = require('../services/supplierHangHoaExport.service');
 var { buildSupplierPurchaseInvoiceExportPack } = require('../services/supplierPurchaseInvoiceExport.service');
 var { handleSupplierDebtExport } = require('../services/supplierDebtExport.service');
 var nhaCungCapImportService = require('../services/nhaCungCapImport.service');
 var DiaChiNhaCungCap = DiaChiNcc || DiaChiDoiTuong;
+var SUPPLIER_TABLE_METRICS_LIMIT = 100;
 
 var SUPPLIER_EXPORT_COLUMNS = [
     { header: 'Mã NCC', key: 'ma_ncc' },
@@ -62,8 +68,20 @@ function slugifyFilePart(value) {
     return s || 'ncc';
 }
 
-/** Tổng mua từ phiếu nhập, tổng nợ từ sổ công nợ NCC (theo cửa hàng nếu có). */
-async function aggregateSupplierPurchaseTotals(storeId) {
+function normalizeSupplierObjectIds(supplierIds) {
+    var source = Array.isArray(supplierIds) ? supplierIds : (supplierIds ? [supplierIds] : []);
+    var seen = {};
+    var ids = [];
+    source.forEach(function(value) {
+        var id = String(value || '').trim();
+        if (!id || seen[id] || !mongoose.Types.ObjectId.isValid(id)) return;
+        seen[id] = true;
+        ids.push(new mongoose.Types.ObjectId(id));
+    });
+    return ids;
+}
+
+async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
     var purchaseMatch = {
         trang_thai: 'completed',
         deleted_at: null,
@@ -81,6 +99,12 @@ async function aggregateSupplierPurchaseTotals(storeId) {
         purchaseMatch.cua_hang_id = storeObjectId;
         debtMatch.cua_hang_id = storeObjectId;
         debtTransactionMatch.cua_hang_id = storeObjectId;
+    }
+    var supplierObjectIds = normalizeSupplierObjectIds(supplierIds);
+    if (supplierObjectIds.length) {
+        purchaseMatch.nha_cung_cap_id = { $in: supplierObjectIds };
+        debtMatch.nha_cung_cap_id = { $in: supplierObjectIds };
+        debtTransactionMatch.nha_cung_cap_id = { $in: supplierObjectIds };
     }
     var purchaseRows = await PhieuNhap.aggregate([
         { $match: purchaseMatch },
@@ -139,7 +163,7 @@ async function aggregateSupplierPurchaseTotals(storeId) {
     return map;
 }
 
-async function aggregateSupplierDebtDayInfo(storeId) {
+async function aggregateSupplierDebtDayInfo(storeId, supplierIds) {
     var match = {
         trang_thai: 'completed',
         deleted_at: null,
@@ -148,6 +172,10 @@ async function aggregateSupplierDebtDayInfo(storeId) {
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         match.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
+    }
+    var supplierObjectIds = normalizeSupplierObjectIds(supplierIds);
+    if (supplierObjectIds.length) {
+        match.nha_cung_cap_id = { $in: supplierObjectIds };
     }
     var rows = await PhieuNhap.aggregate([
         { $match: match },
@@ -565,6 +593,51 @@ function normalizeFilterQuery(query) {
         warnOnly: String(query.warnOnly || '') === '1' ? '1' : '',
         warnMinDays: String(warnMinDays),
         warnMinAmount: normalizeFilterMoneyField(query.warnMinAmount)
+    };
+}
+
+function requiresComputedSupplierData(filter) {
+    filter = filter || {};
+    return Boolean(
+        hasFilterQueryValue(filter.totalBuyFrom) ||
+        hasFilterQueryValue(filter.totalBuyTo) ||
+        hasFilterQueryValue(filter.currentDebtFrom) ||
+        hasFilterQueryValue(filter.currentDebtTo) ||
+        filter.warnOnly === '1' ||
+        filter.debtDaySort === 'oldest' ||
+        filter.debtDaySort === 'newest'
+    );
+}
+
+function normalizeSupplierMetricIds(value) {
+    var source = Array.isArray(value) ? value.join(',') : String(value || '');
+    var seen = {};
+    var ids = [];
+    source.split(',').forEach(function(item) {
+        var id = String(item || '').trim();
+        if (!id || seen[id] || !mongoose.Types.ObjectId.isValid(id)) return;
+        seen[id] = true;
+        ids.push(id);
+    });
+    return ids;
+}
+
+function countSupplierMetricIdCandidates(value) {
+    var source = Array.isArray(value) ? value.join(',') : String(value || '');
+    return source.split(',').map(function(item) {
+        return String(item || '').trim();
+    }).filter(Boolean).length;
+}
+
+function buildSupplierStoreAccessQuery(storeId) {
+    if (!storeId || !mongoose.Types.ObjectId.isValid(storeId)) return {};
+    var storeObjectId = new mongoose.Types.ObjectId(String(storeId));
+    return {
+        $or: [
+            { cua_hang_id: storeObjectId },
+            { cua_hang_id: null },
+            { cua_hang_id: { $exists: false } }
+        ]
     };
 }
 
@@ -1292,78 +1365,212 @@ exports.apiSupplierDetail = async function(req, res, next) {
     }
 };
 
-async function seedSuppliersIfEmpty() {
-    var count = await NhaCungCap.countDocuments();
-    if (count > 0) return;
+exports.apiTableMetrics = async function(req, res, next) {
+    try {
+        return await measureAsync('nhaCungCap.apiTableMetrics.total', async function() {
+            var rawIds = req?.query?.ids || '';
+            if (countSupplierMetricIdCandidates(rawIds) > SUPPLIER_TABLE_METRICS_LIMIT) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Chỉ được tải tối đa ' + SUPPLIER_TABLE_METRICS_LIMIT + ' nhà cung cấp mỗi lần.'
+                });
+            }
+            var ids = normalizeSupplierMetricIds(rawIds);
+            if (!ids.length) {
+                return res.json({ success: true, rows: [] });
+            }
 
-    await NhaCungCap.insertMany([
-        { ma_ncc: 'NCC0001', ten_ncc: 'Nhà cung cấp An Phú', sdt: '0911000001', email: 'anphu@example.com', tong_no: 0, tong_mua: 5000000, trang_thai: 'active' },
-        { ma_ncc: 'NCC0002', ten_ncc: 'Công ty Hoàng Gia', sdt: '0911000002', email: 'hoanggia@example.com', ten_cong_ty: 'Công ty Hoàng Gia', ma_so_thue: '0309998887', tong_no: 2400000, tong_mua: 12000000, trang_thai: 'active' },
-        { ma_ncc: 'NCC0003', ten_ncc: 'Nhà cung cấp Minh Tâm', sdt: '0911000003', email: 'minhtam@example.com', tong_no: 900000, tong_mua: 3000000, trang_thai: 'inactive' }
-    ]);
-}
+            var storeId = await resolveStoreId(req);
+            var supplierQuery = Object.assign(
+                { _id: { $in: ids.map(function(id) { return new mongoose.Types.ObjectId(id); }) } },
+                buildSupplierStoreAccessQuery(storeId)
+            );
+            var suppliers = await NhaCungCap.find(supplierQuery)
+                .select('_id tong_mua tong_no')
+                .lean();
+            if (!suppliers.length) {
+                return res.json({ success: true, rows: [] });
+            }
 
+            var allowedIds = suppliers.map(function(supplier) { return String(supplier._id); });
+            var supplierMap = suppliers.reduce(function(map, supplier) {
+                map[String(supplier._id)] = supplier;
+                return map;
+            }, {});
+            var aggregateResult = await Promise.all([
+                measureAsync('nhaCungCap.apiTableMetrics.aggregateTotals', function() {
+                    return aggregateSupplierPurchaseTotals(storeId, allowedIds);
+                }),
+                measureAsync('nhaCungCap.apiTableMetrics.aggregateDebtDays', function() {
+                    return aggregateSupplierDebtDayInfo(storeId, allowedIds);
+                })
+            ]);
+            var totalsMap = aggregateResult[0];
+            var debtDayMap = aggregateResult[1];
+            var debtWarnSettings = normalizeDebtWarnSettings(normalizeFilterQuery(req?.query || {}));
+
+            var rows = ids.map(function(id) {
+                var supplier = supplierMap[id];
+                if (!supplier) return null;
+                applySupplierTotalsFromMap(supplier, totalsMap);
+                applySupplierDebtDayInfo(supplier, debtDayMap);
+                applySupplierDebtWarning(supplier, debtWarnSettings);
+                return {
+                    id: id,
+                    tong_mua: Number(supplier.tong_mua || 0),
+                    da_thanh_toan: Number(supplier.da_thanh_toan || 0),
+                    tong_no: Number(supplier.tong_no || 0),
+                    tong_no_theo_so: Number(supplier.tong_no_theo_so || 0),
+                    so_ngay_no_xa: supplier.so_ngay_no_xa != null ? Number(supplier.so_ngay_no_xa) : null,
+                    so_ngay_no_gan: supplier.so_ngay_no_gan != null ? Number(supplier.so_ngay_no_gan) : null,
+                    no_xa_nhat_ma_phieu: supplier.no_xa_nhat_ma_phieu || '',
+                    no_xa_nhat_tien: Number(supplier.no_xa_nhat_tien || 0),
+                    debt_warning: !!supplier.debt_warning
+                };
+            }).filter(Boolean);
+
+            return res.json({ success: true, rows: rows });
+        });
+    } catch (err) {
+        next(err);
+    }
+};
 exports.index = async function(req, res, next) {
     try {
-        var storeId = await resolveStoreId(req);
-
         var requestQuery = req?.query || {};
-        if (Object.prototype.hasOwnProperty.call(requestQuery, 'supplier')) {
-            var redirectQuery = Object.assign({}, requestQuery);
+        if (
+            Object.prototype.hasOwnProperty.call(
+                requestQuery,
+                'supplier'
+            )
+        ) {
+            var redirectQuery = Object.assign(
+                {},
+                requestQuery
+            );
+
             delete redirectQuery.supplier;
-            var qsStr = querystring.stringify(redirectQuery);
-            return res.redirect(302, '/nha-cung-cap' + (qsStr ? '?' + qsStr : ''));
+
+            var qsStr = querystring.stringify(
+                redirectQuery
+            );
+
+            return res.redirect(
+                302,
+                '/nha-cung-cap' +
+                (qsStr ? '?' + qsStr : '')
+            );
         }
-
         var filter = normalizeFilterQuery(requestQuery);
-        var supplierQuery = buildSupplierQueryFromFilter(filter);
-        var debtWarnSettings = normalizeDebtWarnSettings(filter);
+        var supplierQuery =
+            buildSupplierQueryFromFilter(filter);
+        var formMode =
+            requestQuery.mode === 'create'
+                ? 'create'
+                : '';
+        var initialData = await Promise.all([
+            loadSupplierGroups(),
 
-        var supplierGroups = await loadSupplierGroups();
-        var addressTypes = await loadAddressTypes();
-        var suppliers = await NhaCungCap.find(supplierQuery).sort({ created_at: 1, ma_ncc: 1 }).lean();
-        var totalsMap = await aggregateSupplierPurchaseTotals(storeId);
-        var debtDayMap = await aggregateSupplierDebtDayInfo(storeId);
-        suppliers.forEach(function(s) {
-            applySupplierTotalsFromMap(s, totalsMap);
-            applySupplierDebtDayInfo(s, debtDayMap);
-            applySupplierDebtWarning(s, debtWarnSettings);
+            NhaCungCap.find(supplierQuery)
+                .select(
+                    '_id ma_ncc ten_ncc sdt email ' +
+                    'tong_mua tong_no trang_thai ' +
+                    'created_at cua_hang_id'
+                )
+                .sort({
+                    created_at: 1,
+                    ma_ncc: 1
+                })
+                .lean(),
+            formMode === 'create'
+                ? loadAddressTypes()
+                : Promise.resolve([])
+        ]);
+
+        var supplierGroups = initialData[0];
+        var suppliers = initialData[1];
+        var addressTypes = initialData[2];
+        suppliers.forEach(function(supplier) {
+            supplier.da_thanh_toan =
+                resolveSupplierDaThanhToan(supplier);
+            supplier.tong_no_theo_so = null;
+            supplier.debt_warning = false;
+            supplier.metrics_pending = true;
         });
-        suppliers = filterSuppliersByComputedTotals(suppliers, filter);
-        suppliers = filterSuppliersByDebtWarning(suppliers, debtWarnSettings);
-        suppliers = sortSuppliersByDebtDaySort(suppliers, filter.debtDaySort);
-
-        res.render('nha-cung-cap/index', {
+        var locals = {
             title: 'Nhà cung cấp',
             pageTitle: 'Nhà cung cấp',
             activeMenu: 'nha-cung-cap',
+
             user: req.user,
             flash: requestQuery,
+
             suppliers: suppliers,
             supplierGroups: supplierGroups,
             addressTypes: addressTypes,
-            formMode: requestQuery.mode === 'create' ? 'create' : '',
+
+            formMode: formMode,
+            metricsLazyLoad: true,
+
             formatDate: formatDate,
             filter: filter,
-            filterQueryString: buildFilterQueryString(filter),
-            debtWarnDefaultDays: SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
-            formatFilterMoney: formatFilterMoneyDisplay,
+
+            filterQueryString:
+                buildFilterQueryString(filter),
+
+            debtWarnDefaultDays:
+                SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
+
+            formatFilterMoney:
+                formatFilterMoneyDisplay,
+
             filterDebtRangeLabel: (function() {
-                if (!hasFilterQueryValue(filter.currentDebtFrom) && !hasFilterQueryValue(filter.currentDebtTo)) return '';
-                var fromText = hasFilterQueryValue(filter.currentDebtFrom)
-                    ? formatFilterMoneyDisplay(filter.currentDebtFrom)
+                var hasFrom = hasFilterQueryValue(
+                    filter.currentDebtFrom
+                );
+
+                var hasTo = hasFilterQueryValue(
+                    filter.currentDebtTo
+                );
+
+                if (!hasFrom && !hasTo) {
+                    return '';
+                }
+
+                var fromText = hasFrom
+                    ? formatFilterMoneyDisplay(
+                        filter.currentDebtFrom
+                    )
                     : '0';
-                var toText = hasFilterQueryValue(filter.currentDebtTo)
-                    ? formatFilterMoneyDisplay(filter.currentDebtTo)
+
+                var toText = hasTo
+                    ? formatFilterMoneyDisplay(
+                        filter.currentDebtTo
+                    )
                     : 'không giới hạn';
+
                 return fromText + ' – ' + toText;
             })(),
-            mapNhapHangStatus: mapNhapHangStatus,
-            mapTraHangStatus: mapTraHangStatus,
-            mapSupplierPurchaseHistoryType: mapSupplierPurchaseHistoryType,
-            mapCongNoLoai: mapCongNoLoai,
-            mapCongNoDirection: mapCongNoDirection
-        });
+
+            mapNhapHangStatus:
+                mapNhapHangStatus,
+
+            mapTraHangStatus:
+                mapTraHangStatus,
+
+            mapSupplierPurchaseHistoryType:
+                mapSupplierPurchaseHistoryType,
+
+            mapCongNoLoai:
+                mapCongNoLoai,
+
+            mapCongNoDirection:
+                mapCongNoDirection
+        };
+        return res.render(
+            'nha-cung-cap/index',
+            locals
+        );
     } catch (error) {
         next(error);
     }

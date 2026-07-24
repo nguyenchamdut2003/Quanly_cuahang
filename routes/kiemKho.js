@@ -22,6 +22,8 @@ const {
     resolveTenQuyCachFromParams
 } = require('../services/kho.service');
 const { formatLotName } = require('../utils/kiemKhoDisplay');
+const { ThungRacItem } = require('../models/trash.model');
+const { ENTITY_LABELS, buildTrashChildFields } = require('../services/trashLabels.service');
 
 async function shouldSyncQuyCach(khoId, hangHoaId, loHangId, tenQuyCach) {
     if (tenQuyCach) return true;
@@ -38,7 +40,7 @@ function getSelectedStatuses(query) {
 }
 
 function buildKiemKhoFilter(query = {}) {
-    const filter = {};
+    const filter = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
     const q = String(query.q || '').trim();
     const dateMode = query.date_mode || 'this_month';
     const statuses = getSelectedStatuses(query);
@@ -72,6 +74,12 @@ function buildKiemKhoFilter(query = {}) {
     }
 
     return { filter, q, dateMode, statuses };
+}
+
+function activeKiemKhoDocumentFilter(extra) {
+    return Object.assign({}, extra || {}, {
+        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+    });
 }
 
 function escapeCsv(value) {
@@ -359,6 +367,11 @@ function lotDisplayFromPopulated(lo) {
 
 function isObjectId(value) {
     return /^[0-9a-fA-F]{24}$/.test(String(value || '').trim());
+}
+
+function normalizeKiemKhoIds(rawIds) {
+    const list = Array.isArray(rawIds) ? rawIds : [rawIds];
+    return [...new Set(list.map(id => String(id || '').trim()).filter(isObjectId))];
 }
 
 function sanitizeTonPreviewRows(rawItems) {
@@ -751,7 +764,7 @@ router.get('/:id/export.csv', async (req, res, next) => {
             return res.status(404).send('Không tìm thấy phiếu kiểm kho');
         }
 
-        const ticket = await PhieuKiemKho.findById(req.params.id)
+        const ticket = await PhieuKiemKho.findOne(activeKiemKhoDocumentFilter({ _id: req.params.id }))
             .populate('kho_id')
             .populate('nguoi_tao_id');
         if (!ticket) {
@@ -855,7 +868,7 @@ router.get('/:id/export.csv', async (req, res, next) => {
 
 async function loadKiemKhoCopyDraft(copyFromId) {
     if (!/^[0-9a-fA-F]{24}$/.test(String(copyFromId || ''))) return null;
-    const ticket = await PhieuKiemKho.findById(copyFromId).lean();
+    const ticket = await PhieuKiemKho.findOne(activeKiemKhoDocumentFilter({ _id: copyFromId })).lean();
     if (!ticket) return null;
     const lines = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: ticket._id })
         .populate('hang_hoa_id')
@@ -1055,52 +1068,222 @@ async function saveKiemKho(req, res, next) {
     }
 }
 
+router.post('/trash/preview', async (req, res, next) => {
+    try {
+        const ids = normalizeKiemKhoIds(req.body?.phieu_kiem_kho_ids || req.body?.ids);
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một phiếu kiểm kho.' });
+        }
+
+        const tickets = await PhieuKiemKho.find({ _id: { $in: ids } })
+            .populate('kho_id')
+            .populate('nguoi_tao_id')
+            .lean();
+        if (tickets.length !== ids.length) {
+            return res.status(404).json({ success: false, message: 'Một hoặc nhiều phiếu kiểm kho không tồn tại.' });
+        }
+
+        const detailCounts = await CTPhieuKiemKho.aggregate([
+            { $match: { phieu_kiem_kho_id: { $in: tickets.map(item => item._id) } } },
+            { $group: { _id: '$phieu_kiem_kho_id', count: { $sum: 1 } } }
+        ]);
+        const countMap = detailCounts.reduce((map, row) => {
+            map[String(row._id)] = row.count;
+            return map;
+        }, {});
+        const ticketMap = tickets.reduce((map, row) => {
+            map[String(row._id)] = row;
+            return map;
+        }, {});
+        const trashRows = await ThungRacItem.find({
+            entity_type: 'PhieuKiemKho',
+            entity_id: { $in: tickets.map(item => item._id) },
+            restored_at: null
+        }).select('entity_id').lean();
+        const trashMap = trashRows.reduce((map, row) => {
+            map[String(row.entity_id)] = true;
+            return map;
+        }, {});
+        const items = ids.map(id => {
+            const ticket = ticketMap[id];
+            const isDeleted = Boolean(ticket.deleted_at || trashMap[id]);
+            const diff = Number(ticket.tong_so_luong_lech || 0);
+            return {
+                phieu_kiem_kho_id: id,
+                ma_kiem_kho: ticket.ma_kiem_kho || '',
+                kho: ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '',
+                trang_thai: ticket.trang_thai || '',
+                can_trash: !isDeleted,
+                block_reason: isDeleted ? 'Phiếu kiểm kho đã nằm trong thùng rác.' : '',
+                warnings: ticket.trang_thai === 'completed' && diff ? ['Phiếu đã cân bằng kho. Khi đưa vào thùng rác, hệ thống sẽ đảo lại phần tồn kho do phiếu này đã ghi nhận.'] : [],
+                groups: [
+                    { entity_type: 'CTPhieuKiemKho', label: ENTITY_LABELS.CTPhieuKiemKho || 'Chi tiết kiểm kho', count: Number(countMap[id] || 0), samples: [] },
+                    { entity_type: 'LichSuKho', label: 'Lịch sử kho liên quan', count: Math.abs(diff) > 0 ? 1 : 0, samples: [] }
+                ].filter(group => Number(group.count || 0) > 0)
+            };
+        });
+        const blocked = items.filter(item => !item.can_trash);
+        const aggregateMap = {};
+        items.forEach(item => {
+            item.groups.forEach(group => {
+                if (!aggregateMap[group.entity_type]) {
+                    aggregateMap[group.entity_type] = { entity_type: group.entity_type, label: group.label, count: 0, samples: [] };
+                }
+                aggregateMap[group.entity_type].count += Number(group.count || 0);
+            });
+        });
+
+        return res.json({
+            success: true,
+            data: {
+                items,
+                allowed_count: items.length - blocked.length,
+                blocked_count: blocked.length,
+                can_proceed: blocked.length === 0 && items.length > 0,
+                aggregate_groups: Object.keys(aggregateMap).map(key => aggregateMap[key])
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+async function rollbackKiemKhoStock(phieu, userId) {
+    if (!phieu || phieu.stock_rollback_at || phieu.trang_thai === 'cancelled') return false;
+    const lines = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: phieu._id }).lean();
+    const maPhieu = phieu.ma_kiem_kho || String(phieu._id);
+    for (const row of lines) {
+        const diff = Number(row.so_luong_lech || 0);
+        if (!diff) continue;
+        const product = await HangHoa.findById(row.hang_hoa_id).select('gia_von').lean();
+        const cost = Number(product?.gia_von || 0);
+        const tenQuyCach = normalizeTenQuyCach(row.ten_quy_cach);
+        const syncQuyCach = await shouldSyncQuyCach(phieu.kho_id, row.hang_hoa_id, row.lo_hang_id, tenQuyCach);
+        if (diff > 0) {
+            await truTonKho({
+                kho_id: phieu.kho_id,
+                hang_hoa_id: row.hang_hoa_id,
+                lo_hang_id: row.lo_hang_id,
+                ten_quy_cach: tenQuyCach,
+                sync_quy_cach: syncQuyCach,
+                so_luong: diff,
+                nguoi_tao_id: userId,
+                loai_phieu: 'kiem_kho',
+                ma_phieu: maPhieu,
+                ghi_chu: `Huy kiem kho ${maPhieu}`
+            });
+        } else {
+            await congTonKho({
+                kho_id: phieu.kho_id,
+                hang_hoa_id: row.hang_hoa_id,
+                lo_hang_id: row.lo_hang_id,
+                ten_quy_cach: tenQuyCach,
+                sync_quy_cach: syncQuyCach,
+                so_luong: Math.abs(diff),
+                gia_von: cost,
+                nguoi_tao_id: userId,
+                loai_phieu: 'kiem_kho',
+                ma_phieu: maPhieu,
+                ghi_chu: `Huy kiem kho ${maPhieu}`
+            });
+        }
+    }
+    phieu.stock_rollback_at = new Date();
+    await phieu.save();
+    return true;
+}
+
+router.post('/trash/move', async (req, res, next) => {
+    try {
+        const ids = normalizeKiemKhoIds(req.body?.phieu_kiem_kho_ids || req.body?.ids);
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một phiếu kiểm kho.' });
+        }
+
+        const tickets = await PhieuKiemKho.find({ _id: { $in: ids } });
+        if (tickets.length !== ids.length) {
+            return res.status(404).json({ success: false, message: 'Một hoặc nhiều phiếu kiểm kho không tồn tại.' });
+        }
+        const existingTrash = await ThungRacItem.exists({
+            entity_type: 'PhieuKiemKho',
+            entity_id: { $in: tickets.map(ticket => ticket._id) },
+            restored_at: null
+        });
+        if (existingTrash || tickets.some(ticket => ticket.deleted_at)) {
+            return res.status(400).json({ success: false, message: 'Danh sách chọn có phiếu kiểm kho đã nằm trong thùng rác.' });
+        }
+
+        const detailCounts = await CTPhieuKiemKho.aggregate([
+            { $match: { phieu_kiem_kho_id: { $in: tickets.map(ticket => ticket._id) } } },
+            { $group: { _id: '$phieu_kiem_kho_id', count: { $sum: 1 } } }
+        ]);
+        const countMap = detailCounts.reduce((map, row) => {
+            map[String(row._id)] = row.count;
+            return map;
+        }, {});
+        const now = new Date();
+        const moved = [];
+        for (const ticket of tickets) {
+            await rollbackKiemKhoStock(ticket, req.user?._id);
+            ticket.deleted_at = now;
+            ticket.deleted_by = req.user?._id || null;
+            await ticket.save();
+
+            const root = await ThungRacItem.create({
+                entity_type: 'PhieuKiemKho',
+                entity_id: ticket._id,
+                ma_chung_tu: ticket.ma_kiem_kho || '',
+                ten_hien_thi: ticket.ma_kiem_kho || 'Phiếu kiểm kho',
+                mo_ta_phu: ticket.trang_thai === 'completed' ? 'Đã cân bằng kho' : (ticket.trang_thai === 'cancelled' ? 'Đã hủy' : 'Phiếu tạm'),
+                cua_hang_id: ticket.cua_hang_id || null,
+                deleted_at: now,
+                deleted_by: req.user?._id || null,
+                is_trash_root: true,
+                trash_group_id: null,
+                sort_order: 0
+            });
+
+            const childGroups = [
+                { entity_type: 'CTPhieuKiemKho', label: ENTITY_LABELS.CTPhieuKiemKho || 'Chi tiết kiểm kho', count: Number(countMap[String(ticket._id)] || 0), samples: [] },
+                { entity_type: 'LichSuKho', label: 'Lịch sử kho liên quan', count: Math.abs(Number(ticket.tong_so_luong_lech || 0)) > 0 ? 1 : 0, samples: [] }
+            ].filter(group => Number(group.count || 0) > 0);
+            let sortOrder = 1;
+            for (const group of childGroups) {
+                const childFields = buildTrashChildFields(group);
+                await ThungRacItem.create({
+                    entity_type: group.entity_type,
+                    entity_id: ticket._id,
+                    ma_chung_tu: childFields.ma_chung_tu,
+                    ten_hien_thi: childFields.ten_hien_thi,
+                    mo_ta_phu: childFields.mo_ta_phu,
+                    cua_hang_id: ticket.cua_hang_id || null,
+                    deleted_at: now,
+                    deleted_by: req.user?._id || null,
+                    is_trash_root: false,
+                    trash_group_id: root._id,
+                    sort_order: sortOrder
+                });
+                sortOrder += 1;
+            }
+
+            moved.push({ phieu_kiem_kho_id: String(ticket._id), ma_kiem_kho: ticket.ma_kiem_kho || '', trash_root_id: String(root._id) });
+        }
+
+        return res.json({ success: true, message: 'Đã đưa ' + moved.length + ' phiếu kiểm kho vào thùng rác.', data: { moved } });
+    } catch (error) {
+        next(error);
+    }
+});
+
 router.post('/:id/cancel', async (req, res, next) => {
     try {
-        const phieu = await PhieuKiemKho.findById(req.params.id);
+        const phieu = await PhieuKiemKho.findOne(activeKiemKhoDocumentFilter({ _id: req.params.id }));
         if (!phieu) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu kiểm kho' });
         if (phieu.trang_thai === 'cancelled') {
             return res.json({ success: true, message: 'Phiếu đã hủy' });
         }
 
-        const lines = await CTPhieuKiemKho.find({ phieu_kiem_kho_id: phieu._id }).lean();
-        const maPhieu = phieu.ma_kiem_kho || String(phieu._id);
-        for (const row of lines) {
-            const diff = Number(row.so_luong_lech || 0);
-            if (!diff) continue;
-            const product = await HangHoa.findById(row.hang_hoa_id).select('gia_von').lean();
-            const cost = Number(product?.gia_von || 0);
-            const tenQuyCach = normalizeTenQuyCach(row.ten_quy_cach);
-            const syncQuyCach = await shouldSyncQuyCach(phieu.kho_id, row.hang_hoa_id, row.lo_hang_id, tenQuyCach);
-            if (diff > 0) {
-                await truTonKho({
-                    kho_id: phieu.kho_id,
-                    hang_hoa_id: row.hang_hoa_id,
-                    lo_hang_id: row.lo_hang_id,
-                    ten_quy_cach: tenQuyCach,
-                    sync_quy_cach: syncQuyCach,
-                    so_luong: diff,
-                    nguoi_tao_id: req.user?._id,
-                    loai_phieu: 'kiem_kho',
-                    ma_phieu: maPhieu,
-                    ghi_chu: `Huy kiem kho ${maPhieu}`
-                });
-            } else {
-                await congTonKho({
-                    kho_id: phieu.kho_id,
-                    hang_hoa_id: row.hang_hoa_id,
-                    lo_hang_id: row.lo_hang_id,
-                    ten_quy_cach: tenQuyCach,
-                    sync_quy_cach: syncQuyCach,
-                    so_luong: Math.abs(diff),
-                    gia_von: cost,
-                    nguoi_tao_id: req.user?._id,
-                    loai_phieu: 'kiem_kho',
-                    ma_phieu: maPhieu,
-                    ghi_chu: `Huy kiem kho ${maPhieu}`
-                });
-            }
-        }
+        await rollbackKiemKhoStock(phieu, req.user?._id);
 
         phieu.trang_thai = 'cancelled';
         await phieu.save();

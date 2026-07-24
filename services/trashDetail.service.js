@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { ThungRacItem } = require('../models/trash.model');
 const {
+  HangHoa,
   PhieuNhap,
   DonHang,
   HoaDonBanHang,
@@ -25,6 +26,8 @@ const {
   GopHoaDon,
   PhanBoHang,
   CTPhanBoHang,
+  PhieuKiemKho,
+  CTPhieuKiemKho,
   NhapVatChua,
   XuatVatChua
 } = require('../models/kiot.model');
@@ -161,6 +164,11 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
         .lean();
     case 'CTHoaDonBanHang':
       return CTHoaDonBanHang.find({ hoa_don_id: parentOid })
+        .populate('hang_hoa_id', 'ma_hang ten_hang')
+        .sort({ _id: 1 })
+        .lean();
+    case 'CTPhieuKiemKho':
+      return CTPhieuKiemKho.find({ phieu_kiem_kho_id: parentOid })
         .populate('hang_hoa_id', 'ma_hang ten_hang')
         .sort({ _id: 1 })
         .lean();
@@ -407,6 +415,32 @@ async function loadVatChuaDocs(sourceType, sourceId) {
 }
 
 function buildDetailTable(entityType, rawRows) {
+  if (entityType === 'CTPhieuKiemKho') {
+    return {
+      columns: [
+        { key: 'ma_hang', header: 'Mã hàng' },
+        { key: 'ten_hang', header: 'Tên hàng' },
+        { key: 'quy_cach', header: 'Quy cách' },
+        { key: 'ton_kho_he_thong', header: 'Tồn kho', align: 'right' },
+        { key: 'so_luong_thuc_te', header: 'Thực tế', align: 'right' },
+        { key: 'so_luong_lech', header: 'SL lệch', align: 'right' },
+        { key: 'gia_tri_lech', header: 'Giá trị lệch', align: 'right' }
+      ],
+      rows: rawRows.map(function(row, index) {
+        return {
+          stt: index + 1,
+          ma_hang: row.hang_hoa_id?.ma_hang || '---',
+          ten_hang: row.hang_hoa_id?.ten_hang || '---',
+          quy_cach: row.ten_quy_cach || '---',
+          ton_kho_he_thong: fmtNum(row.ton_kho_he_thong),
+          so_luong_thuc_te: fmtNum(row.so_luong_thuc_te),
+          so_luong_lech: fmtNum(row.so_luong_lech),
+          gia_tri_lech: fmtMoney(row.gia_tri_lech)
+        };
+      })
+    };
+  }
+
   if (entityType === 'CTPhieuNhap' || entityType === 'CTDonHang' || entityType === 'CTHoaDonBanHang') {
     return {
       columns: [
@@ -724,6 +758,81 @@ async function loadRootDocumentDetail(root) {
 
   if (!parentOid) {
     return buildDetailPayload(entityLabel(entityType), root.ma_chung_tu || '', []);
+  }
+
+  if (entityType === 'HangHoa') {
+    const product = await HangHoa.findById(parentOid)
+      .populate('nhom_hang_id', 'ten_nhom_hang')
+      .populate('nha_cung_cap_id', 'ten_ncc ma_ncc')
+      .lean();
+    if (!product) {
+      return buildDetailPayload('Hàng hóa', root.ma_chung_tu || '', []);
+    }
+
+    const sections = [
+      makeSection('Thông tin hàng hóa', [
+        { key: 'ma_hang', header: 'Mã hàng' },
+        { key: 'ten_hang', header: 'Tên hàng' },
+        { key: 'nhom_hang', header: 'Nhóm hàng' },
+        { key: 'nha_cung_cap', header: 'Nhà cung cấp' },
+        { key: 'ton_kho', header: 'Tồn kho', align: 'right' },
+        { key: 'trang_thai', header: 'Trạng thái' },
+        { key: 'ngay_tao', header: 'Ngày tạo' }
+      ], [{
+        stt: 1,
+        ma_hang: product.ma_hang || '---',
+        ten_hang: product.ten_hang || '---',
+        nhom_hang: product.nhom_hang_id?.ten_nhom_hang || '---',
+        nha_cung_cap: product.nha_cung_cap_id?.ten_ncc || product.nha_cung_cap_id?.ma_ncc || '---',
+        ton_kho: fmtNum(product.ton_kho),
+        trang_thai: product.deleted_at ? 'Trong thùng rác' : (product.trang_thai || '---'),
+        ngay_tao: fmtDateTime(product.created_at)
+      }])
+    ];
+
+    const payload = buildDetailPayload('Hàng hóa', root.ma_chung_tu || product.ma_hang || '', sections);
+    payload.entity_type = entityType;
+    return payload;
+  }
+
+  if (entityType === 'PhieuKiemKho') {
+    const ticket = await PhieuKiemKho.findById(parentOid)
+      .populate('kho_id', 'ten_kho ma_kho')
+      .populate('nguoi_tao_id', 'ho_ten username email')
+      .lean();
+    if (!ticket) {
+      return buildDetailPayload('Phiếu kiểm kho', root.ma_chung_tu || '', []);
+    }
+
+    const lineRows = await loadRelatedRawRows('CTPhieuKiemKho', parentOid, entityType);
+    const creatorName = ticket.nguoi_tao_id
+      ? (ticket.nguoi_tao_id.ho_ten || ticket.nguoi_tao_id.username || ticket.nguoi_tao_id.email || '---')
+      : '---';
+    const sections = [
+      makeSection('Thông tin chung', [
+        { key: 'ma_kiem_kho', header: 'Mã kiểm kho' },
+        { key: 'kho', header: 'Kho' },
+        { key: 'nguoi_tao', header: 'Người tạo' },
+        { key: 'trang_thai', header: 'Trạng thái' },
+        { key: 'tong_so_luong_lech', header: 'Tổng SL lệch', align: 'right' },
+        { key: 'tong_gia_tri_lech', header: 'Tổng giá trị lệch', align: 'right' },
+        { key: 'ngay_kiem', header: 'Ngày kiểm' }
+      ], [{
+        stt: 1,
+        ma_kiem_kho: ticket.ma_kiem_kho || '---',
+        kho: ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '---') : '---',
+        nguoi_tao: creatorName,
+        trang_thai: ticket.deleted_at ? 'Trong thùng rác' : (ticket.trang_thai || '---'),
+        tong_so_luong_lech: fmtNum(ticket.tong_so_luong_lech),
+        tong_gia_tri_lech: fmtMoney(ticket.tong_gia_tri_lech),
+        ngay_kiem: fmtDateTime(ticket.ngay_kiem || ticket.created_at)
+      }])
+    ];
+    appendSectionFromTable(sections, 'Dòng kiểm kho', buildDetailTable('CTPhieuKiemKho', lineRows));
+
+    const payload = buildDetailPayload('Phiếu kiểm kho', root.ma_chung_tu || ticket.ma_kiem_kho || '', sections);
+    payload.entity_type = entityType;
+    return payload;
   }
 
   if (entityType === 'HoaDonBanHang') {

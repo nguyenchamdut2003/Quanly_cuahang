@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 const { ThungRacItem } = require('../models/trash.model');
 const {
+  HangHoa,
+  TonKho,
+  TonKhoLo,
+  TonKhoLoQuyCach,
+  LichSuKho,
+  GiaBanHangHoa,
+  CTBangGia,
+  HangHoaThuocTinh,
   PhieuNhap,
   CTPhieuNhap,
   PhieuTraHangNhap,
@@ -25,6 +33,12 @@ const {
   GopHoaDon,
   PhanBoHang,
   CTPhanBoHang,
+  PhieuKiemKho,
+  CTPhieuKiemKho,
+  PhieuXuatNoiBo,
+  CTXuatNoiBo,
+  PhieuXuatHuy,
+  CTXuatHuy,
   NhapVatChua,
   XuatVatChua
 } = require('../models/kiot.model');
@@ -69,6 +83,11 @@ function addCount(total, result) {
 async function collectIds(query, Model) {
   const rows = await Model.find(query).select('_id').lean();
   return rows.map(function(row) { return row._id; }).filter(Boolean);
+}
+
+async function distinctObjectIds(Model, query, field) {
+  const values = await Model.distinct(field, query);
+  return (values || []).map(toObjectId).filter(Boolean);
 }
 
 function receiptCashBookFilter(bookId) {
@@ -283,13 +302,134 @@ async function hardDeleteCashBook(root, storeId) {
   return deleted;
 }
 
+async function hardDeleteInventoryCheck(root) {
+  const id = toObjectId(root.entity_id);
+  if (!id) return 0;
+  let deleted = 0;
+  deleted = addCount(deleted, await CTPhieuKiemKho.deleteMany({ phieu_kiem_kho_id: id }));
+  deleted = addCount(deleted, await PhieuKiemKho.deleteOne({ _id: id }));
+  return deleted;
+}
+
+async function hardDeleteSaleReturn(returnId, storeId) {
+  const id = toObjectId(returnId);
+  if (!id) return 0;
+  let deleted = 0;
+  const receiptIds = await collectIds({ phieu_tra_hang_id: id }, PhieuThuChi);
+  deleted += await hardDeleteReceipts(receiptIds, storeId);
+  deleted = addCount(deleted, await CongNoKhachHang.deleteMany({
+    $or: [
+      { phieu_tra_hang_id: id },
+      { phieu_thu_chi_id: { $in: receiptIds } }
+    ]
+  }));
+  if (GiaoDichCongNoKhachHang) {
+    deleted = addCount(deleted, await GiaoDichCongNoKhachHang.deleteMany({
+      $or: [
+        { phieu_tra_hang_id: id },
+        { phieu_thu_chi_id: { $in: receiptIds } }
+      ]
+    }));
+  }
+  deleted = addCount(deleted, await CTPhieuTraHang.deleteMany({ phieu_tra_hang_id: id }));
+  deleted = addCount(deleted, await PhieuTraHang.deleteOne({ _id: id }));
+  return deleted;
+}
+
+async function hardDeleteInternalIssue(issueId) {
+  const id = toObjectId(issueId);
+  if (!id) return 0;
+  let deleted = 0;
+  deleted = addCount(deleted, await CTXuatNoiBo.deleteMany({ phieu_xuat_id: id }));
+  deleted = addCount(deleted, await PhieuXuatNoiBo.deleteOne({ _id: id }));
+  return deleted;
+}
+
+async function hardDeleteDisposal(disposalId) {
+  const id = toObjectId(disposalId);
+  if (!id) return 0;
+  let deleted = 0;
+  deleted = addCount(deleted, await CTXuatHuy.deleteMany({ phieu_xuat_huy_id: id }));
+  deleted = addCount(deleted, await PhieuXuatHuy.deleteOne({ _id: id }));
+  return deleted;
+}
+
+async function hardDeleteAllocation(allocationId) {
+  const id = toObjectId(allocationId);
+  if (!id) return 0;
+  let deleted = 0;
+  deleted = addCount(deleted, await CTPhanBoHang.deleteMany({ phan_bo_hang_id: id }));
+  deleted = addCount(deleted, await PhanBoHang.deleteOne({ _id: id }));
+  return deleted;
+}
+
+async function hardDeleteProduct(root, storeId) {
+  const id = toObjectId(root.entity_id);
+  if (!id) return 0;
+  let deleted = 0;
+
+  const [
+    purchaseIds,
+    supplierReturnIds,
+    orderIds,
+    invoiceIds,
+    saleReturnIds,
+    stockCheckIds,
+    disposalIds,
+    internalIssueIds,
+    allocationIds
+  ] = await Promise.all([
+    distinctObjectIds(CTPhieuNhap, { hang_hoa_id: id }, 'phieu_nhap_id'),
+    distinctObjectIds(CTPhieuTraHangNhap, { hang_hoa_id: id }, 'phieu_tra_nhap_id'),
+    distinctObjectIds(CTDonHang, { hang_hoa_id: id }, 'don_hang_id'),
+    distinctObjectIds(CTHoaDonBanHang, { hang_hoa_id: id }, 'hoa_don_id'),
+    distinctObjectIds(CTPhieuTraHang, { hang_hoa_id: id }, 'phieu_tra_hang_id'),
+    distinctObjectIds(CTPhieuKiemKho, { hang_hoa_id: id }, 'phieu_kiem_kho_id'),
+    distinctObjectIds(CTXuatHuy, { hang_hoa_id: id }, 'phieu_xuat_huy_id'),
+    distinctObjectIds(CTXuatNoiBo, { hang_hoa_id: id }, 'phieu_xuat_id'),
+    distinctObjectIds(CTPhanBoHang, { hang_hoa_id: id }, 'phan_bo_hang_id')
+  ]);
+
+  for (const purchaseId of purchaseIds) deleted += await hardDeletePurchase({ entity_id: purchaseId }, storeId);
+  for (const returnId of supplierReturnIds) deleted += await hardDeleteReturnImport(returnId, storeId);
+  for (const orderId of orderIds) deleted += await hardDeleteOrder({ entity_id: orderId }, storeId);
+  for (const invoiceId of invoiceIds) deleted += await hardDeleteInvoice(invoiceId, storeId);
+  for (const returnId of saleReturnIds) deleted += await hardDeleteSaleReturn(returnId, storeId);
+  for (const stockCheckId of stockCheckIds) deleted += await hardDeleteInventoryCheck({ entity_id: stockCheckId });
+  for (const disposalId of disposalIds) deleted += await hardDeleteDisposal(disposalId);
+  for (const issueId of internalIssueIds) deleted += await hardDeleteInternalIssue(issueId);
+  for (const allocationId of allocationIds) deleted += await hardDeleteAllocation(allocationId);
+
+  deleted = addCount(deleted, await CTPhieuNhap.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTPhieuTraHangNhap.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTDonHang.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTHoaDonBanHang.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTPhieuTraHang.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTPhieuKiemKho.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTXuatHuy.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTXuatNoiBo.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTPhanBoHang.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await TonKho.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await TonKhoLo.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await TonKhoLoQuyCach.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await LoHang.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await LichSuKho.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await GiaBanHangHoa.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await CTBangGia.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await HangHoaThuocTinh.deleteMany({ hang_hoa_id: id }));
+  deleted = addCount(deleted, await HangHoa.deleteOne({ _id: id }));
+  return deleted;
+}
+
 async function hardDeleteRootEntity(root, storeId) {
   if (!root || !root.entity_type) return 0;
   if (root.entity_type === 'PhieuNhap') return hardDeletePurchase(root, storeId);
   if (root.entity_type === 'PhieuTraHangNhap') return hardDeleteReturnImport(root.entity_id, storeId);
   if (root.entity_type === 'DonHang') return hardDeleteOrder(root, storeId);
   if (root.entity_type === 'HoaDonBanHang') return hardDeleteInvoice(root.entity_id, storeId);
+  if (root.entity_type === 'HangHoa') return hardDeleteProduct(root, storeId);
   if (root.entity_type === 'SoQuy') return hardDeleteCashBook(root, storeId);
+  if (root.entity_type === 'PhieuKiemKho') return hardDeleteInventoryCheck(root);
   if (root.entity_type === 'NhapVatChua') return hardDeleteVatChuaImport(root.entity_id, storeId);
   if (root.entity_type === 'XuatVatChua') return hardDeleteVatChuaExport(root.entity_id, storeId);
   return 0;

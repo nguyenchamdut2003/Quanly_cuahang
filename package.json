@@ -13,6 +13,8 @@
     "fix:ton-kho-lo-quy-cach": "node scripts/sync-ton-kho-lo-quy-cach.js",
     "seed:kho-flow": "node scripts/seed-kho-flow.js",
     "migrate:so-quy-v2-indexes": "node scripts/migrate-so-quy-v2-indexes.js",
+    "fix:kiem-kho-trash-rollback": "node scripts/backfill-kiem-kho-trash-rollback.js",
+    "fix:kiem-kho-trash-rollback:apply": "node scripts/backfill-kiem-kho-trash-rollback.js --apply",
     "migrate:khach-hang-cccd-to-mst": "node scripts/migrate-khach-hang-cccd-to-mst.js",
     "test:so-quy-v2-schema": "node scripts/local-tests/smoke-so-quy-v2-schema.js",
     "test:so-quy-v2-api": "node scripts/local-tests/smoke-so-quy-v2-api.js",

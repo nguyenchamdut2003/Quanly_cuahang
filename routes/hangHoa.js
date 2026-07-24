@@ -28,6 +28,8 @@ router.post('/thiet-lap-gia/gia-ban-hang-hoa', hangHoaController.upsertGiaBanHan
 router.post('/thiet-lap-gia/:id/retail-price', hangHoaController.updateRetailPrice);
 router.post('/bang-gia/add', hangHoaController.addBangGia);
 router.post('/add', hangHoaController.add);
+router.post('/trash/preview', hangHoaController.previewTrash);
+router.post('/trash/move', hangHoaController.moveToTrash);
 router.post('/:id/update', hangHoaController.update);
 router.post('/:id/delete', hangHoaController.remove);
 router.post('/delete-selected', hangHoaController.removeSelected);

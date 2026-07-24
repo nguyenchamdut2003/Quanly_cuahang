@@ -93,7 +93,7 @@ async function khoHasActivity(khoId) {
             DonHang.exists({ kho_id: khoId }),
             HoaDonBanHang.exists({ kho_id: khoId }),
             PhieuTraHang.exists({ kho_id: khoId }),
-            PhieuKiemKho.exists({ kho_id: khoId }),
+            PhieuKiemKho.exists({ kho_id: khoId, $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }),
             PhieuXuatNoiBo.exists({ kho_id: khoId }),
             PhieuXuatHuy.exists({ kho_id: khoId })
         ]).then(results => results.filter(Boolean).length)
