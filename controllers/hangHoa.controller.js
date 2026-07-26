@@ -3292,4 +3292,12 @@ exports.exportExcel = async function(req, res, next) {
 };
 
 /** Re-export — nguồn giá bán mặc định Phase 0 (xem services/salePrice.service.js). */
+exports.redirectDetail = async function(req, res) {
+    var id = String(req.params.id || '');
+    if (!/^[a-f0-9]{24}$/i.test(id)) {
+        return res.redirect('/hang-hoa');
+    }
+    return res.redirect(302, '/hang-hoa#p-' + id);
+};
+
 exports.resolveSalePrice = resolveSalePrice;

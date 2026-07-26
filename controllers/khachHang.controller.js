@@ -281,6 +281,31 @@ async function makeCustomerCode() {
     return 'KH' + String(Date.now()).slice(-10);
 }
 
+function parseSequentialCode(value, prefix) {
+    var match = String(value || '').trim().match(new RegExp('^' + prefix + '(\\d+)$'));
+    return match ? Number(match[1]) : 0;
+}
+
+function formatSequentialCode(prefix, number) {
+    return prefix + String(number).padStart(4, '0');
+}
+
+async function getNextCustomerCodeSuggestion() {
+    var rows = await KhachHang.find({ ma_khach_hang: /^KH\d+$/ }).select('ma_khach_hang').lean();
+    var max = rows.reduce(function(value, row) {
+        return Math.max(value, parseSequentialCode(row.ma_khach_hang, 'KH'));
+    }, 0);
+    return formatSequentialCode('KH', max + 1);
+}
+
+function isValidCustomerImportCode(value) {
+    return /^KH\d+$/.test(String(value || '').trim());
+}
+
+function isValidAddressImportCode(value) {
+    return /^DCKH\d+$/.test(String(value || '').trim());
+}
+
 async function makeAddressCode() {
     for (var i = 0; i < 20; i += 1) {
         var counter = await Counter.findOneAndUpdate(
@@ -294,6 +319,78 @@ async function makeAddressCode() {
     }
 
     return 'DCKH' + String(Date.now()).slice(-10);
+}
+
+function normalizeImportLookupText(value) {
+    return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function slugifyAddressType(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toLowerCase() || 'loai_dia_chi';
+}
+
+async function resolveImportAddressType(text, typeState) {
+    typeState = typeState || {};
+    var raw = String(text || '').trim();
+    var key = normalizeImportLookupText(raw || 'Khác');
+
+    if (typeState.lookup[key]) {
+        return typeState.lookup[key].ma_loai;
+    }
+
+    var tenLoai = raw || 'Khác';
+    var baseCode = raw ? slugifyAddressType(raw) : 'khac';
+    var maLoai = baseCode;
+    var suffix = 2;
+
+    while (typeState.codes[maLoai]) {
+        maLoai = baseCode + '_' + suffix;
+        suffix += 1;
+    }
+
+    var created = await LoaiDiaChiKhachHang.create({
+        ma_loai: maLoai,
+        ten_loai: tenLoai,
+        trang_thai: 'active'
+    });
+
+    var type = created.toObject ? created.toObject() : created;
+    typeState.codes[maLoai] = true;
+    typeState.lookup[normalizeImportLookupText(maLoai)] = type;
+    typeState.lookup[normalizeImportLookupText(tenLoai)] = type;
+    return maLoai;
+}
+
+async function buildImportAddressTypeState() {
+    var types = await LoaiDiaChiKhachHang.find().lean();
+    var state = {
+        lookup: {},
+        codes: {}
+    };
+
+    types.forEach(function(type) {
+        if (!type || !type.ma_loai) return;
+        state.codes[type.ma_loai] = true;
+        state.lookup[normalizeImportLookupText(type.ma_loai)] = type;
+        if (type.ten_loai) {
+            state.lookup[normalizeImportLookupText(type.ten_loai)] = type;
+        }
+    });
+
+    if (!state.lookup[normalizeImportLookupText('khac')] && !state.lookup[normalizeImportLookupText('Khác')]) {
+        var created = await LoaiDiaChiKhachHang.create({ ma_loai: 'khac', ten_loai: 'Khác', trang_thai: 'active' });
+        var type = created.toObject ? created.toObject() : created;
+        state.codes.khac = true;
+        state.lookup[normalizeImportLookupText('khac')] = type;
+        state.lookup[normalizeImportLookupText('Khác')] = type;
+    }
+
+    return state;
 }
 
 function normalizeAddressPayload(body) {
@@ -1765,7 +1862,9 @@ exports.removeAddress = async function(req, res, next) {
 
 exports.downloadImportTemplate = async function(req, res, next) {
     try {
-        var workbook = await khachHangImportService.buildImportTemplateWorkbook();
+        var workbook = await khachHangImportService.buildImportTemplateWorkbook({
+            suggestedCustomerCode: await getNextCustomerCodeSuggestion()
+        });
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename="mau-nhap-khach-hang.xlsx"');
         await workbook.xlsx.write(res);
@@ -1787,19 +1886,133 @@ exports.importExcel = async function(req, res, next) {
             return res.redirect('/khach-hang?error=import_invalid_file_type');
         }
 
-        var parsedRows = await khachHangImportService.parseCustomerImportBuffer(file.buffer);
-        if (!parsedRows.length) {
+        var parsedImport = await khachHangImportService.parseCustomerImportBuffer(file.buffer);
+        var customerRows = parsedImport.customerRows || [];
+        var addressRows = parsedImport.addressRows || [];
+        var legacyCustomerSheet = !!parsedImport.legacyCustomerSheet;
+
+        if (!customerRows.length && !addressRows.length) {
             return res.redirect('/khach-hang?error=import_empty_file');
         }
 
-        khachHangImportService.validateImportRows(parsedRows, validateCustomerPayload, normalizeCustomerPayload);
+        khachHangImportService.validateImportRows(parsedImport, validateCustomerPayload, normalizeCustomerPayload);
+
+        var errors = [];
+        var customerCodesInFile = {};
+        var addressCodesInFile = {};
+        var customerCodesToCreate = [];
+        var addressCustomerCodes = [];
+        var addressCodes = [];
+
+        customerRows.forEach(function(item) {
+            var body = khachHangImportService.buildCustomerBodyFromImportRow(item.data);
+            var code = String(body.ma_khach_hang || '').trim();
+
+            if (!legacyCustomerSheet && !code) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Khách hàng: thiếu mã khách hàng.');
+            } else if (code && !isValidCustomerImportCode(code)) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Khách hàng: mã khách hàng không đúng định dạng KH + số.');
+            }
+
+            if (code) {
+                if (customerCodesInFile[code]) {
+                    errors.push('Dòng ' + item.rowNumber + ' sheet Khách hàng: trùng mã khách hàng ' + code + ' với dòng ' + customerCodesInFile[code] + '.');
+                }
+                customerCodesInFile[code] = item.rowNumber;
+                customerCodesToCreate.push(code);
+            }
+        });
+
+        addressRows.forEach(function(item) {
+            var body = khachHangImportService.buildAddressBodyFromImportRow(item.data);
+            var customerCode = body.ma_khach_hang;
+            var addressCode = body.ma_dia_chi;
+            var hasAddressData = body.ten_nguoi_nhan || body.sdt_nguoi_nhan || body.dia_chi_chi_tiet || body.tinh_thanh || body.phuong_xa;
+
+            if (!customerCode) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: thiếu mã khách hàng.');
+            } else if (!isValidCustomerImportCode(customerCode)) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: mã khách hàng không đúng định dạng KH + số.');
+            } else {
+                addressCustomerCodes.push(customerCode);
+            }
+
+            if (!hasAddressData) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: thiếu thông tin địa chỉ hoặc người nhận.');
+            }
+
+            if (addressCode) {
+                if (!isValidAddressImportCode(addressCode)) {
+                    errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: mã địa chỉ không đúng định dạng DCKH + số.');
+                }
+                if (addressCodesInFile[addressCode]) {
+                    errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: trùng mã địa chỉ ' + addressCode + ' với dòng ' + addressCodesInFile[addressCode] + '.');
+                }
+                addressCodesInFile[addressCode] = item.rowNumber;
+                addressCodes.push(addressCode);
+            }
+        });
+
+        var allCustomerRefs = Array.from(new Set(customerCodesToCreate.concat(addressCustomerCodes)));
+        var existingCustomers = allCustomerRefs.length
+            ? await KhachHang.find({ ma_khach_hang: { $in: allCustomerRefs } }).select('_id ma_khach_hang').lean()
+            : [];
+        var existingCustomerMap = {};
+        existingCustomers.forEach(function(customer) {
+            existingCustomerMap[customer.ma_khach_hang] = customer;
+        });
+
+        customerRows.forEach(function(item) {
+            var body = khachHangImportService.buildCustomerBodyFromImportRow(item.data);
+            var code = body.ma_khach_hang;
+            if (code && existingCustomerMap[code]) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Khách hàng: mã khách hàng ' + code + ' đã tồn tại trong database.');
+            }
+        });
+
+        var customerCodesToCreateMap = {};
+        customerCodesToCreate.forEach(function(code) {
+            customerCodesToCreateMap[code] = true;
+        });
+
+        addressRows.forEach(function(item) {
+            var body = khachHangImportService.buildAddressBodyFromImportRow(item.data);
+            var code = body.ma_khach_hang;
+            if (code && !customerCodesToCreateMap[code] && !existingCustomerMap[code]) {
+                errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: không tìm thấy khách hàng có mã ' + code + '.');
+            }
+        });
+
+        if (addressCodes.length > 0) {
+            var existingAddresses = await DiaChiKhachHang.find({ ma_dia_chi: { $in: Array.from(new Set(addressCodes)) } }).select('ma_dia_chi').lean();
+            var existingAddressCodeMap = {};
+            existingAddresses.forEach(function(address) {
+                existingAddressCodeMap[address.ma_dia_chi] = true;
+            });
+            addressRows.forEach(function(item) {
+                var code = khachHangImportService.buildAddressBodyFromImportRow(item.data).ma_dia_chi;
+                if (code && existingAddressCodeMap[code]) {
+                    errors.push('Dòng ' + item.rowNumber + ' sheet Địa chỉ: mã địa chỉ ' + code + ' đã tồn tại trong database.');
+                }
+            });
+        }
+
+        if (errors.length > 0) {
+            return res.redirect('/khach-hang?error=' + encodeURIComponent(errors.slice(0, 8).join(' ')));
+        }
 
         var inserted = 0;
+        var insertedAddresses = 0;
         var skipped = 0;
         var rowErrors = [];
+        var customerIdByCode = {};
 
-        for (var i = 0; i < parsedRows.length; i += 1) {
-            var item = parsedRows[i];
+        Object.keys(existingCustomerMap).forEach(function(code) {
+            customerIdByCode[code] = existingCustomerMap[code]._id;
+        });
+
+        for (var i = 0; i < customerRows.length; i += 1) {
+            var item = customerRows[i];
             var body = khachHangImportService.buildCustomerBodyFromImportRow(item.data);
 
             try {
@@ -1815,22 +2028,14 @@ exports.importExcel = async function(req, res, next) {
                     payload.ngay_sinh = null;
                 }
 
-                payload.ma_khach_hang = await makeCustomerCode();
+                payload.ma_khach_hang = payload.ma_khach_hang || await makeCustomerCode();
                 if (req.user && req.user._id) {
                     payload.nguoi_tao_id = req.user._id;
                 }
                 finalizeCustomerPayload(payload);
 
                 var customer = await KhachHang.create(payload);
-
-                var addressPayload = normalizeAddressPayload(body);
-                var hasAddressData = addressPayload.ten_nguoi_nhan || addressPayload.sdt_nguoi_nhan || addressPayload.dia_chi_day_du || addressPayload.dia_chi_chi_tiet || addressPayload.tinh_thanh || addressPayload.phuong_xa;
-                if (hasAddressData) {
-                    addressPayload.ma_dia_chi = await makeAddressCode();
-                    if (!addressPayload.loai_dia_chi) addressPayload.loai_dia_chi = 'khac';
-                    addressPayload.khach_hang_id = customer._id;
-                    await DiaChiKhachHang.create(addressPayload);
-                }
+                customerIdByCode[payload.ma_khach_hang] = customer._id;
 
                 inserted += 1;
             } catch (error) {
@@ -1839,12 +2044,37 @@ exports.importExcel = async function(req, res, next) {
             }
         }
 
-        if (inserted === 0) {
+        var addressTypeState = await buildImportAddressTypeState();
+        for (var addressIndex = 0; addressIndex < addressRows.length; addressIndex += 1) {
+            var addressItem = addressRows[addressIndex];
+            var addressBody = khachHangImportService.buildAddressBodyFromImportRow(addressItem.data);
+
+            try {
+                var addressPayload = normalizeAddressPayload(addressBody);
+                addressPayload.ma_dia_chi = addressPayload.ma_dia_chi || await makeAddressCode();
+                addressPayload.loai_dia_chi = await resolveImportAddressType(addressBody.loai_dia_chi_text, addressTypeState);
+                addressPayload.khach_hang_id = customerIdByCode[addressBody.ma_khach_hang];
+
+                if (addressPayload.mac_dinh) {
+                    await DiaChiKhachHang.updateMany({ khach_hang_id: addressPayload.khach_hang_id }, { $set: { mac_dinh: false } });
+                }
+
+                await DiaChiKhachHang.create(addressPayload);
+                insertedAddresses += 1;
+            } catch (error) {
+                skipped += 1;
+                rowErrors.push('Dòng ' + addressItem.rowNumber + ' sheet Địa chỉ: ' + (error && error.message ? error.message : 'không thể thêm.'));
+            }
+        }
+
+        if (inserted === 0 && insertedAddresses === 0) {
             var failMessage = rowErrors.slice(0, 3).join(' ');
             return res.redirect('/khach-hang?error=' + encodeURIComponent(failMessage || 'import_failed'));
         }
 
-        var successQuery = 'imported=' + inserted + '&import_label=' + encodeURIComponent('khách hàng');
+        var successQuery = 'imported=' + inserted
+            + '&import_label=' + encodeURIComponent('khách hàng')
+            + '&imported_dia_chi=' + insertedAddresses;
         if (skipped > 0) successQuery += '&import_skipped=' + skipped;
         if (rowErrors.length > 0) {
             successQuery += '&import_warning=' + encodeURIComponent(rowErrors.slice(0, 2).join(' '));
@@ -1864,4 +2094,8 @@ exports.importExcel = async function(req, res, next) {
 
         next(error);
     }
+};
+
+exports.redirectDetail = async function(req, res) {
+    return res.redirect('/khach-hang#c-' + encodeURIComponent(req.params.id));
 };

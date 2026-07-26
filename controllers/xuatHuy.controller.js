@@ -30,6 +30,13 @@ const EXPORT_STATUS_MAP = {
   cancelled: 'Đã hủy phiếu'
 };
 
+exports.redirectDetail = async function(req, res) {
+  if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
+    return res.redirect('/xuat-huy');
+  }
+  return res.redirect(302, '/xuat-huy?open=' + encodeURIComponent(req.params.id));
+};
+
 const XUAT_HUY_EXPORT_COLUMNS = [
   { header: 'Mã xuất hủy', key: 'ma_xuat_huy' },
   { header: 'Thời gian', key: 'thoi_gian' },

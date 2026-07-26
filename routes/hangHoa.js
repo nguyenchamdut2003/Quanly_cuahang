@@ -40,12 +40,6 @@ router.post('/units/add', hangHoaController.addUnit);
 router.post('/units/:unitId/update', hangHoaController.updateUnit);
 router.post('/units/:unitId/delete', hangHoaController.removeUnit);
 router.post('/export-excel', hangHoaController.exportExcel);
-router.get('/:id', function(req, res) {
-  var id = String(req.params.id || '');
-  if (!/^[a-f0-9]{24}$/i.test(id)) {
-    return res.redirect('/hang-hoa');
-  }
-  res.redirect(302, '/hang-hoa#p-' + id);
-});
+router.get('/:id', hangHoaController.redirectDetail);
 
 module.exports = router;

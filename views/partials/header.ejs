@@ -71,9 +71,22 @@
             <a href="<%= storeEditUrl %>" class="dropdown-item">
               <i class="fa-solid fa-store"></i> Xem và sửa cửa hàng
             </a>
+            <button type="button" class="dropdown-item dropdown-reset-data" id="resetDataOpen">
+              <i class="fa-solid fa-triangle-exclamation"></i> reset dữ liệu
+            </button>
             <a href="/auth/logout" class="dropdown-item">
               <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
             </a>
+            <div class="reset-data-modal" id="resetDataModal" aria-hidden="true">
+              <div class="reset-data-dialog" role="dialog" aria-modal="true" aria-labelledby="resetDataTitle">
+                <h3 id="resetDataTitle">Cảnh báo</h3>
+                <p>reset sẽ làm sạch hoàn toàn dữ liệu</p>
+                <div class="reset-data-actions">
+                  <button type="button" class="btn btn-danger" id="resetDataConfirm">Đồng ý</button>
+                  <button type="button" class="btn btn-light" id="resetDataCancel">Không</button>
+                </div>
+              </div>
+            </div>
           </div>
           <% } else { %>
             <div class="kv-user-avatar">
@@ -217,6 +230,60 @@
 
     const dropdownContainer = document.querySelector('.user-dropdown-container');
     const dropdownMenu = document.querySelector('.user-dropdown-menu');
+    const resetDataOpen = document.getElementById('resetDataOpen');
+    const resetDataModal = document.getElementById('resetDataModal');
+    const resetDataConfirm = document.getElementById('resetDataConfirm');
+    const resetDataCancel = document.getElementById('resetDataCancel');
+
+    function setResetDataModalOpen(open) {
+      if (!resetDataModal) return;
+      resetDataModal.classList.toggle('is-open', open);
+      resetDataModal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+
+    if (resetDataOpen) {
+      resetDataOpen.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setResetDataModalOpen(true);
+      });
+    }
+
+    if (resetDataCancel) {
+      resetDataCancel.addEventListener('click', function(e) {
+        e.preventDefault();
+        setResetDataModalOpen(false);
+      });
+    }
+
+    if (resetDataModal) {
+      resetDataModal.addEventListener('click', function(e) {
+        if (e.target === resetDataModal) setResetDataModalOpen(false);
+      });
+    }
+
+    if (resetDataConfirm) {
+      resetDataConfirm.addEventListener('click', async function(e) {
+        e.preventDefault();
+        resetDataConfirm.disabled = true;
+        resetDataConfirm.textContent = 'Đang reset...';
+        try {
+          const res = await fetch('/system/reset-data', {
+            method: 'POST',
+            headers: { Accept: 'application/json' }
+          });
+          const data = await res.json().catch(function() { return {}; });
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'Không reset được dữ liệu');
+          }
+          window.location.href = data.redirect || '/';
+        } catch (error) {
+          alert(error.message || 'Không reset được dữ liệu');
+          resetDataConfirm.disabled = false;
+          resetDataConfirm.textContent = 'Đồng ý';
+        }
+      });
+    }
 
     // Generic nav dropdown handler
     document.querySelectorAll('.nav-dropdown').forEach(function(navDrop) {

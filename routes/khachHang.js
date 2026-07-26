@@ -32,8 +32,6 @@ router.get('/:id/export.xlsx', khachHangController.exportOneExcel);
 router.post('/:id/addresses/add', khachHangController.addAddress);
 router.post('/:id/addresses/:addressId/update', khachHangController.updateAddress);
 router.post('/:id/addresses/:addressId/delete', khachHangController.removeAddress);
-router.get('/:id', function(req, res) {
-  res.redirect('/khach-hang#c-' + encodeURIComponent(req.params.id));
-});
+router.get('/:id', khachHangController.redirectDetail);
 
 module.exports = router;

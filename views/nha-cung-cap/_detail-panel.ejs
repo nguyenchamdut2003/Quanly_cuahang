@@ -85,20 +85,24 @@
 
                           <div class="detail-pane" data-detail-pane="address">
                             <% var supplierAddressReturnQuery = filterQueryString || ''; %>
-        <div class="supplier-pane-toolbar">
-                              <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
-                            </div>
-        <div class="supplier-pane-table-wrap table-wrap">
-                              <table class="admin-table warehouse-table">
+        <div class="warehouse-section">
+          <div class="warehouse-heading">
+            <div class="detail-actions">
+              <button class="btn btn-light js-open-address-type-modal" type="button">Loại địa chỉ</button>
+            </div>
+          </div>
+                              <table class="admin-table warehouse-table supplier-address-table">
                                 <thead>
                                   <tr>
                                     <th>Mã địa chỉ</th>
                                     <th>Tên người nhận</th>
                                     <th>SĐT</th>
                                     <th>Địa chỉ</th>
+                                    <th>Phường/xã</th>
+                                    <th>Tỉnh/thành</th>
                                     <th>Loại địa chỉ</th>
+                                    <th>Mặc định</th>
                                     <th>Tạo lúc</th>
-                                    <th>Thao tác</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -110,7 +114,9 @@
                                     </td>
                                     <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
                                     <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_day_du" placeholder="Địa chỉ đầy đủ"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/xã"></td>
+                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/thành"></td>
                                     <td>
                                       <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
                                         <option value="khac">Khác</option>
@@ -119,34 +125,25 @@
                                         <% }) %>
                                       </select>
                                     </td>
-                                    <td>--</td>
-                                    <td class="warehouse-action-cell">
-                                      <div class="warehouse-action-buttons">
-                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
-                                        <button
-                                          class="btn btn-primary btn-sm js-supplier-address-submit"
-                                          type="button"
-                                          data-form-id="<%= supplierAddressAddFormId %>"
-                                          data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
-                                          data-confirm="Bạn có muốn thêm địa chỉ mới không?"
-                                        >Thêm</button>
-                                      </div>
+                                    <td>
+                                      <select data-address-form="<%= supplierAddressAddFormId %>" name="mac_dinh">
+                                        <option value="">Không</option>
+                                        <option value="true">Có</option>
+                                      </select>
                                     </td>
-                                  </tr>
-              <tr class="address-detail-row supplier-address-expand" style="display: none;">
-                                    <td colspan="7">
-                  <div class="supplier-address-expand-grid">
-                    <div><label>Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="so_nha" placeholder="Số nhà"></div>
-                    <div><label>Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/Xã"></div>
-                    <div><label>Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="quan_huyen" placeholder="Quận/Huyện"></div>
-                    <div><label>Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/Thành"></div>
-                    <div class="span-2"><label>Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressAddFormId %>" name="ghi_chu" placeholder="Ghi chú"></div>
-                    <div class="span-2 supplier-address-default-check"><label><input data-address-form="<%= supplierAddressAddFormId %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
-                                      </div>
+                                    <td class="warehouse-action-cell">
+                                      <div class="warehouse-action-meta">--</div>
+                                      <button
+                                        class="btn btn-primary btn-sm js-supplier-address-submit"
+                                        type="button"
+                                        data-form-id="<%= supplierAddressAddFormId %>"
+                                        data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
+                                        data-confirm="Bạn có muốn thêm địa chỉ mới không?"
+                                      >✨ Thêm</button>
                                     </td>
                                   </tr>
                                   <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
-                                    <tr><td colspan="7" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
+                                    <tr><td colspan="9" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
                                   <% } %>
                                   <% (supplierAddresses || []).forEach(function(address) { %>
                                     <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
@@ -157,7 +154,9 @@
                                       </td>
                                       <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
                                       <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_day_du" value="<%= address.dia_chi_day_du || [address.so_nha, address.phuong_xa, address.quan_huyen, address.tinh_thanh].filter(Boolean).join(', ') || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || address.so_nha || address.dia_chi_day_du || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></td>
+                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></td>
                                       <td>
                                         <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
                                           <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
@@ -166,10 +165,15 @@
                                           <% }) %>
                                         </select>
                                       </td>
-                                      <td><%= formatDate(address.created_at) %></td>
+                                      <td>
+                                        <select data-address-form="<%= supplierAddressFormId %>" name="mac_dinh">
+                                          <option value="" <%= address.mac_dinh ? '' : 'selected' %>>Không</option>
+                                          <option value="true" <%= address.mac_dinh ? 'selected' : '' %>>Có</option>
+                                        </select>
+                                      </td>
                                       <td class="warehouse-action-cell">
+                                        <div class="warehouse-action-meta"><%= formatDate(address.created_at) %></div>
                                         <div class="warehouse-action-buttons">
-                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
                                           <button
                                             class="btn btn-light btn-sm js-supplier-address-submit"
                                             type="button"
@@ -183,18 +187,6 @@
                                             data-return-query="<%= supplierAddressReturnQuery %>"
                                             data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
                                           >Xóa</button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                <tr class="address-detail-row supplier-address-expand" style="display: none;">
-                                      <td colspan="7">
-                    <div class="supplier-address-expand-grid">
-                      <div><label>Số nhà</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="so_nha" value="<%= address.so_nha || '' %>"></div>
-                      <div><label>Phường/Xã</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></div>
-                      <div><label>Quận/Huyện</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="quan_huyen" value="<%= address.quan_huyen || '' %>"></div>
-                      <div><label>Tỉnh/Thành</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></div>
-                      <div class="span-2"><label>Ghi chú</label><input class="form-control" data-address-form="<%= supplierAddressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
-                      <div class="span-2 supplier-address-default-check"><label><input data-address-form="<%= supplierAddressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
                                         </div>
                                       </td>
                                     </tr>

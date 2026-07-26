@@ -505,6 +505,64 @@ body {
   text-align: center;
 }
 
+.dropdown-reset-data {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #fee2e2;
+  border-bottom: 1px solid #fee2e2;
+  background: #fff5f5;
+  color: #dc2626;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown-reset-data:hover {
+  background: #fee2e2;
+}
+
+.reset-data-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.reset-data-modal.is-open {
+  display: flex;
+}
+
+.reset-data-dialog {
+  width: min(360px, 100%);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+  padding: 22px;
+}
+
+.reset-data-dialog h3 {
+  margin: 0 0 10px;
+  color: #b91c1c;
+  font-size: 20px;
+}
+
+.reset-data-dialog p {
+  margin: 0;
+  color: #374151;
+  line-height: 1.5;
+}
+
+.reset-data-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
 /* Custom Login Modal */
 .login-modal {
   min-width: 280px;

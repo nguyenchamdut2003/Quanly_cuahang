@@ -2141,11 +2141,11 @@ async function renderPurchasePdf(req, res, next, viewName, title, filenamePrefix
   }
 }
 
-exports.printPurchase = function(req, res, next) {
+exports.printPurchase = async function(req, res, next) {
   return renderPurchasePrint(req, res, next, 'nhap-hang/print-phieu-nhap', 'In phieu nhap hang');
 };
 
-exports.printBangKe02Tndn = function(req, res, next) {
+exports.printBangKe02Tndn = async function(req, res, next) {
   return renderPurchasePrint(req, res, next, 'nhap-hang/bang-ke-02-tndn', 'Bang ke 02/TNDN');
 };
 
@@ -2159,19 +2159,19 @@ exports.printPurchaseBundle = async function(req, res, next) {
   }
 };
 
-exports.printContract = function(req, res, next) {
+exports.printContract = async function(req, res, next) {
   return renderPurchasePrint(req, res, next, 'nhap-hang/hd-mua-ban-nguyen-tac', 'HD mua ban nguyen tac');
 };
 
-exports.printPhieuNhapPdf = function(req, res, next) {
+exports.printPhieuNhapPdf = async function(req, res, next) {
   return renderPurchasePdf(req, res, next, 'nhap-hang/print-phieu-nhap', 'In phieu nhap hang', 'phieu-nhap');
 };
 
-exports.printBangKe02TndnPdf = function(req, res, next) {
+exports.printBangKe02TndnPdf = async function(req, res, next) {
   return renderPurchasePdf(req, res, next, 'nhap-hang/bang-ke-02-tndn', 'Bang ke 02/TNDN', 'bang-ke-02-tndn');
 };
 
-exports.printHdMuaBanNguyenTacPdf = function(req, res, next) {
+exports.printHdMuaBanNguyenTacPdf = async function(req, res, next) {
   return renderPurchasePdf(req, res, next, 'nhap-hang/hd-mua-ban-nguyen-tac', 'HD mua ban nguyen tac', 'hd-mua-ban-nguyen-tac');
 };
 
@@ -2433,5 +2433,9 @@ exports.traHangNhapSubmit = async function(req, res, next) {
     res.json({ success: true, pth });
   } catch (error) {
     res.json({ success: false, message: error.message });
-  }
+    }
+};
+
+exports.redirectDetail = async function(req, res) {
+  return res.redirect('/nhap-hang?purchase=' + encodeURIComponent(req.params.id));
 };

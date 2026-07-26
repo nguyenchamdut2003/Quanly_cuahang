@@ -394,20 +394,14 @@
 
                           <div class="store-detail-pane" data-tab-pane="store-warehouses">
                           <div class="warehouse-section">
-                            <div class="warehouse-heading">
-                              <h3>Danh sách kho</h3>
-                              <div class="detail-actions">
-                                <button class="btn btn-light" type="button">➕ Thêm kho</button>
-
-                              </div>
-                            </div>
-
                             <table class="admin-table warehouse-table">
                               <thead>
                                 <tr>
                                   <th>Mã kho</th>
                                   <th>Tên kho</th>
                                   <th>Địa chỉ</th>
+                                  <th>Phường/xã</th>
+                                  <th>Tỉnh/thành</th>
                                   <th>Trạng thái</th>
                                   <th>Thời gian tạo</th>
                                 </tr>
@@ -415,13 +409,15 @@
                               <tbody>
                                 <% if (warehouses.length === 0) { %>
                                   <tr>
-                                    <td colspan="5" class="empty-cell">Chưa có kho cho cửa hàng này.</td>
+                                    <td colspan="7" class="empty-cell">Chưa có kho cho cửa hàng này.</td>
                                   </tr>
                                 <% } %>
                                 <tr class="warehouse-edit-row warehouse-add-row">
                                   <td><input form="warehouseAddForm" name="ma_kho" value="" placeholder="Mã kho (tự động)"></td>
                                   <td><input form="warehouseAddForm" name="ten_kho" value="" placeholder="Tên kho mới"></td>
                                   <td><input form="warehouseAddForm" name="dia_chi_chi_tiet" value="" placeholder="Địa chỉ chi tiết"></td>
+                                  <td><input form="warehouseAddForm" name="phuong_xa" value="" placeholder="Phường/xã"></td>
+                                  <td><input form="warehouseAddForm" name="tinh_thanh" value="" placeholder="Tỉnh/thành"></td>
                                   <td>
                                     <select form="warehouseAddForm" name="trang_thai">
                                       <option value="active" selected>Đang hoạt động</option>
@@ -444,6 +440,8 @@
                                     <td><input form="<%= warehouseFormId %>" name="ma_kho" value="<%= warehouse.ma_kho || '' %>"></td>
                                     <td><input form="<%= warehouseFormId %>" name="ten_kho" value="<%= warehouse.ten_kho || '' %>" required></td>
                                     <td><input form="<%= warehouseFormId %>" name="dia_chi_chi_tiet" value="<%= warehouse.dia_chi_chi_tiet || warehouse.dia_chi_day_du || warehouse.dia_chi || '' %>"></td>
+                                    <td><input form="<%= warehouseFormId %>" name="phuong_xa" value="<%= warehouse.phuong_xa || '' %>"></td>
+                                    <td><input form="<%= warehouseFormId %>" name="tinh_thanh" value="<%= warehouse.tinh_thanh || '' %>"></td>
                                     <td>
                                       <select form="<%= warehouseFormId %>" name="trang_thai">
                                         <option value="active" <%= warehouse.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>

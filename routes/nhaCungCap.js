@@ -34,8 +34,6 @@ router.get('/:id/dia-chi', nhaCungCapController.listAddresses);
 router.post('/:id/dia-chi', nhaCungCapController.addAddress);
 router.post('/dia-chi/:addressId/update', nhaCungCapController.updateAddress);
 router.post('/dia-chi/:addressId/delete', nhaCungCapController.removeAddress);
-router.get('/:id', function(req, res) {
-  res.redirect('/nha-cung-cap#s-' + encodeURIComponent(req.params.id));
-});
+router.get('/:id', nhaCungCapController.redirectDetail);
 
 module.exports = router;

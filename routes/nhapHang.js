@@ -20,9 +20,7 @@ router.get('/:id/bang-ke-02-tndn/pdf', nhapHangController.printBangKe02TndnPdf);
 router.get('/:id/hd-mua-ban-nguyen-tac', nhapHangController.printContract);
 router.get('/:id/hd-mua-ban-nguyen-tac/pdf', nhapHangController.printHdMuaBanNguyenTacPdf);
 router.get('/:id/detail', nhapHangController.detail);
-router.get('/:id', function(req, res) {
-  res.redirect('/nhap-hang?purchase=' + encodeURIComponent(req.params.id));
-});
+router.get('/:id', nhapHangController.redirectDetail);
 router.get('/:id/export.csv', nhapHangController.exportOneCsv);
 router.get('/:id/export.xlsx', nhapHangController.exportOneExcel);
 router.post('/:id/cancel', nhapHangController.cancel);

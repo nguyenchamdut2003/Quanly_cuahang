@@ -6,9 +6,10 @@ var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var session = require('express-session');
 var passport = require('./config/passport');
-var { CuaHang, LoHang } = require('./models/kiot.model');
+var { CuaHang } = require('./models/kiot.model');
 var { dbWriteRequestContext } = require('./utils/dbWriteLogger');
 
+var healthRouter = require('./routes/health');
 var indexRouter = require('./routes/index');
 var authRouter = require('./routes/auth');
 var profileRouter = require('./routes/profile');
@@ -16,11 +17,7 @@ var cuaHangRouter = require('./routes/cuaHang');
 var hangHoaRouter = require('./routes/hangHoa');
 var vatChuaRouter = require('./routes/vatChua');
 var nhaCungCapRouter = require('./routes/nhaCungCap');
-var { isAuthenticated } = require('./middlewares/auth.middleware');
 var nhapHangRouter = require('./routes/nhapHang');
-var nhapHangController = require('./controllers/nhapHang.controller');
-var hangHoaController = require('./controllers/hangHoa.controller');
-var traHangNhapController = require('./controllers/traHangNhap.controller');
 var kiemKhoRouter = require('./routes/kiemKho');
 var banHangRouter = require('./routes/banHang');
 var donHangRouter = require('./routes/donHang');
@@ -30,7 +27,14 @@ var khachHangRouter = require('./routes/khachHang');
 var xuatDungNoiBoRouter = require('./routes/xuatDungNoiBo');
 var xuatHuyRouter = require('./routes/xuatHuy');
 var stockVoucherRouter = require('./routes/stockVoucher');
-var xuatHuyController = require('./controllers/xuatHuy.controller');
+var apiHangHoaNhapRouter = require('./routes/apiHangHoaNhap');
+var apiNhaCungCapNhapRouter = require('./routes/apiNhaCungCapNhap');
+var apiNhapHangRouter = require('./routes/apiNhapHang');
+var apiKhoNghiepVuRouter = require('./routes/apiKhoNghiepVu');
+var apiPhieuNhapRouter = require('./routes/apiPhieuNhap');
+var apiXuatHuyRouter = require('./routes/apiXuatHuy');
+var phieuNhapPrintRouter = require('./routes/phieuNhapPrint');
+var thuocTinhApiRouter = require('./routes/thuocTinhApi');
 var apiKhoRouter = require('./routes/apiKho');
 var apiAddressRouter = require('./routes/apiAddress');
 var traHangNhapRouter = require('./routes/traHangNhap');
@@ -55,6 +59,8 @@ var apiBangLuongRouter = require('./routes/apiBangLuong');
 var apiSoQuyRouter = require('./routes/apiSoQuy');
 var thietLapNhanVienRouter = require('./routes/thietLapNhanVien');
 var thungRacRouter = require('./routes/thungRac');
+var shortcutRouter = require('./routes/shortcut');
+var systemRouter = require('./routes/system');
 var { countActiveTrashRoots } = require('./services/trashList.service');
 var { isPerformanceEnabled } = require('./utils/performance.util');
 
@@ -127,9 +133,7 @@ if (isPerformanceEnabled()) {
   });
 }
 
-app.get('/healthz', function(req, res) {
-  res.status(200).json({ status: 'ok' });
-});
+app.use('/healthz', healthRouter);
 
 app.use(function(req, res, next) {
   res.locals.originalUrl = req.originalUrl || '/';
@@ -255,38 +259,14 @@ app.use('/tra-hang-nhap', traHangNhapRouter);
 app.use('/kiem-kho', kiemKhoRouter);
 app.use('/ban-hang', banHangRouter);
 
-// APIs for nhapHang feature
-app.get('/api/hang-hoa', isAuthenticated, nhapHangController.apiHangHoa);
-app.get('/api/nha-cung-cap/:id/hang-hoa', isAuthenticated, nhapHangController.apiSupplierProducts);
-app.get('/api/hang-hoa/:id/lo-hang', isAuthenticated, nhapHangController.apiProductLots);
-app.get('/thuoc-tinh', isAuthenticated, hangHoaController.apiAttributes);
-app.post('/thuoc-tinh', isAuthenticated, hangHoaController.apiCreateAttribute);
-app.put('/thuoc-tinh/:id', isAuthenticated, hangHoaController.apiUpdateAttribute);
-app.delete('/thuoc-tinh/:id', isAuthenticated, hangHoaController.apiDeleteAttribute);
-app.get('/gia-tri-thuoc-tinh', isAuthenticated, hangHoaController.apiAttributeValues);
-app.post('/gia-tri-thuoc-tinh', isAuthenticated, hangHoaController.apiCreateAttributeValue);
-app.put('/gia-tri-thuoc-tinh/:id', isAuthenticated, hangHoaController.apiUpdateAttributeValue);
-app.delete('/gia-tri-thuoc-tinh/:id', isAuthenticated, hangHoaController.apiDeleteAttributeValue);
-app.get('/hang-hoa/:id/thuoc-tinh', isAuthenticated, hangHoaController.apiProductAttributes);
-app.get('/phieu-nhap/:id/in', isAuthenticated, nhapHangController.printPurchase);
-app.get('/phieu-nhap/:id/in/pdf', isAuthenticated, nhapHangController.printPhieuNhapPdf);
-app.get('/phieu-nhap/:id/in-tong-hop', isAuthenticated, nhapHangController.printPurchaseBundle);
-app.get('/phieu-nhap/:id/bang-ke-02-tndn', isAuthenticated, nhapHangController.printBangKe02Tndn);
-app.get('/phieu-nhap/:id/bang-ke-02-tndn/pdf', isAuthenticated, nhapHangController.printBangKe02TndnPdf);
-app.get('/phieu-nhap/:id/hd-mua-ban-nguyen-tac', isAuthenticated, nhapHangController.printContract);
-app.get('/phieu-nhap/:id/hd-mua-ban-nguyen-tac/pdf', isAuthenticated, nhapHangController.printHdMuaBanNguyenTacPdf);
-app.get('/api/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);
-app.get('/api/phieu-nhap/con-hang-xuat-huy', isAuthenticated, xuatHuyController.apiPurchasesWithStock);
-app.get('/api/kho/:khoId/phieu-nhap', isAuthenticated, traHangNhapController.apiPurchasesByWarehouse);
-app.get('/api/phieu-nhap/:id/chi-tiet-tra-hang', isAuthenticated, traHangNhapController.apiPurchaseReturnDetail);
-app.get('/api/phieu-nhap/:id/chi-tiet-xuat-huy', isAuthenticated, xuatHuyController.apiPurchaseDestroyDetail);
-app.get('/api/xuat-huy/lo-hang/:loHangId/quy-cach-ton', isAuthenticated, xuatHuyController.apiLotQuyCachTon);
-app.get('/api/kho/:khoId/hang-xuat-huy', isAuthenticated, xuatHuyController.apiWarehouseProducts);
-app.post('/api/hang-hoa/quick-create', isAuthenticated, nhapHangController.quickCreateProduct);
-app.post('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
-app.put('/api/hang-hoa/:id/quick-update', isAuthenticated, nhapHangController.quickUpdateProduct);
-app.post('/api/hang-hoa/:id/inactive', isAuthenticated, nhapHangController.inactiveProduct);
-app.post('/api/nhap-hang/gop-phieu-nhap', isAuthenticated, nhapHangController.mergePurchases);
+app.use('/api/hang-hoa', apiHangHoaNhapRouter);
+app.use('/api/nha-cung-cap', apiNhaCungCapNhapRouter);
+app.use('/', thuocTinhApiRouter);
+app.use('/phieu-nhap', phieuNhapPrintRouter);
+app.use('/api/phieu-nhap', apiPhieuNhapRouter);
+app.use('/api/kho', apiKhoNghiepVuRouter);
+app.use('/api/xuat-huy', apiXuatHuyRouter);
+app.use('/api/nhap-hang', apiNhapHangRouter);
 
 app.use('/api/so-quy', apiSoQuyRouter);
 app.use('/api', apiKhoRouter);
@@ -319,22 +299,8 @@ app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);
 app.use('/xuat-dung-noi-bo', xuatDungNoiBoRouter);
 app.use('/xuat-huy', xuatHuyRouter);
-
-app.get('/hoa-don/:id', isAuthenticated, function(req, res) {
-  res.redirect('/don-hang/hoa-don?invoice=' + encodeURIComponent(req.params.id));
-});
-
-app.get('/lo-hang/:id', isAuthenticated, async function(req, res, next) {
-  try {
-    var lot = await LoHang.findById(req.params.id).select('hang_hoa_id').lean();
-    var target = lot && lot.hang_hoa_id
-      ? '/hang-hoa?lot=' + encodeURIComponent(req.params.id) + '#p-' + String(lot.hang_hoa_id)
-      : '/hang-hoa?lot=' + encodeURIComponent(req.params.id);
-    res.redirect(target);
-  } catch (error) {
-    next(error);
-  }
-});
+app.use('/system', systemRouter);
+app.use('/', shortcutRouter);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

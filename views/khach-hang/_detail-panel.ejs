@@ -153,8 +153,11 @@
                             </div>
                             <div class="customer-detail-pane" data-tab-pane="address">
                               <% var returnQuery = filterQueryString || ''; %>
-                              <div class="customer-address-toolbar">
-                                <button class="btn btn-light btn-sm js-open-address-type-modal" type="button">Loại địa chỉ</button>
+                              <div class="warehouse-section">
+                              <div class="warehouse-heading">
+                                <div class="detail-actions">
+                                  <button class="btn btn-light js-open-address-type-modal" type="button">Loại địa chỉ</button>
+                                </div>
                               </div>
                               <table class="admin-table warehouse-table customer-address-table">
                                 <thead>
@@ -163,19 +166,21 @@
                                     <th>Tên người nhận</th>
                                     <th>SĐT</th>
                                     <th>Địa chỉ</th>
+                                    <th>Phường/xã</th>
+                                    <th>Tỉnh/thành</th>
                                     <th>Loại địa chỉ</th>
+                                    <th>Mặc định</th>
                                     <th>Tạo lúc</th>
-                                    <th>Thao tác</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr class="warehouse-edit-row warehouse-add-row">
-                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ma_dia_chi" placeholder="Tự động" readonly style="background: transparent; border: none;"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ma_dia_chi" placeholder="Tự động" readonly></td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT" maxlength="10" inputmode="numeric"></td>
-                                    <td>
-                                      <input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết">
-                                    </td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" placeholder="Phường/xã"></td>
+                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" placeholder="Tỉnh/thành"></td>
                                     <td>
                                       <select class="js-address-type-select" form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
                                         <option value="khac">Khác</option>
@@ -184,59 +189,36 @@
                                         <% }) %>
                                       </select>
                                     </td>
-                                    <td>--</td>
-                                    <td class="warehouse-action-cell">
-                                      <div class="warehouse-action-buttons">
-                                        <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
-                                        <button
-                                          form="addressAddForm_<%= selectedCustomer._id %>"
-                                          class="btn btn-primary btn-sm js-address-add"
-                                          data-form-id="addressAddForm_<%= selectedCustomer._id %>"
-                                          data-action="/khach-hang/<%= selectedCustomer._id %>/addresses/add"
-                                          type="submit"
-                                        >Thêm</button>
-                                      </div>
+                                    <td>
+                                      <select form="addressAddForm_<%= selectedCustomer._id %>" name="mac_dinh">
+                                        <option value="">Không</option>
+                                        <option value="true">Có</option>
+                                      </select>
                                     </td>
-                                  </tr>
-                                  <tr class="address-detail-row" style="display: none;">
-                                    <td colspan="7">
-                                      <div class="customer-address-detail-grid">
-                                        <div class="customer-address-detail-field">
-                                          <label>Tỉnh/Thành</label>
-                                          <select class="form-control js-ghn-province" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" data-selected-name="">
-                                            <option value="">Chọn Tỉnh/Thành</option>
-                                          </select>
-                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh_id" class="js-ghn-province-id">
-                                        </div>
-                                        <div class="customer-address-detail-field">
-                                          <label>Phường/Xã</label>
-                                          <select class="form-control js-ghn-ward" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" data-selected-name="">
-                                            <option value="">Chọn Phường/Xã</option>
-                                          </select>
-                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa_code" class="js-ghn-ward-code">
-                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" class="js-ghn-district-name">
-                                          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen_id" class="js-ghn-district-id">
-                                        </div>
-                                        <div class="customer-address-detail-field"><label>Địa chỉ chi tiết</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Số nhà, đường, thôn/xóm"></div>
-                                        <div class="customer-address-detail-field customer-address-detail-wide"><label>Ghi chú</label><input class="form-control" form="addressAddForm_<%= selectedCustomer._id %>" name="ghi_chu" placeholder="Ghi chú"></div>
-                                        <div class="customer-address-detail-check"><label><input form="addressAddForm_<%= selectedCustomer._id %>" type="checkbox" name="mac_dinh" value="true"> Đặt làm mặc định</label></div>
-                                      </div>
+                                    <td class="warehouse-action-cell">
+                                      <button
+                                        form="addressAddForm_<%= selectedCustomer._id %>"
+                                        class="btn btn-primary btn-sm js-address-add"
+                                        data-form-id="addressAddForm_<%= selectedCustomer._id %>"
+                                        data-action="/khach-hang/<%= selectedCustomer._id %>/addresses/add"
+                                        type="submit"
+                                      >✨ Thêm</button>
                                     </td>
                                   </tr>
                                   <% if (!customerAddresses || customerAddresses.length === 0) { %>
                                     <tr>
-                                      <td colspan="7" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
+                                      <td colspan="9" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
                                     </tr>
                                   <% } %>
                                   <% (customerAddresses || []).forEach(function(address) { %>
                                     <% var addressFormId = 'addressForm_' + String(address._id); %>
                                     <tr class="warehouse-edit-row">
-                                      <td><input form="<%= addressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly style="background: transparent; border: none; cursor: default;"></td>
+                                      <td><input form="<%= addressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly></td>
                                       <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
                                       <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>" maxlength="10" inputmode="numeric"></td>
-                                      <td>
-                                        <input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>">
-                                      </td>
+                                      <td><input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></td>
+                                      <td><input form="<%= addressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></td>
+                                      <td><input form="<%= addressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></td>
                                       <td>
                                         <select class="js-address-type-select" form="<%= addressFormId %>" name="loai_dia_chi">
                                           <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
@@ -245,10 +227,15 @@
                                           <% }) %>
                                         </select>
                                       </td>
-                                      <td><%= formatDate(address.created_at) %></td>
+                                      <td>
+                                        <select form="<%= addressFormId %>" name="mac_dinh">
+                                          <option value="" <%= address.mac_dinh ? '' : 'selected' %>>Không</option>
+                                          <option value="true" <%= address.mac_dinh ? 'selected' : '' %>>Có</option>
+                                        </select>
+                                      </td>
                                       <td class="warehouse-action-cell">
+                                        <div class="warehouse-action-meta"><%= formatDate(address.created_at) %></div>
                                         <div class="warehouse-action-buttons">
-                                          <button type="button" class="btn btn-light btn-sm" onclick="this.closest('tr').nextElementSibling.style.display = this.closest('tr').nextElementSibling.style.display === 'none' ? 'table-row' : 'none'">▼</button>
                                           <button
                                             form="<%= addressFormId %>"
                                             class="btn btn-light btn-sm"
@@ -264,42 +251,10 @@
                                         </div>
                                       </td>
                                     </tr>
-                                    <tr class="address-detail-row" style="display: none;">
-                                      <td colspan="7">
-                                        <div class="customer-address-detail-grid">
-                                          <div class="customer-address-detail-field">
-                                            <label>Tỉnh/Thành</label>
-                                            <select class="form-control js-ghn-province" form="<%= addressFormId %>" name="tinh_thanh" data-selected-id="<%= address.tinh_thanh_id || '' %>" data-selected-name="<%= address.tinh_thanh || '' %>">
-                                              <% if (address.tinh_thanh) { %>
-                                                <option value="<%= address.tinh_thanh %>" selected><%= address.tinh_thanh %></option>
-                                              <% } else { %>
-                                                <option value="">Chọn Tỉnh/Thành</option>
-                                              <% } %>
-                                            </select>
-                                            <input type="hidden" form="<%= addressFormId %>" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= address.tinh_thanh_id || '' %>">
-                                          </div>
-                                          <div class="customer-address-detail-field">
-                                            <label>Phường/Xã</label>
-                                            <select class="form-control js-ghn-ward" form="<%= addressFormId %>" name="phuong_xa" data-selected-id="<%= address.phuong_xa_code || '' %>" data-selected-name="<%= address.phuong_xa || '' %>">
-                                              <% if (address.phuong_xa) { %>
-                                                <option value="<%= address.phuong_xa %>" selected><%= address.phuong_xa %></option>
-                                              <% } else { %>
-                                                <option value="">Chọn Phường/Xã</option>
-                                              <% } %>
-                                            </select>
-                                            <input type="hidden" form="<%= addressFormId %>" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= address.phuong_xa_code || '' %>">
-                                            <input type="hidden" form="<%= addressFormId %>" name="quan_huyen" class="js-ghn-district-name" value="<%= address.quan_huyen || '' %>">
-                                            <input type="hidden" form="<%= addressFormId %>" name="quan_huyen_id" class="js-ghn-district-id" value="<%= address.quan_huyen_id || '' %>">
-                                          </div>
-                                          <div class="customer-address-detail-field"><label>Địa chỉ chi tiết</label><input class="form-control" form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></div>
-                                          <div class="customer-address-detail-field customer-address-detail-wide"><label>Ghi chú</label><input class="form-control" form="<%= addressFormId %>" name="ghi_chu" value="<%= address.ghi_chu || '' %>"></div>
-                                          <div class="customer-address-detail-check"><label><input form="<%= addressFormId %>" type="checkbox" name="mac_dinh" value="true" <%= address.mac_dinh ? 'checked' : '' %>> Đặt làm mặc định</label></div>
-                                        </div>
-                                      </td>
-                                    </tr>
                                   <% }) %>
                                 </tbody>
                               </table>
+                              </div>
                               <form id="addressAddForm_<%= selectedCustomer._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/add">
                                 <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
                               </form>
