@@ -494,6 +494,7 @@ module.exports = {
   parseVatChuaSignedInput,
   assertVatChuaImportInput,
   assertVatChuaSignedInput,
+  createNhapVatChuaAndIncreaseStock,
   importVatChuaWithPurchase,
   importVatChuaWithSalesReturn,
   cancelNhapVatChuaBySource,

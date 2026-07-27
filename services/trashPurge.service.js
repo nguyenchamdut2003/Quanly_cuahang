@@ -51,6 +51,10 @@ function createHttpError(statusCode, message) {
   return error;
 }
 
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function getTrashRetentionDays() {
   return TRASH_RETENTION_DAYS;
 }
@@ -315,20 +319,30 @@ async function hardDeleteSaleReturn(returnId, storeId) {
   const id = toObjectId(returnId);
   if (!id) return 0;
   let deleted = 0;
-  const receiptIds = await collectIds({ phieu_tra_hang_id: id }, PhieuThuChi);
+  const doc = await PhieuTraHang.findById(id).select('ma_phieu_tra').lean();
+  const receiptFilter = { $or: [{ phieu_tra_hang_id: id }] };
+  if (doc && doc.ma_phieu_tra) receiptFilter.$or.push({ ma_chung_tu_goc: doc.ma_phieu_tra });
+  const receiptIds = await collectIds(receiptFilter, PhieuThuChi);
   deleted += await hardDeleteReceipts(receiptIds, storeId);
+  const [vatImportIds, vatExportIds] = await Promise.all([
+    collectIds({ source_type: 'tra_hang_ban', source_id: id }, NhapVatChua),
+    collectIds({ source_type: 'tra_hang_ban', source_id: id }, XuatVatChua)
+  ]);
+  for (const importId of vatImportIds) deleted += await hardDeleteVatChuaImport(importId, storeId);
+  for (const exportId of vatExportIds) deleted += await hardDeleteVatChuaExport(exportId, storeId);
+  const debtFilter = { $or: [{ phieu_tra_hang_id: id }, { phieu_thu_chi_id: { $in: receiptIds } }] };
+  if (doc && doc.ma_phieu_tra) {
+    debtFilter.$or.push(
+      { ma_chung_tu_goc: doc.ma_phieu_tra },
+      { ghi_chu: { $regex: escapeRegex(doc.ma_phieu_tra), $options: 'i' } }
+    );
+  }
   deleted = addCount(deleted, await CongNoKhachHang.deleteMany({
-    $or: [
-      { phieu_tra_hang_id: id },
-      { phieu_thu_chi_id: { $in: receiptIds } }
-    ]
+    $or: debtFilter.$or
   }));
   if (GiaoDichCongNoKhachHang) {
     deleted = addCount(deleted, await GiaoDichCongNoKhachHang.deleteMany({
-      $or: [
-        { phieu_tra_hang_id: id },
-        { phieu_thu_chi_id: { $in: receiptIds } }
-      ]
+      $or: debtFilter.$or
     }));
   }
   deleted = addCount(deleted, await CTPhieuTraHang.deleteMany({ phieu_tra_hang_id: id }));
@@ -427,6 +441,7 @@ async function hardDeleteRootEntity(root, storeId) {
   if (root.entity_type === 'PhieuTraHangNhap') return hardDeleteReturnImport(root.entity_id, storeId);
   if (root.entity_type === 'DonHang') return hardDeleteOrder(root, storeId);
   if (root.entity_type === 'HoaDonBanHang') return hardDeleteInvoice(root.entity_id, storeId);
+  if (root.entity_type === 'PhieuTraHang') return hardDeleteSaleReturn(root.entity_id, storeId);
   if (root.entity_type === 'HangHoa') return hardDeleteProduct(root, storeId);
   if (root.entity_type === 'SoQuy') return hardDeleteCashBook(root, storeId);
   if (root.entity_type === 'PhieuKiemKho') return hardDeleteInventoryCheck(root);

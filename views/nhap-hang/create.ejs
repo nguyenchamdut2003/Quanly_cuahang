@@ -1778,7 +1778,6 @@
       if (!productSearch.parentElement.contains(e.target)) searchResults.style.display = 'none';
       if (!supplierSearch.parentElement.contains(e.target)) supplierResults.style.display = 'none';
       if (quickProductModal.classList.contains('open') && e.target === quickProductModal) quickProductModal.classList.remove('open');
-      if (lotModal.classList.contains('open') && e.target === lotModal) lotModal.classList.remove('open');
       if (exportConfirmModal && exportConfirmModal.classList.contains('open') && e.target === exportConfirmModal) {
         exportConfirmModal.classList.remove('open');
       }

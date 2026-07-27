@@ -94,6 +94,12 @@
     .vc-status-tag.is-active { background: #ecfdf3; color: #047857; }
     .vc-status-tag.is-inactive { background: #f1f5f9; color: #64748b; }
     .vc-money-suffix { margin-left: 4px; color: #667085; font-size: 12px; font-weight: 600; }
+    .vc-stock-modal-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .vc-stock-modal-table th { height: 34px; background: #f3f6fa; color: #1f2937; font-size: 12px; text-align: left; padding: 0 8px; border-bottom: 1px solid #d9e2ec; }
+    .vc-stock-modal-table td { height: 42px; border-bottom: 1px solid #eef2f6; padding: 6px 8px; font-size: 13px; }
+    .vc-stock-modal-table input { width: 100%; height: 32px; border: 1px solid #cfd8e3; border-radius: 7px; padding: 0 8px; text-align: right; }
+    .vc-stock-modal-table .text-right { text-align: right; }
+    .vc-stock-modal-summary { margin-top: 10px; padding: 10px 12px; border: 1px solid #bfdbfe; background: #eff6ff; border-radius: 8px; color: #0f172a; font-weight: 800; }
     #vcImportTrashModalOverlay { z-index: 4200 !important; }
     #vcImportTrashModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
     #vcImportTrashModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
@@ -116,7 +122,7 @@
     .vc-trash-groups { margin: 0; padding-left: 18px; color: #344054; font-size: 13px; }
     .vc-trash-loading { text-align: center; padding: 24px 8px; color: #667085; font-size: 13px; }
     .vc-documents-wrap { width: 100%; max-width: 100%; overflow-x: auto !important; overflow-y: hidden; padding-bottom: 8px; scrollbar-gutter: stable; }
-    .vc-documents-table { table-layout: fixed; width: 1320px; min-width: 1320px; }
+    .vc-documents-table { table-layout: fixed; width: 1250px; min-width: 1250px; }
     .vc-documents-table th,
     .vc-documents-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vc-documents-table td > a,
@@ -126,16 +132,15 @@
     .vc-documents-table td > a,
     .vc-documents-table td > strong { display: inline-block; }
     .vc-documents-table th:nth-child(1) { width: 132px; }
-    .vc-documents-table th:nth-child(2) { width: 70px; }
-    .vc-documents-table th:nth-child(3) { width: 126px; }
-    .vc-documents-table th:nth-child(4) { width: 104px; }
-    .vc-documents-table th:nth-child(5) { width: 150px; }
-    .vc-documents-table th:nth-child(6) { width: 136px; }
-    .vc-documents-table th:nth-child(7) { width: 86px; }
-    .vc-documents-table th:nth-child(8) { width: 112px; }
-    .vc-documents-table th:nth-child(9) { width: 130px; }
-    .vc-documents-table th:nth-child(10) { width: 142px; }
-    .vc-documents-table th:nth-child(11) { width: 128px; }
+    .vc-documents-table th:nth-child(2) { width: 126px; }
+    .vc-documents-table th:nth-child(3) { width: 104px; }
+    .vc-documents-table th:nth-child(4) { width: 150px; }
+    .vc-documents-table th:nth-child(5) { width: 136px; }
+    .vc-documents-table th:nth-child(6) { width: 86px; }
+    .vc-documents-table th:nth-child(7) { width: 112px; }
+    .vc-documents-table th:nth-child(8) { width: 130px; }
+    .vc-documents-table th:nth-child(9) { width: 142px; }
+    .vc-documents-table th:nth-child(10) { width: 128px; }
     .vc-documents-table .vc-doc-actions-cell { overflow: visible; white-space: normal; }
     table[data-kv-master="vat-chua"] .product-detail-row > td {
       max-width: calc(100vw - 300px);
@@ -241,7 +246,7 @@
   <main class="admin-shell customer-page">
     <% const vcFlash = typeof flash !== 'undefined' ? flash : {}; %>
     <% const vcFlashForGeneric = Object.assign({}, vcFlash); %>
-    <% if (['created', 'imported', 'deleted', 'import_deleted', 'import_updated', 'returned'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
+    <% if (['created', 'imported', 'deleted', 'import_deleted', 'import_updated', 'returned', 'stocktake', 'destroyed'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
     <% if (['missing_store', 'missing_name', 'duplicate_code', 'no_selection', 'import_failed'].indexOf(String(vcFlash.error || '')) >= 0) { delete vcFlashForGeneric.error; } %>
     <%- include('../partials/flash-message', { flash: vcFlashForGeneric }) %>
     <% if (vcFlash.error === 'missing_store') { %>
@@ -267,6 +272,10 @@
       <div class="flash-message flash-success">Đã cập nhật phiếu nhập vật chứa.</div>
     <% } else if (vcFlash.success === 'returned') { %>
       <div class="flash-message flash-success">Đã trả vật chứa thành công.</div>
+    <% } else if (vcFlash.success === 'stocktake') { %>
+      <div class="flash-message flash-success">Đã kiểm kho và cân bằng tồn vật chứa.</div>
+    <% } else if (vcFlash.success === 'destroyed') { %>
+      <div class="flash-message flash-success">Đã xuất hủy vật chứa.</div>
     <% } %>
 
     <div class="customer-shell">
@@ -324,6 +333,8 @@
             <input type="search" name="keyword" form="vatChuaFilterForm" value="<%= filter.keyword || '' %>" placeholder="Theo mã, tên vật chứa">
           </div>
           <div class="customer-toolbar-actions">
+            <button class="btn btn-light" type="button" id="openVatChuaStocktakeModal" <%= missingStore ? 'disabled' : '' %>><i class="fa-solid fa-clipboard-check"></i> Kiểm kho</button>
+            <button class="btn btn-light" type="button" id="openVatChuaDestroyModal" <%= missingStore ? 'disabled' : '' %>><i class="fa-solid fa-trash-arrow-up"></i> Xuất hủy</button>
             <button class="btn btn-primary" type="button" id="openAddVatChuaModal" <%= missingStore ? 'disabled' : '' %>>+ Tạo mới</button>
             <button class="btn btn-light" type="button" id="openImportVatChuaModal" <%= missingStore ? 'disabled' : '' %>>Nhập vật chứa</button>
             <button class="btn btn-danger" type="submit" form="bulkDeleteVatChuaForm" onclick="return confirm('Ngừng sử dụng các vật chứa đã chọn?')">Ngừng sử dụng</button>
@@ -352,7 +363,7 @@
                 <% } %>
                 <% var listBase = '/vat-chua' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
                 <% (items || []).forEach(function(item) { %>
-                  <tr data-kv-detail-id="<%= item._id %>">
+                  <tr data-kv-detail-id="<%= item._id %>" data-vc-row data-vc-id="<%= item._id %>" data-vc-code="<%= item.ma_vat_chua || '' %>" data-vc-name="<%= item.ten_vat_chua || '' %>" data-vc-stock="<%= Number(item.so_luong_ton || 0) %>" data-vc-cost="<%= Number(item.gia_von_trung_binh || 0) %>" data-vc-active="<%= item.trang_thai === 'active' ? '1' : '0' %>">
                     <td class="check-cell"><input class="vat-chua-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn vật chứa"></td>
                     <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_vat_chua || '---' %></a></td>
                     <td><strong><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ten_vat_chua || '---' %></a></strong></td>
@@ -680,6 +691,70 @@
         </div>
       </div>
     </div>
+    <div id="vcStocktakeModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal" style="width:min(820px,96vw)">
+        <div class="modal-header">
+          <h3>Kiểm kho vật chứa</h3>
+          <button type="button" class="modal-close" id="vcStocktakeModalClose" aria-label="Đóng">×</button>
+        </div>
+        <form class="modal-body product-form-body" id="vcStocktakeForm">
+          <div class="vc-doc-modal-table-wrap">
+            <table class="vc-stock-modal-table">
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Tên vật chứa</th>
+                  <th class="text-right">Tồn hệ thống</th>
+                  <th class="text-right">Thực tế</th>
+                  <th class="text-right">Lệch</th>
+                </tr>
+              </thead>
+              <tbody id="vcStocktakeBody"></tbody>
+            </table>
+          </div>
+          <label style="display:block;margin-top:12px;font-weight:700">Ghi chú</label>
+          <input class="vc-side-input" id="vcStocktakeNote" placeholder="Ghi chú kiểm kho">
+          <div id="vcStocktakeSummary" class="vc-stock-modal-summary">Chưa có chênh lệch</div>
+          <div id="vcStocktakeError" class="vc-form-error"></div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcStocktakeModalCancel">Hủy</button>
+          <button class="btn btn-primary" type="submit" form="vcStocktakeForm" id="vcStocktakeModalSave">Cân bằng kho</button>
+        </div>
+      </div>
+    </div>
+    <div id="vcDestroyModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal" style="width:min(820px,96vw)">
+        <div class="modal-header">
+          <h3>Xuất hủy vật chứa</h3>
+          <button type="button" class="modal-close" id="vcDestroyModalClose" aria-label="Đóng">×</button>
+        </div>
+        <form class="modal-body product-form-body" id="vcDestroyForm">
+          <div class="vc-doc-modal-table-wrap">
+            <table class="vc-stock-modal-table">
+              <thead>
+                <tr>
+                  <th>Mã</th>
+                  <th>Tên vật chứa</th>
+                  <th class="text-right">Tồn kho</th>
+                  <th class="text-right">SL hủy</th>
+                  <th class="text-right">Giá vốn</th>
+                </tr>
+              </thead>
+              <tbody id="vcDestroyBody"></tbody>
+            </table>
+          </div>
+          <label style="display:block;margin-top:12px;font-weight:700">Lý do hủy</label>
+          <input class="vc-side-input" id="vcDestroyReason" value="Hỏng/mất vật chứa">
+          <div id="vcDestroySummary" class="vc-stock-modal-summary">Chưa nhập số lượng hủy</div>
+          <div id="vcDestroyError" class="vc-form-error"></div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcDestroyModalCancel">Hủy</button>
+          <button class="btn btn-danger" type="submit" form="vcDestroyForm" id="vcDestroyModalSave">Xuất hủy</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script id="vatChuaPageMeta" type="application/json"><%- JSON.stringify({
@@ -791,6 +866,24 @@
       var returnImportError = document.getElementById('returnVatChuaError');
       var returnImportMode = 'create';
       var returnEditSourceId = '';
+      var openStocktakeBtn = document.getElementById('openVatChuaStocktakeModal');
+      var openDestroyBtn = document.getElementById('openVatChuaDestroyModal');
+      var stocktakeOverlay = document.getElementById('vcStocktakeModalOverlay');
+      var stocktakeForm = document.getElementById('vcStocktakeForm');
+      var stocktakeBody = document.getElementById('vcStocktakeBody');
+      var stocktakeSummary = document.getElementById('vcStocktakeSummary');
+      var stocktakeError = document.getElementById('vcStocktakeError');
+      var stocktakeSave = document.getElementById('vcStocktakeModalSave');
+      var stocktakeClose = document.getElementById('vcStocktakeModalClose');
+      var stocktakeCancel = document.getElementById('vcStocktakeModalCancel');
+      var destroyOverlay = document.getElementById('vcDestroyModalOverlay');
+      var destroyForm = document.getElementById('vcDestroyForm');
+      var destroyBody = document.getElementById('vcDestroyBody');
+      var destroySummary = document.getElementById('vcDestroySummary');
+      var destroyError = document.getElementById('vcDestroyError');
+      var destroySave = document.getElementById('vcDestroyModalSave');
+      var destroyClose = document.getElementById('vcDestroyModalClose');
+      var destroyCancel = document.getElementById('vcDestroyModalCancel');
       var cashBookOptions = [];
       var bankBookOptions = [];
       var selectAll = document.getElementById('selectAllVatChua');
@@ -853,6 +946,138 @@
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
+      }
+      function getVatChuaActionRows() {
+        var checked = checkboxes.filter(function(cb) { return cb.checked; });
+        var source = checked.length
+          ? checked.map(function(cb) { return cb.closest('[data-vc-row]'); })
+          : Array.prototype.slice.call(document.querySelectorAll('[data-vc-row]'));
+        return source.filter(function(row) {
+          return row && row.dataset.vcActive === '1';
+        }).map(function(row) {
+          return {
+            id: row.dataset.vcId || '',
+            code: row.dataset.vcCode || '',
+            name: row.dataset.vcName || '',
+            stock: Math.max(0, Number(row.dataset.vcStock || 0)),
+            cost: Math.max(0, Number(row.dataset.vcCost || 0))
+          };
+        });
+      }
+      function setActionError(el, message) {
+        if (!el) return;
+        el.textContent = message || '';
+        el.style.display = message ? 'block' : 'none';
+      }
+      function showVcActionModal(el) {
+        if (!el) return;
+        el.classList.add('is-visible');
+      }
+      function hideVcActionModal(el) {
+        if (!el) return;
+        el.classList.remove('is-visible');
+      }
+      function renderStocktakeRows() {
+        var rows = getVatChuaActionRows();
+        if (!rows.length) {
+          alert('Không có vật chứa đang sử dụng để kiểm kho.');
+          return false;
+        }
+        if (stocktakeBody) {
+          stocktakeBody.innerHTML = rows.map(function(row) {
+            return '<tr data-vc-stocktake-line data-id="' + escapeHtml(row.id) + '" data-stock="' + row.stock + '" data-cost="' + row.cost + '">' +
+              '<td><strong>' + escapeHtml(row.code || '---') + '</strong></td>' +
+              '<td>' + escapeHtml(row.name || '---') + '</td>' +
+              '<td class="text-right">' + fmt(row.stock) + '</td>' +
+              '<td><input type="number" min="0" step="1" value="' + row.stock + '" data-actual></td>' +
+              '<td class="text-right" data-diff>0</td>' +
+            '</tr>';
+          }).join('');
+        }
+        if (document.getElementById('vcStocktakeNote')) document.getElementById('vcStocktakeNote').value = '';
+        setActionError(stocktakeError, '');
+        refreshStocktakeSummary();
+        return true;
+      }
+      function refreshStocktakeSummary() {
+        var lines = Array.prototype.slice.call(document.querySelectorAll('[data-vc-stocktake-line]'));
+        var inc = 0;
+        var dec = 0;
+        lines.forEach(function(line) {
+          var stock = Math.max(0, Number(line.dataset.stock || 0));
+          var actual = Math.max(0, Math.floor(Number(line.querySelector('[data-actual]')?.value || 0)));
+          var diff = actual - stock;
+          var diffEl = line.querySelector('[data-diff]');
+          if (diffEl) diffEl.textContent = diff > 0 ? ('+' + fmt(diff)) : fmt(diff);
+          if (diff > 0) inc += diff;
+          if (diff < 0) dec += Math.abs(diff);
+        });
+        if (stocktakeSummary) {
+          stocktakeSummary.textContent = (inc || dec)
+            ? ('Lệch tăng: ' + fmt(inc) + ' | Lệch giảm: ' + fmt(dec))
+            : 'Chưa có chênh lệch';
+        }
+      }
+      function renderDestroyRows() {
+        var rows = getVatChuaActionRows().filter(function(row) { return row.stock > 0; });
+        if (!rows.length) {
+          alert('Không có vật chứa còn tồn để xuất hủy.');
+          return false;
+        }
+        if (destroyBody) {
+          destroyBody.innerHTML = rows.map(function(row) {
+            return '<tr data-vc-destroy-line data-id="' + escapeHtml(row.id) + '" data-stock="' + row.stock + '">' +
+              '<td><strong>' + escapeHtml(row.code || '---') + '</strong></td>' +
+              '<td>' + escapeHtml(row.name || '---') + '</td>' +
+              '<td class="text-right">' + fmt(row.stock) + '</td>' +
+              '<td><input type="number" min="0" max="' + row.stock + '" step="1" value="0" data-destroy-qty></td>' +
+              '<td><input type="text" value="' + (row.cost ? fmt(row.cost) : '') + '" inputmode="numeric" data-destroy-cost></td>' +
+            '</tr>';
+          }).join('');
+          Array.prototype.slice.call(destroyBody.querySelectorAll('[data-destroy-cost]')).forEach(bindVNNumberInput);
+        }
+        if (document.getElementById('vcDestroyReason')) document.getElementById('vcDestroyReason').value = 'Hỏng/mất vật chứa';
+        setActionError(destroyError, '');
+        refreshDestroySummary();
+        return true;
+      }
+      function refreshDestroySummary() {
+        var lines = Array.prototype.slice.call(document.querySelectorAll('[data-vc-destroy-line]'));
+        var qty = 0;
+        var amount = 0;
+        lines.forEach(function(line) {
+          var rowQty = Math.max(0, Math.floor(Number(line.querySelector('[data-destroy-qty]')?.value || 0)));
+          var cost = numeric(line.querySelector('[data-destroy-cost]')?.value || 0);
+          qty += rowQty;
+          amount += rowQty * cost;
+        });
+        if (destroySummary) {
+          destroySummary.textContent = qty
+            ? ('Tổng SL hủy: ' + fmt(qty) + ' | Tổng giá trị: ' + fmtMoney(amount))
+            : 'Chưa nhập số lượng hủy';
+        }
+      }
+      async function postVatChuaAction(url, payload, saveBtn, defaultText, submittingText) {
+        if (saveBtn) {
+          saveBtn.disabled = true;
+          saveBtn.textContent = submittingText;
+        }
+        try {
+          var res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          var data = await res.json();
+          if (!data.success) throw new Error(data.message || 'Không thực hiện được thao tác.');
+          window.location.href = '/vat-chua?success=' + encodeURIComponent(url.indexOf('kiem-kho') >= 0 ? 'stocktake' : 'destroyed');
+        } catch (error) {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = defaultText;
+          }
+          throw error;
+        }
       }
       function cashBookLabel(book) {
         var bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
@@ -1206,11 +1431,37 @@
         }
         if (returnImportSave) returnImportSave.disabled = false;
       }
+      function closeStocktakeModal() {
+        hideVcActionModal(stocktakeOverlay);
+        setActionError(stocktakeError, '');
+        if (stocktakeSave) {
+          stocktakeSave.disabled = false;
+          stocktakeSave.textContent = 'Cân bằng kho';
+        }
+      }
+      function closeDestroyModal() {
+        hideVcActionModal(destroyOverlay);
+        setActionError(destroyError, '');
+        if (destroySave) {
+          destroySave.disabled = false;
+          destroySave.textContent = 'Xuất hủy';
+        }
+      }
 
       if (openBtn) openBtn.addEventListener('click', openModal);
       if (openImportBtn) openImportBtn.addEventListener('click', openImportModal);
+      if (openStocktakeBtn) openStocktakeBtn.addEventListener('click', function() {
+        if (renderStocktakeRows()) showVcActionModal(stocktakeOverlay);
+      });
+      if (openDestroyBtn) openDestroyBtn.addEventListener('click', function() {
+        if (renderDestroyRows()) showVcActionModal(destroyOverlay);
+      });
       if (closeBtn) closeBtn.addEventListener('click', closeModal);
       if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+      if (stocktakeClose) stocktakeClose.addEventListener('click', closeStocktakeModal);
+      if (stocktakeCancel) stocktakeCancel.addEventListener('click', closeStocktakeModal);
+      if (destroyClose) destroyClose.addEventListener('click', closeDestroyModal);
+      if (destroyCancel) destroyCancel.addEventListener('click', closeDestroyModal);
       if (importCloseBtn) importCloseBtn.addEventListener('click', closeImportModal);
       if (importCancelBtn) importCancelBtn.addEventListener('click', closeImportModal);
       if (overlay) {
@@ -1228,17 +1479,93 @@
         }
         if (importOverlay.getAttribute('data-auto-open') === '1') openImportModal();
       }
+      if (stocktakeOverlay) {
+        stocktakeOverlay.addEventListener('click', function(e) {
+          if (e.target === stocktakeOverlay) closeStocktakeModal();
+        });
+      }
+      if (destroyOverlay) {
+        destroyOverlay.addEventListener('click', function(e) {
+          if (e.target === destroyOverlay) closeDestroyModal();
+        });
+      }
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
           closeModal();
           closeImportModal();
           closeEditImportModal();
           closeReturnImportModal();
+          closeStocktakeModal();
+          closeDestroyModal();
           var vcDocOverlay = document.getElementById('vcDocumentModalOverlay');
           if (vcDocOverlay) vcDocOverlay.classList.remove('is-visible');
           closeVcImportTrashModal();
         }
       });
+
+      if (stocktakeBody) stocktakeBody.addEventListener('input', refreshStocktakeSummary);
+      if (destroyBody) destroyBody.addEventListener('input', refreshDestroySummary);
+      if (stocktakeForm) {
+        stocktakeForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          setActionError(stocktakeError, '');
+          var items = Array.prototype.slice.call(document.querySelectorAll('[data-vc-stocktake-line]')).map(function(line) {
+            var stock = Math.max(0, Number(line.dataset.stock || 0));
+            var actual = Math.max(0, Math.floor(Number(line.querySelector('[data-actual]')?.value || 0)));
+            return {
+              vat_chua_id: line.dataset.id || '',
+              so_luong_thuc_te: actual,
+              gia_von: Math.max(0, Number(line.dataset.cost || 0)),
+              _changed: actual !== stock
+            };
+          }).filter(function(item) { return item.vat_chua_id && item._changed; });
+          if (!items.length) {
+            setActionError(stocktakeError, 'Không có chênh lệch cần cân bằng.');
+            return;
+          }
+          try {
+            await postVatChuaAction('/vat-chua/kiem-kho', {
+              items: items,
+              ghi_chu: document.getElementById('vcStocktakeNote')?.value || ''
+            }, stocktakeSave, 'Cân bằng kho', 'Đang cân bằng...');
+          } catch (error) {
+            setActionError(stocktakeError, error.message || 'Không kiểm kho được vật chứa.');
+          }
+        });
+      }
+      if (destroyForm) {
+        destroyForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          setActionError(destroyError, '');
+          var items = Array.prototype.slice.call(document.querySelectorAll('[data-vc-destroy-line]')).map(function(line) {
+            var stock = Math.max(0, Number(line.dataset.stock || 0));
+            var qty = Math.max(0, Math.floor(Number(line.querySelector('[data-destroy-qty]')?.value || 0)));
+            return {
+              vat_chua_id: line.dataset.id || '',
+              so_luong: qty,
+              gia_von: numeric(line.querySelector('[data-destroy-cost]')?.value || 0),
+              _valid: qty > 0 && qty <= stock
+            };
+          }).filter(function(item) { return item.vat_chua_id && item.so_luong > 0; });
+          if (!items.length) {
+            setActionError(destroyError, 'Vui lòng nhập ít nhất một số lượng xuất hủy.');
+            return;
+          }
+          var invalid = items.some(function(item) { return !item._valid; });
+          if (invalid) {
+            setActionError(destroyError, 'Số lượng xuất hủy không được vượt tồn kho.');
+            return;
+          }
+          try {
+            await postVatChuaAction('/vat-chua/xuat-huy', {
+              items: items,
+              ly_do_huy: document.getElementById('vcDestroyReason')?.value || ''
+            }, destroySave, 'Xuất hủy', 'Đang xuất hủy...');
+          } catch (error) {
+            setActionError(destroyError, error.message || 'Không xuất hủy được vật chứa.');
+          }
+        });
+      }
 
       if (importGiaVonInput) bindVNNumberInput(importGiaVonInput);
       if (importGiaVonInput) importGiaVonInput.addEventListener('input', renderImportPaymentSummary);

@@ -38,6 +38,8 @@ router.get('/tra-hang/export.csv', donHangController.getTraHangExportCsv);
 router.get('/tra-hang/export.xlsx', donHangController.getTraHangExportXlsx);
 router.get('/tra-hang/create', donHangController.getTraHangCreate);
 router.get('/tra-hang/invoices/search', donHangController.getTraHangInvoicesSearch);
+router.post('/tra-hang/trash/preview', donHangController.postTraHangTrashPreview);
+router.post('/tra-hang/trash/move', donHangController.postTraHangTrashMove);
 router.get('/tra-hang/:id/export.xlsx', donHangController.getTraHangIdExportXlsx);
 router.post('/tra-hang/:id/cancel', donHangController.postTraHangIdCancel);
 router.patch('/tra-hang/:id', donHangController.patchTraHangId);

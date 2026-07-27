@@ -86,6 +86,7 @@
     .delivery-confirm-vat-combo select{flex:1;min-width:160px;max-width:320px}
     .delivery-confirm-vat-combo input{width:88px;text-align:right}
     .delivery-confirm-body{padding:16px 20px;overflow:auto}.delivery-confirm-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}
+    .delivery-confirm-modal.is-submitting{cursor:wait}.delivery-confirm-modal.is-submitting input,.delivery-confirm-modal.is-submitting select,.delivery-confirm-modal.is-submitting button{pointer-events:none;opacity:.72}
     .delivery-confirm-table{width:100%;border-collapse:collapse}.delivery-confirm-table th{height:34px;background:#f3f4f6;border-bottom:1px solid #cfd8e3;text-align:left;font-size:12px;padding:0 8px}.delivery-confirm-table td{height:42px;border-bottom:1px solid #e5e9ee;font-size:13px;padding:0 8px}.delivery-confirm-table input{width:86px;height:30px;border:1px solid #cfd8e3;border-radius:6px;text-align:right;padding:0 8px}.delivery-confirm-error{display:none;color:#d92d20;font-size:13px;margin:0 0 10px}.delivery-payment-due{margin-top:14px;padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;color:#0f172a;font-weight:800}.delivery-payment-due-lines{display:flex;flex-direction:column;gap:6px;line-height:1.45}.delivery-confirm-payment{display:grid;grid-template-columns:120px minmax(0,1fr) 120px minmax(0,1fr);gap:10px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid #e5e9ee}.delivery-confirm-payment label{font-weight:800;font-size:13px}.delivery-confirm-payment input,.delivery-confirm-payment select{height:32px;border:1px solid #cfd8e3;border-radius:6px;padding:0 9px}.delivery-confirm-payment input{text-align:right}.delivery-pay-combo{display:flex;align-items:center;gap:6px;min-width:0}    .delivery-pay-combo input{flex:1;min-width:0}.delivery-confirm-payment #deliveryPaymentSummary{grid-column:1/-1;margin-top:2px}
     .receipt-pay-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.48);z-index:1350;align-items:center;justify-content:center;padding:20px}.receipt-pay-modal{width:min(520px,calc(100vw - 32px));background:#fff;border-radius:10px;box-shadow:0 18px 44px rgba(15,23,42,.3);overflow:hidden}.receipt-pay-head,.receipt-pay-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e5e9ee}.receipt-pay-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}.receipt-pay-body{padding:18px 20px}.receipt-pay-due{padding:10px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:6px;font-weight:800;margin-bottom:14px}.po-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1350;padding:16px}.po-modal.open{display:flex}.po-modal-card{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}.po-modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.po-modal-head h3{margin:0;font-size:18px}.po-modal-close{border:0;background:#fff;font-size:24px;cursor:pointer;color:#667085}.quick-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.quick-pay-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}.quick-pay-grid label.full{grid-column:1/-1}.quick-pay-grid input,.quick-pay-grid select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}.pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:4px 0}.pay-total-summary{font-size:13px;font-weight:600;color:#111827;padding:4px 0}.pay-summary-error{font-size:12px;color:#b45309;font-weight:600;padding:4px 0}.invoice-receipt-pay-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}.kv-btn{height:37px;border:1px solid #cfd8e3;background:#fff;border-radius:8px;padding:0 13px;color:#111827;font-size:14px;font-weight:800;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.kv-btn.primary{color:#0070f4;border-color:#0070f4}
     .locked-action-message{font-size:15px;line-height:1.5}
@@ -382,7 +383,7 @@
       </div>
       <div class="delivery-confirm-foot">
         <button type="button" class="btn" onclick="closeDeliveryConfirmModal()">Bỏ qua</button>
-        <button type="button" class="btn solid" onclick="submitDeliveryConfirmModal()">Xác nhận giao</button>
+        <button type="button" class="btn solid" id="deliveryConfirmSubmitBtn" onclick="submitDeliveryConfirmModal()">Xác nhận giao</button>
       </div>
     </div>
   </div>
@@ -483,6 +484,7 @@
     let pendingDeliveryBatchPayable = 0;
     let pendingDeliveryPrepaidCredit = 0;
     let pendingDeliveryPaymentDue = 0;
+    let pendingDeliverySubmitting = false;
     let pendingReceiptOrderId = '';
     let pendingReceiptDue = 0;
 
@@ -966,17 +968,35 @@
       const vatChuaQtyEl = document.getElementById('deliveryVatChuaQty');
       if (vatChuaIdEl) vatChuaIdEl.value = '';
       if (vatChuaQtyEl) vatChuaQtyEl.value = '';
+      setDeliveryConfirmSubmitting(false);
       refreshDeliveryPaymentSummary();
       document.getElementById('deliveryConfirmError').style.display = 'none';
       document.getElementById('deliveryConfirmOverlay').style.display = 'flex';
     }
 
     function closeDeliveryConfirmModal() {
+      if (pendingDeliverySubmitting) return;
       pendingDeliveryOrderId = '';
       pendingDeliveryBatchPayable = 0;
       pendingDeliveryPrepaidCredit = 0;
       pendingDeliveryPaymentDue = 0;
       document.getElementById('deliveryConfirmOverlay').style.display = 'none';
+    }
+
+    function setDeliveryConfirmSubmitting(isSubmitting) {
+      pendingDeliverySubmitting = Boolean(isSubmitting);
+      const modal = document.querySelector('#deliveryConfirmOverlay .delivery-confirm-modal');
+      const submitBtn = document.getElementById('deliveryConfirmSubmitBtn');
+      if (modal) {
+        modal.classList.toggle('is-submitting', pendingDeliverySubmitting);
+        modal.querySelectorAll('input, select, button').forEach(el => {
+          el.disabled = pendingDeliverySubmitting;
+        });
+      }
+      if (submitBtn) {
+        if (!submitBtn.dataset.defaultText) submitBtn.dataset.defaultText = submitBtn.textContent;
+        submitBtn.textContent = pendingDeliverySubmitting ? 'Đang tạo đơn' : submitBtn.dataset.defaultText;
+      }
     }
 
     function collectDeliverySubmitPayload() {
@@ -1036,6 +1056,7 @@
     }
 
     async function submitDeliveryConfirmModal() {
+      if (pendingDeliverySubmitting) return;
       const payload = collectDeliverySubmitPayload();
       if (!payload) return closeDeliveryConfirmModal();
       if (payload.error) return alert(payload.error);
@@ -1045,14 +1066,23 @@
         vat_chua_id: vatChuaFields.vat_chua_id,
         vat_chua_so_luong: vatChuaFields.vat_chua_so_luong
       });
-      const res = await fetch('/don-hang/' + payload.id + '/xac-nhan-giao', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (!data.success) return alert(data.message || 'Không xác nhận giao được.');
-      location.reload();
+      setDeliveryConfirmSubmitting(true);
+      try {
+        const res = await fetch('/don-hang/' + payload.id + '/xac-nhan-giao', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!data.success) {
+          setDeliveryConfirmSubmitting(false);
+          return alert(data.message || 'Không xác nhận giao được.');
+        }
+        location.reload();
+      } catch (error) {
+        setDeliveryConfirmSubmitting(false);
+        alert('Không xác nhận giao được.');
+      }
     }
 
     async function deleteOrder(id) {

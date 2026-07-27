@@ -53,6 +53,7 @@ const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaW
 const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines } = require('../services/vatChuaDetail.service');
 const { previewOrderTrash, moveOrdersToTrash } = require('../services/orderTrash.service');
 const { previewInvoiceTrash, moveInvoicesToTrash } = require('../services/invoiceTrash.service');
+const { previewReturnTrash, moveReturnsToTrash } = require('../services/returnTrash.service');
 
 async function resolveOrderLineUnitPrice(item, product, bangGiaId, storeId) {
     const resolved = await resolveSalePrice({
@@ -3491,7 +3492,9 @@ async function buildReturnFilter(query = {}) {
         }).select('_id');
         filter.khach_hang_id = { $in: customers.map(item => item._id) };
     }
-    return filter;
+    const deletedGuard = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    if (!Object.keys(filter).length) return deletedGuard;
+    return { $and: [filter, deletedGuard] };
 }
 
 async function getOrderCreateData() {
@@ -4803,6 +4806,15 @@ exports.postHoaDonIdSave = async (req, res, next) => {
         }
         if (!newCustomerId) newCustomerId = '';
 
+        let nextInvoiceDate = invoice.ngay_ban || invoice.created_at || new Date();
+        if (body.ngay_ban !== undefined) {
+            const parsedInvoiceDate = new Date(body.ngay_ban);
+            if (Number.isNaN(parsedInvoiceDate.getTime())) {
+                return res.status(400).json({ success: false, message: 'Ngày hóa đơn không hợp lệ' });
+            }
+            nextInvoiceDate = parsedInvoiceDate;
+        }
+
         const oldPayable = Number(invoice.thanh_toan || 0);
         const oldDebt = Math.max(0, oldPayable - paid);
         const newDebt = Math.max(0, thanhToan - paid);
@@ -4863,6 +4875,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
                 tong_tien: tongTienHang,
                 thanh_toan: thanhToan,
                 trang_thai: status,
+                ngay_ban: nextInvoiceDate,
                 khach_hang_id: newCustomerId || null
             }
         });
@@ -5632,6 +5645,35 @@ exports.getTraHangExportXlsx = async (req, res, next) => {
         await sendReturnWorkbook(res, 'tra-hang-ban.xlsx', returns, detailMap);
     } catch (error) {
         next(error);
+    }
+};
+
+exports.postTraHangTrashPreview = async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        const ids = req.body && (req.body.phieu_tra_hang_ids || req.body.ids);
+        const preview = await previewReturnTrash(ids, storeId);
+        return res.json({ success: true, data: preview });
+    } catch (error) {
+        const status = Number(error && error.statusCode) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không xem trước được thùng rác' });
+    }
+};
+
+exports.postTraHangTrashMove = async (req, res, next) => {
+    try {
+        const storeId = await resolveStoreId(req);
+        const ids = req.body && (req.body.phieu_tra_hang_ids || req.body.ids);
+        const userId = req.user && req.user._id;
+        const result = await moveReturnsToTrash(ids, storeId, userId);
+        return res.json({
+            success: true,
+            message: 'Đã đưa ' + result.moved_count + ' phiếu trả hàng vào thùng rác.',
+            data: result
+        });
+    } catch (error) {
+        const status = Number(error && error.statusCode) || 400;
+        return res.status(status).json({ success: false, message: error.message || 'Không đưa vào thùng rác được' });
     }
 };
 
@@ -7178,13 +7220,6 @@ exports.confirmOrderDelivery = async function(req, res, next) {
 
             if (!detail) {
                 return res.status(400).json({ success: false, message: 'Dòng hàng giao không hợp lệ' });
-            }
-
-            const orderedQuantity = Number(detail.so_luong_dat || detail.so_luong || 0);
-            const deliveredBefore = Number(detail.so_luong_da_giao || 0);
-            const remainingBefore = Math.max(orderedQuantity - deliveredBefore, 0);
-            if (quantity > remainingBefore) {
-                return res.status(400).json({ success: false, message: 'Số lượng giao vượt quá số lượng còn thiếu' });
             }
 
             const lineBase = quantity * deliveryPrice;

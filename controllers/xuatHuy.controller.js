@@ -612,6 +612,28 @@ exports.createSubmit = async function(req, res) {
       return res.status(400).json({ success: false, message: 'Không cho chọn kho khác với kho của phiếu nhập gốc' });
     }
     const rows = await normalizeRows(parseItems(body.items_json || body.items), khoId, false);
+    const purchaseDetails = await CTPhieuNhap.find({
+      phieu_nhap_id: phieuNhapId,
+      hang_hoa_id: { $in: rows.map(row => row.hang_hoa_id) }
+    }).select('hang_hoa_id lo_hang_id').lean();
+    const allowedProducts = new Set();
+    const allowedProductLots = new Set();
+    purchaseDetails.forEach(detail => {
+      const productKey = String(detail.hang_hoa_id || '');
+      allowedProducts.add(productKey);
+      if (detail.lo_hang_id) {
+        allowedProductLots.add(productKey + ':' + String(detail.lo_hang_id));
+      }
+    });
+    for (const row of rows) {
+      const productKey = String(row.hang_hoa_id || '');
+      if (!allowedProducts.has(productKey)) {
+        return res.status(400).json({ success: false, message: 'Hàng xuất hủy không thuộc phiếu nhập gốc đã chọn' });
+      }
+      if (row.lo_hang_id && !allowedProductLots.has(productKey + ':' + String(row.lo_hang_id))) {
+        return res.status(400).json({ success: false, message: 'Lô hàng xuất hủy không thuộc phiếu nhập gốc đã chọn' });
+      }
+    }
     const totals = rows.reduce((sum, row) => {
       sum.qty += Number(row.so_luong || 0);
       sum.value += Number(row.thanh_tien || 0);
@@ -832,11 +854,18 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
       .sort({ created_at: 1 })
       .lean();
 
-    const lotInventoryAll = await TonKhoLo.find({
-      kho_id: khoId,
-      so_luong: { $gt: 0 },
-      $or: [{ gia_tri_thuoc_tinh_id: null }, { gia_tri_thuoc_tinh_id: { $exists: false } }]
-    }).populate('lo_hang_id').lean();
+    const purchaseLotIds = details
+      .map(row => row.lo_hang_id && row.lo_hang_id._id ? row.lo_hang_id._id : row.lo_hang_id)
+      .filter(lotId => isObjectId(lotId));
+    const uniquePurchaseLotIds = Array.from(new Set(purchaseLotIds.map(lotId => String(lotId))));
+    const lotInventoryAll = uniquePurchaseLotIds.length
+      ? await TonKhoLo.find({
+        kho_id: khoId,
+        lo_hang_id: { $in: uniquePurchaseLotIds },
+        so_luong: { $gt: 0 },
+        $or: [{ gia_tri_thuoc_tinh_id: null }, { gia_tri_thuoc_tinh_id: { $exists: false } }]
+      }).populate('lo_hang_id').lean()
+      : [];
     const lotsByProduct = lotInventoryAll.reduce((map, lotRow) => {
       const key = String(lotRow.hang_hoa_id);
       if (!map[key]) map[key] = [];

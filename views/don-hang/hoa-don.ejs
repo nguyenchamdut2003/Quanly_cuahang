@@ -833,6 +833,13 @@
       return true;
     }
 
+    function toDateTimeLocalValue(value) {
+      const date = value ? new Date(value) : new Date();
+      if (Number.isNaN(date.getTime())) return '';
+      const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+
     async function openInvoiceEditModal(id) {
       currentInvoiceEditId = id;
       const modal = document.getElementById('invoiceEditModal');
@@ -914,6 +921,7 @@
         body.innerHTML = `
           <div class="invoice-edit-meta">
             <div class="item">Khách hàng<select id="editInvoiceCustomer">${customerOptions}</select></div>
+            <div class="item">Ngày hóa đơn<input id="editInvoiceDate" type="datetime-local" value="${escapeHtml(toDateTimeLocalValue(ticket.ngay_ban || ticket.created_at))}"></div>
             <div class="item">Kho<b>${escapeHtml(ticket.kho_id?.ten_kho || ticket.kho_id?.ma_kho || '--')}</b></div>
             <div class="item">Trạng thái<b>${escapeHtml(invoiceStatusText(ticket.trang_thai_chuan || ticket.trang_thai || 'processing'))}</b></div>
             <div class="item">Khách cần trả<b>${moneyText(ticket.thanh_toan || ticket.tong_tien || 0)}</b></div>
@@ -949,7 +957,8 @@
         }));
         const payload = {
           items,
-          khach_hang_id: document.getElementById('editInvoiceCustomer')?.value || ''
+          khach_hang_id: document.getElementById('editInvoiceCustomer')?.value || '',
+          ngay_ban: document.getElementById('editInvoiceDate')?.value || ''
         };
         const editVatChuaEl = document.getElementById('editInvoiceVatChuaId');
         if (editVatChuaEl) {

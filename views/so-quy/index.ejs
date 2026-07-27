@@ -340,11 +340,11 @@
           <div class="receipt-payment-block" id="receiptPaymentBlock">
             <div class="receipt-payment-title">Chi tiết thanh toán</div>
             <div class="receipt-payment-grid">
-              <div class="field"><label>Tiền mặt</label><div class="money-wrap"><input name="tien_mat" id="receiptCashAmount" value="0" inputmode="numeric" autocomplete="off"><span>đ</span></div></div>
+              <div class="field"><label>Tiền mặt</label><div class="money-wrap"><input name="tien_mat" id="receiptCashAmount" value="" placeholder="0" inputmode="numeric" autocomplete="off"><span>đ</span></div></div>
               <div class="field"><label>Sổ tiền mặt</label><select name="so_quy_tien_mat_id" id="receiptCashBookSelect"><option value="">Chọn sổ tiền mặt</option></select><div class="partner-hint" id="receiptCashBookHint"></div></div>
-              <div class="field"><label>Chuyển khoản</label><div class="money-wrap"><input name="chuyen_khoan" id="receiptTransferAmount" value="0" inputmode="numeric" autocomplete="off"><span>đ</span></div></div>
+              <div class="field"><label>Chuyển khoản</label><div class="money-wrap"><input name="chuyen_khoan" id="receiptTransferAmount" value="" placeholder="0" inputmode="numeric" autocomplete="off"><span>đ</span></div></div>
               <div class="field"><label>Tài khoản ngân hàng</label><select name="so_quy_chuyen_khoan_id" id="receiptBankBookSelect"><option value="">Chọn tài khoản</option></select><div class="partner-hint" id="receiptBankBookHint"></div></div>
-              <div class="field" id="receiptRefundField"><label>Tiền trả khách</label><div class="money-wrap"><input name="tien_tra_khach" id="receiptRefundAmount" value="0" inputmode="numeric" autocomplete="off"><span>đ</span></div></div>
+              <div class="field" id="receiptRefundField"><label>Tiền trả khách</label><div class="money-wrap"><input name="tien_tra_khach" id="receiptRefundAmount" value="" placeholder="0" inputmode="numeric" autocomplete="off"><span>đ</span></div></div>
               <div class="receipt-payment-summary">
                 <div class="receipt-payment-summary-row"><span id="receiptTotalLabel">Tổng khách đưa</span><b id="receiptTotalDisplay">0 VNĐ</b></div>
                 <div class="receipt-payment-summary-row"><span id="receiptNetLabel">Thực thu</span><b id="receiptNetDisplay">0 VNĐ</b></div>
@@ -629,8 +629,9 @@
     const receiptPaymentState={cashBooks:[],bankBooks:[],loaded:false};
     function receiptPaymentEls(){return{cash:document.getElementById('receiptCashAmount'),bank:document.getElementById('receiptTransferAmount'),refund:document.getElementById('receiptRefundAmount'),refundField:document.getElementById('receiptRefundField'),cashSelect:document.getElementById('receiptCashBookSelect'),bankSelect:document.getElementById('receiptBankBookSelect'),cashHint:document.getElementById('receiptCashBookHint'),bankHint:document.getElementById('receiptBankBookHint'),message:document.getElementById('receiptPaymentMessage'),totalLabel:document.getElementById('receiptTotalLabel'),netLabel:document.getElementById('receiptNetLabel'),totalDisplay:document.getElementById('receiptTotalDisplay'),netDisplay:document.getElementById('receiptNetDisplay'),amount:document.getElementById('amountInput')}}
     function parseMoneyInput(value){const n=Number(String(value||'').replace(/[^\d]/g,''));return Number.isFinite(n)&&n>0?n:0}
-    function setMoneyInput(input,value){if(input)input.value=fmt(parseMoneyInput(value))}
-    function onReceiptMoneyInput(event){const input=event.target;input.value=input.value.replace(/[^\d.]/g,'');updateReceiptPaymentSummary()}
+    function formatMoneyInput(value){const digits=String(value||'').replace(/[^\d]/g,'').replace(/^0+(?=\d)/,'');return digits?fmt(Number(digits)):''}
+    function setMoneyInput(input,value){if(input)input.value=formatMoneyInput(value)}
+    function onReceiptMoneyInput(event){const input=event.target;input.value=formatMoneyInput(input.value);updateReceiptPaymentSummary()}
     function onReceiptMoneyBlur(event){setMoneyInput(event.target,event.target.value);updateReceiptPaymentSummary()}
     function paymentBookOptionLabel(row){const bank=row.thong_tin_ngan_hang||{};if((row.loai_so_quy||'')==='chuyen_khoan')return [bank.ten_ngan_hang,bank.so_tai_khoan,bank.chu_tai_khoan].filter(Boolean).join(' - ')||row.ten_so_quy||'';return row.ten_so_quy||'Tiền mặt'}
     function pickDefaultPaymentBook(rows,current){rows=Array.isArray(rows)?rows:[];if(current&&rows.some(row=>String(row._id)===String(current)))return current;const def=rows.find(row=>row.mac_dinh);if(def)return String(def._id);return rows.length===1?String(rows[0]._id):''}
@@ -673,7 +674,7 @@
     function showReceiptPaymentMessage(message,type){const el=receiptPaymentEls().message;if(!el)return;el.textContent=message||'';el.className=message?'receipt-payment-message show '+(type||'error'):'receipt-payment-message'}
     function resetReceiptPaymentForm(){
       const el=receiptPaymentEls();
-      [el.cash,el.bank,el.refund].forEach(input=>{if(input)input.value='0'});
+      [el.cash,el.bank,el.refund].forEach(input=>{if(input)input.value=''});
       if(el.amount)el.amount.value='0';
       showReceiptPaymentMessage('');
       renderReceiptPaymentBookSelect('cash',receiptPaymentState.cashBooks);
@@ -686,7 +687,7 @@
       const tienMat=parseMoneyInput(el.cash&&el.cash.value);
       const chuyenKhoan=parseMoneyInput(el.bank&&el.bank.value);
       let tienTraKhach=isThu?parseMoneyInput(el.refund&&el.refund.value):0;
-      if(!isThu&&el.refund)el.refund.value='0';
+      if(!isThu&&el.refund)el.refund.value='';
       if(el.refundField)el.refundField.classList.toggle('receipt-payment-hidden',!isThu);
       if(el.refund)el.refund.disabled=!isThu;
       const needCash=tienMat>0||tienTraKhach>0;

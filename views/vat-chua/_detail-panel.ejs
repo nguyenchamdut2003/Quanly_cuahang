@@ -41,7 +41,6 @@
           <thead>
             <tr>
               <th>Thời gian</th>
-              <th>Loại</th>
               <th>Mã chứng từ</th>
               <th>Nghiệp vụ</th>
               <th title="Nhà cung cấp">Nhà cung cấp</th>
@@ -56,7 +55,7 @@
           <tbody>
             <% if (!documents || documents.length === 0) { %>
               <tr>
-                <td colspan="11" class="empty-cell">Chưa có chứng từ liên quan.</td>
+                <td colspan="10" class="empty-cell">Chưa có chứng từ liên quan.</td>
               </tr>
             <% } %>
             <% (documents || []).forEach(function(doc) { %>
@@ -66,7 +65,6 @@
               %>
               <tr>
                 <td title="<%= formatDate(doc.created_at) %>"><%= formatDate(doc.created_at) %></td>
-                <td title="<%= isReturnDoc ? 'Trả' : (doc.doc_kind_label || '---') %>"><%= isReturnDoc ? 'Trả' : (doc.doc_kind_label || '---') %></td>
                 <td title="<%= doc.ma_chung_tu || '---' %>">
                   <% if (doc._id && (doc.doc_kind === 'nhap' || doc.doc_kind === 'xuat')) { %>
                     <button type="button" class="table-code-link vc-doc-open-btn" data-vc-doc-open data-vc-doc-kind="<%= doc.doc_kind %>" data-vc-doc-id="<%= doc._id %>"><%= doc.ma_chung_tu || '---' %></button>

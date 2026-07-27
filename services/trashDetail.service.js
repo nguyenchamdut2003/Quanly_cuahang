@@ -36,7 +36,8 @@ const { entityLabel } = require('./trashLabels.service');
 const ROOT_SOURCE_TYPE = {
   PhieuNhap: 'phieu_nhap',
   DonHang: 'don_hang',
-  HoaDonBanHang: 'hoa_don'
+  HoaDonBanHang: 'hoa_don',
+  PhieuTraHang: 'tra_hang_ban'
 };
 
 function createHttpError(statusCode, message) {
@@ -71,6 +72,10 @@ function parseCodesFromMoTa(moTa) {
   const match = text.match(/Mã tham chiếu:\s*(.+)$/i) || text.match(/Ví dụ:\s*(.+)$/i);
   if (!match) return [];
   return match[1].split(',').map(function(part) { return part.trim(); }).filter(Boolean);
+}
+
+function escapeRegex(text) {
+  return String(text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function pickRowCode(row, entityType) {
@@ -198,6 +203,8 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
         slipIds = await loadReturnSlipIdsForInvoice(parentOid);
       } else if (rootEntityType === 'DonHang') {
         slipIds = await loadReturnSlipIdsForOrder(parentOid);
+      } else if (rootEntityType === 'PhieuTraHang') {
+        slipIds = [parentOid];
       }
       if (!slipIds.length) return [];
       return CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: slipIds } })
@@ -209,6 +216,11 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       if (rootEntityType === 'PhieuNhap') filter.phieu_nhap_id = parentOid;
       else if (rootEntityType === 'DonHang') filter.don_hang_id = parentOid;
       else if (rootEntityType === 'HoaDonBanHang') filter.hoa_don_id = parentOid;
+      else if (rootEntityType === 'PhieuTraHang') {
+        const doc = await PhieuTraHang.findById(parentOid).select('ma_phieu_tra').lean();
+        filter.$or = [{ phieu_tra_hang_id: parentOid }];
+        if (doc && doc.ma_phieu_tra) filter.$or.push({ ma_chung_tu_goc: doc.ma_phieu_tra });
+      }
       else if (rootEntityType === 'NhapVatChua') {
         const doc = await NhapVatChua.findById(parentOid).select('ma_nhap_vat_chua').lean();
         filter.$or = [{ nhap_vat_chua_id: parentOid }];
@@ -233,6 +245,17 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       if (rootEntityType === 'DonHang') {
         return CongNoKhachHang.find({ don_hang_id: parentOid }).sort({ ngay: -1 }).lean();
       }
+      if (rootEntityType === 'PhieuTraHang') {
+        const doc = await PhieuTraHang.findById(parentOid).select('ma_phieu_tra').lean();
+        const filter = { $or: [{ phieu_tra_hang_id: parentOid }] };
+        if (doc && doc.ma_phieu_tra) {
+          filter.$or.push(
+            { ma_chung_tu_goc: doc.ma_phieu_tra },
+            { ghi_chu: { $regex: escapeRegex(doc.ma_phieu_tra), $options: 'i' } }
+          );
+        }
+        return CongNoKhachHang.find(filter).sort({ ngay: -1 }).lean();
+      }
       return [];
     case 'GiaoDichCongNoNhaCungCap':
       return GiaoDichCongNoNhaCungCap.find({
@@ -243,6 +266,16 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       const filter = { trang_thai: { $ne: 'cancelled' } };
       if (rootEntityType === 'HoaDonBanHang') filter.hoa_don_id = parentOid;
       else if (rootEntityType === 'DonHang') filter.don_hang_id = parentOid;
+      else if (rootEntityType === 'PhieuTraHang') {
+        const doc = await PhieuTraHang.findById(parentOid).select('ma_phieu_tra').lean();
+        filter.$or = [{ phieu_tra_hang_id: parentOid }];
+        if (doc && doc.ma_phieu_tra) {
+          filter.$or.push(
+            { ma_chung_tu_goc: doc.ma_phieu_tra },
+            { ghi_chu: { $regex: escapeRegex(doc.ma_phieu_tra), $options: 'i' } }
+          );
+        }
+      }
       else return [];
       return GiaoDichCongNoKhachHang.find(filter).sort({ ngay_giao_dich: -1 }).lean();
     }
@@ -929,6 +962,58 @@ async function loadRootDocumentDetail(root) {
     const payload = buildDetailPayload(
       'Đơn đặt hàng',
       root.ma_chung_tu || order.ma_don_hang || '',
+      sections
+    );
+    payload.entity_type = entityType;
+    return payload;
+  }
+
+  if (entityType === 'PhieuTraHang') {
+    const slip = await PhieuTraHang.findById(parentOid)
+      .populate('khach_hang_id', 'ten_khach_hang ma_khach_hang')
+      .lean();
+    if (!slip) {
+      return buildDetailPayload('Phiếu trả hàng bán', root.ma_chung_tu || '', []);
+    }
+
+    const [lineRows, vatChuaDocs, phieuThuChi, congNoRows, giaoDichRows] = await Promise.all([
+      loadRelatedRawRows('CTPhieuTraHang', parentOid, entityType),
+      loadVatChuaDocs(sourceType, parentOid),
+      loadRelatedRawRows('PhieuThuChi', parentOid, entityType),
+      loadRelatedRawRows('CongNoKhachHang', parentOid, entityType),
+      loadRelatedRawRows('GiaoDichCongNoKhachHang', parentOid, entityType)
+    ]);
+
+    const hasVatChua = vatChuaDocs.nhapDocs.length > 0 || vatChuaDocs.xuatDocs.length > 0;
+    const sections = [
+      makeSection('Thông tin chung', [
+        { key: 'ma_phieu_tra', header: 'Mã phiếu trả' },
+        { key: 'khach_hang', header: 'Khách hàng' },
+        { key: 'tong_tien_tra', header: 'Hàng trả', align: 'right' },
+        { key: 'tong_tien_doi', header: 'Hàng đổi', align: 'right' },
+        { key: 'co_vat_chua', header: 'Vật chứa' },
+        { key: 'ngay_tra', header: 'Ngày trả' }
+      ], [{
+        stt: 1,
+        ma_phieu_tra: slip.ma_phieu_tra || '---',
+        khach_hang: slip.khach_hang_id?.ten_khach_hang || '---',
+        tong_tien_tra: fmtMoney(slip.tong_tien_hang_tra || slip.tong_tien_tra),
+        tong_tien_doi: fmtMoney(slip.tong_tien_hang_doi),
+        co_vat_chua: hasVatChua ? 'Có' : 'Không',
+        ngay_tra: fmtDateTime(slip.ngay_tra || slip.created_at)
+      }])
+    ];
+
+    appendSectionFromTable(sections, 'Dòng trả hàng bán', buildDetailTable('CTPhieuTraHang', lineRows));
+    appendSectionFromTable(sections, 'Nhập vật chứa', buildVatChuaItemsTable(vatChuaDocs.nhapDocs, 'nhap'));
+    appendSectionFromTable(sections, 'Xuất vật chứa', buildVatChuaItemsTable(vatChuaDocs.xuatDocs, 'xuat'));
+    appendSectionFromTable(sections, 'Phiếu thu / chi', buildDetailTable('PhieuThuChi', phieuThuChi));
+    appendSectionFromTable(sections, 'Công nợ khách hàng', buildDetailTable('CongNoKhachHang', congNoRows));
+    appendSectionFromTable(sections, 'Giao dịch công nợ khách', buildDetailTable('GiaoDichCongNoKhachHang', giaoDichRows));
+
+    const payload = buildDetailPayload(
+      'Phiếu trả hàng bán',
+      root.ma_chung_tu || slip.ma_phieu_tra || '',
       sections
     );
     payload.entity_type = entityType;
