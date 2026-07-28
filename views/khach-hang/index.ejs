@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title %></title>
+  <title>Khách hàng</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
@@ -14,6 +14,11 @@
     .customer-import-menu button,.customer-import-menu a{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 14px;font-size:13px;color:#111827;text-decoration:none;cursor:pointer}
     .customer-import-menu button:hover,.customer-import-menu a:hover{background:#f8fafc}
     .customer-import-menu a + button{border-top:1px solid #f2f4f7}
+    .customer-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid #e5e7eb;background:#fff;color:#475467;font-size:14px}
+    .customer-pagination__actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .customer-page-link{min-width:34px;height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:700}
+    .customer-page-link.is-active{background:#0070f4;border-color:#0070f4;color:#fff}
+    .customer-page-link.is-disabled{pointer-events:none;opacity:.45}
     .customer-address-table{table-layout:fixed}
     .customer-address-table th:nth-child(1),
     .customer-address-table td:nth-child(1){width:92px;max-width:92px}
@@ -271,6 +276,14 @@
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
   <main class="admin-shell customer-page">
+    <%
+      function buildCustomerPageUrl(pageNumber) {
+        var parts = [];
+        if (filterQueryString) parts.push(filterQueryString);
+        if (pageNumber > 1) parts.push('page=' + encodeURIComponent(pageNumber));
+        return '/khach-hang' + (parts.length ? '?' + parts.join('&') : '');
+      }
+    %>
     <%- include('../partials/flash-message', { flash: flash }) %>
 
     <div id="addCustomerModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'create' ? '1' : '0' %>">
@@ -689,7 +702,7 @@
 
                 <% } %>
                 <% customers.forEach(function(customer) { %>
-                  <% var listBase = '/khach-hang' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
+                  <% var listBase = buildCustomerPageUrl(pagination ? pagination.page : 1); %>
                   <tr data-kv-detail-id="<%= customer._id %>">
                     <td class="check-cell" onclick="event.stopPropagation()"><input class="customer-checkbox" type="checkbox" name="ids" value="<%= customer._id %>" form="bulkDeleteCustomersForm" aria-label="Chọn khách hàng"></td>
                     <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= customer.ma_khach_hang || '---' %></a></td>
@@ -702,6 +715,22 @@
                 <% }) %>
               </tbody>
             </table>
+          <% if (pagination && pagination.totalPages > 1) { %>
+            <div class="customer-pagination">
+              <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> khách hàng</div>
+              <div class="customer-pagination__actions" aria-label="Phân trang khách hàng">
+                <a class="customer-page-link <%= pagination.page <= 1 ? 'is-disabled' : '' %>" href="<%= buildCustomerPageUrl(Math.max(1, pagination.page - 1)) %>">‹</a>
+                <% for (var pageNumber = 1; pageNumber <= pagination.totalPages; pageNumber++) { %>
+                  <a class="customer-page-link <%= pageNumber === pagination.page ? 'is-active' : '' %>" href="<%= buildCustomerPageUrl(pageNumber) %>"><%= pageNumber %></a>
+                <% } %>
+                <a class="customer-page-link <%= pagination.page >= pagination.totalPages ? 'is-disabled' : '' %>" href="<%= buildCustomerPageUrl(Math.min(pagination.totalPages, pagination.page + 1)) %>">›</a>
+              </div>
+            </div>
+          <% } else if (pagination) { %>
+            <div class="customer-pagination">
+              <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> khách hàng</div>
+            </div>
+          <% } %>
           <% customers.forEach(function(customer) { %>
             <form id="deleteCustomerForm_<%= customer._id %>" method="post" action="/khach-hang/<%= customer._id %>/delete"></form>
           <% }) %>

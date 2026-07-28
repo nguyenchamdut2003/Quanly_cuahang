@@ -1,5 +1,6 @@
-const mongoose = require('mongoose');
-const ExcelJS = require('exceljs');const {
+﻿const mongoose = require('mongoose');
+const ExcelJS = require('exceljs');
+const {
     PhieuXuatNoiBo,
     CTXuatNoiBo,
     LoaiXuatNoiBo,
@@ -116,6 +117,7 @@ const STATUS_MAP = {
     completed: 'Hoàn thành',
     cancelled: 'Đã hủy'
 };
+const XNB_PAGE_SIZE = 10;
 
 const EXPORT_STATUS_MAP = {
     draft: 'Phiếu tạm',
@@ -269,6 +271,26 @@ function buildFilter(query) {
     if (query.nguoi_tao_id) filter.nguoi_tao_id = query.nguoi_tao_id;
     if (query.nguoi_nhan) filter.nguoi_nhan = { $regex: query.nguoi_nhan.trim(), $options: 'i' };
     return { filter, statuses };
+}
+
+function parsePage(query) {
+    const page = Number(query && query.page);
+    return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+}
+
+function buildListQueryString(query, overrides) {
+    const params = new URLSearchParams();
+    Object.entries(query || {}).forEach(([key, value]) => {
+        if (key === 'page' || key === 'page_size') return;
+        if (Array.isArray(value)) {
+            value.forEach(item => params.append(key, item));
+        } else if (value !== undefined && value !== null && String(value) !== '') {
+            params.append(key, value);
+        }
+    });
+    const page = Number(overrides && overrides.page);
+    if (Number.isFinite(page) && page > 1) params.set('page', String(Math.floor(page)));
+    return params.toString();
 }
 
 function formatDateTime(value) {
@@ -483,13 +505,27 @@ async function sendXuatNoiBoWorkbook(res, filename, tickets, detailMap) {
 exports.index = async (req, res, next) => {
     try {
         const { filter, statuses } = buildFilter(req.query);
+        let page = parsePage(req.query);
+        const pageSize = XNB_PAGE_SIZE;
+        const [total, totalAgg, users, loaiXuatList] = await Promise.all([
+            PhieuXuatNoiBo.countDocuments(filter),
+            PhieuXuatNoiBo.aggregate([
+                { $match: filter },
+                { $group: { _id: null, totalValue: { $sum: { $ifNull: ['$tong_gia_tri', 0] } } } }
+            ]),
+            NguoiDung.find().sort({ ho_ten: 1 }),
+            loadLoaiXuatList()
+        ]);
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        if (page > totalPages) page = totalPages;
+        const skip = (page - 1) * pageSize;
         const tickets = await PhieuXuatNoiBo.find(filter)
             .populate('cua_hang_id')
             .populate('kho_id')
             .populate('nguoi_tao_id')
-            .sort({ created_at: -1 });
-        const users = await NguoiDung.find().sort({ ho_ten: 1 });
-        const loaiXuatList = await loadLoaiXuatList();
+            .sort({ created_at: -1 })
+            .skip(skip)
+            .limit(pageSize);
 
         res.render('xuat-dung-noi-bo/index', {
             title: 'Xuất dùng nội bộ',
@@ -498,7 +534,19 @@ exports.index = async (req, res, next) => {
             loaiXuatList,
             filters: req.query,
             selectedStatuses: statuses,
-            statusMap: STATUS_MAP
+            statusMap: STATUS_MAP,
+            tongGiaTriXuat: totalAgg[0] ? Number(totalAgg[0].totalValue || 0) : 0,
+            pagination: {
+                total,
+                page,
+                limit: pageSize,
+                totalPages,
+                from: total === 0 ? 0 : skip + 1,
+                to: Math.min(skip + pageSize, total)
+            },
+            qs: function(overrides) {
+                return buildListQueryString(req.query || {}, overrides || {});
+            }
         });
     } catch (error) {
         next(error);

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= title || 'Đăng nhập' %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/stylesheets/auth.css">
+  </head>
+  <body>
+    <main class="auth-page">
+      <section class="auth-card">
+        <div class="auth-brand">
+          <div>
+            <h1>Đăng nhập</h1>
+            <p>Quản lý bán hàng, kho và sổ quỹ.</p>
+          </div>
+        </div>
+
+        <% if (error) { %>
+          <div class="auth-alert auth-alert--error"><%= error %></div>
+        <% } %>
+        <% if (success) { %>
+          <div class="auth-alert auth-alert--success"><%= success === 'password_reset' ? 'Mật khẩu đã được đặt lại. Vui lòng đăng nhập bằng mật khẩu mới.' : 'Bạn đã đăng xuất.' %></div>
+        <% } %>
+
+        <form method="post" action="/login" class="auth-form" data-auth-form>
+          <input type="hidden" name="returnUrl" value="<%= returnUrl || '' %>">
+          <label>
+            <span>Email</span>
+            <input type="email" name="email" value="<%= email || '' %>" autocomplete="email" required autofocus>
+          </label>
+          <label>
+            <span>Mật khẩu</span>
+            <span class="auth-password-field">
+              <input type="password" name="password" autocomplete="current-password" required data-password-input>
+              <button type="button" class="auth-password-toggle" data-password-toggle aria-label="Hiện mật khẩu">
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+              </button>
+            </span>
+          </label>
+          <div class="auth-form-link">
+            <a href="/forgot-password">Quên mật khẩu?</a>
+          </div>
+          <button type="submit" class="auth-primary" data-submit-text="Đăng nhập">Đăng nhập</button>
+        </form>
+
+        <div class="auth-separator"><span>hoặc</span></div>
+
+        <a href="/auth/google" class="auth-google">
+          <i class="fa-brands fa-google"></i>
+          Đăng nhập bằng Google
+        </a>
+
+        <p class="auth-switch">
+          Chưa có tài khoản? <a href="/register<%= returnUrl ? ('?returnUrl=' + encodeURIComponent(returnUrl)) : '' %>">Đăng ký</a>
+        </p>
+      </section>
+    </main>
+    <script src="/javascripts/auth.js"></script>
+  </body>
+</html>

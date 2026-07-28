@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var chucDanhController = require('../controllers/chucDanh.controller');
+var chucDanhController = require('../controllers/chamcongcu/chucDanh.controller');
 
 router.use(isAuthenticated);
 

@@ -289,7 +289,7 @@
     <div class="pos-container">
       <div class="pos-left">
         <div class="draft-strip">
-          <span class="draft-label"><i class="fa-regular fa-clock"></i> ÄÆ¡n nhÃ¡p</span>
+          <span class="draft-label"><i class="fa-regular fa-clock"></i> Đơn nháp</span>
           <div class="draft-tabs-scroll">
             <% if ((locals.draftOrders || []).length) { %>
               <% draftOrders.forEach((order, index) => { %>
@@ -302,18 +302,18 @@
                 </button>
               <% }) %>
             <% } else { %>
-              <span class="draft-empty">ChÆ°a cÃ³ Ä‘Æ¡n nhÃ¡p</span>
+              <span class="draft-empty">Chưa có đơn nháp</span>
             <% } %>
           </div>
           <div class="draft-actions">
-            <button type="button" class="draft-action-btn" onclick="newDraftOrder()"><i class="fa-solid fa-plus"></i> Táº¡o nhÃ¡p</button>
-            <button type="button" class="draft-action-btn" onclick="saveDraftOrder()"><i class="fa-solid fa-floppy-disk"></i> LÆ°u nhÃ¡p</button>
-            <button type="button" class="draft-action-btn danger" onclick="deleteDraftOrder()"><i class="fa-solid fa-trash"></i> XÃ³a nhÃ¡p</button>
+            <button type="button" class="draft-action-btn" onclick="newDraftOrder()"><i class="fa-solid fa-plus"></i> Tạo nháp</button>
+            <button type="button" class="draft-action-btn" onclick="saveDraftOrder()"><i class="fa-solid fa-floppy-disk"></i> Lưu nháp</button>
+            <button type="button" class="draft-action-btn danger" onclick="deleteDraftOrder()"><i class="fa-solid fa-trash"></i> Xóa nháp</button>
           </div>
         </div>
         <div class="search-container">
           <i class="fa-solid fa-magnifying-glass"></i>
-          <input type="text" id="posSearch" placeholder="TÃ¬m hÃ ng hÃ³a (F3)">
+          <input type="text" id="posSearch" placeholder="Tìm hàng hóa (F3)">
           <div id="posResults" class="search-results"></div>
         </div>
 
@@ -322,10 +322,10 @@
             <thead>
               <tr>
                 <th width="40">STT</th>
-                <th>TÃªn hÃ ng</th>
-                <th width="100" style="text-align: right;">Sá»‘ lÆ°á»£ng</th>
-                <th width="120" style="text-align: right;">ÄÆ¡n giÃ¡</th>
-                <th width="120" style="text-align: right;">ThÃ nh tiá»n</th>
+                <th>Tên hàng</th>
+                <th width="100" style="text-align: right;">Số lượng</th>
+                <th width="120" style="text-align: right;">Đơn giá</th>
+                <th width="120" style="text-align: right;">Thành tiền</th>
                 <th width="40"></th>
               </tr>
             </thead>
@@ -338,9 +338,9 @@
 
       <div class="pos-right">
         <div class="customer-box">
-          <label><i class="fa-solid fa-user"></i> KhÃ¡ch hÃ ng</label>
+          <label><i class="fa-solid fa-user"></i> Khách hàng</label>
           <select id="customerId" onchange="shippingFeeManuallyEdited = false; fillRecipientFromCustomer()" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #ddd;">
-            <option value="">Chá»n khÃ¡ch hÃ ng</option>
+            <option value="">Chọn khách hàng</option>
             <% customers.forEach(c => { %>
               <option value="<%= c._id %>"><%= c.ten_khach_hang %></option>
             <% }) %>
@@ -348,21 +348,21 @@
         </div>
 
         <div class="delivery-box">
-          <div class="delivery-tab"><i class="fa-solid fa-truck-fast"></i> Tá»± giao hÃ ng</div>
+          <div class="delivery-tab"><i class="fa-solid fa-truck-fast"></i> Tự giao hàng</div>
           <div class="delivery-row">
-            <label>Äá»‘i tÃ¡c giao hÃ ng</label>
+            <label>Đối tác giao hàng</label>
             <select id="deliveryPartnerId" class="delivery-input" onchange="shippingFeeManuallyEdited = false; calculateShippingFee()">
-              <option value="">Chá»n Ä‘á»‘i tÃ¡c</option>
+              <option value="">Chọn đối tác</option>
               <% (locals.partners || []).forEach(p => { %>
                 <option value="<%= p._id %>"><%= p.ten_doi_tac %></option>
               <% }) %>
             </select>
           </div>
           <div class="delivery-row">
-            <label>NÆ¡i láº¥y hÃ ng</label>
+            <label>Nơi lấy hàng</label>
             <select id="pickupStoreId" class="delivery-input" onchange="handleStoreChange()">
               <% stores.forEach(s => { %>
-                <option value="<%= s._id %>"><%= s.ten_cua_hang %> - <%= s.sdt || 'ChÆ°a cÃ³ SÄT' %></option>
+                <option value="<%= s._id %>"><%= s.ten_cua_hang %> - <%= s.sdt || 'Chưa có SĐT' %></option>
               <% }) %>
             </select>
             <div class="store-info" id="storeInfo"></div>
@@ -370,57 +370,57 @@
           <div class="delivery-row">
             <label>Kho</label>
             <select id="khoId" class="delivery-input" disabled>
-              <option value="">Vui lÃ²ng chá»n cá»­a hÃ ng trÆ°á»›c</option>
+              <option value="">Vui lòng chọn cửa hàng trước</option>
             </select>
           </div>
           <div class="delivery-row">
-            <label>NgÆ°á»i nháº­n</label>
+            <label>Người nhận</label>
             <div class="recipient-grid">
-              <input id="recipientName" class="delivery-input" placeholder="TÃªn ngÆ°á»i nháº­n">
-              <input id="recipientPhone" class="delivery-input" placeholder="Sá»‘ Ä‘iá»‡n thoáº¡i">
+              <input id="recipientName" class="delivery-input" placeholder="Tên người nhận">
+              <input id="recipientPhone" class="delivery-input" placeholder="Số điện thoại">
             </div>
           </div>
           <div class="delivery-row">
-            <label>Äá»‹a chá»‰ nháº­n</label>
+            <label>Địa chỉ nhận</label>
             <select id="recipientAddressSelect" class="delivery-input" onchange="selectRecipientAddress()" style="margin-bottom:8px">
-              <option value="">Chá»n Ä‘á»‹a chá»‰ khÃ¡ch hÃ ng</option>
+              <option value="">Chọn địa chỉ khách hàng</option>
             </select>
-            <input id="recipientAddress" class="delivery-input" placeholder="Äá»‹a chá»‰ nháº­n hÃ ng">
+            <input id="recipientAddress" class="delivery-input" placeholder="Địa chỉ nhận hàng">
           </div>
           <div class="delivery-row">
-            <label>Ghi chÃº cho bÆ°u tÃ¡</label>
-            <input id="deliveryNote" class="delivery-input" placeholder="Ghi chÃº giao hÃ ng">
+            <label>Ghi chú cho bưu tá</label>
+            <input id="deliveryNote" class="delivery-input" placeholder="Ghi chú giao hàng">
           </div>
         </div>
 
         <div class="payment-box">
           <div class="pay-item">
-            <span>Tá»•ng tiá»n hÃ ng:</span>
+            <span>Tổng tiền hàng:</span>
             <span id="subtotal">0</span>
           </div>
           <div class="pay-item">
-            <span>Chiáº¿t kháº¥u:</span>
+            <span>Chiết khấu:</span>
             <input type="number" id="discount" class="input-pos" value="0" style="width: 100px;" onchange="updateSummary()">
           </div>
           <div class="pay-item">
-            <span>PhÃ­ váº­n chuyá»ƒn:</span>
+            <span>Phí vận chuyển:</span>
             <input type="number" id="shipFee" class="input-pos" value="0" style="width: 100px;" oninput="shippingFeeManuallyEdited = true; updateSummary()">
           </div>
           
           <div class="pay-total">
             <div class="pay-item">
-              <span>KHÃCH Cáº¦N TRáº¢:</span>
+              <span>KHÁCH CẦN TRẢ:</span>
               <span id="grandTotal">0</span>
             </div>
           </div>
 
           <div style="margin-top: 20px;">
-            <label>Ghi chÃº Ä‘Æ¡n hÃ ng</label>
+            <label>Ghi chú đơn hàng</label>
             <textarea id="orderNote" style="width: 100%; margin-top: 5px; padding: 10px; border: 1px solid #ddd; height: 60px; border-radius: 4px;"></textarea>
           </div>
 
           <button class="btn-pay" onclick="checkout()">
-            <i class="fa-solid fa-cart-shopping"></i> THANH TOÃN (F9)
+            <i class="fa-solid fa-cart-shopping"></i> THANH TOÁN (F9)
           </button>
         </div>
       </div>
@@ -467,17 +467,17 @@
         const store = storesData.find(s => s._id === id);
         const box = document.getElementById('storeInfo');
         if (!store) {
-          box.textContent = 'ChÆ°a chá»n nÆ¡i láº¥y hÃ ng';
+          box.textContent = 'Chưa chọn nơi lấy hàng';
           return;
         }
-        const address = storeAddress() || 'ChÆ°a cÃ³ Ä‘á»‹a chá»‰';
-        box.innerHTML = `<strong>${store.ten_cua_hang}</strong><br>SÄT: ${store.sdt || 'ChÆ°a cÃ³'}<br>Äá»‹a chá»‰ láº¥y hÃ ng: ${address}`;
+        const address = storeAddress() || 'Chưa có địa chỉ';
+        box.innerHTML = `<strong>${store.ten_cua_hang}</strong><br>SĐT: ${store.sdt || 'Chưa có'}<br>Địa chỉ lấy hàng: ${address}`;
       }
 
       async function loadKhoByStore(selectedKhoId = '') {
         const storeId = document.getElementById('pickupStoreId').value;
         const khoSelect = document.getElementById('khoId');
-        khoSelect.innerHTML = '<option value="">Chá»n kho</option>';
+        khoSelect.innerHTML = '<option value="">Chọn kho</option>';
         khoSelect.disabled = true;
         if (!storeId) return;
 
@@ -485,11 +485,11 @@
           const res = await fetch('/api/kho?cua_hang_id=' + encodeURIComponent(storeId));
           const result = await res.json();
           const warehouses = result.success ? (result.data || []) : [];
-          khoSelect.innerHTML = '<option value="">Chá»n kho</option>' + warehouses.map(k => `<option value="${k._id}" data-address="${escapeHtml(k.dia_chi_day_du || k.dia_chi || '')}">${k.ten_kho}</option>`).join('');
+          khoSelect.innerHTML = '<option value="">Chọn kho</option>' + warehouses.map(k => `<option value="${k._id}" data-address="${escapeHtml(k.dia_chi_day_du || k.dia_chi || '')}">${k.ten_kho}</option>`).join('');
           khoSelect.disabled = false;
           if (selectedKhoId) khoSelect.value = selectedKhoId;
         } catch (error) {
-          khoSelect.innerHTML = '<option value="">KhÃ´ng táº£i Ä‘Æ°á»£c kho</option>';
+          khoSelect.innerHTML = '<option value="">Không tải được kho</option>';
         }
       }
 
@@ -513,7 +513,7 @@
 
         cart = (draft.items || []).map(item => ({
           hang_hoa_id: item.hang_hoa_id,
-          ten_hang: item.ten_hang || item.ma_hang || 'HÃ ng hÃ³a',
+          ten_hang: item.ten_hang || item.ma_hang || 'Hàng hóa',
           so_luong: Number(item.so_luong || 0),
           don_gia_ban: Number(item.don_gia_ban || 0)
         })).filter(item => item.hang_hoa_id && item.so_luong > 0);
@@ -547,7 +547,7 @@
         document.querySelectorAll('.draft-tab').forEach(tab => tab.classList.remove('active'));
         document.getElementById('customerId').value = '';
         document.getElementById('deliveryPartnerId').value = '';
-        document.getElementById('recipientAddressSelect').innerHTML = '<option value="">Chá»n Ä‘á»‹a chá»‰ khÃ¡ch hÃ ng</option>';
+        document.getElementById('recipientAddressSelect').innerHTML = '<option value="">Chọn địa chỉ khách hàng</option>';
         document.getElementById('recipientName').value = '';
         document.getElementById('recipientPhone').value = '';
         document.getElementById('recipientAddress').value = '';
@@ -563,7 +563,7 @@
         const id = document.getElementById('customerId').value;
         const customer = customersData.find(c => c._id === id);
         const addressSelect = document.getElementById('recipientAddressSelect');
-        addressSelect.innerHTML = '<option value="">Chá»n Ä‘á»‹a chá»‰ khÃ¡ch hÃ ng</option>';
+        addressSelect.innerHTML = '<option value="">Chọn địa chỉ khách hàng</option>';
         if (!customer) {
           document.getElementById('recipientName').value = '';
           document.getElementById('recipientPhone').value = '';
@@ -579,7 +579,7 @@
           const value = formatAddress(address) || address.dia_chi_day_du || '';
           const opt = document.createElement('option');
           opt.value = value;
-          opt.textContent = value || ('Äá»‹a chá»‰ ' + (index + 1));
+          opt.textContent = value || ('Địa chỉ ' + (index + 1));
           opt.dataset.addressId = address._id || '';
           if (address.mac_dinh) opt.selected = true;
           addressSelect.appendChild(opt);
@@ -618,7 +618,7 @@
 
       function supplierName(product) {
         const supplier = product?.nha_cung_cap_id || {};
-        return supplier.ten_ncc || supplier.ten_cong_ty || product?.ten_ncc || 'ChÆ°a cÃ³';
+        return supplier.ten_ncc || supplier.ten_cong_ty || product?.ten_ncc || 'Chưa có';
       }
 
       async function calculateShippingFee() {
@@ -758,8 +758,8 @@
       }
 
       async function saveDraftOrder() {
-        if (cart.length === 0) return alert("ÄÆ¡n nhÃ¡p chÆ°a cÃ³ sáº£n pháº©m");
-        if (!document.getElementById('khoId').value) return alert('Vui lÃ²ng chá»n kho.');
+        if (cart.length === 0) return alert("Đơn nháp chưa có sản phẩm");
+        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
 
         const data = collectOrderData();
         if (currentDraftId) data.draft_order_id = currentDraftId;
@@ -775,16 +775,16 @@
             alert(result.message);
             location.reload();
           } else {
-            alert(result.message || 'KhÃ´ng lÆ°u Ä‘Æ°á»£c Ä‘Æ¡n nhÃ¡p');
+            alert(result.message || 'Không lưu được đơn nháp');
           }
         } catch (err) {
-          alert("Lá»—i khi lÆ°u Ä‘Æ¡n nhÃ¡p");
+          alert("Lỗi khi lưu đơn nháp");
         }
       }
 
       async function deleteDraftOrder() {
-        if (!currentDraftId) return alert("Vui lÃ²ng chá»n Ä‘Æ¡n nhÃ¡p cáº§n xÃ³a");
-        if (!confirm("XÃ³a Ä‘Æ¡n nhÃ¡p nÃ y?")) return;
+        if (!currentDraftId) return alert("Vui lòng chọn đơn nháp cần xóa");
+        if (!confirm("Xóa đơn nháp này?")) return;
 
         try {
           const res = await fetch('/ban-hang/draft/' + currentDraftId, { method: 'DELETE' });
@@ -793,16 +793,16 @@
             alert(result.message);
             location.reload();
           } else {
-            alert(result.message || 'KhÃ´ng xÃ³a Ä‘Æ°á»£c Ä‘Æ¡n nhÃ¡p');
+            alert(result.message || 'Không xóa được đơn nháp');
           }
         } catch (err) {
-          alert("Lá»—i khi xÃ³a Ä‘Æ¡n nhÃ¡p");
+          alert("Lỗi khi xóa đơn nháp");
         }
       }
 
       async function checkout() {
-        if (cart.length === 0) return alert("ÄÆ¡n hÃ ng trá»‘ng");
-        if (!document.getElementById('khoId').value) return alert('Vui lÃ²ng chá»n kho.');
+        if (cart.length === 0) return alert("Đơn hàng trống");
+        if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
 
         const data = collectOrderData();
         if (currentDraftId) data.draft_order_id = currentDraftId;
@@ -821,7 +821,7 @@
             alert(result.message);
           }
         } catch (err) {
-          alert("Lá»—i khi thanh toÃ¡n");
+          alert("Lỗi khi thanh toán");
         }
       }
 

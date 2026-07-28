@@ -1323,8 +1323,11 @@
         const ton = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).tonThucTe, 0);
         const khaDung = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).soLuongKhaDung, 0);
         const dat = lot.items.reduce((sum, entry) => sum + Number(entry.row.so_luong_dat || entry.row.so_luong || 0), 0);
-        const datePart = [lot.ten_lo || lot.ma_lo || '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
+        const datePart = [lot.ngay_nhap ? `Ngày lô ${formatDateVi(lot.ngay_nhap)}` : '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
         return { ton, khaDung, dat, datePart };
+      }
+      function lotGroupName(lot, fallbackIndex) {
+        return lot ? (lot.ten_lo || lot.ma_lo || `Lô ${fallbackIndex + 1}`) : `Lô ${fallbackIndex + 1}`;
       }
       function maxLotColumnsInCart() {
         return cart.reduce((max, item) => {
@@ -1332,7 +1335,17 @@
           return Math.max(max, groupLotsForItem(item).length);
         }, 0);
       }
-      function renderCartThead(maxLots) {
+      function lotColumnHeadersInCart(maxLots) {
+        return Array.from({ length: maxLots }, (_, index) => {
+          for (const item of cart) {
+            if (!itemHasLotGrid(item)) continue;
+            const lot = groupLotsForItem(item)[index];
+            if (lot) return lotGroupName(lot, index);
+          }
+          return `Lô ${index + 1}`;
+        });
+      }
+      function renderCartThead(maxLots, lotHeaders = []) {
         const thead = document.getElementById('cartHead');
         if (!thead) return;
         if (maxLots <= 0) {
@@ -1351,12 +1364,12 @@
           </tr>`;
           return;
         }
-        const lotHeaders = Array.from({ length: maxLots }, (_, index) => `<th class="num lot-col">Lô ${index + 1}</th>`).join('');
+        const lotHeaderHtml = Array.from({ length: maxLots }, (_, index) => `<th class="num lot-col">${escapeHtml(lotHeaders[index] || `Lô ${index + 1}`)}</th>`).join('');
         thead.innerHTML = `<tr>
           <th>STT</th>
           <th>Mã hàng</th>
           <th>Tên hàng</th>
-          ${lotHeaders}
+          ${lotHeaderHtml}
           <th class="num">Thành tiền</th>
           <th></th>
         </tr>`;
@@ -1519,7 +1532,7 @@
       }
       function renderCart() {
         const maxLots = maxLotColumnsInCart();
-        renderCartThead(maxLots);
+        renderCartThead(maxLots, lotColumnHeadersInCart(maxLots));
         let subtotal = 0;
         cartBody.innerHTML = cart.map((item, idx) => {
           const line = computeLineTotals(item);

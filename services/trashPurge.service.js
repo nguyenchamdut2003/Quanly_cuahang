@@ -84,8 +84,8 @@ function addCount(total, result) {
   return Number(total || 0) + Number(result && (result.deletedCount || result.modifiedCount) || 0);
 }
 
-async function collectIds(query, Model) {
-  const rows = await Model.find(query).select('_id').lean();
+async function collectIds(query, Model, session) {
+  const rows = await (session ? Model.find(query).session(session) : Model.find(query)).select('_id').lean();
   return rows.map(function(row) { return row._id; }).filter(Boolean);
 }
 
@@ -104,41 +104,43 @@ function receiptCashBookFilter(bookId) {
   };
 }
 
-async function hardDeleteReceipts(receiptIds, storeId) {
+async function hardDeleteReceipts(receiptIds, storeId, session) {
   const ids = (receiptIds || []).filter(Boolean);
   if (!ids.length) return 0;
   const receiptFilter = { _id: { $in: ids } };
   if (storeId) receiptFilter.cua_hang_id = storeId;
   let deleted = 0;
-  deleted = addCount(deleted, await CongNoNhaCungCap.deleteMany({ phieu_thu_chi_id: { $in: ids } }));
-  deleted = addCount(deleted, await CongNoKhachHang.deleteMany({ phieu_thu_chi_id: { $in: ids } }));
+  deleted = addCount(deleted, await CongNoNhaCungCap.deleteMany({ phieu_thu_chi_id: { $in: ids } }, { session }));
+  deleted = addCount(deleted, await CongNoKhachHang.deleteMany({ phieu_thu_chi_id: { $in: ids } }, { session }));
   if (GiaoDichCongNoNhaCungCap) {
-    deleted = addCount(deleted, await GiaoDichCongNoNhaCungCap.deleteMany({ phieu_thu_chi_id: { $in: ids } }));
+    deleted = addCount(deleted, await GiaoDichCongNoNhaCungCap.deleteMany({ phieu_thu_chi_id: { $in: ids } }, { session }));
   }
   if (GiaoDichCongNoKhachHang) {
-    deleted = addCount(deleted, await GiaoDichCongNoKhachHang.deleteMany({ phieu_thu_chi_id: { $in: ids } }));
+    deleted = addCount(deleted, await GiaoDichCongNoKhachHang.deleteMany({ phieu_thu_chi_id: { $in: ids } }, { session }));
   }
-  deleted = addCount(deleted, await PhieuThuChi.deleteMany(receiptFilter));
+  deleted = addCount(deleted, await PhieuThuChi.deleteMany(receiptFilter, { session }));
   return deleted;
 }
 
-async function hardDeleteVatChuaImport(importId, storeId) {
+async function hardDeleteVatChuaImport(importId, storeId, session) {
   const id = toObjectId(importId);
   if (!id) return 0;
   let deleted = 0;
-  const receiptIds = await collectIds({ nhap_vat_chua_id: id }, PhieuThuChi);
-  const xuatIds = await collectIds({ source_id: id }, XuatVatChua);
-  deleted = addCount(deleted, await XuatVatChua.deleteMany({ _id: { $in: xuatIds } }));
-  deleted += await hardDeleteReceipts(receiptIds, storeId);
-  deleted = addCount(deleted, await CongNoNhaCungCap.deleteMany({ nhap_vat_chua_id: id }));
-  deleted = addCount(deleted, await NhapVatChua.deleteOne({ _id: id }));
+  const receiptIds = await collectIds({ nhap_vat_chua_id: id }, PhieuThuChi, session);
+  const xuatIds = await collectIds({ source_id: id }, XuatVatChua, session);
+  deleted = addCount(deleted, await XuatVatChua.deleteMany({ _id: { $in: xuatIds } }).session(session || null));
+  deleted += await hardDeleteReceipts(receiptIds, storeId, session);
+  deleted = addCount(deleted, await CongNoNhaCungCap.deleteMany({ nhap_vat_chua_id: id }).session(session || null));
+  deleted = addCount(deleted, await NhapVatChua.deleteOne({ _id: id }).session(session || null));
   return deleted;
 }
 
-async function hardDeleteVatChuaExport(exportId, storeId) {
+async function hardDeleteVatChuaExport(exportId, storeId, session) {
   const id = toObjectId(exportId);
   if (!id) return 0;
-  const doc = await XuatVatChua.findById(id).select('ma_xuat_vat_chua source_id').lean();
+  const doc = await (session ? XuatVatChua.findById(id).session(session) : XuatVatChua.findById(id))
+    .select('ma_xuat_vat_chua source_id')
+    .lean();
   let deleted = 0;
   const receiptFilter = {
     $or: [
@@ -148,78 +150,112 @@ async function hardDeleteVatChuaExport(exportId, storeId) {
     })
   };
   if (storeId) receiptFilter.cua_hang_id = storeId;
-  const receiptIds = receiptFilter.$or.length ? await collectIds(receiptFilter, PhieuThuChi) : [];
-  deleted += await hardDeleteReceipts(receiptIds, storeId);
-  deleted = addCount(deleted, await XuatVatChua.deleteOne({ _id: id }));
+  const receiptIds = receiptFilter.$or.length ? await collectIds(receiptFilter, PhieuThuChi, session) : [];
+  deleted += await hardDeleteReceipts(receiptIds, storeId, session);
+  deleted = addCount(deleted, await XuatVatChua.deleteOne({ _id: id }).session(session || null));
   return deleted;
 }
 
-async function hardDeletePurchase(root, storeId) {
+async function hardDeletePurchase(root, storeId, session) {
   const id = toObjectId(root.entity_id);
   if (!id) return 0;
+  const purchaseFilter = { _id: id, deleted_at: { $ne: null } };
+  if (storeId) purchaseFilter.cua_hang_id = storeId;
+  const purchase = await (session ? PhieuNhap.findOne(purchaseFilter).session(session) : PhieuNhap.findOne(purchaseFilter))
+    .select('_id cua_hang_id deleted_at')
+    .lean();
+  if (!purchase) {
+    throw createHttpError(400, 'Chỉ được xóa vĩnh viễn phiếu nhập đang nằm trong thùng rác.');
+  }
+  const rootFilter = {
+    entity_type: 'PhieuNhap',
+    entity_id: id,
+    is_trash_root: true,
+    restored_at: null
+  };
+  if (storeId) rootFilter.cua_hang_id = storeId;
+  const hasRoot = await (session ? ThungRacItem.exists(rootFilter).session(session) : ThungRacItem.exists(rootFilter));
+  if (!hasRoot) {
+    throw createHttpError(400, 'Phiếu nhập chưa có root thùng rác hợp lệ.');
+  }
+  const activeReturns = await (session
+    ? PhieuTraHangNhap.countDocuments({ phieu_nhap_id: id, deleted_at: null, trang_thai: { $ne: 'cancelled' } }).session(session)
+    : PhieuTraHangNhap.countDocuments({ phieu_nhap_id: id, deleted_at: null, trang_thai: { $ne: 'cancelled' } }));
+  if (activeReturns > 0) {
+    throw createHttpError(400, 'Phiếu nhập vẫn còn phiếu trả hàng nhập liên quan. Vui lòng xử lý trước khi xóa vĩnh viễn.');
+  }
+  const activeMerges = await (session
+    ? GopPhieuNhap.countDocuments({ $or: [{ phieu_nhan_id: id }, { phieu_nguon_ids: id }], trang_thai: { $ne: 'cancelled' } }).session(session)
+    : GopPhieuNhap.countDocuments({ $or: [{ phieu_nhan_id: id }, { phieu_nguon_ids: id }], trang_thai: { $ne: 'cancelled' } }));
+  if (activeMerges > 0) {
+    throw createHttpError(400, 'Phiếu nhập vẫn còn chứng từ gộp liên quan. Vui lòng xử lý trước khi xóa vĩnh viễn.');
+  }
+
   let deleted = 0;
-  const returnIds = await collectIds({ phieu_nhap_id: id }, PhieuTraHangNhap);
-  const vatChuaImportIds = await collectIds({ source_type: 'phieu_nhap', source_id: id }, NhapVatChua);
+  const vatChuaImportIds = await collectIds({ source_type: 'phieu_nhap', source_id: id }, NhapVatChua, session);
   for (const vatChuaImportId of vatChuaImportIds) {
-    deleted += await hardDeleteVatChuaImport(vatChuaImportId, storeId);
+    deleted += await hardDeleteVatChuaImport(vatChuaImportId, storeId, session);
   }
   const receiptIds = await collectIds({
     $or: [
       { phieu_nhap_id: id },
-      { phieu_tra_hang_nhap_id: { $in: returnIds } },
       { 'allocations.phieu_nhap_id': id }
     ]
-  }, PhieuThuChi);
-  deleted += await hardDeleteReceipts(receiptIds, storeId);
+  }, PhieuThuChi, session);
+  deleted += await hardDeleteReceipts(receiptIds, storeId, session);
   deleted = addCount(deleted, await CongNoNhaCungCap.deleteMany({
     $or: [
       { phieu_nhap_id: id },
-      { phieu_tra_nhap_id: { $in: returnIds } },
       { phieu_thu_chi_id: { $in: receiptIds } }
     ]
-  }));
+  }).session(session || null));
   if (GiaoDichCongNoNhaCungCap) {
     deleted = addCount(deleted, await GiaoDichCongNoNhaCungCap.deleteMany({
       $or: [
         { phieu_nhap_id: id },
-        { phieu_tra_hang_nhap_id: { $in: returnIds } },
         { phieu_thu_chi_id: { $in: receiptIds } }
       ]
-    }));
+    }).session(session || null));
   }
-  deleted = addCount(deleted, await CTPhieuTraHangNhap.deleteMany({ phieu_tra_nhap_id: { $in: returnIds } }));
-  deleted = addCount(deleted, await PhieuTraHangNhap.deleteMany({ _id: { $in: returnIds } }));
-  deleted = addCount(deleted, await CTPhieuNhap.deleteMany({ phieu_nhap_id: id }));
-  deleted = addCount(deleted, await HoaDonDauVao.deleteMany({ phieu_nhap_id: id }));
-  deleted = addCount(deleted, await LoHang.deleteMany({ phieu_nhap_id: id }));
-  deleted = addCount(deleted, await GopPhieuNhap.deleteMany({ $or: [{ phieu_nhan_id: id }, { phieu_nguon_ids: id }] }));
-  deleted = addCount(deleted, await PhieuNhap.deleteOne({ _id: id }));
+  deleted = addCount(deleted, await CTPhieuNhap.deleteMany({ phieu_nhap_id: id }).session(session || null));
+  deleted = addCount(deleted, await HoaDonDauVao.deleteMany({ phieu_nhap_id: id }).session(session || null));
+  deleted = addCount(deleted, await LoHang.deleteMany({ phieu_nhap_id: id }).session(session || null));
+  deleted = addCount(deleted, await GopPhieuNhap.deleteMany({ $or: [{ phieu_nhan_id: id }, { phieu_nguon_ids: id }], trang_thai: 'cancelled' }).session(session || null));
+  deleted = addCount(deleted, await PhieuNhap.deleteOne({ _id: id, deleted_at: { $ne: null } }).session(session || null));
   return deleted;
 }
 
-async function hardDeleteReturnImport(returnId, storeId) {
+async function hardDeleteReturnImport(returnId, storeId, session) {
   const id = toObjectId(returnId);
   if (!id) return 0;
+  const docFilter = { _id: id };
+  if (storeId) docFilter.cua_hang_id = storeId;
+  const doc = await (session ? PhieuTraHangNhap.findOne(docFilter).session(session) : PhieuTraHangNhap.findOne(docFilter))
+    .select('_id deleted_at')
+    .lean();
+  if (doc && !doc.deleted_at) {
+    throw createHttpError(409, 'Chỉ được xóa vĩnh viễn phiếu trả hàng nhập đang trong thùng rác.');
+  }
   let deleted = 0;
-  const receiptIds = await collectIds({ phieu_tra_hang_nhap_id: id }, PhieuThuChi);
-  deleted += await hardDeleteReceipts(receiptIds, storeId);
+  const receiptIds = await collectIds({ phieu_tra_hang_nhap_id: id }, PhieuThuChi, session);
+  deleted += await hardDeleteReceipts(receiptIds, storeId, session);
   deleted = addCount(deleted, await CongNoNhaCungCap.deleteMany({
     $or: [
       { phieu_tra_nhap_id: id },
       { phieu_thu_chi_id: { $in: receiptIds } }
     ]
-  }));
+  }, { session }));
   if (GiaoDichCongNoNhaCungCap) {
     deleted = addCount(deleted, await GiaoDichCongNoNhaCungCap.deleteMany({
       $or: [
         { phieu_tra_hang_nhap_id: id },
         { phieu_thu_chi_id: { $in: receiptIds } }
       ]
-    }));
+    }, { session }));
   }
-  deleted = addCount(deleted, await XuatVatChua.deleteMany({ source_type: 'phieu_tra_hang_nhap', source_id: id }));
-  deleted = addCount(deleted, await CTPhieuTraHangNhap.deleteMany({ phieu_tra_nhap_id: id }));
-  deleted = addCount(deleted, await PhieuTraHangNhap.deleteOne({ _id: id }));
+  deleted = addCount(deleted, await XuatVatChua.deleteMany({ source_type: 'phieu_tra_hang_nhap', source_id: id }, { session }));
+  deleted = addCount(deleted, await CTPhieuTraHangNhap.deleteMany({ phieu_tra_nhap_id: id }, { session }));
+  deleted = addCount(deleted, await PhieuTraHangNhap.deleteOne({ _id: id }, { session }));
   return deleted;
 }
 
@@ -315,21 +351,28 @@ async function hardDeleteInventoryCheck(root) {
   return deleted;
 }
 
-async function hardDeleteSaleReturn(returnId, storeId) {
+async function hardDeleteSaleReturn(returnId, storeId, session) {
   const id = toObjectId(returnId);
   if (!id) return 0;
   let deleted = 0;
-  const doc = await PhieuTraHang.findById(id).select('ma_phieu_tra').lean();
+  const docFilter = { _id: id };
+  if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) docFilter.cua_hang_id = storeId;
+  const doc = await (session ? PhieuTraHang.findOne(docFilter).session(session) : PhieuTraHang.findOne(docFilter))
+    .select('ma_phieu_tra deleted_at')
+    .lean();
+  if (doc && !doc.deleted_at) {
+    throw createHttpError(409, 'Chỉ được xóa vĩnh viễn phiếu trả hàng bán đã nằm trong thùng rác.');
+  }
   const receiptFilter = { $or: [{ phieu_tra_hang_id: id }] };
   if (doc && doc.ma_phieu_tra) receiptFilter.$or.push({ ma_chung_tu_goc: doc.ma_phieu_tra });
-  const receiptIds = await collectIds(receiptFilter, PhieuThuChi);
-  deleted += await hardDeleteReceipts(receiptIds, storeId);
+  const receiptIds = await collectIds(receiptFilter, PhieuThuChi, session);
+  deleted += await hardDeleteReceipts(receiptIds, storeId, session);
   const [vatImportIds, vatExportIds] = await Promise.all([
-    collectIds({ source_type: 'tra_hang_ban', source_id: id }, NhapVatChua),
-    collectIds({ source_type: 'tra_hang_ban', source_id: id }, XuatVatChua)
+    collectIds({ source_type: 'tra_hang_ban', source_id: id }, NhapVatChua, session),
+    collectIds({ source_type: 'tra_hang_ban', source_id: id }, XuatVatChua, session)
   ]);
-  for (const importId of vatImportIds) deleted += await hardDeleteVatChuaImport(importId, storeId);
-  for (const exportId of vatExportIds) deleted += await hardDeleteVatChuaExport(exportId, storeId);
+  for (const importId of vatImportIds) deleted += await hardDeleteVatChuaImport(importId, storeId, session);
+  for (const exportId of vatExportIds) deleted += await hardDeleteVatChuaExport(exportId, storeId, session);
   const debtFilter = { $or: [{ phieu_tra_hang_id: id }, { phieu_thu_chi_id: { $in: receiptIds } }] };
   if (doc && doc.ma_phieu_tra) {
     debtFilter.$or.push(
@@ -339,14 +382,14 @@ async function hardDeleteSaleReturn(returnId, storeId) {
   }
   deleted = addCount(deleted, await CongNoKhachHang.deleteMany({
     $or: debtFilter.$or
-  }));
+  }).session(session || null));
   if (GiaoDichCongNoKhachHang) {
     deleted = addCount(deleted, await GiaoDichCongNoKhachHang.deleteMany({
       $or: debtFilter.$or
-    }));
+    }).session(session || null));
   }
-  deleted = addCount(deleted, await CTPhieuTraHang.deleteMany({ phieu_tra_hang_id: id }));
-  deleted = addCount(deleted, await PhieuTraHang.deleteOne({ _id: id }));
+  deleted = addCount(deleted, await CTPhieuTraHang.deleteMany({ phieu_tra_hang_id: id }).session(session || null));
+  deleted = addCount(deleted, await PhieuTraHang.deleteOne(docFilter).session(session || null));
   return deleted;
 }
 
@@ -435,13 +478,13 @@ async function hardDeleteProduct(root, storeId) {
   return deleted;
 }
 
-async function hardDeleteRootEntity(root, storeId) {
+async function hardDeleteRootEntity(root, storeId, session) {
   if (!root || !root.entity_type) return 0;
-  if (root.entity_type === 'PhieuNhap') return hardDeletePurchase(root, storeId);
-  if (root.entity_type === 'PhieuTraHangNhap') return hardDeleteReturnImport(root.entity_id, storeId);
+  if (root.entity_type === 'PhieuNhap') return hardDeletePurchase(root, storeId, session);
+  if (root.entity_type === 'PhieuTraHangNhap') return hardDeleteReturnImport(root.entity_id, storeId, session);
   if (root.entity_type === 'DonHang') return hardDeleteOrder(root, storeId);
   if (root.entity_type === 'HoaDonBanHang') return hardDeleteInvoice(root.entity_id, storeId);
-  if (root.entity_type === 'PhieuTraHang') return hardDeleteSaleReturn(root.entity_id, storeId);
+  if (root.entity_type === 'PhieuTraHang') return hardDeleteSaleReturn(root.entity_id, storeId, session);
   if (root.entity_type === 'HangHoa') return hardDeleteProduct(root, storeId);
   if (root.entity_type === 'SoQuy') return hardDeleteCashBook(root, storeId);
   if (root.entity_type === 'PhieuKiemKho') return hardDeleteInventoryCheck(root);
@@ -499,22 +542,31 @@ async function permanentDeleteTrashGroups(rootTrashIds, storeId) {
 
   const rootObjectIds = roots.map(function(row) { return row._id; });
   let deletedEntities = 0;
-  for (const root of roots) {
-    deletedEntities += await hardDeleteRootEntity(root, storeId);
-  }
+  let deletedItems = 0;
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async function() {
+      for (const root of roots) {
+        deletedEntities += await hardDeleteRootEntity(root, storeId, session);
+      }
 
-  const deleteResult = await ThungRacItem.deleteMany({
-    cua_hang_id: storeId,
-    restored_at: null,
-    $or: [
-      { _id: { $in: rootObjectIds } },
-      { trash_group_id: { $in: rootObjectIds } }
-    ]
-  });
+      const deleteResult = await ThungRacItem.deleteMany({
+        cua_hang_id: storeId,
+        restored_at: null,
+        $or: [
+          { _id: { $in: rootObjectIds } },
+          { trash_group_id: { $in: rootObjectIds } }
+        ]
+      }, { session });
+      deletedItems = Number(deleteResult.deletedCount || 0);
+    });
+  } finally {
+    await session.endSession();
+  }
 
   return {
     deleted_roots: roots.length,
-    deleted_items: Number(deleteResult.deletedCount || 0),
+    deleted_items: deletedItems,
     deleted_entities: deletedEntities,
     roots: roots.map(function(row) {
       return {

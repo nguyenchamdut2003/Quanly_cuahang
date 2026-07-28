@@ -294,7 +294,8 @@ async function buildProfitByCustomerReport(options) {
 
   const returnFilter = {
     ngay_tra: { $gte: range.start, $lt: range.end },
-    trang_thai: { $nin: ['cancelled', 'draft'] }
+    trang_thai: { $nin: ['cancelled', 'draft'] },
+    deleted_at: null
   };
   if (storeId) returnFilter.cua_hang_id = storeId;
   const returns = await PhieuTraHang.find(returnFilter).select('khach_hang_id tong_tien_tra').lean();

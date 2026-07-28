@@ -58,13 +58,25 @@
     .summary-body{padding:16px;overflow:auto}
     .summary-total{display:flex;justify-content:flex-end;gap:22px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#475467}
     .summary-total b{color:#111827;font-size:16px}
+    .xnb-footer{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:13px}
+    .xnb-page-size{font-weight:600}
+    .xnb-pagination{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .xnb-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+    .xnb-page-link.is-disabled{color:#94a3b8;background:#f8fafc;cursor:not-allowed}
+    .xnb-page-current{font-weight:800;color:#111827}
   </style>
 </head>
 <body>
   <%- include('../partials/header') %>
   <%
+    const safePagination = locals.pagination || { page: 1, totalPages: 1, total: 0, from: 0, to: 0, limit: 10 };
+    const pageHref = page => {
+      const query = typeof qs === 'function' ? qs({ page }) : '';
+      return '/xuat-dung-noi-bo' + (query ? '?' + query : '');
+    };
     const exportParams = new URLSearchParams();
     Object.keys(filters || {}).forEach(key => {
+      if (key === 'page' || key === 'page_size') return;
       const value = filters[key];
       if (Array.isArray(value)) {
         value.forEach(item => exportParams.append(key, item));
@@ -73,11 +85,12 @@
       }
     });
     const exportQuery = exportParams.toString();
-    const tongGiaTriXuat = (tickets || []).reduce((sum, t) => sum + Number(t.tong_gia_tri || 0), 0);
+    const tongGiaTriXuatValue = Number(locals.tongGiaTriXuat || 0);
     const formatVnd = value => `${Number(value || 0).toLocaleString('vi-VN')} VNĐ`;
   %>
 
   <form class="xnb-page" method="GET" action="/xuat-dung-noi-bo" id="filterForm">
+    <input type="hidden" name="page" id="xnbPageInput" value="<%= safePagination.page %>">
     <aside class="xnb-sidebar">
       <h1 class="xnb-title">Xuất dùng nội bộ</h1>
       <div class="filter-block">
@@ -112,7 +125,7 @@
       <div class="xnb-summary">
         <span>Tổng giá trị xuất dùng nội bộ</span>
         <span class="summary-actions">
-          <strong><%= formatVnd(tongGiaTriXuat) %></strong>
+          <strong><%= formatVnd(tongGiaTriXuatValue) %></strong>
           <button class="kv-btn small" type="button" id="summaryDetailBtn"><i class="fa-regular fa-eye"></i> Chi tiết</button>
         </span>
       </div>
@@ -129,6 +142,27 @@
             <% } %>
           </tbody>
         </table>
+      </div>
+      <div class="xnb-footer">
+        <span class="xnb-page-size">Hiển thị 10 dòng/trang</span>
+        <nav class="xnb-pagination" aria-label="Phân trang xuất dùng nội bộ">
+          <% if (safePagination.page > 1) { %>
+            <a class="xnb-page-link" href="<%= pageHref(1) %>">Đầu</a>
+            <a class="xnb-page-link" href="<%= pageHref(safePagination.page - 1) %>">Trước</a>
+          <% } else { %>
+            <span class="xnb-page-link is-disabled">Đầu</span>
+            <span class="xnb-page-link is-disabled">Trước</span>
+          <% } %>
+          <span class="xnb-page-current"><%= safePagination.page %> / <%= safePagination.totalPages %></span>
+          <% if (safePagination.page < safePagination.totalPages) { %>
+            <a class="xnb-page-link" href="<%= pageHref(safePagination.page + 1) %>">Sau</a>
+            <a class="xnb-page-link" href="<%= pageHref(safePagination.totalPages) %>">Cuối</a>
+          <% } else { %>
+            <span class="xnb-page-link is-disabled">Sau</span>
+            <span class="xnb-page-link is-disabled">Cuối</span>
+          <% } %>
+        </nav>
+        <span><%= safePagination.from %> - <%= safePagination.to %> trong <%= safePagination.total %> phiếu</span>
       </div>
     </main>
   </form>
@@ -154,7 +188,18 @@
     </div>
   </div>
   <script>
-    function submitFilters(){document.getElementById('filterForm').submit();}
+    function submitFilters(){
+      const pageInput = document.getElementById('xnbPageInput');
+      if (pageInput) pageInput.value = '1';
+      document.getElementById('filterForm').submit();
+    }
+    const filterForm = document.getElementById('filterForm');
+    if (filterForm) {
+      filterForm.addEventListener('submit', function() {
+        const pageInput = document.getElementById('xnbPageInput');
+        if (pageInput) pageInput.value = '1';
+      });
+    }
   </script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {

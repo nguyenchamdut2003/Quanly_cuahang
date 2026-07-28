@@ -4,12 +4,14 @@ const {
   CTPhieuTraHangNhap,
   PhieuThuChi,
   CongNoNhaCungCap,
+  GiaoDichCongNoNhaCungCap,
   NhaCungCap,
-  XuatVatChua
+  XuatVatChua,
+  VatChua
 } = require('../models/kiot.model');
 const { ThungRacItem } = require('../models/trash.model');
 const { ENTITY_LABELS, buildTrashChildFields } = require('./trashLabels.service');
-const { congTonKho } = require('./kho.service');
+const { congTonKho, truTonKho } = require('./kho.service');
 const { cancelXuatVatChuaBySource } = require('./vatChuaExport.service');
 
 function createHttpError(statusCode, message) {
@@ -28,37 +30,130 @@ function normalizeIds(rawIds) {
   }))];
 }
 
+function toObjectId(value) {
+  const raw = String(value || '').trim();
+  return mongoose.Types.ObjectId.isValid(raw) ? new mongoose.Types.ObjectId(raw) : null;
+}
+
+function withSessionQuery(query, session) {
+  return session ? query.session(session) : query;
+}
+
+function withSessionOptions(options, session) {
+  return session ? Object.assign({}, options || {}, { session }) : (options || {});
+}
+
 function sampleTexts(rows, pickFn, limit) {
   if (!Array.isArray(rows) || !rows.length) return [];
   return rows.slice(0, limit || 5).map(pickFn).filter(Boolean);
 }
 
-async function loadRelatedReceipts(returnIds, storeId) {
+function objectIdStrings(rows) {
+  return (rows || []).map(function(row) { return String(row && row._id || ''); }).filter(Boolean);
+}
+
+function supplierDebtSign(row) {
+  const type = String(row && row.loai || '');
+  if (type === 'tang_no') return 1;
+  if (type === 'giam_no' || type === 'thanh_toan') return -1;
+  return 0;
+}
+
+function supplierDebtTxSign(row) {
+  const direction = String(row && row.huong_cong_no || '');
+  if (direction === 'tang_no') return 1;
+  if (direction === 'giam_no') return -1;
+  return 0;
+}
+
+async function applySupplierDebtRows(rows, mode, session) {
+  const direction = mode === 'restore' ? 1 : -1;
+  for (const row of rows || []) {
+    if (!row || !row.nha_cung_cap_id) continue;
+    const sign = supplierDebtSign(row);
+    const amount = Number(row.so_tien || 0);
+    if (!sign || !amount) continue;
+    await NhaCungCap.updateOne(
+      { _id: row.nha_cung_cap_id },
+      { $inc: { tong_no: direction * sign * amount } },
+      { session }
+    );
+  }
+}
+
+async function applySupplierDebtTxRows(rows, mode, session) {
+  const direction = mode === 'restore' ? 1 : -1;
+  for (const row of rows || []) {
+    if (!row || !row.nha_cung_cap_id) continue;
+    const sign = supplierDebtTxSign(row);
+    const amount = Number(row.gia_tri || 0);
+    if (!sign || !amount) continue;
+    await NhaCungCap.updateOne(
+      { _id: row.nha_cung_cap_id },
+      { $inc: { tong_no: direction * sign * amount } },
+      { session }
+    );
+  }
+}
+
+async function loadRelatedReceipts(returnIds, storeId, session, includeDeleted) {
   if (!returnIds.length) return [];
   const objectIds = returnIds.map(function(id) { return new mongoose.Types.ObjectId(id); });
   const filter = {
-    phieu_tra_hang_nhap_id: { $in: objectIds },
-    deleted_at: null
+    phieu_tra_hang_nhap_id: { $in: objectIds }
   };
+  if (!includeDeleted) filter.deleted_at = null;
   if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) filter.cua_hang_id = storeId;
-  return PhieuThuChi.find(filter)
-    .select('_id ma_phieu gia_tri ngay_lap phieu_tra_hang_nhap_id')
-    .sort({ ngay_lap: -1, created_at: -1 })
+  return withSessionQuery(PhieuThuChi.find(filter)
+    .select('_id ma_phieu gia_tri ngay_lap phieu_tra_hang_nhap_id trang_thai deleted_at')
+    .sort({ ngay_lap: -1, created_at: -1 }), session)
     .lean();
 }
 
-async function loadRelatedXuatVatChua(returnIds, storeId) {
+async function loadRelatedXuatVatChua(returnIds, storeId, session, includeDeleted) {
   if (!returnIds.length) return [];
   const objectIds = returnIds.map(function(id) { return new mongoose.Types.ObjectId(id); });
   const filter = {
     source_type: 'phieu_tra_hang_nhap',
-    source_id: { $in: objectIds },
-    deleted_at: null
+    source_id: { $in: objectIds }
   };
+  if (!includeDeleted) filter.deleted_at = null;
   if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) filter.cua_hang_id = storeId;
-  return XuatVatChua.find(filter)
-    .select('_id ma_xuat_vat_chua source_id tong_so_luong')
-    .sort({ created_at: -1 })
+  return withSessionQuery(XuatVatChua.find(filter)
+    .select('_id ma_xuat_vat_chua source_id tong_so_luong trang_thai deleted_at items cua_hang_id')
+    .sort({ created_at: -1 }), session)
+    .lean();
+}
+
+async function loadRelatedSupplierDebt(returnIds, receiptIds, storeId, session, includeDeleted) {
+  if (!returnIds.length && !receiptIds.length) return [];
+  const returnObjectIds = returnIds.map(function(id) { return new mongoose.Types.ObjectId(id); });
+  const receiptObjectIds = receiptIds.map(function(id) { return new mongoose.Types.ObjectId(id); });
+  const or = [];
+  if (returnObjectIds.length) or.push({ phieu_tra_nhap_id: { $in: returnObjectIds } });
+  if (receiptObjectIds.length) or.push({ phieu_thu_chi_id: { $in: receiptObjectIds } });
+  const filter = { $or: or };
+  if (!includeDeleted) filter.deleted_at = null;
+  if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) filter.cua_hang_id = storeId;
+  return withSessionQuery(CongNoNhaCungCap.find(filter)
+    .select('_id cua_hang_id nha_cung_cap_id phieu_tra_nhap_id phieu_thu_chi_id so_tien loai deleted_at')
+    .sort({ ngay: -1 }), session)
+    .lean();
+}
+
+async function loadRelatedSupplierDebtTx(returnIds, receiptIds, storeId, session, includeDeleted) {
+  if (!GiaoDichCongNoNhaCungCap || (!returnIds.length && !receiptIds.length)) return [];
+  const returnObjectIds = returnIds.map(function(id) { return new mongoose.Types.ObjectId(id); });
+  const receiptObjectIds = receiptIds.map(function(id) { return new mongoose.Types.ObjectId(id); });
+  const or = [];
+  if (returnObjectIds.length) or.push({ phieu_tra_hang_nhap_id: { $in: returnObjectIds } });
+  if (receiptObjectIds.length) or.push({ phieu_thu_chi_id: { $in: receiptObjectIds } });
+  const filter = { $or: or };
+  if (!includeDeleted) filter.deleted_at = null;
+  if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) filter.cua_hang_id = storeId;
+  return withSessionQuery(GiaoDichCongNoNhaCungCap.find(filter)
+    .select('_id cua_hang_id nha_cung_cap_id ma_giao_dich phieu_tra_hang_nhap_id phieu_thu_chi_id gia_tri huong_cong_no trang_thai deleted_at')
+    .sort({ ngay_giao_dich: -1 }), session)
     .lean();
 }
 
@@ -91,9 +186,11 @@ async function buildReturnImportImpact(doc, storeId) {
   let canTrash = true;
   let blockReason = '';
   const warnings = [];
-  if (doc.deleted_at) {
+  if (doc.deleted_at || String(doc.trang_thai || '') === 'cancelled') {
     canTrash = false;
-    blockReason = 'Phiếu trả hàng nhập đã nằm trong thùng rác.';
+    blockReason = doc.deleted_at
+      ? 'Phiếu trả hàng nhập đã nằm trong thùng rác.'
+      : 'Phiếu trả hàng nhập đã hủy, không xử lý lại.';
   } else {
     const inTrash = await ThungRacItem.exists({
       entity_type: 'PhieuTraHangNhap',
@@ -106,9 +203,13 @@ async function buildReturnImportImpact(doc, storeId) {
     }
   }
 
-  const detailCount = await CTPhieuTraHangNhap.countDocuments({ phieu_tra_nhap_id: doc._id });
-  const receipts = await loadRelatedReceipts([String(doc._id)], storeId);
-  const xuatVatChua = await loadRelatedXuatVatChua([String(doc._id)], storeId);
+  const returnId = String(doc._id);
+  const detailCount = await CTPhieuTraHangNhap.countDocuments({ phieu_tra_nhap_id: doc._id, deleted_at: null });
+  const receipts = await loadRelatedReceipts([returnId], storeId);
+  const receiptIds = objectIdStrings(receipts);
+  const xuatVatChua = await loadRelatedXuatVatChua([returnId], storeId);
+  const debtRows = await loadRelatedSupplierDebt([returnId], receiptIds, storeId);
+  const debtTxRows = await loadRelatedSupplierDebtTx([returnId], receiptIds, storeId);
 
   if (String(doc.trang_thai || '') === 'completed') {
     warnings.push('Tồn kho hàng hóa sẽ được cộng lại theo số lượng đã trả.');
@@ -135,11 +236,23 @@ async function buildReturnImportImpact(doc, storeId) {
       label: ENTITY_LABELS.XuatVatChua,
       count: xuatVatChua.length,
       samples: sampleTexts(xuatVatChua, function(row) { return row.ma_xuat_vat_chua || ''; }, 5)
+    },
+    {
+      entity_type: 'CongNoNhaCungCap',
+      label: ENTITY_LABELS.CongNoNhaCungCap,
+      count: debtRows.length,
+      samples: []
+    },
+    {
+      entity_type: 'GiaoDichCongNoNhaCungCap',
+      label: ENTITY_LABELS.GiaoDichCongNoNhaCungCap,
+      count: debtTxRows.length,
+      samples: sampleTexts(debtTxRows, function(row) { return row.ma_giao_dich || ''; }, 5)
     }
   ].filter(function(group) { return Number(group.count || 0) > 0; });
 
   return {
-    phieu_tra_hang_nhap_id: String(doc._id),
+    phieu_tra_hang_nhap_id: returnId,
     ma_phieu_tra_nhap: doc.ma_phieu_tra_nhap || '',
     ten_ncc: doc.nha_cung_cap_id && doc.nha_cung_cap_id.ten_ncc ? doc.nha_cung_cap_id.ten_ncc : '',
     tong_tien_tra: Number(doc.tong_tien_tra || doc.ncc_can_tra || 0),
@@ -183,9 +296,8 @@ async function previewReturnImportTrash(rawIds, storeId) {
   };
 }
 
-async function rollbackCompletedReturn(doc, userId, session) {
-  if (!doc || String(doc.trang_thai || '') !== 'completed') return;
-  const rows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: doc._id }).session(session).lean();
+async function rollbackInventory(doc, userId, session) {
+  const rows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: doc._id, deleted_at: null }).session(session).lean();
   for (const row of rows) {
     const tenQc = String(row.ten_quy_cach || '').trim();
     await congTonKho({
@@ -203,37 +315,56 @@ async function rollbackCompletedReturn(doc, userId, session) {
       session: session
     });
   }
+}
 
-  await cancelXuatVatChuaBySource(doc.cua_hang_id, 'phieu_tra_hang_nhap', doc._id, session);
-
-  const receipts = await PhieuThuChi.find({ phieu_tra_hang_nhap_id: doc._id, deleted_at: null }).session(session).lean();
-  for (const rec of receipts) {
-    const linked = await CongNoNhaCungCap.find({ phieu_thu_chi_id: rec._id }).session(session).lean();
-    for (const row of linked) {
-      if (!row.nha_cung_cap_id) continue;
-      const amount = Number(row.so_tien || 0);
-      if (row.loai === 'giam_no') {
-        await NhaCungCap.updateOne({ _id: row.nha_cung_cap_id }, { $inc: { tong_no: amount } }, { session });
-      } else if (row.loai === 'thanh_toan') {
-        await NhaCungCap.updateOne({ _id: row.nha_cung_cap_id }, { $inc: { tong_no: -amount } }, { session });
-      }
-    }
+async function restoreInventory(doc, userId, session) {
+  const rows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: doc._id }).session(session).lean();
+  for (const row of rows) {
+    const tenQc = String(row.ten_quy_cach || '').trim();
+    await truTonKho({
+      kho_id: doc.kho_id,
+      hang_hoa_id: row.hang_hoa_id,
+      lo_hang_id: row.lo_hang_id,
+      so_luong: row.so_luong,
+      gia_von: row.gia_tra_lai || row.gia_nhap || row.don_gia || 0,
+      nguoi_tao_id: userId,
+      loai_phieu: 'tra_hang_nhap',
+      ma_phieu: String(doc.ma_phieu_tra_nhap || ''),
+      ghi_chu: 'Khôi phục phiếu trả hàng nhập từ thùng rác',
+      ten_quy_cach: tenQc || undefined,
+      sync_quy_cach: Boolean(row.lo_hang_id && tenQc),
+      session: session
+    });
   }
-  await CongNoNhaCungCap.deleteMany({ phieu_thu_chi_id: { $in: receipts.map(function(row) { return row._id; }) } }).session(session);
+}
 
-  const standalone = await CongNoNhaCungCap.find({
-    phieu_tra_nhap_id: doc._id,
-    $or: [{ phieu_thu_chi_id: { $exists: false } }, { phieu_thu_chi_id: null }]
-  }).session(session).lean();
-  for (const row of standalone) {
-    if (row.loai === 'giam_no' && row.nha_cung_cap_id) {
-      await NhaCungCap.updateOne({ _id: row.nha_cung_cap_id }, { $inc: { tong_no: Number(row.so_tien || 0) } }, { session });
-    }
+async function rollbackCompletedReturn(doc, userId, session, options) {
+  if (!doc || String(doc.trang_thai || '') !== 'completed') return {};
+  const storeId = doc.cua_hang_id;
+  await rollbackInventory(doc, userId, session);
+  await cancelXuatVatChuaBySource(storeId, 'phieu_tra_hang_nhap', doc._id, session);
+
+  const returnId = String(doc._id);
+  const receipts = await loadRelatedReceipts([returnId], storeId, session, false);
+  const receiptIds = objectIdStrings(receipts);
+  const debtRows = await loadRelatedSupplierDebt([returnId], receiptIds, storeId, session, false);
+  const debtTxRows = await loadRelatedSupplierDebtTx([returnId], receiptIds, storeId, session, false);
+
+  await applySupplierDebtRows(debtRows, 'rollback', session);
+  await applySupplierDebtTxRows(debtTxRows, 'rollback', session);
+
+  const hardDelete = options && options.hardDeleteRelated;
+  if (hardDelete) {
+    if (debtRows.length) await CongNoNhaCungCap.deleteMany({ _id: { $in: debtRows.map(function(row) { return row._id; }) } }).session(session);
+    if (debtTxRows.length) await GiaoDichCongNoNhaCungCap.deleteMany({ _id: { $in: debtTxRows.map(function(row) { return row._id; }) } }).session(session);
+    if (receipts.length) await PhieuThuChi.deleteMany({ _id: { $in: receipts.map(function(row) { return row._id; }) } }).session(session);
   }
-  await CongNoNhaCungCap.deleteMany({
-    phieu_tra_nhap_id: doc._id,
-    $or: [{ phieu_thu_chi_id: { $exists: false } }, { phieu_thu_chi_id: null }]
-  }).session(session);
+
+  return {
+    receipts: receipts,
+    debtRows: debtRows,
+    debtTxRows: debtTxRows
+  };
 }
 
 async function moveReturnImportToTrash(rawIds, storeId, userId) {
@@ -253,13 +384,21 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
         const doc = await PhieuTraHangNhap.findOne({
           _id: item.phieu_tra_hang_nhap_id,
           cua_hang_id: storeId,
-          deleted_at: null
+          deleted_at: null,
+          trang_thai: { $ne: 'cancelled' }
         }).session(session);
         if (!doc) continue;
 
-        await rollbackCompletedReturn(doc, userId, session);
+        const originalStatus = String(doc.trang_thai || 'draft');
+        const rollback = await rollbackCompletedReturn(doc, userId, session, { hardDeleteRelated: false });
 
-        const receipts = await loadRelatedReceipts([String(doc._id)], storeId);
+        const returnId = String(doc._id);
+        const receipts = rollback.receipts || await loadRelatedReceipts([returnId], storeId, session, false);
+        const receiptIds = objectIdStrings(receipts);
+        const xuatVatChua = await loadRelatedXuatVatChua([returnId], storeId, session, false);
+        const debtRows = rollback.debtRows || await loadRelatedSupplierDebt([returnId], receiptIds, storeId, session, false);
+        const debtTxRows = rollback.debtTxRows || await loadRelatedSupplierDebtTx([returnId], receiptIds, storeId, session, false);
+
         if (receipts.length) {
           await PhieuThuChi.updateMany(
             { _id: { $in: receipts.map(function(row) { return row._id; }) } },
@@ -268,6 +407,7 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
                 trang_thai: 'cancelled',
                 deleted_at: now,
                 deleted_by: userId || null,
+                nguoi_huy_id: userId || null,
                 ngay_huy: now,
                 ly_do_huy: 'Đưa phiếu trả hàng nhập vào thùng rác'
               }
@@ -275,7 +415,6 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
             { session }
           );
         }
-        const xuatVatChua = await loadRelatedXuatVatChua([String(doc._id)], storeId);
         if (xuatVatChua.length) {
           await XuatVatChua.updateMany(
             { _id: { $in: xuatVatChua.map(function(row) { return row._id; }) } },
@@ -283,11 +422,50 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
             { session }
           );
         }
+        if (debtRows.length) {
+          await CongNoNhaCungCap.updateMany(
+            { _id: { $in: debtRows.map(function(row) { return row._id; }) } },
+            { $set: { deleted_at: now, deleted_by: userId || null } },
+            { session }
+          );
+        }
+        if (debtTxRows.length) {
+          await GiaoDichCongNoNhaCungCap.updateMany(
+            { _id: { $in: debtTxRows.map(function(row) { return row._id; }) } },
+            {
+              $set: {
+                trang_thai: 'cancelled',
+                deleted_at: now,
+                deleted_by: userId || null,
+                nguoi_huy_id: userId || null,
+                ngay_huy: now,
+                ly_do_huy: 'Đưa phiếu trả hàng nhập vào thùng rác'
+              }
+            },
+            { session }
+          );
+        }
+        await CTPhieuTraHangNhap.updateMany(
+          { phieu_tra_nhap_id: doc._id, deleted_at: null },
+          { $set: { deleted_at: now, deleted_by: userId || null } },
+          { session }
+        );
 
         doc.deleted_at = now;
         doc.deleted_by = userId || null;
         doc.trang_thai = 'cancelled';
         await doc.save({ session });
+
+        const metadata = {
+          original_status: originalStatus,
+          phieu_tra_nhap_id: String(doc._id),
+          phieu_nhap_id: doc.phieu_nhap_id ? String(doc.phieu_nhap_id) : '',
+          cua_hang_id: doc.cua_hang_id ? String(doc.cua_hang_id) : String(storeId || ''),
+          receipt_ids: objectIdStrings(receipts),
+          xuat_vat_chua_ids: objectIdStrings(xuatVatChua),
+          cong_no_ncc_ids: objectIdStrings(debtRows),
+          giao_dich_cong_no_ncc_ids: objectIdStrings(debtTxRows)
+        };
 
         const rootRows = await ThungRacItem.create([{
           entity_type: 'PhieuTraHangNhap',
@@ -300,7 +478,9 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
           deleted_by: userId || null,
           is_trash_root: true,
           trash_group_id: null,
-          sort_order: 0
+          restored_at: null,
+          sort_order: 0,
+          metadata: metadata
         }], { session });
         const root = rootRows && rootRows[0];
         let sortOrder = 1;
@@ -318,7 +498,9 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
             deleted_by: userId || null,
             is_trash_root: false,
             trash_group_id: root._id,
-            sort_order: sortOrder
+            restored_at: null,
+            sort_order: sortOrder,
+            metadata: metadata
           }], { session });
           sortOrder += 1;
         }
@@ -340,7 +522,218 @@ async function moveReturnImportToTrash(rawIds, storeId, userId) {
   };
 }
 
+async function restoreXuatVatChuaRows(rows, session) {
+  for (const xuatDoc of rows || []) {
+    if (!xuatDoc || !xuatDoc._id) continue;
+    const items = Array.isArray(xuatDoc.items) ? xuatDoc.items : [];
+    for (const item of items) {
+      const vatChuaId = toObjectId(item.vat_chua_id);
+      const qty = Math.floor(Number(item.so_luong || 0));
+      if (!vatChuaId || qty <= 0) continue;
+      const result = await VatChua.updateOne(
+        { _id: vatChuaId, so_luong_ton: { $gte: qty } },
+        { $inc: { so_luong_ton: -qty } },
+        { session }
+      );
+      if (!result || Number(result.modifiedCount || 0) < 1) {
+        throw createHttpError(409, 'Tồn vật chứa không đủ để khôi phục phiếu xuất vật chứa.');
+      }
+    }
+    await XuatVatChua.updateOne(
+      { _id: xuatDoc._id },
+      { $set: { trang_thai: 'active', deleted_at: null, deleted_by: null } },
+      { session }
+    );
+  }
+}
+
+async function restoreReturnImportFromTrash(rootTrashIds, storeId, userId) {
+  const ids = normalizeIds(rootTrashIds);
+  if (!ids.length) throw createHttpError(400, 'Vui lòng chọn ít nhất một chứng từ trong thùng rác.');
+  if (!storeId || !mongoose.Types.ObjectId.isValid(String(storeId))) {
+    throw createHttpError(400, 'Không xác định được cửa hàng.');
+  }
+  const session = await mongoose.startSession();
+  const restored = [];
+  try {
+    await session.withTransaction(async function() {
+      const objectIds = ids.map(function(id) { return new mongoose.Types.ObjectId(id); });
+      const roots = await ThungRacItem.find({
+        _id: { $in: objectIds },
+        cua_hang_id: storeId,
+        restored_at: null,
+        is_trash_root: true,
+        entity_type: 'PhieuTraHangNhap'
+      }).session(session).lean();
+      if (roots.length !== ids.length) {
+        throw createHttpError(404, 'Chỉ hỗ trợ khôi phục các phiếu trả hàng nhập còn trong thùng rác.');
+      }
+
+      const now = new Date();
+      for (const root of roots) {
+        const metadata = root.metadata || {};
+        const doc = await PhieuTraHangNhap.findOne({
+          _id: root.entity_id,
+          cua_hang_id: storeId
+        }).session(session);
+        if (!doc) throw createHttpError(404, 'Phiếu trả hàng nhập đã bị xóa vĩnh viễn.');
+        if (!doc.deleted_at) throw createHttpError(400, 'Phiếu trả hàng nhập không còn trong thùng rác.');
+
+        const originalStatus = String(metadata.original_status || 'draft');
+        const returnId = String(doc._id);
+        const receiptIds = Array.isArray(metadata.receipt_ids) ? metadata.receipt_ids.filter(toObjectId) : [];
+        const xuatIds = Array.isArray(metadata.xuat_vat_chua_ids) ? metadata.xuat_vat_chua_ids.filter(toObjectId) : [];
+        const debtIds = Array.isArray(metadata.cong_no_ncc_ids) ? metadata.cong_no_ncc_ids.filter(toObjectId) : [];
+        const debtTxIds = Array.isArray(metadata.giao_dich_cong_no_ncc_ids) ? metadata.giao_dich_cong_no_ncc_ids.filter(toObjectId) : [];
+
+        if (originalStatus === 'completed') {
+          await restoreInventory(doc, userId, session);
+        }
+
+        const receiptFilter = receiptIds.length
+          ? { _id: { $in: receiptIds.map(toObjectId).filter(Boolean) } }
+          : { phieu_tra_hang_nhap_id: doc._id };
+        const receipts = await PhieuThuChi.find(receiptFilter).session(session).lean();
+        const currentReceiptIds = objectIdStrings(receipts);
+
+        const xuatFilter = xuatIds.length
+          ? { _id: { $in: xuatIds.map(toObjectId).filter(Boolean) } }
+          : { source_type: 'phieu_tra_hang_nhap', source_id: doc._id };
+        const xuatRows = await XuatVatChua.find(xuatFilter).session(session).lean();
+
+        const debtFilter = debtIds.length
+          ? { _id: { $in: debtIds.map(toObjectId).filter(Boolean) } }
+          : {
+              $or: [
+                { phieu_tra_nhap_id: doc._id },
+                { phieu_thu_chi_id: { $in: currentReceiptIds.map(toObjectId).filter(Boolean) } }
+              ]
+            };
+        const debtRows = await CongNoNhaCungCap.find(debtFilter).session(session).lean();
+
+        const debtTxFilter = debtTxIds.length
+          ? { _id: { $in: debtTxIds.map(toObjectId).filter(Boolean) } }
+          : {
+              $or: [
+                { phieu_tra_hang_nhap_id: doc._id },
+                { phieu_thu_chi_id: { $in: currentReceiptIds.map(toObjectId).filter(Boolean) } }
+              ]
+            };
+        const debtTxRows = await GiaoDichCongNoNhaCungCap.find(debtTxFilter).session(session).lean();
+
+        if (originalStatus === 'completed') {
+          await restoreXuatVatChuaRows(xuatRows, session);
+          await applySupplierDebtRows(debtRows, 'restore', session);
+          await applySupplierDebtTxRows(debtTxRows, 'restore', session);
+        }
+
+        if (receipts.length) {
+          await PhieuThuChi.updateMany(
+            { _id: { $in: receipts.map(function(row) { return row._id; }) } },
+            {
+              $set: {
+                trang_thai: 'paid',
+                deleted_at: null,
+                deleted_by: null,
+                nguoi_huy_id: null,
+                ngay_huy: null,
+                ly_do_huy: ''
+              }
+            },
+            { session }
+          );
+        }
+        if (debtRows.length) {
+          await CongNoNhaCungCap.updateMany(
+            { _id: { $in: debtRows.map(function(row) { return row._id; }) } },
+            { $set: { deleted_at: null, deleted_by: null } },
+            { session }
+          );
+        }
+        if (debtTxRows.length) {
+          await GiaoDichCongNoNhaCungCap.updateMany(
+            { _id: { $in: debtTxRows.map(function(row) { return row._id; }) } },
+            {
+              $set: {
+                trang_thai: 'active',
+                deleted_at: null,
+                deleted_by: null,
+                nguoi_huy_id: null,
+                ngay_huy: null,
+                ly_do_huy: ''
+              }
+            },
+            { session }
+          );
+        }
+        await CTPhieuTraHangNhap.updateMany(
+          { phieu_tra_nhap_id: doc._id },
+          { $set: { deleted_at: null, deleted_by: null } },
+          { session }
+        );
+
+        doc.deleted_at = null;
+        doc.deleted_by = null;
+        doc.trang_thai = originalStatus;
+        await doc.save({ session });
+
+        await ThungRacItem.deleteMany({
+          cua_hang_id: storeId,
+          $or: [
+            { _id: root._id },
+            { trash_group_id: root._id }
+          ]
+        }).session(session);
+
+        restored.push({
+          trash_id: String(root._id),
+          phieu_tra_hang_nhap_id: returnId,
+          ma_phieu_tra_nhap: doc.ma_phieu_tra_nhap || ''
+        });
+      }
+    });
+  } finally {
+    await session.endSession();
+  }
+  return {
+    restored_count: restored.length,
+    restored: restored
+  };
+}
+
+async function cancelReturnImport(returnId, storeId, userId) {
+  const id = toObjectId(returnId);
+  if (!id) throw createHttpError(400, 'ID phiếu trả hàng nhập không hợp lệ.');
+  const session = await mongoose.startSession();
+  let result = null;
+  try {
+    await session.withTransaction(async function() {
+      const filter = { _id: id, deleted_at: null };
+      if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) filter.cua_hang_id = storeId;
+      const doc = await PhieuTraHangNhap.findOne(filter).session(session);
+      if (!doc) throw createHttpError(404, 'Không tìm thấy phiếu trả hàng nhập.');
+      if (String(doc.trang_thai || '') === 'cancelled') {
+        throw createHttpError(400, 'Phiếu trả hàng nhập đã hủy.');
+      }
+      if (String(doc.trang_thai || '') === 'completed') {
+        await rollbackCompletedReturn(doc, userId, session, { hardDeleteRelated: true });
+      }
+      doc.trang_thai = 'cancelled';
+      await doc.save({ session });
+      result = {
+        phieu_tra_hang_nhap_id: String(doc._id),
+        ma_phieu_tra_nhap: doc.ma_phieu_tra_nhap || ''
+      };
+    });
+  } finally {
+    await session.endSession();
+  }
+  return result;
+}
+
 module.exports = {
   previewReturnImportTrash,
-  moveReturnImportToTrash
+  moveReturnImportToTrash,
+  restoreReturnImportFromTrash,
+  cancelReturnImport
 };

@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var baoCaoController = require('../controllers/baoCao.controller');
+var baoCaoController = require('../controllers/baocaocontroller');
 
 router.use(isAuthenticated);
 router.get('/', baoCaoController.index);

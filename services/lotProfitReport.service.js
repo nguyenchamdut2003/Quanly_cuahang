@@ -15,6 +15,24 @@ function toObjectId(value) {
   return mongoose.Types.ObjectId.isValid(id) ? id : null;
 }
 
+function parseDateStart(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function parseDateEnd(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(23, 59, 59, 999);
+  return date;
+}
+
 function lotDisplayName(lot) {
   if (!lot) return 'Lô không tên';
   return String(lot.ten_lo || lot.ma_lo || '').trim() || 'Lô không tên';
@@ -38,6 +56,37 @@ function specFromImportRow(row) {
     ten_quy_cach: tenQuyCach,
     gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || null
   };
+}
+
+function importSlicesFromRow(row) {
+  const lotInfo = row.lot_info;
+  const qcItems = lotInfo && typeof lotInfo === 'object' && Array.isArray(lotInfo.quy_cach_items)
+    ? lotInfo.quy_cach_items
+    : [];
+  const normalizedQcItems = qcItems
+    .map((item) => {
+      const qty = Math.max(0, Number(item.so_luong || item.so_luong_nhap || 0));
+      const price = Math.max(0, Number(item.don_gia_nhap || item.gia_von || row.don_gia_nhap || 0));
+      return {
+        ten_quy_cach: String(item.ten_quy_cach || item.ten_thuoc_tinh || item.quy_cach || '').trim(),
+        gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || row.gia_tri_thuoc_tinh_id || null,
+        so_luong: qty,
+        gia_tri_nhap: Math.max(0, Number(item.thanh_tien || qty * price))
+      };
+    })
+    .filter((item) => item.ten_quy_cach || item.so_luong > 0 || item.gia_tri_nhap > 0);
+
+  if (normalizedQcItems.length) return normalizedQcItems;
+
+  const spec = specFromImportRow(row);
+  const qty = Math.max(0, Number(row.so_luong || 0));
+  const price = Math.max(0, Number(row.don_gia_nhap || 0));
+  return [{
+    ten_quy_cach: spec.ten_quy_cach,
+    gia_tri_thuoc_tinh_id: spec.gia_tri_thuoc_tinh_id,
+    so_luong: qty,
+    gia_tri_nhap: qty * price
+  }];
 }
 
 /** Khóa tổng hợp: lo_hang_id + thuộc tính/quy cách (cùng hang_hoa_id trong một báo cáo). */
@@ -125,7 +174,8 @@ async function loadLotImportStatsBySpec(hangHoaId, options = {}) {
   const filterLoId = toObjectId(options.lo_hang_id);
 
   const completedPurchases = await PhieuNhap.find({
-    trang_thai: 'completed'
+    trang_thai: 'completed',
+    deleted_at: null
   }).select('_id').lean();
   const purchaseIds = completedPurchases.map((row) => row._id);
   if (!purchaseIds.length) return map;
@@ -144,22 +194,21 @@ async function loadLotImportStatsBySpec(hangHoaId, options = {}) {
   details.forEach((row) => {
     const lotId = toObjectId(row.lo_hang_id);
     if (!lotId) return;
-    const spec = specFromImportRow(row);
-    const key = makeLotSpecKey(lotId, spec);
-    if (!map.has(key)) {
-      map.set(key, {
-        lo_hang_id: lotId,
-        ten_quy_cach: normalizeSpecLabel(spec.ten_quy_cach),
-        gia_tri_thuoc_tinh_id: spec.gia_tri_thuoc_tinh_id,
-        so_luong_nhap: 0,
-        gia_tri_nhap: 0
-      });
-    }
-    const bucket = map.get(key);
-    const qty = Math.max(0, Number(row.so_luong || 0));
-    const price = Math.max(0, Number(row.don_gia_nhap || 0));
-    bucket.so_luong_nhap += qty;
-    bucket.gia_tri_nhap += qty * price;
+    importSlicesFromRow(row).forEach((slice) => {
+      const key = makeLotSpecKey(lotId, slice);
+      if (!map.has(key)) {
+        map.set(key, {
+          lo_hang_id: lotId,
+          ten_quy_cach: normalizeSpecLabel(slice.ten_quy_cach),
+          gia_tri_thuoc_tinh_id: slice.gia_tri_thuoc_tinh_id,
+          so_luong_nhap: 0,
+          gia_tri_nhap: 0
+        });
+      }
+      const bucket = map.get(key);
+      bucket.so_luong_nhap += Math.max(0, Number(slice.so_luong || 0));
+      bucket.gia_tri_nhap += Math.max(0, Number(slice.gia_tri_nhap || 0));
+    });
   });
 
   return map;
@@ -230,6 +279,8 @@ async function buildLotProfitReport(options = {}) {
   }
 
   const filterLoId = toObjectId(options.lo_hang_id);
+  const ngayNhapFrom = parseDateStart(options.ngay_nhap_from);
+  const ngayNhapTo = parseDateEnd(options.ngay_nhap_to);
   const storeId = toObjectId(options.cua_hang_id) || toObjectId(product.cua_hang_id);
   const filterOptions = {
     lots: await loadProductLotOptions(hangHoaId)
@@ -295,7 +346,17 @@ async function buildLotProfitReport(options = {}) {
     );
   });
 
-  const visibleRows = rows.filter((row) => row.so_luong_nhap > 0 || row.so_luong_xuat > 0);
+  const visibleRows = rows.filter((row) => {
+    if (!(row.so_luong_nhap > 0 || row.so_luong_xuat > 0)) return false;
+    if (ngayNhapFrom || ngayNhapTo) {
+      if (!row.ngay_nhap) return false;
+      const time = new Date(row.ngay_nhap).getTime();
+      if (!Number.isFinite(time)) return false;
+      if (ngayNhapFrom && time < ngayNhapFrom.getTime()) return false;
+      if (ngayNhapTo && time > ngayNhapTo.getTime()) return false;
+    }
+    return true;
+  });
 
   visibleRows.sort((a, b) => {
     const dateA = a.ngay_nhap ? new Date(a.ngay_nhap).getTime() : 0;

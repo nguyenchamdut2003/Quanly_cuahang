@@ -249,7 +249,7 @@ async function attachMissingDocRefs(receipt) {
             .lean();
         if (row) receipt.hoa_don_id = row;
     } else if (/^PN/i.test(code) && !receipt.phieu_nhap_id) {
-        const row = await PhieuNhap.findOne({ ma_phieu_nhap: code })
+        const row = await PhieuNhap.findOne({ ma_phieu_nhap: code, deleted_at: null })
             .select('ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id')
             .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' })
             .lean();
@@ -261,7 +261,7 @@ async function attachMissingDocRefs(receipt) {
             .lean();
         if (row) receipt.don_hang_id = row;
     } else if (/^TH(?!N)/i.test(code) && !receipt.phieu_tra_hang_id) {
-        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code })
+        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code, deleted_at: null })
             .select('ma_phieu_tra ngay_tra tong_tien_tra can_tra_khach trang_thai khach_hang_id')
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
             .lean();

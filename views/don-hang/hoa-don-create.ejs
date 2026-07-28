@@ -504,6 +504,21 @@
       margin-bottom: 8px
     }
 
+    .invoice-date-row {
+      margin: 0 0 12px 32px;
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      color: #667085;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .invoice-date-row .line-input {
+      width: 100%;
+    }
+
     .customer-search {
       position: relative;
       margin-bottom: 16px
@@ -889,6 +904,10 @@
             <%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit',
               minute:'2-digit' }) %>
           </span></div>
+        <div class="invoice-date-row">
+          <label for="invoiceDate">Ng&#224;y h&#243;a &#273;&#417;n</label>
+          <input id="invoiceDate" class="line-input" type="datetime-local">
+        </div>
         <input type="hidden" id="customerId">
         <input type="hidden" id="storeId" value="<%= currentStoreId || '' %>">
         <div class="section-line">
@@ -1008,6 +1027,14 @@
       let paymentPriority = 'cash';
       let isPayAllMode = false;
       let payAllTarget = 'cash';
+      function formatDateTimeLocal(date) {
+        const pad = value => String(value).padStart(2, '0');
+        return [
+          date.getFullYear(),
+          pad(date.getMonth() + 1),
+          pad(date.getDate())
+        ].join('-') + 'T' + [pad(date.getHours()), pad(date.getMinutes())].join(':');
+      }
       let cashBookOptions = [];
       let bankBookOptions = [];
       const products = <%- JSON.stringify(products.map(p => ({ _id: String(p._id), ma_hang: p.ma_hang || '', ten_hang: p.ten_hang || '', gia_co_dinh: p.gia_co_dinh || 0, nha_cung_cap_id: p.nha_cung_cap_id ? String(p.nha_cung_cap_id._id || p.nha_cung_cap_id) : '', ten_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ten_ncc || p.nha_cung_cap_id.ten_cong_ty || '') : '', ma_ncc: p.nha_cung_cap_id ? (p.nha_cung_cap_id.ma_ncc || '') : '' }))) %>;
@@ -1332,8 +1359,11 @@
         const ton = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).tonThucTe, 0);
         const khaDung = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).soLuongKhaDung, 0);
         const dat = lot.items.reduce((sum, entry) => sum + Number(entry.row.so_luong_dat || entry.row.so_luong || 0), 0);
-        const datePart = [lot.ten_lo || lot.ma_lo || '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
+        const datePart = [lot.ngay_nhap ? `Ngày lô ${formatDateVi(lot.ngay_nhap)}` : '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
         return { ton, khaDung, dat, datePart };
+      }
+      function lotGroupName(lot, fallbackIndex) {
+        return lot ? (lot.ten_lo || lot.ma_lo || `Lô ${fallbackIndex + 1}`) : `Lô ${fallbackIndex + 1}`;
       }
       function maxLotColumnsInCart() {
         return cart.reduce((max, item) => {
@@ -1341,7 +1371,17 @@
           return Math.max(max, groupLotsForItem(item).length);
         }, 0);
       }
-      function renderCartThead(maxLots) {
+      function lotColumnHeadersInCart(maxLots) {
+        return Array.from({ length: maxLots }, (_, index) => {
+          for (const item of cart) {
+            if (!itemHasLotGrid(item)) continue;
+            const lot = groupLotsForItem(item)[index];
+            if (lot) return lotGroupName(lot, index);
+          }
+          return `Lô ${index + 1}`;
+        });
+      }
+      function renderCartThead(maxLots, lotHeaders = []) {
         const thead = document.getElementById('cartHead');
         if (!thead) return;
         if (maxLots <= 0) {
@@ -1360,12 +1400,12 @@
           </tr>`;
           return;
         }
-        const lotHeaders = Array.from({ length: maxLots }, (_, index) => `<th class="num lot-col">Lô ${index + 1}</th>`).join('');
+        const lotHeaderHtml = Array.from({ length: maxLots }, (_, index) => `<th class="num lot-col">${escapeHtml(lotHeaders[index] || `Lô ${index + 1}`)}</th>`).join('');
         thead.innerHTML = `<tr>
           <th>STT</th>
           <th>Mã hàng</th>
           <th>Tên hàng</th>
-          ${lotHeaders}
+          ${lotHeaderHtml}
           <th class="num">Thành tiền</th>
           <th></th>
         </tr>`;
@@ -1528,7 +1568,7 @@
       }
       function renderCart() {
         const maxLots = maxLotColumnsInCart();
-        renderCartThead(maxLots);
+        renderCartThead(maxLots, lotColumnHeadersInCart(maxLots));
         let subtotal = 0;
         cartBody.innerHTML = cart.map((item, idx) => {
           const line = computeLineTotals(item);
@@ -2005,6 +2045,8 @@
         if (!cart.length) return alert('Hóa đơn chưa có sản phẩm');
         if (!getStoreId()) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.');
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
+        const invoiceDateInput = document.getElementById('invoiceDate');
+        if (invoiceDateInput && invoiceDateInput.value && Number.isNaN(new Date(invoiceDateInput.value).getTime())) return alert('Ngay hoa don khong hop le.');
         if (!customerId.value) return alert('Vui lòng chọn khách hàng.');
         const wantsShipping = Boolean(partnerId.value) || num(shippingFee.value) > 0;
         if (wantsShipping && !partnerId.value) return alert('Vui lòng chọn đối tác giao hàng');
@@ -2024,6 +2066,7 @@
         const invoiceVatChuaQty = document.getElementById('invoiceVatChuaQty');
         const data = {
           khach_hang_id: customerId.value,
+          ngay_ban: invoiceDateInput ? invoiceDateInput.value : '',
           cua_hang_id: getStoreId(),
           kho_id: document.getElementById('khoId').value,
           bang_gia_id: selectedPriceBookId(),
@@ -2199,6 +2242,8 @@
       }
       document.addEventListener('DOMContentLoaded', async () => {
         if (copyFromError) alert(copyFromError);
+        const invoiceDateInput = document.getElementById('invoiceDate');
+        if (invoiceDateInput && !invoiceDateInput.value) invoiceDateInput.value = formatDateTimeLocal(new Date());
         renderCurrentStore();
         handleShippingFeePayerChange();
         document.getElementById('khoId').addEventListener('change', handleWarehouseChange);

@@ -3,6 +3,11 @@
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
   const safeCashBooks = Array.isArray(locals.cashBooks) ? locals.cashBooks : [];
   const safeFilters = locals.filters || {};
+  const safePagination = locals.pagination || { page: 1, totalPages: 1, total: 0, from: 0, to: 0, limit: 10 };
+  const pageHref = page => {
+    const query = typeof qs === 'function' ? qs({ page }) : '';
+    return '/tra-hang-nhap' + (query ? '?' + query : '');
+  };
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
@@ -15,6 +20,7 @@
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(function(key) {
+    if (key === 'page' || key === 'page_size') return;
     const value = safeFilters[key];
     if (Array.isArray(value)) {
       value.forEach(function(item) { exportParams.append(key, item); });
@@ -191,7 +197,12 @@
     .empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085}
     .empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}
     .empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
-    .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .footer{min-height:38px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569}
+    .return-page-size{font-weight:700}
+    .return-pagination{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .return-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+    .return-page-link.is-disabled{color:#94a3b8;background:#f8fafc;pointer-events:none}
+    .return-page-current{font-weight:800;color:#111827}
     .receipt-pay-action{display:flex;justify-content:flex-end;margin-top:10px}
     .receipt-pay-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1350;padding:16px}
     .receipt-pay-modal.open{display:flex}
@@ -234,26 +245,27 @@
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
-  <form method="GET" action="/tra-hang-nhap" class="return-page">
+  <form method="GET" action="/tra-hang-nhap" class="return-page" id="returnFilterForm">
+    <input type="hidden" name="page" id="returnPageInput" value="<%= safePagination.page %>">
     <div class="return-shell">
       <aside class="sidebar">
         <h1 class="title">Trả hàng nhập</h1>
         <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã trả hàng</label>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="submitReturnFilters()"> Phiếu tạm</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitReturnFilters()"> Đã trả hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="submitReturnFilters()"> Đã hủy</label>
         </div>
         <div class="filter-block">
           <div class="filter-title">Thời gian</div>
-          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <span>›</span></span></label>
-          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
-          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
-          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="submitReturnFilters()"><span class="radio-pill">Tháng này <span>›</span></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="submitReturnFilters()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
+          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="submitReturnFilters()">
+          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="submitReturnFilters()">
         </div>
         <div class="filter-block">
           <div class="filter-title">Người tạo</div>
-          <select class="filter-control" name="nguoi_tao" onchange="this.form.submit()">
+          <select class="filter-control" name="nguoi_tao" onchange="submitReturnFilters()">
             <option value="">Chọn người tạo</option>
             <% safeUsers.forEach(function(u) { %>
               <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option>
@@ -262,7 +274,7 @@
         </div>
         <div class="filter-block">
           <div class="filter-title">Người trả</div>
-          <select class="filter-control" name="nguoi_tra" onchange="this.form.submit()">
+          <select class="filter-control" name="nguoi_tra" onchange="submitReturnFilters()">
             <option value="">Chọn người trả</option>
             <% safeUsers.forEach(function(u) { %>
               <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tra || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option>
@@ -486,7 +498,27 @@
             </tbody>
           </table>
         </div>
-        <div class="footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+        <div class="footer">
+          <span class="return-page-size">Hiển thị 10 dòng/trang</span>
+          <nav class="return-pagination" aria-label="Phân trang trả hàng nhập">
+            <% if (safePagination.page > 1) { %>
+              <a class="return-page-link" href="<%= pageHref(1) %>">Đầu</a>
+              <a class="return-page-link" href="<%= pageHref(safePagination.page - 1) %>">Trước</a>
+            <% } else { %>
+              <span class="return-page-link is-disabled">Đầu</span>
+              <span class="return-page-link is-disabled">Trước</span>
+            <% } %>
+            <span class="return-page-current"><%= safePagination.page %> / <%= safePagination.totalPages %></span>
+            <% if (safePagination.page < safePagination.totalPages) { %>
+              <a class="return-page-link" href="<%= pageHref(safePagination.page + 1) %>">Sau</a>
+              <a class="return-page-link" href="<%= pageHref(safePagination.totalPages) %>">Cuối</a>
+            <% } else { %>
+              <span class="return-page-link is-disabled">Sau</span>
+              <span class="return-page-link is-disabled">Cuối</span>
+            <% } %>
+          </nav>
+          <span><%= safePagination.from %> - <%= safePagination.to %> trong <%= safePagination.total %> phiếu</span>
+        </div>
       </main>
     </div>
   </form>
@@ -547,7 +579,25 @@
     </div>
   </div>
   <script>
+    function submitReturnFilters() {
+      var pageInput = document.getElementById('returnPageInput');
+      var form = document.getElementById('returnFilterForm');
+      if (pageInput) pageInput.value = '1';
+      if (!form) return;
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    }
     document.addEventListener('DOMContentLoaded', function() {
+      var returnFilterForm = document.getElementById('returnFilterForm');
+      if (returnFilterForm) {
+        returnFilterForm.addEventListener('submit', function() {
+          var pageInput = document.getElementById('returnPageInput');
+          if (pageInput) pageInput.value = '1';
+        });
+      }
       var pendingReturnReceiptId = '';
       var pendingReturnReceiptDue = 0;
       var returnTrashPendingIds = [];

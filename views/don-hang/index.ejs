@@ -2,6 +2,11 @@
   const safeOrders = Array.isArray(locals.orders) ? locals.orders : [];
   const safeFilters = locals.filters || {};
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
+  const safePagination = locals.pagination || { page: 1, totalPages: 1, total: 0, from: 0, to: 0, limit: 10 };
+  const pageHref = page => {
+    const query = typeof qs === 'function' ? qs({ page }) : '';
+    return '/don-hang' + (query ? '?' + query : '');
+  };
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : ['draft', 'shipping', 'completed']);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
@@ -20,6 +25,7 @@
   })[status] || 'Chưa giao';
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(function(key) {
+    if (key === 'page' || key === 'page_size') return;
     const value = safeFilters[key];
     if (Array.isArray(value)) {
       value.forEach(function(item) { exportParams.append(key, item); });
@@ -132,18 +138,25 @@
     .order-trash-table .num{text-align:right;font-weight:700}
     .order-trash-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee}
     .order-trash-loading{text-align:center;padding:28px 12px;color:#667085;font-size:13px}
+    .order-pagination{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:12px}
+    .order-page-size{font-weight:700}
+    .order-pagination-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .order-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+    .order-page-link.is-disabled{color:#94a3b8;background:#f8fafc;pointer-events:none}
+    .order-page-current{font-weight:800;color:#111827}
     @media(max-width:760px){.actions{flex-wrap:wrap;justify-content:flex-end}.order-merge-overlay{padding:8px}.order-merge-head{padding:18px 18px 12px}.order-merge-body{padding:14px 18px 22px}.order-merge-head h3{font-size:20px}.order-merge-desc{font-size:15px}.order-merge-table{min-width:840px}.order-merge-empty{min-height:260px}.order-merge-empty .empty-icon{width:112px;height:112px;font-size:40px;box-shadow:inset 0 0 0 16px #dcecff}}
   </style>
 </head>
 <body>
   <%- include('../partials/header') %>
   <form id="filterForm" class="order-page" method="GET" action="/don-hang">
+    <input type="hidden" name="page" id="orderPageInput" value="<%= safePagination.page %>">
     <div class="order-shell">
       <aside class="sidebar">
         <h1 class="title">Đặt hàng</h1>
         <div class="filter-block">
           <div class="filter-title">Thời gian</div>
-          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type !== 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type !== 'custom' ? 'checked' : '' %> onchange="submitOrderFilters()"><span class="radio-pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
           <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label>
           <div class="date-range"><input type="date" name="date_from" value="<%= safeFilters.date_from || '' %>"><input type="date" name="date_to" value="<%= safeFilters.date_to || '' %>"></div>
         </div>
@@ -151,14 +164,14 @@
           <div class="filter-title">Trạng thái</div>
           <div class="tag-box">
             <% [['draft','Phiếu tạm'],['shipping','Đang giao hàng'],['completed','Hoàn thành'],['cancelled','Đã hủy'],['merged','Đã gộp']].forEach(([value,label]) => { %>
-              <label class="tag" style="<%= selectedStatuses.includes(value) ? '' : 'background:#e8f3ff;color:#006dff' %>"><input class="status-check" type="checkbox" name="trang_thai" value="<%= value %>" <%= selectedStatuses.includes(value) ? 'checked' : '' %> onchange="this.form.submit()"> <%= label %> <i class="fa-solid fa-xmark"></i></label>
+              <label class="tag" style="<%= selectedStatuses.includes(value) ? '' : 'background:#e8f3ff;color:#006dff' %>"><input class="status-check" type="checkbox" name="trang_thai" value="<%= value %>" <%= selectedStatuses.includes(value) ? 'checked' : '' %> onchange="submitOrderFilters()"> <%= label %> <i class="fa-solid fa-xmark"></i></label>
             <% }) %>
           </div>
         </div>
-        <div class="filter-block"><div class="filter-title">Đối tác giao hàng</div><select name="doi_tac" class="filter-control" onchange="this.form.submit()"><option value="">Chọn đối tác giao hàng</option><% (locals.partners || []).forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
+        <div class="filter-block"><div class="filter-title">Đối tác giao hàng</div><select name="doi_tac" class="filter-control" onchange="submitOrderFilters()"><option value="">Chọn đối tác giao hàng</option><% (locals.partners || []).forEach(p => { %><option value="<%= p._id %>" <%= String(safeFilters.doi_tac || '') === String(p._id) ? 'selected' : '' %>><%= p.ten_doi_tac %></option><% }) %></select></div>
         <div class="filter-block"><div class="filter-title">Thời gian giao hàng</div><label class="radio-line"><input type="radio" name="delivery_time_type" value="all" <%= safeFilters.delivery_time_type !== 'custom' ? 'checked' : '' %>><span class="radio-pill">Toàn thời gian <i class="fa-solid fa-chevron-right"></i></span></label><label class="radio-line"><input type="radio" name="delivery_time_type" value="custom" <%= safeFilters.delivery_time_type === 'custom' ? 'checked' : '' %>><span class="radio-pill">Tùy chỉnh <i class="fa-regular fa-calendar-days"></i></span></label><div class="date-range"><input type="date" name="delivery_from" value="<%= safeFilters.delivery_from || '' %>"><input type="date" name="delivery_to" value="<%= safeFilters.delivery_to || '' %>"></div></div>
         <div class="filter-block"><div class="filter-title">Khu vực giao hàng</div><input name="khu_vuc" value="<%= safeFilters.khu_vuc || '' %>" class="filter-control" placeholder="Chọn Tỉnh/Thành phố"></div>
-        <div class="filter-block"><div class="filter-title">Phương thức thanh toán</div><select name="phuong_thuc_tt" class="filter-control" onchange="this.form.submit()"><option value="">Chọn phương thức thanh toán...</option><option value="COD" <%= safeFilters.phuong_thuc_tt === 'COD' ? 'selected' : '' %>>COD</option></select></div>
+        <div class="filter-block"><div class="filter-title">Phương thức thanh toán</div><select name="phuong_thuc_tt" class="filter-control" onchange="submitOrderFilters()"><option value="">Chọn phương thức thanh toán...</option><option value="COD" <%= safeFilters.phuong_thuc_tt === 'COD' ? 'selected' : '' %>>COD</option></select></div>
         <div class="filter-block"><div class="filter-title">Người tạo</div><input name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" list="userList" class="filter-control" placeholder="Chọn người tạo"></div>
         <div class="filter-block"><div class="filter-title">Người nhận đặt</div><input name="nguoi_nhan" value="<%= safeFilters.nguoi_nhan || '' %>" class="filter-control" placeholder="Chọn người nhận đặt"></div>
         <datalist id="userList"><% safeUsers.forEach(u => { %><option value="<%= u.ho_ten || u.username %>"></option><% }) %></datalist>
@@ -188,6 +201,27 @@
               <% } %>
             </tbody>
           </table>
+        </div>
+        <div class="order-pagination">
+          <span class="order-page-size">Hiển thị 10 dòng/trang</span>
+          <nav class="order-pagination-actions" aria-label="Phân trang đơn hàng">
+            <% if (safePagination.page > 1) { %>
+              <a class="order-page-link" href="<%= pageHref(1) %>">Đầu</a>
+              <a class="order-page-link" href="<%= pageHref(safePagination.page - 1) %>">Trước</a>
+            <% } else { %>
+              <span class="order-page-link is-disabled">Đầu</span>
+              <span class="order-page-link is-disabled">Trước</span>
+            <% } %>
+            <span class="order-page-current"><%= safePagination.page %> / <%= safePagination.totalPages %></span>
+            <% if (safePagination.page < safePagination.totalPages) { %>
+              <a class="order-page-link" href="<%= pageHref(safePagination.page + 1) %>">Sau</a>
+              <a class="order-page-link" href="<%= pageHref(safePagination.totalPages) %>">Cuối</a>
+            <% } else { %>
+              <span class="order-page-link is-disabled">Sau</span>
+              <span class="order-page-link is-disabled">Cuối</span>
+            <% } %>
+          </nav>
+          <span><%= safePagination.from %> - <%= safePagination.to %> trong <%= safePagination.total %> đơn</span>
         </div>
       </main>
     </div>
@@ -433,6 +467,17 @@
   </div>
 
   <script>
+    function submitOrderFilters() {
+      const pageInput = document.getElementById('orderPageInput');
+      const form = document.getElementById('filterForm');
+      if (pageInput) pageInput.value = '1';
+      if (!form) return;
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    }
     const money = value => Number(value || 0).toLocaleString('vi-VN');
     const moneyText = value => money(value) + ' VNĐ';
     const num = value => Number(String(value || '').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
@@ -615,6 +660,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+      const filterForm = document.getElementById('filterForm');
+      if (filterForm) {
+        filterForm.addEventListener('submit', function() {
+          const pageInput = document.getElementById('orderPageInput');
+          if (pageInput) pageInput.value = '1';
+        });
+      }
       const id = new URLSearchParams(window.location.search).get('order');
       if (id) {
         const row = document.querySelector('[data-order-row="' + id + '"]');

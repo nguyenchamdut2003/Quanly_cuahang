@@ -160,7 +160,7 @@ async function mergePurchasesInSession(req, session) {
     const sourcePurchaseIds = purchaseIds.filter(id => id !== receivingPurchaseId);
     const note = String(body.ghi_chu || '').trim();
 
-    const purchases = await PhieuNhap.find({ _id: { $in: purchaseIds } })
+    const purchases = await PhieuNhap.find({ _id: { $in: purchaseIds }, deleted_at: null })
         .populate('nha_cung_cap_id')
         .session(session);
     if (purchases.length !== purchaseIds.length) {
@@ -196,7 +196,8 @@ async function mergePurchasesInSession(req, session) {
 
     const returnRows = await PhieuTraHangNhap.find({
         phieu_nhap_id: { $in: purchaseIds },
-        trang_thai: { $ne: 'cancelled' }
+        trang_thai: { $ne: 'cancelled' },
+        deleted_at: null
     }).select('phieu_nhap_id').session(session).lean();
     const returnPurchaseIds = new Set(returnRows.map(row => String(row.phieu_nhap_id || '')));
 

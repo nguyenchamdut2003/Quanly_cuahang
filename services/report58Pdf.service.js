@@ -460,7 +460,7 @@ async function build01VtPdfData(query, store, range) {
             'Chọn một phiếu nhập hàng ở bộ lọc bên trái để in mẫu 01-VT (Phiếu nhập kho).');
     }
 
-    const purchase = await PhieuNhap.findOne({ _id: phieuId, ...storeFilter(store) })
+    const purchase = await PhieuNhap.findOne({ _id: phieuId, deleted_at: null, ...storeFilter(store) })
         .populate('kho_id', 'ten_kho dia_chi_day_du dia_chi')
         .populate('nha_cung_cap_id', 'ten_ncc dia_chi')
         .populate('nguoi_tao_id', 'ho_ten email')
@@ -866,7 +866,8 @@ async function fetchSalesLedgerEvents(query, store, range) {
         PhieuTraHang.find({
             ...sf,
             ...rangeFilter(range, 'ngay_tra'),
-            trang_thai: { $nin: ['cancelled', 'draft'] }
+            trang_thai: { $nin: ['cancelled', 'draft'] },
+            deleted_at: null
         })
             .select('ma_phieu_tra ngay_tra tong_tien_tra tong_tien_hang_tra ly_do khach_hang_id')
             .populate('khach_hang_id', 'ten_khach_hang')
@@ -1073,11 +1074,11 @@ async function buildS2bPdfData(query, store, range) {
             .select('ma_hoa_don ngay_ban tong_tien giam_gia thanh_toan ghi_chu')
             .sort({ ngay_ban: 1 })
             .lean(),
-        PhieuTraHang.find({ ...sf, ...rangeFilter(range, 'ngay_tra'), trang_thai: { $nin: ['cancelled', 'draft'] } })
+        PhieuTraHang.find({ ...sf, ...rangeFilter(range, 'ngay_tra'), trang_thai: { $nin: ['cancelled', 'draft'] }, deleted_at: null })
             .select('ma_phieu_tra ngay_tra tong_tien_tra tong_tien_hang_tra')
             .sort({ ngay_tra: 1 })
             .lean(),
-        PhieuNhap.find({ ...sf, ...rangeFilter(range, 'ngay_nhap'), trang_thai: 'completed' })
+        PhieuNhap.find({ ...sf, ...rangeFilter(range, 'ngay_nhap'), trang_thai: 'completed', deleted_at: null })
             .select('ma_phieu_nhap ngay_nhap tong_tien ghi_chu')
             .sort({ ngay_nhap: 1 })
             .lean(),
@@ -2038,7 +2039,7 @@ async function buildB02PdfData(query, store, range) {
         HoaDonBanHang.find({ ...sf, ...rangeFilter(range, 'ngay_ban'), trang_thai: { $ne: 'cancelled' } })
             .select('_id tong_tien giam_gia thanh_toan')
             .lean(),
-        PhieuTraHang.find({ ...sf, ...rangeFilter(range, 'ngay_tra'), trang_thai: { $nin: ['cancelled', 'draft'] } })
+        PhieuTraHang.find({ ...sf, ...rangeFilter(range, 'ngay_tra'), trang_thai: { $nin: ['cancelled', 'draft'] }, deleted_at: null })
             .select('tong_tien_tra tong_tien_hang_tra')
             .lean(),
         PhieuThuChi.find({ ...sf, ...rangeFilter(range, 'ngay_lap'), loai_phieu: 'chi', trang_thai: { $ne: 'cancelled' } })
@@ -2191,7 +2192,8 @@ async function buildReport58PdfData({ mau, query = {}, store = null, range = nul
 async function loadPurchaseVoucherOptions(store = null) {
     return PhieuNhap.find({
         ...storeFilter(store),
-        trang_thai: { $ne: 'cancelled' }
+        trang_thai: { $ne: 'cancelled' },
+        deleted_at: null
     })
         .select('ma_phieu_nhap ngay_nhap tong_tien trang_thai')
         .populate('nha_cung_cap_id', 'ten_ncc')

@@ -10,6 +10,7 @@ const {
   TonKhoLoQuyCach,
   LichSuKho,
   CongNoNhaCungCap,
+  GiaoDichCongNoNhaCungCap,
   PhieuThuChi,
   Kho
 } = require('../models/kiot.model');
@@ -19,7 +20,8 @@ const { syncTonKhoSauQuyCach } = require('./kho.service');
 const {
   assertVatChuaImportInput,
   parseVatChuaImportInput,
-  importVatChuaWithPurchase
+  importVatChuaWithPurchase,
+  cancelNhapVatChuaBySource
 } = require('./vatChuaImport.service');
 
 function logNhapHangOk(table, detail) {
@@ -658,6 +660,144 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
   }
 }
 
+async function adjustCompletedPurchaseEffects(purchase, rows, direction, options = {}) {
+  const session = options.session;
+  const userId = cleanId(options.userId);
+  const isRollback = direction < 0;
+  const warehouse = await withSessionQuery(Kho.findById(purchase.kho_id), session).lean();
+  if (!warehouse) throw new Error('Khong tim thay kho nhap');
+
+  for (const row of rows) {
+    const qty = Number(row.so_luong || 0);
+    if (qty <= 0) continue;
+    const quyCachItems = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
+    let updated = null;
+
+    if (isRollback) {
+      const stock = await withSessionQuery(TonKho.findOne({
+        kho_id: purchase.kho_id,
+        hang_hoa_id: row.hang_hoa_id
+      }), session).lean();
+      if (!stock || Number(stock.so_luong || 0) < qty) throw new Error('Ton kho khong du de hoan tac phieu nhap');
+    }
+
+    if (row.lo_hang_id && quyCachItems.length) {
+      for (const qc of quyCachItems) {
+        const qcFilter = {
+          kho_id: purchase.kho_id,
+          hang_hoa_id: row.hang_hoa_id,
+          lo_hang_id: row.lo_hang_id,
+          $or: [
+            { ten_thuoc_tinh: qc.ten_thuoc_tinh },
+            { ten_quy_cach: qc.ten_quy_cach }
+          ]
+        };
+        if (isRollback) {
+          const qcStock = await withSessionQuery(TonKhoLoQuyCach.findOne(qcFilter), session).lean();
+          if (!qcStock || Number(qcStock.so_luong || 0) < Number(qc.so_luong || 0)) {
+            throw new Error('Ton kho quy cach trong lo khong du de hoan tac phieu nhap');
+          }
+        }
+        await TonKhoLoQuyCach.findOneAndUpdate(
+          qcFilter,
+          {
+            $inc: {
+              so_luong: direction * Number(qc.so_luong || 0),
+              thanh_tien: direction * Number(qc.thanh_tien || 0)
+            },
+            $setOnInsert: {
+              cua_hang_id: purchase.cua_hang_id,
+              kho_id: purchase.kho_id,
+              hang_hoa_id: row.hang_hoa_id,
+              lo_hang_id: row.lo_hang_id,
+              ten_quy_cach: qc.ten_quy_cach,
+              ten_thuoc_tinh: qc.ten_quy_cach
+            },
+            $set: {
+              don_gia_nhap: Number(qc.don_gia_nhap || row.don_gia_nhap || 0),
+              gia_von: Number(qc.gia_von || qc.don_gia_nhap || row.don_gia_nhap || 0)
+            }
+          },
+          withSessionOptions({ upsert: !isRollback, new: true }, session)
+        );
+      }
+      const synced = await syncTonKhoSauQuyCach(
+        purchase.kho_id,
+        row.hang_hoa_id,
+        row.lo_hang_id,
+        warehouse,
+        row.don_gia_nhap,
+        { session }
+      );
+      updated = synced.inventory;
+    } else {
+      updated = await TonKho.findOneAndUpdate(
+        { cua_hang_id: purchase.cua_hang_id, kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id },
+        { $inc: { so_luong: direction * qty }, $setOnInsert: { cua_hang_id: purchase.cua_hang_id } },
+        withSessionOptions({ upsert: !isRollback, new: true }, session)
+      ).lean();
+      if (!updated || Number(updated.so_luong || 0) < 0) throw new Error('Ton kho khong du de hoan tac phieu nhap');
+
+      if (row.lo_hang_id) {
+        const lotStock = await TonKhoLo.findOneAndUpdate(
+          {
+            cua_hang_id: purchase.cua_hang_id,
+            kho_id: purchase.kho_id,
+            hang_hoa_id: row.hang_hoa_id,
+            lo_hang_id: row.lo_hang_id,
+            gia_tri_thuoc_tinh_id: null
+          },
+          { $inc: { so_luong: direction * qty }, $set: { gia_von: row.don_gia_nhap } },
+          withSessionOptions({ upsert: !isRollback, new: true }, session)
+        );
+        if (!lotStock || Number(lotStock.so_luong || 0) < 0) throw new Error('Ton kho lo khong du de hoan tac phieu nhap');
+        const lotQtyAfter = Number(lotStock.so_luong || 0);
+        await LoHang.updateOne(
+          { _id: row.lo_hang_id },
+          {
+            $inc: { so_luong_con_lai: direction * qty },
+            $set: { trang_thai: lotQtyAfter > 0 ? 'active' : 'het_hang' }
+          },
+          withSessionOptions({}, session)
+        );
+      }
+    }
+
+    await createOne(LichSuKho, {
+      cua_hang_id: purchase.cua_hang_id,
+      kho_id: purchase.kho_id,
+      hang_hoa_id: row.hang_hoa_id,
+      lo_hang_id: row.lo_hang_id || undefined,
+      nguoi_tao_id: userId,
+      loai_phieu: isRollback ? 'dieu_chinh' : 'nhap_hang',
+      ma_phieu: purchase.ma_phieu_nhap,
+      so_luong_thay_doi: direction * qty,
+      ton_kho_sau: Number(updated?.so_luong || 0),
+      gia_tri_thay_doi: direction * Number(row.thanh_tien || 0),
+      ghi_chu: (isRollback ? 'Hoan tac phieu nhap ' : 'Khoi phuc phieu nhap ') + purchase.ma_phieu_nhap,
+      ngay: new Date()
+    }, session);
+  }
+
+  if (purchase.nha_cung_cap_id) {
+    const canTra = Number(purchase.can_tra_ncc || 0);
+    const conNo = Number(purchase.con_no_ncc || 0);
+    await NhaCungCap.updateOne(
+      { _id: purchase.nha_cung_cap_id },
+      { $inc: { tong_mua: direction * canTra, tong_no: direction * conNo } },
+      withSessionOptions({}, session)
+    );
+  }
+}
+
+async function rollbackCompletedPurchaseEffects(purchase, rows, options = {}) {
+  await adjustCompletedPurchaseEffects(purchase, rows, -1, options);
+}
+
+async function restoreCompletedPurchaseEffects(purchase, rows, options = {}) {
+  await adjustCompletedPurchaseEffects(purchase, rows, 1, options);
+}
+
 async function createPurchase(data = {}, options = {}) {
   const session = options.session || data.session;
   const storeId = cleanId(data.cua_hang_id);
@@ -799,154 +939,83 @@ async function createPurchase(data = {}, options = {}) {
 }
 
 async function cancelPurchase(id, storeId, userId) {
-  const filter = { _id: id };
-  if (cleanId(storeId)) filter.cua_hang_id = storeId;
-  const purchase = await PhieuNhap.findOne(filter);
-  if (!purchase) throw new Error('Khong tim thay phieu nhap');
-  if (purchase.trang_thai === 'cancelled') throw new Error('Phieu nhap da bi huy');
+  const session = await mongoose.startSession();
+  try {
+    let result;
+    await session.withTransaction(async function() {
+      const filter = { _id: id, deleted_at: null };
+      if (cleanId(storeId)) filter.cua_hang_id = storeId;
+      const purchase = await withSessionQuery(PhieuNhap.findOne(filter), session);
+      if (!purchase) throw new Error('Khong tim thay phieu nhap hoac phieu dang trong thung rac');
+      if (purchase.trang_thai === 'cancelled') throw new Error('Phieu nhap da bi huy');
 
-  const rows = await CTPhieuNhap.find({ phieu_nhap_id: purchase._id }).lean();
-  const warehouse = await Kho.findById(purchase.kho_id).lean();
-  if (purchase.trang_thai === 'completed') {
-    if (!warehouse) throw new Error('Khong tim thay kho nhap');
-
-    for (const row of rows) {
-      const qty = Number(row.so_luong || 0);
-      const stock = await TonKho.findOne({ kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id }).lean();
-      if (!stock || Number(stock.so_luong || 0) < qty) throw new Error('Ton kho khong du de huy phieu nhap');
-      const quyCachItems = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
-      if (row.lo_hang_id && quyCachItems.length) {
-        for (const qc of quyCachItems) {
-          const qcStock = await TonKhoLoQuyCach.findOne({
-            kho_id: purchase.kho_id,
-            hang_hoa_id: row.hang_hoa_id,
-            lo_hang_id: row.lo_hang_id,
+      const rows = await withSessionQuery(CTPhieuNhap.find({ phieu_nhap_id: purchase._id }), session).lean();
+      if (purchase.trang_thai === 'completed') {
+        await rollbackCompletedPurchaseEffects(purchase, rows, { userId, session });
+        await cancelNhapVatChuaBySource(purchase.cua_hang_id, 'phieu_nhap', purchase._id, session);
+        await PhieuThuChi.updateMany(
+          {
+            loai_phieu: 'chi',
+            trang_thai: { $ne: 'cancelled' },
             $or: [
-              { ten_thuoc_tinh: qc.ten_thuoc_tinh },
-              { ten_quy_cach: qc.ten_quy_cach }
+              { phieu_nhap_id: purchase._id },
+              { 'allocations.phieu_nhap_id': purchase._id }
             ]
-          }).lean();
-          if (!qcStock || Number(qcStock.so_luong || 0) < Number(qc.so_luong || 0)) {
-            throw new Error('Ton kho quy cach trong lo khong du de huy phieu nhap');
-          }
-        }
-      } else if (row.lo_hang_id) {
-        const lotStock = await TonKhoLo.findOne({
-          kho_id: purchase.kho_id,
-          hang_hoa_id: row.hang_hoa_id,
-          lo_hang_id: row.lo_hang_id,
-          gia_tri_thuoc_tinh_id: null
-        }).lean();
-        if (!lotStock || Number(lotStock.so_luong || 0) < qty) throw new Error('Ton kho lo khong du de huy phieu nhap');
-      }
-    }
-
-    for (const row of rows) {
-      const qty = Number(row.so_luong || 0);
-      const quyCachItems = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
-      let updated = null;
-
-      if (row.lo_hang_id && quyCachItems.length) {
-        for (const qc of quyCachItems) {
-          const nextQc = await TonKhoLoQuyCach.findOneAndUpdate(
+          },
+          {
+            $set: {
+              trang_thai: 'cancelled',
+              ghi_chu: 'Huy theo phieu nhap ' + purchase.ma_phieu_nhap
+            }
+          },
+          withSessionOptions({}, session)
+        );
+        const now = new Date();
+        await CongNoNhaCungCap.updateMany(
+          { phieu_nhap_id: purchase._id, deleted_at: null },
+          { $set: { deleted_at: now, deleted_by: cleanId(userId) || null } },
+          withSessionOptions({}, session)
+        );
+        if (GiaoDichCongNoNhaCungCap) {
+          await GiaoDichCongNoNhaCungCap.updateMany(
             {
-              kho_id: purchase.kho_id,
-              hang_hoa_id: row.hang_hoa_id,
-              lo_hang_id: row.lo_hang_id,
+              deleted_at: null,
+              trang_thai: { $ne: 'cancelled' },
               $or: [
-                { ten_thuoc_tinh: qc.ten_thuoc_tinh },
-                { ten_quy_cach: qc.ten_quy_cach }
+                { phieu_nhap_id: purchase._id },
+                { 'phan_bo_phieu_nhap.phieu_nhap_id': purchase._id }
               ]
             },
             {
-              $inc: {
-                so_luong: -Number(qc.so_luong || 0),
-                thanh_tien: -Number(qc.thanh_tien || 0)
+              $set: {
+                deleted_at: now,
+                deleted_by: cleanId(userId) || null,
+                trang_thai: 'cancelled',
+                nguoi_huy_id: cleanId(userId) || null,
+                ngay_huy: now,
+                ly_do_huy: 'Hủy phiếu nhập'
               }
             },
-            { new: true }
-          ).lean();
-          if (!nextQc || Number(nextQc.so_luong || 0) < 0) {
-            throw new Error('Ton kho quy cach trong lo khong du de huy phieu nhap');
-          }
-        }
-        const synced = await syncTonKhoSauQuyCach(
-          purchase.kho_id,
-          row.hang_hoa_id,
-          row.lo_hang_id,
-          warehouse,
-          row.don_gia_nhap
-        );
-        updated = synced.inventory;
-        await LoHang.updateOne(
-          { _id: row.lo_hang_id },
-          { $set: { trang_thai: synced.lotTotal > 0 ? 'active' : 'het_hang' } }
-        );
-      } else {
-        updated = await TonKho.findOneAndUpdate(
-          { kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id },
-          { $inc: { so_luong: -qty } },
-          { new: true }
-        ).lean();
-        if (row.lo_hang_id) {
-          await TonKhoLo.findOneAndUpdate(
-            { kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: row.lo_hang_id, gia_tri_thuoc_tinh_id: null },
-            { $inc: { so_luong: -qty } },
-            { new: true }
+            withSessionOptions({}, session)
           );
-          await LoHang.updateOne({ _id: row.lo_hang_id }, { $inc: { so_luong_con_lai: -qty } });
         }
       }
-      await LichSuKho.create({
-        cua_hang_id: purchase.cua_hang_id,
-        kho_id: purchase.kho_id,
-        hang_hoa_id: row.hang_hoa_id,
-        lo_hang_id: row.lo_hang_id || undefined,
-        nguoi_tao_id: cleanId(userId),
-        loai_phieu: 'dieu_chinh',
-        ma_phieu: purchase.ma_phieu_nhap,
-        so_luong_thay_doi: -qty,
-        ton_kho_sau: Number(updated?.so_luong || 0),
-        gia_tri_thay_doi: -Number(row.thanh_tien || 0),
-        ghi_chu: 'Huy phieu nhap ' + purchase.ma_phieu_nhap,
-        ngay: new Date()
-      });
-    }
 
-    if (purchase.nha_cung_cap_id) {
-      const canTra = Number(purchase.can_tra_ncc || 0);
-      const conNo = Number(purchase.con_no_ncc || 0);
-      if (conNo > 0) {
-        await CongNoNhaCungCap.create({
-          cua_hang_id: purchase.cua_hang_id,
-          nha_cung_cap_id: purchase.nha_cung_cap_id,
-          phieu_nhap_id: purchase._id,
-          so_tien: conNo,
-          loai: 'giam_no',
-          ghi_chu: 'Dao cong no do huy phieu nhap ' + purchase.ma_phieu_nhap,
-          ngay: new Date()
-        });
-      }
-      await NhaCungCap.updateOne(
-        { _id: purchase.nha_cung_cap_id },
-        { $inc: { tong_mua: -canTra, tong_no: -conNo } }
-      );
-    }
-
-    const payments = await PhieuThuChi.find({ phieu_nhap_id: purchase._id, loai_phieu: 'chi', trang_thai: { $ne: 'cancelled' } }).lean();
-    for (const payment of payments) {
-      await PhieuThuChi.updateOne({ _id: payment._id }, { $set: { trang_thai: 'cancelled', ghi_chu: (payment.ghi_chu || '') + ' | Huy theo phieu nhap ' + purchase.ma_phieu_nhap } });
-    }
+      purchase.trang_thai = 'cancelled';
+      await purchase.save(withSessionOptions({}, session));
+      result = purchase;
+    });
+    return result;
+  } finally {
+    await session.endSession();
   }
-
-  purchase.trang_thai = 'cancelled';
-  await purchase.save();
-  return purchase;
 }
 
 module.exports = {
   createPurchase,
   cancelPurchase,
+  rollbackCompletedPurchaseEffects,
+  restoreCompletedPurchaseEffects,
   calculateTotals,
   normalizeItems,
   normalizeQuyCachItems,

@@ -254,7 +254,7 @@ async function getDashboardData(user) {
 exports.index = async function(req, res, next) {
   try {
     if (!req.isAuthenticated()) {
-      return res.render('login', { title: 'Đăng nhập', query: req.query || {} });
+      return res.redirect('/login');
     }
 
     const dashboard = await getDashboardData(req.user);

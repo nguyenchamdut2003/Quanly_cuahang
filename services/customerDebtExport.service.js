@@ -183,7 +183,8 @@ async function loadReturnDeductionsByOrder(orderIds) {
 
     const rows = await PhieuTraHang.find({
         don_hang_id: { $in: orderIds },
-        trang_thai: { $ne: 'cancelled' }
+        trang_thai: { $ne: 'cancelled' },
+        deleted_at: null
     })
         .select('don_hang_id ma_phieu_tra can_tra_khach tong_tien_tra')
         .lean();

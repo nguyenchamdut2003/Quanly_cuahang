@@ -1,9 +1,9 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var nhanVienController = require('../controllers/nhanVien.controller');
-var phongBanController = require('../controllers/phongBan.controller');
-var chucDanhController = require('../controllers/chucDanh.controller');
+var nhanVienController = require('../controllers/chamcongcu/nhanVien.controller');
+var phongBanController = require('../controllers/chamcongcu/phongBan.controller');
+var chucDanhController = require('../controllers/chamcongcu/chucDanh.controller');
 
 router.use(isAuthenticated);
 

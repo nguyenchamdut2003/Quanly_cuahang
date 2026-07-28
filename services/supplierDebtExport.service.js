@@ -107,6 +107,7 @@ function buildPurchaseQuery(supplierId, storeId) {
     const query = {
         nha_cung_cap_id: new mongoose.Types.ObjectId(String(supplierId)),
         trang_thai: 'completed',
+        deleted_at: null,
         con_no_ncc: { $gt: 0 }
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
@@ -128,7 +129,8 @@ async function loadReturnDeductionsByPurchase(purchaseIds, storeId) {
 
     const match = {
         phieu_nhap_id: { $in: purchaseIds },
-        trang_thai: 'completed'
+        trang_thai: 'completed',
+        deleted_at: null
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         match.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
@@ -184,7 +186,7 @@ async function buildSupplierDebtAdminPack(supplier, storeId) {
         { header: 'Ghi chú', key: 'ghi_chu', width: 36 }
     ];
 
-    const debtMatch = { nha_cung_cap_id: supplier._id };
+    const debtMatch = { nha_cung_cap_id: supplier._id, deleted_at: null };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         debtMatch.cua_hang_id = storeId;
     }
@@ -328,7 +330,7 @@ function normalizeDebtExportFileMode(raw) {
 }
 
 async function loadSupplierLedgerRows(supplierId, storeId) {
-    const debtMatch = { nha_cung_cap_id: supplierId };
+    const debtMatch = { nha_cung_cap_id: supplierId, deleted_at: null };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         debtMatch.cua_hang_id = storeId;
     }
@@ -345,7 +347,7 @@ async function loadSupplierLedgerRows(supplierId, storeId) {
     }));
 
     if (GiaoDichCongNoNhaCungCap) {
-        const txMatch = { nha_cung_cap_id: supplierId };
+        const txMatch = { nha_cung_cap_id: supplierId, deleted_at: null, trang_thai: 'active' };
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
             txMatch.cua_hang_id = storeId;
         }

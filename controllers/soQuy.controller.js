@@ -33,7 +33,6 @@ const {
 } = require('../services/cashbookListScope.service');
 const { resolveStoreId } = require('../utils/storeScope');
 const hrLog = require('../utils/hrPayrollLogger');
-const soQuyPrint = require('../controllers/soQuyPrint.controller');
 
 function isObjectId(value) {
     return /^[0-9a-fA-F]{24}$/.test(String(value || ''));
@@ -226,7 +225,7 @@ async function attachMissingDocRefs(receipt) {
             .lean();
         if (row) receipt.hoa_don_id = row;
     } else if (/^PN/i.test(code) && !receipt.phieu_nhap_id) {
-        const row = await PhieuNhap.findOne({ ma_phieu_nhap: code })
+        const row = await PhieuNhap.findOne({ ma_phieu_nhap: code, deleted_at: null })
             .select('ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id')
             .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' })
             .lean();
@@ -243,7 +242,7 @@ async function attachMissingDocRefs(receipt) {
             .lean();
         if (row) receipt.nhap_vat_chua_id = row;
     } else if (isCustomerReturnDocCode(code) && !receipt.phieu_tra_hang_id) {
-        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code })
+        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code, deleted_at: null })
             .select('ma_phieu_tra ngay_tra tong_tien_tra can_tra_khach trang_thai khach_hang_id')
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
             .lean();
@@ -284,13 +283,13 @@ async function enrichReceiptListDocRefs(list) {
             ? HoaDonBanHang.find({ ma_hoa_don: { $in: unique(invoiceCodes) } }).select('_id ma_hoa_don').lean()
             : [],
         unique(purchaseCodes).length
-            ? PhieuNhap.find({ ma_phieu_nhap: { $in: unique(purchaseCodes) } }).select('_id ma_phieu_nhap').lean()
+            ? PhieuNhap.find({ ma_phieu_nhap: { $in: unique(purchaseCodes) }, deleted_at: null }).select('_id ma_phieu_nhap').lean()
             : [],
         unique(supplierReturnCodes).length
-            ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: unique(supplierReturnCodes) } }).select('_id ma_phieu_tra_nhap').lean()
+            ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: unique(supplierReturnCodes) }, deleted_at: null, trang_thai: { $ne: 'cancelled' } }).select('_id ma_phieu_tra_nhap').lean()
             : [],
         unique(customerReturnCodes).length
-            ? PhieuTraHang.find({ ma_phieu_tra: { $in: unique(customerReturnCodes) } }).select('_id ma_phieu_tra').lean()
+            ? PhieuTraHang.find({ ma_phieu_tra: { $in: unique(customerReturnCodes) }, deleted_at: null }).select('_id ma_phieu_tra').lean()
             : [],
         unique(orderCodes).length
             ? DonHang.find({ ma_don_hang: { $in: unique(orderCodes) } }).select('_id ma_don_hang').lean()

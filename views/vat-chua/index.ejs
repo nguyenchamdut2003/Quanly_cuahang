@@ -142,6 +142,11 @@
     .vc-documents-table th:nth-child(9) { width: 142px; }
     .vc-documents-table th:nth-child(10) { width: 128px; }
     .vc-documents-table .vc-doc-actions-cell { overflow: visible; white-space: normal; }
+    .vat-chua-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid #e5e7eb;background:#fff;color:#475467;font-size:14px}
+    .vat-chua-pagination__actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .vat-chua-page-link{min-width:34px;height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:700}
+    .vat-chua-page-link.is-active{background:#0070f4;border-color:#0070f4;color:#fff}
+    .vat-chua-page-link.is-disabled{pointer-events:none;opacity:.45}
     table[data-kv-master="vat-chua"] .product-detail-row > td {
       max-width: calc(100vw - 300px);
       overflow: hidden;
@@ -244,6 +249,14 @@
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
   <main class="admin-shell customer-page">
+    <%
+      function buildVatChuaPageUrl(pageNumber) {
+        var parts = [];
+        if (filterQueryString) parts.push(filterQueryString);
+        if (pageNumber > 1) parts.push('page=' + encodeURIComponent(pageNumber));
+        return '/vat-chua' + (parts.length ? '?' + parts.join('&') : '');
+      }
+    %>
     <% const vcFlash = typeof flash !== 'undefined' ? flash : {}; %>
     <% const vcFlashForGeneric = Object.assign({}, vcFlash); %>
     <% if (['created', 'imported', 'deleted', 'import_deleted', 'import_updated', 'returned', 'stocktake', 'destroyed'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
@@ -361,7 +374,7 @@
                     <td colspan="7" class="empty-cell">Không có vật chứa phù hợp với bộ lọc.</td>
                   </tr>
                 <% } %>
-                <% var listBase = '/vat-chua' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
+                <% var listBase = buildVatChuaPageUrl(pagination ? pagination.page : 1); %>
                 <% (items || []).forEach(function(item) { %>
                   <tr data-kv-detail-id="<%= item._id %>" data-vc-row data-vc-id="<%= item._id %>" data-vc-code="<%= item.ma_vat_chua || '' %>" data-vc-name="<%= item.ten_vat_chua || '' %>" data-vc-stock="<%= Number(item.so_luong_ton || 0) %>" data-vc-cost="<%= Number(item.gia_von_trung_binh || 0) %>" data-vc-active="<%= item.trang_thai === 'active' ? '1' : '0' %>">
                     <td class="check-cell"><input class="vat-chua-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn vật chứa"></td>
@@ -382,6 +395,22 @@
               </tbody>
             </table>
           </form>
+          <% if (pagination && pagination.totalPages > 1) { %>
+            <div class="vat-chua-pagination">
+              <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> vật chứa</div>
+              <div class="vat-chua-pagination__actions" aria-label="Phân trang vật chứa">
+                <a class="vat-chua-page-link <%= pagination.page <= 1 ? 'is-disabled' : '' %>" href="<%= buildVatChuaPageUrl(Math.max(1, pagination.page - 1)) %>">‹</a>
+                <% for (var pageNumber = 1; pageNumber <= pagination.totalPages; pageNumber++) { %>
+                  <a class="vat-chua-page-link <%= pageNumber === pagination.page ? 'is-active' : '' %>" href="<%= buildVatChuaPageUrl(pageNumber) %>"><%= pageNumber %></a>
+                <% } %>
+                <a class="vat-chua-page-link <%= pagination.page >= pagination.totalPages ? 'is-disabled' : '' %>" href="<%= buildVatChuaPageUrl(Math.min(pagination.totalPages, pagination.page + 1)) %>">›</a>
+              </div>
+            </div>
+          <% } else if (pagination) { %>
+            <div class="vat-chua-pagination">
+              <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> vật chứa</div>
+            </div>
+          <% } %>
         </div>
       </section>
     </div>

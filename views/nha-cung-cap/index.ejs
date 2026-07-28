@@ -499,6 +499,47 @@
       background: #fff;
     }
     .supplier-pay-footer button:disabled { opacity: .5; cursor: not-allowed; }
+    .supplier-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-top: 1px solid #e5e7eb;
+      background: #fff;
+      color: #475467;
+      font-size: 14px;
+    }
+    .supplier-pagination__actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .supplier-page-link {
+      min-width: 32px;
+      height: 30px;
+      padding: 0 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      color: #0f172a;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    .supplier-page-link.is-active {
+      border-color: #0070f4;
+      background: #0070f4;
+      color: #fff;
+    }
+    .supplier-page-link.is-disabled {
+      color: #94a3b8;
+      background: #f8fafc;
+      pointer-events: none;
+    }
 
     @media (max-width: 1100px) {
       .supplier-detail-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -662,7 +703,7 @@
                 <tr><td colspan="9" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr>
               <% } %>
               <% suppliers.forEach(function(supplier) { %>
-                <% var listBase = '/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : ''); %>
+                <% var listBase = typeof buildSupplierPageUrl === 'function' ? buildSupplierPageUrl(pagination ? pagination.page : 1) : ('/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : '')); %>
                 <tr
                   class="supplier-row"
                   data-kv-detail-id="<%= supplier._id %>"
@@ -706,6 +747,19 @@
             </tbody>
           </table>
         </div>
+        <% if (pagination) { %>
+          <div class="supplier-pagination">
+            <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> nhà cung cấp</div>
+            <div class="supplier-pagination__actions" aria-label="Phân trang nhà cung cấp">
+              <a class="supplier-page-link <%= pagination.page <= 1 ? 'is-disabled' : '' %>" href="<%= buildSupplierPageUrl(Math.max(1, pagination.page - 1)) %>">‹</a>
+              <% for (var pageNumber = 1; pageNumber <= pagination.totalPages; pageNumber++) { %>
+                <a class="supplier-page-link <%= pageNumber === pagination.page ? 'is-active' : '' %>" href="<%= buildSupplierPageUrl(pageNumber) %>"><%= pageNumber %></a>
+              <% } %>
+              <a class="supplier-page-link <%= pagination.page >= pagination.totalPages ? 'is-disabled' : '' %>" href="<%= buildSupplierPageUrl(Math.min(pagination.totalPages, pagination.page + 1)) %>">›</a>
+            </div>
+            <div>10 dòng/trang</div>
+          </div>
+        <% } %>
       </section>
     </div>
   </main>

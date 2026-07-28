@@ -505,6 +505,19 @@ body {
   text-align: center;
 }
 
+.header-logout-form {
+  margin: 0;
+}
+
+.header-logout-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .dropdown-reset-data {
   width: 100%;
   border: 0;
@@ -2162,6 +2175,20 @@ body {
   border-bottom: 2px solid #e2e8f0;
 }
 
+.supplier-column-total {
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.supplier-column-total.is-return {
+  color: #ef4444;
+}
+
 .warehouse-table td {
   padding: 12px 16px;
   background: #ffffff;
@@ -3087,6 +3114,75 @@ body {
 .lot-profit-total-row td {
   background: #f8fafc;
   font-weight: 700;
+}
+
+.lot-profit-date-th {
+  position: relative;
+  min-width: 150px;
+}
+
+.lot-profit-date-trigger {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lot-profit-date-arrow {
+  color: #475569;
+  font-size: 12px;
+}
+
+.lot-profit-date-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  width: 230px;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .18);
+  color: #334155;
+  text-align: left;
+}
+
+.lot-profit-date-menu.is-open {
+  display: block;
+}
+
+.lot-profit-date-menu label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lot-profit-date-menu input {
+  height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.lot-profit-date-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .lot-filter-segment {

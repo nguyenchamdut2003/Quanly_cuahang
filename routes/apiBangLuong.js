@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var bangLuongController = require('../controllers/bangLuong.controller');
+var bangLuongController = require('../controllers/chamcongcu/bangLuong.controller');
 var hrLog = require('../utils/hrPayrollLogger');
 
 function payrollApiRequestLog(req, res, next) {

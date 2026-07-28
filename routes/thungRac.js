@@ -5,6 +5,7 @@ const thungRacController = require('../controllers/thungRac.controller');
 
 router.get('/', isAuthenticated, thungRacController.index);
 router.get('/detail/:id', isAuthenticated, thungRacController.detail);
+router.post('/restore', isAuthenticated, thungRacController.restore);
 router.post('/purge', isAuthenticated, thungRacController.purge);
 
 module.exports = router;

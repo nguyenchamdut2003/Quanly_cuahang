@@ -135,7 +135,7 @@ async function collectSupplierProductIds(supplierId, storeId) {
     const [directIds, phieuIds] = await Promise.all([
         HangHoa.find(directQuery).distinct('_id'),
         (async () => {
-            const pnMatch = { nha_cung_cap_id: supplierOid, trang_thai: 'completed' };
+            const pnMatch = { nha_cung_cap_id: supplierOid, trang_thai: 'completed', deleted_at: null };
             if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
                 pnMatch.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
             }

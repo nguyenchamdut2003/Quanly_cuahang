@@ -2,7 +2,7 @@ var express = require('express');
 var multer = require('multer');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var nhaCungCapController = require('../controllers/nhaCungCap.controller');
+var nhaCungCapController = require('../controllers/nhacungcapcontroller');
 
 var upload = multer({
     storage: multer.memoryStorage(),

@@ -124,7 +124,7 @@ async function buildOrderImpact(order) {
     CongNoKhachHang.countDocuments({ don_hang_id: orderId }),
     GiaoDichCongNoKhachHang.countDocuments({ don_hang_id: orderId, trang_thai: { $ne: 'cancelled' } }),
     invoiceIds.length
-      ? PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' } })
+      ? PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' }, deleted_at: null })
         .select('ma_phieu_tra')
         .lean()
       : [],

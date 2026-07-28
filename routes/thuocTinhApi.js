@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var controller = require('../controllers/hangHoa.controller');
+var controller = require('../controllers/hanghoacontroller');
 
 router.get('/thuoc-tinh', isAuthenticated, controller.apiAttributes);
 router.post('/thuoc-tinh', isAuthenticated, controller.apiCreateAttribute);

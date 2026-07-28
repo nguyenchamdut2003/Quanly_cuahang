@@ -59,6 +59,10 @@ const ThungRacItemSchema = new Schema({
     default: null,
     index: true
   },
+  metadata: {
+    type: Schema.Types.Mixed,
+    default: {}
+  },
   sort_order: {
     type: Number,
     default: 0

@@ -119,7 +119,7 @@ async function buildInvoiceImpact(invoice) {
       .lean(),
     CongNoKhachHang.countDocuments({ hoa_don_id: invoiceId }),
     GiaoDichCongNoKhachHang.countDocuments({ hoa_don_id: invoiceId, trang_thai: { $ne: 'cancelled' } }),
-    PhieuTraHang.find({ hoa_don_id: invoiceId, trang_thai: { $ne: 'cancelled' } })
+    PhieuTraHang.find({ hoa_don_id: invoiceId, trang_thai: { $ne: 'cancelled' }, deleted_at: null })
       .select('ma_phieu_tra')
       .lean(),
     GopHoaDon.countDocuments({

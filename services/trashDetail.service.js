@@ -37,7 +37,8 @@ const ROOT_SOURCE_TYPE = {
   PhieuNhap: 'phieu_nhap',
   DonHang: 'don_hang',
   HoaDonBanHang: 'hoa_don',
-  PhieuTraHang: 'tra_hang_ban'
+  PhieuTraHang: 'tra_hang_ban',
+  PhieuTraHangNhap: 'phieu_tra_hang_nhap'
 };
 
 function createHttpError(statusCode, message) {
@@ -128,7 +129,8 @@ function pickRowCode(row, entityType) {
 async function loadReturnSlipIdsForInvoice(invoiceId) {
   const slips = await PhieuTraHang.find({
     hoa_don_id: invoiceId,
-    trang_thai: { $ne: 'cancelled' }
+    trang_thai: { $ne: 'cancelled' },
+    deleted_at: null
   }).select('_id').lean();
   return slips.map(function(row) { return row._id; });
 }
@@ -139,7 +141,8 @@ async function loadReturnSlipIdsForOrder(orderId) {
   if (!invoiceIds.length) return [];
   const slips = await PhieuTraHang.find({
     hoa_don_id: { $in: invoiceIds },
-    trang_thai: { $ne: 'cancelled' }
+    trang_thai: { $ne: 'cancelled' },
+    deleted_at: null
   }).select('_id').lean();
   return slips.map(function(row) { return row._id; });
 }
@@ -178,23 +181,25 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
         .sort({ _id: 1 })
         .lean();
     case 'PhieuTraHangNhap':
-      return PhieuTraHangNhap.find({ phieu_nhap_id: parentOid, trang_thai: { $ne: 'cancelled' } })
+      return PhieuTraHangNhap.find({ phieu_nhap_id: parentOid, trang_thai: { $ne: 'cancelled' }, deleted_at: null })
         .sort({ created_at: -1 })
         .lean();
     case 'CTPhieuTraHangNhap':
-      return CTPhieuTraHangNhap.find({ phieu_nhap_id: parentOid })
+      return CTPhieuTraHangNhap.find(rootEntityType === 'PhieuTraHangNhap'
+        ? { phieu_tra_nhap_id: parentOid }
+        : { phieu_nhap_id: parentOid, deleted_at: null })
         .populate('hang_hoa_id', 'ma_hang ten_hang')
         .sort({ _id: 1 })
         .lean();
     case 'PhieuTraHang':
       if (rootEntityType === 'HoaDonBanHang') {
-        return PhieuTraHang.find({ hoa_don_id: parentOid, trang_thai: { $ne: 'cancelled' } }).lean();
+        return PhieuTraHang.find({ hoa_don_id: parentOid, trang_thai: { $ne: 'cancelled' }, deleted_at: null }).lean();
       }
       if (rootEntityType === 'DonHang') {
         const invoiceIds = (await HoaDonBanHang.find({ don_hang_id: parentOid }).select('_id').lean())
           .map(function(row) { return row._id; });
         if (!invoiceIds.length) return [];
-        return PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' } }).lean();
+        return PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' }, deleted_at: null }).lean();
       }
       return [];
     case 'CTPhieuTraHang': {
@@ -207,15 +212,18 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
         slipIds = [parentOid];
       }
       if (!slipIds.length) return [];
-      return CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: slipIds } })
+      return CTPhieuTraHang.find(rootEntityType === 'PhieuTraHang'
+        ? { phieu_tra_hang_id: { $in: slipIds } }
+        : { phieu_tra_hang_id: { $in: slipIds }, deleted_at: null })
         .populate('hang_hoa_id', 'ma_hang ten_hang')
         .lean();
     }
     case 'PhieuThuChi': {
-      const filter = { trang_thai: { $ne: 'cancelled' } };
+      const filter = rootEntityType === 'PhieuTraHangNhap' ? {} : { trang_thai: { $ne: 'cancelled' } };
       if (rootEntityType === 'PhieuNhap') filter.phieu_nhap_id = parentOid;
       else if (rootEntityType === 'DonHang') filter.don_hang_id = parentOid;
       else if (rootEntityType === 'HoaDonBanHang') filter.hoa_don_id = parentOid;
+      else if (rootEntityType === 'PhieuTraHangNhap') filter.phieu_tra_hang_nhap_id = parentOid;
       else if (rootEntityType === 'PhieuTraHang') {
         const doc = await PhieuTraHang.findById(parentOid).select('ma_phieu_tra').lean();
         filter.$or = [{ phieu_tra_hang_id: parentOid }];
@@ -237,6 +245,9 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       return PhieuThuChi.find(filter).sort({ ngay_lap: -1 }).lean();
     }
     case 'CongNoNhaCungCap':
+      if (rootEntityType === 'PhieuTraHangNhap') {
+        return CongNoNhaCungCap.find({ phieu_tra_nhap_id: parentOid }).sort({ ngay: -1 }).lean();
+      }
       return CongNoNhaCungCap.find({ phieu_nhap_id: parentOid }).sort({ ngay: -1 }).lean();
     case 'CongNoKhachHang':
       if (rootEntityType === 'HoaDonBanHang') {
@@ -258,6 +269,11 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       }
       return [];
     case 'GiaoDichCongNoNhaCungCap':
+      if (rootEntityType === 'PhieuTraHangNhap') {
+        return GiaoDichCongNoNhaCungCap.find({
+          phieu_tra_hang_nhap_id: parentOid
+        }).sort({ ngay_giao_dich: -1 }).lean();
+      }
       return GiaoDichCongNoNhaCungCap.find({
         phieu_nhap_id: parentOid,
         trang_thai: { $ne: 'cancelled' }
@@ -328,7 +344,10 @@ async function loadRelatedRawRows(entityType, parentId, rootEntityType) {
       }).lean();
     case 'XuatVatChua':
       if (!sourceType) return [];
-      return XuatVatChua.find({
+      return XuatVatChua.find(rootEntityType === 'PhieuTraHangNhap' ? {
+        source_type: sourceType,
+        source_id: parentOid
+      } : {
         source_type: sourceType,
         source_id: parentOid,
         trang_thai: { $ne: 'cancelled' }
@@ -432,13 +451,20 @@ function appendSectionFromTable(sections, title, table) {
 
 async function loadVatChuaDocs(sourceType, sourceId) {
   const sourceOid = new mongoose.Types.ObjectId(sourceId);
+  const includeCancelled = sourceType === 'phieu_tra_hang_nhap';
   const [nhapDocs, xuatDocs] = await Promise.all([
-    NhapVatChua.find({
+    NhapVatChua.find(includeCancelled ? {
+      source_type: sourceType,
+      source_id: sourceOid
+    } : {
       source_type: sourceType,
       source_id: sourceOid,
       trang_thai: { $ne: 'cancelled' }
     }).sort({ created_at: -1 }).lean(),
-    XuatVatChua.find({
+    XuatVatChua.find(includeCancelled ? {
+      source_type: sourceType,
+      source_id: sourceOid
+    } : {
       source_type: sourceType,
       source_id: sourceOid,
       trang_thai: { $ne: 'cancelled' }
@@ -1014,6 +1040,58 @@ async function loadRootDocumentDetail(root) {
     const payload = buildDetailPayload(
       'Phiếu trả hàng bán',
       root.ma_chung_tu || slip.ma_phieu_tra || '',
+      sections
+    );
+    payload.entity_type = entityType;
+    return payload;
+  }
+
+  if (entityType === 'PhieuTraHangNhap') {
+    const slip = await PhieuTraHangNhap.findById(parentOid)
+      .populate('nha_cung_cap_id', 'ten_ncc ma_ncc')
+      .populate('phieu_nhap_id', 'ma_phieu_nhap')
+      .lean();
+    if (!slip) {
+      return buildDetailPayload('Phiếu trả hàng nhập', root.ma_chung_tu || '', []);
+    }
+
+    const [lineRows, vatChuaDocs, phieuThuChi, congNoRows, giaoDichRows] = await Promise.all([
+      loadRelatedRawRows('CTPhieuTraHangNhap', parentOid, entityType),
+      loadVatChuaDocs(sourceType, parentOid),
+      loadRelatedRawRows('PhieuThuChi', parentOid, entityType),
+      loadRelatedRawRows('CongNoNhaCungCap', parentOid, entityType),
+      loadRelatedRawRows('GiaoDichCongNoNhaCungCap', parentOid, entityType)
+    ]);
+
+    const hasVatChua = vatChuaDocs.nhapDocs.length > 0 || vatChuaDocs.xuatDocs.length > 0;
+    const sections = [
+      makeSection('Thông tin chung', [
+        { key: 'ma_phieu_tra_nhap', header: 'Mã phiếu trả' },
+        { key: 'nha_cung_cap', header: 'Nhà cung cấp' },
+        { key: 'phieu_nhap', header: 'Phiếu nhập gốc' },
+        { key: 'tong_tien_tra', header: 'Tổng tiền trả', align: 'right' },
+        { key: 'co_vat_chua', header: 'Vật chứa' },
+        { key: 'ngay_tra', header: 'Ngày trả' }
+      ], [{
+        stt: 1,
+        ma_phieu_tra_nhap: slip.ma_phieu_tra_nhap || '---',
+        nha_cung_cap: slip.nha_cung_cap_id?.ten_ncc || slip.nha_cung_cap_id?.ma_ncc || '---',
+        phieu_nhap: slip.phieu_nhap_id?.ma_phieu_nhap || '---',
+        tong_tien_tra: fmtMoney(slip.tong_tien_tra || slip.ncc_can_tra),
+        co_vat_chua: hasVatChua ? 'Có' : 'Không',
+        ngay_tra: fmtDateTime(slip.ngay_tra || slip.created_at)
+      }])
+    ];
+
+    appendSectionFromTable(sections, 'Dòng trả hàng nhập', buildDetailTable('CTPhieuTraHangNhap', lineRows));
+    appendSectionFromTable(sections, 'Xuất vật chứa', buildVatChuaItemsTable(vatChuaDocs.xuatDocs, 'xuat'));
+    appendSectionFromTable(sections, 'Phiếu thu / chi', buildDetailTable('PhieuThuChi', phieuThuChi));
+    appendSectionFromTable(sections, 'Công nợ nhà cung cấp', buildDetailTable('CongNoNhaCungCap', congNoRows));
+    appendSectionFromTable(sections, 'Giao dịch công nợ NCC', buildDetailTable('GiaoDichCongNoNhaCungCap', giaoDichRows));
+
+    const payload = buildDetailPayload(
+      'Phiếu trả hàng nhập',
+      root.ma_chung_tu || slip.ma_phieu_tra_nhap || '',
       sections
     );
     payload.entity_type = entityType;

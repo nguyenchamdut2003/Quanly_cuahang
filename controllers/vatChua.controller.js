@@ -10,6 +10,8 @@ var { previewNhapVatChuaTrash, moveNhapVatChuaToTrash } = require('../services/v
 var { loadNhapVatChuaForEdit, updateNhapVatChuaImport } = require('../services/vatChuaImportEdit.service');
 var { loadXuatVatChuaForEdit, updateXuatVatChuaReturn, deleteXuatVatChuaReturn } = require('../services/vatChuaReturnEdit.service');
 
+var VAT_CHUA_PAGE_SIZE = 10;
+
 function formatDate(value) {
   if (!value) return '---';
   return new Date(value).toLocaleString('vi-VN', {
@@ -212,7 +214,15 @@ exports.index = async function(req, res, next) {
         missingStore: true,
         suppliers: [],
         activeVatChuaList: [],
-        openDetailVatChuaId: ''
+        openDetailVatChuaId: '',
+        pagination: {
+          page: 1,
+          limit: VAT_CHUA_PAGE_SIZE,
+          total: 0,
+          totalPages: 1,
+          from: 0,
+          to: 0
+        }
       });
     }
 
@@ -249,6 +259,13 @@ exports.index = async function(req, res, next) {
         gia_von_trung_binh: avgCostMap[String(item._id)] || 0
       });
     });
+    var totalItems = items.length;
+    var totalPages = Math.max(1, Math.ceil(totalItems / VAT_CHUA_PAGE_SIZE));
+    var page = parseInt(requestQuery.page, 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    var start = (page - 1) * VAT_CHUA_PAGE_SIZE;
+    var pageItems = items.slice(start, start + VAT_CHUA_PAGE_SIZE);
 
     var suppliers = await loadSuppliersForStore(storeId);
     var activeVatChuaList = await loadActiveVatChuaForStore(storeId);
@@ -260,7 +277,7 @@ exports.index = async function(req, res, next) {
       activeMenu: 'vat-chua',
       user: req.user,
       flash: requestQuery,
-      items: items,
+      items: pageItems,
       filter: filter,
       formatDate: formatDate,
       filterQueryString: buildFilterQueryString(filter),
@@ -268,7 +285,15 @@ exports.index = async function(req, res, next) {
       missingStore: false,
       suppliers: suppliers,
       activeVatChuaList: activeVatChuaList,
-      openDetailVatChuaId: openDetailVatChuaId
+      openDetailVatChuaId: openDetailVatChuaId,
+      pagination: {
+        page: page,
+        limit: VAT_CHUA_PAGE_SIZE,
+        total: totalItems,
+        totalPages: totalPages,
+        from: totalItems ? start + 1 : 0,
+        to: Math.min(start + VAT_CHUA_PAGE_SIZE, totalItems)
+      }
     });
   } catch (error) {
     next(error);

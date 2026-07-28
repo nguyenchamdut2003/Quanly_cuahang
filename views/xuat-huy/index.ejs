@@ -3,12 +3,18 @@
   const safeWarehouses = Array.isArray(locals.warehouses) ? locals.warehouses : [];
   const safeUsers = Array.isArray(locals.users) ? locals.users : [];
   const safeFilters = locals.filters || {};
+  const safePagination = locals.pagination || { page: 1, totalPages: 1, total: 0, from: 0, to: 0, limit: 10 };
+  const pageHref = page => {
+    const query = typeof qs === 'function' ? qs({ page }) : '';
+    return '/xuat-huy' + (query ? '?' + query : '');
+  };
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
   const badgeClass = status => status === 'draft' ? 'draft' : (status === 'cancelled' ? 'cancelled' : '');
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(function(key) {
+    if (key === 'page' || key === 'page_size') return;
     const value = safeFilters[key];
     if (Array.isArray(value)) {
       value.forEach(function(item) { exportParams.append(key, item); });
@@ -99,7 +105,12 @@
     .empty{height:420px;text-align:center}.empty-box{height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#667085}
     .empty-icon{width:78px;height:78px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;color:#0070f4;font-size:34px;margin-bottom:12px}
     .empty-title{font-size:14px;font-weight:800;color:#111827;margin-bottom:6px}
-    .footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .footer{min-height:38px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569}
+    .xh-page-size{font-weight:700}
+    .xh-pagination{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .xh-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+    .xh-page-link.is-disabled{color:#94a3b8;background:#f8fafc;cursor:not-allowed}
+    .xh-page-current{font-weight:800;color:#111827}
     @media(max-width:1100px){.xh-shell{padding:12px 30px;grid-template-columns:220px minmax(0,1fr)}}
     @media(max-width:1024px){.xh-detail-split{flex-direction:column;align-items:stretch;gap:20px}.xh-summary-box{flex:none;width:100%;max-width:100%;min-width:0}}
 
@@ -234,26 +245,27 @@
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
-  <form method="GET" action="/xuat-huy" class="xh-page">
+  <form method="GET" action="/xuat-huy" class="xh-page" id="xhFilterForm">
+    <input type="hidden" name="page" id="xhPageInput" value="<%= safePagination.page %>">
     <div class="xh-shell">
       <aside class="sidebar">
         <h1 class="title">Xuất hủy</h1>
         <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="this.form.submit()"> Phiếu tạm</label>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy hàng</label>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy phiếu</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= !selectedStatuses.length || selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="submitXhFilters()"> Phiếu tạm</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitXhFilters()"> Đã hủy hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="submitXhFilters()"> Đã hủy phiếu</label>
         </div>
         <div class="filter-block">
           <div class="filter-title">Thời gian</div>
-          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tháng này <span>›</span></span></label>
-          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="this.form.submit()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
-          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
-          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+          <label class="radio-line"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="submitXhFilters()"><span class="radio-pill">Tháng này <span>›</span></span></label>
+          <label class="radio-line"><input type="radio" name="time_type" value="custom" <%= safeFilters.time_type === 'custom' ? 'checked' : '' %> onchange="submitXhFilters()"><span class="radio-pill">Tùy chỉnh <span>›</span></span></label>
+          <input class="filter-control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="submitXhFilters()">
+          <input class="filter-control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="submitXhFilters()">
         </div>
         <div class="filter-block">
           <div class="filter-title">Kho</div>
-          <select class="filter-control" name="kho_id" onchange="this.form.submit()">
+          <select class="filter-control" name="kho_id" onchange="submitXhFilters()">
             <option value="">Chọn kho</option>
             <% safeWarehouses.forEach(function(k) { %>
               <option value="<%= k._id %>" <%= String(safeFilters.kho_id || '') === String(k._id) ? 'selected' : '' %>><%= k.ten_kho || k.ma_kho %></option>
@@ -262,7 +274,7 @@
         </div>
         <div class="filter-block">
           <div class="filter-title">Người tạo</div>
-          <select class="filter-control" name="nguoi_tao" onchange="this.form.submit()">
+          <select class="filter-control" name="nguoi_tao" onchange="submitXhFilters()">
             <option value="">Chọn người tạo</option>
             <% safeUsers.forEach(function(u) { %>
               <option value="<%= u._id %>" <%= String(safeFilters.nguoi_tao || '') === String(u._id) ? 'selected' : '' %>><%= u.ho_ten || u.email %></option>
@@ -412,11 +424,43 @@
             </tbody>
           </table>
         </div>
-        <div class="footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+        <div class="footer">
+          <span class="xh-page-size">Hiển thị 10 dòng/trang</span>
+          <nav class="xh-pagination" aria-label="Phân trang xuất hủy">
+            <% if (safePagination.page > 1) { %>
+              <a class="xh-page-link" href="<%= pageHref(1) %>">Đầu</a>
+              <a class="xh-page-link" href="<%= pageHref(safePagination.page - 1) %>">Trước</a>
+            <% } else { %>
+              <span class="xh-page-link is-disabled">Đầu</span>
+              <span class="xh-page-link is-disabled">Trước</span>
+            <% } %>
+            <span class="xh-page-current"><%= safePagination.page %> / <%= safePagination.totalPages %></span>
+            <% if (safePagination.page < safePagination.totalPages) { %>
+              <a class="xh-page-link" href="<%= pageHref(safePagination.page + 1) %>">Sau</a>
+              <a class="xh-page-link" href="<%= pageHref(safePagination.totalPages) %>">Cuối</a>
+            <% } else { %>
+              <span class="xh-page-link is-disabled">Sau</span>
+              <span class="xh-page-link is-disabled">Cuối</span>
+            <% } %>
+          </nav>
+          <span><%= safePagination.from %> - <%= safePagination.to %> trong <%= safePagination.total %> phiếu</span>
+        </div>
       </main>
     </div>
   </form>
   <script>
+    function submitXhFilters() {
+      var pageInput = document.getElementById('xhPageInput');
+      if (pageInput) pageInput.value = '1';
+      document.getElementById('xhFilterForm').submit();
+    }
+    var xhFilterForm = document.getElementById('xhFilterForm');
+    if (xhFilterForm) {
+      xhFilterForm.addEventListener('submit', function() {
+        var pageInput = document.getElementById('xhPageInput');
+        if (pageInput) pageInput.value = '1';
+      });
+    }
     document.addEventListener('DOMContentLoaded', function() {
       function expandXhDetail(id, scroll) {
         var row = document.querySelector('.xh-row[data-detail-id="' + id + '"]');

@@ -2,6 +2,7 @@
   const safeTickets = Array.isArray(locals.importSlips) ? locals.importSlips : [];
   const safeFilters = locals.filter || {};
   const safeSuppliers = Array.isArray(locals.suppliers) ? locals.suppliers : [];
+  const safePagination = locals.pagination || { page: 1, totalPages: 1, total: 0, from: 0, to: 0, limit: 10 };
   const selectedStatuses = Array.isArray(safeFilters.statuses) ? safeFilters.statuses : [];
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
@@ -205,7 +206,12 @@
     .summary-card{border:1px solid #e4eaf2;border-radius:6px;padding:10px}
     .summary-line{display:flex;justify-content:space-between;font-size:12px;margin:6px 0}
     .summary-line b{font-size:13px}
-    .po-footer{height:30px;font-size:12px;display:flex;align-items:center;gap:8px}
+    .po-footer{min-height:38px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569}
+    .po-page-size{font-weight:700}
+    .po-pagination{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .po-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+    .po-page-link.is-disabled{color:#94a3b8;background:#f8fafc;pointer-events:none}
+    .po-page-current{font-weight:800;color:#111827}
     .po-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000}
     .po-modal.open{display:flex}
     .po-modal-card{width:min(1120px,calc(100vw - 32px));max-height:calc(100vh - 64px);overflow:auto;background:#fff;border-radius:8px;padding:18px;box-shadow:0 18px 44px rgba(15,23,42,.28)}
@@ -331,17 +337,18 @@
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
   <form id="poFilterForm" method="GET" action="/nhap-hang" class="po-page">
+    <input type="hidden" name="page" id="poPageInput" value="<%= safePagination.page %>">
     <div class="po-shell">
       <aside class="po-sidebar">
         <h1 class="po-title">Nhập hàng</h1>
         <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã nhập hàng</label>
-          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitPoFilters()"> Đã nhập hàng</label>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="submitPoFilters()"> Đã hủy</label>
         </div>
         <div class="filter-block">
           <div class="filter-title">Nhà cung cấp</div>
-          <select class="filter-control" name="nha_cung_cap_id" aria-label="Lọc theo nhà cung cấp" onchange="this.form.submit()">
+          <select class="filter-control" name="nha_cung_cap_id" aria-label="Lọc theo nhà cung cấp" onchange="submitPoFilters()">
             <option value="">Tất cả nhà cung cấp</option>
             <% safeSuppliers.forEach(function(s) { %>
               <option value="<%= s._id %>" <%= String(safeFilters.nha_cung_cap_id || '') === String(s._id) ? 'selected' : '' %>><%= (s.ma_ncc ? s.ma_ncc + ' - ' : '') + (s.ten_ncc || 'Không tên') %></option>
@@ -374,7 +381,7 @@
               <input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu nhập">
             </div>
             <span class="po-sort-label">Sắp xếp công nợ</span>
-            <select class="po-sort-select" name="sort" aria-label="Sắp xếp công nợ" onchange="this.form.submit()">
+            <select class="po-sort-select" name="sort" aria-label="Sắp xếp công nợ" onchange="submitPoFilters()">
               <option value="newest" <%= safeFilters.sort === 'newest' ? 'selected' : '' %>>Mới nhất</option>
               <option value="oldest" <%= safeFilters.sort === 'oldest' ? 'selected' : '' %>>Cũ nhất</option>
               <option value="debt_high" <%= safeFilters.sort === 'debt_high' ? 'selected' : '' %>>Nợ NCC cao nhất</option>
@@ -640,7 +647,27 @@
             </tbody>
           </table>
         </div>
-        <div class="po-footer"><span>Hiển thị</span><select><option>15 dòng</option></select></div>
+        <div class="po-footer">
+          <span class="po-page-size">Hiển thị 10 dòng/trang</span>
+          <nav class="po-pagination" aria-label="Phân trang nhập hàng">
+            <% if (safePagination.page > 1) { %>
+              <a class="po-page-link" href="<%= buildPurchasePageUrl(1) %>">Đầu</a>
+              <a class="po-page-link" href="<%= buildPurchasePageUrl(safePagination.page - 1) %>">Trước</a>
+            <% } else { %>
+              <span class="po-page-link is-disabled">Đầu</span>
+              <span class="po-page-link is-disabled">Trước</span>
+            <% } %>
+            <span class="po-page-current"><%= safePagination.page %> / <%= safePagination.totalPages %></span>
+            <% if (safePagination.page < safePagination.totalPages) { %>
+              <a class="po-page-link" href="<%= buildPurchasePageUrl(safePagination.page + 1) %>">Sau</a>
+              <a class="po-page-link" href="<%= buildPurchasePageUrl(safePagination.totalPages) %>">Cuối</a>
+            <% } else { %>
+              <span class="po-page-link is-disabled">Sau</span>
+              <span class="po-page-link is-disabled">Cuối</span>
+            <% } %>
+          </nav>
+          <span><%= safePagination.from %> - <%= safePagination.to %> trong <%= safePagination.total %> phiếu</span>
+        </div>
       </main>
     </div>
   </form>
@@ -659,6 +686,8 @@
             <tr>
               <th>Bảng / loại dữ liệu</th>
               <th class="num">Số bản ghi</th>
+              <th>Tác động</th>
+              <th class="num">SL/Giá trị</th>
               <th>Ví dụ</th>
             </tr>
           </thead>
@@ -1425,6 +1454,17 @@
       labelPrintArea.innerHTML = `<div class="label-sheet">${labels.join('')}</div>`;
       window.print();
     }
+    function submitPoFilters() {
+      var form = document.getElementById('poFilterForm');
+      var pageInput = document.getElementById('poPageInput');
+      if (pageInput) pageInput.value = '1';
+      if (!form) return;
+      if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    }
     document.addEventListener('DOMContentLoaded', function() {
       var poFilterForm = document.getElementById('poFilterForm');
       function parseFilterMoney(value) {
@@ -1452,6 +1492,8 @@
       if (poFilterForm) {
         bindVnMoneyFilterInputs(poFilterForm);
         poFilterForm.addEventListener('submit', function() {
+          var pageInput = document.getElementById('poPageInput');
+          if (pageInput) pageInput.value = '1';
           poFilterForm.querySelectorAll('.js-vn-money-filter').forEach(function(input) {
             var parsed = parseFilterMoney(input.value);
             input.value = parsed === '' ? '' : String(parsed);
@@ -1460,19 +1502,19 @@
         var warnOnlyCheckbox = document.getElementById('warnOnlyCheckbox');
         if (warnOnlyCheckbox) {
           warnOnlyCheckbox.addEventListener('change', function() {
-            poFilterForm.submit();
+            submitPoFilters();
           });
         }
         var warnMinDaysInput = poFilterForm.querySelector('input[name="warnMinDays"]');
         if (warnMinDaysInput) {
           warnMinDaysInput.addEventListener('change', function() {
-            poFilterForm.submit();
+            submitPoFilters();
           });
         }
         var warnMinAmountInput = poFilterForm.querySelector('input[name="warnMinAmount"]');
         if (warnMinAmountInput) {
           warnMinAmountInput.addEventListener('change', function() {
-            poFilterForm.submit();
+            submitPoFilters();
           });
         }
       }
@@ -1833,14 +1875,21 @@
         if (!impactBody) return;
         var groups = preview.aggregate_groups || [];
         if (!groups.length) {
-          impactBody.innerHTML = '<tr><td colspan="3">Không có dữ liệu liên quan đáng kể.</td></tr>';
+          impactBody.innerHTML = '<tr><td colspan="5">Không có dữ liệu liên quan đáng kể.</td></tr>';
           return;
         }
         impactBody.innerHTML = groups.map(function(group) {
           var samples = (group.samples || []).join(', ');
+          var qty = Number(group.affected_quantity || 0);
+          var amount = Number(group.affected_amount || 0);
+          var impact = [];
+          if (qty) impact.push(qty.toLocaleString('vi-VN'));
+          if (amount) impact.push(amount.toLocaleString('vi-VN') + ' VNĐ');
           return '<tr>'
             + '<td>' + escapeHtml(group.label || group.entity_type) + '</td>'
             + '<td class="num">' + escapeHtml(String(group.count || 0)) + '</td>'
+            + '<td>' + escapeHtml(group.action || 'giữ nguyên') + '</td>'
+            + '<td class="num">' + escapeHtml(impact.join(' / ') || '—') + '</td>'
             + '<td>' + escapeHtml(samples || '—') + '</td>'
             + '</tr>';
         }).join('');
@@ -1857,7 +1906,7 @@
           overlay.classList.add('is-open');
           overlay.setAttribute('aria-hidden', 'false');
         }
-        if (impactBody) impactBody.innerHTML = '<tr><td colspan="3" class="purchase-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
+        if (impactBody) impactBody.innerHTML = '<tr><td colspan="5" class="purchase-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
         if (alertBox) alertBox.innerHTML = '';
         if (selectedList) selectedList.innerHTML = '';
         if (confirmBtn) confirmBtn.disabled = true;
@@ -1877,7 +1926,7 @@
             if (confirmBtn) confirmBtn.disabled = !previewData.can_proceed;
           })
           .catch(function(err) {
-            if (impactBody) impactBody.innerHTML = '<tr><td colspan="3">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
+            if (impactBody) impactBody.innerHTML = '<tr><td colspan="5">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
             alert(err.message || 'Không tải được thông tin xóa');
           });
       }

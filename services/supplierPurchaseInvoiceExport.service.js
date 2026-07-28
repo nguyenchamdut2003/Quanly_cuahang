@@ -191,7 +191,8 @@ async function buildSupplierPurchaseInvoiceExportPack(supplier, storeId) {
     const supplierOid = new mongoose.Types.ObjectId(String(supplier._id));
     const pnMatch = {
         nha_cung_cap_id: supplierOid,
-        trang_thai: 'completed'
+        trang_thai: 'completed',
+        deleted_at: null
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         pnMatch.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));

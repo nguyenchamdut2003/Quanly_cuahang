@@ -1,10 +1,16 @@
 <%
   const safeReturns = Array.isArray(locals.returns) ? locals.returns : [];
   const safeFilters = locals.filters || {};
+  const safePagination = locals.pagination || { page: 1, totalPages: 1, total: 0, from: 0, to: 0, limit: 10 };
+  const pageHref = page => {
+    const query = typeof qs === 'function' ? qs({ page }) : '';
+    return '/don-hang/tra-hang' + (query ? '?' + query : '');
+  };
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const selectedTypes = Array.isArray(safeFilters.loai_tra_hang) ? safeFilters.loai_tra_hang : (safeFilters.loai_tra_hang ? [safeFilters.loai_tra_hang] : []);
   const exportParams = new URLSearchParams();
   Object.keys(safeFilters).forEach(key => {
+    if (key === 'page' || key === 'page_size') return;
     const value = safeFilters[key];
     if (Array.isArray(value)) {
       value.forEach(item => exportParams.append(key, item));
@@ -36,30 +42,38 @@
     .page{overflow:hidden}.shell{padding:14px 30px 0!important;width:100%;overflow:hidden}.main{overflow:hidden}.toolbar{min-width:0}.actions{flex:0 0 auto}.table-wrap{max-width:100%;overflow:auto}.table{min-width:1080px}.return-detail{padding:0 16px 12px;overflow:hidden}.detail-head,.detail-bottom,.detail-actions{min-width:0}.detail-head>div:first-child{min-width:0}.detail-meta{grid-template-columns:repeat(3,minmax(0,216px));max-width:720px}.items-table{table-layout:fixed}.items-table th,.items-table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.detail-bottom{grid-template-columns:minmax(0,1fr) minmax(220px,280px)}.detail-actions{gap:12px}.detail-action-group{min-width:0;flex-wrap:wrap}
     .invoice-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:30px;z-index:1000}.invoice-modal-backdrop.open{display:flex}.invoice-modal{width:1435px;max-width:calc(100vw - 64px);min-height:625px;background:#fff;border-radius:14px;box-shadow:0 22px 48px rgba(0,0,0,.35);padding:28px 36px 32px;position:relative}.invoice-modal h2{margin:0 0 28px;font-size:20px}.invoice-close{position:absolute;right:28px;top:24px;border:0;background:transparent;color:#7a8794;font-size:28px;cursor:pointer}.invoice-modal-grid{display:grid;grid-template-columns:268px minmax(0,1fr);gap:42px}.invoice-filter-card{background:#fff;border-radius:6px;box-shadow:0 10px 26px rgba(15,23,42,.14);padding:14px 20px 20px;margin-bottom:32px}.invoice-filter-card h3{margin:0 0 18px;font-size:16px}.invoice-filter-input{width:100%;height:44px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none;color:#111827}.invoice-filter-input::placeholder{color:#7a8794}.invoice-pick-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-pick-table table{width:100%;border-collapse:collapse;table-layout:fixed}.invoice-pick-table th{height:53px;background:#338cf2;color:#fff;text-align:left;padding:0 14px;font-size:16px}.invoice-pick-table td{height:56px;border-bottom:1px solid #dde3ea;padding:0 14px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.invoice-pick-table a{color:#006dff;text-decoration:none}.invoice-choose{height:34px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.invoice-pager{height:74px;display:flex;align-items:center;justify-content:flex-end;gap:18px}.invoice-page-btn{min-width:42px;height:42px;border-radius:8px;border:0;background:#fff;color:#111827;font-size:16px;cursor:pointer}.invoice-page-btn.active{background:#0070f4;color:#fff;font-weight:800}.invoice-page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick-return{position:absolute;right:36px;bottom:32px;height:49px;border:0;border-radius:8px;background:#0070f4;color:#fff;font-size:17px;font-weight:800;padding:0 30px;cursor:pointer}
     .type-badge{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:4px;background:#e8f3ff;color:#075cad;font-size:12px;font-weight:800}.type-badge.exchange{background:#fff7ed;color:#c2410c}.detail-section-title{margin:14px 0 6px;font-size:13px;font-weight:800;color:#111827}.items-table.return-table th{background:#eefdf3}.items-table.exchange-table th{background:#fff7ed}.items-table.vat-chua-table th{background:#eef6ff}.muted-empty{height:38px;color:#667085;text-align:center}.settlement-line{font-size:14px;font-weight:900}.settlement-refund{color:#006dff}.settlement-collect{color:#c2410c}.settlement-none{color:#15803d}.return-detail>.items-table:not(.return-table):not(.exchange-table):not(.vat-chua-table){display:none}.legacy-summary{display:none}.return-detail .items-table .num{text-align:left}
+    .return-trash-overlay{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:center;justify-content:center;z-index:1200;padding:24px}.return-trash-overlay.open{display:flex}.return-trash-modal{width:760px;max-width:calc(100vw - 32px);max-height:calc(100vh - 48px);background:#fff;border-radius:8px;box-shadow:0 24px 64px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden}.return-trash-head{height:56px;border-bottom:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;padding:0 18px}.return-trash-head h3{margin:0;font-size:18px}.return-trash-close{width:32px;height:32px;border:0;background:#fff;color:#667085;font-size:24px;cursor:pointer}.return-trash-body{padding:16px 18px;overflow:auto}.return-trash-desc{margin:0 0 12px;color:#475467;font-size:13px}.return-trash-alert{border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px}.return-trash-selected{margin:0 0 12px;padding-left:18px;font-size:13px;color:#111827}.return-trash-table{width:100%;border-collapse:collapse;border:1px solid #d7dde5;border-radius:6px;overflow:hidden}.return-trash-table th{height:34px;background:#eef6ff;text-align:left;font-size:12px;padding:0 10px;border-bottom:1px solid #d7dde5}.return-trash-table td{height:36px;border-bottom:1px solid #eef2f6;padding:0 10px;font-size:12px}.return-trash-foot{height:58px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 18px}.btn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
+    .return-pagination{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:12px}
+    .return-page-size{font-weight:700}
+    .return-pagination-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .return-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+    .return-page-link.is-disabled{color:#94a3b8;background:#f8fafc;pointer-events:none}
+    .return-page-current{font-weight:800;color:#111827}
   </style>
 </head>
 <body>
   <%- include('../partials/header') %>
-  <form class="page" method="GET" action="/don-hang/tra-hang">
+  <form class="page" id="returnFilterForm" method="GET" action="/don-hang/tra-hang">
+    <input type="hidden" name="page" id="returnPageInput" value="<%= safePagination.page %>">
     <div class="shell">
       <aside class="sidebar">
         <h1 class="title">Trả hàng</h1>
         <div class="filter">
           <div class="filter-title">Loại trả hàng</div>
-          <label class="check"><input type="checkbox" name="loai_tra_hang" value="theo_hoa_don" <%= !selectedTypes.length || selectedTypes.includes('theo_hoa_don') ? 'checked' : '' %> onchange="this.form.submit()"> Theo hóa đơn</label>
-          <label class="check"><input type="checkbox" name="loai_tra_hang" value="tra_nhanh" <%= !selectedTypes.length || selectedTypes.includes('tra_nhanh') ? 'checked' : '' %> onchange="this.form.submit()"> Trả nhanh</label>
-          <label class="check"><input type="checkbox" name="loai_tra_hang" value="chuyen_hoan" <%= !selectedTypes.length || selectedTypes.includes('chuyen_hoan') ? 'checked' : '' %> onchange="this.form.submit()"> Chuyển hoàn</label>
+          <label class="check"><input type="checkbox" name="loai_tra_hang" value="theo_hoa_don" <%= !selectedTypes.length || selectedTypes.includes('theo_hoa_don') ? 'checked' : '' %> onchange="submitReturnFilters()"> Theo hóa đơn</label>
+          <label class="check"><input type="checkbox" name="loai_tra_hang" value="tra_nhanh" <%= !selectedTypes.length || selectedTypes.includes('tra_nhanh') ? 'checked' : '' %> onchange="submitReturnFilters()"> Trả nhanh</label>
+          <label class="check"><input type="checkbox" name="loai_tra_hang" value="chuyen_hoan" <%= !selectedTypes.length || selectedTypes.includes('chuyen_hoan') ? 'checked' : '' %> onchange="submitReturnFilters()"> Chuyển hoàn</label>
         </div>
         <div class="filter">
           <div class="filter-title">Trạng thái</div>
-          <label class="check"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="this.form.submit()"> Đã trả</label>
-          <label class="check"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="this.form.submit()"> Đã hủy</label>
+          <label class="check"><input type="checkbox" name="trang_thai" value="completed" <%= !selectedStatuses.length || selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitReturnFilters()"> Đã trả</label>
+          <label class="check"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="submitReturnFilters()"> Đã hủy</label>
         </div>
         <div class="filter">
           <div class="filter-title">Thời gian</div>
-          <label class="radio"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="this.form.submit()"><span class="pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
-          <input class="control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="this.form.submit()">
-          <input class="control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="this.form.submit()">
+          <label class="radio"><input type="radio" name="time_type" value="this_month" <%= safeFilters.time_type === 'this_month' ? 'checked' : '' %> onchange="submitReturnFilters()"><span class="pill">Tháng này <i class="fa-solid fa-chevron-right"></i></span></label>
+          <input class="control" type="date" name="date_from" value="<%= safeFilters.date_from || '' %>" onchange="submitReturnFilters()">
+          <input class="control" type="date" name="date_to" value="<%= safeFilters.date_to || '' %>" onchange="submitReturnFilters()">
         </div>
         <div class="filter"><div class="filter-title">Người tạo</div><input class="control" name="nguoi_tao" value="<%= safeFilters.nguoi_tao || '' %>" placeholder="Chọn người tạo"></div>
         <div class="filter"><div class="filter-title">Người nhận trả</div><input class="control" name="nguoi_nhan_tra" value="<%= safeFilters.nguoi_nhan_tra || '' %>" placeholder="Chọn người nhận trả"></div>
@@ -103,9 +117,51 @@
             </tbody>
           </table>
         </div>
+        <div class="return-pagination">
+          <span class="return-page-size">Hiển thị 10 dòng/trang</span>
+          <nav class="return-pagination-actions" aria-label="Phân trang trả hàng">
+            <% if (safePagination.page > 1) { %>
+              <a class="return-page-link" href="<%= pageHref(1) %>">Đầu</a>
+              <a class="return-page-link" href="<%= pageHref(safePagination.page - 1) %>">Trước</a>
+            <% } else { %>
+              <span class="return-page-link is-disabled">Đầu</span>
+              <span class="return-page-link is-disabled">Trước</span>
+            <% } %>
+            <span class="return-page-current"><%= safePagination.page %> / <%= safePagination.totalPages %></span>
+            <% if (safePagination.page < safePagination.totalPages) { %>
+              <a class="return-page-link" href="<%= pageHref(safePagination.page + 1) %>">Sau</a>
+              <a class="return-page-link" href="<%= pageHref(safePagination.totalPages) %>">Cuối</a>
+            <% } else { %>
+              <span class="return-page-link is-disabled">Sau</span>
+              <span class="return-page-link is-disabled">Cuối</span>
+            <% } %>
+          </nav>
+          <span><%= safePagination.from %> - <%= safePagination.to %> trong <%= safePagination.total %> phiếu trả</span>
+        </div>
       </main>
     </div>
   </form>
+  <div id="returnTrashModalOverlay" class="return-trash-overlay" aria-hidden="true">
+    <div class="return-trash-modal" role="dialog" aria-labelledby="returnTrashModalTitle" aria-modal="true">
+      <div class="return-trash-head">
+        <h3 id="returnTrashModalTitle">Đưa vào thùng rác</h3>
+        <button type="button" class="return-trash-close" id="returnTrashModalClose" aria-label="Đóng">&times;</button>
+      </div>
+      <div class="return-trash-body">
+        <p class="return-trash-desc">Các dữ liệu liên quan bên dưới sẽ được hoàn tác nghiệp vụ và đưa vào thùng rác cùng phiếu trả hàng bán.</p>
+        <div id="returnTrashAlert"></div>
+        <ul class="return-trash-selected" id="returnTrashSelectedList"></ul>
+        <table class="return-trash-table">
+          <thead><tr><th>Bảng / loại dữ liệu</th><th class="num">Số bản ghi</th><th>Ví dụ</th></tr></thead>
+          <tbody id="returnTrashImpactRows"></tbody>
+        </table>
+      </div>
+      <div class="return-trash-foot">
+        <button type="button" class="btn" id="returnTrashCancel">Bỏ qua</button>
+        <button type="button" class="btn danger" id="returnTrashConfirm" disabled>Đưa vào thùng rác</button>
+      </div>
+    </div>
+  </div>
   <div id="invoiceModal" class="invoice-modal-backdrop">
     <div class="invoice-modal">
       <button type="button" class="invoice-close" onclick="closeInvoiceModal()">&times;</button>
@@ -153,6 +209,15 @@
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     let invoiceSearchTimer = null;
     let invoicePage = 1;
+
+    function submitReturnFilters() {
+      const pageInput = document.getElementById('returnPageInput');
+      const form = document.getElementById('returnFilterForm');
+      if (pageInput) pageInput.value = '1';
+      if (!form) return;
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.submit();
+    }
 
     function openInvoiceModal() {
       const modal = document.getElementById('invoiceModal');
@@ -384,8 +449,85 @@
       trashReturnSlips(getSelectedReturnIds());
     }
 
+    let pendingReturnTrashIds = [];
+
+    function closeReturnTrashModal() {
+      const overlay = document.getElementById('returnTrashModalOverlay');
+      if (overlay) {
+        overlay.classList.remove('open');
+        overlay.setAttribute('aria-hidden', 'true');
+      }
+      pendingReturnTrashIds = [];
+      const confirmBtn = document.getElementById('returnTrashConfirm');
+      if (confirmBtn) confirmBtn.disabled = true;
+    }
+
+    function renderReturnTrashPreview(preview) {
+      const overlay = document.getElementById('returnTrashModalOverlay');
+      const selectedList = document.getElementById('returnTrashSelectedList');
+      const impactRows = document.getElementById('returnTrashImpactRows');
+      const alertBox = document.getElementById('returnTrashAlert');
+      const confirmBtn = document.getElementById('returnTrashConfirm');
+      const items = Array.isArray(preview.items) ? preview.items : [];
+      const groups = Array.isArray(preview.aggregate_groups) ? preview.aggregate_groups : [];
+      if (selectedList) {
+        selectedList.innerHTML = items.map(item => {
+          const name = item.ma_phieu_tra || item.phieu_tra_hang_id || '';
+          const customer = item.ten_khach ? ' - ' + item.ten_khach : '';
+          const blocked = item.can_trash ? '' : ' (' + (item.block_reason || 'Không thể xóa') + ')';
+          return '<li><strong>' + escapeHtml(name) + '</strong>' + escapeHtml(customer + blocked) + '</li>';
+        }).join('');
+      }
+      if (impactRows) {
+        impactRows.innerHTML = groups.length ? groups.map(group => {
+          const samples = Array.isArray(group.samples) && group.samples.length ? group.samples.join(', ') : '';
+          return '<tr><td>' + escapeHtml(group.label || group.entity_type || '') + '</td><td class="num">' + money(group.count || 0) + '</td><td>' + escapeHtml(samples) + '</td></tr>';
+        }).join('') : '<tr><td colspan="3">Không có dữ liệu con liên quan.</td></tr>';
+      }
+      const warnings = items.reduce((list, item) => list.concat(Array.isArray(item.warnings) ? item.warnings : []), []);
+      if (alertBox) {
+        alertBox.innerHTML = warnings.length
+          ? '<div class="return-trash-alert">' + warnings.map(escapeHtml).join('<br>') + '</div>'
+          : '';
+      }
+      if (confirmBtn) confirmBtn.disabled = !preview.can_proceed;
+      if (overlay) {
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
+    }
+
+    async function confirmReturnTrashMove() {
+      const selectedIds = pendingReturnTrashIds.filter(Boolean);
+      if (!selectedIds.length) return closeReturnTrashModal();
+      const confirmBtn = document.getElementById('returnTrashConfirm');
+      if (confirmBtn) confirmBtn.disabled = true;
+      const res = await fetch('/don-hang/tra-hang/trash/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phieu_tra_hang_ids: selectedIds })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        if (confirmBtn) confirmBtn.disabled = false;
+        return alert(data.message || 'Không đưa vào thùng rác được');
+      }
+      location.reload();
+    }
+
     async function trashReturnSlips(ids) {
       const selectedIds = Array.isArray(ids) ? ids.filter(Boolean) : [];
+      if (!selectedIds.length) return alert('Vui lòng chọn ít nhất một phiếu trả hàng.');
+      const previewRes = await fetch('/don-hang/tra-hang/trash/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phieu_tra_hang_ids: selectedIds })
+      });
+      const previewData = await previewRes.json();
+      if (!previewData.success) return alert(previewData.message || 'Không tải được dữ liệu ảnh hưởng');
+      pendingReturnTrashIds = selectedIds;
+      renderReturnTrashPreview(previewData.data || {});
+      return;
       if (!selectedIds.length) return alert('Vui lòng chọn ít nhất một phiếu trả hàng.');
       if (!confirm('Đưa ' + selectedIds.length + ' phiếu trả hàng vào thùng rác?')) return;
       const res = await fetch('/don-hang/tra-hang/trash/move', {
@@ -399,6 +541,13 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      const returnFilterForm = document.getElementById('returnFilterForm');
+      if (returnFilterForm) {
+        returnFilterForm.addEventListener('submit', () => {
+          const pageInput = document.getElementById('returnPageInput');
+          if (pageInput) pageInput.value = '1';
+        });
+      }
       const selectAll = document.getElementById('returnSelectAll');
       if (selectAll) {
         selectAll.addEventListener('change', () => {
@@ -411,6 +560,12 @@
       document.querySelectorAll('.return-select-check').forEach(item => {
         item.addEventListener('change', updateReturnTrashButton);
       });
+      const trashClose = document.getElementById('returnTrashModalClose');
+      const trashCancel = document.getElementById('returnTrashCancel');
+      const trashConfirm = document.getElementById('returnTrashConfirm');
+      if (trashClose) trashClose.addEventListener('click', closeReturnTrashModal);
+      if (trashCancel) trashCancel.addEventListener('click', closeReturnTrashModal);
+      if (trashConfirm) trashConfirm.addEventListener('click', confirmReturnTrashMove);
       updateReturnTrashButton();
     });
 

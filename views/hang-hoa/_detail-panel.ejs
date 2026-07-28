@@ -376,7 +376,24 @@
       <table class="admin-table product-inner-table lot-profit-table">
         <thead>
           <tr>
-            <th>Ng&agrave;y nh&#7853;p / Ng&agrave;y l&ocirc;</th>
+            <th class="lot-profit-date-th">
+              <button type="button" class="lot-profit-date-trigger" data-lot-profit-date-toggle>
+                <span>Ng&agrave;y nh&#7853;p l&ocirc;</span>
+                <span class="lot-profit-date-arrow">▾</span>
+              </button>
+              <div class="lot-profit-date-menu" data-lot-profit-date-menu>
+                <label>T&#7915; ng&agrave;y
+                  <input class="lot-profit-filter" type="date" data-field="ngay_nhap_from">
+                </label>
+                <label>&#272;&#7871;n ng&agrave;y
+                  <input class="lot-profit-filter" type="date" data-field="ngay_nhap_to">
+                </label>
+                <div class="lot-profit-date-actions">
+                  <button type="button" class="btn btn-primary btn-sm" data-lot-profit-date-apply>&Aacute;p d&#7909;ng</button>
+                  <button type="button" class="btn btn-light btn-sm" data-lot-profit-date-clear>X&oacute;a</button>
+                </div>
+              </div>
+            </th>
             <th>T&ecirc;n h&agrave;ng</th>
             <th>L&ocirc;</th>
             <th>Thu&#7897;c t&iacute;nh</th>

@@ -29,6 +29,7 @@ const EXPORT_STATUS_MAP = {
   completed: 'Đã hủy hàng',
   cancelled: 'Đã hủy phiếu'
 };
+const XH_PAGE_SIZE = 10;
 
 exports.redirectDetail = async function(req, res) {
   if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
@@ -247,6 +248,26 @@ function statusLabel(value) {
   return 'Đã hủy hàng';
 }
 
+function parsePage(query) {
+  const page = Number(query && query.page);
+  return Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+}
+
+function buildListQueryString(query, overrides) {
+  const params = new URLSearchParams();
+  Object.entries(query || {}).forEach(([key, value]) => {
+    if (key === 'page' || key === 'page_size') return;
+    if (Array.isArray(value)) {
+      value.forEach(item => params.append(key, item));
+    } else if (value !== undefined && value !== null && String(value) !== '') {
+      params.append(key, value);
+    }
+  });
+  const page = Number(overrides && overrides.page);
+  if (Number.isFinite(page) && page > 1) params.set('page', String(Math.floor(page)));
+  return params.toString();
+}
+
 async function makeCode() {
   const last = await PhieuXuatHuy.findOne({ ma_xuat_huy: /^XH\d+$/ }).sort({ ma_xuat_huy: -1 }).lean();
   const next = last && last.ma_xuat_huy ? Number(String(last.ma_xuat_huy).replace(/\D/g, '')) + 1 : 1;
@@ -452,15 +473,23 @@ exports.index = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const query = await buildFilter(req, storeId);
-    const [{ warehouses, users }, tickets] = await Promise.all([
+    let page = parsePage(req.query);
+    const pageSize = XH_PAGE_SIZE;
+    const [{ warehouses, users }, total] = await Promise.all([
       loadWarehousesAndUsers(storeId),
-      PhieuXuatHuy.find(query)
-        .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
-        .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang' })
-        .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
-        .sort({ ngay_xuat: -1, created_at: -1 })
-        .lean()
+      PhieuXuatHuy.countDocuments(query)
     ]);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (page > totalPages) page = totalPages;
+    const skip = (page - 1) * pageSize;
+    const tickets = await PhieuXuatHuy.find(query)
+      .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
+      .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang' })
+      .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
+      .sort({ ngay_xuat: -1, created_at: -1 })
+      .skip(skip)
+      .limit(pageSize)
+      .lean();
 
     const ticketIds = tickets.map(function(t) { return t._id; });
     var detailRows = [];
@@ -498,7 +527,18 @@ exports.index = async function(req, res, next) {
       users,
       filters: req.query || {},
       formatDate,
-      statusLabel
+      statusLabel,
+      pagination: {
+        total,
+        page,
+        limit: pageSize,
+        totalPages,
+        from: total === 0 ? 0 : skip + 1,
+        to: Math.min(skip + pageSize, total)
+      },
+      qs: function(overrides) {
+        return buildListQueryString(req.query || {}, overrides || {});
+      }
     });
   } catch (error) {
     next(error);
@@ -606,7 +646,7 @@ exports.createSubmit = async function(req, res) {
     if (!reason) return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do hủy' });
     const kho = await Kho.findById(khoId).lean();
     if (!kho) return res.status(400).json({ success: false, message: 'Kho hủy không hợp lệ' });
-    const purchase = await PhieuNhap.findOne({ _id: phieuNhapId, trang_thai: 'completed' }).select('kho_id').lean();
+    const purchase = await PhieuNhap.findOne({ _id: phieuNhapId, trang_thai: 'completed', deleted_at: null }).select('kho_id').lean();
     if (!purchase) return res.status(400).json({ success: false, message: 'Phiếu nhập gốc không hợp lệ' });
     if (String(purchase.kho_id || '') !== String(khoId)) {
       return res.status(400).json({ success: false, message: 'Không cho chọn kho khác với kho của phiếu nhập gốc' });
@@ -763,7 +803,7 @@ exports.apiWarehouseProducts = async function(req, res) {
 exports.apiPurchasesWithStock = async function(req, res) {
   try {
     const storeId = await resolveStoreId(req);
-    const filter = { trang_thai: 'completed' };
+    const filter = { trang_thai: 'completed', deleted_at: null };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
     const purchases = await PhieuNhap.find(filter)
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
@@ -839,7 +879,7 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
     const storeId = await resolveStoreId(req);
     const purchaseId = String(req.params.id || '').trim();
     if (!isObjectId(purchaseId)) return res.status(400).json({ success: false, message: 'Phiếu nhập không hợp lệ' });
-    const filter = { _id: purchaseId, trang_thai: 'completed' };
+    const filter = { _id: purchaseId, trang_thai: 'completed', deleted_at: null };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
     const purchase = await PhieuNhap.findOne(filter)
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })

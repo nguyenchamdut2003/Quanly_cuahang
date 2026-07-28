@@ -17,6 +17,7 @@ var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require(
 var { previewPurchaseTrash, movePurchasesToTrash } = require('../services/purchaseTrash.service');
 
 var PURCHASE_DEBT_WARN_DEFAULT_DAYS = 10;
+var NHAP_HANG_PAGE_SIZE = 10;
 
 function hasFilterQueryValue(value) {
   return String(value ?? '').trim() !== '';
@@ -116,6 +117,29 @@ function normalizeNhapHangFilter(query) {
     warnMinDays: String(warnMinDays),
     warnMinAmount: normalizeFilterMoneyField(query.warnMinAmount)
   };
+}
+
+function parsePurchasePage(query) {
+  var page = parseInt(query && query.page, 10);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+}
+
+function buildPurchaseListQueryString(filter, page) {
+  var params = new URLSearchParams();
+  filter = filter || {};
+  if (filter.q) params.set('q', filter.q);
+  (filter.statuses || []).forEach(function(status) {
+    params.append('trang_thai', status);
+  });
+  if (filter.nha_cung_cap_id) params.set('nha_cung_cap_id', filter.nha_cung_cap_id);
+  if (filter.sort && filter.sort !== 'newest') params.set('sort', filter.sort);
+  if (filter.warnOnly === '1') params.set('warnOnly', '1');
+  if (filter.warnMinDays && String(filter.warnMinDays) !== String(PURCHASE_DEBT_WARN_DEFAULT_DAYS)) {
+    params.set('warnMinDays', filter.warnMinDays);
+  }
+  if (hasFilterQueryValue(filter.warnMinAmount)) params.set('warnMinAmount', filter.warnMinAmount);
+  if (page > 1) params.set('page', String(page));
+  return params.toString();
 }
 
 function purchaseSortSpec(sort) {
@@ -349,6 +373,13 @@ exports.index = async function(req, res, next) {
       applyPurchaseDebtWarning(slip, debtWarnSettings);
     });
     importSlips = filterPurchasesByDebtWarning(importSlips, debtWarnSettings);
+    var pageSize = NHAP_HANG_PAGE_SIZE;
+    var totalSlips = importSlips.length;
+    var page = parsePurchasePage(req.query);
+    var totalPages = Math.max(1, Math.ceil(totalSlips / pageSize));
+    if (page > totalPages) page = totalPages;
+    var skip = (page - 1) * pageSize;
+    importSlips = importSlips.slice(skip, skip + pageSize);
 
     var slipIds = importSlips.map(function(s) { return s._id; });
     var detailRows = [];
@@ -388,7 +419,8 @@ exports.index = async function(req, res, next) {
     if (slipIds.length > 0 && mongoose.models.PhieuTraHangNhap) {
       var returnRows = await mongoose.models.PhieuTraHangNhap.find({
         phieu_nhap_id: { $in: slipIds },
-        trang_thai: { $ne: 'cancelled' }
+        trang_thai: { $ne: 'cancelled' },
+        deleted_at: null
       }).select('phieu_nhap_id ma_phieu_tra_nhap').lean();
       returnRows.forEach(function(row) {
         var slipKey = String(row.phieu_nhap_id || '');
@@ -490,7 +522,19 @@ exports.index = async function(req, res, next) {
       importSlips: importSlips,
       formatDate: formatDate,
       statusLabel: statusLabel,
-      paymentMethodLabel: paymentMethodLabel
+      paymentMethodLabel: paymentMethodLabel,
+      pagination: {
+        total: totalSlips,
+        page: page,
+        limit: pageSize,
+        totalPages: totalPages,
+        from: totalSlips === 0 ? 0 : skip + 1,
+        to: Math.min(skip + pageSize, totalSlips)
+      },
+      buildPurchasePageUrl: function(pageNumber) {
+        var qs = buildPurchaseListQueryString(filter, pageNumber);
+        return '/nhap-hang' + (qs ? '?' + qs : '');
+      }
     });
   } catch (error) {
     next(error);
@@ -746,7 +790,7 @@ function legacyPaymentMethodFromDetail(detail) {
 
 async function loadPurchaseWithItems(id, storeId) {
   if (!mongoose.Types.ObjectId.isValid(String(id || ''))) return null;
-  var filter = { _id: id };
+  var filter = { _id: id, deleted_at: null };
   if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
   var ticket = await PhieuNhap.findOne(filter)
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du dia_chi_chi_tiet phuong_xa tinh_thanh sdt email' })
@@ -1223,7 +1267,7 @@ exports.detail = async function(req, res, next) {
 async function paySupplierLegacyUnused(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
-    var filter = { _id: req.params.id };
+    var filter = { _id: req.params.id, deleted_at: null };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
     var purchase = await PhieuNhap.findOne(filter).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' });
     if (!purchase) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
@@ -1329,7 +1373,7 @@ exports.paySupplier = async function(req, res, next) {
     var result;
     session = await mongoose.startSession();
     await session.withTransaction(async function() {
-      var filter = { _id: req.params.id };
+      var filter = { _id: req.params.id, deleted_at: null };
       if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
       var purchase = await PhieuNhap.findOne(filter)
         .session(session)
@@ -2321,14 +2365,14 @@ exports.exportOneExcel = async function(req, res, next) {
 exports.traHangNhapPage = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
-    var returns = await mongoose.models.PhieuTraHangNhap.find(storeId ? { cua_hang_id: storeId } : {})
+    var returns = await mongoose.models.PhieuTraHangNhap.find(storeId ? { cua_hang_id: storeId, deleted_at: null } : { deleted_at: null })
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .sort({ ngay_tra: -1 })
       .lean();
 
     var suppliers = await mongoose.models.NhaCungCap.find(storeId ? { cua_hang_id: storeId } : {}).lean();
-    var receipts = await mongoose.models.PhieuNhap.find(storeId ? { cua_hang_id: storeId, trang_thai: 'completed' } : { trang_thai: 'completed' }).lean();
+    var receipts = await mongoose.models.PhieuNhap.find(storeId ? { cua_hang_id: storeId, trang_thai: 'completed', deleted_at: null } : { trang_thai: 'completed', deleted_at: null }).lean();
     var products = await mongoose.models.HangHoa.find(storeId ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' }).lean();
 
     res.render('nhap-hang/tra-hang-nhap', {

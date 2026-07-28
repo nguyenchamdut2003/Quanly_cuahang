@@ -206,7 +206,7 @@ async function loadSalesReturn(id) {
 }
 
 async function loadPurchaseReturn(id) {
-  var ticket = await PhieuTraHangNhap.findById(id)
+  var ticket = await PhieuTraHangNhap.findOne({ _id: id, deleted_at: null })
     .populate('cua_hang_id')
     .populate('kho_id')
     .populate('nha_cung_cap_id')

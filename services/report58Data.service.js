@@ -111,11 +111,13 @@ async function fetchPeriodAggregates(range, store) {
         ...rangeFilter(range, 'ngay_ban')
     };
     const returnFilter = {
+        deleted_at: null,
         ...storeFilter(store),
         ...rangeFilter(range, 'ngay_tra')
     };
     const purchaseFilter = {
         trang_thai: { $ne: 'cancelled' },
+        deleted_at: null,
         ...storeFilter(store),
         ...rangeFilter(range, 'ngay_nhap')
     };
@@ -249,7 +251,7 @@ async function fetchRevenueExpenseRows(range, store) {
             .select('ma_hoa_don ngay_ban tong_tien thanh_toan ghi_chu')
             .sort({ ngay_ban: 1 })
             .lean(),
-        PhieuNhap.find({ trang_thai: { $ne: 'cancelled' }, ...sf, ...rangeFilter(range, 'ngay_nhap') })
+        PhieuNhap.find({ trang_thai: { $ne: 'cancelled' }, deleted_at: null, ...sf, ...rangeFilter(range, 'ngay_nhap') })
             .select('ma_phieu_nhap ngay_nhap tong_tien ghi_chu')
             .sort({ ngay_nhap: 1 })
             .lean(),
@@ -399,7 +401,7 @@ async function fetchDebtLedgerRows(range, store) {
             .populate('khach_hang_id', 'ten_khach_hang ma_khach_hang')
             .sort({ ngay_giao_dich: 1, ma_giao_dich: 1 })
             .lean(),
-        GiaoDichCongNoNhaCungCap.find({ ...sf, ...rf })
+        GiaoDichCongNoNhaCungCap.find({ ...sf, ...rf, deleted_at: null, trang_thai: 'active' })
             .populate('nha_cung_cap_id', 'ten_ncc ma_ncc')
             .sort({ ngay_giao_dich: 1, ma_giao_dich: 1 })
             .lean()

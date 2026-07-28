@@ -2,7 +2,7 @@ var express = require('express');
 var multer = require('multer');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var khachHangController = require('../controllers/khachHang.controller');
+var khachHangController = require('../controllers/khachhangcontroller');
 
 var upload = multer({
     storage: multer.memoryStorage(),

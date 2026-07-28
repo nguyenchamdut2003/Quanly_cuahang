@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var caLamViecController = require('../controllers/caLamViec.controller');
+var caLamViecController = require('../controllers/chamcongcu/caLamViec.controller');
 
 router.use(isAuthenticated);
 

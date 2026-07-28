@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var chamcongController = require('../controllers/chamcongMoi.controller');
+var chamcongController = require('../controllers/chamcongmoicontroller');
 
 router.use(isAuthenticated);
 

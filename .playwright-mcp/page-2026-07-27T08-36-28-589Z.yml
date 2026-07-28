@@ -1,0 +1,8 @@
+- generic [ref=e2]:
+  - heading "Hệ thống quản lý bán hàng & kho vận" [level=1] [ref=e3]
+  - generic [ref=e4]: Vui lòng đăng nhập bằng tài khoản admin.
+  - separator [ref=e5]
+  - link [ref=e6] [cursor=pointer]:
+    - /url: /auth/google
+    - img "Google" [ref=e7]
+    - text: Đăng nhập bằng Google

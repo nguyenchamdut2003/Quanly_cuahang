@@ -92,6 +92,9 @@
     .trash-purge-btn{height:34px;border:1px solid #fecaca;background:#fff5f5;color:#b42318;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer}
     .trash-purge-btn:disabled{opacity:.45;cursor:not-allowed}
     .trash-purge-btn:not(:disabled):hover{background:#fee2e2}
+    .trash-restore-btn{height:34px;border:1px solid #bbf7d0;background:#f0fdf4;color:#047857;border-radius:8px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer}
+    .trash-restore-btn:disabled{opacity:.45;cursor:not-allowed}
+    .trash-restore-btn:not(:disabled):hover{background:#dcfce7}
     .trash-expire-note{display:block;font-size:11px;color:#94a3b8;margin-top:2px}
     .trash-check-col{width:42px;text-align:center}
     .trash-check-col input{width:16px;height:16px;cursor:pointer}
@@ -274,6 +277,7 @@
       <% } else { %>
         <div class="trash-toolbar">
           <div class="trash-toolbar-left">
+            <button type="button" class="trash-restore-btn" id="trashRestoreBtn" disabled>Khôi phục</button>
             <button type="button" class="trash-purge-btn" id="trashPurgeBtn" disabled>Xóa vĩnh viễn</button>
             <span class="trash-toolbar-note">Đã chọn: <strong id="trashSelectedCount">0</strong></span>
           </div>
@@ -485,6 +489,7 @@
     (function initTrashPurge() {
       var checkAll = document.getElementById('trashCheckAll');
       var purgeBtn = document.getElementById('trashPurgeBtn');
+      var restoreBtn = document.getElementById('trashRestoreBtn');
       var selectedCountEl = document.getElementById('trashSelectedCount');
 
       function getRootChecks() {
@@ -502,6 +507,7 @@
         var selected = getSelectedIds();
         if (selectedCountEl) selectedCountEl.textContent = String(selected.length);
         if (purgeBtn) purgeBtn.disabled = selected.length === 0;
+        if (restoreBtn) restoreBtn.disabled = selected.length === 0;
         if (checkAll) {
           var checks = getRootChecks();
           checkAll.checked = checks.length > 0 && selected.length === checks.length;
@@ -543,6 +549,28 @@
             })
             .catch(function(err) {
               alert(err.message || 'Không xóa được');
+              updateToolbar();
+            });
+        });
+      }
+
+      if (restoreBtn) {
+        restoreBtn.addEventListener('click', function() {
+          var ids = getSelectedIds();
+          if (!ids.length) return;
+          restoreBtn.disabled = true;
+          fetch('/thung-rac/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ root_ids: ids })
+          })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (!data.success) throw new Error(data.message || 'Không khôi phục được');
+              window.location.reload();
+            })
+            .catch(function(err) {
+              alert(err.message || 'Không khôi phục được');
               updateToolbar();
             });
         });

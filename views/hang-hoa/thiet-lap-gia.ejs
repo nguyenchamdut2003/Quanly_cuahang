@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title %></title>
+  <title>Thiết lập giá</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
 </head>
@@ -130,7 +130,7 @@
 
       <div class="price-setup-workspace">
         <header class="price-setup-page-head">
-          <h1 class="price-setup-title"><%= pageTitle %></h1>
+          <h1 class="price-setup-title">Thiết lập giá</h1>
           <div class="price-setup-head-search">
             <label class="customer-search price-setup-search-wide">
               <span aria-hidden="true">⌕</span>
@@ -143,11 +143,6 @@
             <button type="button" class="btn btn-light price-setup-btn-icon">
               <span aria-hidden="true">↓</span> Xuất file
             </button>
-            <div class="price-setup-icon-group">
-              <button type="button" class="price-setup-icon-btn" title="Chế độ xem" aria-label="Chế độ xem">☰</button>
-              <button type="button" class="price-setup-icon-btn" title="Thiết lập" aria-label="Thiết lập">⚙</button>
-              <button type="button" class="price-setup-icon-btn" title="Trợ giúp" aria-label="Trợ giúp">?</button>
-            </div>
           </div>
         </header>
 
@@ -170,15 +165,6 @@
                 <th scope="col">Loại áp dụng</th>
                 <th scope="col">Giá mặc định</th>
                 <th scope="col">Cho sửa giá</th>
-              </tr>
-              <tr class="price-setup-filter-row">
-                <th>
-                  <input class="price-setup-th-input" type="text" name="filterMa" placeholder="Tìm mã hàng" value="<%= filter.filterMa %>">
-                </th>
-                <th>
-                  <input class="price-setup-th-input" type="text" name="filterTen" placeholder="Tìm tên hàng" value="<%= filter.filterTen %>">
-                </th>
-                <th colspan="9" class="price-setup-filter-row-spacer"></th>
               </tr>
             </thead>
             <tbody>
@@ -232,12 +218,7 @@
 
         <footer class="price-setup-footer">
           <div class="price-setup-page-size">
-            <span>Hiển thị</span>
-            <select name="limit" class="price-setup-limit-select" onchange="document.getElementById('priceSetupPage').value='1'; document.getElementById('priceSetupFilterForm').submit();">
-              <% [15, 25, 50, 100].forEach(function(n) { %>
-                <option value="<%= n %>" <%= pagination.limit === n ? 'selected' : '' %>><%= n %> dòng</option>
-              <% }) %>
-            </select>
+            <span>Hiển thị 10 dòng/trang</span>
           </div>
           <nav class="price-setup-pagination" aria-label="Phân trang">
             <% if (pagination.page > 1) { %>

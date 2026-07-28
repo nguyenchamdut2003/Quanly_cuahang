@@ -185,6 +185,11 @@
       return q.length ? ('?' + q.join('&')) : '';
     }
 
+    function closeDateMenu() {
+      var menu = pane.querySelector('[data-lot-profit-date-menu]');
+      if (menu) menu.classList.remove('is-open');
+    }
+
     function lotLabel(lot) {
       return lot.label || lot.ten_lo || lot.ma_lo || 'Lô không tên';
     }
@@ -292,6 +297,36 @@
 
     var lotSelect = pane.querySelector('[data-field="lo_hang_id"]');
     if (lotSelect) lotSelect.addEventListener('change', loadReport);
+    var dateToggle = pane.querySelector('[data-lot-profit-date-toggle]');
+    var dateMenu = pane.querySelector('[data-lot-profit-date-menu]');
+    if (dateToggle && dateMenu) {
+      dateToggle.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        dateMenu.classList.toggle('is-open');
+      });
+      dateMenu.addEventListener('click', function(event) {
+        event.stopPropagation();
+      });
+      var applyDateBtn = pane.querySelector('[data-lot-profit-date-apply]');
+      var clearDateBtn = pane.querySelector('[data-lot-profit-date-clear]');
+      if (applyDateBtn) {
+        applyDateBtn.addEventListener('click', function() {
+          closeDateMenu();
+          loadReport();
+        });
+      }
+      if (clearDateBtn) {
+        clearDateBtn.addEventListener('click', function() {
+          pane.querySelectorAll('[data-field="ngay_nhap_from"], [data-field="ngay_nhap_to"]').forEach(function(input) {
+            input.value = '';
+          });
+          closeDateMenu();
+          loadReport();
+        });
+      }
+      document.addEventListener('click', closeDateMenu);
+    }
     var exportBtn = pane.querySelector('.lot-profit-export');
     if (exportBtn) {
       exportBtn.addEventListener('click', function() {

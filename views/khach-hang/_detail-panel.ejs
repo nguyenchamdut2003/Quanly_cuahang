@@ -10,6 +10,7 @@
                               <button class="detail-tab" type="button" data-tab-target="orders">Đơn hàng</button>
                               <button class="detail-tab" type="button" data-tab-target="invoices">Hóa đơn</button>
                               <button class="detail-tab" type="button" data-tab-target="returns">Trả hàng</button>
+                              <button class="detail-tab" type="button" data-tab-target="vat-chua">Nhập/Trả vật chứa</button>
                               <button class="detail-tab" type="button" data-tab-target="debts">Công nợ</button>
                             </div>
                             <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
@@ -363,6 +364,89 @@
                                       <td><%= customerReturnStatusLabel[ret.trang_thai] || ret.trang_thai || '---' %></td>
                                       <td><%= ret.ghi_chu || '---' %></td>
                                       <td><a class="btn btn-light btn-sm" href="/don-hang/tra-hang?customer=<%= selectedCustomer._id %>">Xem</a></td>
+                                    </tr>
+                                  <% }) %>
+                                </tbody>
+                              </table>
+                            </div>
+                            <div class="customer-detail-pane" data-tab-pane="vat-chua">
+                              <%
+                                var customerVatChuaTotalQty = (customerVatChuaHistory || []).reduce(function(sum, row) {
+                                  var sign = row.loai === 'tra_vat_chua' ? -1 : 1;
+                                  return sum + sign * Number(row.so_luong || 0);
+                                }, 0);
+                                var customerVatChuaTotalMoney = (customerVatChuaHistory || []).reduce(function(sum, row) {
+                                  var sign = row.loai === 'tra_vat_chua' ? -1 : 1;
+                                  return sum + sign * Number(row.tong_cong || 0);
+                                }, 0);
+                              %>
+                              <table class="admin-table warehouse-table">
+                                <thead>
+                                  <tr>
+                                    <th class="text-center">Mã phiếu</th>
+                                    <th class="text-center">Thời gian</th>
+                                    <th class="text-center">Người tạo</th>
+                                    <th class="text-center">
+                                      Số lượng
+                                      <% if ((customerVatChuaHistory || []).length > 0) { %>
+                                        <div class="supplier-column-total <%= customerVatChuaTotalQty < 0 ? 'is-return' : '' %>"><%= customerVatChuaTotalQty.toLocaleString('vi-VN') %></div>
+                                      <% } %>
+                                    </th>
+                                    <th class="text-center">
+                                      Tổng tiền
+                                      <% if ((customerVatChuaHistory || []).length > 0) { %>
+                                        <div class="supplier-column-total <%= customerVatChuaTotalMoney < 0 ? 'is-return' : '' %>"><%= customerVatChuaTotalMoney.toLocaleString('vi-VN') %> VNĐ</div>
+                                      <% } %>
+                                    </th>
+                                    <th class="text-center">Trạng thái</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <% if (!(customerVatChuaHistory || []).length) { %>
+                                    <tr><td colspan="6" class="empty-cell">Chưa có lịch sử nhập/trả vật chứa.</td></tr>
+                                  <% } %>
+                                  <% (customerVatChuaHistory || []).forEach(function(row) { %>
+                                    <%
+                                      var isReturnVatChua = row.loai === 'tra_vat_chua';
+                                      var vatChuaHref = '#';
+                                      if (row.loai === 'nhap_vat_chua' && row.nhap_vat_chua_id) vatChuaHref = '/vat-chua?nhap_vat_chua=' + encodeURIComponent(String(row.nhap_vat_chua_id));
+                                      else if (row.loai === 'tra_vat_chua') vatChuaHref = '/vat-chua';
+                                      var vatChuaTypeLabel = isReturnVatChua ? 'Trả vật chứa' : 'Nhập vật chứa';
+                                      var vatChuaStatusClass = 'status-pill';
+                                      if (row.trang_thai === 'completed') vatChuaStatusClass += ' is-active';
+                                      else if (row.trang_thai === 'active') vatChuaStatusClass += ' is-active';
+                                      else if (row.trang_thai === 'draft') vatChuaStatusClass += ' is-draft';
+                                      else if (row.trang_thai === 'cancelled') vatChuaStatusClass += ' is-cancelled';
+                                    %>
+                                    <tr>
+                                      <td class="text-center">
+                                        <a href="<%= vatChuaHref %>" class="table-code-link ref-link">
+                                          <% if (!isReturnVatChua) { %>
+                                            <i class="fa-solid fa-file-import history-type-icon" title="Nhập vật chứa"></i>
+                                          <% } else { %>
+                                            <i class="fa-solid fa-arrow-rotate-left history-type-icon history-type-icon--return" title="Trả vật chứa"></i>
+                                          <% } %>
+                                          <%= row.ma_phieu || '--' %>
+                                        </a>
+                                      </td>
+                                      <td class="supplier-muted-cell text-center"><%= formatDate(row.thoi_gian) %></td>
+                                      <td class="text-center">
+                                        <div class="history-creator">
+                                          <span class="history-creator-avatar"><%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %></span>
+                                          <%= row.nguoi_tao || '--' %>
+                                        </div>
+                                      </td>
+                                      <td class="text-center">
+                                        <span class="history-amount <%= isReturnVatChua ? 'is-return' : '' %>">
+                                          <%= isReturnVatChua ? '-' : '' %><%= Number(row.so_luong || 0).toLocaleString('vi-VN') %>
+                                        </span>
+                                      </td>
+                                      <td class="text-center">
+                                        <span class="history-amount <%= isReturnVatChua ? 'is-return' : '' %>">
+                                          <%= isReturnVatChua ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ
+                                        </span>
+                                      </td>
+                                      <td class="text-center"><span class="<%= vatChuaStatusClass %>"><%= vatChuaTypeLabel %></span></td>
                                     </tr>
                                   <% }) %>
                                 </tbody>

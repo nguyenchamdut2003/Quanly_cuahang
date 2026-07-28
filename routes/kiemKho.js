@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var kiemKhoController = require('../controllers/kiemKho.controller');
+var kiemKhoController = require('../controllers/kiemkhocontroller');
 
 router.use(isAuthenticated);
 router.post('/preview-ton-he-thong', kiemKhoController.postPreviewTonHeThong);

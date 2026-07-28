@@ -98,7 +98,11 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback_secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // in production use true with https
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production'
+  }
 }));
 
 app.use(passport.initialize());
@@ -247,8 +251,8 @@ app.use(async function(req, res, next) {
   next();
 });
 
+app.use('/', authRouter);
 app.use('/', indexRouter);
-app.use('/auth', authRouter);
 app.use('/profile', profileRouter);
 app.use('/cua-hang', cuaHangRouter);
 app.use('/hang-hoa', hangHoaRouter);

@@ -66,7 +66,8 @@ async function listDonHangThu(storeId, customerId) {
   const filter = {
     cua_hang_id: storeId,
     khach_hang_id: customerId,
-    trang_thai: CANCELLED_EXCLUDE
+    trang_thai: CANCELLED_EXCLUDE,
+    deleted_at: null
   };
   const orders = await DonHang.find(filter)
     .select('ma_don_hang khach_hang_id khach_can_tra khach_thanh_toan tong_thanh_toan tong_tien')
@@ -169,7 +170,8 @@ async function listPhieuTraHangNhapThu(storeId, supplierId) {
   const filter = {
     cua_hang_id: storeId,
     nha_cung_cap_id: supplierId,
-    trang_thai: CANCELLED_EXCLUDE
+    trang_thai: CANCELLED_EXCLUDE,
+    deleted_at: null
   };
   const rows = await PhieuTraHangNhap.find(filter)
     .select('ma_phieu_tra_nhap nha_cung_cap_id ncc_can_tra ncc_da_tra')
@@ -200,6 +202,7 @@ async function listPhieuNhapChi(storeId, supplierId) {
     cua_hang_id: storeId,
     nha_cung_cap_id: supplierId,
     trang_thai: CANCELLED_EXCLUDE,
+    deleted_at: null,
     con_no_ncc: { $gt: 0 }
   };
   const rows = await PhieuNhap.find(filter)
@@ -530,7 +533,7 @@ async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, do
       return { remaining: Math.max(0, payable - Number(paid || 0)), found: true, code: invoice.ma_hoa_don };
     }
     if (docType === 'phieu_tra_hang_nhap') {
-      const row = await PhieuTraHangNhap.findOne({ _id: docId, cua_hang_id: storeId }).lean();
+      const row = await PhieuTraHangNhap.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null }).lean();
       if (!row || row.trang_thai === 'cancelled') return { remaining: 0, found: false };
       const remaining = Math.max(0, Number(row.ncc_can_tra || 0) - Number(row.ncc_da_tra || 0));
       return { remaining, found: remaining > 0, code: row.ma_phieu_tra_nhap };
@@ -544,13 +547,13 @@ async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, do
     }
   } else {
     if (docType === 'phieu_nhap') {
-      const row = await PhieuNhap.findOne({ _id: docId, cua_hang_id: storeId }).lean();
+      const row = await PhieuNhap.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null }).lean();
       if (!row || row.trang_thai === 'cancelled') return { remaining: 0, found: false };
       const remaining = Number(row.con_no_ncc || 0);
       return { remaining, found: remaining > 0, code: row.ma_phieu_nhap };
     }
     if (docType === 'phieu_tra_hang') {
-      const row = await PhieuTraHang.findOne({ _id: docId, cua_hang_id: storeId }).lean();
+      const row = await PhieuTraHang.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null }).lean();
       if (!row || ['cancelled'].includes(String(row.trang_thai || ''))) return { remaining: 0, found: false };
       const paid = await sumReceiptAmount('chi', { phieu_tra_hang_id: docId });
       const remaining = Math.max(0, Number(row.can_tra_khach || 0) - paid);

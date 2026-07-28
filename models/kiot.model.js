@@ -29,7 +29,8 @@ const CuaHangSchema = new Schema({
 const NguoiDungSchema = new Schema({
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
   google_id: { type: String, unique: true, sparse: true },
-  email: { type: String, unique: true, required: true },
+  email: { type: String, unique: true, required: true, trim: true, lowercase: true },
+  password_hash: { type: String, select: false },
   ho_ten: { type: String },
   anh_dai_dien: { type: String },
   sdt: { type: String },
@@ -775,7 +776,9 @@ const CtPhieuTraHangNhapSchema = new Schema({
   gia_nhap: { type: Number, default: 0 },
   gia_tra_lai: { type: Number, default: 0 },
   ghi_chu: { type: String },
-  thanh_tien: { type: Number, default: 0 }
+  thanh_tien: { type: Number, default: 0 },
+  deleted_at: { type: Date, default: null, index: true },
+  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'ct_phieu_tra_hang_nhap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -923,6 +926,18 @@ const CongNoNhaCungCapSchema = new Schema({
   ngay: {
     type: Date,
     default: Date.now
+  },
+
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
   }
 }, {
   collection: 'cong_no_nha_cung_cap',
@@ -1788,7 +1803,9 @@ const CTPhieuTraHangSchema = new Schema({
   thanh_tien: { type: Number },
   ghi_chu: {
     type: String
-  }
+  },
+  deleted_at: { type: Date, default: null, index: true },
+  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "ct_phieu_tra_hang" });
 CTPhieuTraHangSchema.index({ phieu_tra_hang_id: 1, ct_hoa_don_id: 1 });
 
@@ -1823,12 +1840,6 @@ const CTPhieuKiemKhoSchema = new Schema({
   nguyen_nhan_lech: { type: String }
 }, { collection: "ct_phieu_kiem_kho" });
 
-// SO_QUY — danh mục tên sổ dùng chung toàn hệ thống; số dư tính từ PhieuThuChi (không lưu so_du trên SoQuy).
-// Migration DB (thủ công, sau backup):
-// 1) Gộp sổ trùng (nhiều "Tiền mặt" theo cửa hàng cũ) trước khi tạo index mới.
-// 2) db.so_quy.updateMany({}, { $unset: { cua_hang_id: "", chi_nhanh_id: "" } });
-// 3) Drop index cũ: uq_so_quy_store_branch_type_name, uq_so_quy_bank_account, uq_so_quy_default_per_type, idx_so_quy_list (nếu còn).
-// 4) Khởi động lại app để Mongoose tạo index mới.
 const SoQuySchema = new Schema({
   ten_so_quy: {
     type: String,
@@ -2033,10 +2044,14 @@ const CongNoKhachHangSchema = new Schema({
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
   phieu_thu_chi_id: { type: ObjectId, ref: 'PhieuThuChi' },
+  phieu_tra_hang_id: { type: ObjectId, ref: 'PhieuTraHang', default: null },
+  cua_hang_id: { type: ObjectId, ref: 'CuaHang', default: null },
   so_tien: { type: Number },
   loai: { type: String },
   ghi_chu: { type: String },
-  ngay: { type: Date, default: Date.now }
+  ngay: { type: Date, default: Date.now },
+  deleted_at: { type: Date, default: null, index: true },
+  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "cong_no_khach_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const VatChuaNhapXuatItemSchema = new Schema({
@@ -2382,6 +2397,18 @@ const GiaoDichCongNoNhaCungCapSchema = new Schema({
 
   ly_do_huy: {
     type: String
+  },
+
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
   }
 }, {
   collection: 'giao_dich_cong_no_nha_cung_cap',
@@ -2549,6 +2576,18 @@ const GiaoDichCongNoKhachHangSchema = new Schema({
 
   ly_do_huy: {
     type: String
+  },
+
+  deleted_at: {
+    type: Date,
+    default: null,
+    index: true
+  },
+
+  deleted_by: {
+    type: ObjectId,
+    ref: 'NguoiDung',
+    default: null
   }
 }, {
   collection: 'giao_dich_cong_no_khach_hang',

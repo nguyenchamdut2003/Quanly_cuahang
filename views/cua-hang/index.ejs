@@ -14,6 +14,11 @@
     .store-import-menu button,.store-import-menu a{display:block;width:100%;border:0;background:#fff;text-align:left;padding:10px 14px;font-size:13px;color:#111827;text-decoration:none;cursor:pointer}
     .store-import-menu button:hover,.store-import-menu a:hover{background:#f8fafc}
     .store-import-menu button + button,.store-import-menu a + button{border-top:1px solid #f2f4f7}
+    .store-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid #e5e7eb;background:#fff;color:#475467;font-size:14px}
+    .store-pagination__actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .store-page-link{min-width:34px;height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:700}
+    .store-page-link.is-active{background:#0070f4;border-color:#0070f4;color:#fff}
+    .store-page-link.is-disabled{pointer-events:none;opacity:.45}
   </style>
 </head>
 <body class="admin-body">
@@ -178,7 +183,20 @@
       </section>
     <% } %>
 
-    <% var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : ''; %>
+    <%
+      var filterQueryPrefix = filterQueryString ? filterQueryString + '&' : '';
+      var pageQueryString = filterQueryString || '';
+      if (pagination && pagination.page > 1) {
+        pageQueryString += (pageQueryString ? '&' : '') + 'page=' + encodeURIComponent(pagination.page);
+      }
+      var pageQueryPrefix = pageQueryString ? pageQueryString + '&' : '';
+      function buildStorePageUrl(pageNumber) {
+        var parts = [];
+        if (filterQueryString) parts.push(filterQueryString);
+        if (pageNumber > 1) parts.push('page=' + encodeURIComponent(pageNumber));
+        return '/cua-hang' + (parts.length ? '?' + parts.join('&') : '');
+      }
+    %>
     <div class="store-layout">
       <aside class="store-filter-panel">
         <form method="get" action="/cua-hang" id="storeFilterForm" class="store-filter-form">
@@ -283,7 +301,7 @@
               <% } %>
               <% stores.forEach(function(store) { %>
                 <% var isSelected = selectedStore && String(selectedStore._id) === String(store._id); %>
-                <% var rowHref = isSelected ? ('/cua-hang' + (filterQueryString ? '?' + filterQueryString : '')) : ('/cua-hang?' + filterQueryPrefix + 'store=' + store._id); %>
+                <% var rowHref = isSelected ? ('/cua-hang' + (pageQueryString ? '?' + pageQueryString : '')) : ('/cua-hang?' + pageQueryPrefix + 'store=' + store._id); %>
                 <tr class="<%= isSelected ? 'is-selected' : '' %>" onclick="window.location.href='<%= rowHref %>'">
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
                   <td><a class="table-code-link" href="<%= rowHref %>"><%= store.ma_cua_hang || '---' %></a></td>
@@ -518,6 +536,22 @@
             </tbody>
           </table>
           </form>
+          <% if (pagination && pagination.totalPages > 1) { %>
+            <div class="store-pagination">
+              <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> cửa hàng</div>
+              <div class="store-pagination__actions" aria-label="Phân trang cửa hàng">
+                <a class="store-page-link <%= pagination.page <= 1 ? 'is-disabled' : '' %>" href="<%= buildStorePageUrl(Math.max(1, pagination.page - 1)) %>">‹</a>
+                <% for (var pageNumber = 1; pageNumber <= pagination.totalPages; pageNumber++) { %>
+                  <a class="store-page-link <%= pageNumber === pagination.page ? 'is-active' : '' %>" href="<%= buildStorePageUrl(pageNumber) %>"><%= pageNumber %></a>
+                <% } %>
+                <a class="store-page-link <%= pagination.page >= pagination.totalPages ? 'is-disabled' : '' %>" href="<%= buildStorePageUrl(Math.min(pagination.totalPages, pagination.page + 1)) %>">›</a>
+              </div>
+            </div>
+          <% } else if (pagination) { %>
+            <div class="store-pagination">
+              <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> cửa hàng</div>
+            </div>
+          <% } %>
           <% if (selectedStore) { %>
             <form id="warehouseAddForm" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/add"></form>
             <% warehouses.forEach(function(warehouse) { %>
@@ -540,7 +574,13 @@
       var ghnWardCache = {};
 
       function normalizeText(value) {
-        return String(value || '').trim().toLowerCase();
+        return String(value || '')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/đ/g, 'd')
+          .replace(/Đ/g, 'd')
+          .trim()
+          .toLowerCase();
       }
 
       function getFieldBlock(container, selector) {
@@ -629,14 +669,33 @@
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
+        function chooseMatchingOption() {
+          var term = normalizeText(input.value);
+          if (!term) {
+            if (select.value) choose('');
+            return;
+          }
+          var matched = options().find(function(option) {
+            return normalizeText(option.textContent) === term || normalizeText(option.value) === term;
+          }) || options().find(function(option) {
+            return normalizeText(option.textContent).indexOf(term) !== -1 || normalizeText(option.value).indexOf(term) !== -1;
+          });
+          if (matched && select.value !== matched.value) {
+            choose(matched.value);
+          }
+        }
+
         input.addEventListener('focus', openMenu);
         input.addEventListener('input', openMenu);
+        input.addEventListener('blur', function() {
+          window.setTimeout(chooseMatchingOption, 120);
+        });
         input.addEventListener('keydown', function(event) {
           if (event.key !== 'Enter') return;
           var firstOption = menu.querySelector('.address-combobox-option');
-          if (!firstOption) return;
           event.preventDefault();
-          choose(firstOption.getAttribute('data-value') || '');
+          if (firstOption) choose(firstOption.getAttribute('data-value') || '');
+          else chooseMatchingOption();
         });
         toggle.addEventListener('click', function() {
           input.focus();
@@ -811,7 +870,7 @@
           storeCreateForm.reset();
           var createWardSelect = storeCreateForm.querySelector('.js-ghn-ward');
           if (createWardSelect) {
-            createWardSelect.innerHTML = '<option value="">Chá»n phÆ°á»ng/xÃ£</option>';
+            createWardSelect.innerHTML = '<option value="">Chọn phường/xã</option>';
             createWardSelect.value = '';
           }
           storeCreateForm.querySelectorAll('.js-ghn-province, .js-ghn-ward').forEach(refreshAddressSelect);

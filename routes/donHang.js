@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var donHangController = require('../controllers/donHang.controller');
+var donHangController = require('../controllers/dathangcontroller');
 
 router.use(isAuthenticated);
 router.get('/gop-don/candidates', donHangController.getGopDonCandidates);

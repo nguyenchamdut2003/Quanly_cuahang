@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
-var banHangController = require('../controllers/banHang.controller');
+var banHangController = require('../controllers/dathangcontroller/banHang.controller');
 
 router.use(isAuthenticated);
 router.get('/', banHangController.index);
