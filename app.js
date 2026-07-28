@@ -61,13 +61,18 @@ var thietLapNhanVienRouter = require('./routes/thietLapNhanVien');
 var thungRacRouter = require('./routes/thungRac');
 var shortcutRouter = require('./routes/shortcut');
 var systemRouter = require('./routes/system');
-var { countActiveTrashRoots } = require('./services/trashList.service');
 var { isPerformanceEnabled } = require('./utils/performance.util');
 
 var app = express();
 
 function isStaticAssetRequestPath(requestPath) {
   return /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)$/i.test(requestPath || '');
+}
+
+function isHeaderStoreDataRequired(req) {
+  var requestPath = String(req.path || '');
+  return requestPath.indexOf('/cua-hang/api/') !== 0
+    && requestPath.indexOf('/api/address/') !== 0;
 }
 
 // view engine setup
@@ -210,6 +215,10 @@ app.use(async (req, res, next) => {
     return next();
   }
 
+  if (!isHeaderStoreDataRequired(req)) {
+    return next();
+  }
+
   try {
     const stores = await CuaHang.find({ trang_thai: 'active' })
       .sort({ ma_cua_hang: 1, created_at: 1 })
@@ -238,16 +247,8 @@ app.use(async (req, res, next) => {
   }
 });
 
-app.use(async function(req, res, next) {
+app.use(function(req, res, next) {
   res.locals.trashCount = 0;
-  if (!req.user || !res.locals.currentStore || !res.locals.currentStore._id) {
-    return next();
-  }
-  try {
-    res.locals.trashCount = await countActiveTrashRoots(res.locals.currentStore._id);
-  } catch (error) {
-    res.locals.trashCount = 0;
-  }
   next();
 });
 

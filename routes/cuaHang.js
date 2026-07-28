@@ -12,6 +12,10 @@ var upload = multer({
 router.use(isAuthenticated);
 
 router.get('/', cuaHangController.index);
+router.get('/api/warehouse-counts', cuaHangController.warehouseCounts);
+router.get('/api/province-options', cuaHangController.provinceOptions);
+router.get('/api/:id/detail', cuaHangController.detail);
+router.get('/api/:id/warehouses', cuaHangController.warehouses);
 router.get('/export.xlsx', cuaHangController.exportExcel);
 router.get('/import/template.xlsx', cuaHangController.downloadImportTemplate);
 router.post('/import', upload.single('file'), cuaHangController.importExcel);

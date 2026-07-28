@@ -10,6 +10,7 @@ exports.index = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const pageData = await loadTrashPageData(storeId);
+    res.locals.trashCount = pageData.totalRoots || 0;
 
     res.render('thung-rac/index', {
       activeMenu: 'thung-rac',

@@ -189,7 +189,6 @@
       if (pagination && pagination.page > 1) {
         pageQueryString += (pageQueryString ? '&' : '') + 'page=' + encodeURIComponent(pagination.page);
       }
-      var pageQueryPrefix = pageQueryString ? pageQueryString + '&' : '';
       function buildStorePageUrl(pageNumber) {
         var parts = [];
         if (filterQueryString) parts.push(filterQueryString);
@@ -279,7 +278,7 @@
       <section class="store-table-panel">
         <div class="table-wrap">
           <form id="bulkDeleteForm" method="post" action="/cua-hang/delete-selected">
-          <table class="admin-table store-table">
+          <table class="admin-table store-table" data-kv-master="cua-hang">
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllStores" type="checkbox" aria-label="Chọn tất cả"></th>
@@ -300,16 +299,14 @@
                 </tr>
               <% } %>
               <% stores.forEach(function(store) { %>
-                <% var isSelected = selectedStore && String(selectedStore._id) === String(store._id); %>
-                <% var rowHref = isSelected ? ('/cua-hang' + (pageQueryString ? '?' + pageQueryString : '')) : ('/cua-hang?' + pageQueryPrefix + 'store=' + store._id); %>
-                <tr class="<%= isSelected ? 'is-selected' : '' %>" onclick="window.location.href='<%= rowHref %>'">
-                  <td class="check-cell" onclick="event.stopPropagation()"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
-                  <td><a class="table-code-link" href="<%= rowHref %>"><%= store.ma_cua_hang || '---' %></a></td>
+                <tr class="store-list-row" data-kv-detail-id="<%= store._id %>">
+                  <td class="check-cell"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
+                  <td><a class="table-code-link kv-detail-code-link" href="/cua-hang"><%= store.ma_cua_hang || '---' %></a></td>
                   <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi_day_du || store.dia_chi || 'Chưa có địa chỉ' %></div></td>
                   <td><%= store.ma_so_thue || '---' %></td>
                   <td><%= store.sdt || '---' %></td>
                   <td><%= store.email || '---' %></td>
-                  <td><%= warehouseCountMap[String(store._id)] || 0 %></td>
+                  <td><span class="store-warehouse-count" data-store-id="<%= store._id %>">...</span></td>
                   <td>
                     <span class="status-pill <%= store.trang_thai === 'active' ? 'is-active' : '' %>">
                       <%= store.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
@@ -318,224 +315,11 @@
                   <td><%= formatDate(store.created_at) %></td>
                 </tr>
 
-                <% if (isSelected) { %>
-                  <tr class="store-detail-row">
-                    <td colspan="9">
-                      <div class="store-detail">
-                        <div class="detail-tabs">
-                          <div class="detail-tab-list">
-                            <button class="detail-tab is-active" type="button" data-tab-target="store-info">Thông tin</button>
-                            <button class="detail-tab" type="button" data-tab-target="store-warehouses">Danh sách kho</button>
-                            <button class="detail-tab" type="button" data-tab-target="store-notes">Ghi chú</button>
-                          </div>
-                          <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
-                        </div>
-
-                        <div class="store-detail-body">
-                          <div class="store-detail-pane is-active" data-tab-pane="store-info">
-                          <div class="store-info-block">
-                            <div class="store-image-placeholder">CH</div>
-                            <div>
-                              <h2><%= selectedStore.ten_cua_hang || 'Cửa hàng' %></h2>
-                              <p><%= selectedStore.ma_cua_hang || '---' %> - <%= selectedStore.tinh_thanh || 'Chưa có tỉnh thành' %></p>
-                              <div class="tag-row">
-                                <span class="tag">Cửa hàng</span>
-                                <span class="tag tag-green"><%= selectedStore.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div class="store-fields">
-                            <div>
-                              <span>Mã cửa hàng</span>
-                              <input name="ma_cua_hang" value="<%= selectedStore.ma_cua_hang || '' %>">
-                            </div>
-                            <div>
-                              <span>Tên cửa hàng *</span>
-                              <input name="ten_cua_hang" value="<%= selectedStore.ten_cua_hang || '' %>" required>
-                            </div>
-                            <div>
-                              <span>Mã số thuế</span>
-                              <input name="ma_so_thue" value="<%= selectedStore.ma_so_thue || '' %>">
-                            </div>
-                            <div>
-                              <span>Điện thoại</span>
-                              <input name="sdt" value="<%= selectedStore.sdt || '' %>">
-                            </div>
-                            <div>
-                              <span>Email</span>
-                              <input name="email" type="email" value="<%= selectedStore.email || '' %>">
-                            </div>
-                            <div>
-                              <span>Địa chỉ chi tiết</span>
-                              <input name="dia_chi_chi_tiet" value="<%= selectedStore.dia_chi_chi_tiet || '' %>">
-                            </div>
-                            <div>
-                              <span>Địa chỉ đầy đủ</span>
-                              <input value="<%= selectedStore.dia_chi_day_du || selectedStore.dia_chi || '' %>" readonly>
-                            </div>
-                            <div>
-                              <span>Phường/xã</span>
-                              <select class="js-ghn-ward" name="phuong_xa" data-selected-id="<%= selectedStore.phuong_xa_code || '' %>" data-selected-name="<%= selectedStore.phuong_xa || '' %>">
-                                <% if (selectedStore.phuong_xa) { %>
-                                  <option value="<%= selectedStore.phuong_xa %>" selected><%= selectedStore.phuong_xa %></option>
-                                <% } else { %>
-                                  <option value="">Chọn phường/xã</option>
-                                <% } %>
-                              </select>
-                              <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= selectedStore.phuong_xa_code || '' %>">
-                            </div>
-                            <div>
-                              <span>Tỉnh/thành</span>
-                              <select class="js-ghn-province" name="tinh_thanh" data-selected-id="<%= selectedStore.tinh_thanh_id || '' %>" data-selected-name="<%= selectedStore.tinh_thanh || '' %>">
-                                <% if (selectedStore.tinh_thanh) { %>
-                                  <option value="<%= selectedStore.tinh_thanh %>" selected><%= selectedStore.tinh_thanh %></option>
-                                <% } else { %>
-                                  <option value="">Chọn tỉnh/thành</option>
-                                <% } %>
-                              </select>
-                              <input type="hidden" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= selectedStore.tinh_thanh_id || '' %>">
-                            </div>
-                            <div>
-                              <span>Trạng thái</span>
-                              <select name="trang_thai">
-                                <option value="active" <%= selectedStore.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
-                                <option value="inactive" <%= selectedStore.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
-                              </select>
-                            </div>
-                            <div>
-                              <span>Kho trực thuộc</span>
-                              <strong><%= warehouses.length %></strong>
-                            </div>
-                          </div>
-                          </div>
-
-                          <div class="store-detail-pane" data-tab-pane="store-warehouses">
-                          <div class="warehouse-section">
-                            <table class="admin-table warehouse-table">
-                              <thead>
-                                <tr>
-                                  <th>Mã kho</th>
-                                  <th>Tên kho</th>
-                                  <th>Địa chỉ</th>
-                                  <th>Phường/xã</th>
-                                  <th>Tỉnh/thành</th>
-                                  <th>Trạng thái</th>
-                                  <th>Thời gian tạo</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <% if (warehouses.length === 0) { %>
-                                  <tr>
-                                    <td colspan="7" class="empty-cell">Chưa có kho cho cửa hàng này.</td>
-                                  </tr>
-                                <% } %>
-                                <tr class="warehouse-edit-row warehouse-add-row">
-                                  <td><input form="warehouseAddForm" name="ma_kho" value="" placeholder="Mã kho (tự động)"></td>
-                                  <td><input form="warehouseAddForm" name="ten_kho" value="" placeholder="Tên kho mới"></td>
-                                  <td><input form="warehouseAddForm" name="dia_chi_chi_tiet" value="" placeholder="Địa chỉ chi tiết"></td>
-                                  <td><input form="warehouseAddForm" name="phuong_xa" value="" placeholder="Phường/xã"></td>
-                                  <td><input form="warehouseAddForm" name="tinh_thanh" value="" placeholder="Tỉnh/thành"></td>
-                                  <td>
-                                    <select form="warehouseAddForm" name="trang_thai">
-                                      <option value="active" selected>Đang hoạt động</option>
-                                      <option value="inactive">Ngừng hoạt động</option>
-                                    </select>
-                                  </td>
-                                  <td class="warehouse-action-cell">
-                                    <button
-                                      form="warehouseAddForm"
-                                      class="btn btn-primary btn-sm"
-                                      type="submit"
-                                      onclick="return confirm('Bạn có muốn thêm kho mới không?')"
-                                    >✨ Thêm</button>
-
-                                  </td>
-                                </tr>
-                                <% warehouses.forEach(function(warehouse) { %>
-                                  <% var warehouseFormId = 'warehouseForm_' + String(warehouse._id); %>
-                                  <tr class="warehouse-edit-row">
-                                    <td><input form="<%= warehouseFormId %>" name="ma_kho" value="<%= warehouse.ma_kho || '' %>"></td>
-                                    <td><input form="<%= warehouseFormId %>" name="ten_kho" value="<%= warehouse.ten_kho || '' %>" required></td>
-                                    <td><input form="<%= warehouseFormId %>" name="dia_chi_chi_tiet" value="<%= warehouse.dia_chi_chi_tiet || warehouse.dia_chi_day_du || warehouse.dia_chi || '' %>"></td>
-                                    <td><input form="<%= warehouseFormId %>" name="phuong_xa" value="<%= warehouse.phuong_xa || '' %>"></td>
-                                    <td><input form="<%= warehouseFormId %>" name="tinh_thanh" value="<%= warehouse.tinh_thanh || '' %>"></td>
-                                    <td>
-                                      <select form="<%= warehouseFormId %>" name="trang_thai">
-                                        <option value="active" <%= warehouse.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
-                                        <option value="inactive" <%= warehouse.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
-                                      </select>
-                                    </td>
-                                    <td class="warehouse-action-cell">
-                                      <div class="warehouse-action-meta"><%= formatDate(warehouse.created_at) %></div>
-                                      <div class="warehouse-action-buttons">
-                                        <button
-                                          form="<%= warehouseFormId %>"
-                                          class="btn btn-light btn-sm"
-                                          type="submit"
-                                          onclick="return confirm('Bạn có muốn lưu chỉnh sửa kho này không?')"
-                                        >💾 Lưu</button>
-                                        <button
-                                          form="warehouseDeleteForm_<%= warehouse._id %>"
-                                          class="btn btn-danger btn-sm"
-                                          type="submit"
-                                          onclick="return confirm('Bạn có chắc muốn xóa kho này không?')"
-                                        >🗑️ Xóa</button>
-
-                                      </div>
-                                    </td>
-                                  </tr>
-                                <% }) %>
-                              </tbody>
-                            </table>
-                          </div>
-                          </div>
-
-                          <div class="store-detail-pane" data-tab-pane="store-notes">
-                            <div class="warehouse-section">
-                              <h3>Ghi chú</h3>
-                              <p class="muted-line">Chưa có ghi chú cho cửa hàng này.</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div class="page-actions detail-panel-footer page-actions--sm">
-                          <button
-                            class="btn btn-danger btn-sm"
-                            type="submit"
-                            formaction="/cua-hang/<%= selectedStore._id %>/delete"
-                            formmethod="post"
-                            onclick="return confirm('Bạn có chắc muốn xóa cửa hàng này và các kho trực thuộc không?')"
-                          >Xóa</button>
-                          <button
-                            class="btn btn-success btn-sm"
-                            type="submit"
-                            formaction="/cua-hang/<%= selectedStore._id %>/update"
-                            formmethod="post"
-                            onclick="return confirm('Bạn có muốn lưu thay đổi cửa hàng này không?')"
-                          >Chỉnh sửa</button>
-                          <a
-                            class="btn btn-success btn-sm"
-                            href="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
-                            data-store-export-action
-                            data-store-info-url="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
-                            data-store-info-label="Xuất thông tin"
-                            data-store-info-disabled="0"
-                            data-store-warehouses-url="/cua-hang/<%= selectedStore._id %>/export/warehouses.xlsx"
-                            data-store-warehouses-label="Xuất kho"
-                            data-store-warehouses-disabled="<%= warehouses.length ? '0' : '1' %>"
-                            data-store-notes-url="/cua-hang/<%= selectedStore._id %>/export/notes.xlsx"
-                            data-store-notes-label="Xuất ghi chú"
-                            data-store-notes-disabled="1"
-                          >Xuất thông tin</a>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                <% } %>
               <% }) %>
             </tbody>
           </table>
           </form>
+          <div id="storeDynamicFormsMount"></div>
           <% if (pagination && pagination.totalPages > 1) { %>
             <div class="store-pagination">
               <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> cửa hàng</div>
@@ -552,13 +336,6 @@
               <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> cửa hàng</div>
             </div>
           <% } %>
-          <% if (selectedStore) { %>
-            <form id="warehouseAddForm" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/add"></form>
-            <% warehouses.forEach(function(warehouse) { %>
-              <form id="warehouseForm_<%= warehouse._id %>" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/<%= warehouse._id %>/update"></form>
-              <form id="warehouseDeleteForm_<%= warehouse._id %>" method="post" action="/cua-hang/<%= selectedStore._id %>/warehouse/<%= warehouse._id %>/delete"></form>
-            <% }) %>
-          <% } %>
         </div>
       </section>
     </div>
@@ -571,7 +348,9 @@
       var addStoreModalCancel = document.getElementById('addStoreModalCancel');
       var storeCreateForm = document.getElementById('storeCreateForm');
       var ghnProvinceCache = null;
+      var ghnProvincePromise = null;
       var ghnWardCache = {};
+      var ghnWardPromiseCache = {};
 
       function normalizeText(value) {
         return String(value || '')
@@ -733,21 +512,82 @@
           });
       }
 
+      function fetchStoreJson(url) {
+        return fetch(url, { headers: { Accept: 'application/json' } })
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            if (!data || !data.success) throw new Error((data && data.message) || 'Khong tai duoc du lieu cua hang.');
+            return data;
+          });
+      }
+
+      function loadWarehouseCounts() {
+        var nodes = Array.prototype.slice.call(document.querySelectorAll('.store-warehouse-count'));
+        var ids = nodes.map(function(node) { return node.getAttribute('data-store-id') || ''; }).filter(Boolean);
+        if (!ids.length) return;
+        fetchStoreJson('/cua-hang/api/warehouse-counts?ids=' + encodeURIComponent(ids.join(','))).then(function(data) {
+          var counts = data.counts || {};
+          nodes.forEach(function(node) {
+            var id = node.getAttribute('data-store-id') || '';
+            node.textContent = Number(counts[id] || 0);
+          });
+          document.querySelectorAll('.store-detail-warehouse-count').forEach(function(node) {
+            var id = node.getAttribute('data-store-id') || '';
+            node.textContent = Number(counts[id] || 0);
+          });
+        }).catch(function() {
+          nodes.forEach(function(node) { node.textContent = '0'; });
+          document.querySelectorAll('.store-detail-warehouse-count').forEach(function(node) { node.textContent = '0'; });
+        });
+      }
+
+      function loadProvinceFilterOptions() {
+        if (!storeCityFilterDropdown) return;
+        fetchStoreJson('/cua-hang/api/province-options').then(function(data) {
+          var items = Array.isArray(data.items) ? data.items : [];
+          var currentValue = storeCityFilterValue ? String(storeCityFilterValue.value || 'all') : 'all';
+          var base = storeCityFilterDropdown.querySelector('.group-manage-item[data-value="all"]');
+          storeCityFilterDropdown.innerHTML = '';
+          if (base) storeCityFilterDropdown.appendChild(base);
+          items.forEach(function(city) {
+            var row = document.createElement('div');
+            row.className = 'group-manage-item' + (currentValue === city ? ' is-active' : '');
+            row.setAttribute('data-value', city);
+            row.setAttribute('data-name', city);
+            row.innerHTML = '<button class="group-manage-option" type="button">' + escapeHtml(city) + '</button>';
+            storeCityFilterDropdown.appendChild(row);
+          });
+          bindStoreCityFilterOptions();
+        }).catch(function() {});
+      }
+
       function getGhnProvinces() {
         if (ghnProvinceCache) return Promise.resolve(ghnProvinceCache);
-        return fetchAddressItems('/api/address/provinces').then(function(items) {
+        if (ghnProvincePromise) return ghnProvincePromise;
+        ghnProvincePromise = fetchAddressItems('/api/address/provinces').then(function(items) {
           ghnProvinceCache = items;
+          ghnProvincePromise = null;
           return items;
+        }).catch(function(error) {
+          ghnProvincePromise = null;
+          throw error;
         });
+        return ghnProvincePromise;
       }
 
       function getGhnWardsByProvince(provinceId) {
         if (!provinceId) return Promise.resolve([]);
         if (ghnWardCache[provinceId]) return Promise.resolve(ghnWardCache[provinceId]);
-        return fetchAddressItems('/api/address/wards-by-province?province_id=' + encodeURIComponent(provinceId)).then(function(items) {
+        if (ghnWardPromiseCache[provinceId]) return ghnWardPromiseCache[provinceId];
+        ghnWardPromiseCache[provinceId] = fetchAddressItems('/api/address/wards-by-province?province_id=' + encodeURIComponent(provinceId)).then(function(items) {
           ghnWardCache[provinceId] = items;
+          delete ghnWardPromiseCache[provinceId];
           return items;
+        }).catch(function(error) {
+          delete ghnWardPromiseCache[provinceId];
+          throw error;
         });
+        return ghnWardPromiseCache[provinceId];
       }
 
       function findByIdOrName(items, id, name, idKey, nameKey) {
@@ -942,14 +782,13 @@
         });
       }
 
-      if (storeCityFilterTrigger && storeCityFilterDropdown) {
-        storeCityFilterTrigger.addEventListener('click', function () {
-          storeCityFilterDropdown.classList.toggle('is-open');
-        });
-
+      function bindStoreCityFilterOptions() {
+        if (!storeCityFilterDropdown) return;
         Array.prototype.slice.call(storeCityFilterDropdown.querySelectorAll('.group-manage-item')).forEach(function (item) {
           var optionBtn = item.querySelector('.group-manage-option');
           if (!optionBtn) return;
+          if (optionBtn.getAttribute('data-bound') === '1') return;
+          optionBtn.setAttribute('data-bound', '1');
           optionBtn.addEventListener('click', function () {
             Array.prototype.slice.call(storeCityFilterDropdown.querySelectorAll('.group-manage-item')).forEach(function (node) {
               node.classList.remove('is-active');
@@ -962,8 +801,19 @@
         });
       }
 
-      var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.store-detail'));
-      detailBlocks.forEach(function (detailBlock) {
+      if (storeCityFilterTrigger && storeCityFilterDropdown) {
+        storeCityFilterTrigger.addEventListener('click', function () {
+          storeCityFilterDropdown.classList.toggle('is-open');
+        });
+        bindStoreCityFilterOptions();
+      }
+
+      loadWarehouseCounts();
+      loadProvinceFilterOptions();
+
+      function bindStoreDetailPanel(detailBlock) {
+        if (!detailBlock || detailBlock.getAttribute('data-store-detail-bound') === '1') return;
+        detailBlock.setAttribute('data-store-detail-bound', '1');
         var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
         var detailBody = detailBlock.querySelector('.store-detail-body');
         var tabs = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab'));
@@ -1013,7 +863,122 @@
           collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
           collapseBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
         });
-      });
+      }
+
+      function StoreInlineDetail(table) {
+        this.table = table;
+        this.activeId = null;
+        this.activeRow = null;
+        this.detailRow = null;
+        this.abortController = null;
+        this.bind();
+      }
+
+      StoreInlineDetail.prototype.bind = function() {
+        var self = this;
+        if (!self.table) return;
+        self.table.addEventListener('click', function(event) {
+          var codeLink = event.target.closest('a.kv-detail-code-link');
+          if (codeLink && self.table.contains(codeLink)) {
+            event.preventDefault();
+            var codeRow = codeLink.closest('tr[data-kv-detail-id]');
+            if (codeRow) self.toggle(codeRow);
+            return;
+          }
+
+          var row = event.target.closest('tr[data-kv-detail-id]');
+          if (!row || !self.table.contains(row)) return;
+          if (event.target.closest('a, button, input, select, textarea, label')) return;
+          self.toggle(row);
+        });
+      };
+
+      StoreInlineDetail.prototype.colspan = function() {
+        var headerCells = this.table ? this.table.querySelectorAll('thead th') : [];
+        return headerCells.length || 1;
+      };
+
+      StoreInlineDetail.prototype.close = function() {
+        if (this.abortController) {
+          this.abortController.abort();
+          this.abortController = null;
+        }
+        var formsMount = document.getElementById('storeDynamicFormsMount');
+        if (formsMount) formsMount.innerHTML = '';
+        if (this.detailRow && this.detailRow.parentNode) {
+          this.detailRow.parentNode.removeChild(this.detailRow);
+        }
+        if (this.activeRow) this.activeRow.classList.remove('is-selected');
+        this.activeId = null;
+        this.activeRow = null;
+        this.detailRow = null;
+      };
+
+      StoreInlineDetail.prototype.toggle = function(row) {
+        var id = row.getAttribute('data-kv-detail-id');
+        if (!id) return;
+        if (this.activeId === id && this.detailRow) {
+          this.close();
+          return;
+        }
+        this.open(row, id);
+      };
+
+      StoreInlineDetail.prototype.open = function(row, id) {
+        var self = this;
+        self.close();
+        self.activeId = id;
+        self.activeRow = row;
+        row.classList.add('is-selected');
+
+        var detailRow = document.createElement('tr');
+        detailRow.className = 'store-detail-row kv-inline-detail-tr';
+        var detailCell = document.createElement('td');
+        detailCell.colSpan = self.colspan();
+        detailCell.innerHTML = '<div class="kv-detail-panel product-detail kv-detail-loading"><p class="kv-detail-loading-text">Đang tải thông tin...</p></div>';
+        detailRow.appendChild(detailCell);
+        row.parentNode.insertBefore(detailRow, row.nextSibling);
+        self.detailRow = detailRow;
+
+        self.abortController = window.AbortController ? new AbortController() : null;
+        fetch('/cua-hang/api/' + encodeURIComponent(id) + '/detail', {
+          headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          signal: self.abortController ? self.abortController.signal : undefined
+        }).then(function(response) {
+          return response.json().then(function(data) {
+            if (!response.ok || !data || !data.success) {
+              throw new Error((data && data.message) || 'Khong tai duoc thong tin cua hang.');
+            }
+            return data;
+          });
+        }).then(function(data) {
+          if (self.activeId !== id || self.detailRow !== detailRow) return;
+          detailCell.innerHTML = data.html || '<div class="store-detail-content">Khong co du lieu.</div>';
+          var formsMount = document.getElementById('storeDynamicFormsMount');
+          if (formsMount) formsMount.innerHTML = data.forms_html || '';
+          bindStoreDetailPanel(detailCell.querySelector('.store-detail'));
+          orderStoreAddressFields();
+          initGhnAddressSelects();
+          var countNode = detailCell.querySelector('.store-detail-warehouse-count[data-store-id="' + id + '"]');
+          if (countNode && typeof data.warehouse_count !== 'undefined') {
+            countNode.textContent = Number(data.warehouse_count || 0);
+          }
+          var listCountNode = document.querySelector('.store-warehouse-count[data-store-id="' + id + '"]');
+          if (listCountNode && typeof data.warehouse_count !== 'undefined') {
+            listCountNode.textContent = Number(data.warehouse_count || 0);
+          }
+        }).catch(function(error) {
+          if (error && error.name === 'AbortError') return;
+          if (self.detailRow !== detailRow) return;
+          detailCell.innerHTML = '<div class="kv-detail-panel product-detail kv-detail-error"><p>Khong tai duoc thong tin cua hang.</p></div>';
+        });
+      };
+
+      var storeMasterTable = document.querySelector('table[data-kv-master="cua-hang"]');
+      if (storeMasterTable) new StoreInlineDetail(storeMasterTable);
 
       document.addEventListener('click', function (event) {
         if (!storeCityFilterDropdown || !storeCityFilterTrigger) return;

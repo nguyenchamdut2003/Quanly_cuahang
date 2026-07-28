@@ -1,0 +1,181 @@
+<div class="store-detail" data-store-id="<%= selectedStore._id %>">
+  <div class="detail-tabs">
+    <div class="detail-tab-list">
+      <button class="detail-tab is-active" type="button" data-tab-target="store-info">Thông tin</button>
+      <button class="detail-tab" type="button" data-tab-target="store-warehouses">Danh sách kho</button>
+      <button class="detail-tab" type="button" data-tab-target="store-notes">Ghi chú</button>
+    </div>
+    <button class="detail-collapse-btn" type="button" aria-expanded="true">Thu gọn</button>
+  </div>
+
+  <div class="store-detail-body">
+    <div class="store-detail-pane detail-pane is-active" data-tab-pane="store-info" data-tab-panel="store-info">
+      <div class="store-info-block">
+        <div class="store-image-placeholder">CH</div>
+        <div>
+          <h2><%= selectedStore.ten_cua_hang || 'Cửa hàng' %></h2>
+          <p><%= selectedStore.ma_cua_hang || '---' %> - <%= selectedStore.tinh_thanh || 'Chưa có tỉnh thành' %></p>
+          <div class="tag-row">
+            <span class="tag">Cửa hàng</span>
+            <span class="tag tag-green"><%= selectedStore.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="store-fields">
+        <div>
+          <span>Mã cửa hàng</span>
+          <input name="ma_cua_hang" value="<%= selectedStore.ma_cua_hang || '' %>">
+        </div>
+        <div>
+          <span>Tên cửa hàng *</span>
+          <input name="ten_cua_hang" value="<%= selectedStore.ten_cua_hang || '' %>" required>
+        </div>
+        <div>
+          <span>Mã số thuế</span>
+          <input name="ma_so_thue" value="<%= selectedStore.ma_so_thue || '' %>">
+        </div>
+        <div>
+          <span>Điện thoại</span>
+          <input name="sdt" value="<%= selectedStore.sdt || '' %>">
+        </div>
+        <div>
+          <span>Email</span>
+          <input name="email" type="email" value="<%= selectedStore.email || '' %>">
+        </div>
+        <div>
+          <span>Địa chỉ chi tiết</span>
+          <input name="dia_chi_chi_tiet" value="<%= selectedStore.dia_chi_chi_tiet || '' %>">
+        </div>
+        <div>
+          <span>Địa chỉ đầy đủ</span>
+          <input value="<%= selectedStore.dia_chi_day_du || selectedStore.dia_chi || '' %>" readonly>
+        </div>
+        <div>
+          <span>Phường/xã</span>
+          <select class="js-ghn-ward" name="phuong_xa" data-selected-id="<%= selectedStore.phuong_xa_code || '' %>" data-selected-name="<%= selectedStore.phuong_xa || '' %>">
+            <% if (selectedStore.phuong_xa) { %>
+              <option value="<%= selectedStore.phuong_xa %>" selected><%= selectedStore.phuong_xa %></option>
+            <% } else { %>
+              <option value="">Chọn phường/xã</option>
+            <% } %>
+          </select>
+          <input type="hidden" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= selectedStore.phuong_xa_code || '' %>">
+        </div>
+        <div>
+          <span>Tỉnh/thành</span>
+          <select class="js-ghn-province" name="tinh_thanh" data-selected-id="<%= selectedStore.tinh_thanh_id || '' %>" data-selected-name="<%= selectedStore.tinh_thanh || '' %>">
+            <% if (selectedStore.tinh_thanh) { %>
+              <option value="<%= selectedStore.tinh_thanh %>" selected><%= selectedStore.tinh_thanh %></option>
+            <% } else { %>
+              <option value="">Chọn tỉnh/thành</option>
+            <% } %>
+          </select>
+          <input type="hidden" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= selectedStore.tinh_thanh_id || '' %>">
+        </div>
+        <div>
+          <span>Trạng thái</span>
+          <select name="trang_thai">
+            <option value="active" <%= selectedStore.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+            <option value="inactive" <%= selectedStore.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+          </select>
+        </div>
+        <div>
+          <span>Kho trực thuộc</span>
+          <strong class="store-detail-warehouse-count" data-store-id="<%= selectedStore._id %>"><%= warehouses.length %></strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="store-detail-pane detail-pane" data-tab-pane="store-warehouses" data-tab-panel="store-warehouses">
+      <div class="warehouse-section">
+        <table class="admin-table warehouse-table">
+          <thead>
+            <tr>
+              <th>Mã kho</th>
+              <th>Tên kho</th>
+              <th>Địa chỉ</th>
+              <th>Phường/xã</th>
+              <th>Tỉnh/thành</th>
+              <th>Trạng thái</th>
+              <th>Thời gian tạo</th>
+            </tr>
+          </thead>
+          <tbody id="storeWarehouseRows" data-store-id="<%= selectedStore._id %>">
+            <% if (warehouses.length === 0) { %>
+              <tr>
+                <td colspan="7" class="empty-cell">Chưa có kho cho cửa hàng này.</td>
+              </tr>
+            <% } %>
+            <tr class="warehouse-edit-row warehouse-add-row">
+              <td><input form="warehouseAddForm" name="ma_kho" value="" placeholder="Mã kho (tự động)"></td>
+              <td><input form="warehouseAddForm" name="ten_kho" value="" placeholder="Tên kho mới"></td>
+              <td><input form="warehouseAddForm" name="dia_chi_chi_tiet" value="" placeholder="Địa chỉ chi tiết"></td>
+              <td><input form="warehouseAddForm" name="phuong_xa" value="" placeholder="Phường/xã"></td>
+              <td><input form="warehouseAddForm" name="tinh_thanh" value="" placeholder="Tỉnh/thành"></td>
+              <td>
+                <select form="warehouseAddForm" name="trang_thai">
+                  <option value="active" selected>Đang hoạt động</option>
+                  <option value="inactive">Ngừng hoạt động</option>
+                </select>
+              </td>
+              <td class="warehouse-action-cell">
+                <button form="warehouseAddForm" class="btn btn-primary btn-sm" type="submit" onclick="return confirm('Bạn có muốn thêm kho mới không?')">Thêm</button>
+              </td>
+            </tr>
+            <% warehouses.forEach(function(warehouse) { %>
+              <% var warehouseFormId = 'warehouseForm_' + String(warehouse._id); %>
+              <tr class="warehouse-edit-row">
+                <td><input form="<%= warehouseFormId %>" name="ma_kho" value="<%= warehouse.ma_kho || '' %>"></td>
+                <td><input form="<%= warehouseFormId %>" name="ten_kho" value="<%= warehouse.ten_kho || '' %>" required></td>
+                <td><input form="<%= warehouseFormId %>" name="dia_chi_chi_tiet" value="<%= warehouse.dia_chi_chi_tiet || warehouse.dia_chi_day_du || warehouse.dia_chi || '' %>"></td>
+                <td><input form="<%= warehouseFormId %>" name="phuong_xa" value="<%= warehouse.phuong_xa || '' %>"></td>
+                <td><input form="<%= warehouseFormId %>" name="tinh_thanh" value="<%= warehouse.tinh_thanh || '' %>"></td>
+                <td>
+                  <select form="<%= warehouseFormId %>" name="trang_thai">
+                    <option value="active" <%= warehouse.trang_thai !== 'inactive' ? 'selected' : '' %>>Đang hoạt động</option>
+                    <option value="inactive" <%= warehouse.trang_thai === 'inactive' ? 'selected' : '' %>>Ngừng hoạt động</option>
+                  </select>
+                </td>
+                <td class="warehouse-action-cell">
+                  <div class="warehouse-action-meta"><%= formatDate(warehouse.created_at) %></div>
+                  <div class="warehouse-action-buttons">
+                    <button form="<%= warehouseFormId %>" class="btn btn-light btn-sm" type="submit" onclick="return confirm('Bạn có muốn lưu chỉnh sửa kho này không?')">Lưu</button>
+                    <button form="warehouseDeleteForm_<%= warehouse._id %>" class="btn btn-danger btn-sm" type="submit" onclick="return confirm('Bạn có chắc muốn xóa kho này không?')">Xóa</button>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="store-detail-pane detail-pane" data-tab-pane="store-notes" data-tab-panel="store-notes">
+      <div class="warehouse-section">
+        <h3>Ghi chú</h3>
+        <p class="muted-line">Chưa có ghi chú cho cửa hàng này.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-actions detail-panel-footer page-actions--sm">
+    <button class="btn btn-danger btn-sm" type="submit" formaction="/cua-hang/<%= selectedStore._id %>/delete" formmethod="post" onclick="return confirm('Bạn có chắc muốn xóa cửa hàng này và các kho trực thuộc không?')">Xóa</button>
+    <button class="btn btn-success btn-sm" type="submit" formaction="/cua-hang/<%= selectedStore._id %>/update" formmethod="post" onclick="return confirm('Bạn có muốn lưu thay đổi cửa hàng này không?')">Chỉnh sửa</button>
+    <a
+      class="btn btn-success btn-sm"
+      href="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
+      data-store-export-action
+      data-store-info-url="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
+      data-store-info-label="Xuất thông tin"
+      data-store-info-disabled="0"
+      data-store-warehouses-url="/cua-hang/<%= selectedStore._id %>/export/warehouses.xlsx"
+      data-store-warehouses-label="Xuất kho"
+      data-store-warehouses-disabled="<%= warehouses.length ? '0' : '1' %>"
+      data-store-notes-url="/cua-hang/<%= selectedStore._id %>/export/notes.xlsx"
+      data-store-notes-label="Xuất ghi chú"
+      data-store-notes-disabled="1"
+    >Xuất thông tin</a>
+  </div>
+
+</div>

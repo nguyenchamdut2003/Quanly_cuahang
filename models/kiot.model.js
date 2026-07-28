@@ -20,7 +20,9 @@ const CuaHangSchema = new Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
-  }
+  },
+  deleted_at: { type: Date, default: null, index: true },
+  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'cua_hang',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -63,7 +65,9 @@ const KhoSchema = new Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
-  }
+  },
+  deleted_at: { type: Date, default: null, index: true },
+  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'kho',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
