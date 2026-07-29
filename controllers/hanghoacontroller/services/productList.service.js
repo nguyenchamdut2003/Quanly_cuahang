@@ -62,6 +62,7 @@
     buildPriceSetupQueryString,
     loadAvgLotCostByProductId,
     loadAvgSalePriceByProductId,
+    loadActiveInventoryTotalsByProductId,
     buildProductListPriceMaps,
     applyProductListPriceFields,
     buildFilterQueryString,
@@ -144,19 +145,14 @@ async function index(req, res, next) {
             return HangHoa.find(productQuery).sort({ created_at: -1, ma_hang: 1 }).lean();
         });
         var productIds = products.map(function(item) { return item._id; });
+        var lotManagedProductIds = products
+            .filter(function(item) { return !!item.quan_ly_theo_lo; })
+            .map(function(item) { return item._id; });
 
         var inventoryRows = await measureAsync('hangHoa.index.loadInventory', function() {
-            return productIds.length > 0
-                ? TonKho.aggregate([
-                    { $match: { hang_hoa_id: { $in: productIds } } },
-                    { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
-                ])
-                : Promise.resolve([]);
+            return loadActiveInventoryTotalsByProductId(productIds, lotManagedProductIds);
         });
-        var inventoryMap = inventoryRows.reduce(function(map, row) {
-            map[String(row._id)] = Number(row.total || 0);
-            return map;
-        }, {});
+        var inventoryMap = inventoryRows || {};
 
         var stockRange = makeRangeFilter(filter.stockFrom, filter.stockTo);
         if (stockRange) {

@@ -62,6 +62,7 @@
     buildPriceSetupQueryString,
     loadAvgLotCostByProductId,
     loadAvgSalePriceByProductId,
+    loadActiveInventoryTotalsByProductId,
     buildProductListPriceMaps,
     applyProductListPriceFields,
     buildFilterQueryString,
@@ -129,17 +130,11 @@ async function priceSetup(req, res, next) {
             .sort({ created_at: -1, ma_hang: 1 })
             .lean();
         var productIds = allProducts.map(function(item) { return item._id; });
+        var lotManagedProductIds = allProducts
+            .filter(function(item) { return !!item.quan_ly_theo_lo; })
+            .map(function(item) { return item._id; });
 
-        var inventoryRows = productIds.length > 0
-            ? await TonKho.aggregate([
-                { $match: { hang_hoa_id: { $in: productIds } } },
-                { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
-            ])
-            : [];
-        var inventoryMap = inventoryRows.reduce(function(map, row) {
-            map[String(row._id)] = Number(row.total || 0);
-            return map;
-        }, {});
+        var inventoryMap = await loadActiveInventoryTotalsByProductId(productIds, lotManagedProductIds);
 
         var products = allProducts.filter(function(item) {
             var qty = Number(inventoryMap[String(item._id)] || 0);
@@ -192,11 +187,11 @@ async function priceSetup(req, res, next) {
         defaultEnd.setFullYear(defaultEnd.getFullYear() + 1);
 
         var pageTitleText = selectedBangGiaOrdered.length > 0
-            ? String(selectedBangGiaOrdered.length) + ' báº£ng giÃ¡'
-            : 'Thiáº¿t láº­p giÃ¡';
+            ? String(selectedBangGiaOrdered.length) + ' bảng giá'
+            : 'Thiết lập giá';
 
         res.render('hang-hoa/thiet-lap-gia', {
-            title: 'Thiáº¿t láº­p giÃ¡',
+            title: 'Thiết lập giá',
             pageTitle: pageTitleText,
             activeMenu: 'hang-hoa',
             user: req.user,
@@ -229,7 +224,7 @@ async function updateRetailPrice(req, res, next) {
     try {
         var productId = normalizeIdParam(req?.params?.id);
         if (!productId) {
-            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'MÃ£ hÃ ng khÃ´ng há»£p lá»‡.' });
+            if (shouldRespondJson(req)) return res.status(400).json({ success: false, message: 'Mã hàng không hợp lệ.' });
             return res.redirect('/hang-hoa/thiet-lap-gia?error=invalid_product');
         }
 
@@ -278,7 +273,7 @@ async function upsertGiaBanHangHoaPrice(req, res, next) {
         res.redirect('/hang-hoa/thiet-lap-gia?success=updated_gia_ban');
     } catch (error) {
         if (shouldRespondJson(req)) {
-            return res.status(400).json({ success: false, message: error.message || 'LÆ°u giÃ¡ tháº¥t báº¡i.' });
+            return res.status(400).json({ success: false, message: error.message || 'Lưu giá thất bại.' });
         }
         next(error);
     }
@@ -295,7 +290,7 @@ async function updateCTBangGiaPrice(req, res, next) {
             !mongoose.Types.ObjectId.isValid(hangHoaId)
         ) {
             if (shouldRespondJson(req)) {
-                return res.status(400).json({ success: false, message: 'Thiáº¿u hoáº·c sai mÃ£ báº£ng giÃ¡ / hÃ ng hÃ³a.' });
+                return res.status(400).json({ success: false, message: 'Thiếu hoặc sai mã bảng giá / hàng hóa.' });
             }
             return res.redirect('/hang-hoa/thiet-lap-gia?error=invalid_ct');
         }
@@ -324,7 +319,7 @@ async function addBangGia(req, res, next) {
         var ten = String(body.ten_bang_gia || '').trim();
         if (!ten) {
             if (shouldRespondJson(req)) {
-                return res.status(400).json({ success: false, message: 'Vui lÃ²ng nháº­p tÃªn báº£ng giÃ¡.' });
+                return res.status(400).json({ success: false, message: 'Vui lòng nhập tên bảng giá.' });
             }
             return res.redirect('/hang-hoa/thiet-lap-gia?error=missing_bang_gia_name');
         }
@@ -397,7 +392,7 @@ async function addBangGia(req, res, next) {
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'ÄÃ£ táº¡o báº£ng giÃ¡.',
+                message: 'Đã tạo bảng giá.',
                 id: String(created._id),
                 ma_bang_gia: created.ma_bang_gia
             });
@@ -408,28 +403,28 @@ async function addBangGia(req, res, next) {
     }
 };
 
-// â”€â”€â”€ EXCEL EXPORT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// EXCEL EXPORT
 // Supported column keys and their definitions
 var HANG_HOA_COLUMNS = {
-    loai_hang:       { header: 'Loáº¡i hÃ ng',           width: 16 },
-    ma_hang:         { header: 'MÃ£ hÃ ng',              width: 16 },
-    ten_hang:        { header: 'TÃªn hÃ ng',             width: 30 },
-    thuong_hieu:     { header: 'ThÆ°Æ¡ng hiá»‡u',          width: 18 },
-    nhom_hang:       { header: 'NhÃ³m hÃ ng',            width: 20 },
-    hinh_anh:        { header: 'HÃ¬nh áº£nh',             width: 20 },
-    dang_kinh_doanh: { header: 'Äang kinh doanh',      width: 16 },
-    ban_truc_tiep:   { header: 'ÄÆ°á»£c bÃ¡n trá»±c tiáº¿p',   width: 18 },
-    gia_von_trung_binh: { header: 'GiÃ¡ vá»‘n trung bÃ¬nh', width: 18, numeric: true },
-    gia_ban_trung_binh: { header: 'GiÃ¡ bÃ¡n trung bÃ¬nh', width: 18 },
-    ton_kho:         { header: 'Tá»“n kho',              width: 12, numeric: true },
-    kh_dat:          { header: 'KH Ä‘áº·t',               width: 12, numeric: true },
-    du_kien_het:     { header: 'Dá»± kiáº¿n háº¿t hÃ ng',     width: 18 },
-    ton_nho_nhat:    { header: 'Tá»“n nhá» nháº¥t',         width: 14, numeric: true },
-    ton_lon_nhat:    { header: 'Tá»“n lá»›n nháº¥t',         width: 14, numeric: true },
-    dvt:             { header: 'ÄVT',                  width: 10 },
-    ma_dvt_co_ban:   { header: 'MÃ£ ÄVT cÆ¡ báº£n',        width: 14 },
-    quy_doi:         { header: 'Quy Ä‘á»•i',              width: 12, numeric: true },
-    gia_nhap_cuoi:   { header: 'GiÃ¡ nháº­p cuá»‘i',        width: 16, numeric: true }
+    loai_hang:       { header: 'Loại hàng',           width: 16 },
+    ma_hang:         { header: 'Mã hàng',              width: 16 },
+    ten_hang:        { header: 'Tên hàng',             width: 30 },
+    thuong_hieu:     { header: 'Thương hiệu',          width: 18 },
+    nhom_hang:       { header: 'Nhóm hàng',            width: 20 },
+    hinh_anh:        { header: 'Hình ảnh',             width: 20 },
+    dang_kinh_doanh: { header: 'Đang kinh doanh',      width: 16 },
+    ban_truc_tiep:   { header: 'Được bán trực tiếp',   width: 18 },
+    gia_von_trung_binh: { header: 'Giá vốn trung bình', width: 18, numeric: true },
+    gia_ban_trung_binh: { header: 'Giá bán trung bình', width: 18 },
+    ton_kho:         { header: 'Tồn kho',              width: 12, numeric: true },
+    kh_dat:          { header: 'KH đặt',               width: 12, numeric: true },
+    du_kien_het:     { header: 'Dự kiến hết hàng',     width: 18 },
+    ton_nho_nhat:    { header: 'Tồn nhỏ nhất',         width: 14, numeric: true },
+    ton_lon_nhat:    { header: 'Tồn lớn nhất',         width: 14, numeric: true },
+    dvt:             { header: 'ĐVT',                  width: 10 },
+    ma_dvt_co_ban:   { header: 'Mã ĐVT cơ bản',        width: 14 },
+    quy_doi:         { header: 'Quy đổi',              width: 12, numeric: true },
+    gia_nhap_cuoi:   { header: 'Giá nhập cuối',        width: 16, numeric: true }
 };
 
 

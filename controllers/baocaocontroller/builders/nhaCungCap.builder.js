@@ -1,4 +1,4 @@
-﻿const { NhaCungCap, PhieuNhap, PhieuTraHangNhap } = require('../../../models/kiot.model');
+const { NhaCungCap, PhieuNhap, PhieuTraHangNhap } = require('../../../models/kiot.model');
 const { buildProfitBySupplierReport } = require('../../../services/profitReport.service');
 const { getSalesRange } = require('../helpers/date.helper');
 
@@ -23,13 +23,11 @@ async function buildSupplierReport(query = {}) {
     const supplierIds = suppliers.map(item => item._id);
     const purchaseFilter = {
         ngay_nhap: { $gte: range.start, $lt: range.end },
-        nha_cung_cap_id: { $in: supplierIds },
-        deleted_at: null
+        nha_cung_cap_id: { $in: supplierIds }
     };
     const returnFilter = {
         ngay_tra: { $gte: range.start, $lt: range.end },
         nha_cung_cap_id: { $in: supplierIds },
-        deleted_at: null,
         trang_thai: 'completed'
     };
     if (query.status) purchaseFilter.trang_thai = query.status;

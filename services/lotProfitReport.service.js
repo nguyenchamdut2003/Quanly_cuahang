@@ -175,7 +175,10 @@ async function loadLotImportStatsBySpec(hangHoaId, options = {}) {
 
   const completedPurchases = await PhieuNhap.find({
     trang_thai: 'completed',
-    deleted_at: null
+    $or: [
+      { deleted_at: null },
+      { deleted_at: { $exists: false } }
+    ]
   }).select('_id').lean();
   const purchaseIds = completedPurchases.map((row) => row._id);
   if (!purchaseIds.length) return map;
@@ -289,7 +292,13 @@ async function buildLotProfitReport(options = {}) {
   const importMap = await loadLotImportStatsBySpec(hangHoaId, { lo_hang_id: filterLoId });
   const salesMap = new Map();
 
-  const invoiceFilter = { trang_thai: { $ne: 'cancelled' } };
+  const invoiceFilter = {
+    trang_thai: { $ne: 'cancelled' },
+    $or: [
+      { deleted_at: null },
+      { deleted_at: { $exists: false } }
+    ]
+  };
   if (storeId) invoiceFilter.cua_hang_id = storeId;
 
   const invoices = await HoaDonBanHang.find(invoiceFilter)

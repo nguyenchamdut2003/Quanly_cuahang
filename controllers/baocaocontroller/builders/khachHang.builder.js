@@ -1,4 +1,4 @@
-﻿const { HoaDonBanHang, KhachHang, PhieuTraHang } = require('../../../models/kiot.model');
+const { HoaDonBanHang, KhachHang, PhieuTraHang } = require('../../../models/kiot.model');
 const { buildProfitByCustomerReport } = require('../../../services/profitReport.service');
 const { getSalesRange } = require('../helpers/date.helper');
 
@@ -27,8 +27,7 @@ async function buildCustomerReport(query = {}) {
     };
     const returnFilter = {
         ngay_tra: { $gte: range.start, $lt: range.end },
-        khach_hang_id: { $in: customerIds },
-        deleted_at: null
+        khach_hang_id: { $in: customerIds }
     };
 
     const [invoices, returns] = await Promise.all([
@@ -85,7 +84,7 @@ async function buildCustomerReport(query = {}) {
 
     return {
         generatedAt: new Date(),
-        branchName: 'Cửa hàng trung tâm',
+        branchName: 'C?a h�ng trung t�m',
         range,
         rows,
         topCustomers: rows.slice(0, 10),

@@ -142,9 +142,11 @@
                                 >Chỉnh sửa</button>
                                 <button
                                   class="btn btn-danger btn-sm"
-                                  type="submit"
-                                  form="deleteCustomerForm_<%= selectedCustomer._id %>"
-                                  onclick="return confirm('Bạn có chắc muốn xóa khách hàng này không?')"
+                                  type="button"
+                                  data-customer-delete-action
+                                  data-customer-id="<%= selectedCustomer._id %>"
+                                  data-customer-code="<%= selectedCustomer.ma_khach_hang || '' %>"
+                                  data-customer-name="<%= selectedCustomer.ten_khach_hang || '' %>"
                                 >Xóa</button>
                                 <a
                                   class="btn btn-success btn-sm"
@@ -163,25 +165,35 @@
                               <table class="admin-table warehouse-table customer-address-table">
                                 <thead>
                                   <tr>
-                                    <th>Mã địa chỉ</th>
                                     <th>Tên người nhận</th>
                                     <th>SĐT</th>
-                                    <th>Địa chỉ</th>
-                                    <th>Phường/xã</th>
                                     <th>Tỉnh/thành</th>
+                                    <th>Phường/xã</th>
+                                    <th>Địa chỉ</th>
                                     <th>Loại địa chỉ</th>
                                     <th>Mặc định</th>
-                                    <th>Tạo lúc</th>
+                                    <th>Thao tác</th>
                                   </tr>
                                 </thead>
                                 <tbody>
                                   <tr class="warehouse-edit-row warehouse-add-row">
-                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ma_dia_chi" placeholder="Tự động" readonly></td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT" maxlength="10" inputmode="numeric"></td>
+                                    <td>
+                                      <select form="addressAddForm_<%= selectedCustomer._id %>" class="js-ghn-province" name="tinh_thanh" data-selected-name="">
+                                        <option value="">Chọn Tỉnh/Thành</option>
+                                      </select>
+                                      <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh_id" class="js-ghn-province-id">
+                                    </td>
+                                    <td>
+                                      <select form="addressAddForm_<%= selectedCustomer._id %>" class="js-ghn-ward" name="phuong_xa" data-selected-name="">
+                                        <option value="">Chọn Phường/Xã</option>
+                                      </select>
+                                      <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa_code" class="js-ghn-ward-code">
+                                      <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" class="js-ghn-district-name">
+                                      <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen_id" class="js-ghn-district-id">
+                                    </td>
                                     <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết"></td>
-                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa" placeholder="Phường/xã"></td>
-                                    <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh" placeholder="Tỉnh/thành"></td>
                                     <td>
                                       <select class="js-address-type-select" form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
                                         <option value="khac">Khác</option>
@@ -208,18 +220,37 @@
                                   </tr>
                                   <% if (!customerAddresses || customerAddresses.length === 0) { %>
                                     <tr>
-                                      <td colspan="9" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
+                                      <td colspan="8" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
                                     </tr>
                                   <% } %>
                                   <% (customerAddresses || []).forEach(function(address) { %>
                                     <% var addressFormId = 'addressForm_' + String(address._id); %>
                                     <tr class="warehouse-edit-row">
-                                      <td><input form="<%= addressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly></td>
                                       <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
                                       <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>" maxlength="10" inputmode="numeric"></td>
+                                      <td>
+                                        <select form="<%= addressFormId %>" class="js-ghn-province" name="tinh_thanh" data-selected-id="<%= address.tinh_thanh_id || '' %>" data-selected-name="<%= address.tinh_thanh || '' %>">
+                                          <% if (address.tinh_thanh) { %>
+                                            <option value="<%= address.tinh_thanh %>" selected><%= address.tinh_thanh %></option>
+                                          <% } else { %>
+                                            <option value="">Chọn Tỉnh/Thành</option>
+                                          <% } %>
+                                        </select>
+                                        <input type="hidden" form="<%= addressFormId %>" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= address.tinh_thanh_id || '' %>">
+                                      </td>
+                                      <td>
+                                        <select form="<%= addressFormId %>" class="js-ghn-ward" name="phuong_xa" data-selected-id="<%= address.phuong_xa_code || '' %>" data-selected-name="<%= address.phuong_xa || '' %>">
+                                          <% if (address.phuong_xa) { %>
+                                            <option value="<%= address.phuong_xa %>" selected><%= address.phuong_xa %></option>
+                                          <% } else { %>
+                                            <option value="">Chọn Phường/Xã</option>
+                                          <% } %>
+                                        </select>
+                                        <input type="hidden" form="<%= addressFormId %>" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= address.phuong_xa_code || '' %>">
+                                        <input type="hidden" form="<%= addressFormId %>" name="quan_huyen" class="js-ghn-district-name" value="<%= address.quan_huyen || '' %>">
+                                        <input type="hidden" form="<%= addressFormId %>" name="quan_huyen_id" class="js-ghn-district-id" value="<%= address.quan_huyen_id || '' %>">
+                                      </td>
                                       <td><input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></td>
-                                      <td><input form="<%= addressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></td>
-                                      <td><input form="<%= addressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></td>
                                       <td>
                                         <select class="js-address-type-select" form="<%= addressFormId %>" name="loai_dia_chi">
                                           <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
@@ -235,7 +266,6 @@
                                         </select>
                                       </td>
                                       <td class="warehouse-action-cell">
-                                        <div class="warehouse-action-meta"><%= formatDate(address.created_at) %></div>
                                         <div class="warehouse-action-buttons">
                                           <button
                                             form="<%= addressFormId %>"
@@ -245,8 +275,10 @@
                                           >Lưu</button>
                                           <button
                                             form="addressDeleteForm_<%= address._id %>"
-                                            class="btn btn-danger btn-sm"
+                                            class="btn btn-danger btn-sm address-delete-btn"
                                             type="submit"
+                                            data-address-delete-action="1"
+                                            style="display:inline-flex!important;visibility:visible!important;opacity:1!important"
                                             onclick="return confirm('Bạn có chắc muốn xóa địa chỉ này không?')"
                                           >Xóa</button>
                                         </div>

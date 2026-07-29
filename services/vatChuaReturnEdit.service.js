@@ -5,9 +5,7 @@ const {
   XuatVatChua,
   PhieuThuChi
 } = require('../models/kiot.model');
-const { ThungRacItem } = require('../models/trash.model');
 const { extractPaymentDetail } = require('./paymentCashBook.service');
-const { ENTITY_LABELS, buildTrashChildFields } = require('./trashLabels.service');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message || 'Yeu cau khong hop le');
@@ -268,103 +266,7 @@ async function updateXuatVatChuaReturn(id, data = {}, storeId, userId) {
   return result;
 }
 
-async function deleteXuatVatChuaReturn(id, storeId, userId) {
-  const docId = cleanId(id);
-  const store = cleanId(storeId);
-  if (!docId || !store) throw createHttpError(400, 'ID phieu tra vat chua khong hop le.');
-
-  const session = await mongoose.startSession();
-  let result = null;
-  try {
-    await session.withTransaction(async function() {
-      const doc = await XuatVatChua.findOne({ _id: docId, cua_hang_id: store, deleted_at: null }).session(session);
-      assertEditableReturn(doc);
-      const now = new Date();
-
-      const items = Array.isArray(doc.items) ? doc.items : [];
-      for (const line of items) {
-        const vatChuaId = cleanId(line && line.vat_chua_id);
-        const qty = Math.max(0, Math.floor(Number(line && line.so_luong || 0)));
-        if (!vatChuaId || qty <= 0) continue;
-        await VatChua.updateOne(
-          { _id: vatChuaId, cua_hang_id: store },
-          { $inc: { so_luong_ton: qty } },
-          { session }
-        );
-      }
-
-      const receipts = await PhieuThuChi.find(relatedReceiptFilter(doc)).session(session);
-      for (const receipt of receipts) {
-        receipt.trang_thai = 'cancelled';
-        receipt.deleted_at = now;
-        receipt.deleted_by = userId || null;
-        receipt.ngay_huy = new Date();
-        receipt.ly_do_huy = 'Xoa phieu tra vat chua ' + (doc.ma_xuat_vat_chua || '');
-        await receipt.save({ session });
-      }
-
-      const root = await ThungRacItem.create([{
-        entity_type: 'XuatVatChua',
-        entity_id: doc._id,
-        ma_chung_tu: doc.ma_xuat_vat_chua || '',
-        ten_hien_thi: doc.ma_xuat_vat_chua || 'Phieu tra vat chua',
-        mo_ta_phu: doc.doi_tuong_ten ? ('Doi tuong: ' + doc.doi_tuong_ten) : '',
-        cua_hang_id: doc.cua_hang_id || store || null,
-        deleted_at: now,
-        deleted_by: userId || null,
-        is_trash_root: true,
-        trash_group_id: null,
-        sort_order: 0
-      }], { session });
-      const rootDoc = root && root[0];
-
-      if (receipts.length && rootDoc) {
-        const childFields = buildTrashChildFields({
-          entity_type: 'PhieuThuChi',
-          label: ENTITY_LABELS.PhieuThuChi,
-          count: receipts.length,
-          samples: receipts.map(function(row) { return row.ma_phieu || ''; }).filter(Boolean).slice(0, 5)
-        });
-        await ThungRacItem.create([{
-          entity_type: 'PhieuThuChi',
-          entity_id: doc._id,
-          ma_chung_tu: childFields.ma_chung_tu,
-          ten_hien_thi: childFields.ten_hien_thi,
-          mo_ta_phu: childFields.mo_ta_phu,
-          cua_hang_id: doc.cua_hang_id || store || null,
-          deleted_at: now,
-          deleted_by: userId || null,
-          is_trash_root: false,
-          trash_group_id: rootDoc._id,
-          sort_order: 1
-        }], { session });
-      }
-
-      doc.trang_thai = 'cancelled';
-      doc.deleted_at = now;
-      doc.deleted_by = userId || null;
-      doc.ghi_chu = [String(doc.ghi_chu || '').trim(), 'Da xoa phieu tra vat chua'].filter(Boolean).join(' | ');
-      await doc.save({ session });
-
-      result = {
-        _id: String(doc._id),
-        ma_xuat_vat_chua: doc.ma_xuat_vat_chua || '',
-        restored_qty: items.reduce(function(sum, line) {
-          return sum + Math.max(0, Math.floor(Number(line && line.so_luong || 0)));
-        }, 0),
-        cancelled_receipts: receipts.length,
-        trash_root_id: rootDoc ? String(rootDoc._id) : ''
-      };
-    });
-  } finally {
-    await session.endSession();
-  }
-
-  return result;
-}
-
 module.exports = {
   loadXuatVatChuaForEdit,
-  updateXuatVatChuaReturn,
-  deleteXuatVatChuaReturn
+  updateXuatVatChuaReturn
 };

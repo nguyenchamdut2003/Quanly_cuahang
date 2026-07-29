@@ -211,7 +211,7 @@ exports.postHoaDonDauVaoAdd = async (req, res, next) => {
 exports.getTraHangNhap = async (req, res, next) => {
     try {
         const [returns, suppliers, receipts, products] = await Promise.all([
-            PhieuTraHangNhap.find({ deleted_at: null }).populate('nha_cung_cap_id').populate('phieu_nhap_id').sort({ created_at: -1 }),
+            PhieuTraHangNhap.find({}).populate('nha_cung_cap_id').populate('phieu_nhap_id').sort({ created_at: -1 }),
             NhaCungCap.find().sort({ ten_ncc: 1 }),
             PhieuNhap.find().sort({ created_at: -1 }),
             HangHoa.find().sort({ ten_hang: 1 })

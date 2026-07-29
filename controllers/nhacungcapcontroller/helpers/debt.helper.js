@@ -2,7 +2,7 @@ const { mongoose, PhieuNhap, SoQuy, Counter, parseMoney, SUPPLIER_DEBT_WARN_DEFA
 
 function isVisibleSupplierDebtRow(row) {
     if (!row) return false;
-    if (row.deleted_at || row.trang_thai === 'cancelled') return false;
+    if (row.trang_thai === 'cancelled') return false;
     if (row.phieu_nhap_id && isDeletedDebtLinkedDoc(row.phieu_nhap_id)) return false;
     if (row.nhap_vat_chua_id && isDeletedDebtLinkedDoc(row.nhap_vat_chua_id)) return false;
     if (row.phieu_tra_nhap_id && isDeletedDebtLinkedDoc(row.phieu_tra_nhap_id)) return false;
@@ -12,7 +12,7 @@ function isVisibleSupplierDebtRow(row) {
 }
 
 function isDeletedDebtLinkedDoc(doc) {
-    return !!(doc && typeof doc === 'object' && (doc.deleted_at || doc.trang_thai === 'cancelled'));
+    return !!(doc && typeof doc === 'object' && (doc.trang_thai === 'cancelled'));
 }
 
 function getDebtDocumentInfo(row) {
@@ -209,7 +209,6 @@ async function loadSupplierUnpaidPurchases(supplierId, storeId) {
     var query = {
         nha_cung_cap_id: supplierId,
         trang_thai: 'completed',
-        deleted_at: null,
         con_no_ncc: { $gt: 0 }
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;

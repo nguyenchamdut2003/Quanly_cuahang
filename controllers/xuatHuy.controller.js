@@ -646,7 +646,7 @@ exports.createSubmit = async function(req, res) {
     if (!reason) return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do hủy' });
     const kho = await Kho.findById(khoId).lean();
     if (!kho) return res.status(400).json({ success: false, message: 'Kho hủy không hợp lệ' });
-    const purchase = await PhieuNhap.findOne({ _id: phieuNhapId, trang_thai: 'completed', deleted_at: null }).select('kho_id').lean();
+    const purchase = await PhieuNhap.findOne({ _id: phieuNhapId, trang_thai: 'completed' }).select('kho_id').lean();
     if (!purchase) return res.status(400).json({ success: false, message: 'Phiếu nhập gốc không hợp lệ' });
     if (String(purchase.kho_id || '') !== String(khoId)) {
       return res.status(400).json({ success: false, message: 'Không cho chọn kho khác với kho của phiếu nhập gốc' });
@@ -803,7 +803,7 @@ exports.apiWarehouseProducts = async function(req, res) {
 exports.apiPurchasesWithStock = async function(req, res) {
   try {
     const storeId = await resolveStoreId(req);
-    const filter = { trang_thai: 'completed', deleted_at: null };
+    const filter = { trang_thai: 'completed' };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
     const purchases = await PhieuNhap.find(filter)
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
@@ -879,7 +879,7 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
     const storeId = await resolveStoreId(req);
     const purchaseId = String(req.params.id || '').trim();
     if (!isObjectId(purchaseId)) return res.status(400).json({ success: false, message: 'Phiếu nhập không hợp lệ' });
-    const filter = { _id: purchaseId, trang_thai: 'completed', deleted_at: null };
+    const filter = { _id: purchaseId, trang_thai: 'completed' };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
     const purchase = await PhieuNhap.findOne(filter)
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })

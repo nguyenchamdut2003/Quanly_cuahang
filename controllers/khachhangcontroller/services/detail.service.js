@@ -23,7 +23,7 @@ async function loadCustomerDetail(options) {
     var cid = normalizeIdParam(options.customerId);
     if (!cid || !/^[a-f0-9]{24}$/i.test(cid)) return null;
 
-    var selectedCustomer = await KhachHang.findById(cid)
+    var selectedCustomer = await KhachHang.findOne({ _id: cid })
         .populate({ path: 'nguoi_tao_id', select: 'ho_ten email username' })
         .lean();
     if (!selectedCustomer) return null;
@@ -45,14 +45,12 @@ async function loadCustomerDetail(options) {
     var nhapVatChuaRows = await NhapVatChua.find({
         doi_tuong_type: 'khach_hang',
         doi_tuong_id: selectedCustomer._id,
-        trang_thai: 'active',
-        deleted_at: null
+        trang_thai: 'active'
     }).sort({ created_at: -1 }).lean();
     var xuatVatChuaRows = await XuatVatChua.find({
         doi_tuong_type: 'khach_hang',
         doi_tuong_id: selectedCustomer._id,
-        trang_thai: 'active',
-        deleted_at: null
+        trang_thai: 'active'
     }).sort({ created_at: -1 }).lean();
     var customerVatChuaHistory = nhapVatChuaRows.map(function(row) {
         return {

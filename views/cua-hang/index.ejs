@@ -105,7 +105,6 @@
         <form id="storeImportForm" method="post" action="/cua-hang/import" enctype="multipart/form-data" hidden>
           <input type="file" name="file" id="storeImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
         </form>
-        <button class="btn btn-danger" type="submit" form="bulkDeleteForm" onclick="return confirm('Xóa các cửa hàng đã chọn?')">Xóa đã chọn</button>
         <a class="btn btn-light" href="/cua-hang/export.xlsx<%= filterQueryString ? '?' + filterQueryString : '' %>">Xuất file</a>
       </div>
     </div>
@@ -277,11 +276,9 @@
 
       <section class="store-table-panel">
         <div class="table-wrap">
-          <form id="bulkDeleteForm" method="post" action="/cua-hang/delete-selected">
           <table class="admin-table store-table" data-kv-master="cua-hang">
             <thead>
               <tr>
-                <th class="check-cell"><input id="selectAllStores" type="checkbox" aria-label="Chọn tất cả"></th>
                   <th>Mã cửa hàng</th>
                   <th>Tên cửa hàng</th>
                   <th>Mã số thuế</th>
@@ -295,12 +292,11 @@
             <tbody>
               <% if (stores.length === 0) { %>
                 <tr>
-                  <td colspan="9" class="empty-cell">Không có cửa hàng phù hợp với bộ lọc.</td>
+                  <td colspan="8" class="empty-cell">Không có cửa hàng phù hợp với bộ lọc.</td>
                 </tr>
               <% } %>
               <% stores.forEach(function(store) { %>
                 <tr class="store-list-row" data-kv-detail-id="<%= store._id %>">
-                  <td class="check-cell"><input class="store-checkbox" type="checkbox" name="ids" value="<%= store._id %>" aria-label="Chọn cửa hàng"></td>
                   <td><a class="table-code-link kv-detail-code-link" href="/cua-hang"><%= store.ma_cua_hang || '---' %></a></td>
                   <td><strong><%= store.ten_cua_hang || '---' %></strong><div class="muted-line"><%= store.dia_chi_day_du || store.dia_chi || 'Chưa có địa chỉ' %></div></td>
                   <td><%= store.ma_so_thue || '---' %></td>
@@ -318,7 +314,6 @@
               <% }) %>
             </tbody>
           </table>
-          </form>
           <div id="storeDynamicFormsMount"></div>
           <% if (pagination && pagination.totalPages > 1) { %>
             <div class="store-pagination">
@@ -657,10 +652,14 @@
           : null;
       }
 
-      function initGhnAddressSelects() {
-        document.querySelectorAll('.js-ghn-province').forEach(function(provinceSelect) {
-          var container = provinceSelect.closest('form') || provinceSelect.closest('.store-form-grid') || document;
+      function initGhnAddressSelects(root) {
+        var scope = root && root.querySelectorAll ? root : document;
+        scope.querySelectorAll('.js-ghn-province').forEach(function(provinceSelect) {
+          if (provinceSelect.getAttribute('data-ghn-address-bound') === '1') return;
+          provinceSelect.setAttribute('data-ghn-address-bound', '1');
+          var container = provinceSelect.closest('.warehouse-edit-row') || provinceSelect.closest('form') || provinceSelect.closest('.store-form-grid') || provinceSelect.closest('.store-fields') || document;
           var wardSelect = container.querySelector('.js-ghn-ward');
+          if (wardSelect) wardSelect.setAttribute('data-ghn-address-bound', '1');
           enhanceAddressSelect(provinceSelect, 'Tìm hoặc chọn tỉnh/thành');
           enhanceAddressSelect(wardSelect, 'Tìm hoặc chọn phường/xã');
 
@@ -734,26 +733,6 @@
       orderStoreAddressFields();
       initGhnAddressSelects();
 
-      var selectAll = document.getElementById('selectAllStores');
-      var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.store-checkbox'));
-
-      if (selectAll) {
-        selectAll.addEventListener('change', function () {
-          checkboxes.forEach(function (checkbox) {
-            checkbox.checked = selectAll.checked;
-          });
-        });
-      }
-
-      checkboxes.forEach(function (checkbox) {
-        checkbox.addEventListener('change', function () {
-          if (!selectAll) return;
-          selectAll.checked = checkboxes.length > 0 && checkboxes.every(function (item) {
-            return item.checked;
-          });
-        });
-      });
-
       var createdFilterSelect = document.getElementById('createdFilterSelect');
       var customDateRange = document.getElementById('customDateRange');
       var storeCityFilterTrigger = document.getElementById('storeCityFilterTrigger');
@@ -811,9 +790,50 @@
       loadWarehouseCounts();
       loadProvinceFilterOptions();
 
+      function ensureWarehouseDeleteActions(detailBlock) {
+        var formsMount = document.getElementById('storeDynamicFormsMount');
+        if (!detailBlock || !formsMount) return;
+
+        detailBlock.querySelectorAll('.warehouse-edit-row:not(.warehouse-add-row)').forEach(function(row) {
+          var updateInput = row.querySelector('[form^="warehouseForm_"]');
+          if (!updateInput) return;
+
+          var updateFormId = updateInput.getAttribute('form') || '';
+          var warehouseId = updateFormId.replace(/^warehouseForm_/, '');
+          if (!warehouseId) return;
+
+          var buttons = row.querySelector('.warehouse-action-buttons');
+          if (!buttons || buttons.querySelector('[data-warehouse-delete-action]')) return;
+
+          var storeId = (detailBlock.getAttribute('data-store-id') || (detailBlock.querySelector('#storeWarehouseRows') || {}).dataset?.storeId || '').trim();
+          if (!storeId) return;
+
+          var deleteFormId = 'warehouseDeleteForm_' + warehouseId;
+          if (!document.getElementById(deleteFormId)) {
+            var form = document.createElement('form');
+            form.id = deleteFormId;
+            form.method = 'post';
+            form.action = '/cua-hang/' + encodeURIComponent(storeId) + '/warehouse/' + encodeURIComponent(warehouseId) + '/delete';
+            formsMount.appendChild(form);
+          }
+
+          var button = document.createElement('button');
+          button.type = 'submit';
+          button.className = 'btn btn-danger btn-sm';
+          button.setAttribute('form', deleteFormId);
+          button.setAttribute('data-warehouse-delete-action', '1');
+          button.textContent = 'Xóa';
+          button.addEventListener('click', function(event) {
+            if (!confirm('Bạn có chắc muốn xóa kho này không?')) event.preventDefault();
+          });
+          buttons.appendChild(button);
+        });
+      }
+
       function bindStoreDetailPanel(detailBlock) {
         if (!detailBlock || detailBlock.getAttribute('data-store-detail-bound') === '1') return;
         detailBlock.setAttribute('data-store-detail-bound', '1');
+        ensureWarehouseDeleteActions(detailBlock);
         var collapseBtn = detailBlock.querySelector('.detail-collapse-btn');
         var detailBody = detailBlock.querySelector('.store-detail-body');
         var tabs = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab'));
@@ -857,7 +877,6 @@
             }
           });
         }
-
         collapseBtn.addEventListener('click', function () {
           var isCollapsed = detailBlock.classList.toggle('is-collapsed');
           collapseBtn.textContent = isCollapsed ? 'Mở rộng' : 'Thu gọn';
@@ -961,7 +980,7 @@
           if (formsMount) formsMount.innerHTML = data.forms_html || '';
           bindStoreDetailPanel(detailCell.querySelector('.store-detail'));
           orderStoreAddressFields();
-          initGhnAddressSelects();
+          initGhnAddressSelects(detailCell);
           var countNode = detailCell.querySelector('.store-detail-warehouse-count[data-store-id="' + id + '"]');
           if (countNode && typeof data.warehouse_count !== 'undefined') {
             countNode.textContent = Number(data.warehouse_count || 0);

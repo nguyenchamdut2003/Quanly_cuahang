@@ -7,17 +7,14 @@ var SUPPLIER_DEBT_WARN_DEFAULT_DAYS = 10;
 async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
     var purchaseMatch = {
         trang_thai: 'completed',
-        deleted_at: null,
         nha_cung_cap_id: { $exists: true, $ne: null }
     };
     var debtMatch = {
-        nha_cung_cap_id: { $exists: true, $ne: null },
-        deleted_at: null
+        nha_cung_cap_id: { $exists: true, $ne: null }
     };
     var debtTransactionMatch = {
         nha_cung_cap_id: { $exists: true, $ne: null },
-        trang_thai: 'active',
-        deleted_at: null
+        trang_thai: 'active'
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         var storeObjectId = new mongoose.Types.ObjectId(String(storeId));
@@ -42,15 +39,15 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         }
     ]);
     var debtRows = await CongNoNhaCungCap.find(debtMatch)
-        .populate({ path: 'phieu_nhap_id', select: 'deleted_at' })
-        .populate({ path: 'nhap_vat_chua_id', select: 'deleted_at' })
-        .populate({ path: 'phieu_tra_nhap_id', select: 'deleted_at' })
-        .populate({ path: 'phieu_thu_chi_id', select: 'deleted_at trang_thai' })
+        .populate({ path: 'phieu_nhap_id', select: '_id' })
+        .populate({ path: 'nhap_vat_chua_id', select: '_id' })
+        .populate({ path: 'phieu_tra_nhap_id', select: '_id' })
+        .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
         .lean();
     var debtTransactionRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.find(debtTransactionMatch)
-        .populate({ path: 'phieu_nhap_id', select: 'deleted_at trang_thai' })
-        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'deleted_at trang_thai' })
-        .populate({ path: 'phieu_thu_chi_id', select: 'deleted_at trang_thai' })
+        .populate({ path: 'phieu_nhap_id', select: 'trang_thai' })
+        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'trang_thai' })
+        .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
         .lean() : [];
     var map = {};
     purchaseRows.forEach(function(r) {
@@ -91,7 +88,6 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
 async function aggregateSupplierDebtDayInfo(storeId, supplierIds) {
     var match = {
         trang_thai: 'completed',
-        deleted_at: null,
         nha_cung_cap_id: { $exists: true, $ne: null },
         con_no_ncc: { $gt: 0 }
     };

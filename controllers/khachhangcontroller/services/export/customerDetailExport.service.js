@@ -1,4 +1,4 @@
-﻿var { KhachHang, DiaChiKhachHang } = require('../../../../models/kiot.model');
+var { KhachHang, DiaChiKhachHang } = require('../../../../models/kiot.model');
 var { normalizeIdParam } = require('../../helpers/common.helper');
 var { loadCustomerGroups } = require('../group.service');
 var { loadAddressTypes } = require('../addressType.service');
@@ -33,7 +33,7 @@ async function buildCustomerDetailWorkbook(customerId) {
             return map;
         }, {});
 
-        var customer = await KhachHang.findById(customerId).lean();
+        var customer = await KhachHang.findOne({ _id: customerId }).lean();
         if (!customer) { var invalidCustomer = new Error('invalid_customer'); invalidCustomer.code = 'invalid_customer'; throw invalidCustomer; }
         customer.nhom_khach_hang_ten = groupMap[String(customer.nhom_khach_hang_id || '')] || '---';
 
@@ -68,7 +68,7 @@ async function buildCustomerDetailWorkbook(customerId) {
             };
         }));
 
-        addExportSheet(workbook, 'Mặt hàng', [
+        addExportSheet(workbook, 'Đơn hàng', [
             { header: 'Mã đơn hàng', key: 'ma_don_hang', width: 18 },
             { header: 'Ngày đặt', key: 'ngay_dat', width: 20 },
             { header: 'Tổng tiền hàng', key: 'tong_tien_hang', width: 16 },

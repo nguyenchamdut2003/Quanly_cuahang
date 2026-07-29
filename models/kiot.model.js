@@ -21,8 +21,6 @@ const CuaHangSchema = new Schema({
     enum: ['active', 'inactive'],
     default: 'active'
   },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'cua_hang',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -66,8 +64,6 @@ const KhoSchema = new Schema({
     enum: ['active', 'inactive'],
     default: 'active'
   },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'kho',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -136,7 +132,7 @@ const KhachHangSchema = new Schema({
     type: String,
     enum: ['active', 'inactive'],
     default: 'active'
-  }
+  },
 }, {
   collection: 'khach_hang',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -361,8 +357,6 @@ const HangHoaSchema = new Schema({
     enum: ['active', 'inactive'],
     default: 'active'
   },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'hang_hoa',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -641,18 +635,6 @@ const PhieuNhapSchema = new Schema({
   ghi_chu: {
     type: String
   },
-
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, {
   collection: 'phieu_nhap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -751,15 +733,6 @@ const PhieuTraHangNhapSchema = new Schema({
   ghi_chu: { type: String },
   nguoi_tra_id: { type: ObjectId, ref: 'NguoiDung' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
-  deleted_at: {
-    type: Date,
-    default: null
-  },
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, {
   collection: 'phieu_tra_hang_nhap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -781,8 +754,6 @@ const CtPhieuTraHangNhapSchema = new Schema({
   gia_tra_lai: { type: Number, default: 0 },
   ghi_chu: { type: String },
   thanh_tien: { type: Number, default: 0 },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, {
   collection: 'ct_phieu_tra_hang_nhap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -931,18 +902,6 @@ const CongNoNhaCungCapSchema = new Schema({
     type: Date,
     default: Date.now
   },
-
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, {
   collection: 'cong_no_nha_cung_cap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -1218,18 +1177,6 @@ const DonHangSchema = new Schema({
   kho_id: { type: ObjectId, ref: 'Kho' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
-
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, { collection: "don_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 // CT_DON_HANG
@@ -1325,18 +1272,6 @@ const HoaDonBanHangSchema = new Schema({
   merged_at: { type: Date, default: null },
   merged_by: { type: ObjectId, ref: 'NguoiDung', default: null },
   merge_note: { type: String, default: '' },
-
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, { collection: "hoa_don_ban_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 // Một đơn có thể có nhiều hóa đơn (mỗi lần xác nhận giao). Chạy scripts/migrate-hoa-don-don-hang-index.js nếu DB còn unique cũ.
 HoaDonBanHangSchema.index({ don_hang_id: 1 });
@@ -1758,8 +1693,6 @@ const PhieuTraHangSchema = new Schema({
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "phieu_tra_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 // CT_PHIEU_TRA_HANG
@@ -1808,8 +1741,6 @@ const CTPhieuTraHangSchema = new Schema({
   ghi_chu: {
     type: String
   },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "ct_phieu_tra_hang" });
 CTPhieuTraHangSchema.index({ phieu_tra_hang_id: 1, ct_hoa_don_id: 1 });
 
@@ -1826,8 +1757,6 @@ const PhieuKiemKhoSchema = new Schema({
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' },
   kho_id: { type: ObjectId, ref: 'Kho' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null },
   stock_rollback_at: { type: Date, default: null }
 }, { collection: "phieu_kiem_kho", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
@@ -1886,16 +1815,6 @@ const SoQuySchema = new Schema({
     default: 'active',
     index: true
   },
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, { collection: "so_quy", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 SoQuySchema.index(
   {
@@ -2005,16 +1924,6 @@ const PhieuThuChiSchema = new Schema({
   nguoi_huy_id: { type: ObjectId, ref: 'NguoiDung' },
   ngay_huy: { type: Date },
   ly_do_huy: { type: String },
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, { collection: "phieu_thu_chi", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 PhieuThuChiSchema.index({ cua_hang_id: 1, nhan_vien_id: 1, ngay_lap: -1 });
@@ -2054,8 +1963,6 @@ const CongNoKhachHangSchema = new Schema({
   loai: { type: String },
   ghi_chu: { type: String },
   ngay: { type: Date, default: Date.now },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "cong_no_khach_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const VatChuaNhapXuatItemSchema = new Schema({
@@ -2100,8 +2007,6 @@ const PhieuXuatNoiBoSchema = new Schema({
   cong_don_vao_the: { type: Boolean, default: false },
   trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'draft' },
   ghi_chu: { type: String },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "phieu_xuat_noi_bo", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const CTXuatNoiBoSchema = new Schema({
@@ -2140,8 +2045,6 @@ const PhieuXuatHuySchema = new Schema({
   tong_gia_tri: { type: Number, default: 0 },
   trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'draft' },
   ghi_chu: { type: String },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "phieu_xuat_huy", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const CTXuatHuySchema = new Schema({
@@ -2171,8 +2074,6 @@ const PhanBoHangSchema = new Schema({
   trang_thai: { type: String, enum: ['draft', 'confirmed', 'cancelled'], default: 'draft' },
   ngay_xac_nhan: { type: Date },
   ghi_chu: { type: String },
-  deleted_at: { type: Date, default: null, index: true },
-  deleted_by: { type: ObjectId, ref: 'NguoiDung', default: null }
 }, { collection: "phan_bo_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const CTPhanBoHangSchema = new Schema({
@@ -2402,18 +2303,6 @@ const GiaoDichCongNoNhaCungCapSchema = new Schema({
   ly_do_huy: {
     type: String
   },
-
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, {
   collection: 'giao_dich_cong_no_nha_cung_cap',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -2581,18 +2470,6 @@ const GiaoDichCongNoKhachHangSchema = new Schema({
   ly_do_huy: {
     type: String
   },
-
-  deleted_at: {
-    type: Date,
-    default: null,
-    index: true
-  },
-
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  }
 }, {
   collection: 'giao_dich_cong_no_khach_hang',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -2630,20 +2507,6 @@ GiaoDichCongNoKhachHangSchema.index({
 GiaoDichCongNoKhachHangSchema.index({
   van_don_id: 1
 });
-
-/**
- * VatChua — module vật chứa (két, túi, sọt, thùng...).
- *
- * Quy tắc tồn (phase sau — chưa implement service nhập/xuất):
- * - Tạo NhapVatChua active: VatChua.so_luong_ton += tổng số lượng theo từng item.
- * - Hủy NhapVatChua: VatChua.so_luong_ton -= tổng số lượng theo từng item.
- * - Tạo XuatVatChua active: kiểm tra đủ tồn, rồi VatChua.so_luong_ton -= tổng số lượng theo từng item.
- * - Hủy XuatVatChua: VatChua.so_luong_ton += tổng số lượng theo từng item.
- *
- * Chỉ dùng cua_hang_id; không dùng chi_nhanh_id.
- * Tham chiếu mềm chứng từ cũ qua source_type, source_id, source_code.
- */
-
 const VatChuaSchema = new Schema({
   ma_vat_chua: {
     type: String,
@@ -2739,15 +2602,6 @@ const NhapVatChuaSchema = new Schema({
     enum: ['active', 'cancelled'],
     default: 'active'
   },
-  deleted_at: {
-    type: Date,
-    default: null
-  },
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
-  },
   cua_hang_id: {
     type: ObjectId,
     ref: 'CuaHang',
@@ -2829,15 +2683,6 @@ const XuatVatChuaSchema = new Schema({
     type: String,
     enum: ['active', 'cancelled'],
     default: 'active'
-  },
-  deleted_at: {
-    type: Date,
-    default: null
-  },
-  deleted_by: {
-    type: ObjectId,
-    ref: 'NguoiDung',
-    default: null
   },
   cua_hang_id: {
     type: ObjectId,

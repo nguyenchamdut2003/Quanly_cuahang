@@ -95,15 +95,14 @@
                               <table class="admin-table warehouse-table supplier-address-table">
                                 <thead>
                                   <tr>
-                                    <th>Mã địa chỉ</th>
                                     <th>Tên người nhận</th>
                                     <th>SĐT</th>
-                                    <th>Địa chỉ</th>
-                                    <th>Phường/xã</th>
                                     <th>Tỉnh/thành</th>
+                                    <th>Phường/xã</th>
+                                    <th>Địa chỉ</th>
                                     <th>Loại địa chỉ</th>
                                     <th>Mặc định</th>
-                                    <th>Tạo lúc</th>
+                                    <th>Thao tác</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -111,13 +110,20 @@
                                   <tr class="warehouse-edit-row warehouse-add-row">
                                     <td>
                                       <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
-                  <input data-address-form="<%= supplierAddressAddFormId %>" name="ma_dia_chi" placeholder="Tự động" readonly class="supplier-readonly-input">
+                                      <input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận">
                                     </td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
                                     <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan" placeholder="SĐT"></td>
+                                    <td>
+                                      <select data-address-form="<%= supplierAddressAddFormId %>" class="js-ghn-province" name="tinh_thanh" data-selected-name="">
+                                        <option value="">Chọn Tỉnh/Thành</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <select data-address-form="<%= supplierAddressAddFormId %>" class="js-ghn-ward" name="phuong_xa" data-selected-name="">
+                                        <option value="">Chọn Phường/Xã</option>
+                                      </select>
+                                    </td>
                                     <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết"></td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="phuong_xa" placeholder="Phường/xã"></td>
-                                    <td><input data-address-form="<%= supplierAddressAddFormId %>" name="tinh_thanh" placeholder="Tỉnh/thành"></td>
                                     <td>
                                       <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>" name="loai_dia_chi">
                                         <option value="khac">Khác</option>
@@ -133,7 +139,6 @@
                                       </select>
                                     </td>
                                     <td class="warehouse-action-cell">
-                                      <div class="warehouse-action-meta">--</div>
                                       <button
                                         class="btn btn-primary btn-sm js-supplier-address-submit"
                                         type="button"
@@ -144,20 +149,35 @@
                                     </td>
                                   </tr>
                                   <% if (!supplierAddresses || supplierAddresses.length === 0) { %>
-                                    <tr><td colspan="9" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
+                                    <tr><td colspan="8" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td></tr>
                                   <% } %>
                                   <% (supplierAddresses || []).forEach(function(address) { %>
                                     <% var supplierAddressFormId = 'supplierAddressForm_' + String(address._id); %>
                                     <tr class="warehouse-edit-row">
                                       <td>
                                         <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden" value="<%= supplierAddressReturnQuery %>">
-                    <input data-address-form="<%= supplierAddressFormId %>" name="ma_dia_chi" value="<%= address.ma_dia_chi || '' %>" readonly class="supplier-readonly-input">
+                                        <input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>">
                                       </td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>"></td>
                                       <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                                      <td>
+                                        <select data-address-form="<%= supplierAddressFormId %>" class="js-ghn-province" name="tinh_thanh" data-selected-name="<%= address.tinh_thanh || '' %>">
+                                          <% if (address.tinh_thanh) { %>
+                                            <option value="<%= address.tinh_thanh %>" selected><%= address.tinh_thanh %></option>
+                                          <% } else { %>
+                                            <option value="">Chọn Tỉnh/Thành</option>
+                                          <% } %>
+                                        </select>
+                                      </td>
+                                      <td>
+                                        <select data-address-form="<%= supplierAddressFormId %>" class="js-ghn-ward" name="phuong_xa" data-selected-name="<%= address.phuong_xa || '' %>">
+                                          <% if (address.phuong_xa) { %>
+                                            <option value="<%= address.phuong_xa %>" selected><%= address.phuong_xa %></option>
+                                          <% } else { %>
+                                            <option value="">Chọn Phường/Xã</option>
+                                          <% } %>
+                                        </select>
+                                      </td>
                                       <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || address.so_nha || address.dia_chi_day_du || '' %>"></td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="phuong_xa" value="<%= address.phuong_xa || '' %>"></td>
-                                      <td><input data-address-form="<%= supplierAddressFormId %>" name="tinh_thanh" value="<%= address.tinh_thanh || '' %>"></td>
                                       <td>
                                         <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>" name="loai_dia_chi">
                                           <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
@@ -173,7 +193,6 @@
                                         </select>
                                       </td>
                                       <td class="warehouse-action-cell">
-                                        <div class="warehouse-action-meta"><%= formatDate(address.created_at) %></div>
                                         <div class="warehouse-action-buttons">
                                           <button
                                             class="btn btn-light btn-sm js-supplier-address-submit"
@@ -183,10 +202,12 @@
                                             data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?"
                                           >Lưu</button>
                                           <button
-                                            class="btn btn-danger btn-sm js-supplier-address-delete"
+                                            class="btn btn-danger btn-sm js-supplier-address-delete address-delete-btn"
                                             type="button"
+                                            data-address-delete-action="1"
                                             data-return-query="<%= supplierAddressReturnQuery %>"
                                             data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
+                                            style="display:inline-flex!important;visibility:visible!important;opacity:1!important"
                                           >Xóa</button>
                                         </div>
                                       </td>

@@ -71,7 +71,7 @@ async function updateCustomer(options) {
     delete payload.ma_khach_hang;
     if (!payload.nhom_khach_hang_id) delete payload.nhom_khach_hang_id;
 
-    var existingCustomer = await KhachHang.findById(customerId).lean();
+    var existingCustomer = await KhachHang.findOne({ _id: customerId }).lean();
     if (!existingCustomer) {
         var notFound = new Error('invalid_customer');
         notFound.code = 'invalid_customer';
@@ -108,16 +108,25 @@ async function updateCustomer(options) {
 }
 
 async function removeCustomer(customerId) {
-    await KhachHang.findByIdAndDelete(customerId);
+    throw Object.assign(new Error('Chuc nang xoa/dua vao thung rac da duoc tat.'), { statusCode: 410 });
 }
 
-async function removeCustomers(ids) {
-    await KhachHang.deleteMany({ _id: { $in: ids } });
+async function removeCustomerWithContext(customerId, context) {
+    throw Object.assign(new Error('Chuc nang xoa/dua vao thung rac da duoc tat.'), { statusCode: 410 });
+}
+
+async function removeCustomers(ids, context) {
+    var results = [];
+    for (var i = 0; i < ids.length; i += 1) {
+        results.push(await softDeleteCustomer(ids[i], context));
+    }
+    return results;
 }
 
 module.exports = {
     createCustomer,
     updateCustomer,
     removeCustomer,
+    removeCustomerWithContext,
     removeCustomers
 };

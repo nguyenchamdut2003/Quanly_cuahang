@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const {
     DonHang,
@@ -52,9 +52,20 @@ const { resolveSalePrice, normalizeUnitPrice } = require('../../../services/sale
 const { parseVatChuaImportInput, parseVatChuaSignedInput, assertVatChuaImportInput, assertVatChuaSignedInput, importVatChuaWithSalesReturn, cancelNhapVatChuaBySource } = require('../../../services/vatChuaImport.service');
 const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaWithSalesReturn, cancelXuatVatChuaBySource } = require('../../../services/vatChuaExport.service');
 const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines } = require('../../../services/vatChuaDetail.service');
-const { previewOrderTrash, moveOrdersToTrash } = require('../../../services/orderTrash.service');
-const { previewInvoiceTrash, moveInvoicesToTrash } = require('../../../services/invoiceTrash.service');
-const { previewReturnTrash, moveReturnsToTrash, cancelReturnSlip } = require('../../../services/returnTrash.service');
+
+function disabledTrashOperation() {
+    const error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+    error.statusCode = 410;
+    throw error;
+}
+
+const previewOrderTrash = disabledTrashOperation;
+const moveOrdersToTrash = disabledTrashOperation;
+const previewInvoiceTrash = disabledTrashOperation;
+const moveInvoicesToTrash = disabledTrashOperation;
+const previewReturnTrash = disabledTrashOperation;
+const moveReturnsToTrash = disabledTrashOperation;
+const cancelReturnSlip = disabledTrashOperation;
 
 async function resolveOrderLineUnitPrice(item, product, bangGiaId, storeId) {
     const resolved = await resolveSalePrice({
@@ -76,7 +87,7 @@ async function resolveOrderLineUnitPrice(item, product, bangGiaId, storeId) {
     if (resolved.cho_phep_sua_gia === false) {
         if (hasManual && normalizeUnitPrice(manualRaw) !== normalizeUnitPrice(resolved.gia_ban)) {
             return {
-                error: 'Không được thay đổi đơn giá cho dòng hàng này (đã khóa sửa giá).'
+                error: 'Không được thay đổi đơn giá cho dòng hàng này (dòng khóa sửa giá).'
             };
         }
         return { unitPrice: resolved.gia_ban, resolved };
@@ -143,12 +154,12 @@ const ORDER_EXPORT_COLUMN_DEFS = [
     { group: 'thanh_toan', key: 'cod_amount', header: 'Số tiền COD', style: { numFmt: '#,##0' } },
     { group: 'chi_tiet', key: 'ma_hang', header: 'Mã hàng', default: true },
     { group: 'chi_tiet', key: 'ten_hang', header: 'Tên hàng', default: true },
-    { group: 'chi_tiet', key: 'lo_hang', header: 'Lô hàng' },
+    { group: 'chi_tiet', key: 'lo_hang', header: 'Loại hàng' },
     { group: 'chi_tiet', key: 'so_luong_dat', header: 'SL đặt', style: { numFmt: '#,##0.##' }, default: true },
     { group: 'chi_tiet', key: 'so_luong_xac_nhan', header: 'SL xác nhận', style: { numFmt: '#,##0.##' } },
     { group: 'chi_tiet', key: 'so_luong_da_giao', header: 'SL đã giao', style: { numFmt: '#,##0.##' }, default: true },
     { group: 'chi_tiet', key: 'so_luong_con_thieu', header: 'SL còn thiếu', style: { numFmt: '#,##0.##' } },
-    { group: 'chi_tiet', key: 'trang_thai_giao', header: 'Trạng thái giao dòng' },
+    { group: 'chi_tiet', key: 'trang_thai_giao', header: 'Trạng thái giao hàng', style: { numFmt: '#,##0' } },
     { group: 'chi_tiet', key: 'don_gia_ban', header: 'Đơn giá bán', style: { numFmt: '#,##0' }, default: true },
     { group: 'chi_tiet', key: 'chiet_khau', header: 'Chiết khấu', style: { numFmt: '#,##0.##' } },
     { group: 'chi_tiet', key: 'kieu_chiet_khau', header: 'Kiểu chiết khấu' },
@@ -242,7 +253,7 @@ const INVOICE_EXPORT_COLUMNS = [
     { header: 'Khách cần trả', key: 'khach_can_tra', style: { numFmt: '#,##0' } },
     { header: 'Khách đã trả', key: 'khach_da_tra', style: { numFmt: '#,##0' } },
     { header: 'Tiền thừa trả khách', key: 'tien_thua_tra_khach', style: { numFmt: '#,##0' } },
-    { header: 'Công nợ', key: 'cong_no', style: { numFmt: '#,##0' } },
+    { header: 'Cộng nợ', key: 'cong_no', style: { numFmt: '#,##0' } },
     { header: 'Phương thức thanh toán', key: 'phuong_thuc_thanh_toan' },
     { header: 'COD', key: 'cod' },
     { header: 'Trạng thái hóa đơn', key: 'trang_thai_hoa_don' },
@@ -252,7 +263,7 @@ const INVOICE_EXPORT_COLUMNS = [
     { header: 'Thương hiệu', key: 'thuong_hieu' },
     { header: 'Nhóm hàng', key: 'nhom_hang' },
     { header: 'Đơn vị tính', key: 'don_vi_tinh' },
-    { header: 'Lô hàng', key: 'lo_hang' },
+    { header: 'Loại hàng', key: 'lo_hang' },
     { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
     { header: 'Đơn giá', key: 'don_gia', style: { numFmt: '#,##0' } },
     { header: 'Chiết khấu', key: 'chiet_khau', style: { numFmt: '#,##0.##' } },
@@ -261,8 +272,8 @@ const INVOICE_EXPORT_COLUMNS = [
 ];
 
 const RETURN_EXPORT_STATUS_MAP = {
-    completed: 'Đã trả',
-    cancelled: 'Đã hủy',
+    completed: ' hoàn thành',
+    cancelled: ' đã hủy',
     draft: 'Phiếu tạm',
     pending: 'Đang xử lý'
 };
@@ -292,13 +303,13 @@ const RETURN_EXPORT_COLUMNS = [
     { header: 'Lý do', key: 'ly_do' },
     { header: 'Ghi chú', key: 'ghi_chu' },
     { header: 'Trạng thái', key: 'trang_thai' },
-    { header: 'Loại dòng', key: 'loai_dong' },
+    { header: 'Loại dạng', key: 'loai_dong' },
     { header: 'Mã hàng', key: 'ma_hang' },
     { header: 'Tên hàng', key: 'ten_hang' },
     { header: 'Thương hiệu', key: 'thuong_hieu' },
     { header: 'Nhóm hàng', key: 'nhom_hang' },
     { header: 'Đơn vị tính', key: 'don_vi_tinh' },
-    { header: 'Lô hàng', key: 'lo_hang' },
+    { header: 'Loại hàng', key: 'lo_hang' },
     { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
     { header: 'Đơn giá', key: 'don_gia', style: { numFmt: '#,##0' } },
     { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } }
@@ -433,7 +444,7 @@ function buildOrderFilter(query = {}) {
     if (query.nguoi_tao && /^[0-9a-fA-F]{24}$/.test(query.nguoi_tao)) {
         filter.nguoi_tao_id = query.nguoi_tao;
     }
-    const deletedGuard = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    const deletedGuard = {};
     if (!Object.keys(filter).length) return deletedGuard;
     return { $and: [filter, deletedGuard] };
 }
@@ -461,7 +472,7 @@ function exportUserName(user) {
 }
 
 function exportCustomerName(customer) {
-    return customer ? (customer.ten_khach_hang || customer.ten_ca_nhan || customer.ten_cong_ty || customer.ma_khach_hang || '') : 'Khách lẻ';
+    return customer ? (customer.ten_khach_hang || customer.ten_ca_nhan || customer.ten_cong_ty || customer.ma_khach_hang || '') : 'Khách hàng';
 }
 
 function exportCustomerPhone(customer, shipment) {
@@ -524,7 +535,7 @@ function formatOrderLotText(item, product) {
     if (lot && typeof lot === 'object' && (lot.ten_lo || lot.ma_lo)) {
         return lot.ten_lo || lot.ma_lo || '';
     }
-    if (product?.quan_ly_theo_lo) return 'Chưa chốt lô';
+    if (product?.quan_ly_theo_lo) return 'Chưa chọn lô';
     return 'Không có';
 }
 
@@ -680,7 +691,7 @@ async function recordSalesReturnRefundReceipt({
     userId
 }) {
     if (!refund || refund <= 0) return null;
-    if (!storeId) throw new Error('Thiếu cửa hàng để ghi phiếu chi hoàn tiền trả hàng.');
+    if (!storeId) throw new Error('Thi?u c?a h�ng d? ghi phi?u chi ho�n ti?n tr? h�ng.');
 
     const refundBase = {
         loai_phieu: 'chi',
@@ -692,7 +703,7 @@ async function recordSalesReturnRefundReceipt({
         hoa_don_id: hoa_don_id || undefined,
         phieu_tra_hang_id: returnSlip._id,
         ma_chung_tu_goc: ma_phieu_tra,
-        doi_tuong: customerId ? undefined : 'Khách lẻ',
+        doi_tuong: customerId ? undefined : 'Kh�ch l?',
         nhom_doi_tuong: 'khach_hang',
         hach_toan: false,
         ghi_chu: `Hoan tien tra hang ${ma_phieu_tra}`
@@ -817,11 +828,10 @@ async function loadReturnInvoiceContext(invoiceId) {
 
     const returns = await PhieuTraHang.find({
         hoa_don_id: invoice._id,
-        trang_thai: { $ne: 'cancelled' },
-        deleted_at: null
+        trang_thai: { $ne: 'cancelled' }
     }).select('_id').lean();
     const returnedItems = returns.length
-        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' }, deleted_at: null })
+        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } })
             .select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong')
             .lean()
         : [];
@@ -864,7 +874,7 @@ async function loadReturnInvoiceContext(invoiceId) {
         invoice,
         items: returnableItems,
         return_multi_lot_note: hasMultiLotLines
-            ? 'Một số dòng hóa đơn xuất từ nhiều lô — trả hàng theo từng lô riêng.'
+            ? 'Một số dòng hóa đơn xuất từ nhiều lô để trả hàng theo từng lô riêng.'
             : ''
     };
 }
@@ -1215,7 +1225,7 @@ async function loadOrderExportData(filter) {
 async function sendOrderWorkbook(res, filename, orders, detailMap, shipmentMap, selectedColumns) {
     const columns = selectedColumns && selectedColumns.length ? selectedColumns : ORDER_EXPORT_COLUMNS;
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Đặt hàng');
+    const worksheet = workbook.addWorksheet('Đơn hàng');
     worksheet.columns = columns;
 
     orders.forEach(order => {
@@ -1463,7 +1473,7 @@ async function loadReturnExportData(filter) {
         .sort({ ngay_tra: -1, created_at: -1 });
     const returnIds = returns.map(item => item._id);
     const details = returnIds.length
-        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds }, deleted_at: null })
+        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds } })
             .populate({
                 path: 'hang_hoa_id',
                 populate: [
@@ -1774,7 +1784,7 @@ async function validateOrderAvailability({ khoId, normalizedItems, exclude_don_h
         ].filter(Boolean).join(' - ');
 
         if (tenQuyCach && !item.gia_tri_thuoc_tinh_id && !item.ten_quy_cach) {
-            warnings.push(`Dòng hàng quy cách ${label} thiếu gia_tri_thuoc_tinh_id và ten_quy_cach, chỉ có thể đối chiếu tồn theo dữ liệu còn lại.`);
+            warnings.push(`Dòng hàng quy cách ${label} thiếu gia_tri_thuoc_tinh_id và ten_quy_cach, chỉ có thể đối chiếu theo dữ liệu còn lại.`);
         }
         if (soLuongDat > tonThucTe) {
             const message = `Số lượng đặt vượt tồn thực tế. Khi giao có thể thiếu hàng. Dòng [${label}] tồn ${tonThucTe}, khách đặt ${soLuongDat}.`;
@@ -1783,7 +1793,7 @@ async function validateOrderAvailability({ khoId, normalizedItems, exclude_don_h
             continue;
         }
         if (soLuongDat > khaDung) {
-            const message = `Số lượng đặt của [${label}] vượt khả dụng. Khả dụng còn ${khaDung}, khách đặt ${soLuongDat}.`;
+            const message = `Số lượng đặt vượt khả dụng. Khả dụng cần ${khaDung}, khách đặt ${soLuongDat}.`;
             if (!CHO_PHEP_DAT_AM_KHO) return { valid: false, message };
             warnings.push(message);
         }
@@ -1871,8 +1881,8 @@ function normalizeInvoiceStatus(value) {
 function normalizePaymentMethodValue(value) {
     const method = String(value || '').trim();
     if (['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(method)) return method;
-    if (/chuyển|chuyen|bank/i.test(method)) return 'chuyen_khoan';
-    if (/ví|vi/i.test(method)) return 'vi_dien_tu';
+    if (/chuy?n|chuyen|bank/i.test(method)) return 'chuyen_khoan';
+    if (/v�|vi/i.test(method)) return 'vi_dien_tu';
     if (/cod/i.test(method)) return 'khac';
     return 'tien_mat';
 }
@@ -1918,8 +1928,8 @@ function validatePaymentBooksForCustomer(payment, books = {}) {
     const tienThua = Number(payment.tien_thua || 0);
     if ((tienMat > 0 || tienThua > 0) && !books.so_quy_tien_mat_id) {
         errors.push(tienThua > 0 && tienMat <= 0
-            ? 'Vui lòng chọn sổ tiền mặt để trả tiền thừa cho khách.'
-            : 'Vui lòng chọn sổ tiền mặt.');
+            ? 'Vui lòng chọn số tiền mặt để trả tiền thừa cho khách.'
+            : 'Vui lòng chọn số tiền mặt.');
     }
     if (chuyenKhoan > 0 && !books.so_quy_chuyen_khoan_id) {
         errors.push('Vui lòng chọn tài khoản chuyển khoản.');
@@ -2013,7 +2023,6 @@ async function recordCustomerPaymentReceipts(data, payment) {
     return taoPhieuThuKhachHang(Object.assign({}, payload, { payment }));
 }
 
-/** Tổng phải thu / đã thu / còn nợ đơn: theo HĐ active nếu đã có HĐ, không thì theo tổng đơn gốc. */
 async function computeOrderPaymentBalance(orderId, orderFallback = {}) {
     const invoices = await HoaDonBanHang.find({
         don_hang_id: orderId,
@@ -2072,7 +2081,7 @@ async function computeDeliveryPaymentDue(orderId, batchPayable, orderFallback = 
     };
 }
 
-/** Danh sách HĐ còn nợ (theo thứ tự tạo) và tổng còn nợ. */
+/** Danh s�ch H� c�n n? (theo th? t? t?o) v� t?ng c�n n?. */
 async function getOrderInvoiceDebtSummary(orderId) {
     const invoices = await HoaDonBanHang.find({
         don_hang_id: orderId,
@@ -2395,7 +2404,7 @@ async function rollbackDeliveryInvoice(invoiceId, options = {}) {
             nguoi_tao_id: options.nguoi_tao_id,
             loai_phieu: 'rollback_ban_hang',
             ma_phieu: maPhieu,
-            ghi_chu: options.ghi_chu || `Hoan ton HĐ ${maPhieu}`
+            ghi_chu: options.ghi_chu || `Hoàn trả Hàng ${maPhieu}`
         });
     }
 
@@ -2680,7 +2689,7 @@ async function mergeInvoicesInSession(req, session) {
 
     const storeIds = new Set(invoices.map(invoice => String(invoice.cua_hang_id || '')).filter(Boolean));
     if (storeIds.size !== 1) {
-        const error = new Error('Không thể gộp các hóa đơn khác cửa hàng.');
+        const error = new Error('Không thể gộp các hóa đơn khác của hàng.');
         error.status = 400;
         throw error;
     }
@@ -2734,8 +2743,7 @@ async function mergeInvoicesInSession(req, session) {
 
     const returnRows = await PhieuTraHang.find({
         hoa_don_id: { $in: invoiceIds },
-        trang_thai: { $ne: 'cancelled' },
-        deleted_at: null
+        trang_thai: { $ne: 'cancelled' }
     }).select('hoa_don_id ma_phieu_tra').session(session).lean();
     const returnInvoiceIds = new Set(returnRows.map(row => String(row.hoa_don_id || '')));
 
@@ -2833,7 +2841,7 @@ async function mergeInvoicesInSession(req, session) {
         {
             $set: {
                 trang_thai: 'cancelled',
-                ghi_chu: `Vận đơn bị ngưng do hóa đơn đã gộp vào ${receivingInvoice.ma_hoa_don}`
+                ghi_chu: `Vận đơn bị hủy do hóa đơn đã gộp vào ${receivingInvoice.ma_hoa_don}`
             }
         },
         { session }
@@ -3385,7 +3393,7 @@ async function buildInvoiceFilter(query = {}) {
         }
     }
 
-    const deletedGuard = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    const deletedGuard = {};
     if (!Object.keys(filter).length) return deletedGuard;
     return { $and: [filter, deletedGuard] };
 }
@@ -3417,7 +3425,7 @@ async function decorateInvoices(invoices) {
             ],
             trang_thai: { $ne: 'cancelled' }
         }).lean(),
-        PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' }, deleted_at: null }).lean(),
+        PhieuTraHang.find({ hoa_don_id: { $in: invoiceIds }, trang_thai: { $ne: 'cancelled' } }).lean(),
         CongNoKhachHang.find({ hoa_don_id: { $in: invoiceIds } }).lean()
     ]);
 
@@ -3494,7 +3502,7 @@ async function buildReturnFilter(query = {}) {
         }).select('_id');
         filter.khach_hang_id = { $in: customers.map(item => item._id) };
     }
-    const deletedGuard = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    const deletedGuard = {};
     if (!Object.keys(filter).length) return deletedGuard;
     return { $and: [filter, deletedGuard] };
 }
@@ -3533,7 +3541,7 @@ async function mergeOrdersInSession(req, session) {
     const orderIds = uniqueObjectIds(Array.isArray(body.don_hang_ids) ? body.don_hang_ids : [])
         .map(id => String(id));
     if (orderIds.length < 2) {
-        const error = new Error('Vui lòng chền ít nhất 2 đơn để gộp.');
+        const error = new Error('Vui lòng chọn ít nhất 2 đơn hàng để gộp.');
         error.status = 400;
         throw error;
     }
@@ -3557,7 +3565,7 @@ async function mergeOrdersInSession(req, session) {
 
     const storeIds = new Set(orders.map(order => String(order.cua_hang_id || '')).filter(Boolean));
     if (storeIds.size !== 1) {
-        const error = new Error('Không thể gộp các đơn khác cửa hàng.');
+        const error = new Error('Không thể gộp các đơn khác của hàng.');
         error.status = 400;
         throw error;
     }
@@ -3692,7 +3700,7 @@ async function mergeOrdersInSession(req, session) {
         {
             $set: {
                 trang_thai: 'cancelled',
-                ghi_chu: `Vận đơn bị ngưng do đơn hàng đã gộp vào ${receivingOrder.ma_don_hang}`
+                ghi_chu: `Vận đơn bị hủy do đơn hàng đã gộp vào ${receivingOrder.ma_don_hang}`
             }
         },
         { session }
@@ -3733,9 +3741,9 @@ async function mergeOrdersInSession(req, session) {
 
 async function loadSalesReturnCopyDraft(copyFromId) {
     if (!/^[0-9a-fA-F]{24}$/.test(String(copyFromId || ''))) return null;
-    const slip = await PhieuTraHang.findOne({ _id: copyFromId, deleted_at: null }).lean();
+    const slip = await PhieuTraHang.findOne({ _id: copyFromId }).lean();
     if (!slip || slip.trang_thai === 'cancelled') return null;
-    const lines = await CTPhieuTraHang.find({ phieu_tra_hang_id: slip._id, deleted_at: null })
+    const lines = await CTPhieuTraHang.find({ phieu_tra_hang_id: slip._id })
         .populate('hang_hoa_id')
         .populate('lo_hang_id')
         .lean();
@@ -3810,15 +3818,14 @@ async function getReturnableInvoiceIds(filter) {
 
     const returns = await PhieuTraHang.find({
         hoa_don_id: { $in: invoiceIds },
-        trang_thai: { $ne: 'cancelled' },
-        deleted_at: null
+        trang_thai: { $ne: 'cancelled' }
     }).select('_id hoa_don_id').lean();
     const returnById = returns.reduce((map, row) => {
         map[String(row._id)] = String(row.hoa_don_id);
         return map;
     }, {});
     const returnItems = returns.length
-        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' }, deleted_at: null })
+        ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } })
             .select('phieu_tra_hang_id hang_hoa_id so_luong')
             .lean()
         : [];

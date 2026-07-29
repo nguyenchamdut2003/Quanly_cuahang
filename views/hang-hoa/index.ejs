@@ -264,7 +264,6 @@
         </div>
 
         <div class="customer-table-wrap">
-          <form id="bulkDeleteProductsForm" method="post" action="/hang-hoa/delete-selected">
           <table class="admin-table customer-table" data-kv-master="hang-hoa">
             <thead>
               <tr>
@@ -301,7 +300,6 @@
               <% }) %>
             </tbody>
           </table>
-          </form>
           <% if (pagination && pagination.totalPages > 1) { %>
             <div class="product-pagination">
               <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> hàng hóa</div>
@@ -318,9 +316,7 @@
               <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> hàng hóa</div>
             </div>
           <% } %>
-          <% (products || []).forEach(function(item) { %>
-            <form id="deleteProductForm_<%= item._id %>" method="post" action="/hang-hoa/<%= item._id %>/delete"></form>
-          <% }) %>
+          <form id="bulkDeleteProductsForm" method="post" action="/hang-hoa/delete-selected" style="display:none" aria-hidden="true"></form>
         </div>
       </section>
     </div>

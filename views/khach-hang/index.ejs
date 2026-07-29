@@ -19,20 +19,39 @@
     .customer-page-link{min-width:34px;height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:700}
     .customer-page-link.is-active{background:#0070f4;border-color:#0070f4;color:#fff}
     .customer-page-link.is-disabled{pointer-events:none;opacity:.45}
+    .store-delete-modal-overlay{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:24px}
+    .store-delete-modal-overlay.is-visible{display:flex}
+    .store-delete-modal{width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 48px);display:flex;flex-direction:column;background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(15,23,42,.28);overflow:hidden}
+    .store-delete-modal-header,.store-delete-modal-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #e5e7eb}
+    .store-delete-modal-footer{justify-content:flex-end;border-top:1px solid #e5e7eb;border-bottom:0;background:#f8fafc}
+    .store-delete-modal-header h3{margin:0;font-size:22px;color:#0f172a}
+    .store-delete-modal-close{border:0;background:transparent;color:#94a3b8;font-size:28px;font-weight:700;line-height:1;cursor:pointer}
+    .store-delete-modal-body{padding:18px 20px;overflow:auto}
+    .store-delete-message{margin:0 0 12px;color:#475467}
+    .store-delete-message.is-error{color:#d92d20;font-weight:700}
+    .store-delete-target-list{margin:0 0 14px;padding-left:18px;color:#1f2937}
+    .store-delete-relations-table{width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+    .store-delete-relations-table th,.store-delete-relations-table td{padding:10px 12px;border-bottom:1px solid #e2e8f0;text-align:left}
+    .store-delete-relations-table th{background:#f1f5f9;color:#344054;font-weight:800}
+    .store-delete-relations-table td:nth-child(2),.store-delete-relations-table th:nth-child(2){text-align:right;width:120px}
     .customer-address-table{table-layout:fixed}
     .customer-address-table th:nth-child(1),
-    .customer-address-table td:nth-child(1){width:92px;max-width:92px}
+    .customer-address-table td:nth-child(1){width:150px;max-width:150px}
+    .customer-address-table th:nth-child(2),
+    .customer-address-table td:nth-child(2){width:120px;max-width:120px}
+    .customer-address-table td:nth-child(2) > input{letter-spacing:0;padding:0 8px}
     .customer-address-table th:nth-child(3),
-    .customer-address-table td:nth-child(3){width:112px;max-width:112px}
-    .customer-address-table td:nth-child(3) > input{letter-spacing:0;padding:0 8px}
-    .customer-address-table th:nth-child(7),
-    .customer-address-table td:nth-child(7){width:148px;max-width:148px}
-    .customer-address-table th:nth-child(8),
-    .customer-address-table td:nth-child(8){width:92px;max-width:92px}
-    .customer-address-table th:nth-child(9),
-    .customer-address-table td:nth-child(9){width:190px;max-width:190px}
+    .customer-address-table td:nth-child(3){width:160px;max-width:160px}
+    .customer-address-table th:nth-child(4),
+    .customer-address-table td:nth-child(4){width:180px;max-width:180px}
     .customer-address-table th:nth-child(6),
-    .customer-address-table td:nth-child(6){width:118px;max-width:118px;white-space:nowrap;font-size:12px;padding-left:8px;padding-right:8px}
+    .customer-address-table td:nth-child(6){width:140px;max-width:140px;white-space:nowrap;font-size:12px;padding-left:8px;padding-right:8px}
+    .customer-address-table th:nth-child(7),
+    .customer-address-table td:nth-child(7){width:92px;max-width:92px}
+    .customer-address-table th:nth-child(8),
+    .customer-address-table td:nth-child(8){width:150px;max-width:150px;min-width:150px}
+    .customer-address-table td:nth-child(8).warehouse-action-cell{padding-left:6px!important;padding-right:6px!important}
+    .customer-address-table td:nth-child(8) .warehouse-action-buttons{gap:6px;justify-content:center;flex-wrap:nowrap}
     .address-type-list{display:grid;gap:8px;max-height:280px;overflow:auto}
     .address-type-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid #e2e8f0;border-radius:6px;padding:8px}
     .address-type-row.is-default{background:#f8fafc}
@@ -667,6 +686,7 @@
               <input type="file" name="file" id="customerImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
             </form>
             <a class="btn btn-light" href="/khach-hang/export.xlsx<%= filterQueryString ? '?' + filterQueryString : '' %>">Xuất file</a>
+            <button class="btn btn-danger" type="button" id="bulkDeleteCustomersBtn">Xóa đã chọn</button>
           </div>
 
 
@@ -703,7 +723,7 @@
                 <% } %>
                 <% customers.forEach(function(customer) { %>
                   <% var listBase = buildCustomerPageUrl(pagination ? pagination.page : 1); %>
-                  <tr data-kv-detail-id="<%= customer._id %>">
+                  <tr data-kv-detail-id="<%= customer._id %>" data-customer-code="<%= customer.ma_khach_hang || '' %>" data-customer-name="<%= customer.ten_khach_hang || '' %>">
                     <td class="check-cell" onclick="event.stopPropagation()"><input class="customer-checkbox" type="checkbox" name="ids" value="<%= customer._id %>" form="bulkDeleteCustomersForm" aria-label="Chọn khách hàng"></td>
                     <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= customer.ma_khach_hang || '---' %></a></td>
                     <td><strong><%= customer.ten_khach_hang || '---' %></strong></td>
@@ -738,6 +758,32 @@
       </section>
     </div>
   </main>
+  <div class="store-delete-modal-overlay" id="customerDeleteModalOverlay" aria-hidden="true">
+    <div class="store-delete-modal" role="dialog" aria-modal="true" aria-labelledby="customerDeleteModalTitle">
+      <div class="store-delete-modal-header">
+        <h3 id="customerDeleteModalTitle">Chuyển khách hàng vào thùng rác</h3>
+        <button type="button" class="store-delete-modal-close" id="customerDeleteModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="store-delete-modal-body">
+        <p class="store-delete-message" id="customerDeleteMessage">Đang kiểm tra dữ liệu liên quan...</p>
+        <ul class="store-delete-target-list" id="customerDeleteTarget"></ul>
+        <table class="store-delete-relations-table" id="customerDeleteRelationsTable" hidden>
+          <thead>
+            <tr>
+              <th>Phiếu / dữ liệu liên quan</th>
+              <th>Số lượng</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody id="customerDeleteRelations"></tbody>
+        </table>
+      </div>
+      <div class="store-delete-modal-footer">
+        <button type="button" class="btn btn-light" id="customerDeleteCancel">Bỏ qua</button>
+        <button type="button" class="btn btn-danger" id="customerDeleteConfirm" hidden>Chuyển vào thùng rác</button>
+      </div>
+    </div>
+  </div>
   <div id="groupModalOverlay" class="group-modal-overlay">
     <div class="group-modal">
       <div class="group-modal-header">
@@ -788,6 +834,217 @@
         });
       });
 
+      var customerDeleteModalOverlay = document.getElementById('customerDeleteModalOverlay');
+      var customerDeleteModalClose = document.getElementById('customerDeleteModalClose');
+      var customerDeleteCancel = document.getElementById('customerDeleteCancel');
+      var customerDeleteConfirm = document.getElementById('customerDeleteConfirm');
+      var customerDeleteMessage = document.getElementById('customerDeleteMessage');
+      var customerDeleteTarget = document.getElementById('customerDeleteTarget');
+      var customerDeleteRelations = document.getElementById('customerDeleteRelations');
+      var customerDeleteRelationsTable = document.getElementById('customerDeleteRelationsTable');
+      var bulkDeleteCustomersBtn = document.getElementById('bulkDeleteCustomersBtn');
+      var pendingDeleteCustomer = null;
+      var pendingBulkDeleteCustomers = [];
+
+      function fetchCustomerJson(url, options) {
+        return fetch(url, Object.assign({
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        }, options || {})).then(function(response) {
+          return response.json().then(function(data) {
+            if (!response.ok || !data || !data.success) {
+              throw new Error((data && data.message) || 'Không xử lý được khách hàng.');
+            }
+            return data;
+          });
+        });
+      }
+
+      function selectedCustomerBoxes() {
+        return checkboxes.filter(function(box) { return box.checked; });
+      }
+
+      function closeCustomerDeleteModal() {
+        if (!customerDeleteModalOverlay) return;
+        customerDeleteModalOverlay.classList.remove('is-visible');
+        customerDeleteModalOverlay.setAttribute('aria-hidden', 'true');
+        pendingDeleteCustomer = null;
+        pendingBulkDeleteCustomers = [];
+        if (customerDeleteConfirm) {
+          customerDeleteConfirm.hidden = true;
+          customerDeleteConfirm.disabled = false;
+          customerDeleteConfirm.textContent = 'Chuyển vào thùng rác';
+        }
+      }
+
+      function showCustomerDeleteLoading(label) {
+        if (!customerDeleteModalOverlay) return;
+        customerDeleteModalOverlay.classList.add('is-visible');
+        customerDeleteModalOverlay.setAttribute('aria-hidden', 'false');
+        if (customerDeleteMessage) {
+          customerDeleteMessage.textContent = 'Đang kiểm tra dữ liệu liên quan...';
+          customerDeleteMessage.classList.remove('is-error');
+        }
+        if (customerDeleteTarget) customerDeleteTarget.innerHTML = label ? '<li>' + escapeHtml(label) + '</li>' : '';
+        if (customerDeleteRelations) customerDeleteRelations.innerHTML = '';
+        if (customerDeleteRelationsTable) customerDeleteRelationsTable.hidden = true;
+        if (customerDeleteConfirm) customerDeleteConfirm.hidden = true;
+      }
+
+      function renderCustomerDeleteRelations(relations) {
+        var rows = (relations || []).filter(function(item) { return Number(item && item.count || 0) > 0; });
+        if (customerDeleteRelationsTable) customerDeleteRelationsTable.hidden = rows.length === 0;
+        if (!customerDeleteRelations) return;
+        customerDeleteRelations.innerHTML = rows.map(function(item) {
+          var note = item.soft_delete_supported === false
+            ? 'Chưa hỗ trợ deleted_at, chỉ ghi nhận trong batch thùng rác.'
+            : 'Sẽ được chuyển vào thùng rác cùng khách hàng.';
+          return '<tr>'
+            + '<td>' + escapeHtml(item.label || item.key || 'Dữ liệu liên quan') + '</td>'
+            + '<td>' + Number(item.count || 0).toLocaleString('vi-VN') + '</td>'
+            + '<td>' + escapeHtml(note) + '</td>'
+            + '</tr>';
+        }).join('');
+      }
+
+      function mergeCustomerDeleteRelations(results) {
+        var grouped = {};
+        (results || []).forEach(function(result) {
+          (result.relations || []).forEach(function(item) {
+            if (!item || Number(item.count || 0) <= 0) return;
+            var key = item.key || item.label || 'related';
+            if (!grouped[key]) grouped[key] = { key: key, label: item.label || item.key, count: 0 };
+            grouped[key].count += Number(item.count || 0);
+          });
+        });
+        return Object.keys(grouped).map(function(key) { return grouped[key]; });
+      }
+
+      function showCustomerDeleteCheckResult(data) {
+        var customer = data && data.customer || {};
+        pendingDeleteCustomer = customer;
+        pendingBulkDeleteCustomers = [];
+        if (customerDeleteTarget) {
+          customerDeleteTarget.innerHTML = '<li><strong>' + escapeHtml(customer.ma_khach_hang || '') + '</strong> ' + escapeHtml(customer.ten_khach_hang || '') + '</li>';
+        }
+        renderCustomerDeleteRelations(data && data.relations || []);
+        if (customerDeleteMessage) {
+          customerDeleteMessage.textContent = Number(data && data.totalRelated || 0) > 0
+            ? 'Các dữ liệu trong bảng dưới đây sẽ được ghi nhận trong thùng rác cùng khách hàng. Xác nhận chuyển vào thùng rác?'
+            : 'Khách hàng không có dữ liệu liên quan. Xác nhận chuyển vào thùng rác?';
+          customerDeleteMessage.classList.remove('is-error');
+        }
+        if (customerDeleteConfirm) {
+          customerDeleteConfirm.hidden = false;
+          customerDeleteConfirm.textContent = 'Chuyển vào thùng rác';
+        }
+      }
+
+      function openCustomerDeleteModalFromInfo(info) {
+        if (!info || !info.id) return;
+        showCustomerDeleteLoading([info.code, info.name].filter(Boolean).join(' - '));
+        fetchCustomerJson('/khach-hang/api/' + encodeURIComponent(info.id) + '/delete-check')
+          .then(showCustomerDeleteCheckResult)
+          .catch(function(error) {
+            pendingDeleteCustomer = null;
+            if (customerDeleteMessage) {
+              customerDeleteMessage.textContent = error.message || 'Không kiểm tra được dữ liệu liên quan.';
+              customerDeleteMessage.classList.add('is-error');
+            }
+          });
+      }
+
+      function openBulkCustomerDeleteModal() {
+        var boxes = selectedCustomerBoxes();
+        if (!boxes.length) {
+          alert('Vui lòng chọn khách hàng cần xóa.');
+          return;
+        }
+        showCustomerDeleteLoading('Đã chọn: ' + boxes.length.toLocaleString('vi-VN') + ' khách hàng');
+        Promise.all(boxes.map(function(box) {
+          return fetchCustomerJson('/khach-hang/api/' + encodeURIComponent(box.value) + '/delete-check');
+        })).then(function(results) {
+          pendingDeleteCustomer = null;
+          pendingBulkDeleteCustomers = boxes.map(function(box) { return box.value; });
+          if (customerDeleteTarget) {
+            customerDeleteTarget.innerHTML = '<li>Đã chọn: <strong>' + boxes.length.toLocaleString('vi-VN') + '</strong> khách hàng</li>';
+          }
+          renderCustomerDeleteRelations(mergeCustomerDeleteRelations(results));
+          if (customerDeleteMessage) {
+            var total = results.reduce(function(sum, item) { return sum + Number(item.totalRelated || 0); }, 0);
+            customerDeleteMessage.textContent = total > 0
+              ? 'Các dữ liệu trong bảng dưới đây sẽ được ghi nhận trong thùng rác cùng khách hàng. Xác nhận chuyển vào thùng rác?'
+              : 'Các khách hàng đã chọn không có dữ liệu liên quan. Xác nhận chuyển vào thùng rác?';
+            customerDeleteMessage.classList.remove('is-error');
+          }
+          if (customerDeleteConfirm) {
+            customerDeleteConfirm.hidden = false;
+            customerDeleteConfirm.textContent = 'Chuyển đã chọn';
+          }
+        }).catch(function(error) {
+          pendingBulkDeleteCustomers = [];
+          if (customerDeleteMessage) {
+            customerDeleteMessage.textContent = error.message || 'Không kiểm tra được dữ liệu liên quan.';
+            customerDeleteMessage.classList.add('is-error');
+          }
+        });
+      }
+
+      function removeCustomerRows(ids) {
+        (ids || []).forEach(function(id) {
+          var row = document.querySelector('tr[data-kv-detail-id="' + id + '"]');
+          if (row && row.parentNode) row.parentNode.removeChild(row);
+        });
+      }
+
+      function submitCustomerDelete() {
+        if (!customerDeleteConfirm) return;
+        customerDeleteConfirm.disabled = true;
+        if (pendingBulkDeleteCustomers.length) {
+          var body = new URLSearchParams();
+          pendingBulkDeleteCustomers.forEach(function(id) { body.append('ids', id); });
+          fetchCustomerJson('/khach-hang/delete-selected', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: body.toString()
+          }).then(function() {
+            var ids = pendingBulkDeleteCustomers.slice();
+            closeCustomerDeleteModal();
+            if (kvCustomer) kvCustomer.closeDetail();
+            removeCustomerRows(ids);
+          }).catch(function(error) {
+            customerDeleteConfirm.disabled = false;
+            if (customerDeleteMessage) {
+              customerDeleteMessage.textContent = error.message || 'Không xóa được khách hàng.';
+              customerDeleteMessage.classList.add('is-error');
+            }
+          });
+          return;
+        }
+        if (!pendingDeleteCustomer || !pendingDeleteCustomer._id) {
+          customerDeleteConfirm.disabled = false;
+          return;
+        }
+        fetchCustomerJson('/khach-hang/' + encodeURIComponent(pendingDeleteCustomer._id) + '/delete', { method: 'POST' })
+          .then(function() {
+            var deletedId = pendingDeleteCustomer._id;
+            closeCustomerDeleteModal();
+            if (kvCustomer) kvCustomer.closeDetail();
+            removeCustomerRows([deletedId]);
+          })
+          .catch(function(error) {
+            customerDeleteConfirm.disabled = false;
+            if (customerDeleteMessage) {
+              customerDeleteMessage.textContent = error.message || 'Không xóa được khách hàng.';
+              customerDeleteMessage.classList.add('is-error');
+            }
+          });
+      }
+
       var kvCustomerTable = document.querySelector('table[data-kv-master="khach-hang"]');
       var kvCustomer = null;
 
@@ -809,6 +1066,19 @@
         }
 
         initGhnAddressSelects(wrap);
+        var deleteAction = detailBlock.querySelector('[data-customer-delete-action]');
+        if (deleteAction && !deleteAction.getAttribute('data-customer-delete-bound')) {
+          deleteAction.setAttribute('data-customer-delete-bound', '1');
+          deleteAction.addEventListener('click', function(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            openCustomerDeleteModalFromInfo({
+              id: deleteAction.getAttribute('data-customer-id') || '',
+              code: deleteAction.getAttribute('data-customer-code') || '',
+              name: deleteAction.getAttribute('data-customer-name') || ''
+            });
+          });
+        }
       }
 
       if (kvCustomerTable && typeof KvInlineDetail !== 'undefined') {
@@ -833,6 +1103,17 @@
       }
 
       document.addEventListener('click', function(e) {
+        var deleteButton = e.target.closest('[data-customer-delete-action]');
+        if (deleteButton) {
+          e.preventDefault();
+          e.stopPropagation();
+          openCustomerDeleteModalFromInfo({
+            id: deleteButton.getAttribute('data-customer-id') || '',
+            code: deleteButton.getAttribute('data-customer-code') || '',
+            name: deleteButton.getAttribute('data-customer-name') || ''
+          });
+          return;
+        }
         var refA = e.target.closest('a.ref-link[href^="/khach-hang/"]');
         if (!refA || (window.location.pathname || '') !== '/khach-hang') return;
         var href = refA.getAttribute('href') || '';
@@ -850,6 +1131,18 @@
       }
       if (createdFilterSelect) createdFilterSelect.addEventListener('change', toggleCustomDateRange);
       toggleCustomDateRange();
+
+      if (bulkDeleteCustomersBtn) {
+        bulkDeleteCustomersBtn.addEventListener('click', openBulkCustomerDeleteModal);
+      }
+      if (customerDeleteModalClose) customerDeleteModalClose.addEventListener('click', closeCustomerDeleteModal);
+      if (customerDeleteCancel) customerDeleteCancel.addEventListener('click', closeCustomerDeleteModal);
+      if (customerDeleteConfirm) customerDeleteConfirm.addEventListener('click', submitCustomerDelete);
+      if (customerDeleteModalOverlay) {
+        customerDeleteModalOverlay.addEventListener('click', function(event) {
+          if (event.target === customerDeleteModalOverlay) closeCustomerDeleteModal();
+        });
+      }
 
       var groupFilterTrigger = document.getElementById('groupFilterTrigger');
       var groupFilterSelectedLabel = document.getElementById('groupFilterSelectedLabel');
@@ -1006,6 +1299,116 @@
         }
       }
 
+      function enhanceAddressSelect(select, placeholder) {
+        if (!select || select.getAttribute('data-combobox-bound') === '1') return;
+        select.setAttribute('data-combobox-bound', '1');
+        select.classList.add('address-native-select');
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'address-combobox';
+        wrapper.innerHTML =
+          '<input class="address-combobox-input" type="text" autocomplete="off">' +
+          '<button class="address-combobox-toggle" type="button" aria-label="Mở danh sách">▾</button>' +
+          '<div class="address-combobox-menu"></div>';
+        select.parentNode.insertBefore(wrapper, select.nextSibling);
+
+        var input = wrapper.querySelector('.address-combobox-input');
+        var toggle = wrapper.querySelector('.address-combobox-toggle');
+        var menu = wrapper.querySelector('.address-combobox-menu');
+        input.placeholder = placeholder || '';
+
+        function options() {
+          return Array.prototype.slice.call(select.options).filter(function(option) {
+            return option.value !== '';
+          });
+        }
+
+        function syncInput() {
+          var option = select.options[select.selectedIndex] || null;
+          input.value = option && option.value ? option.textContent : '';
+        }
+
+        function renderMenu() {
+          var term = normalizeText(input.value);
+          var rows = options().filter(function(option) {
+            return !term || normalizeText(option.textContent).indexOf(term) !== -1 || normalizeText(option.value).indexOf(term) !== -1;
+          }).slice(0, 80);
+          menu.innerHTML = rows.length
+            ? rows.map(function(option) {
+              return '<button type="button" class="address-combobox-option" data-value="' + escapeAttr(option.value) + '">' + escapeAttr(option.textContent) + '</button>';
+            }).join('')
+            : '<div class="address-combobox-empty">Không có dữ liệu phù hợp</div>';
+        }
+
+        function openMenu() {
+          renderMenu();
+          wrapper.classList.add('is-open');
+        }
+
+        function closeMenu() {
+          wrapper.classList.remove('is-open');
+        }
+
+        function choose(value) {
+          select.value = value;
+          syncInput();
+          closeMenu();
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function chooseMatchingOption() {
+          var term = normalizeText(input.value);
+          if (!term) {
+            if (select.value) choose('');
+            return;
+          }
+          var matched = options().find(function(option) {
+            return normalizeText(option.textContent) === term || normalizeText(option.value) === term;
+          }) || options().find(function(option) {
+            return normalizeText(option.textContent).indexOf(term) !== -1 || normalizeText(option.value).indexOf(term) !== -1;
+          });
+          if (matched && select.value !== matched.value) choose(matched.value);
+        }
+
+        input.addEventListener('focus', openMenu);
+        input.addEventListener('input', openMenu);
+        input.addEventListener('blur', function() {
+          window.setTimeout(chooseMatchingOption, 120);
+        });
+        input.addEventListener('keydown', function(event) {
+          if (event.key !== 'Enter') return;
+          var firstOption = menu.querySelector('.address-combobox-option');
+          event.preventDefault();
+          if (firstOption) choose(firstOption.getAttribute('data-value') || '');
+          else chooseMatchingOption();
+        });
+        toggle.addEventListener('click', function() {
+          input.focus();
+          wrapper.classList.toggle('is-open');
+          if (wrapper.classList.contains('is-open')) renderMenu();
+        });
+        menu.addEventListener('mousedown', function(event) {
+          event.preventDefault();
+          var option = event.target.closest('.address-combobox-option');
+          if (option) choose(option.getAttribute('data-value') || '');
+        });
+        document.addEventListener('click', function(event) {
+          if (!wrapper.contains(event.target)) closeMenu();
+        });
+
+        select._addressComboboxRefresh = function() {
+          syncInput();
+          renderMenu();
+        };
+        syncInput();
+      }
+
+      function refreshAddressSelect(select) {
+        if (select && typeof select._addressComboboxRefresh === 'function') {
+          select._addressComboboxRefresh();
+        }
+      }
+
       function initGhnAddressSelects(root) {
         var scope = root || document;
         scope.querySelectorAll('.js-ghn-province').forEach(function(provinceSelect) {
@@ -1015,14 +1418,18 @@
           var wardSelect = formId
             ? document.querySelector('.js-ghn-ward[form="' + formId + '"]')
             : (provinceSelect.closest('form') ? provinceSelect.closest('form').querySelector('.js-ghn-ward') : null);
+          enhanceAddressSelect(provinceSelect, 'Tìm hoặc chọn tỉnh/thành');
+          enhanceAddressSelect(wardSelect, 'Tìm hoặc chọn phường/xã');
 
           getGhnProvinces().then(function(provinces) {
             renderProvinceSelect(provinceSelect, provinces);
+            refreshAddressSelect(provinceSelect);
             var province = selectedProvinceFromSelect(provinceSelect);
             syncGhnHidden(provinceSelect, wardSelect);
             if (province && wardSelect) {
               return getGhnWardsByProvince(province.province_id).then(function(wards) {
                 renderWardSelect(wardSelect, wards);
+                refreshAddressSelect(wardSelect);
                 syncGhnHidden(provinceSelect, wardSelect);
               });
             }
@@ -1037,11 +1444,13 @@
               wardSelect.value = '';
               wardSelect.setAttribute('data-selected-id', '');
               wardSelect.setAttribute('data-selected-name', '');
+              refreshAddressSelect(wardSelect);
             }
             syncGhnHidden(provinceSelect, wardSelect);
             if (!province || !wardSelect) return;
             getGhnWardsByProvince(province.province_id).then(function(wards) {
               renderWardSelect(wardSelect, wards);
+              refreshAddressSelect(wardSelect);
             }).catch(function(error) {
               console.warn('[GHN_ADDRESS]', error && error.message ? error.message : error);
             });

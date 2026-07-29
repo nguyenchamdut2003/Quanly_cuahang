@@ -29,6 +29,7 @@
     .return-import-grid table{width:max(100%,1120px);min-width:1120px;table-layout:auto;border-collapse:collapse;border-spacing:0}
     .return-import-grid th{height:auto;min-height:34px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:12px;font-weight:800;padding:8px;text-align:left;vertical-align:top;box-sizing:border-box}
     .return-import-grid td{min-height:40px;height:auto;border-bottom:1px solid #edf1f5;padding:8px;font-size:13px;color:#111827;vertical-align:top;box-sizing:border-box;word-wrap:break-word}
+    .return-import-grid td.merge-cell{vertical-align:middle}
     .return-import-grid .col-name{min-width:168px;max-width:260px}
     .return-import-grid .col-unit{min-width:52px;width:1%;white-space:nowrap;color:#111827}
     .num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.attr{width:92px}.lot{width:118px}.smallqty{width:104px}.qty{width:105px}.money{width:122px}.remove{width:42px}
@@ -347,6 +348,11 @@
       if (!iso) return '';
       return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+      });
+    }
     async function loadPurchasesByWarehouse(khoId) {
       const select = document.getElementById('phieuNhapId');
       if (!khoId) {
@@ -371,8 +377,8 @@
         select.innerHTML = '<option value="">Chọn phiếu nhập gốc</option>' + rows.map(row => {
           const supplier = row.nha_cung_cap || {};
           const supplierName = supplier.ten_ncc || supplier.ma_ncc || '';
-          const hanTra = row.ngay_het_han_tra ? ('Hạn trả ' + formatDeadlineShort(row.ngay_het_han_tra)) : '';
-          const label = [row.ma_phieu_nhap || '', formatDateOnly(row.ngay_nhap), hanTra, supplierName].filter(Boolean).join(' - ');
+          const lotNames = Array.isArray(row.lot_names) ? row.lot_names.filter(Boolean).join(', ') : '';
+          const label = [row.ma_phieu_nhap || '', lotNames, supplierName].filter(Boolean).join(' - ');
           return `<option value="${row._id}" data-ncc="${row.nha_cung_cap_id || ''}" data-kho="${row.kho_id || ''}">${label}</option>`;
         }).join('');
         select.disabled = false;
@@ -456,20 +462,46 @@
         renderTotals();
         return;
       }
+      const groupKeys = items.map(it => [
+        it.hang_hoa_id || '',
+        it.ma_hang || '',
+        it.ten_hang || '',
+        it.don_vi_tinh || '',
+        it.lo_hang_id || '',
+        it.ten_lo || '',
+        it.ma_lo || '',
+        it.ngay_nhap_lo || '',
+        it.han_su_dung || ''
+      ].join('|'));
+      const groupSpans = {};
+      items.forEach((it, idx) => {
+        if (idx > 0 && groupKeys[idx] === groupKeys[idx - 1]) return;
+        let span = 1;
+        while (idx + span < items.length && groupKeys[idx + span] === groupKeys[idx]) span++;
+        groupSpans[idx] = span;
+      });
       body.innerHTML = items.map((it, idx) => {
         const line = Number(it.so_luong || 0) * Number(it.gia_tra_lai || 0);
         const ghiChuVal = String(it.ghi_chu || '').replace(/"/g, '&quot;');
         const attrLabel = it.thuoc_tinh_label || it.ten_quy_cach || it.ten_thuoc_tinh || '--';
-        const loCell = (it.ten_lo || it.ma_lo || '') + (it.han_su_dung ? `<div style="font-size:11px;color:#667085;margin-top:2px">HSD ${formatDateOnly(it.han_su_dung)}</div>` : '');
+        const lotName = it.ten_lo || it.ma_lo || '';
+        const lotDate = formatDateOnly(it.ngay_nhap_lo);
+        const expiryDate = formatDateOnly(it.han_su_dung);
+        const lotDateLine = [lotDate, expiryDate ? ('HSD ' + expiryDate) : ''].filter(Boolean).join(' - ');
+        const loCell = escapeHtml(lotName) + (lotDateLine ? `<div style="font-size:11px;color:#667085;margin-top:2px">${escapeHtml(lotDateLine)}</div>` : '');
         const tonHienTai = Number(it.ton_kho_hien_tai || 0);
         const toiDaTra = maxReturnQty(it);
+        const groupSpan = groupSpans[idx] || 0;
+        const mergedBeforeAttr = groupSpan ? `
+          <td class="merge-cell" rowspan="${groupSpan}">${escapeHtml(it.ma_hang || '')}</td>
+          <td class="col-name merge-cell" rowspan="${groupSpan}">${escapeHtml(it.ten_hang || '')}${it.quan_ly_theo_lo && !it.ct_phieu_nhap_id ? `<select class="lot-select" onchange="updateItem(${idx}, 'lo_hang_id', this.value)">${lotOptions(it)}</select>` : ''}</td>
+          <td class="col-unit merge-cell" rowspan="${groupSpan}">${escapeHtml(it.don_vi_tinh || '')}</td>` : '';
+        const mergedLotCell = groupSpan ? `<td class="merge-cell" rowspan="${groupSpan}">${loCell}</td>` : '';
         return `<tr>
           <td class="center">${idx + 1}</td>
-          <td>${it.ma_hang || ''}</td>
-          <td class="col-name">${it.ten_hang || ''}${it.quan_ly_theo_lo && !it.ct_phieu_nhap_id ? `<select class="lot-select" onchange="updateItem(${idx}, 'lo_hang_id', this.value)">${lotOptions(it)}</select>` : ''}</td>
-          <td class="col-unit">${it.don_vi_tinh || ''}</td>
-          <td>${attrLabel}</td>
-          <td>${loCell}</td>
+          ${mergedBeforeAttr}
+          <td>${escapeHtml(attrLabel)}</td>
+          ${mergedLotCell}
           <td class="num" title="Tồn hiện tại theo lô/thuộc tính: ${fmt(tonHienTai)}">${fmt(tonHienTai)}</td>
           <td><input class="cell-input" type="number" min="0" max="${toiDaTra}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
           <td><input class="cell-input" inputmode="numeric" value="${fmt(it.gia_nhap || 0)}" oninput="applyVNNumberFormat(this)" onchange="updateItem(${idx}, 'gia_nhap', this.value)" ${it.ct_phieu_nhap_id ? 'readonly' : ''}></td>

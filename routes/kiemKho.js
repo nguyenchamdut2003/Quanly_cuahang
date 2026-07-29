@@ -15,8 +15,6 @@ router.get('/export.csv', kiemKhoController.getExportCsv);
 router.post('/export-excel', kiemKhoController.postExportExcel);
 router.get('/:id/export.csv', kiemKhoController.getIdExportCsv);
 router.get('/create', kiemKhoController.getCreate);
-router.post('/trash/preview', kiemKhoController.postTrashPreview);
-router.post('/trash/move', kiemKhoController.postTrashMove);
 router.post('/:id/cancel', kiemKhoController.postIdCancel);
 router.post('/', kiemKhoController.saveKiemKho);
 router.post('/add', kiemKhoController.saveKiemKho);

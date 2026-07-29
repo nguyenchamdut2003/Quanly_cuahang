@@ -1,4 +1,4 @@
-﻿const {
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -280,7 +280,7 @@ exports.getTraHangIdExportXlsx = async (req, res, next) => {
         if (!/^[0-9a-fA-F]{24}$/.test(String(req.params.id || ''))) {
             return res.status(404).send('Không tìm thấy phiếu trả hàng');
         }
-        const { returns, detailMap } = await loadReturnExportData({ _id: req.params.id, deleted_at: null });
+        const { returns, detailMap } = await loadReturnExportData({ _id: req.params.id });
         if (!returns.length) return res.status(404).send('Không tìm thấy phiếu trả hàng');
         await sendReturnWorkbook(
             res,

@@ -355,7 +355,6 @@
         </div>
 
         <div class="customer-table-wrap">
-          <form id="bulkDeleteVatChuaForm" method="post" action="/vat-chua/delete-selected">
             <table class="admin-table customer-table" data-kv-master="vat-chua">
               <thead>
                 <tr>
@@ -377,7 +376,7 @@
                 <% var listBase = buildVatChuaPageUrl(pagination ? pagination.page : 1); %>
                 <% (items || []).forEach(function(item) { %>
                   <tr data-kv-detail-id="<%= item._id %>" data-vc-row data-vc-id="<%= item._id %>" data-vc-code="<%= item.ma_vat_chua || '' %>" data-vc-name="<%= item.ten_vat_chua || '' %>" data-vc-stock="<%= Number(item.so_luong_ton || 0) %>" data-vc-cost="<%= Number(item.gia_von_trung_binh || 0) %>" data-vc-active="<%= item.trang_thai === 'active' ? '1' : '0' %>">
-                    <td class="check-cell"><input class="vat-chua-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn vật chứa"></td>
+                    <td class="check-cell"><input class="vat-chua-checkbox" type="checkbox" name="ids" value="<%= item._id %>" form="bulkDeleteVatChuaForm" aria-label="Chọn vật chứa"></td>
                     <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_vat_chua || '---' %></a></td>
                     <td><strong><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ten_vat_chua || '---' %></a></strong></td>
                     <td class="text-right"><%= Number(item.gia_von_trung_binh || 0).toLocaleString('vi-VN') %></td>
@@ -394,7 +393,6 @@
                 <% }) %>
               </tbody>
             </table>
-          </form>
           <% if (pagination && pagination.totalPages > 1) { %>
             <div class="vat-chua-pagination">
               <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> vật chứa</div>
@@ -411,6 +409,7 @@
               <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> vật chứa</div>
             </div>
           <% } %>
+          <form id="bulkDeleteVatChuaForm" method="post" action="/vat-chua/delete-selected" style="display:none" aria-hidden="true"></form>
         </div>
       </section>
     </div>

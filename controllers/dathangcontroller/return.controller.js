@@ -1,4 +1,4 @@
-﻿const {
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -439,7 +439,7 @@ exports.getTraHangInvoicesSearch = async (req, res, next) => {
                 tong_tien: i.tong_tien || 0,
                 thanh_toan: i.thanh_toan || 0,
                 nguoi_ban: i.nguoi_ban_id?.ho_ten || i.nguoi_ban_id?.username || 'Admin',
-                khach_hang: i.khach_hang_id?.ten_khach_hang || 'Khách lẻ',
+                khach_hang: i.khach_hang_id?.ten_khach_hang || 'Kh�ch l?',
                 khach_hang_id: i.khach_hang_id ? String(i.khach_hang_id._id) : ''
             })),
             pagination: {
@@ -471,14 +471,14 @@ exports.getTraHangInvoiceId = async (req, res, next) => {
 
 exports.getTraHangIdDetail = async (req, res, next) => {
     try {
-        const returnSlip = await PhieuTraHang.findOne({ _id: req.params.id, deleted_at: null })
+        const returnSlip = await PhieuTraHang.findOne({ _id: req.params.id })
             .populate('hoa_don_id')
             .populate('khach_hang_id')
             .populate('nguoi_tao_id')
             .populate('doi_tac_giao_hang_id');
         if (!returnSlip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
 
-        const items = await CTPhieuTraHang.find({ phieu_tra_hang_id: returnSlip._id, deleted_at: null }).populate('hang_hoa_id');
+        const items = await CTPhieuTraHang.find({ phieu_tra_hang_id: returnSlip._id }).populate('hang_hoa_id');
         const invoice = returnSlip.hoa_don_id?._id
             ? await HoaDonBanHang.findById(returnSlip.hoa_don_id._id).populate('cua_hang_id').populate('nguoi_ban_id')
             : null;
@@ -567,9 +567,9 @@ exports.postTraHangAdd = async (req, res, next) => {
                 return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể trả hàng' });
             }
             const invoiceItems = await CTHoaDonBanHang.find({ hoa_don_id }).lean();
-            const returns = await PhieuTraHang.find({ hoa_don_id, trang_thai: { $ne: 'cancelled' }, deleted_at: null }).select('_id').lean();
+            const returns = await PhieuTraHang.find({ hoa_don_id, trang_thai: { $ne: 'cancelled' } }).select('_id').lean();
             const returnedItems = returns.length
-                ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' }, deleted_at: null }).select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong').lean()
+                ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } }).select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong').lean()
                 : [];
             const invoiceLineById = invoiceItems.reduce((map, row) => {
                 map[String(row._id)] = row;
@@ -611,7 +611,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                     const returnedQty = Number(returnedByInvoiceLine[item.ct_hoa_don_id] || 0) + Number(returnedByLegacyLine[legacyKey] || 0);
                     const remainingQty = Math.max(Number(soldByInvoiceLine[item.ct_hoa_don_id] || 0) - returnedQty, 0);
                     if (item.so_luong > remainingQty) {
-                        return res.status(400).json({ success: false, message: 'So luong tra vuot qua so luong con co the tra' });
+                        return res.status(400).json({ success: false, message: 'Số lượng trả vượt quá số lượng còn có thể trả' });
                     }
                     continue;
                 }
@@ -633,11 +633,11 @@ exports.postTraHangAdd = async (req, res, next) => {
 
         const warehouseId = kho_id || invoice?.kho_id;
         if (!warehouseId) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chền kho xử lý trả/đổi hàng' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho xét trả/hủy hàng' });
         }
         const warehouse = await Kho.findById(warehouseId).lean();
         if (!warehouse) {
-            return res.status(400).json({ success: false, message: 'Kho xử lý trả/đổi hàng không hợp lệ' });
+            return res.status(400).json({ success: false, message: 'Kho xét trả/hủy hàng không hợp lệ' });
         }
 
         for (const item of cleanItems) {
@@ -705,7 +705,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                 trang_thai: 'active'
             }).lean();
             if (!vatChuaRow) {
-                return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng' });
+                return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngưng sử dụng' });
             }
             if (parsedVatChua.qty < 0) {
                 const tonVatChua = Math.max(0, Number(vatChuaRow.so_luong_ton || 0));
@@ -713,7 +713,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                 if (tonVatChua < exportQty) {
                     return res.status(400).json({
                         success: false,
-                        message: 'Tồn vật chứa không đủ để xuất (còn ' + tonVatChua + ', cần ' + exportQty + ')'
+                        message: 'Tồn vật chứa không đủ để xuất (cần ' + tonVatChua + ', cần ' + exportQty + ')'
                     });
                 }
             }
@@ -774,7 +774,7 @@ exports.postTraHangAdd = async (req, res, next) => {
             const customer = await KhachHang.findById(khach_hang_id || invoice?.khach_hang_id).select('ten_khach_hang').lean();
             cleanSenderName = customer?.ten_khach_hang || '';
             if (!cleanSenderName) {
-                return res.status(400).json({ success: false, message: 'Vui lòng nhập tên người gửi trả' });
+                return res.status(400).json({ success: false, message: 'Vui lòng nhập tên người gửi trả hàng.' });
             }
         }
 
@@ -834,7 +834,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                 nguoi_tao_id: req.user?._id,
                 loai_phieu: 'tra_hang',
                 ma_phieu: ma_phieu_tra,
-                ghi_chu: `Khach tra hang ${ma_phieu_tra}`
+                ghi_chu: `Khách trả hàng ${ma_phieu_tra}`
             });
         }
 
@@ -852,7 +852,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                 nguoi_tao_id: req.user?._id,
                 loai_phieu: 'ban_hang',
                 ma_phieu: ma_phieu_tra,
-                ghi_chu: `Doi hang ${ma_phieu_tra}`
+                ghi_chu: `Đổi hàng ${ma_phieu_tra}`
             });
             await CTPhieuTraHang.create({
                 phieu_tra_hang_id: returnSlip._id,
@@ -911,7 +911,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                     phieu_tra_hang_id: returnSlip._id,
                     so_tien: debt,
                     loai: 'tang_no',
-                    ghi_chu: `Công nợ đổi hàng ${ma_phieu_tra}`,
+                    ghi_chu: `Cộng nợ đổi hàng ${ma_phieu_tra}`,
                     ngay: new Date()
                 });
                 const customer = await KhachHang.findById(customerId).select('tong_no').lean();
@@ -958,12 +958,12 @@ exports.postTraHangAdd = async (req, res, next) => {
             } catch (vatChuaError) {
                 return res.status(400).json({
                     success: false,
-                    message: vatChuaError.message || 'Không ghi nhận vật chứa được'
+                    message: vatChuaError.message || 'Không ghi nhận vật chưa được'
                 });
             }
         }
 
-        res.json({ success: true, message: 'Đã tạo phiếu trả hàng', ma_phieu_tra, id: returnSlip._id, print_url: '/chung-tu-kho/tra-hang-ban/' + returnSlip._id });
+        res.json({ success: true, message: ' tạo phiếu trả hàng', ma_phieu_tra, id: returnSlip._id, print_url: '/chung-tu-kho/tra-hang-ban/' + returnSlip._id });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message || 'Không tạo được phiếu trả hàng' });
     }
@@ -972,7 +972,7 @@ exports.postTraHangAdd = async (req, res, next) => {
 
 exports.patchTraHangId = async (req, res, next) => {
     try {
-        const slip = await PhieuTraHang.findOne({ _id: req.params.id, deleted_at: null });
+        const slip = await PhieuTraHang.findOne({ _id: req.params.id });
         if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
         if (slip.trang_thai === 'cancelled') {
             return res.status(400).json({ success: false, message: 'Phiếu đã hủy, không thể sửa' });
@@ -995,7 +995,7 @@ exports.postTraHangIdCancel = async (req, res, next) => {
             message: result && result.already_cancelled ? 'Phiếu đã hủy' : 'Đã hủy phiếu trả hàng',
             data: result
         });
-        const slip = await PhieuTraHang.findOne({ _id: req.params.id, deleted_at: null });
+        const slip = await PhieuTraHang.findOne({ _id: req.params.id });
         if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
         if (slip.trang_thai === 'cancelled') {
             return res.json({ success: true, message: 'Phiếu đã hủy' });

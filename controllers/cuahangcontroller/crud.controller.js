@@ -1,5 +1,5 @@
-const { CuaHang, Kho } = require('../../models/kiot.model');
-const { normalizeIdParam, normalizeIdList, normalizeStorePayload } = require('./helpers/common.helper');
+﻿const { CuaHang } = require('../../models/kiot.model');
+const { normalizeIdParam, normalizeStorePayload } = require('./helpers/common.helper');
 const { makeStoreCode } = require('./helpers/code.helper');
 
 const add = async function(req, res, next) {
@@ -51,38 +51,8 @@ const update = async function(req, res, next) {
     }
 };
 
-const remove = async function(req, res, next) {
-    try {
-        var storeId = normalizeIdParam(req?.params?.id);
-        if (!storeId) return res.redirect('/cua-hang?error=invalid_store');
-        await Kho.deleteMany({ cua_hang_id: storeId });
-        await CuaHang.findByIdAndDelete(storeId);
-        res.redirect('/cua-hang?success=deleted');
-    } catch (error) {
-        next(error);
-    }
-};
-
-const removeSelected = async function(req, res, next) {
-    try {
-        var ids = normalizeIdList(req?.body?.ids);
-
-        if (ids.length === 0) {
-            return res.redirect('/cua-hang?error=no_selection');
-        }
-
-        await Kho.deleteMany({ cua_hang_id: { $in: ids } });
-        await CuaHang.deleteMany({ _id: { $in: ids } });
-
-        res.redirect('/cua-hang?success=deleted');
-    } catch (error) {
-        next(error);
-    }
-};
-
 module.exports = {
     add,
-    update,
-    remove,
-    removeSelected
+    update
 };
+

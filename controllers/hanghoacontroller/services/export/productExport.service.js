@@ -62,6 +62,7 @@
   buildPriceSetupQueryString,
   loadAvgLotCostByProductId,
   loadAvgSalePriceByProductId,
+  loadActiveInventoryTotalsByProductId,
   buildProductListPriceMaps,
   applyProductListPriceFields,
   buildFilterQueryString,
@@ -202,18 +203,14 @@ async function exportExcel(req, res, next) {
       var productIds = products.map(function (p) {
         return p._id;
       });
-      var inventoryRows = await TonKho.aggregate([
-        { $match: { hang_hoa_id: { $in: productIds } } },
-        {
-          $group: {
-            _id: "$hang_hoa_id",
-            total: { $sum: { $ifNull: ["$so_luong", 0] } },
-          },
-        },
-      ]);
-      inventoryRows.forEach(function (row) {
-        inventoryMap[String(row._id)] = Number(row.total || 0);
-      });
+      var lotManagedProductIds = products
+        .filter(function (p) {
+          return !!p.quan_ly_theo_lo;
+        })
+        .map(function (p) {
+          return p._id;
+        });
+      inventoryMap = await loadActiveInventoryTotalsByProductId(productIds, lotManagedProductIds);
     }
 
     // Apply stock range filter if needed

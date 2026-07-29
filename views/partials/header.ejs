@@ -5,7 +5,7 @@
   <div class="kv-topbar">
     <div></div>
     <div class="kv-top-actions">
-      <% if (locals.user) { %>
+      <% if (false && locals.user) { %>
         <a href="/thung-rac" class="kv-trash-link" title="Thùng rác" aria-label="Thùng rác">
           <svg class="kv-trash-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 6h2v9h-2V9Zm4 0h2v9h-2V9ZM6 9h2l1 11h6l1-11h2l-1.2 13H7.2L6 9Z"></path>
@@ -144,9 +144,6 @@
           <div class="nav-mega-col">
             <div class="nav-mega-heading">Nhà cung cấp</div>
             <a href="/nha-cung-cap" class="nav-mega-item">Nhà cung cấp</a>
-            <a href="/nhap-hang" class="nav-mega-item">
-              <span>Hóa đơn đầu vào</span>
-            </a>
           </div>
           <div class="nav-mega-col">
             <div class="nav-mega-heading">Mua hàng</div>
@@ -206,10 +203,81 @@
     </nav>
 
   </div>
+  <style>
+    .app-delete-disabled-hidden {
+      display: none !important;
+    }
+  </style>
 </header>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
+    function disableDeleteAndTrashUi(root) {
+      const scope = root && root.querySelectorAll ? root : document;
+      const selector = [
+        'a[href*="/thung-rac"]',
+        'a[href*="/delete"]',
+        'a[href*="/trash"]',
+        'form[action*="/delete"]',
+        'form[action*="/trash"]',
+        'button[id*="Trash"]',
+        'button[id*="trash"]',
+        'button[id*="Delete"]',
+        'button[id*="delete"]',
+        'button[form*="Delete"]',
+        'button[form*="delete"]',
+        '[data-action*="/delete"]',
+        '[data-action*="/trash"]',
+        '[onclick*="/delete"]',
+        '[onclick*="/trash"]',
+        '[onclick*="delete"]',
+        '[onclick*="Delete"]',
+        '[onclick*="trash"]',
+        '[onclick*="Trash"]',
+        '.btn-trash-product',
+        '.js-address-type-delete',
+        '.js-cashbook-delete',
+        '.group-manage-action-delete',
+        '.address-type-action-delete'
+      ].join(',');
+      scope.querySelectorAll(selector).forEach(function(el) {
+        if (el.closest && el.closest('#resetDataModal')) return;
+        if (el.tagName === 'FORM') {
+          el.querySelectorAll('button,input[type="submit"]').forEach(function(btn) {
+            btn.classList.add('app-delete-disabled-hidden');
+          });
+          return;
+        }
+        el.classList.add('app-delete-disabled-hidden');
+      });
+
+      scope.querySelectorAll('button,a').forEach(function(el) {
+        if (el.closest && el.closest('#resetDataModal')) return;
+        const text = String(el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const destructiveText = [
+          'xóa',
+          'xóa đã chọn',
+          'xóa vĩnh viễn',
+          'đưa vào thùng rác',
+          'chuyển vào thùng rác',
+          'chuyển đã chọn vào thùng rác',
+          'khôi phục'
+        ];
+        if (destructiveText.includes(text)) {
+          el.classList.add('app-delete-disabled-hidden');
+        }
+      });
+    }
+
+    disableDeleteAndTrashUi(document);
+    new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        mutation.addedNodes.forEach(function(node) {
+          if (node && node.nodeType === 1) disableDeleteAndTrashUi(node);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+
     const headerEl = document.querySelector('.kv-header');
     const navToggle = document.getElementById('kvNavToggle');
     const navBackdrop = document.getElementById('kvNavBackdrop');

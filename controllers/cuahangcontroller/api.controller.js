@@ -1,7 +1,6 @@
 const mongoose = require('mongoose');
 const { CuaHang, Kho } = require('../../models/kiot.model');
 const { formatDate, enrichWarehouseRow } = require('./helpers/common.helper');
-const { NOT_DELETED_QUERY } = require('./helpers/filter.helper');
 
 function ok(res, data) {
     return res.json(Object.assign({ success: true }, data || {}));
@@ -17,9 +16,6 @@ function normalizeObjectIds(value) {
         .map(function(id) { return new mongoose.Types.ObjectId(id); });
 }
 
-function notDeletedFilter(extra) {
-    return Object.assign({}, extra || {}, { $and: [NOT_DELETED_QUERY] });
-}
 
 function renderDetail(res, view, data) {
     return new Promise(function(resolve, reject) {
@@ -53,7 +49,7 @@ exports.warehouseCounts = async function(req, res, next) {
         if (!ids.length) return ok(res, { counts: {} });
 
         var rows = await Kho.aggregate([
-            { $match: { cua_hang_id: { $in: ids }, $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] } },
+            { $match: { cua_hang_id: { $in: ids } } },
             { $group: { _id: '$cua_hang_id', total: { $sum: 1 } } }
         ]);
 
@@ -74,14 +70,14 @@ exports.detail = async function(req, res, next) {
             return res.status(400).json({ success: false, message: 'Cua hang khong hop le' });
         }
 
-        var store = await CuaHang.findOne(notDeletedFilter({ _id: storeId }))
+        var store = await CuaHang.findOne({ _id: storeId })
             .select('ma_cua_hang ten_cua_hang ma_so_thue dia_chi dia_chi_chi_tiet dia_chi_day_du tinh_thanh tinh_thanh_id phuong_xa phuong_xa_code sdt email trang_thai created_at updated_at')
             .lean();
         if (!store) {
             return res.status(404).json({ success: false, message: 'Khong tim thay cua hang' });
         }
 
-        var warehouses = await Kho.find(notDeletedFilter({ cua_hang_id: store._id }))
+        var warehouses = await Kho.find({ cua_hang_id: store._id })
             .select('ma_kho ten_kho dia_chi dia_chi_chi_tiet dia_chi_day_du phuong_xa tinh_thanh trang_thai created_at updated_at')
             .sort({ created_at: 1, ma_kho: 1 })
             .lean();
@@ -104,7 +100,7 @@ exports.detail = async function(req, res, next) {
 
 exports.provinceOptions = async function(req, res, next) {
     try {
-        var rows = await CuaHang.distinct('tinh_thanh', notDeletedFilter());
+        var rows = await CuaHang.distinct('tinh_thanh', {});
         var items = (rows || [])
             .map(function(city) { return String(city || '').trim(); })
             .filter(Boolean)
@@ -122,12 +118,12 @@ exports.warehouses = async function(req, res, next) {
             return res.status(400).json({ success: false, message: 'Cua hang khong hop le' });
         }
 
-        var store = await CuaHang.findOne(notDeletedFilter({ _id: storeId })).select('_id').lean();
+        var store = await CuaHang.findOne({ _id: storeId }).select('_id').lean();
         if (!store) {
             return res.status(404).json({ success: false, message: 'Khong tim thay cua hang' });
         }
 
-        var warehouses = await Kho.find(notDeletedFilter({ cua_hang_id: store._id }))
+        var warehouses = await Kho.find({ cua_hang_id: store._id })
             .select('ma_kho ten_kho dia_chi dia_chi_chi_tiet dia_chi_day_du phuong_xa tinh_thanh trang_thai created_at updated_at')
             .sort({ created_at: 1, ma_kho: 1 })
             .lean();

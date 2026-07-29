@@ -1,4 +1,4 @@
-﻿const { CTHoaDonBanHang, HoaDonBanHang, KhachHang, NguoiDung, PhieuThuChi, PhieuTraHang } = require('../../../models/kiot.model');
+const { CTHoaDonBanHang, HoaDonBanHang, KhachHang, NguoiDung, PhieuThuChi, PhieuTraHang } = require('../../../models/kiot.model');
 const { getDayRange } = require('../helpers/date.helper');
 
 async function buildEndOfDayReport(query = {}) {
@@ -35,7 +35,7 @@ async function buildEndOfDayReport(query = {}) {
             .populate('khach_hang_id')
             .populate('nguoi_ban_id')
             .sort({ ngay_ban: 1 }),
-        PhieuTraHang.find({ ngay_tra: { $gte: start, $lt: end }, deleted_at: null })
+        PhieuTraHang.find({ ngay_tra: { $gte: start, $lt: end } })
             .populate('hoa_don_id')
             .populate('khach_hang_id')
             .populate('nguoi_tao_id')
@@ -75,7 +75,7 @@ async function buildEndOfDayReport(query = {}) {
     return {
         date: day,
         generatedAt: new Date(),
-        branchName: 'Cửa hàng trung tâm',
+        branchName: 'C?a h�ng trung t�m',
         invoices,
         returns,
         receipts,

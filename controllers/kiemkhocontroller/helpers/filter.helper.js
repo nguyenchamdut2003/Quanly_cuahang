@@ -5,7 +5,7 @@ function getSelectedStatuses(query) {
 }
 
 function buildKiemKhoFilter(query = {}) {
-    const filter = { $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] };
+    const filter = {};
     const q = String(query.q || '').trim();
     const dateMode = query.date_mode || 'this_month';
     const statuses = getSelectedStatuses(query);
@@ -42,9 +42,7 @@ function buildKiemKhoFilter(query = {}) {
 }
 
 function activeKiemKhoDocumentFilter(extra) {
-    return Object.assign({}, extra || {}, {
-        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
-    });
+    return Object.assign({}, extra || {}, {});
 }
 
 module.exports = {

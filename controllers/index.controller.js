@@ -9,7 +9,6 @@ const {
   NhaCungCap,
   VanDon
 } = require('../models/kiot.model');
-const { countActiveTrashRoots } = require('../services/trashList.service');
 
 function startOfDay(date = new Date()) {
   const value = new Date(date);
@@ -259,7 +258,7 @@ exports.index = async function(req, res, next) {
     }
 
     if (res.locals.currentStore && res.locals.currentStore._id) {
-      res.locals.trashCount = await countActiveTrashRoots(res.locals.currentStore._id);
+      res.locals.trashCount = 0;
     }
 
     const dashboard = await getDashboardData(req.user);

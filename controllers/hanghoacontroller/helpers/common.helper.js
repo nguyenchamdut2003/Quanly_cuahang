@@ -1,4 +1,4 @@
-﻿var mongoose = require('mongoose');
+var mongoose = require('mongoose');
 const { getReservedQuantitiesByOrder, getReservedQuantitiesForSale, buildVariantKey, buildLotKey } = require('../../../services/availability.service');
 var querystring = require('querystring');
 var path = require('path');
@@ -42,13 +42,21 @@ var {
 var pdfService = require('../../../services/pdf.service');
 var { buildLotProfitReport } = require('../../../services/lotProfitReport.service');
 var { submitStockAllocation } = require('../../../services/allocationSubmit.service');
-var { previewProductTrash, moveProductsToTrash } = require('../../../services/productTrash.service');
 var { measureAsync, isPerformanceEnabled } = require('../../../utils/performance.util');
 var {
     resolveSalePrice,
     buildPriceSetupLines,
     upsertGiaBanHangHoa
 } = require('../../../services/salePrice.service');
+
+function disabledTrashOperation() {
+    var error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+    error.statusCode = 410;
+    throw error;
+}
+
+var previewProductTrash = disabledTrashOperation;
+var moveProductsToTrash = disabledTrashOperation;
 
 function formatDate(value) {
     if (!value) return '---';
@@ -98,9 +106,8 @@ function normalizeFilterQuery(query) {
     };
 }
 
-/** Danh sÃ¡ch máº·c Ä‘á»‹nh: chá»‰ active; chá»‰ khi filter "Ngá»«ng kinh doanh" má»›i láº¥y inactive. */
+/** Danh sách mặc định: chỉ active; chỉ khi filter "Ngừng kinh doanh" mới lấy inactive. */
 function applyProductListStatusFilter(productQuery, filter) {
-    productQuery.$and = (productQuery.$and || []).concat([{ $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }]);
     if (filter && filter.status === 'inactive') {
         productQuery.trang_thai = 'inactive';
     } else {
@@ -164,6 +171,24 @@ async function loadAvgLotCostByProductId(productIds) {
     var rows = await TonKhoLo.aggregate([
         { $match: { hang_hoa_id: { $in: productIds }, so_luong: { $gt: 0 } } },
         {
+            $lookup: {
+                from: 'lo_hang',
+                localField: 'lo_hang_id',
+                foreignField: '_id',
+                as: 'lot'
+            }
+        },
+        { $unwind: '$lot' },
+        {
+            $lookup: {
+                from: 'phieu_nhap',
+                localField: 'lot.phieu_nhap_id',
+                foreignField: '_id',
+                as: 'purchase'
+            }
+        },
+        { $unwind: { path: '$purchase', preserveNullAndEmptyArrays: true } },
+        {
             $group: {
                 _id: '$hang_hoa_id',
                 totalQty: { $sum: { $ifNull: ['$so_luong', 0] } },
@@ -205,6 +230,15 @@ async function loadAvgSalePriceByProductId(productIds) {
             }
         },
         { $unwind: '$invoice' },
+        {
+            $lookup: {
+                from: 'don_hang',
+                localField: 'invoice.don_hang_id',
+                foreignField: '_id',
+                as: 'order'
+            }
+        },
+        { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
         { $match: { 'invoice.trang_thai': { $ne: 'cancelled' } } },
         {
             $group: {
@@ -229,6 +263,73 @@ async function loadAvgSalePriceByProductId(productIds) {
             totalQty: totalQty,
             avgPrice: totalQty > 0 ? Math.round(totalRevenue / totalQty) : null
         };
+    });
+    return map;
+}
+
+async function loadActiveInventoryTotalsByProductId(productIds, lotManagedProductIds, storeId) {
+    var map = {};
+    var ids = (productIds || [])
+        .filter(function(id) { return id && mongoose.Types.ObjectId.isValid(String(id)); })
+        .map(function(id) { return new mongoose.Types.ObjectId(String(id)); });
+    if (!ids.length) return map;
+
+    var scopedMatch = { hang_hoa_id: { $in: ids } };
+    if (storeId && mongoose.Types.ObjectId.isValid(String(storeId))) {
+        scopedMatch.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
+    }
+
+    var lotManagedSet = (lotManagedProductIds || []).reduce(function(acc, id) {
+        acc[String(id)] = true;
+        return acc;
+    }, {});
+
+    var results = await Promise.all([
+        TonKho.aggregate([
+            { $match: scopedMatch },
+            { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+        ]),
+        TonKhoLo.aggregate([
+            { $match: Object.assign({}, scopedMatch, { so_luong: { $gt: 0 } }) },
+            {
+                $lookup: {
+                    from: 'lo_hang',
+                    localField: 'lo_hang_id',
+                    foreignField: '_id',
+                    as: 'lot'
+                }
+            },
+            { $unwind: '$lot' },
+            {
+                $lookup: {
+                    from: 'phieu_nhap',
+                    localField: 'lot.phieu_nhap_id',
+                    foreignField: '_id',
+                    as: 'purchase'
+                }
+            },
+            { $unwind: { path: '$purchase', preserveNullAndEmptyArrays: true } },
+            { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
+        ])
+    ]);
+
+    var stockRows = results[0] || [];
+    var lotRows = results[1] || [];
+    var stockMap = {};
+    var lotMap = {};
+
+    stockRows.forEach(function(row) {
+        stockMap[String(row._id)] = Number(row.total || 0);
+    });
+    lotRows.forEach(function(row) {
+        lotMap[String(row._id)] = Number(row.total || 0);
+    });
+
+    ids.forEach(function(id) {
+        var key = String(id);
+        map[key] = lotManagedSet[key]
+            ? Number(lotMap[key] || 0)
+            : Number(stockMap[key] || 0);
     });
     return map;
 }
@@ -383,11 +484,11 @@ async function ensureDefaultAttributes(storeId) {
             cua_hang_id: storeId && mongoose.Types.ObjectId.isValid(storeId) ? storeId : undefined,
             ma_thuoc_tinh: 'SIZE',
             ten_thuoc_tinh: 'Size',
-            mo_ta: 'KÃ­ch cá»¡ hÃ ng hÃ³a',
+            mo_ta: 'Kích cỡ hàng hóa',
             trang_thai: 'active'
         });
     }
-    var defaults = ['Lá»›n', 'Trung', 'Bi'];
+    var defaults = ['Lớn', 'Trung', 'Bi'];
     for (var i = 0; i < defaults.length; i++) {
         var exists = await GiaTriThuocTinh.findOne({ thuoc_tinh_id: attr._id, ten_gia_tri: defaults[i] }).select('_id').lean();
         if (!exists) {
@@ -403,7 +504,7 @@ async function ensureDefaultAttributes(storeId) {
     }
     var sizeValues = await GiaTriThuocTinh.find({ thuoc_tinh_id: attr._id, ten_gia_tri: { $in: defaults } }).select('_id thuoc_tinh_id').lean();
     var cucumberProducts = await HangHoa.find({
-        ten_hang: { $regex: 'DÆ°a leo Lá»—', $options: 'i' },
+        ten_hang: { $regex: 'Dưa leo Lỗ', $options: 'i' },
         trang_thai: { $ne: 'deleted' }
     }).select('_id').lean();
     for (var p = 0; p < cucumberProducts.length; p++) {
@@ -503,7 +604,7 @@ async function createDefaultLotFromInventory(product, inventoryRows, req, option
             hang_hoa_id: product._id,
             nha_cung_cap_id: product.nha_cung_cap_id || undefined,
             ma_lo: maLo,
-            ten_lo: options.ten_lo || 'LÃ´ máº·c Ä‘á»‹nh ' + (product.ma_hang || product.ten_hang || ''),
+            ten_lo: options.ten_lo || 'Lô mặc định ' + (product.ma_hang || product.ten_hang || ''),
             ngay_nhap: new Date(),
             han_su_dung: options.han_su_dung || undefined,
             so_luong_ban_dau: missingQty,
@@ -511,7 +612,7 @@ async function createDefaultLotFromInventory(product, inventoryRows, req, option
             don_gia_nhap: Number(product.gia_nhap_cuoi || product.gia_von || 0),
             gia_von: Number(product.gia_von || 0),
             trang_thai: 'active',
-            ghi_chu: options.ghi_chu || 'Táº¡o tá»± Ä‘á»™ng tá»« tá»“n hiá»‡n táº¡i'
+            ghi_chu: options.ghi_chu || 'Tạo tự động từ tồn hiện tại'
         });
 
         await TonKhoLo.findOneAndUpdate(
@@ -554,7 +655,7 @@ function mapBy(rows, key) {
 function labelStockTransactionType(type, quantity) {
     var labels = {
         nhap_hang: 'Nhập hàng',
-        tra_hang_nhap: 'Trả hàng nhà cung cấp',
+        tra_hang_nhap: 'Trả hàng nhập',
         tra_hang: 'Trả hàng',
         kiem_kho: 'Kiểm hàng',
         ban_hang: 'Bán hàng',
@@ -643,7 +744,7 @@ async function enrichStockCardRows(rows, productId) {
         return map;
     }, {});
 
-    var supplierReturns = await PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: codes }, deleted_at: null, trang_thai: { $ne: 'cancelled' } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean();
+    var supplierReturns = await PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: codes }, trang_thai: { $ne: 'cancelled' } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean();
     var supplierReturnMap = mapBy(supplierReturns, 'ma_phieu_tra_nhap');
     var supplierReturnIds = supplierReturns.map(function(doc) { return doc._id; });
     var supplierReturnDetails = supplierReturnIds.length ? await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: { $in: supplierReturnIds }, hang_hoa_id: productObjectId }).lean() : [];
@@ -670,10 +771,10 @@ async function enrichStockCardRows(rows, productId) {
         return map;
     }, {});
 
-    var returns = await PhieuTraHang.find({ ma_phieu_tra: { $in: codes }, deleted_at: null }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
+    var returns = await PhieuTraHang.find({ ma_phieu_tra: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
     var returnMap = mapBy(returns, 'ma_phieu_tra');
     var returnIds = returns.map(function(doc) { return doc._id; });
-    var returnDetails = returnIds.length ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds }, hang_hoa_id: productObjectId, deleted_at: null }).lean() : [];
+    var returnDetails = returnIds.length ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds }, hang_hoa_id: productObjectId }).lean() : [];
     var returnDetailMap = returnDetails.reduce(function(map, row) {
         map[String(row.phieu_tra_hang_id)] = row;
         return map;
@@ -681,7 +782,7 @@ async function enrichStockCardRows(rows, productId) {
 
     var checks = await PhieuKiemKho.find({
         ma_kiem_kho: { $in: codes },
-        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+        
     }).lean();
     var checkMap = mapBy(checks, 'ma_kiem_kho');
     var checkIds = checks.map(function(doc) { return doc._id; });
@@ -804,7 +905,7 @@ async function filterTrashedKiemKhoStockRows(rows) {
 
     var activeChecks = await PhieuKiemKho.find({
         ma_kiem_kho: { $in: checkCodes },
-        $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+        
     }).select('ma_kiem_kho').lean();
     var activeMap = activeChecks.reduce(function(map, doc) {
         if (doc.ma_kiem_kho) map[String(doc.ma_kiem_kho)] = true;
@@ -928,14 +1029,14 @@ async function resolveStoreId(req) {
 
 function respondUnitError(req, res, statusCode, message) {
     if (shouldRespondJson(req)) {
-        return res.status(statusCode || 400).json({ success: false, message: message || 'KhÃ´ng thá»ƒ xá»­ lÃ½ Ä‘Æ¡n vá»‹ tÃ­nh.' });
+        return res.status(statusCode || 400).json({ success: false, message: message || 'Không thể xử lý đơn vị tính.' });
     }
     return res.redirect('/hang-hoa?error=unit_error');
 }
 
 function respondProductGroupError(req, res, statusCode, message) {
     if (shouldRespondJson(req)) {
-        return res.status(statusCode || 400).json({ success: false, message: message || 'KhÃ´ng thá»ƒ xá»­ lÃ½ nhÃ³m hÃ ng.' });
+        return res.status(statusCode || 400).json({ success: false, message: message || 'Không thể xử lý nhóm hàng.' });
     }
     return res.redirect('/hang-hoa?error=group_error');
 }
@@ -1029,7 +1130,7 @@ async function loadProductContractData(req) {
     }, 0);
 
     return {
-        title: 'HÄ nguyÃªn táº¯c hÃ ng hÃ³a',
+        title: 'HĐ nguyên tắc hàng hóa',
         activeMenu: 'hang-hoa',
         user: req.user,
         store: store,
@@ -1096,17 +1197,18 @@ async function loadProductDetailById(productId, req) {
     }, {});
 
     var productObjectId = new mongoose.Types.ObjectId(productId);
-    var inventoryMatch = { hang_hoa_id: productObjectId };
-    if (hasStoreScope) inventoryMatch.cua_hang_id = new mongoose.Types.ObjectId(storeId);
-    var inventoryRows = await TonKho.aggregate([
-        { $match: inventoryMatch },
-        { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
-    ]);
-    item.ton_kho = inventoryRows[0] ? Number(inventoryRows[0].total || 0) : 0;
+    var inventoryMap = await loadActiveInventoryTotalsByProductId(
+        [item._id],
+        item.quan_ly_theo_lo ? [item._id] : [],
+        hasStoreScope ? storeId : null
+    );
+    item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
     item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
     item.nha_cung_cap_ten = supplierMap[String(item.nha_cung_cap_id || '')] || '---';
     item.don_vi_tinh_ten = unitMap[String(item.don_vi_tinh_id || '')] || '---';
     item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
+    var detailPriceMaps = await buildProductListPriceMaps([item._id]);
+    applyProductListPriceFields(item, detailPriceMaps);
 
     var stockQuery = { hang_hoa_id: item._id };
     if (hasStoreScope) stockQuery.cua_hang_id = storeId;
@@ -1194,11 +1296,13 @@ async function loadProductDetailById(productId, req) {
     selectedProductLots = selectedProductLots.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
         var lot = row.lo_hang_id || {};
+        var lotId = String((lot && lot._id) || row.lo_hang_id || '');
         var rawQty = normalizeStockNumber(row.so_luong !== undefined && row.so_luong !== null ? row.so_luong : lot.so_luong_con_lai);
         var remainQty = normalizeStockNumber(lot.so_luong_con_lai !== undefined && lot.so_luong_con_lai !== null ? lot.so_luong_con_lai : rawQty);
         var sellableQty = isSellableLot(lot) ? Math.max(Math.min(rawQty, remainQty), 0) : 0;
         var expiredQty = isExpiredLot(lot) ? rawQty : 0;
         row.ton_thuc_te = rawQty;
+        row.so_luong = rawQty;
         row.ton_co_the_giao = sellableQty;
         row.ton_het_han = expiredQty;
         row.lo_da_het_han = isExpiredLot(lot);
@@ -1307,7 +1411,7 @@ async function loadProductDetailById(productId, req) {
     var tonHetHan = normalizeStockNumber(item.ton_het_han);
     item.co_ton_nhung_khong_the_giao = tonKhoThucTe > 0 && tonCoTheGiao <= 0 && tonHetHan < tonKhoThucTe;
     item.ly_do_khong_the_giao = item.co_ton_nhung_khong_the_giao
-        ? 'Tá»“n thá»±c táº¿ cÃ²n nhÆ°ng khÃ´ng Ä‘á»§ Ä‘iá»u kiá»‡n giao (ngoÃ i lÃ´ háº¿t háº¡n).'
+        ? 'Tồn thực tế còn nhưng không đủ điều kiện giao (ngoài lô hết hạn).'
         : '';
 
     selectedProductInventory = selectedProductInventory.map(function(row) {
@@ -1317,7 +1421,7 @@ async function loadProductDetailById(productId, req) {
         row.ton_co_the_giao = Math.max(rawSellable - Number(row.khach_dat || 0), 0);
         row.ton_het_han = item.quan_ly_theo_lo && summary ? summary.expired : 0;
         row.ly_do_khong_the_giao = row.ton_thuc_te > 0 && row.ton_co_the_giao <= 0 && row.ton_het_han < row.ton_thuc_te
-            ? 'Tá»“n kho cÃ²n nhÆ°ng khÃ´ng Ä‘á»§ Ä‘iá»u kiá»‡n giao (ngoÃ i lÃ´ háº¿t háº¡n).'
+            ? 'Tồn kho còn nhưng không đủ điều kiện giao (ngoài lô hết hạn).'
             : '';
         return row;
     });
@@ -1397,6 +1501,7 @@ module.exports = {
     buildPriceSetupQueryString,
     loadAvgLotCostByProductId,
     loadAvgSalePriceByProductId,
+    loadActiveInventoryTotalsByProductId,
     buildProductListPriceMaps,
     applyProductListPriceFields,
     buildFilterQueryString,

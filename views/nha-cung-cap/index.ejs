@@ -82,17 +82,21 @@
     }
     .supplier-address-table{table-layout:fixed}
     .supplier-address-table th:nth-child(1),
-    .supplier-address-table td:nth-child(1){width:104px;max-width:104px}
+    .supplier-address-table td:nth-child(1){width:150px;max-width:150px}
+    .supplier-address-table th:nth-child(2),
+    .supplier-address-table td:nth-child(2){width:120px;max-width:120px}
     .supplier-address-table th:nth-child(3),
-    .supplier-address-table td:nth-child(3){width:112px;max-width:112px}
+    .supplier-address-table td:nth-child(3){width:160px;max-width:160px}
+    .supplier-address-table th:nth-child(4),
+    .supplier-address-table td:nth-child(4){width:180px;max-width:180px}
     .supplier-address-table th:nth-child(6),
-    .supplier-address-table td:nth-child(6){width:118px;max-width:118px;white-space:nowrap}
+    .supplier-address-table td:nth-child(6){width:140px;max-width:140px;white-space:nowrap}
     .supplier-address-table th:nth-child(7),
-    .supplier-address-table td:nth-child(7){width:148px;max-width:148px}
+    .supplier-address-table td:nth-child(7){width:92px;max-width:92px}
     .supplier-address-table th:nth-child(8),
-    .supplier-address-table td:nth-child(8){width:92px;max-width:92px}
-    .supplier-address-table th:nth-child(9),
-    .supplier-address-table td:nth-child(9){width:190px;max-width:190px}
+    .supplier-address-table td:nth-child(8){width:150px;max-width:150px;min-width:150px}
+    .supplier-address-table td:nth-child(8).warehouse-action-cell{padding-left:6px!important;padding-right:6px!important}
+    .supplier-address-table td:nth-child(8) .warehouse-action-buttons{gap:6px;justify-content:center;flex-wrap:nowrap}
     .filter-range-stack { display: grid; gap: 8px; margin-top: 8px; }
     .filter-range-stack label span { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; }
     .filter-range-stack input {
@@ -1097,6 +1101,7 @@
           },
           onOpen: function(id, root) {
             bindSupplierInlinePanel(root);
+            if (typeof initGhnAddressSelects === 'function') initGhnAddressSelects(root);
             if (window.__openSupplierDebtTab) {
               var debtTab = root.querySelector('[data-detail-tab="debt"]');
               if (debtTab) debtTab.click();
@@ -1673,6 +1678,236 @@
         });
       }
 
+      function normalizeAddressText(value) {
+        return String(value || '').trim().toLowerCase();
+      }
+
+      var ghnProvinceCache = null;
+      var ghnWardCache = {};
+
+      function fetchAddressItems(url) {
+        return fetch(url, { headers: { Accept: 'application/json' } })
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            if (!data || !data.success) throw new Error((data && data.message) || 'Không lấy được danh mục địa chỉ.');
+            return Array.isArray(data.items) ? data.items : [];
+          });
+      }
+
+      function getGhnProvinces() {
+        if (ghnProvinceCache) return Promise.resolve(ghnProvinceCache);
+        return fetchAddressItems('/api/address/provinces').then(function(items) {
+          ghnProvinceCache = items;
+          return items;
+        });
+      }
+
+      function getGhnWardsByProvince(provinceId) {
+        if (!provinceId) return Promise.resolve([]);
+        if (ghnWardCache[provinceId]) return Promise.resolve(ghnWardCache[provinceId]);
+        return fetchAddressItems('/api/address/wards-by-province?province_id=' + encodeURIComponent(provinceId)).then(function(items) {
+          ghnWardCache[provinceId] = items;
+          return items;
+        });
+      }
+
+      function findAddressItem(items, id, name, idKey, nameKey) {
+        var selectedId = String(id || '');
+        var selectedName = normalizeAddressText(name);
+        return items.find(function(item) { return selectedId && String(item[idKey]) === selectedId; })
+          || items.find(function(item) { return selectedName && normalizeAddressText(item[nameKey]) === selectedName; })
+          || null;
+      }
+
+      function selectedProvinceFromSelect(select) {
+        var option = select && select.options ? select.options[select.selectedIndex] : null;
+        return option && option.getAttribute('data-id')
+          ? { province_id: option.getAttribute('data-id'), province_name: select.value }
+          : null;
+      }
+
+      function renderProvinceSelect(select, items) {
+        var selected = findAddressItem(items, select.getAttribute('data-selected-id'), select.getAttribute('data-selected-name') || select.value, 'province_id', 'province_name');
+        var currentName = select.getAttribute('data-selected-name') || select.value || '';
+        select.innerHTML = '<option value="">Chọn Tỉnh/Thành</option>' + items.map(function(item) {
+          return '<option value="' + escapeHtml(item.province_name) + '" data-id="' + escapeHtml(item.province_id) + '">' + escapeHtml(item.province_name) + '</option>';
+        }).join('');
+        if (selected) {
+          select.value = selected.province_name;
+          select.setAttribute('data-selected-id', selected.province_id);
+          select.setAttribute('data-selected-name', selected.province_name);
+        } else if (currentName) {
+          select.innerHTML = '<option value="' + escapeHtml(currentName) + '" selected>' + escapeHtml(currentName) + '</option>' + select.innerHTML;
+          select.value = currentName;
+        }
+      }
+
+      function renderWardSelect(select, items) {
+        if (!select) return;
+        var selected = findAddressItem(items, select.getAttribute('data-selected-id'), select.getAttribute('data-selected-name') || select.value, 'ward_code', 'ward_name');
+        var currentName = select.getAttribute('data-selected-name') || select.value || '';
+        select.innerHTML = '<option value="">Chọn Phường/Xã</option>' + items.map(function(item) {
+          var label = item.ward_name + (item.district_name ? ' - ' + item.district_name : '');
+          return '<option value="' + escapeHtml(item.ward_name) + '" data-code="' + escapeHtml(item.ward_code) + '">' + escapeHtml(label) + '</option>';
+        }).join('');
+        if (selected) {
+          select.value = selected.ward_name;
+          select.setAttribute('data-selected-id', selected.ward_code);
+          select.setAttribute('data-selected-name', selected.ward_name);
+        } else if (currentName) {
+          select.innerHTML = '<option value="' + escapeHtml(currentName) + '" selected>' + escapeHtml(currentName) + '</option>' + select.innerHTML;
+          select.value = currentName;
+        }
+      }
+
+      function enhanceAddressSelect(select, placeholder) {
+        if (!select || select.getAttribute('data-combobox-bound') === '1') return;
+        select.setAttribute('data-combobox-bound', '1');
+        select.classList.add('address-native-select');
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'address-combobox';
+        wrapper.innerHTML = '<input class="address-combobox-input" type="text" autocomplete="off"><button class="address-combobox-toggle" type="button" aria-label="Mở danh sách">▾</button><div class="address-combobox-menu"></div>';
+        select.parentNode.insertBefore(wrapper, select.nextSibling);
+
+        var input = wrapper.querySelector('.address-combobox-input');
+        var toggle = wrapper.querySelector('.address-combobox-toggle');
+        var menu = wrapper.querySelector('.address-combobox-menu');
+        input.placeholder = placeholder || '';
+
+        function options() {
+          return Array.prototype.slice.call(select.options).filter(function(option) { return option.value !== ''; });
+        }
+
+        function syncInput() {
+          var option = select.options[select.selectedIndex] || null;
+          input.value = option && option.value ? option.textContent : '';
+        }
+
+        function renderMenu() {
+          var term = normalizeAddressText(input.value);
+          var rows = options().filter(function(option) {
+            return !term || normalizeAddressText(option.textContent).indexOf(term) !== -1 || normalizeAddressText(option.value).indexOf(term) !== -1;
+          }).slice(0, 80);
+          menu.innerHTML = rows.length
+            ? rows.map(function(option) {
+              return '<button type="button" class="address-combobox-option" data-value="' + escapeHtml(option.value) + '">' + escapeHtml(option.textContent) + '</button>';
+            }).join('')
+            : '<div class="address-combobox-empty">Không có dữ liệu phù hợp</div>';
+        }
+
+        function closeMenu() {
+          wrapper.classList.remove('is-open');
+        }
+
+        function choose(value) {
+          select.value = value;
+          syncInput();
+          closeMenu();
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        function chooseMatchingOption() {
+          var term = normalizeAddressText(input.value);
+          if (!term) {
+            if (select.value) choose('');
+            return;
+          }
+          var matched = options().find(function(option) {
+            return normalizeAddressText(option.textContent) === term || normalizeAddressText(option.value) === term;
+          }) || options().find(function(option) {
+            return normalizeAddressText(option.textContent).indexOf(term) !== -1 || normalizeAddressText(option.value).indexOf(term) !== -1;
+          });
+          if (matched && select.value !== matched.value) choose(matched.value);
+        }
+
+        input.addEventListener('focus', function() {
+          renderMenu();
+          wrapper.classList.add('is-open');
+        });
+        input.addEventListener('input', function() {
+          renderMenu();
+          wrapper.classList.add('is-open');
+        });
+        input.addEventListener('blur', function() {
+          window.setTimeout(chooseMatchingOption, 120);
+        });
+        input.addEventListener('keydown', function(event) {
+          if (event.key !== 'Enter') return;
+          var firstOption = menu.querySelector('.address-combobox-option');
+          event.preventDefault();
+          if (firstOption) choose(firstOption.getAttribute('data-value') || '');
+          else chooseMatchingOption();
+        });
+        toggle.addEventListener('click', function() {
+          input.focus();
+          wrapper.classList.toggle('is-open');
+          if (wrapper.classList.contains('is-open')) renderMenu();
+        });
+        menu.addEventListener('mousedown', function(event) {
+          event.preventDefault();
+          var option = event.target.closest('.address-combobox-option');
+          if (option) choose(option.getAttribute('data-value') || '');
+        });
+        document.addEventListener('click', function(event) {
+          if (!wrapper.contains(event.target)) closeMenu();
+        });
+
+        select._addressComboboxRefresh = function() {
+          syncInput();
+          renderMenu();
+        };
+        syncInput();
+      }
+
+      function refreshAddressSelect(select) {
+        if (select && typeof select._addressComboboxRefresh === 'function') select._addressComboboxRefresh();
+      }
+
+      function initGhnAddressSelects(root) {
+        var scope = root || document;
+        scope.querySelectorAll('.js-ghn-province').forEach(function(provinceSelect) {
+          if (provinceSelect.getAttribute('data-ghn-bound') === '1') return;
+          provinceSelect.setAttribute('data-ghn-bound', '1');
+          var formId = provinceSelect.getAttribute('data-address-form');
+          var wardSelect = formId ? document.querySelector('.js-ghn-ward[data-address-form="' + formId + '"]') : null;
+          enhanceAddressSelect(provinceSelect, 'Tìm hoặc chọn tỉnh/thành');
+          enhanceAddressSelect(wardSelect, 'Tìm hoặc chọn phường/xã');
+
+          getGhnProvinces().then(function(provinces) {
+            renderProvinceSelect(provinceSelect, provinces);
+            refreshAddressSelect(provinceSelect);
+            var province = selectedProvinceFromSelect(provinceSelect);
+            if (province && wardSelect) {
+              return getGhnWardsByProvince(province.province_id).then(function(wards) {
+                renderWardSelect(wardSelect, wards);
+                refreshAddressSelect(wardSelect);
+              });
+            }
+          }).catch(function(error) {
+            console.warn('[GHN_ADDRESS]', error && error.message ? error.message : error);
+          });
+
+          provinceSelect.addEventListener('change', function() {
+            var province = selectedProvinceFromSelect(provinceSelect);
+            if (wardSelect) {
+              wardSelect.innerHTML = '<option value="">Chọn Phường/Xã</option>';
+              wardSelect.value = '';
+              wardSelect.setAttribute('data-selected-id', '');
+              wardSelect.setAttribute('data-selected-name', '');
+              refreshAddressSelect(wardSelect);
+            }
+            if (!province || !wardSelect) return;
+            getGhnWardsByProvince(province.province_id).then(function(wards) {
+              renderWardSelect(wardSelect, wards);
+              refreshAddressSelect(wardSelect);
+            }).catch(function(error) {
+              console.warn('[GHN_ADDRESS]', error && error.message ? error.message : error);
+            });
+          });
+        });
+      }
+
       function isDefaultAddressTypeCode(value) {
         return String(value || '').toLowerCase() === 'khac';
       }
@@ -1830,6 +2065,7 @@
         });
       }
       renderAddressTypeSelects();
+      initGhnAddressSelects(document);
 
       function submitSupplierAddressForm(action, formId, confirmMessage) {
         if (!action || !formId) return;

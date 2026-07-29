@@ -174,6 +174,10 @@ async function getReservedQuantitiesByOrder({
         'don_hang.kho_id': khoId,
         'don_hang.trang_thai': { $nin: ['cancelled', 'merged'] },
         'don_hang.trang_thai_giao_hang': { $ne: 'giao_du' },
+        $or: [
+          { 'don_hang.deleted_at': null },
+          { 'don_hang.deleted_at': { $exists: false } }
+        ],
         ...(excludedOrderId ? { 'don_hang._id': { $ne: excludedOrderId } } : {})
       }
     },
@@ -252,11 +256,21 @@ async function getReservedQuantitiesByDirectInvoice({
       $match: {
         'hoa_don.kho_id': khoId,
         'hoa_don.trang_thai': { $ne: 'cancelled' },
-        'hoa_don.da_tru_ton_kho': { $ne: true },
-        $or: [
-          { 'hoa_don.don_hang_id': { $exists: false } },
-          { 'hoa_don.don_hang_id': null }
+        $and: [
+          {
+            $or: [
+              { 'hoa_don.deleted_at': null },
+              { 'hoa_don.deleted_at': { $exists: false } }
+            ]
+          },
+          {
+            $or: [
+              { 'hoa_don.don_hang_id': { $exists: false } },
+              { 'hoa_don.don_hang_id': null }
+            ]
+          }
         ],
+        'hoa_don.da_tru_ton_kho': { $ne: true },
         ...(excludedInvoiceId ? { 'hoa_don._id': { $ne: excludedInvoiceId } } : {})
       }
     },

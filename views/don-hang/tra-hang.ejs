@@ -91,7 +91,21 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th class="check-col"><input type="checkbox" id="returnSelectAll" onclick="event.stopPropagation()"></th><th>Loại</th><th>Mã trả hàng</th><th>Người bán</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Hàng trả</th><th class="num">Hàng đổi</th><th class="num">Cần thu/trả</th><th>Trạng thái</th></tr></thead>
+            <thead><tr>
+              <th class="check-col">
+                <input type="checkbox" id="returnSelectAll" onclick="event.stopPropagation()">
+              </th><th>Loại</th>
+              <th>Mã trả hàng</th>
+              <th>Người bán</th>
+              <th>Thời gian</th>
+              <th>Mã KH</th>
+              <th>Khách hàng</th>
+              <th class="num">Hàng trả</th>
+              <th class="num">Hàng đổi</th>
+              <th class="num">Cần trả</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
             <tbody>
               <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td class="num"><strong>0</strong></td><td></td></tr>
               <% if (safeReturns.length) { %>

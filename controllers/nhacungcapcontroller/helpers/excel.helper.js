@@ -206,7 +206,7 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             });
         });
         if (PhieuTraHangNhap) {
-            var ptMatch = { nha_cung_cap_id: supplier._id, deleted_at: null, trang_thai: { $ne: 'cancelled' } };
+            var ptMatch = { nha_cung_cap_id: supplier._id, trang_thai: { $ne: 'cancelled' } };
             if (storeId && mongoose.Types.ObjectId.isValid(storeId)) ptMatch.cua_hang_id = storeId;
             var traRows = await PhieuTraHangNhap.find(ptMatch).sort({ ngay_tra: -1, created_at: -1 }).lean();
             traRows.forEach(function(row) {

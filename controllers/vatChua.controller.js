@@ -6,9 +6,18 @@ var { createXuatVatChuaAndDecreaseStock } = require('../services/vatChuaExport.s
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo, extractPaymentDetail } = require('../services/paymentCashBook.service');
 var { loadVatChuaDetailContext, loadVatChuaDocumentDetail } = require('../services/vatChuaDetail.service');
-var { previewNhapVatChuaTrash, moveNhapVatChuaToTrash } = require('../services/vatChuaImportTrash.service');
 var { loadNhapVatChuaForEdit, updateNhapVatChuaImport } = require('../services/vatChuaImportEdit.service');
-var { loadXuatVatChuaForEdit, updateXuatVatChuaReturn, deleteXuatVatChuaReturn } = require('../services/vatChuaReturnEdit.service');
+var { loadXuatVatChuaForEdit, updateXuatVatChuaReturn } = require('../services/vatChuaReturnEdit.service');
+
+function disabledTrashOperation() {
+  var error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+  error.statusCode = 410;
+  throw error;
+}
+
+var previewNhapVatChuaTrash = disabledTrashOperation;
+var moveNhapVatChuaToTrash = disabledTrashOperation;
+var deleteXuatVatChuaReturn = disabledTrashOperation;
 
 var VAT_CHUA_PAGE_SIZE = 10;
 
@@ -184,7 +193,7 @@ async function resolveOpenDetailVatChuaId(storeId, nhapVatChuaIdRaw) {
   var nhapId = normalizeObjectId(nhapVatChuaIdRaw);
   if (!nhapId || !storeId) return '';
   var nhap = await NhapVatChua.findOne({ _id: nhapId, cua_hang_id: storeId })
-    .where('deleted_at').equals(null)
+    
     .select('items.vat_chua_id')
     .lean();
   if (!nhap || !Array.isArray(nhap.items) || !nhap.items.length) return '';
@@ -503,7 +512,7 @@ exports.apiImportReturn = async function(req, res, next) {
       _id: importId,
       cua_hang_id: storeId,
       trang_thai: { $ne: 'cancelled' }
-    }).where('deleted_at').equals(null).lean();
+    }).lean();
     if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập vật chứa.' });
 
     var line = (Array.isArray(doc.items) ? doc.items : []).find(function(item) {
@@ -515,7 +524,6 @@ exports.apiImportReturn = async function(req, res, next) {
       source_type: 'manual',
       source_id: doc._id,
       trang_thai: 'active',
-      deleted_at: null,
       'items.vat_chua_id': line.vat_chua_id
     }).select('items').lean();
     var returnedQty = returnedRows.reduce(function(sum, row) {

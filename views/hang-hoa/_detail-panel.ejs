@@ -33,7 +33,7 @@
         <div><span>C&oacute; th&#7875; b&aacute;n</span><strong><%= Number(item.ton_co_the_giao || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>H&#7871;t h&#7841;n</span><strong><%= Number(item.ton_het_han || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>&#272;&#7883;nh m&#7913;c t&#7891;n</span><strong><%= Number(item.dinh_muc_toi_thieu || 0).toLocaleString('vi-VN') %> - 0</strong></div>
-        <div><span>Gi&aacute; v&#7889;n</span><strong><%= Number(item.gia_von || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Gi&aacute; v&#7889;n</span><strong><%= Number(item.gia_von_trung_binh_hien_thi != null ? item.gia_von_trung_binh_hien_thi : item.gia_von || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>Gi&aacute; b&aacute;n</span><strong><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>&#272;&#417;n v&#7883; t&iacute;nh</span><strong><%= item.don_vi_tinh_ten || '---' %></strong></div>
         <div><span>Nh&agrave; cung c&#7845;p</span><strong><%= item.nha_cung_cap_ten || '---' %></strong></div>

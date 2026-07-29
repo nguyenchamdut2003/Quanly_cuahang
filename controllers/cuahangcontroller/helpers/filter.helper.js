@@ -1,13 +1,6 @@
 const { Kho } = require('../../../models/kiot.model');
 
 const STORE_PAGE_SIZE = 10;
-const NOT_DELETED_QUERY = {
-    $or: [
-        { deleted_at: null },
-        { deleted_at: { $exists: false } }
-    ]
-};
-
 function normalizeFilterQuery(query) {
     query = query || {};
     var status = query.status === 'active' || query.status === 'inactive' ? query.status : 'all';
@@ -84,7 +77,7 @@ function buildFilterQueryString(filter) {
 
 async function buildStoreQueryFromFilter(filter) {
     var dateRange = getDateRange(filter);
-    var storeQuery = { $and: [NOT_DELETED_QUERY] };
+    var storeQuery = {};
 
     if (filter.keyword) {
         storeQuery.$or = [
@@ -135,7 +128,6 @@ async function buildStoreQueryFromFilter(filter) {
 
 module.exports = {
     STORE_PAGE_SIZE,
-    NOT_DELETED_QUERY,
     normalizeFilterQuery,
     getDateRange,
     buildFilterQueryString,

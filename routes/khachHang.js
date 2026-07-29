@@ -15,6 +15,7 @@ router.get('/', khachHangController.index);
 router.get('/export.xlsx', khachHangController.exportExcel);
 router.get('/import/template.xlsx', khachHangController.downloadImportTemplate);
 router.post('/import', upload.single('file'), khachHangController.importExcel);
+router.get('/api/:id/delete-check', khachHangController.deleteCheck);
 router.get('/api/:id/detail', khachHangController.apiCustomerDetail);
 router.post('/add', khachHangController.add);
 router.post('/:id/update', khachHangController.update);

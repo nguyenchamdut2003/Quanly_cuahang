@@ -1,10 +1,6 @@
 var { calculateCashBookBalances } = require('../../services/cashBookBalance.service');
 var hrLog = require('../../utils/hrPayrollLogger');
 var catalog = require('../../services/soQuyCatalog.service');
-var {
-  previewCashBookTrash,
-  moveCashBooksToTrash
-} = require('../../services/cashBookTrash.service');
 var { resolveStoreId } = require('../../utils/storeScope');
 
 async function buildCashBookResponse(row) {
@@ -75,7 +71,7 @@ exports.create = async function(req, res, next) {
       body: req.body || {}
     });
     var data = await buildCashBookResponse(row.toObject ? row.toObject() : row);
-    return res.json({ success: true, message: 'Táº¡o sá»• quá»¹ thÃ nh cÃ´ng', data: data });
+    return res.json({ success: true, message: 'Tạo sổ quỹ thành công', data: data });
   } catch (error) {
     return jsonError(res, error);
   }
@@ -88,48 +84,22 @@ exports.putId = async function(req, res, next) {
       body: req.body || {}
     });
     var data = await buildCashBookResponse(row.toObject ? row.toObject() : row);
-    return res.json({ success: true, message: 'Cáº­p nháº­t sá»• quá»¹ thÃ nh cÃ´ng', data: data });
+    return res.json({ success: true, message: 'Cập nhật sổ quỹ thành công', data: data });
   } catch (error) {
     return jsonError(res, error);
   }
 };
 
 exports.postTrashPreview = async function(req, res) {
-  try {
-    var storeId = await resolveStoreId(req);
-    var ids = req.body && (req.body.so_quy_ids || req.body.ids || req.body.id);
-    var preview = await previewCashBookTrash(ids, storeId);
-    return res.json({ success: true, data: preview });
-  } catch (error) {
-    return jsonError(res, error);
-  }
+  return res.status(410).json({ success: false, message: 'Chức năng xóa/đưa vào thùng rác đã được tắt.' });
 };
 
 exports.postTrashMove = async function(req, res) {
-  try {
-    var storeId = await resolveStoreId(req);
-    var ids = req.body && (req.body.so_quy_ids || req.body.ids || req.body.id);
-    var result = await moveCashBooksToTrash(ids, storeId, req.user && req.user._id);
-    return res.json({
-      success: true,
-      message: 'ÄÃ£ Ä‘Æ°a ' + result.moved_count + ' sá»• quá»¹ vÃ o thÃ¹ng rÃ¡c.',
-      data: result
-    });
-  } catch (error) {
-    return jsonError(res, error);
-  }
+  return res.status(410).json({ success: false, message: 'Chức năng xóa/đưa vào thùng rác đã được tắt.' });
 };
 
 exports.deleteId = async function(req, res) {
-  try {
-    var storeId = await resolveStoreId(req);
-    var result = await moveCashBooksToTrash([req.params.id], storeId, req.user && req.user._id);
-    return res.json({
-      success: true,
-      message: 'ÄÃ£ Ä‘Æ°a sá»• quá»¹ vÃ o thÃ¹ng rÃ¡c.',
-      data: result
-    });
-  } catch (error) {
-    return jsonError(res, error);
-  }
+  return res.status(410).json({ success: false, message: 'Chức năng xóa/đưa vào thùng rác đã được tắt.' });
 };
+
+

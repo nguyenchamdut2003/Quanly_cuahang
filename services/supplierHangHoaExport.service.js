@@ -65,6 +65,34 @@ async function loadAvgLotCostByProductId(productIds) {
     const rows = await TonKhoLo.aggregate([
         { $match: { hang_hoa_id: { $in: productIds }, so_luong: { $gt: 0 } } },
         {
+            $lookup: {
+                from: 'lo_hang',
+                localField: 'lo_hang_id',
+                foreignField: '_id',
+                as: 'lot'
+            }
+        },
+        { $unwind: '$lot' },
+        {
+            $lookup: {
+                from: 'phieu_nhap',
+                localField: 'lot.phieu_nhap_id',
+                foreignField: '_id',
+                as: 'purchase'
+            }
+        },
+        { $unwind: { path: '$purchase', preserveNullAndEmptyArrays: true } },
+        {
+            $match: {
+                $or: [
+                    { 'lot.phieu_nhap_id': null },
+                    { 'lot.phieu_nhap_id': { $exists: false } },
+                    { 'purchase.deleted_at': null },
+                    { 'purchase.deleted_at': { $exists: false } }
+                ]
+            }
+        },
+        {
             $group: {
                 _id: '$hang_hoa_id',
                 totalQty: { $sum: { $ifNull: ['$so_luong', 0] } },
@@ -101,7 +129,36 @@ async function loadAvgSalePriceByProductId(productIds) {
             }
         },
         { $unwind: '$invoice' },
-        { $match: { 'invoice.trang_thai': { $ne: 'cancelled' } } },
+        {
+            $lookup: {
+                from: 'don_hang',
+                localField: 'invoice.don_hang_id',
+                foreignField: '_id',
+                as: 'order'
+            }
+        },
+        { $unwind: { path: '$order', preserveNullAndEmptyArrays: true } },
+        {
+            $match: {
+                'invoice.trang_thai': { $ne: 'cancelled' },
+                $and: [
+                    {
+                        $or: [
+                            { 'invoice.deleted_at': null },
+                            { 'invoice.deleted_at': { $exists: false } }
+                        ]
+                    },
+                    {
+                        $or: [
+                            { 'invoice.don_hang_id': null },
+                            { 'invoice.don_hang_id': { $exists: false } },
+                            { 'order.deleted_at': null },
+                            { 'order.deleted_at': { $exists: false } }
+                        ]
+                    }
+                ]
+            }
+        },
         {
             $group: {
                 _id: '$hang_hoa_id',

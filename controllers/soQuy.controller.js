@@ -53,7 +53,6 @@ function receiptErrorMessage(error) {
 function buildFilter(query = {}, storeId) {
     const filter = {};
     if (storeId) filter.cua_hang_id = toObjectId(storeId);
-    filter.deleted_at = null;
     if (query.q && query.q.trim() !== '') filter.ma_phieu = { $regex: query.q.trim(), $options: 'i' };
     if (query.loai_phieu && ['thu', 'chi'].includes(query.loai_phieu)) filter.loai_phieu = query.loai_phieu;
     if (query.doi_tuong_search && query.doi_tuong_search.trim() !== '') filter.doi_tuong = { $regex: query.doi_tuong_search.trim(), $options: 'i' };
@@ -135,10 +134,10 @@ async function applyCashBookFilter(filter, query = {}) {
     if (soQuyId === 'unassigned') {
         bookClause = { $or: [{ so_quy_id: null }, { so_quy_id: { $exists: false } }] };
     } else if (soQuyId === 'tien_mat') {
-        const books = await SoQuy.find({ loai_so_quy: 'tien_mat', $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).select('_id').lean();
+        const books = await SoQuy.find({ loai_so_quy: 'tien_mat',  }).select('_id').lean();
         bookClause = { $or: buildBookMatchConditions(books.map(book => book._id), 'tien_mat') };
     } else if (soQuyId === 'chuyen_khoan') {
-        const books = await SoQuy.find({ loai_so_quy: 'chuyen_khoan', $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).select('_id').lean();
+        const books = await SoQuy.find({ loai_so_quy: 'chuyen_khoan',  }).select('_id').lean();
         bookClause = { $or: buildBookMatchConditions(books.map(book => book._id), 'chuyen_khoan') };
     } else if (isObjectId(soQuyId)) {
         const bookId = toObjectId(soQuyId);
@@ -225,7 +224,7 @@ async function attachMissingDocRefs(receipt) {
             .lean();
         if (row) receipt.hoa_don_id = row;
     } else if (/^PN/i.test(code) && !receipt.phieu_nhap_id) {
-        const row = await PhieuNhap.findOne({ ma_phieu_nhap: code, deleted_at: null })
+        const row = await PhieuNhap.findOne({ ma_phieu_nhap: code })
             .select('ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id')
             .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' })
             .lean();
@@ -242,7 +241,7 @@ async function attachMissingDocRefs(receipt) {
             .lean();
         if (row) receipt.nhap_vat_chua_id = row;
     } else if (isCustomerReturnDocCode(code) && !receipt.phieu_tra_hang_id) {
-        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code, deleted_at: null })
+        const row = await PhieuTraHang.findOne({ ma_phieu_tra: code })
             .select('ma_phieu_tra ngay_tra tong_tien_tra can_tra_khach trang_thai khach_hang_id')
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
             .lean();
@@ -283,13 +282,13 @@ async function enrichReceiptListDocRefs(list) {
             ? HoaDonBanHang.find({ ma_hoa_don: { $in: unique(invoiceCodes) } }).select('_id ma_hoa_don').lean()
             : [],
         unique(purchaseCodes).length
-            ? PhieuNhap.find({ ma_phieu_nhap: { $in: unique(purchaseCodes) }, deleted_at: null }).select('_id ma_phieu_nhap').lean()
+            ? PhieuNhap.find({ ma_phieu_nhap: { $in: unique(purchaseCodes) } }).select('_id ma_phieu_nhap').lean()
             : [],
         unique(supplierReturnCodes).length
-            ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: unique(supplierReturnCodes) }, deleted_at: null, trang_thai: { $ne: 'cancelled' } }).select('_id ma_phieu_tra_nhap').lean()
+            ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: unique(supplierReturnCodes) }, trang_thai: { $ne: 'cancelled' } }).select('_id ma_phieu_tra_nhap').lean()
             : [],
         unique(customerReturnCodes).length
-            ? PhieuTraHang.find({ ma_phieu_tra: { $in: unique(customerReturnCodes) }, deleted_at: null }).select('_id ma_phieu_tra').lean()
+            ? PhieuTraHang.find({ ma_phieu_tra: { $in: unique(customerReturnCodes) } }).select('_id ma_phieu_tra').lean()
             : [],
         unique(orderCodes).length
             ? DonHang.find({ ma_don_hang: { $in: unique(orderCodes) } }).select('_id ma_don_hang').lean()
@@ -397,8 +396,8 @@ exports.index = async (req, res, next) => {
                 .populate('chamcongmoi_bang_luong_id', 'ma_bang_luong ma_nhan_vien ten_nhan_vien thang_bang_luong tong_tien trang_thai created_at')
                 .populate('allocations.phieu_nhap_id')
                 .sort({ ngay_lap: -1 }),
-            SoQuy.find({ trang_thai: 'active', $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).sort({ ten_so_quy: 1 }),
-            SoQuy.find({ $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }).sort({ trang_thai: 1, ten_so_quy: 1 }),
+            SoQuy.find({ trang_thai: 'active',  }).sort({ ten_so_quy: 1 }),
+            SoQuy.find({}).sort({ trang_thai: 1, ten_so_quy: 1 }),
             KhachHang.find({ trang_thai: { $ne: 'inactive' } }).sort({ ten_khach_hang: 1 }),
             NhaCungCap.find({ trang_thai: 'active' }).sort({ ten_ncc: 1 }),
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),

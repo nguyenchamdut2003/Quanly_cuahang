@@ -1,4 +1,4 @@
-﻿var { DonHang, HoaDonBanHang, PhieuTraHang, CongNoKhachHang } = require('../../../models/kiot.model');
+var { DonHang, HoaDonBanHang, PhieuTraHang, CongNoKhachHang } = require('../../../models/kiot.model');
 
 async function loadCustomerHistory(customerId) {
     if (!customerId) {
@@ -15,7 +15,7 @@ async function loadCustomerHistory(customerId) {
         .sort({ ngay_ban: -1, created_at: -1 })
         .limit(50)
         .lean();
-    var returns = await PhieuTraHang.find(Object.assign({}, query, { deleted_at: null }))
+    var returns = await PhieuTraHang.find(query)
         .populate('hoa_don_id')
         .sort({ ngay_tra: -1, created_at: -1 })
         .limit(50)
@@ -49,7 +49,7 @@ async function loadFullCustomerHistory(customerId) {
         .populate('don_hang_id')
         .sort({ ngay_ban: -1, created_at: -1 })
         .lean();
-    var returns = await PhieuTraHang.find(Object.assign({}, query, { deleted_at: null }))
+    var returns = await PhieuTraHang.find(query)
         .populate('hoa_don_id')
         .sort({ ngay_tra: -1, created_at: -1 })
         .lean();

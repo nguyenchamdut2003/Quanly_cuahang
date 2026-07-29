@@ -88,7 +88,7 @@ async function khoHasActivity(khoId) {
             DonHang.exists({ kho_id: khoId }),
             HoaDonBanHang.exists({ kho_id: khoId }),
             PhieuTraHang.exists({ kho_id: khoId }),
-            PhieuKiemKho.exists({ kho_id: khoId, $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }] }),
+            PhieuKiemKho.exists({ kho_id: khoId,  }),
             PhieuXuatNoiBo.exists({ kho_id: khoId }),
             PhieuXuatHuy.exists({ kho_id: khoId })
         ]).then(results => results.filter(Boolean).length)
@@ -164,7 +164,7 @@ exports.deleteKhoId = async (req, res, next) => {
         await khoHasActivity(kho._id);
         kho.trang_thai = 'inactive';
         await kho.save();
-        res.json({ success: true, message: 'Da chuyen kho sang inactive', data: kho });
+        res.json({ success: true, message: 'Đã chuyển kho sang inactive', data: kho });
     } catch (error) {
         next(error);
     }
@@ -173,7 +173,7 @@ exports.deleteKhoId = async (req, res, next) => {
 exports.getTonKho = async (req, res, next) => {
     try {
         if (!req.query.kho_id) {
-            return res.status(400).json({ success: false, message: 'Thieu kho_id' });
+            return res.status(400).json({ success: false, message: 'Thiếu kho_id' });
         }
 
         const data = await layTonKhoTheoKho(req.query.kho_id);

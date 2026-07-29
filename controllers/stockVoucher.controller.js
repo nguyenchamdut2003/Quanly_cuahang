@@ -206,7 +206,7 @@ async function loadSalesReturn(id) {
 }
 
 async function loadPurchaseReturn(id) {
-  var ticket = await PhieuTraHangNhap.findOne({ _id: id, deleted_at: null })
+  var ticket = await PhieuTraHangNhap.findOne({ _id: id })
     .populate('cua_hang_id')
     .populate('kho_id')
     .populate('nha_cung_cap_id')
@@ -247,7 +247,7 @@ async function loadPurchaseReturn(id) {
 async function loadInventoryCheck(id) {
   var ticket = await PhieuKiemKho.findOne({
     _id: id,
-    $or: [{ deleted_at: null }, { deleted_at: { $exists: false } }]
+    
   })
     .populate('cua_hang_id')
     .populate('kho_id')

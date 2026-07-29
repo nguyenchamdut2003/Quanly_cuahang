@@ -4,7 +4,6 @@ module.exports = {
     ...require('./list.controller'),
     ...require('./detail.controller'),
     ...require('./crud.controller'),
-    ...require('./trash.controller'),
     ...require('./group.controller'),
     ...require('./unit.controller'),
     ...require('./attribute.controller'),

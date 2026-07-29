@@ -14,7 +14,15 @@ var purchaseService = require('../services/purchase.service');
 var { mergePurchasesInSession } = require('../services/purchaseMerge.service');
 var pdfService = require('../services/pdf.service');
 var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require('../services/vatChuaDetail.service');
-var { previewPurchaseTrash, movePurchasesToTrash } = require('../services/purchaseTrash.service');
+
+function disabledTrashOperation() {
+  var error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+  error.statusCode = 410;
+  throw error;
+}
+
+var previewPurchaseTrash = disabledTrashOperation;
+var movePurchasesToTrash = disabledTrashOperation;
 
 var PURCHASE_DEBT_WARN_DEFAULT_DAYS = 10;
 var NHAP_HANG_PAGE_SIZE = 10;
@@ -364,7 +372,6 @@ exports.index = async function(req, res, next) {
     if (filter.q) query.ma_phieu_nhap = { $regex: filter.q, $options: 'i' };
     query.trang_thai = { $in: filter.statuses };
     if (filter.nha_cung_cap_id) query.nha_cung_cap_id = filter.nha_cung_cap_id;
-    query.$or = [{ deleted_at: null }, { deleted_at: { $exists: false } }];
 
     var importSlips = await loadSortedPurchases(query, filter.sort);
 
@@ -419,8 +426,7 @@ exports.index = async function(req, res, next) {
     if (slipIds.length > 0 && mongoose.models.PhieuTraHangNhap) {
       var returnRows = await mongoose.models.PhieuTraHangNhap.find({
         phieu_nhap_id: { $in: slipIds },
-        trang_thai: { $ne: 'cancelled' },
-        deleted_at: null
+        trang_thai: { $ne: 'cancelled' }
       }).select('phieu_nhap_id ma_phieu_tra_nhap').lean();
       returnRows.forEach(function(row) {
         var slipKey = String(row.phieu_nhap_id || '');
@@ -790,7 +796,7 @@ function legacyPaymentMethodFromDetail(detail) {
 
 async function loadPurchaseWithItems(id, storeId) {
   if (!mongoose.Types.ObjectId.isValid(String(id || ''))) return null;
-  var filter = { _id: id, deleted_at: null };
+  var filter = { _id: id };
   if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
   var ticket = await PhieuNhap.findOne(filter)
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du dia_chi_chi_tiet phuong_xa tinh_thanh sdt email' })
@@ -1267,7 +1273,7 @@ exports.detail = async function(req, res, next) {
 async function paySupplierLegacyUnused(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
-    var filter = { _id: req.params.id, deleted_at: null };
+    var filter = { _id: req.params.id };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
     var purchase = await PhieuNhap.findOne(filter).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' });
     if (!purchase) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
@@ -1373,7 +1379,7 @@ exports.paySupplier = async function(req, res, next) {
     var result;
     session = await mongoose.startSession();
     await session.withTransaction(async function() {
-      var filter = { _id: req.params.id, deleted_at: null };
+      var filter = { _id: req.params.id };
       if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
       var purchase = await PhieuNhap.findOne(filter)
         .session(session)
@@ -1593,6 +1599,100 @@ async function applyQuyCachDelta(params) {
   if (warehouse) await syncTonKhoSauQuyCach(khoId, productId, lotId, warehouse, params.cost);
 }
 
+function toObjectIdOrNull(value) {
+  var id = String(value || '').trim();
+  return mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : null;
+}
+
+async function calculateProductCostFromCurrentStock(productId, storeId) {
+  var productObjectId = toObjectIdOrNull(productId);
+  if (!productObjectId) return null;
+  var storeObjectId = toObjectIdOrNull(storeId);
+
+  var lotMatch = { hang_hoa_id: productObjectId, so_luong: { $gt: 0 } };
+  if (storeObjectId) lotMatch.cua_hang_id = storeObjectId;
+  var lotRows = await TonKhoLo.aggregate([
+    { $match: lotMatch },
+    {
+      $group: {
+        _id: '$hang_hoa_id',
+        totalQty: { $sum: { $ifNull: ['$so_luong', 0] } },
+        totalValue: {
+          $sum: {
+            $multiply: [
+              { $ifNull: ['$so_luong', 0] },
+              { $ifNull: ['$gia_von', 0] }
+            ]
+          }
+        }
+      }
+    }
+  ]);
+  if (lotRows[0] && Number(lotRows[0].totalQty || 0) > 0) {
+    return Math.round(Number(lotRows[0].totalValue || 0) / Number(lotRows[0].totalQty || 1));
+  }
+
+  var purchaseMatch = {
+    'purchase.trang_thai': 'completed'
+  };
+  if (storeObjectId) purchaseMatch['purchase.cua_hang_id'] = storeObjectId;
+  var purchaseRows = await CTPhieuNhap.aggregate([
+    { $match: { hang_hoa_id: productObjectId, so_luong: { $gt: 0 } } },
+    {
+      $lookup: {
+        from: 'phieu_nhap',
+        localField: 'phieu_nhap_id',
+        foreignField: '_id',
+        as: 'purchase'
+      }
+    },
+    { $unwind: '$purchase' },
+    { $match: purchaseMatch },
+    {
+      $group: {
+        _id: '$hang_hoa_id',
+        totalQty: { $sum: { $ifNull: ['$so_luong', 0] } },
+        totalValue: {
+          $sum: {
+            $multiply: [
+              { $ifNull: ['$so_luong', 0] },
+              { $ifNull: ['$don_gia_nhap', 0] }
+            ]
+          }
+        }
+      }
+    }
+  ]);
+  if (purchaseRows[0] && Number(purchaseRows[0].totalQty || 0) > 0) {
+    return Math.round(Number(purchaseRows[0].totalValue || 0) / Number(purchaseRows[0].totalQty || 1));
+  }
+  return null;
+}
+
+async function refreshProductCostsAfterPurchaseEdit(rows, storeId) {
+  var latestCostByProduct = {};
+  (rows || []).forEach(function(pair) {
+    var productId = String(pair && pair.next && pair.next.hang_hoa_id || '');
+    if (!productId) return;
+    latestCostByProduct[productId] = Number(pair.next.don_gia_nhap || 0);
+  });
+  var productIds = Object.keys(latestCostByProduct);
+  for (var i = 0; i < productIds.length; i++) {
+    var productId = productIds[i];
+    var avgCost = await calculateProductCostFromCurrentStock(productId, storeId);
+    if (avgCost == null) avgCost = latestCostByProduct[productId];
+    await HangHoa.updateOne(
+      { _id: productId },
+      {
+        $set: {
+          gia_von: Number(avgCost || 0),
+          gia_nhap_cuoi: Number(latestCostByProduct[productId] || 0)
+        }
+      }
+    );
+  }
+}
+
 exports.save = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
@@ -1756,6 +1856,16 @@ exports.save = async function(req, res, next) {
               await LoHang.updateOne({ _id: lotId }, { $inc: { so_luong_con_lai: delta }, $set: { don_gia_nhap: pair.next.don_gia_nhap, gia_von: pair.next.don_gia_nhap } });
             }
           }
+          if (lotId && delta === 0 && Number(pair.oldRow.don_gia_nhap || 0) !== Number(pair.next.don_gia_nhap || 0)) {
+            await TonKhoLo.updateOne(
+              { cua_hang_id: oldTicket.cua_hang_id?._id || oldTicket.cua_hang_id, kho_id: oldKhoId, hang_hoa_id: productId, lo_hang_id: lotId, gia_tri_thuoc_tinh_id: attributeValueId || null },
+              { $set: { gia_von: pair.next.don_gia_nhap } }
+            );
+            await LoHang.updateOne(
+              { _id: lotId },
+              { $set: { don_gia_nhap: pair.next.don_gia_nhap, gia_von: pair.next.don_gia_nhap } }
+            );
+          }
         } else {
           var oldStock = await TonKho.findOne({ kho_id: oldKhoId, hang_hoa_id: productId }).lean();
           if (!oldStock || Number(oldStock.so_luong || 0) < oldQty) {
@@ -1850,6 +1960,13 @@ exports.save = async function(req, res, next) {
           }
         });
       }
+    }
+
+    if (oldTicket.trang_thai === 'completed') {
+      await refreshProductCostsAfterPurchaseEdit(
+        normalizedRows,
+        oldTicket.cua_hang_id?._id || oldTicket.cua_hang_id || storeId
+      );
     }
 
     if (oldTicket.trang_thai === 'completed') {
@@ -2365,14 +2482,14 @@ exports.exportOneExcel = async function(req, res, next) {
 exports.traHangNhapPage = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
-    var returns = await mongoose.models.PhieuTraHangNhap.find(storeId ? { cua_hang_id: storeId, deleted_at: null } : { deleted_at: null })
+    var returns = await mongoose.models.PhieuTraHangNhap.find(storeId ? { cua_hang_id: storeId } : {})
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .sort({ ngay_tra: -1 })
       .lean();
 
     var suppliers = await mongoose.models.NhaCungCap.find(storeId ? { cua_hang_id: storeId } : {}).lean();
-    var receipts = await mongoose.models.PhieuNhap.find(storeId ? { cua_hang_id: storeId, trang_thai: 'completed', deleted_at: null } : { trang_thai: 'completed', deleted_at: null }).lean();
+    var receipts = await mongoose.models.PhieuNhap.find(storeId ? { cua_hang_id: storeId, trang_thai: 'completed' } : { trang_thai: 'completed' }).lean();
     var products = await mongoose.models.HangHoa.find(storeId ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' }).lean();
 
     res.render('nhap-hang/tra-hang-nhap', {

@@ -1,4 +1,4 @@
-﻿const {
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -373,8 +373,7 @@ exports.getGopHoaDonCandidates = async (req, res, next) => {
         const returnRows = invoiceIds.length
             ? await PhieuTraHang.find({
                 hoa_don_id: { $in: invoiceIds },
-                trang_thai: { $ne: 'cancelled' },
-                deleted_at: null
+                trang_thai: { $ne: 'cancelled' }
             }).select('hoa_don_id').lean()
             : [];
         const returnInvoiceIds = new Set(returnRows.map(row => String(row.hoa_don_id || '')));

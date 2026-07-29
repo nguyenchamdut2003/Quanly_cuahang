@@ -1,4 +1,4 @@
-﻿const { HoaDonBanHang, PhieuTraHang } = require('../../../models/kiot.model');
+const { HoaDonBanHang, PhieuTraHang } = require('../../../models/kiot.model');
 const { getSalesRange, formatDateInput, formatDisplayDate } = require('../helpers/date.helper');
 
 async function buildSalesReport(query = {}) {
@@ -8,7 +8,7 @@ async function buildSalesReport(query = {}) {
 
     const [invoices, returns] = await Promise.all([
         HoaDonBanHang.find(invoiceFilter).sort({ ngay_ban: 1 }),
-        PhieuTraHang.find({ ngay_tra: { $gte: range.start, $lt: range.end }, deleted_at: null }).sort({ ngay_tra: 1 })
+        PhieuTraHang.find({ ngay_tra: { $gte: range.start, $lt: range.end } }).sort({ ngay_tra: 1 })
     ]);
 
     const rows = range.days.map(date => {

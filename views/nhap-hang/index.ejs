@@ -33,8 +33,10 @@
     if (!lot) return '--';
     const lotName = lot.ten_lo || lot.ma_lo || '--';
     const lotText = lot._id ? refLink('lot', lot, lotName) : lotName;
+    const lotDate = formatDateOnly(lot.ngay_nhap);
     const expiry = formatDateOnly(lot.han_su_dung);
-    return expiry ? `${lotText} - HSD: ${expiry}` : lotText;
+    const dateText = [lotDate || '--', expiry ? `HSD: ${expiry}` : 'HSD: --'].join(' - ');
+    return `${lotText}<br><span class="lot-cell-date">${dateText}</span>`;
   };
   const thuocTinhSummary = row => {
     const info = row && row.lot_info ? row.lot_info : null;

@@ -29,7 +29,16 @@ const { loadReturnsLinkedVatChuaMap } = require('../services/vatChuaDetail.servi
 const { truTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
-const { previewReturnImportTrash, moveReturnImportToTrash, cancelReturnImport } = require('../services/returnImportTrash.service');
+
+function disabledTrashOperation() {
+  const error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+  error.statusCode = 410;
+  throw error;
+}
+
+const previewReturnImportTrash = disabledTrashOperation;
+const moveReturnImportToTrash = disabledTrashOperation;
+const cancelReturnImport = disabledTrashOperation;
 
 /** Số ngày được trả hàng nhập kể từ ngày nhập (khi phiếu không có hạn riêng). Có thể ghi đè bằng biến môi trường SO_NGAY_TRA_HANG_NHAP. */
 const DEFAULT_SO_NGAY_TRA_HANG_NHAP = (() => {
@@ -448,10 +457,11 @@ async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}
   const [details, returnRows] = await Promise.all([
     CTPhieuNhap.find({ phieu_nhap_id: { $in: ids } })
       .populate({ path: 'hang_hoa_id', select: 'quan_ly_theo_lo' })
+      .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo' })
       .select('phieu_nhap_id so_luong hang_hoa_id lo_hang_id lot_info don_gia_nhap gia_tri_thuoc_tinh_id')
       .lean(),
-    CTPhieuTraHangNhap.find({ phieu_nhap_id: { $in: ids }, deleted_at: null })
-      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai deleted_at' })
+    CTPhieuTraHangNhap.find({ phieu_nhap_id: { $in: ids } })
+      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
       .select('phieu_nhap_id ct_phieu_nhap_id so_luong phieu_tra_nhap_id ten_quy_cach gia_tri_thuoc_tinh_id')
       .lean()
   ]);
@@ -459,7 +469,6 @@ async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}
   const returnedByPurchaseSlot = {};
   returnRows.forEach(row => {
     if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
-    if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.deleted_at) return;
     const pid = String(row.phieu_nhap_id);
     if (!row.ct_phieu_nhap_id) return;
     const ctId = String(row.ct_phieu_nhap_id);
@@ -493,7 +502,16 @@ async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}
       }
       if (hasReturnable) break;
     }
-    if (hasReturnable) eligible.push(p);
+    if (hasReturnable) {
+      const lotNames = [...new Set(rows.map(row => {
+        const lot = row.lo_hang_id;
+        return lot && typeof lot === 'object'
+          ? String(lot.ten_lo || lot.ma_lo || '').trim()
+          : '';
+      }).filter(Boolean))];
+      p.lot_names = lotNames;
+      eligible.push(p);
+    }
   }
   return eligible;
 }
@@ -613,7 +631,7 @@ function applyWorksheetFormat(worksheet) {
 }
 
 async function buildListFilter(req, storeId) {
-  const query = { deleted_at: null };
+  const query = {};
   if (isObjectId(storeId)) query.cua_hang_id = storeId;
   const q = String(req.query.q || '').trim();
   if (q) query.ma_phieu_tra_nhap = { $regex: q, $options: 'i' };
@@ -881,14 +899,13 @@ async function validateReturnItems(params) {
       currentReturnFilter.phieu_tra_nhap_id = { $ne: returnId };
     }
     const completedReturns = await CTPhieuTraHangNhap.find(currentReturnFilter)
-      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai deleted_at' })
+      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
       .lean();
 
     completedReturns.forEach(row => {
       const ptId0 = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
       if (ptId0 && ignoreSet.has(String(ptId0))) return;
       if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
-      if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.deleted_at) return;
       if (!row.ct_phieu_nhap_id) return;
       const ctId = String(row.ct_phieu_nhap_id);
       const key = parseReturnLineSlotKey(ctId, row);
@@ -1280,8 +1297,7 @@ async function repairMissingSupplierRefundReceipts(returns, userId) {
   const existing = await PhieuThuChi.find({
     phieu_tra_hang_nhap_id: { $in: ids },
     loai_phieu: 'thu',
-    trang_thai: { $ne: 'cancelled' },
-    deleted_at: null
+    trang_thai: { $ne: 'cancelled' }
   }).select('phieu_tra_hang_nhap_id').lean();
   const existingSet = new Set(existing.map(row => String(row.phieu_tra_hang_nhap_id)));
   for (const row of candidates) {
@@ -1531,14 +1547,13 @@ async function buildPurchaseReturnGridItems(purchase, storeId, requestedKhoId, o
     .sort({ created_at: 1 })
     .lean();
 
-  const returnRows = await CTPhieuTraHangNhap.find({ phieu_nhap_id: purchase._id, deleted_at: null })
-    .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai deleted_at' })
+  const returnRows = await CTPhieuTraHangNhap.find({ phieu_nhap_id: purchase._id })
+    .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
     .lean();
 
   const returnedBySlot = {};
   returnRows.forEach(row => {
     if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
-    if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.deleted_at) return;
     const retId = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
     if (retId && ignoreReturnIds.has(String(retId))) return;
     if (!row.ct_phieu_nhap_id) return;
@@ -1631,6 +1646,7 @@ async function buildPurchaseReturnGridItems(purchase, storeId, requestedKhoId, o
         lo_hang_id: lotId,
         ma_lo: row.lo_hang_id ? (row.lo_hang_id.ma_lo || '') : '',
         ten_lo: row.lo_hang_id ? (row.lo_hang_id.ten_lo || '') : '',
+        ngay_nhap_lo: row.lo_hang_id && row.lo_hang_id.ngay_nhap ? row.lo_hang_id.ngay_nhap : null,
         han_su_dung: row.lo_hang_id && row.lo_hang_id.han_su_dung ? row.lo_hang_id.han_su_dung : null,
         so_luong_nhap: importedQty,
         tong_so_luong_da_tra: returnedQty,
@@ -1736,6 +1752,7 @@ async function buildGridItemFromReturnLine(line, khoId, storeId) {
     lo_hang_id: lotId,
     ma_lo: line.lo_hang_id ? (line.lo_hang_id.ma_lo || '') : '',
     ten_lo: line.lo_hang_id ? (line.lo_hang_id.ten_lo || '') : '',
+    ngay_nhap_lo: line.lo_hang_id && line.lo_hang_id.ngay_nhap ? line.lo_hang_id.ngay_nhap : null,
     gia_tri_thuoc_tinh_id: gttLine,
     ton_kho_lo_quy_cach_id: tonKhoLoQcFromLine || tonKhoLoQcIdStr,
     so_luong_nhap: 0,
@@ -1770,7 +1787,7 @@ async function buildReturnLinesOnlyGridItems(lines, khoId) {
 
 async function loadReturnCopyDraft(req, storeId, copyFromId) {
   if (!isObjectId(copyFromId) || !isObjectId(storeId)) return null;
-  const source = await PhieuTraHangNhap.findOne({ _id: copyFromId, cua_hang_id: storeId, deleted_at: null })
+  const source = await PhieuTraHangNhap.findOne({ _id: copyFromId, cua_hang_id: storeId })
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
     .lean();
   if (!source) return null;
@@ -1937,6 +1954,7 @@ exports.apiPurchasesByWarehouse = async function(req, res) {
         ma_phieu_nhap: row.ma_phieu_nhap || '',
         ngay_nhap: row.ngay_nhap || row.created_at || null,
         ngay_het_han_tra: deadlineEnd ? deadlineEnd.toISOString() : null,
+        lot_names: Array.isArray(row.lot_names) ? row.lot_names : [],
         kho_id: getObjectIdValue(row.kho_id),
         nha_cung_cap_id: supplier ? supplier._id : '',
         nha_cung_cap: supplier
@@ -2082,7 +2100,7 @@ exports.createSubmit = async function(req, res, next) {
 
 exports.detail = async function(req, res, next) {
   try {
-    const ret = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null })
+    const ret = await PhieuTraHangNhap.findOne({ _id: req.params.id })
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .populate('kho_id')
@@ -2103,7 +2121,7 @@ exports.detail = async function(req, res, next) {
 
 exports.complete = async function(req, res) {
   try {
-    const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null });
+    const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id });
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
     if (returnDoc.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (returnDoc.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
@@ -2173,7 +2191,7 @@ exports.createReceipt = async function(req, res) {
     session = await mongoose.startSession();
     let result;
     await session.withTransaction(async () => {
-      const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id, deleted_at: null }).session(session);
+      const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id }).session(session);
       if (!returnDoc) throw new Error('Không tìm thấy phiếu trả hàng nhập');
       if (returnDoc.trang_thai === 'cancelled') throw new Error('Phiếu đã hủy, không thể tạo phiếu thu');
       if (returnDoc.trang_thai !== 'completed') throw new Error('Chỉ tạo phiếu thu cho phiếu đã trả hàng');
@@ -2243,7 +2261,7 @@ exports.exportOneExcel = async function(req, res, next) {
       return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
     }
     const storeId = await resolveStoreId(req);
-    const query = { _id: req.params.id, deleted_at: null };
+    const query = { _id: req.params.id };
     if (isObjectId(storeId)) query.cua_hang_id = storeId;
     const ticket = await PhieuTraHangNhap.findOne(query)
       .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
@@ -2299,7 +2317,7 @@ exports.exportCsv = async function(req, res, next) {
 
 async function loadReturnWithItems(id, storeId) {
   if (!isObjectId(id)) return null;
-  const filter = { _id: id, deleted_at: null };
+  const filter = { _id: id };
   if (isObjectId(storeId)) filter.cua_hang_id = storeId;
   const ticket = await PhieuTraHangNhap.findOne(filter)
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du sdt email' })

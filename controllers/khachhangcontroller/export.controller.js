@@ -53,7 +53,7 @@ exports.exportCustomerDebt = async function(req, res, next) {
     try {
         var customerId = normalizeIdParam(req?.params?.id);
         if (!customerId) return res.redirect('/khach-hang?error=invalid_customer');
-        var customer = await KhachHang.findById(customerId).lean();
+        var customer = await KhachHang.findOne({ _id: customerId }).lean();
         if (!customer) return res.redirect('/khach-hang?error=invalid_customer');
         await handleCustomerDebtExport(res, customer, req.query || {});
     } catch (error) {

@@ -1,4 +1,4 @@
-﻿var { NguoiDung } = require('../../../models/kiot.model');
+var { NguoiDung } = require('../../../models/kiot.model');
 
 function normalizeFilterQuery(query) {
     query = query || {};

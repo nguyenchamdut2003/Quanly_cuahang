@@ -1,4 +1,4 @@
-﻿const {
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -272,6 +272,9 @@ exports.getHoaDon = async (req, res, next) => {
             .populate('kho_id')
             .populate('nguoi_ban_id')
             .sort({ created_at: -1 });
+        const visibleInvoices = rawInvoices.filter(function(invoice) {
+            return true;
+        });
         const storeId = await resolveStoreId(req);
         const cashBookQuery = storeId
             ? { trang_thai: 'active', $or: [{ cua_hang_id: storeId }, { cua_hang_id: { $exists: false } }, { cua_hang_id: null }] }
@@ -295,7 +298,7 @@ exports.getHoaDon = async (req, res, next) => {
                 .lean();
         }
         const [decoratedInvoices, partners, users, priceBooks, cashBooks] = await Promise.all([
-            decorateInvoices(rawInvoices),
+            decorateInvoices(visibleInvoices),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
             BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }),
@@ -311,7 +314,7 @@ exports.getHoaDon = async (req, res, next) => {
         const skip = (page - 1) * pageSize;
         invoices = invoices.slice(skip, skip + pageSize);
         res.render('don-hang/hoa-don', {
-            title: 'Hóa đơn',
+            title: 'H�a don',
             invoices,
             partners,
             users,
@@ -415,7 +418,7 @@ exports.getHoaDonCreate = async (req, res, next) => {
         }
 
         res.render('don-hang/hoa-don-create', {
-            title: 'Hóa đơn',
+            title: 'H�a don',
             ...data,
             currentStoreId: storeId || '',
             warehouses,
@@ -470,7 +473,7 @@ exports.createInvoice = async function(req, res, next) {
         if (don_hang_id && /^[0-9a-fA-F]{24}$/.test(String(don_hang_id))) {
             return res.status(400).json({
                 success: false,
-                message: 'Hóa đơn từ đơn hàng được tạo tự động khi xác nhận giao hàng. Vui lòng dùng nút Xác nhận giao.'
+                message: 'Hóa đơn từ đơn hàng không thể được tạo khi xác nhận giao hàng. Vui lòng dùng nút Xác nhận giao.'
             });
         }
 
@@ -480,12 +483,12 @@ exports.createInvoice = async function(req, res, next) {
 
         const sessionStoreId = await resolveStoreId(req);
         if (!sessionStoreId) {
-            return res.status(400).json({ success: false, message: 'Chưa chền cửa hàng làm việc. Vui lòng chền cửa hàng ở menu trên.' });
+            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc. Vui lòng chọn cửa hàng ở menu trên.' });
         }
 
         const finalKhoId = kho_id || sourceOrder?.kho_id;
         if (!finalKhoId) {
-            return res.status(400).json({ success: false, message: 'Vui lòng chền kho.' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
         }
         const kho = await Kho.findById(finalKhoId).lean();
         if (!kho) return res.status(400).json({ success: false, message: 'Kho không hợp lệ.' });
@@ -570,13 +573,13 @@ exports.createInvoice = async function(req, res, next) {
                 trang_thai: 'active'
             }).select('so_luong_ton ten_vat_chua').lean();
             if (!vatChuaRow) {
-                return res.status(400).json({ success: false, message: 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng' });
+                return res.status(400).json({ success: false, message: 'Vật chất không hợp lệ hoặc đã ngưng sử dụng' });
             }
             const tonVatChua = Math.max(0, Number(vatChuaRow.so_luong_ton || 0));
             if (tonVatChua < parsedVatChua.qty) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Tồn vật chứa không đủ để xuất (còn ' + tonVatChua + ', cần ' + parsedVatChua.qty + ')'
+                    message: 'Tồn vật chất không đủ để xuất (cần ' + tonVatChua + ', cần ' + parsedVatChua.qty + ')'
                 });
             }
         }
@@ -650,7 +653,7 @@ exports.createInvoice = async function(req, res, next) {
             tong_tien: tong_tien_hang,
             giam_gia: discount,
             thanh_toan: payable,
-            phuong_thuc_tt: codEnabled ? 'COD' : (phuong_thuc_thanh_toan || 'Tiền mặt'),
+            phuong_thuc_tt: codEnabled ? 'COD' : (phuong_thuc_thanh_toan || 'Ti?n m?t'),
             trang_thai: invoiceStatus,
             ghi_chu,
             cua_hang_id: finalStoreId,
@@ -700,7 +703,7 @@ exports.createInvoice = async function(req, res, next) {
                 stockLines: stockAppliedLines,
                 restoreStock: stockAppliedLines.length > 0
             });
-            if (/tồn kho|ton kho|Ton kho/i.test(stockError.message || '')) {
+            if (/t?n kho|ton kho|Ton kho/i.test(stockError.message || '')) {
                 return res.status(400).json({ success: false, message: stockError.message });
             }
             throw stockError;
@@ -725,7 +728,7 @@ exports.createInvoice = async function(req, res, next) {
                 });
                 return res.status(400).json({
                     success: false,
-                    message: vatChuaError.message || 'Không ghi nhận xuất vật chứa được'
+                    message: vatChuaError.message || 'Không ghi nhận xuất vật chất được'
                 });
             }
         }
@@ -799,7 +802,7 @@ exports.createInvoice = async function(req, res, next) {
                 hoa_don_id: invoice._id,
                 so_tien: debt,
                 loai: 'tang_no',
-                ghi_chu: `Công nợ hóa đơn ${ma_hoa_don}`,
+                ghi_chu: `Cộng nợ hóa đơn ${ma_hoa_don}`,
                 ngay: invoice.ngay_ban
             });
             const customer = await KhachHang.findById(finalCustomerId).select('tong_no').lean();
@@ -811,14 +814,14 @@ exports.createInvoice = async function(req, res, next) {
         if (!sourceOrder && !codEnabled && paymentAtCreate.tong_khach_dua > 0) {
             const customerName = finalCustomerId
                 ? (await KhachHang.findById(finalCustomerId).select('ten_khach_hang').lean())?.ten_khach_hang
-                : 'Khách lẻ';
+                : 'Kh�ch l?';
             await recordCustomerPaymentReceipts(buildCustomerPaymentReceiptPayload(req.body, paymentAtCreate, {
                 loai_thu_chi: 'Thu tien hoa don',
                 ngay_lap: invoice.ngay_ban || new Date(),
                 cua_hang_id: invoice.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id: finalCustomerId,
-                doi_tuong: customerName || 'Khách lẻ',
+                doi_tuong: customerName || 'Kh�ch l?',
                 hoa_don_id: invoice._id,
                 van_don_id: shipment?._id,
                 ma_chung_tu_goc: ma_hoa_don,
@@ -827,7 +830,7 @@ exports.createInvoice = async function(req, res, next) {
             }), paymentAtCreate);
         }
 
-        res.json({ success: true, message: 'Đã tạo hóa đơn', ma_hoa_don, id: invoice._id, data: { invoice, shipment } });
+        res.json({ success: true, message: 'mã tạo hóa đơn', ma_hoa_don, id: invoice._id, data: { invoice, shipment } });
     } catch (error) {
         if (error?.code === 11000 && error?.keyPattern?.don_hang_id && req.body?.don_hang_id) {
             const existingInvoice = await HoaDonBanHang.findOne({ don_hang_id: req.body.don_hang_id }).lean();
@@ -842,13 +845,13 @@ exports.createInvoice = async function(req, res, next) {
         if (error?.code === 11000 && error?.keyPattern?.don_hang_id) {
             return res.status(409).json({
                 success: false,
-                message: 'Dữ liệu cũ đang có hóa đơn bán trực tiếp với don_hang_id = null. Hệ thống đã bỏ ghi null cho hóa đơn mới; vui lòng xóa field don_hang_id:null ở các hóa đơn cũ hoặc rebuild index nếu cần.'
+                message: 'Dữ liệu cũ đang có hóa đơn bán trực tiếp với don_hang_id = null. Hệ thống sẽ bỏ ghi null cho hóa đơn mới; vui lòng xóa field don_hang_id:null ? các hóa đơn cũ hoặc rebuild index nếu cần.'
             });
         }
         if (error?.code === 11000 && error?.keyPattern?.ma_hoa_don) {
             return res.status(409).json({
                 success: false,
-                message: 'Mã hóa đơn bị trùng. Vui lòng bấm thanh toán lại để hệ thống sinh mã mới.'
+                message: 'Mã hóa đơn bị trùng. Vui lòng nhấn thanh toán lại để hệ thống sinh mã mới.'
             });
         }
         res.status(500).json({ success: false, message: error.message || 'Không tạo được hóa đơn' });
@@ -1016,7 +1019,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
                 } catch (stockError) {
                     return res.status(400).json({
                         success: false,
-                        message: stockError.message || 'Tồn kho không đủ để điều chỉnh số lượng dòng hàng'
+                        message: stockError.message || 'Tồn kho không đủ để điều chỉnh số lượng đơn hàng'
                     });
                 }
             }
@@ -1136,7 +1139,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
         try {
             assertVatChuaImportInput(parsedVatChua);
         } catch (vcErr) {
-            return res.status(400).json({ success: false, message: vcErr.message || 'Dữ liệu vật chứa không hợp lệ' });
+            return res.status(400).json({ success: false, message: vcErr.message || 'Dữ liệu vât ch?a không hợp lệ' });
         }
 
         const storeId = invoice.cua_hang_id;
@@ -1160,7 +1163,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
             } catch (vatChuaError) {
                 return res.status(400).json({
                     success: false,
-                    message: vatChuaError.message || 'Không ghi nhận xuất vật chứa được'
+                    message: vatChuaError.message || 'Không ghi nhận xuất vât ch?a được'
                 });
             }
         }
@@ -1270,7 +1273,7 @@ exports.postHoaDonIdCancel = async (req, res, next) => {
                 hoa_don_id: invoice._id,
                 so_tien: debtIncrease,
                 loai: 'giam_no',
-                ghi_chu: `Đảo công nợ hủy hóa đơn ${invoice.ma_hoa_don}`,
+                ghi_chu: `Hoàn tiền hủy hóa đơn ${invoice.ma_hoa_don}`,
                 ngay: new Date()
             });
         }

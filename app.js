@@ -58,7 +58,6 @@ var bangLuongRouter = require('./routes/bangLuong');
 var apiBangLuongRouter = require('./routes/apiBangLuong');
 var apiSoQuyRouter = require('./routes/apiSoQuy');
 var thietLapNhanVienRouter = require('./routes/thietLapNhanVien');
-var thungRacRouter = require('./routes/thungRac');
 var shortcutRouter = require('./routes/shortcut');
 var systemRouter = require('./routes/system');
 var { isPerformanceEnabled } = require('./utils/performance.util');
@@ -67,6 +66,15 @@ var app = express();
 
 function isStaticAssetRequestPath(requestPath) {
   return /\.(css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)$/i.test(requestPath || '');
+}
+
+function isDisabledDeleteOrTrashRequest(req) {
+  var method = String(req.method || 'GET').toUpperCase();
+  var requestPath = String(req.path || '').toLowerCase();
+  if (requestPath === '/system/reset-data') return false;
+  if (requestPath === '/thung-rac' || requestPath.indexOf('/thung-rac/') === 0) return true;
+  if (method === 'DELETE') return true;
+  return /(^|\/)(delete|delete-selected|trash)(\/|$)/.test(requestPath);
 }
 
 function isHeaderStoreDataRequired(req) {
@@ -205,7 +213,6 @@ app.use(function(req, res, next) {
   next();
 });
 
-// middleware: danh sách cửa hàng active + cửa hàng đang hiển thị (user.cua_hang_id → session → mặc định đầu tiên)
 app.use(async (req, res, next) => {
   res.locals.user = req.user || null;
   res.locals.currentStore = null;
@@ -220,7 +227,13 @@ app.use(async (req, res, next) => {
   }
 
   try {
-    const stores = await CuaHang.find({ trang_thai: 'active' })
+    const stores = await CuaHang.find({
+      trang_thai: 'active',
+      $or: [
+        { deleted_at: null },
+        { deleted_at: { $exists: false } }
+      ]
+    })
       .sort({ ma_cua_hang: 1, created_at: 1 })
       .lean();
     res.locals.availableStores = stores;
@@ -252,6 +265,15 @@ app.use(function(req, res, next) {
   next();
 });
 
+app.use(function(req, res, next) {
+  if (!isDisabledDeleteOrTrashRequest(req)) return next();
+  var message = 'Chuc nang xoa du lieu va thung rac da duoc tat. Chi giu chuc nang reset du lieu.';
+  if (req.xhr || (req.headers.accept || '').indexOf('application/json') !== -1) {
+    return res.status(410).json({ success: false, message: message });
+  }
+  return next(createError(410, message));
+});
+
 app.use('/', authRouter);
 app.use('/', indexRouter);
 app.use('/profile', profileRouter);
@@ -276,6 +298,7 @@ app.use('/api/nhap-hang', apiNhapHangRouter);
 app.use('/api/so-quy', apiSoQuyRouter);
 app.use('/api', apiKhoRouter);
 app.use('/api/address', apiAddressRouter);
+
 app.use('/api/don-hang', donHangRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);
@@ -298,7 +321,6 @@ app.use('/chamcongmoi', chamcongMoiRouter);
 app.use('/cham-cong', chamCongRouter);
 app.use('/bang-luong', bangLuongRouter);
 app.use('/thiet-lap-nhan-vien', thietLapNhanVienRouter);
-app.use('/thung-rac', thungRacRouter);
 app.use('/nhan-vien', nhanVienRouter);
 app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);

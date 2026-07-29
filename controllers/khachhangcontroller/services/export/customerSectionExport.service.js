@@ -1,4 +1,4 @@
-﻿var { KhachHang, DiaChiKhachHang, DonHang, HoaDonBanHang, PhieuTraHang, CongNoKhachHang } = require('../../../../models/kiot.model');
+var { KhachHang, DiaChiKhachHang, DonHang, HoaDonBanHang, PhieuTraHang, CongNoKhachHang } = require('../../../../models/kiot.model');
 var { normalizeIdParam } = require('../../helpers/common.helper');
 var { loadCustomerGroups } = require('../group.service');
 var { loadAddressTypes } = require('../addressType.service');
@@ -36,7 +36,7 @@ async function buildCustomerSectionWorkbook(customerId, section) {
             map[String(group._id)] = group.ten_nhom || '---';
             return map;
         }, {});
-        var customer = await KhachHang.findById(customerId).lean();
+        var customer = await KhachHang.findOne({ _id: customerId }).lean();
         if (!customer) { var invalidCustomer = new Error('invalid_customer'); invalidCustomer.code = 'invalid_customer'; throw invalidCustomer; }
         customer.nhom_khach_hang_ten = groupMap[String(customer.nhom_khach_hang_id || '')] || '---';
 
@@ -130,7 +130,7 @@ async function buildCustomerSectionWorkbook(customerId, section) {
         }
 
         if (section === 'returns') {
-            var returns = await PhieuTraHang.find({ khach_hang_id: customer._id, deleted_at: null })
+            var returns = await PhieuTraHang.find({ khach_hang_id: customer._id })
                 .populate('hoa_don_id')
                 .sort({ ngay_tra: -1, created_at: -1 })
                 .lean();
