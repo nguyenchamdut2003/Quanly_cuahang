@@ -1,10 +1,11 @@
 var express = require('express');
 var router = express.Router();
-var { isAuthenticated } = require('../middlewares/auth.middleware');
+var { isLoggedInActive } = require('../middlewares/auth.middleware');
 var profileController = require('../controllers/profile.controller');
 
-router.use(isAuthenticated);
+router.use(isLoggedInActive);
 router.get('/', profileController.index);
 router.post('/update', profileController.postUpdate);
+router.post('/change-password', profileController.postChangePassword);
 
 module.exports = router;

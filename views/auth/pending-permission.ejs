@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= title || 'Cho phan quyen' %></title>
+    <link rel="stylesheet" href="/stylesheets/auth.css">
+    <style>
+      .pending-card { text-align: center; }
+      .pending-card h1 { margin-bottom: 10px; }
+      .pending-card p { color: #475467; line-height: 1.55; }
+      .pending-actions { display: flex; justify-content: center; gap: 10px; margin-top: 24px; }
+      .pending-actions form { margin: 0; }
+      .pending-logout { border: 0; border-radius: 6px; padding: 11px 16px; background: #eef2f7; color: #344054; font-weight: 700; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main class="auth-page">
+      <section class="auth-card pending-card">
+        <h1>Vui l&ograve;ng li&ecirc;n h&#7879; admin &dstrok;&#7875; ph&acirc;n quy&#7873;n v&agrave;o web.</h1>
+        <p>T&agrave;i kho&#7843;n <strong><%= user && user.email ? user.email : '' %></strong> &dstrok;&atilde; &dstrok;&#259;ng nh&#7853;p th&agrave;nh c&ocirc;ng nh&#432;ng ch&#432;a &dstrok;&#432;&#7907;c c&#7845;p quy&#7873;n admin.</p>
+        <div class="pending-actions">
+          <form method="post" action="/logout">
+            <button type="submit" class="pending-logout">&Dstrok;&#259;ng xu&#7845;t</button>
+          </form>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

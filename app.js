@@ -13,6 +13,7 @@ var healthRouter = require('./routes/health');
 var indexRouter = require('./routes/index');
 var authRouter = require('./routes/auth');
 var profileRouter = require('./routes/profile');
+var accountPermissionRouter = require('./routes/accountPermission');
 var cuaHangRouter = require('./routes/cuaHang');
 var hangHoaRouter = require('./routes/hangHoa');
 var vatChuaRouter = require('./routes/vatChua');
@@ -154,6 +155,7 @@ app.use('/healthz', healthRouter);
 
 app.use(function(req, res, next) {
   res.locals.originalUrl = req.originalUrl || '/';
+  res.locals.query = req.query || {};
   res.locals.refUrl = function(type, id) {
     var safeId = String(id || '').trim();
     if (!safeId) return '';
@@ -215,6 +217,7 @@ app.use(function(req, res, next) {
 
 app.use(async (req, res, next) => {
   res.locals.user = req.user || null;
+  res.locals.forcePasswordChange = !!(req.user && req.user.must_change_password);
   res.locals.currentStore = null;
   res.locals.availableStores = [];
 
@@ -277,6 +280,7 @@ app.use(function(req, res, next) {
 app.use('/', authRouter);
 app.use('/', indexRouter);
 app.use('/profile', profileRouter);
+app.use('/phan-quyen-tai-khoan', accountPermissionRouter);
 app.use('/cua-hang', cuaHangRouter);
 app.use('/hang-hoa', hangHoaRouter);
 app.use('/vat-chua', vatChuaRouter);

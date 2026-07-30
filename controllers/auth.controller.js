@@ -2,6 +2,7 @@ var bcrypt = require('bcrypt');
 var mongoose = require('mongoose');
 var passport = require('../config/passport');
 var { CuaHang, NguoiDung } = require('../models/kiot.model');
+var superAdminService = require('../services/superAdmin.service');
 
 var SALT_ROUNDS = 12;
 
@@ -31,6 +32,9 @@ function resolveReturnUrl(req) {
 }
 
 function defaultRedirectForUser(user) {
+  if (user && user.trang_thai === 'active' && !['super_admin', 'admin'].includes(user.vai_tro)) {
+    return '/cho-phan-quyen';
+  }
   return user && user.cua_hang_id ? '/' : '/';
 }
 
@@ -108,9 +112,17 @@ exports.getLogin = function(req, res) {
   });
 };
 
-exports.postLogin = function(req, res, next) {
+exports.postLogin = async function(req, res, next) {
   var email = normalizeEmail(req.body && req.body.email);
   var returnUrl = resolveReturnUrl(req);
+
+  try {
+    if (superAdminService.isSuperAdminLogin(email)) {
+      await superAdminService.ensureSuperAdminAccount();
+    }
+  } catch (error) {
+    return next(error);
+  }
 
   passport.authenticate('local', function(error, user, info) {
     if (error) return next(error);
@@ -160,22 +172,34 @@ exports.postRegister = async function(req, res, next) {
       return renderRegister(res, { status: 400, ho_ten: hoTen, sdt: sdt, email: email, returnUrl: returnUrl, error: 'Xác nhận mật khẩu không khớp.' });
     }
 
-    var existed = await NguoiDung.findOne({ email: email }).select('_id').lean();
-    if (existed) {
+    var existed = await NguoiDung.findOne({ email: email }).select('+password_hash');
+    if (existed && existed.password_hash) {
       return renderRegister(res, { status: 409, ho_ten: hoTen, sdt: sdt, email: email, returnUrl: returnUrl, error: 'Email này đã được sử dụng.' });
     }
 
     var passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    var user = await NguoiDung.create({
-      cua_hang_id: null,
-      email: email,
-      password_hash: passwordHash,
-      ho_ten: hoTen,
-      sdt: sdt,
-      vai_tro: 'user',
-      trang_thai: 'active',
-      lan_dang_nhap_cuoi: new Date()
-    });
+    var user;
+    if (existed) {
+      existed.password_hash = passwordHash;
+      existed.ho_ten = hoTen || existed.ho_ten;
+      existed.sdt = sdt || existed.sdt || '';
+      existed.vai_tro = existed.vai_tro || 'user';
+      existed.trang_thai = existed.trang_thai || 'active';
+      existed.lan_dang_nhap_cuoi = new Date();
+      await existed.save();
+      user = existed;
+    } else {
+      user = await NguoiDung.create({
+        cua_hang_id: null,
+        email: email,
+        password_hash: passwordHash,
+        ho_ten: hoTen,
+        sdt: sdt,
+        vai_tro: 'user',
+        trang_thai: 'active',
+        lan_dang_nhap_cuoi: new Date()
+      });
+    }
 
     await loginWithFreshSession(req, user);
     if (req.session && req.session.returnUrl) delete req.session.returnUrl;
@@ -199,6 +223,9 @@ exports.postCurrentStore = async function(req, res, next) {
   try {
     if (typeof req.isAuthenticated !== 'function' || !req.isAuthenticated() || !req.user) {
       return res.redirect('/login?error=login_required');
+    }
+    if (!['super_admin', 'admin'].includes(req.user.vai_tro)) {
+      return res.redirect('/cho-phan-quyen');
     }
 
     var storeId = String(req.body && req.body.cua_hang_id || '').trim();
@@ -237,6 +264,13 @@ exports.getGoogleCallback = async function(req, res, next) {
   } catch (error) {
     next(error);
   }
+};
+
+exports.getPendingPermission = function(req, res) {
+  res.render('auth/pending-permission', {
+    title: 'Cho phan quyen',
+    user: req.user || null
+  });
 };
 
 exports.postLogout = async function(req, res, next) {

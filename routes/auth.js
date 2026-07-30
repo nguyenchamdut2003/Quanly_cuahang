@@ -3,7 +3,7 @@ var router = express.Router();
 var passport = require('../config/passport');
 var authController = require('../controllers/auth.controller');
 var passwordResetController = require('../controllers/passwordReset.controller');
-var { isGuest } = require('../middlewares/auth.middleware');
+var { isGuest, isLoggedInActive } = require('../middlewares/auth.middleware');
 
 router.get('/login', isGuest, authController.getLogin);
 router.post('/login', isGuest, authController.postLogin);
@@ -17,6 +17,7 @@ router.post('/resend-reset-code', isGuest, passwordResetController.postResendRes
 router.get('/reset-password', isGuest, passwordResetController.getResetPassword);
 router.post('/reset-password', isGuest, passwordResetController.postResetPassword);
 router.post('/logout', authController.postLogout);
+router.get('/cho-phan-quyen', isLoggedInActive, authController.getPendingPermission);
 
 router.post('/auth/current-store', authController.postCurrentStore);
 router.get('/auth/google',

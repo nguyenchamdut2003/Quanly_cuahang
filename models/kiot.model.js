@@ -36,9 +36,10 @@ const NguoiDungSchema = new Schema({
   sdt: { type: String },
   vai_tro: {
     type: String,
-    enum: ['admin', 'quan_ly', 'nhan_vien', 'user'],
+    enum: ['super_admin', 'admin', 'quan_ly', 'nhan_vien', 'user'],
     default: 'user'
   },
+  must_change_password: { type: Boolean, default: false },
   trang_thai: {
     type: String,
     enum: ['active', 'inactive', 'blocked'],

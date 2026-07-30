@@ -1,5 +1,12 @@
 const { NguoiDung } = require('../models/kiot.model');
+const bcrypt = require('bcrypt');
 const { normalizeAddress } = require('../utils/address');
+
+const SALT_ROUNDS = 12;
+
+function isValidPassword(password) {
+    return /^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(String(password || ''));
+}
 
 // Bắt buộc đăng nhập để vào trang cá nhân
 
@@ -45,6 +52,40 @@ exports.postUpdate = async function(req, res, next) {
 
         // Redirect về trang profile kèm theo báo thành công (nếu cần thiết có thể thêm flash message)
         res.redirect('/profile?success=1');
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.postChangePassword = async function(req, res, next) {
+    try {
+        const userId = req.user && req.user._id;
+        const currentPassword = String(req.body && req.body.current_password || '');
+        const password = String(req.body && req.body.password || '');
+        const confirmPassword = String(req.body && req.body.confirm_password || '');
+
+        if (!userId) return res.status(400).send('Khong tim thay thong tin nguoi dung');
+        if (!password || password !== confirmPassword) {
+            return res.redirect('/profile?password_error=confirm');
+        }
+        if (!isValidPassword(password)) {
+            return res.redirect('/profile?password_error=weak');
+        }
+
+        const user = await NguoiDung.findById(userId).select('+password_hash');
+        if (!user) return res.status(404).send('Nguoi dung khong ton tai');
+
+        if (user.password_hash) {
+            const matched = await bcrypt.compare(currentPassword, user.password_hash);
+            if (!matched) return res.redirect('/profile?password_error=current');
+        }
+
+        user.password_hash = await bcrypt.hash(password, SALT_ROUNDS);
+        user.must_change_password = false;
+        await user.save();
+
+        if (req.user) req.user.must_change_password = false;
+        res.redirect('/profile?password_success=1');
     } catch (error) {
         next(error);
     }

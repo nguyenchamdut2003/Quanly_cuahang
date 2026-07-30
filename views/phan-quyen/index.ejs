@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/stylesheets/style.css">
+    <style>
+      .permission-page { max-width: 1200px; margin: 28px auto; padding: 0 18px; }
+      .permission-panel { background: #fff; border: 1px solid #d8e1ec; border-radius: 8px; overflow: hidden; }
+      .permission-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid #e6edf5; }
+      .permission-head h1 { font-size: 22px; margin: 0; color: #172033; }
+      .permission-table { width: 100%; border-collapse: collapse; }
+      .permission-table th, .permission-table td { padding: 12px 14px; border-bottom: 1px solid #eef2f7; text-align: left; font-size: 14px; }
+      .permission-table th { background: #f6f9fc; color: #344054; font-weight: 700; }
+      .permission-table select { min-width: 140px; height: 36px; border: 1px solid #cfd8e3; border-radius: 6px; padding: 0 8px; background: #fff; }
+      .permission-role-readonly { display: inline-flex; min-width: 140px; height: 36px; align-items: center; padding: 0 10px; border-radius: 6px; background: #eef2f7; color: #344054; font-weight: 700; }
+      .permission-save { height: 36px; border: 0; border-radius: 6px; padding: 0 12px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
+      .permission-alert { margin: 0 0 14px; padding: 12px 14px; border-radius: 6px; font-size: 14px; }
+      .permission-alert.success { background: #e8f7ef; color: #067647; }
+      .permission-alert.error { background: #fff0f0; color: #c1121f; }
+      @media (max-width: 760px) {
+        .permission-panel { overflow-x: auto; }
+        .permission-table { min-width: 720px; }
+      }
+    </style>
+  </head>
+  <body class="admin-body">
+    <%- include('../partials/header') %>
+    <main class="permission-page">
+      <% if (success) { %>
+        <div class="permission-alert success">Da cap nhat phan quyen tai khoan.</div>
+      <% } %>
+      <% if (error) { %>
+        <div class="permission-alert error">
+          <%= error === 'super_admin_locked' ? 'Khong duoc thay doi vai tro super admin.' : 'Khong cap nhat duoc phan quyen.' %>
+        </div>
+      <% } %>
+      <section class="permission-panel">
+        <div class="permission-head">
+          <h1>Phân quyền tài khoản</h1>
+        </div>
+        <table class="permission-table">
+          <thead>
+            <tr>
+              <th>Tài khoản</th>
+              <th>Họ tên</th>
+              <th>Số điện thoại</th>
+              <th>Trạng thái</th>
+              <th>Vai trò</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% users.forEach(function(item) { %>
+              <tr>
+                <td><strong><%= item.email %></strong></td>
+                <td><%= item.ho_ten || '--' %></td>
+                <td><%= item.sdt || '--' %></td>
+                <td><%= item.trang_thai || '--' %></td>
+                <td>
+                  <% if (item.vai_tro === 'super_admin') { %>
+                    <span class="permission-role-readonly">Super admin</span>
+                  <% } else { %>
+                    <form method="post" action="/phan-quyen-tai-khoan/<%= item._id %>/role" style="display:flex;gap:8px;align-items:center;">
+                      <select name="vai_tro">
+                        <% roleOptions.forEach(function(role) { %>
+                          <option value="<%= role.value %>" <%= item.vai_tro === role.value ? 'selected' : '' %>><%= role.label %></option>
+                        <% }) %>
+                      </select>
+                      <button type="submit" class="permission-save">Luu</button>
+                    </form>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

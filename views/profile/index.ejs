@@ -97,6 +97,24 @@
           <button type="submit" class="btn-submit"><i class="fa-solid fa-save"></i> Lưu thông tin</button>
         </div>
       </form>
+      <h2 style="margin: 28px 0 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">&Dstrok;&#7893;i m&#7853;t kh&#7849;u</h2>
+      <form action="/profile/change-password" method="POST">
+        <div class="form-group">
+          <label>M&#7853;t kh&#7849;u hi&#7879;n t&#7841;i *</label>
+          <input type="password" name="current_password" autocomplete="current-password" required>
+        </div>
+        <div class="form-group">
+          <label>M&#7853;t kh&#7849;u m&#7899;i *</label>
+          <input type="password" name="password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required>
+        </div>
+        <div class="form-group">
+          <label>X&aacute;c nh&#7853;n m&#7853;t kh&#7849;u m&#7899;i *</label>
+          <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required>
+        </div>
+        <div style="text-align: right;">
+          <button type="submit" class="btn-submit"><i class="fa-solid fa-key"></i> L&#432;u m&#7853;t kh&#7849;u</button>
+        </div>
+      </form>
     </div>
     
     <script>
@@ -111,6 +129,24 @@
           container.insertBefore(successDiv, container.childNodes[2]);
           
           // Xóa param khỏi URL để không hiện lại khi f5
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        if (urlParams.get('password_success') === '1' || urlParams.get('password_error')) {
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'success-message';
+          if (urlParams.get('password_error')) {
+            messageDiv.style.background = '#fff0f0';
+            messageDiv.style.color = '#b91c1c';
+            messageDiv.style.borderColor = '#fecaca';
+            const code = urlParams.get('password_error');
+            messageDiv.innerText = code === 'current'
+              ? 'Mat khau hien tai khong dung.'
+              : (code === 'weak' ? 'Mat khau moi phai co it nhat 8 ky tu, gom chu va so.' : 'Xac nhan mat khau moi khong khop.');
+          } else {
+            messageDiv.innerText = 'Doi mat khau thanh cong!';
+          }
+          const container = document.querySelector('.profile-container');
+          container.insertBefore(messageDiv, container.childNodes[2]);
           window.history.replaceState(null, '', window.location.pathname);
         }
       });

@@ -47,6 +47,9 @@ passport.use('local', new LocalStrategy({
             return done(null, false, { message: loginMessage });
         }
 
+        if (user.vai_tro === 'super_admin' && String(password || '') === 'admin') {
+            user.must_change_password = true;
+        }
         user.lan_dang_nhap_cuoi = new Date();
         await user.save();
         return done(null, user);

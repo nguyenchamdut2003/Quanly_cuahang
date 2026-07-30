@@ -25,11 +25,52 @@ function redirectToLogin(req, res, error) {
     return res.redirect(loginUrl);
 }
 
-exports.isAuthenticated = (req, res, next) => {
+function isAppAdmin(user) {
+    return user && ['super_admin', 'admin'].includes(user.vai_tro);
+}
+
+function redirectToPending(req, res) {
+    if (wantsJsonResponse(req)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Vui long lien he admin de phan quyen vao web.'
+        });
+    }
+    return res.redirect('/cho-phan-quyen');
+}
+
+exports.isLoggedInActive = (req, res, next) => {
     const loggedIn = typeof req.isAuthenticated === 'function' && req.isAuthenticated() && req.user;
 
     if (loggedIn && req.user.trang_thai === 'active') {
         return next();
+    }
+
+    if (wantsJsonResponse(req)) {
+        if (loggedIn) {
+            return res.status(403).json({
+                success: false,
+                message: 'TÃ i khoáº£n Ä‘Ã£ bá»‹ khÃ³a hoáº·c ngá»«ng hoáº¡t Ä‘á»™ng.'
+            });
+        }
+        return res.status(401).json({
+            success: false,
+            message: 'PhiÃªn Ä‘Äƒng nháº­p Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i.'
+        });
+    }
+
+    return redirectToLogin(req, res, loggedIn ? 'account_inactive' : 'unauthorized');
+};
+
+exports.isAuthenticated = (req, res, next) => {
+    const loggedIn = typeof req.isAuthenticated === 'function' && req.isAuthenticated() && req.user;
+
+    if (loggedIn && req.user.trang_thai === 'active' && isAppAdmin(req.user)) {
+        return next();
+    }
+
+    if (loggedIn && req.user.trang_thai === 'active') {
+        return redirectToPending(req, res);
     }
 
     if (wantsJsonResponse(req)) {
@@ -51,6 +92,7 @@ exports.isAuthenticated = (req, res, next) => {
 exports.isGuest = (req, res, next) => {
     const loggedIn = typeof req.isAuthenticated === 'function' && req.isAuthenticated() && req.user;
     if (!loggedIn) return next();
+    if (req.user.trang_thai === 'active' && !isAppAdmin(req.user)) return res.redirect('/cho-phan-quyen');
     if (req.user.cua_hang_id) return res.redirect('/');
     return res.redirect('/cua-hang?mode=create');
 };
@@ -78,3 +120,5 @@ exports.checkRole = (roles) => {
 };
 
 exports.requireRole = exports.checkRole;
+
+exports.isSuperAdmin = exports.checkRole('super_admin');

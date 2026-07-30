@@ -71,9 +71,19 @@
             <a href="<%= storeEditUrl %>" class="dropdown-item">
               <i class="fa-solid fa-store"></i> Xem và sửa cửa hàng
             </a>
-            <button type="button" class="dropdown-item dropdown-reset-data" id="resetDataOpen">
-              <i class="fa-solid fa-triangle-exclamation"></i> reset dữ liệu
+            <% if (locals.user && locals.user.vai_tro === 'super_admin') { %>
+              <a href="/phan-quyen-tai-khoan" class="dropdown-item">
+                <i class="fa-solid fa-user-shield"></i> Ph&acirc;n quy&#7873;n t&agrave;i kho&#7843;n
+              </a>
+            <% } %>
+            <button type="button" class="dropdown-item" id="changePasswordOpen">
+              <i class="fa-solid fa-key"></i> &Dstrok;&#7893;i m&#7853;t kh&#7849;u
             </button>
+            <% if (locals.user && locals.user.vai_tro === 'super_admin') { %>
+              <button type="button" class="dropdown-item dropdown-reset-data" id="resetDataOpen">
+              <i class="fa-solid fa-triangle-exclamation"></i> reset dữ liệu
+              </button>
+            <% } %>
             <form method="post" action="/logout" class="header-logout-form">
               <button type="submit" class="dropdown-item header-logout-button">
                 <i class="fa-solid fa-right-from-bracket"></i> Đăng xuất
@@ -90,6 +100,34 @@
               </div>
             </div>
           </div>
+            <div class="change-password-modal<%= locals.forcePasswordChange ? ' is-open' : '' %>" id="changePasswordModal" aria-hidden="<%= locals.forcePasswordChange ? 'false' : 'true' %>" data-force="<%= locals.forcePasswordChange ? '1' : '0' %>">
+              <div class="change-password-dialog" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle">
+                <h3 id="changePasswordTitle">&Dstrok;&#7893;i m&#7853;t kh&#7849;u</h3>
+                <% if (locals.forcePasswordChange) { %>
+                  <p class="change-password-note">L&#432;u &yacute; &dstrok;&#7893;i m&#7853;t kh&#7849;u lu&ocirc;n &dstrok;&#7875; tr&aacute;nh &dstrok;&#7875; m&#7853;t kh&#7849;u t&#7921; t&#7841;o.</p>
+                <% } %>
+                <form method="post" action="/profile/change-password" class="change-password-form">
+                  <label>
+                    <span>M&#7853;t kh&#7849;u hi&#7879;n t&#7841;i</span>
+                    <input type="password" name="current_password" autocomplete="current-password" required>
+                  </label>
+                  <label>
+                    <span>M&#7853;t kh&#7849;u m&#7899;i</span>
+                    <input type="password" name="password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required>
+                  </label>
+                  <label>
+                    <span>X&aacute;c nh&#7853;n m&#7853;t kh&#7849;u m&#7899;i</span>
+                    <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required>
+                  </label>
+                  <div class="change-password-actions">
+                    <button type="submit" class="btn btn-primary">L&#432;u m&#7853;t kh&#7849;u</button>
+                    <% if (!locals.forcePasswordChange) { %>
+                      <button type="button" class="btn btn-light" id="changePasswordCancel">H&#7911;y</button>
+                    <% } %>
+                  </div>
+                </form>
+              </div>
+            </div>
           <% } else { %>
             <div class="kv-user-avatar">
               <i class="fa-solid fa-user"></i>
@@ -310,6 +348,38 @@
     const resetDataModal = document.getElementById('resetDataModal');
     const resetDataConfirm = document.getElementById('resetDataConfirm');
     const resetDataCancel = document.getElementById('resetDataCancel');
+    const changePasswordOpen = document.getElementById('changePasswordOpen');
+    const changePasswordModal = document.getElementById('changePasswordModal');
+    const changePasswordCancel = document.getElementById('changePasswordCancel');
+
+    function setChangePasswordModalOpen(open) {
+      if (!changePasswordModal) return;
+      const isForced = changePasswordModal.getAttribute('data-force') === '1';
+      if (!open && isForced) return;
+      changePasswordModal.classList.toggle('is-open', open);
+      changePasswordModal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+
+    if (changePasswordOpen) {
+      changePasswordOpen.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setChangePasswordModalOpen(true);
+      });
+    }
+
+    if (changePasswordCancel) {
+      changePasswordCancel.addEventListener('click', function(e) {
+        e.preventDefault();
+        setChangePasswordModalOpen(false);
+      });
+    }
+
+    if (changePasswordModal) {
+      changePasswordModal.addEventListener('click', function(e) {
+        if (e.target === changePasswordModal) setChangePasswordModalOpen(false);
+      });
+    }
 
     function setResetDataModalOpen(open) {
       if (!resetDataModal) return;
