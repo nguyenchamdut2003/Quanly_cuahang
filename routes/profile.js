@@ -7,5 +7,6 @@ router.use(isLoggedInActive);
 router.get('/', profileController.index);
 router.post('/update', profileController.postUpdate);
 router.post('/change-password', profileController.postChangePassword);
+router.post('/skip-password-change', profileController.postSkipPasswordChange);
 
 module.exports = router;

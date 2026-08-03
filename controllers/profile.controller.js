@@ -90,3 +90,17 @@ exports.postChangePassword = async function(req, res, next) {
         next(error);
     }
 };
+
+exports.postSkipPasswordChange = async function(req, res, next) {
+    try {
+        const userId = req.user && req.user._id;
+        if (!userId) return res.status(400).json({ success: false, message: 'Khong tim thay thong tin nguoi dung' });
+
+        await NguoiDung.updateOne({ _id: userId }, { $set: { must_change_password: false } });
+        if (req.user) req.user.must_change_password = false;
+
+        res.json({ success: true });
+    } catch (error) {
+        next(error);
+    }
+};

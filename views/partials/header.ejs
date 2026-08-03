@@ -102,6 +102,7 @@
           </div>
             <div class="change-password-modal<%= locals.forcePasswordChange ? ' is-open' : '' %>" id="changePasswordModal" aria-hidden="<%= locals.forcePasswordChange ? 'false' : 'true' %>" data-force="<%= locals.forcePasswordChange ? '1' : '0' %>">
               <div class="change-password-dialog" role="dialog" aria-modal="true" aria-labelledby="changePasswordTitle">
+                <button type="button" class="change-password-close" id="changePasswordClose" aria-label="B&#7887; qua &#273;&#7893;i m&#7853;t kh&#7849;u">&times;</button>
                 <h3 id="changePasswordTitle">&Dstrok;&#7893;i m&#7853;t kh&#7849;u</h3>
                 <% if (locals.forcePasswordChange) { %>
                   <p class="change-password-note">L&#432;u &yacute; &dstrok;&#7893;i m&#7853;t kh&#7849;u lu&ocirc;n &dstrok;&#7875; tr&aacute;nh &dstrok;&#7875; m&#7853;t kh&#7849;u t&#7921; t&#7841;o.</p>
@@ -351,13 +352,39 @@
     const changePasswordOpen = document.getElementById('changePasswordOpen');
     const changePasswordModal = document.getElementById('changePasswordModal');
     const changePasswordCancel = document.getElementById('changePasswordCancel');
+    const changePasswordClose = document.getElementById('changePasswordClose');
 
-    function setChangePasswordModalOpen(open) {
+    function setChangePasswordModalOpen(open, options) {
       if (!changePasswordModal) return;
       const isForced = changePasswordModal.getAttribute('data-force') === '1';
-      if (!open && isForced) return;
+      const allowForcedClose = options && options.allowForcedClose;
+      if (!open && isForced && !allowForcedClose) return;
       changePasswordModal.classList.toggle('is-open', open);
       changePasswordModal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+
+    async function skipPasswordChange() {
+      if (!changePasswordModal) return;
+      const isForced = changePasswordModal.getAttribute('data-force') === '1';
+      if (!isForced) {
+        setChangePasswordModalOpen(false);
+        return;
+      }
+      if (changePasswordClose) changePasswordClose.disabled = true;
+      try {
+        const res = await fetch('/profile/skip-password-change', {
+          method: 'POST',
+          headers: { Accept: 'application/json' }
+        });
+        const data = await res.json().catch(function() { return {}; });
+        if (!res.ok || !data.success) throw new Error(data.message || 'Khong bo qua duoc doi mat khau');
+        changePasswordModal.setAttribute('data-force', '0');
+        setChangePasswordModalOpen(false, { allowForcedClose: true });
+      } catch (error) {
+        alert(error.message || 'Khong bo qua duoc doi mat khau');
+      } finally {
+        if (changePasswordClose) changePasswordClose.disabled = false;
+      }
     }
 
     if (changePasswordOpen) {
@@ -372,6 +399,13 @@
       changePasswordCancel.addEventListener('click', function(e) {
         e.preventDefault();
         setChangePasswordModalOpen(false);
+      });
+    }
+
+    if (changePasswordClose) {
+      changePasswordClose.addEventListener('click', function(e) {
+        e.preventDefault();
+        skipPasswordChange();
       });
     }
 
