@@ -1,3 +1,5 @@
+const { pad2 } = require('./date.helper');
+
 function uniqueValues(items) {
   var seen = {};
   return items.filter(function(item) {

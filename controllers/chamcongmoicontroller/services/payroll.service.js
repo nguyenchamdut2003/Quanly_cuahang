@@ -1,9 +1,16 @@
-const { ChamCongMoiBanGhi, ChamCongMoiThang, ChamCongMoiBangLuong } = require('../../../models/chamcongmoi.model');
+const mongoose = require('mongoose');
+const {
+  ChamCongMoiNhanVien,
+  ChamCongMoiBanGhi,
+  ChamCongMoiThang,
+  ChamCongMoiBangLuong
+} = require('../../../models/chamcongmoi.model');
 const { PhieuThuChi } = require('../../../models/kiot.model');
 const { getNextCode } = require('../../../utils/hrCode');
-const { formatMonth, monthBounds } = require('../helpers/date.helper');
-const { employeeLabel } = require('../helpers/employee.helper');
+const { formatMonth, monthBounds, formatAttendanceDayDisplay, monthShortLabel } = require('../helpers/date.helper');
+const { serializeEmployee } = require('../helpers/employee.helper');
 const { serializeAttendanceDays } = require('../helpers/attendance.helper');
+const { uniqueValues } = require('../helpers/common.helper');
 
 async function loadAttendanceDaysForMonth(storeId, employeeId, monthKey) {
   var bounds = monthBounds(monthKey);
@@ -256,7 +263,7 @@ async function getPayrollMap(storeId, employeeId, monthKeys) {
     nhan_vien_id: employeeId,
     thang_bang_luong: { $in: monthKeys },
     trang_thai: 'can_thanh_toan'
-  }).select('_id ma_bang_luong thang_bang_luong tong_tien').lean();
+  }).select('_id ma_bang_luong thang_bang_luong loai_luong tong_tien').lean();
   var map = {};
   payrolls.forEach(function(item) {
     var mapKey = item.thang_bang_luong + ':' + (item.loai_luong || 'ngay');

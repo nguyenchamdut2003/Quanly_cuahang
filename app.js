@@ -47,20 +47,8 @@ var chucDanhRouter = require('./routes/chucDanh');
 var apiChucDanhRouter = require('./routes/apiChucDanh');
 var nhanVienRouter = require('./routes/nhanVien');
 var apiNhanVienRouter = require('./routes/apiNhanVien');
-var caLamViecRouter = require('./routes/caLamViec');
-var apiCaLamViecRouter = require('./routes/apiCaLamViec');
-var ngayLamNghiRouter = require('./routes/ngayLamNghi');
-var apiNgayLamViecCuaHangRouter = require('./routes/apiNgayLamViecCuaHang');
-var apiNgayLeTetRouter = require('./routes/apiNgayLeTet');
-var lichLamViecRouter = require('./routes/lichLamViec');
-var apiLichLamViecRouter = require('./routes/apiLichLamViec');
-var chamCongRouter = require('./routes/chamCong');
 var chamcongMoiRouter = require('./routes/chamcongMoi');
-var apiChamCongRouter = require('./routes/apiChamCong');
-var bangLuongRouter = require('./routes/bangLuong');
-var apiBangLuongRouter = require('./routes/apiBangLuong');
 var apiSoQuyRouter = require('./routes/apiSoQuy');
-var thietLapNhanVienRouter = require('./routes/thietLapNhanVien');
 var shortcutRouter = require('./routes/shortcut');
 var systemRouter = require('./routes/system');
 var { isPerformanceEnabled } = require('./utils/performance.util');
@@ -194,8 +182,6 @@ app.use(function(req, res, next) {
       kho: '/cua-hang?kho=' + encodeURIComponent(safeId),
       cashbook: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
-      payroll: '/bang-luong/' + safeId,
-      bang_luong: '/bang-luong/' + safeId,
       chamcong_payroll: '/chamcongmoi?tab=payroll-paid&bang_luong=' + encodeURIComponent(safeId),
       chamcongmoi_bang_luong: '/chamcongmoi?tab=payroll-paid&bang_luong=' + encodeURIComponent(safeId),
       nhap_vat_chua: '/vat-chua?nhap_vat_chua=' + encodeURIComponent(safeId)
@@ -314,21 +300,9 @@ app.use('/bao-cao', baoCaoRouter);
 app.use('/api/phong-ban', apiPhongBanRouter);
 app.use('/api/chuc-danh', apiChucDanhRouter);
 app.use('/api/nhan-vien', apiNhanVienRouter);
-app.use('/api/ca-lam-viec', apiCaLamViecRouter);
-app.use('/api/ngay-lam-viec-cua-hang', apiNgayLamViecCuaHangRouter);
-app.use('/api/ngay-le-tet', apiNgayLeTetRouter);
-app.use('/api/lich-lam-viec', apiLichLamViecRouter);
-app.use('/api/cham-cong', apiChamCongRouter);
-app.use('/api/bang-luong', apiBangLuongRouter);
 app.use('/phong-ban', phongBanRouter);
 app.use('/chuc-danh', chucDanhRouter);
-app.use('/ca-lam-viec', caLamViecRouter);
-app.use('/ngay-lam-nghi', ngayLamNghiRouter);
-app.use('/lich-lam-viec', lichLamViecRouter);
 app.use('/chamcongmoi', chamcongMoiRouter);
-app.use('/cham-cong', chamCongRouter);
-app.use('/bang-luong', bangLuongRouter);
-app.use('/thiet-lap-nhan-vien', thietLapNhanVienRouter);
 app.use('/nhan-vien', nhanVienRouter);
 app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);

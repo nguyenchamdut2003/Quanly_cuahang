@@ -36,45 +36,47 @@ async function createPayrollPayment({ storeId, payrollId, body, userId }) {
     throw Object.assign(new Error('Sá»‘ tiá»n thanh toÃ¡n pháº£i báº±ng ' + tongTien.toLocaleString('vi-VN') + ' Ä‘'), { status: 400 });
   }
 
-  var receipt;
   session = await mongoose.startSession();
-  await session.withTransaction(async function() {
-    var lockedPayroll = await ChamCongMoiBangLuong.findOne({
-      _id: payrollId,
-      cua_hang_id: storeId,
-      trang_thai: 'can_thanh_toan'
-    }).session(session);
-    if (!lockedPayroll) throw new Error('Báº£ng lÆ°Æ¡ng khÃ´ng cÃ²n á»Ÿ tráº¡ng thÃ¡i cáº§n thanh toÃ¡n');
+  try {
+    await session.withTransaction(async function() {
+      var lockedPayroll = await ChamCongMoiBangLuong.findOne({
+        _id: payrollId,
+        cua_hang_id: storeId,
+        trang_thai: 'can_thanh_toan'
+      }).session(session);
+      if (!lockedPayroll) throw new Error('Báº£ng lÆ°Æ¡ng khÃ´ng cÃ²n á»Ÿ tráº¡ng thÃ¡i cáº§n thanh toÃ¡n');
 
-    receipt = await taoPhieuThuChi({
-      loai_phieu: 'chi',
-      loai_thu_chi: 'tra_luong_nhan_vien',
-      cua_hang_id: storeId,
-      nguoi_tao_id: userId,
-      nhom_doi_tuong: 'nhan_vien',
-      doi_tuong: lockedPayroll.ten_nhan_vien || lockedPayroll.ma_nhan_vien || 'NhÃ¢n viÃªn',
-      chamcongmoi_bang_luong_id: lockedPayroll._id,
-      ma_chung_tu_goc: lockedPayroll.ma_bang_luong || '',
-      hach_toan: false,
-      payment_v2: true,
-      tien_mat: paymentDetail.tien_mat,
-      chuyen_khoan: paymentDetail.chuyen_khoan,
-      so_quy_tien_mat_id: body.so_quy_tien_mat_id,
-      so_quy_chuyen_khoan_id: body.so_quy_chuyen_khoan_id,
-      ghi_chu: String(body.ghi_chu || '').trim() || (
-        'Thanh toÃ¡n lÆ°Æ¡ng ' + (lockedPayroll.ma_bang_luong || '') +
-        ' - ' + (lockedPayroll.ten_nhan_vien || lockedPayroll.ma_nhan_vien || 'nhÃ¢n viÃªn')
-      ),
-      session: session
+      receipt = await taoPhieuThuChi({
+        loai_phieu: 'chi',
+        loai_thu_chi: 'tra_luong_nhan_vien',
+        cua_hang_id: storeId,
+        nguoi_tao_id: userId,
+        nhom_doi_tuong: 'nhan_vien',
+        doi_tuong: lockedPayroll.ten_nhan_vien || lockedPayroll.ma_nhan_vien || 'NhÃ¢n viÃªn',
+        chamcongmoi_bang_luong_id: lockedPayroll._id,
+        ma_chung_tu_goc: lockedPayroll.ma_bang_luong || '',
+        hach_toan: false,
+        payment_v2: true,
+        tien_mat: paymentDetail.tien_mat,
+        chuyen_khoan: paymentDetail.chuyen_khoan,
+        so_quy_tien_mat_id: body.so_quy_tien_mat_id,
+        so_quy_chuyen_khoan_id: body.so_quy_chuyen_khoan_id,
+        ghi_chu: String(body.ghi_chu || '').trim() || (
+          'Thanh toÃ¡n lÆ°Æ¡ng ' + (lockedPayroll.ma_bang_luong || '') +
+          ' - ' + (lockedPayroll.ten_nhan_vien || lockedPayroll.ma_nhan_vien || 'nhÃ¢n viÃªn')
+        ),
+        session: session
+      });
+
+      await ChamCongMoiBangLuong.updateOne(
+        { _id: lockedPayroll._id, cua_hang_id: storeId },
+        { $set: { trang_thai: 'da_thanh_toan' } },
+        { session: session }
+      );
     });
-
-    await ChamCongMoiBangLuong.updateOne(
-      { _id: lockedPayroll._id, cua_hang_id: storeId },
-      { $set: { trang_thai: 'da_thanh_toan' } },
-      { session: session }
-    );
-  });
-  await session.endSession();
+  } finally {
+    await session.endSession();
+  }
 
   return {
     success: true,

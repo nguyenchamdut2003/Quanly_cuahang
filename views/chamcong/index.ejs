@@ -671,6 +671,11 @@
         </button>`;
       }
 
+      function cssEscape(value) {
+        if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(String(value || ''));
+        return String(value || '').replace(/["\\]/g, '\\$&');
+      }
+
       function switchTab(tab, skipLoad) {
         document.querySelectorAll('.cc-tab').forEach(btn => btn.classList.toggle('is-active', btn.dataset.tab === tab));
         document.getElementById('ccAttendancePane').classList.toggle('is-active', tab === 'attendance');
@@ -893,8 +898,10 @@
         }
         const params = new URLSearchParams({ nhan_vien_id: employeeId, week_start: weekStart });
         if (monthStart) params.set('month_start', monthStart);
-        const res = await fetch('/chamcongmoi/api/tuan?' + params.toString());
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/tuan?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) {
           if (!options.silent) setStatus(json.message || 'Không tải được chấm công', 'error');
           return false;
@@ -1013,8 +1020,10 @@
       }
 
       async function refreshEmployees(selectedId) {
-        const res = await fetch('/chamcongmoi/api/nhan-vien');
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien', {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) return;
         employeeSelect.innerHTML = '<option value="">Chọn nhân viên</option>' + json.items.map(function(item) {
           const selected = String(item._id) === String(selectedId || employeeSelect.value) ? ' selected' : '';
@@ -1147,11 +1156,10 @@
       }
 
       async function loadPayrollPayBooks(type) {
-        const res = await fetch('/api/so-quy/active?loai_so_quy=' + encodeURIComponent(type), {
+        const json = await fetchJson('/api/so-quy/active?loai_so_quy=' + encodeURIComponent(type), {
           headers: { Accept: 'application/json' },
           credentials: 'same-origin'
         });
-        const json = await res.json();
         if (!json.success) return [];
         return Array.isArray(json.items) ? json.items : (Array.isArray(json.data) ? json.data : []);
       }
@@ -1182,8 +1190,10 @@
       }
 
       async function openPayrollPayModal(payrollId) {
-        const previewRes = await fetch('/chamcongmoi/api/bang-luong/' + encodeURIComponent(payrollId) + '/thanh-toan');
-        const preview = await previewRes.json();
+        const preview = await fetchJson('/chamcongmoi/api/bang-luong/' + encodeURIComponent(payrollId) + '/thanh-toan', {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!preview.success) {
           setStatus(preview.message || 'Không tải được thông tin thanh toán', 'error');
           return;
@@ -1317,8 +1327,10 @@
         const params = new URLSearchParams();
         const payrollEmployeeId = document.getElementById('ccPayrollEmployee').value;
         if (payrollEmployeeId) params.set('nhan_vien_id', payrollEmployeeId);
-        const res = await fetch('/chamcongmoi/api/bang-luong?' + params.toString());
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/bang-luong?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) {
           if (!options.silent) setStatus(json.message || 'Không tải được bảng lương', 'error');
           return false;
@@ -1335,7 +1347,7 @@
           return renderPayrollTableRow(item, 'pending');
         }).join('');
         if (highlightPayrollId) {
-          const row = payrollRows.querySelector('[data-payroll-id="' + CSS.escape(highlightPayrollId) + '"]');
+          const row = payrollRows.querySelector('[data-payroll-id="' + cssEscape(highlightPayrollId) + '"]');
           if (row) {
             row.classList.add('cc-row-highlight');
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1346,7 +1358,7 @@
 
       function highlightPayrollRow(payrollId, tableBody) {
         if (!payrollId || !tableBody) return;
-        const safeId = CSS.escape(String(payrollId));
+        const safeId = cssEscape(payrollId);
         const row = tableBody.querySelector('[data-payroll-id="' + safeId + '"]')
           || tableBody.querySelector('[data-payroll-code="' + safeId + '"]');
         if (!row) return;
@@ -1359,8 +1371,10 @@
         const params = new URLSearchParams({ trang_thai: 'da_thanh_toan' });
         const payrollEmployeeId = document.getElementById('ccPayrollPaidEmployee').value;
         if (payrollEmployeeId) params.set('nhan_vien_id', payrollEmployeeId);
-        const res = await fetch('/chamcongmoi/api/bang-luong?' + params.toString());
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/bang-luong?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) {
           if (!options.silent) setStatus(json.message || 'Không tải được bảng lương đã thanh toán', 'error');
           return false;
@@ -1382,8 +1396,10 @@
         const params = new URLSearchParams({ include_inactive: '1' });
         const keyword = document.getElementById('ccEmployeeKeyword').value.trim();
         if (keyword) params.set('keyword', keyword);
-        const res = await fetch('/chamcongmoi/api/nhan-vien?' + params.toString());
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) {
           setStatus(json.message || 'Không tải được danh sách nhân viên', 'error');
           return;
@@ -1474,8 +1490,10 @@
           document.getElementById('ccFormName').focus();
           return;
         }
-        const res = await fetch('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id));
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) {
           setStatus(json.message || 'Không tải được nhân viên', 'error');
           return;
@@ -1493,12 +1511,12 @@
         const url = employeeEditId
           ? '/chamcongmoi/api/nhan-vien/' + encodeURIComponent(employeeEditId)
           : '/chamcongmoi/api/nhan-vien';
-        const res = await fetch(url, {
+        const json = await fetchJson(url, {
           method: employeeEditId ? 'PUT' : 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify(payload)
         });
-        const json = await res.json();
         if (!json.success) {
           setStatus(json.message || 'Lưu nhân viên thất bại', 'error');
           return;
@@ -1513,8 +1531,11 @@
 
       async function deleteEmployee(id) {
         if (!confirm('Chuyển nhân viên sang trạng thái đã nghỉ?')) return;
-        const res = await fetch('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id), { method: 'DELETE' });
-        const json = await res.json();
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id), {
+          method: 'DELETE',
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
         if (!json.success) {
           setStatus(json.message || 'Không cập nhật được nhân viên', 'error');
           return;
