@@ -67,6 +67,14 @@
     }
     .supplier-debt-warn-tip.is-visible { display: block; }
     .supplier-debt-warn-tip strong { color: #b42318; font-weight: 800; }
+    .supplier-partner-export-btn {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: inline-block;
+      vertical-align: middle;
+    }
     .supplier-metrics-loading { color: #64748b; }
     .supplier-metrics-error { color: #b42318; font-weight: 700; }
     .supplier-list-panel {
@@ -86,17 +94,26 @@
     .supplier-address-table th:nth-child(2),
     .supplier-address-table td:nth-child(2){width:120px;max-width:120px}
     .supplier-address-table th:nth-child(3),
-    .supplier-address-table td:nth-child(3){width:160px;max-width:160px}
+    .supplier-address-table td:nth-child(3){width:170px;max-width:170px}
     .supplier-address-table th:nth-child(4),
     .supplier-address-table td:nth-child(4){width:180px;max-width:180px}
     .supplier-address-table th:nth-child(6),
     .supplier-address-table td:nth-child(6){width:140px;max-width:140px;white-space:nowrap}
     .supplier-address-table th:nth-child(7),
-    .supplier-address-table td:nth-child(7){width:92px;max-width:92px}
+    .supplier-address-table td:nth-child(7){width:108px;max-width:108px}
     .supplier-address-table th:nth-child(8),
-    .supplier-address-table td:nth-child(8){width:150px;max-width:150px;min-width:150px}
+    .supplier-address-table td:nth-child(8){width:180px;max-width:180px;min-width:180px}
     .supplier-address-table td:nth-child(8).warehouse-action-cell{padding-left:6px!important;padding-right:6px!important}
     .supplier-address-table td:nth-child(8) .warehouse-action-buttons{gap:6px;justify-content:center;flex-wrap:nowrap}
+    .supplier-address-table .js-ghn-province,
+    .supplier-address-table .js-ghn-ward{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 8px;font-size:13px}
+    .profit-positive{color:#047857}
+    .profit-negative{color:#b42318}
+    .supplier-address-profit-detail-row td{background:#f8fafc!important;padding:10px 12px!important}
+    .supplier-address-profit-detail{display:grid;gap:10px}
+    .supplier-address-profit-summary{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:#475467}
+    .supplier-address-profit-table{margin:0}
+    .supplier-address-profit-table th,.supplier-address-profit-table td{font-size:12px}
     .filter-range-stack { display: grid; gap: 8px; margin-top: 8px; }
     .filter-range-stack label span { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; }
     .filter-range-stack input {
@@ -1101,6 +1118,7 @@
           },
           onOpen: function(id, root) {
             bindSupplierInlinePanel(root);
+            if (typeof syncAddressTypesFromDetail === 'function') syncAddressTypesFromDetail(root);
             if (typeof initGhnAddressSelects === 'function') initGhnAddressSelects(root);
             if (window.__openSupplierDebtTab) {
               var debtTab = root.querySelector('[data-detail-tab="debt"]');
@@ -1871,8 +1889,11 @@
           provinceSelect.setAttribute('data-ghn-bound', '1');
           var formId = provinceSelect.getAttribute('data-address-form');
           var wardSelect = formId ? document.querySelector('.js-ghn-ward[data-address-form="' + formId + '"]') : null;
-          enhanceAddressSelect(provinceSelect, 'Tìm hoặc chọn tỉnh/thành');
-          enhanceAddressSelect(wardSelect, 'Tìm hoặc chọn phường/xã');
+          var useNativeAddressSelect = !!provinceSelect.closest('.supplier-address-table');
+          if (!useNativeAddressSelect) {
+            enhanceAddressSelect(provinceSelect, 'Tìm hoặc chọn tỉnh/thành');
+            enhanceAddressSelect(wardSelect, 'Tìm hoặc chọn phường/xã');
+          }
 
           getGhnProvinces().then(function(provinces) {
             renderProvinceSelect(provinceSelect, provinces);
@@ -1942,6 +1963,25 @@
           select.value = types.some(function(type) { return String(type.ma_loai) === String(current); }) || current === 'khac'
             ? current
             : 'khac';
+        });
+      }
+
+      function syncAddressTypesFromDetail(root) {
+        var scope = root || document;
+        if (!Array.isArray(window.__addressTypes)) window.__addressTypes = [];
+        var known = {};
+        (window.__addressTypes || []).forEach(function(type) {
+          known[String(type.ma_loai || '')] = true;
+        });
+        scope.querySelectorAll('.js-address-type-select option').forEach(function(option) {
+          var code = String(option.value || '').trim();
+          if (!code || known[code]) return;
+          known[code] = true;
+          window.__addressTypes.push({
+            _id: '',
+            ma_loai: code,
+            ten_loai: option.textContent || code
+          });
         });
       }
 
@@ -2092,6 +2132,19 @@
       }
 
       document.addEventListener('click', function(event) {
+        var profitBtn = event.target.closest('.js-supplier-address-profit-toggle');
+        if (profitBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          var addressId = profitBtn.getAttribute('data-address-id') || '';
+          var row = addressId ? document.querySelector('[data-address-profit-row="' + addressId + '"]') : null;
+          if (!row) return;
+          var isOpen = row.style.display !== 'none';
+          row.style.display = isOpen ? 'none' : 'table-row';
+          profitBtn.textContent = isOpen ? 'Chi tiết' : 'Ẩn';
+          return;
+        }
+
         var submitBtn = event.target.closest('.js-supplier-address-submit');
         if (submitBtn) {
           event.preventDefault();

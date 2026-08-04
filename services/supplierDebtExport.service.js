@@ -3,6 +3,7 @@ const ExcelJS = require('exceljs');
 const { ZipArchive } = require('archiver');
 const {
     PhieuNhap,
+    CTPhieuNhap,
     PhieuTraHangNhap,
     CongNoNhaCungCap,
     GiaoDichCongNoNhaCungCap
@@ -19,6 +20,8 @@ const PARTNER_COLUMNS = [
     { key: 'ngay_phieu', header: 'Ngày phiếu nhập', width: 18 },
     { key: 'ma_phieu_nhap', header: 'Mã phiếu nhập', width: 18 },
     { key: 'ten_ncc', header: 'Nhà cung cấp', width: 28 },
+    { key: 'san_pham', header: 'Sản phẩm', width: 40 },
+    { key: 'so_luong', header: 'Số lượng', width: 14, numeric: true },
     { key: 'tong_tien_nhap', header: 'Tổng tiền nhập', width: 16, numeric: true },
     { key: 'giam_tru_tra_hang', header: 'Giảm trừ / trả hàng', width: 18, numeric: true },
     { key: 'da_thanh_toan', header: 'Đã thanh toán', width: 16, numeric: true },
@@ -121,6 +124,35 @@ async function loadUnpaidPurchases(supplierId, storeId) {
         .sort({ ngay_nhap: 1, created_at: 1 })
         .select('ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc ghi_chu')
         .lean();
+}
+
+async function loadPurchaseProductSummaries(purchaseIds) {
+    const map = {};
+    if (!purchaseIds.length) return map;
+
+    const rows = await CTPhieuNhap.find({ phieu_nhap_id: { $in: purchaseIds } })
+        .populate({ path: 'hang_hoa_id', select: 'ten_hang' })
+        .select('phieu_nhap_id hang_hoa_id so_luong lot_info')
+        .lean();
+
+    rows.forEach((row) => {
+        const pid = String(row.phieu_nhap_id || '');
+        if (!pid) return;
+        if (!map[pid]) map[pid] = { items: [] };
+
+        const productName = String(row.hang_hoa_id?.ten_hang || '').trim() || '---';
+
+        const quantity = Number(row.so_luong || row.lot_info?.so_luong_tong || 0);
+        const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
+        const existing = map[pid].items.find((item) => item.productName === productName);
+        if (existing) {
+            existing.quantity += safeQuantity;
+        } else {
+            map[pid].items.push({ productName, quantity: safeQuantity });
+        }
+    });
+
+    return map;
 }
 
 async function loadReturnDeductionsByPurchase(purchaseIds, storeId) {
@@ -233,23 +265,32 @@ async function buildSupplierDebtPartnerPack(supplier, storeId) {
     const purchases = await loadUnpaidPurchases(supplier._id, storeId);
     const purchaseIds = purchases.map((row) => row._id);
     const returnMap = await loadReturnDeductionsByPurchase(purchaseIds, storeId);
+    const productSummaryMap = await loadPurchaseProductSummaries(purchaseIds);
     const supplierName = supplier.ten_ncc || supplier.ten_cong_ty || supplier.ma_ncc || '';
 
     let totalConPhaiTra = 0;
     purchases.forEach((purchase, index) => {
         const returnInfo = returnMap[String(purchase._id)] || { amount: 0, codes: [] };
+        const productSummary = productSummaryMap[String(purchase._id)] || { items: [] };
+        const productItems = productSummary.items.length ? productSummary.items : [{ productName: '', quantity: '' }];
         const amounts = resolvePartnerRowAmounts(purchase, returnInfo);
         totalConPhaiTra += amounts.conPhaiTra;
-        ws.addRow({
-            stt: index + 1,
-            ngay_phieu: formatExportDate(purchase.ngay_nhap || purchase.created_at),
-            ma_phieu_nhap: purchase.ma_phieu_nhap || '',
-            ten_ncc: supplierName,
-            tong_tien_nhap: amounts.tongTienNhap,
-            giam_tru_tra_hang: amounts.giamTru,
-            da_thanh_toan: amounts.daThanhToan,
-            con_phai_tra: amounts.conPhaiTra,
-            ghi_chu_doi_soat: buildPartnerReconcileNote(returnInfo)
+
+        productItems.forEach((item, itemIndex) => {
+            const isFirstItem = itemIndex === 0;
+            ws.addRow({
+                stt: isFirstItem ? index + 1 : '',
+                ngay_phieu: formatExportDate(purchase.ngay_nhap || purchase.created_at),
+                ma_phieu_nhap: purchase.ma_phieu_nhap || '',
+                ten_ncc: supplierName,
+                san_pham: item.productName,
+                so_luong: item.quantity,
+                tong_tien_nhap: isFirstItem ? amounts.tongTienNhap : '',
+                giam_tru_tra_hang: isFirstItem ? amounts.giamTru : '',
+                da_thanh_toan: isFirstItem ? amounts.daThanhToan : '',
+                con_phai_tra: isFirstItem ? amounts.conPhaiTra : '',
+                ghi_chu_doi_soat: isFirstItem ? buildPartnerReconcileNote(returnInfo) : ''
+            });
         });
     });
 
@@ -260,6 +301,8 @@ async function buildSupplierDebtPartnerPack(supplier, storeId) {
             ngay_phieu: '',
             ma_phieu_nhap: '',
             ten_ncc: '',
+            san_pham: '',
+            so_luong: '',
             tong_tien_nhap: '',
             giam_tru_tra_hang: '',
             da_thanh_toan: 'Tổng còn phải trả',

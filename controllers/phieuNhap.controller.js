@@ -1,6 +1,6 @@
 const {
     PhieuNhap, CTPhieuNhap, HangHoa, NhaCungCap, CuaHang,
-    HoaDonDauVao, PhieuTraHangNhap, CTPhieuTraHangNhap, NguoiDung,
+     PhieuTraHangNhap, CTPhieuTraHangNhap, NguoiDung,
     Kho, LoHang, TonKho, CongNoNhaCungCap
 } = require('../models/kiot.model');
 const { congTonKho } = require('../services/kho.service');
@@ -169,40 +169,6 @@ exports.getExportCsv = async (req, res, next) => {
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', 'attachment; filename="nhap-hang.csv"');
         res.send('\uFEFF' + rows.map(row => row.map(escape).join(',')).join('\n'));
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.getHoaDonDauVao = async (req, res, next) => {
-    try {
-        const [docs, suppliers, receipts] = await Promise.all([
-            HoaDonDauVao.find().populate('nha_cung_cap_id').populate('phieu_nhap_id').sort({ created_at: -1 }),
-            NhaCungCap.find().sort({ ten_ncc: 1 }),
-            PhieuNhap.find().sort({ created_at: -1 })
-        ]);
-        res.render('phieu-nhap/hoa-don-dau-vao', { title: 'Hóa đơn đầu vào', docs, suppliers, receipts });
-    } catch (error) {
-        next(error);
-    }
-};
-
-exports.postHoaDonDauVaoAdd = async (req, res, next) => {
-    try {
-        const { ma_hoa_don, ngay_hoa_don, nha_cung_cap_id, phieu_nhap_id, tong_tien, ghi_chu } = req.body || {};
-        const count = await HoaDonDauVao.countDocuments();
-        const code = ma_hoa_don && ma_hoa_don.trim() !== '' ? ma_hoa_don.trim() : 'HDV' + String(count + 1).padStart(6, '0');
-        await HoaDonDauVao.create({
-            ma_hoa_don: code,
-            ngay_hoa_don: ngay_hoa_don || new Date(),
-            nha_cung_cap_id: nha_cung_cap_id || null,
-            phieu_nhap_id: phieu_nhap_id || null,
-            tong_tien: Number(tong_tien) || 0,
-            ghi_chu,
-            nguoi_tao_id: req.user?._id,
-            trang_thai: 'completed'
-        });
-        res.json({ success: true, message: 'Đã tạo hóa đơn đầu vào' });
     } catch (error) {
         next(error);
     }
@@ -508,7 +474,7 @@ exports.postAdd = async (req, res, next) => {
                             so_luong_con_lai: 0,
                             gia_von: item.don_gia_nhap,
                             trang_thai: 'active',
-                            ghi_chu: item.ghi_chu_lo || `Tao tu phieu nhap ${ma_phieu_nhap}`
+                            ghi_chu: item.ghi_chu_lo || `Tạo từ phiếu nhập ${ma_phieu_nhap}`
                         });
                         loHangId = lot._id;
                     }
@@ -544,7 +510,7 @@ exports.postAdd = async (req, res, next) => {
                     phieu_nhap_id: phieu._id,
                     so_tien: can_tra_ncc,
                     loai: 'tang_no',
-                    ghi_chu: `Cong no phieu nhap ${ma_phieu_nhap}`,
+                    ghi_chu: `Công nợ phiếu nhập ${ma_phieu_nhap}`,
                     ngay: new Date()
                 });
             }
@@ -629,7 +595,7 @@ exports.postAddOld = async (req, res, next) => {
                 phieu_nhap_id: phieu._id,
                 so_tien: tong_tien,
                 loai: 'tang_no',
-                ghi_chu: `Cong no phieu nhap ${ma_phieu_nhap}`,
+                ghi_chu: `Công nợ phiếu nhập ${ma_phieu_nhap}`,
                 ngay: phieu.ngay_nhap || new Date()
             });
         }

@@ -59,6 +59,8 @@
     .purchase-date-input:focus{border-color:#0070f4;box-shadow:0 0 0 2px rgba(0,112,244,.12)}
     .supplier-picker{margin-bottom:10px;border:1px solid #e1e7ef;border-radius:8px;padding:8px;background:#fafcff}
     .supplier-picker .supplier-search{margin-bottom:8px}
+    .supplier-address-select{width:100%;height:30px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;padding:0 10px;font-size:13px;outline:none;margin-bottom:8px}
+    .supplier-address-select:disabled{background:#f2f4f7;color:#98a2b3;cursor:not-allowed}
     .supplier-products-actions{display:flex;justify-content:flex-end;margin-bottom:8px}
     .btn-add-mini{height:26px;border:0;background:#0070f4;color:#fff;border-radius:6px;padding:0 8px;font-size:12px;cursor:pointer;white-space:nowrap}
     .supplier-products-list{max-height:210px;overflow:auto}
@@ -217,6 +219,9 @@
             <i class="fa-solid fa-plus js-quick-add-product" title="Thêm hàng hóa nhanh"></i>
             <div id="supplierResults" class="supplier-results"></div>
           </div>
+          <select id="supplierAddressId" name="dia_chi_ncc_id" class="supplier-address-select" disabled>
+            <option value="">Chọn NCC trước để chọn địa chỉ</option>
+          </select>
           <div class="supplier-products-actions">
             <button type="button" class="btn-add-mini js-quick-add-product" title="Thêm hàng hóa">+ Thêm hàng hóa</button>
           </div>
@@ -428,6 +433,7 @@
       ten_don_vi: u.ten_don_vi || ''
     }));
     let supplierProducts = [];
+    let supplierAddresses = [];
     let quickEditId = '';
     let lotEditItemId = '';
     let isPayAllMode = false;
@@ -485,6 +491,7 @@
     const supplierSearch = document.getElementById('supplierSearch');
     const supplierResults = document.getElementById('supplierResults');
     const supplierIdInput = document.getElementById('supplierId');
+    const supplierAddressInput = document.getElementById('supplierAddressId');
     const supplierProductsList = document.getElementById('supplierProductsList');
     const quickProductModal = document.getElementById('quickProductModal');
     const itemsJsonInput = document.getElementById('nhapHangItemsJson');
@@ -734,6 +741,64 @@
     function openSupplierSuggest(showAll) {
       const keyword = showAll ? '' : supplierSearch.value;
       renderSupplierResults(getSupplierSuggest(keyword, 20));
+    }
+
+    function makeSupplierAddressLabel(address) {
+      const parts = [];
+      const recipient = String(address.ten_nguoi_nhan || '').trim();
+      const phone = String(address.sdt_nguoi_nhan || '').trim();
+      const fullAddress = String(address.dia_chi_day_du || '').trim();
+      const code = String(address.ma_dia_chi || '').trim();
+      if (recipient) parts.push(recipient);
+      if (phone) parts.push(phone);
+      if (fullAddress) parts.push(fullAddress);
+      if (!parts.length && code) parts.push(code);
+      if (!parts.length) parts.push('Địa chỉ không tên');
+      return parts.join(' - ') + (address.mac_dinh ? ' (Mặc định)' : '');
+    }
+
+    function renderSupplierAddresses(stateText) {
+      if (!supplierAddressInput) return;
+      const supplierId = String(supplierIdInput.value || '').trim();
+      if (!supplierId) {
+        supplierAddressInput.innerHTML = '<option value="">Chọn NCC trước để chọn địa chỉ</option>';
+        supplierAddressInput.disabled = true;
+        return;
+      }
+      if (stateText) {
+        supplierAddressInput.innerHTML = `<option value="">${escapeHtml(stateText)}</option>`;
+        supplierAddressInput.disabled = true;
+        return;
+      }
+      if (!supplierAddresses.length) {
+        supplierAddressInput.innerHTML = '<option value="">NCC chưa có địa chỉ</option>';
+        supplierAddressInput.disabled = true;
+        return;
+      }
+      supplierAddressInput.innerHTML = '<option value="">Chọn địa chỉ</option>' + supplierAddresses.map(address => {
+        return `<option value="${escapeHtml(address._id)}">${escapeHtml(makeSupplierAddressLabel(address))}</option>`;
+      }).join('');
+      const defaultAddress = supplierAddresses.find(address => Boolean(address.mac_dinh)) || supplierAddresses[0];
+      supplierAddressInput.value = defaultAddress ? String(defaultAddress._id) : '';
+      supplierAddressInput.disabled = false;
+    }
+
+    async function loadSupplierAddresses(supplierId) {
+      supplierId = String(supplierId || '').trim();
+      supplierAddresses = [];
+      renderSupplierAddresses(supplierId ? 'Đang tải địa chỉ...' : '');
+      if (!supplierId) return [];
+      try {
+        const response = await fetch(`/nhap-hang/api/nha-cung-cap/${supplierId}/dia-chi`, { headers: { 'Accept': 'application/json' } });
+        const json = await response.json();
+        supplierAddresses = json && json.success && Array.isArray(json.data) ? json.data : [];
+        renderSupplierAddresses('');
+        return supplierAddresses;
+      } catch (e) {
+        supplierAddresses = [];
+        renderSupplierAddresses('Không tải được địa chỉ');
+        return [];
+      }
     }
 
     function clampDiscountValue(value, type) {
@@ -1021,6 +1086,8 @@
       if (!this.value.trim()) {
         supplierIdInput.value = '';
         supplierProducts = [];
+        supplierAddresses = [];
+        renderSupplierAddresses('');
         renderSupplierProducts();
       }
       openSupplierSuggest(false);
@@ -1043,9 +1110,11 @@
       supplierSearch.value = supplier.ten_ncc;
       supplierResults.style.display = 'none';
       supplierProducts = [];
+      supplierAddresses = [];
       renderSupplierProducts();
       fetchProductsForSuggest(productSearch.value.trim()).then(list => renderProductResults(list.slice(0, 12)));
       loadSupplierProducts(supplier._id);
+      loadSupplierAddresses(supplier._id);
     }
 
     function addItem(id) {
@@ -1789,6 +1858,7 @@
 
     normalizePaymentLayout();
     initKhoSelect();
+    renderSupplierAddresses('');
     renderItems();
     loadPaymentCashBooks();
     (function showInitialErrorFromUrl() {

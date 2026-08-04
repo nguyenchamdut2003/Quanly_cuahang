@@ -2,6 +2,7 @@ const { mongoose, querystring, NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHa
 const { normalizeFilterQuery, buildFilterQueryString } = require('./filter.helper');
 const { aggregateSupplierPurchaseTotals, applySupplierTotalsFromMap, normalizeDebtWarnSettings } = require('./metrics.helper');
 const { isVisibleSupplierDebtRow, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierUnpaidPurchases, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks } = require('./debt.helper');
+const { buildProfitBySupplierAddressReport } = require('../../../services/profitReport.service');
 
 async function loadSupplierDetailRenderLocals(req, supplierId) {
     var storeId = await resolveStoreId(req);
@@ -23,6 +24,26 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     var filterQueryString = buildFilterQueryString(filter);
 
     var supplierAddresses = await DiaChiNhaCungCap.find({ nha_cung_cap_id: selectedSupplier._id }).sort({ created_at: -1 }).lean();
+    var addressProfitReport = await buildProfitBySupplierAddressReport({
+        cua_hang_id: storeId,
+        supplier_id: selectedSupplier._id,
+        addresses: supplierAddresses
+    });
+    var addressProfitById = new Map((addressProfitReport.rows || []).map(function(row) {
+        return [String(row.address_id || row.id || ''), row];
+    }));
+    supplierAddresses = supplierAddresses.map(function(address) {
+        var profit = addressProfitById.get(String(address._id || '')) || {};
+        return Object.assign({}, address, {
+            doanh_thu: Number(profit.doanh_thu || 0),
+            gia_von: Number(profit.gia_von || 0),
+            loi_nhuan: Number(profit.loi_nhuan || 0),
+            ty_le_loi_nhuan: Number(profit.ty_le_loi_nhuan || 0),
+            so_luong_ban: Number(profit.so_luong || 0),
+            thieu_gia_von: Boolean(profit.thieu_gia_von),
+            profit_detail_rows: Array.isArray(profit.detailRows) ? profit.detailRows : []
+        });
+    });
 
     var phieuNhapQuery = {
         nha_cung_cap_id: selectedSupplier._id,
@@ -299,7 +320,7 @@ async function loadSupplierInternalExportHistory(supplier, storeId) {
             _id: row._id,
             ma_xuat_noi_bo: row.ma_xuat_noi_bo || '--',
             loai_xuat: row.loai_xuat || '--',
-            ten_hang_hoa: itemNames.length ? itemNames.join(', ') : 'Không có',
+            ten_hang_hoa: itemNames.length ? itemNames.join(', ') : 'Kh\u00f4ng c\u00f3',
             kho: row?.kho_id?.ten_kho || row?.kho_id?.ma_kho || '--',
             cua_hang: row?.cua_hang_id?.ten_cua_hang || '--',
             tong_so_luong: Number(row.tong_so_luong || 0),
@@ -336,39 +357,39 @@ function buildSupplierInternalExportReceiverNames(supplier) {
 }
 
 function mapNhapHangStatus(value) {
-    if (value === 'draft') return 'Phiếu tạm';
-    if (value === 'cancelled') return 'Đã hủy';
-    return 'Đã nhập hàng';
+    if (value === 'draft') return 'Phi\u1ebfu t\u1ea1m';
+    if (value === 'cancelled') return '\u0110\u00e3 h\u1ee7y';
+    return '\u0110\u00e3 nh\u1eadp h\u00e0ng';
 }
 
 function mapTraHangStatus(value) {
-    if (value === 'draft') return 'Phiếu tạm';
-    if (value === 'cancelled') return 'Đã hủy';
-    return 'Trả hàng nhập';
+    if (value === 'draft') return 'Phi\u1ebfu t\u1ea1m';
+    if (value === 'cancelled') return '\u0110\u00e3 h\u1ee7y';
+    return 'Tr\u1ea3 h\u00e0ng nh\u1eadp';
 }
 
 function mapXuatNoiBoStatus(status) {
-    if (status === 'completed') return 'Hoàn thành';
-    if (status === 'draft') return 'Phiếu tạm';
-    if (status === 'cancelled') return 'Đã hủy';
+    if (status === 'completed') return 'Ho\u00e0n th\u00e0nh';
+    if (status === 'draft') return 'Phi\u1ebfu t\u1ea1m';
+    if (status === 'cancelled') return '\u0110\u00e3 h\u1ee7y';
     return status || '--';
 }
 
 function mapCongNoLoai(value) {
-    if (value === 'thanh_toan') return 'Thanh toán';
-    if (value === 'giam_no') return 'Giảm nợ';
-    return 'Nhập hàng';
+    if (value === 'thanh_toan') return 'Thanh to\u00e1n';
+    if (value === 'giam_no') return 'Gi\u1ea3m n\u1ee3';
+    return 'Nh\u1eadp h\u00e0ng';
 }
 
 function mapCongNoDirection(value) {
-    return value === 'tang_no' ? 'Tăng nợ' : 'Giảm nợ';
+    return value === 'tang_no' ? 'T\u0103ng n\u1ee3' : 'Gi\u1ea3m n\u1ee3';
 }
 
 function mapSupplierPurchaseHistoryType(value) {
-    if (value === 'tra') return 'Tr? h�ng h�a';
-    if (value === 'nhap_vat_chua') return 'Nh?p v?t ch?a';
-    if (value === 'tra_vat_chua') return 'Tr? v?t ch?a';
-    return 'Nh?p h�ng h�a';
+    if (value === 'tra') return 'Tr\u1ea3 h\u00e0ng h\u00f3a';
+    if (value === 'nhap_vat_chua') return 'Nh\u1eadp v\u1eadt ch\u1ee9a';
+    if (value === 'tra_vat_chua') return 'Tr\u1ea3 v\u1eadt ch\u1ee9a';
+    return 'Nh\u1eadp h\u00e0ng h\u00f3a';
 }
 
 function buildSupplierReturnUrl(supplierId, returnQueryRaw, extraParams) {

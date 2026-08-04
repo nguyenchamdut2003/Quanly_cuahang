@@ -5,6 +5,7 @@ const {
   HoaDonBanHang,
   CTHoaDonBanHang,
   PhieuTraHang,
+  PhieuNhap,
   KhachHang,
   NhaCungCap
 } = require('../models/kiot.model');
@@ -114,7 +115,7 @@ async function buildLotCostMap(lines) {
   if (!lotIds.size) return new Map();
 
   const lotDocs = await LoHang.find({ _id: { $in: Array.from(lotIds) } })
-    .select('gia_von don_gia_nhap ma_lo ten_lo nha_cung_cap_id hang_hoa_id ngay_nhap')
+    .select('gia_von don_gia_nhap ma_lo ten_lo nha_cung_cap_id hang_hoa_id phieu_nhap_id ngay_nhap')
     .lean();
 
   return new Map(lotDocs.map(function(doc) {
@@ -427,8 +428,104 @@ async function buildProfitBySupplierReport(options) {
   };
 }
 
+async function buildProfitBySupplierAddressReport(options = {}) {
+  const storeId = toObjectId(options.cua_hang_id);
+  const supplierId = toObjectId(options.supplier_id || options.nha_cung_cap_id);
+  const addresses = Array.isArray(options.addresses) ? options.addresses : [];
+  const range = options.range || { start: new Date(0), end: new Date('3000-01-01T00:00:00.000Z') };
+  const addressIds = new Set(addresses.map(function(row) { return String(row._id || ''); }).filter(Boolean));
+  const bucketMap = new Map();
+
+  addresses.forEach(function(address) {
+    const id = String(address._id || '');
+    if (!id) return;
+    bucketMap.set(id, Object.assign({
+      id,
+      address_id: id,
+      detailRows: []
+    }, emptyProfitBucket()));
+  });
+
+  if (!supplierId || !addressIds.size) {
+    return { rows: Array.from(bucketMap.values()), totals: { doanh_thu: 0, gia_von: 0, loi_nhuan: 0, so_luong: 0 } };
+  }
+
+  const { lines, invoiceMap } = await loadSalesLineFacts(range, storeId);
+  const lotCostMapRaw = await buildLotCostMap(lines);
+  const purchaseIds = Array.from(new Set(Array.from(lotCostMapRaw.values())
+    .map(function(pack) { return pack && pack.doc ? pack.doc.phieu_nhap_id : null; })
+    .filter(Boolean)
+    .map(String)));
+
+  const purchases = purchaseIds.length ? await PhieuNhap.find({
+    _id: { $in: purchaseIds },
+    nha_cung_cap_id: supplierId
+  }).select('_id dia_chi_ncc_id').lean() : [];
+  const purchaseAddressMap = new Map(purchases.map(function(row) {
+    return [String(row._id), String(row.dia_chi_ncc_id || '')];
+  }));
+
+  lines.forEach(function(line) {
+    const product = line.hang_hoa_id || {};
+    const productCost = Number(product.gia_von || 0);
+    const invoice = invoiceMap.get(String(line.hoa_don_id)) || {};
+
+    expandLineToLotSlices(line).forEach(function(slice) {
+      const lotPack = lotCostMapRaw.get(String(slice.lo_hang_id || '')) || {};
+      const lotDoc = lotPack.doc || {};
+      const purchaseId = String(lotDoc.phieu_nhap_id || '');
+      const addressId = purchaseAddressMap.get(purchaseId) || '';
+      if (!addressId || !bucketMap.has(addressId)) return;
+
+      const costInfo = resolveUnitCost(slice, new Map([[String(slice.lo_hang_id), lotPack.cost || 0]]), productCost);
+      const lineCost = roundMoney(slice.so_luong * costInfo.unitCost);
+      const bucket = bucketMap.get(addressId);
+      addSliceToBucket(bucket, slice, costInfo.unitCost, costInfo.thieu_gia_von);
+      bucket.detailRows.push({
+        hoa_don_id: invoice._id || line.hoa_don_id,
+        ma_hoa_don: invoice.ma_hoa_don || '',
+        ngay_ban: invoice.ngay_ban || null,
+        hang_hoa_id: product._id || slice.hang_hoa_id,
+        ma_hang: product.ma_hang || '',
+        ten_hang: product.ten_hang || '',
+        lo_hang_id: slice.lo_hang_id,
+        ma_lo: lotDoc.ma_lo || '',
+        ten_lo: lotDoc.ten_lo || lotDoc.ma_lo || '',
+        ten_quy_cach: normalizeSpecLabel(slice.ten_quy_cach),
+        so_luong: slice.so_luong,
+        doanh_thu: slice.doanh_thu,
+        gia_von: lineCost,
+        loi_nhuan: slice.doanh_thu - lineCost,
+        thieu_gia_von: costInfo.thieu_gia_von
+      });
+    });
+  });
+
+  const rows = Array.from(bucketMap.values()).map(function(bucket) {
+    bucket.loi_nhuan = bucket.doanh_thu - bucket.gia_von;
+    bucket.ty_le_loi_nhuan = bucket.doanh_thu > 0 ? (bucket.loi_nhuan / bucket.doanh_thu) * 100 : 0;
+    bucket.thieu_gia_von = bucket.dong_thieu_gia_von > 0;
+    bucket.detailRows.sort(function(a, b) {
+      return new Date(b.ngay_ban || 0).getTime() - new Date(a.ngay_ban || 0).getTime()
+        || String(a.ma_hang).localeCompare(String(b.ma_hang), 'vi');
+    });
+    return bucket;
+  });
+
+  const totals = rows.reduce(function(acc, row) {
+    acc.doanh_thu += row.doanh_thu;
+    acc.gia_von += row.gia_von;
+    acc.loi_nhuan += row.loi_nhuan;
+    acc.so_luong += row.so_luong;
+    return acc;
+  }, { doanh_thu: 0, gia_von: 0, loi_nhuan: 0, so_luong: 0 });
+
+  return { rows, totals };
+}
+
 module.exports = {
   buildProfitByLotReport,
   buildProfitByCustomerReport,
-  buildProfitBySupplierReport
+  buildProfitBySupplierReport,
+  buildProfitBySupplierAddressReport
 };

@@ -527,6 +527,11 @@ const PhieuNhapSchema = new Schema({
     ref: 'NhaCungCap'
   },
 
+  dia_chi_ncc_id: {
+    type: ObjectId,
+    ref: 'DiaChiNcc'
+  },
+
   nguoi_tao_id: {
     type: ObjectId,
     ref: 'NguoiDung'
@@ -1110,18 +1115,6 @@ TonKhoLoQuyCachSchema.index(
   { kho_id: 1, hang_hoa_id: 1, lo_hang_id: 1, ten_quy_cach: 1 },
   { unique: true }
 );
-
-// HOA_DON_DAU_VAO
-const HoaDonDauVaoSchema = new Schema({
-  ma_hoa_don: { type: String, unique: true },
-  ngay_hoa_don: { type: Date, default: Date.now },
-  nha_cung_cap_id: { type: ObjectId, ref: 'NhaCungCap' },
-  phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
-  tong_tien: { type: Number, default: 0 },
-  trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'completed' },
-  ghi_chu: { type: String },
-  nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' }
-}, { collection: "hoa_don_dau_vao", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 // DON_HANG
 const DonHangSchema = new Schema({
@@ -2741,7 +2734,6 @@ const TonKhoLo = mongoose.models.TonKhoLo || mongoose.model("TonKhoLo", TonKhoLo
 const TonKhoLoQuyCach = mongoose.models.TonKhoLoQuyCach || mongoose.model("TonKhoLoQuyCach", TonKhoLoQuyCachSchema);
 const PhieuNhap = mongoose.models.PhieuNhap || mongoose.model("PhieuNhap", PhieuNhapSchema);
 const CTPhieuNhap = mongoose.models.CTPhieuNhap || mongoose.model("CTPhieuNhap", CtPhieuNhapSchema);
-const HoaDonDauVao = mongoose.models.HoaDonDauVao || mongoose.model("HoaDonDauVao", HoaDonDauVaoSchema);
 const PhieuTraHangNhap = mongoose.models.PhieuTraHangNhap || mongoose.model("PhieuTraHangNhap", PhieuTraHangNhapSchema);
 const CTPhieuTraHangNhap = mongoose.models.CTPhieuTraHangNhap || mongoose.model("CTPhieuTraHangNhap", CtPhieuTraHangNhapSchema);
 const DonHang = mongoose.models.DonHang || mongoose.model("DonHang", DonHangSchema);
@@ -2789,7 +2781,7 @@ module.exports = {
   NhomNhaCungCap, DiaChiDoiTuong, DiaChiNcc, NhaCungCap,
   NhomHang, DonViTinh, HangHoa,
   BangGia, CTBangGia, GiaBanHangHoa, TonKho, LoHang, TonKhoLo, TonKhoLoQuyCach,
-  PhieuNhap, CTPhieuNhap, HoaDonDauVao, PhieuTraHangNhap, CTPhieuTraHangNhap,
+  PhieuNhap, CTPhieuNhap, PhieuTraHangNhap, CTPhieuTraHangNhap,
   DonHang, CTDonHang,
   HoaDonBanHang, CTHoaDonBanHang, DoiTacGiaoHang, BangGiaVanChuyen, VanDon, GopDonHang, GopHoaDon, GopPhieuNhap,
   PhieuTraHang, CTPhieuTraHang,

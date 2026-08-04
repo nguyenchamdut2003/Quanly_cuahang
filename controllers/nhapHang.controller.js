@@ -262,106 +262,6 @@ async function resolveStoreId(req) {
   return activeStore ? String(activeStore._id) : '';
 }
 
-async function seedNhapHangIfEmpty(storeId, userId) {
-  if (!storeId || !mongoose.Types.ObjectId.isValid(storeId)) return;
-  var existing = await PhieuNhap.countDocuments({ cua_hang_id: storeId });
-  if (existing > 0) return;
-
-  var firstWarehouse = await Kho.findOne({ cua_hang_id: storeId }).lean();
-  if (!firstWarehouse) {
-    var suffix = String(Date.now()).slice(-5);
-    firstWarehouse = await Kho.create({
-      cua_hang_id: storeId,
-      ma_kho: 'KHO' + suffix,
-      ten_kho: 'Kho tổng'
-    });
-  }
-
-  var supplier = await NhaCungCap.findOne({ cua_hang_id: storeId, ten_ncc: /hoang gia/i }).lean();
-  if (!supplier) {
-    var supplierCode = await makeSupplierCode();
-    supplier = await NhaCungCap.create({
-      cua_hang_id: storeId,
-      ma_ncc: supplierCode,
-      ten_ncc: 'Công ty Hoàng Gia',
-      trang_thai: 'active'
-    });
-  }
-
-  var product = await HangHoa.findOne({ cua_hang_id: storeId, ten_hang: 'Áo thun nam' }).lean();
-  if (!product) {
-    var productCode = await makeProductCode();
-    product = await HangHoa.create({
-      cua_hang_id: storeId,
-      nha_cung_cap_id: supplier._id,
-      ma_hang: productCode,
-      ten_hang: 'Áo thun nam',
-      gia_von: 100000,
-      gia_ban: 150000,
-      loai_hang: 'hang_hoa',
-      trang_thai: 'active',
-      quan_ly_theo_lo: false
-    });
-  }
-
-  var code = await makePhieuNhapCode();
-  var soLuong = 50;
-  var donGia = 100000;
-  var tongTien = soLuong * donGia;
-
-  var purchase = await PhieuNhap.create({
-    cua_hang_id: storeId,
-    kho_id: firstWarehouse._id,
-    nha_cung_cap_id: supplier._id,
-    nguoi_tao_id: userId || null,
-    ma_phieu_nhap: code,
-    ngay_nhap: new Date(),
-    tong_tien_hang: tongTien,
-    giam_gia: 0,
-    kieu_giam_gia: 'vnd',
-    tong_tien: tongTien,
-    can_tra_ncc: tongTien,
-    da_tra_ncc: tongTien, // Đã thanh toán đủ
-    con_no_ncc: 0,
-    phuong_thuc_thanh_toan: 'tien_mat',
-    trang_thai: 'completed',
-    ghi_chu: 'Nhập hàng mẫu tự động'
-  });
-
-  await CTPhieuNhap.create({
-    phieu_nhap_id: purchase._id,
-    hang_hoa_id: product._id,
-    so_luong: soLuong,
-    don_gia_nhap: donGia,
-    giam_gia: 0,
-    kieu_giam_gia: 'vnd',
-    thanh_tien: tongTien
-  });
-
-  // Khong tu tao PhieuThuChi cho du lieu mau vi phieu thu/chi phai gan so_quy_id va di qua service chuan.
-
-  await TonKho.updateOne(
-    { kho_id: firstWarehouse._id, hang_hoa_id: product._id },
-    { 
-      $inc: { so_luong: soLuong }, 
-      $setOnInsert: { cua_hang_id: storeId } 
-    },
-    { upsert: true }
-  );
-
-  await LichSuKho.create({
-    cua_hang_id: storeId,
-    kho_id: firstWarehouse._id,
-    hang_hoa_id: product._id,
-    loai_phieu: 'nhap_hang',
-    ma_phieu: code,
-    so_luong_thay_doi: soLuong,
-    ton_kho_sau: soLuong,
-    ghi_chu: 'Nhập hàng',
-    ngay: new Date()
-  });
-}
-
 exports.index = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
@@ -1014,6 +914,22 @@ exports.apiSupplierProducts = async function(req, res, next) {
         .select('ma_hang ten_hang don_vi_tinh_id nhom_hang_id nha_cung_cap_id gia_nhap_cuoi gia_von trang_thai quan_ly_theo_lo loai_gia gia_co_dinh')
         .lean();
     }
+    return res.json({ success: true, data: items, items: items });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.apiSupplierAddresses = async function(req, res, next) {
+  try {
+    var supplierId = String(req.params.id || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(supplierId)) {
+      return res.status(400).json({ success: false, message: 'nha_cung_cap_id khong hop le' });
+    }
+    var items = await DiaChiNcc.find({ nha_cung_cap_id: supplierId })
+      .sort({ mac_dinh: -1, created_at: -1 })
+      .select('ma_dia_chi ten_nguoi_nhan sdt_nguoi_nhan so_nha dia_chi_day_du tinh_thanh quan_huyen phuong_xa loai_dia_chi mac_dinh ghi_chu')
+      .lean();
     return res.json({ success: true, data: items, items: items });
   } catch (error) {
     next(error);
@@ -2052,6 +1968,7 @@ exports.copy = async function(req, res, next) {
       cua_hang_id: source.cua_hang_id,
       kho_id: source.kho_id?._id || source.kho_id,
       nha_cung_cap_id: source.nha_cung_cap_id?._id || source.nha_cung_cap_id || undefined,
+      dia_chi_ncc_id: source.dia_chi_ncc_id?._id || source.dia_chi_ncc_id || undefined,
       nguoi_tao_id: req.user && req.user._id ? req.user._id : undefined,
       ma_phieu_nhap: maPhieu,
       ngay_nhap: new Date(),
@@ -2242,10 +2159,16 @@ async function buildPurchasePrintData(req, title) {
   } : {};
   var supplierId = loaded.ticket.nha_cung_cap_id && (loaded.ticket.nha_cung_cap_id._id || loaded.ticket.nha_cung_cap_id);
   var supplierAddress = null;
+  var selectedSupplierAddressId = loaded.ticket.dia_chi_ncc_id && (loaded.ticket.dia_chi_ncc_id._id || loaded.ticket.dia_chi_ncc_id);
   if (supplierId) {
-    supplierAddress = await DiaChiNcc.findOne({ nha_cung_cap_id: supplierId })
-      .sort({ mac_dinh: -1, created_at: -1 })
-      .lean();
+    if (selectedSupplierAddressId) {
+      supplierAddress = await DiaChiNcc.findOne({ _id: selectedSupplierAddressId, nha_cung_cap_id: supplierId }).lean();
+    }
+    if (!supplierAddress) {
+      supplierAddress = await DiaChiNcc.findOne({ nha_cung_cap_id: supplierId })
+        .sort({ mac_dinh: -1, created_at: -1 })
+        .lean();
+    }
   }
   return {
     title: title,

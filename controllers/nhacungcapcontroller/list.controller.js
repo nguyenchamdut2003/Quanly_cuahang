@@ -91,9 +91,7 @@ exports.index = async function(req, res, next) {
           var initialData = await Promise.all([
               loadSupplierGroups(),
               NhaCungCap.countDocuments(supplierQuery),
-              formMode === 'create'
-                  ? loadAddressTypes()
-                  : Promise.resolve([])
+              loadAddressTypes()
           ]);
           var supplierGroups = initialData[0];
           var totalSuppliers = initialData[1];

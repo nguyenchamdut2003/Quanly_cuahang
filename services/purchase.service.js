@@ -3,6 +3,7 @@ const {
   PhieuNhap,
   CTPhieuNhap,
   NhaCungCap,
+  DiaChiNcc,
   HangHoa,
   LoHang,
   TonKho,
@@ -809,6 +810,14 @@ async function createPurchase(data = {}, options = {}) {
   if (!items.length) throw new Error('Vui long chon hang hoa');
 
   const supplierId = cleanId(data.nha_cung_cap_id);
+  const supplierAddressId = supplierId ? cleanId(data.dia_chi_ncc_id) : undefined;
+  if (supplierAddressId) {
+    const address = await withSessionQuery(
+      DiaChiNcc.findOne({ _id: supplierAddressId, nha_cung_cap_id: supplierId }).select('_id'),
+      session
+    ).lean();
+    if (!address) throw new Error('Dia chi nha cung cap khong hop le');
+  }
   const mode = data.submitMode === 'completed' ? 'completed' : 'draft';
   const vatChuaImport = parseVatChuaImportInput(data);
   if (mode === 'completed') assertVatChuaImportInput(vatChuaImport);
@@ -856,6 +865,7 @@ async function createPurchase(data = {}, options = {}) {
     cua_hang_id: storeId,
     kho_id: khoId,
     nha_cung_cap_id: supplierId,
+    dia_chi_ncc_id: supplierAddressId,
     nguoi_tao_id: cleanId(data.nguoi_tao_id),
     ma_phieu_nhap: maPhieu,
     ngay_nhap: parseDate(data.ngay_nhap) || now,
