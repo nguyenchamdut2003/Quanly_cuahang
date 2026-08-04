@@ -855,6 +855,7 @@ const LichSuKhoSchema = new Schema({
 });
 
 LichSuKhoSchema.index({ kho_id: 1, hang_hoa_id: 1, ngay: -1 });
+LichSuKhoSchema.index({ hang_hoa_id: 1, ngay: -1, created_at: -1 });
 
 const CongNoNhaCungCapSchema = new Schema({
   cua_hang_id: {

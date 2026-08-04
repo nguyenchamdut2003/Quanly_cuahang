@@ -735,76 +735,117 @@ async function enrichStockCardRows(rows, productId) {
     var productObjectId = productId instanceof mongoose.Types.ObjectId
         ? productId
         : (mongoose.Types.ObjectId.isValid(productId) ? new mongoose.Types.ObjectId(productId) : productId);
-    var purchases = await PhieuNhap.find({ ma_phieu_nhap: { $in: codes } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean();
+    var typeMap = rows.reduce(function(map, row) {
+        var type = String(row && row.loai_phieu || '').trim();
+        if (type) map[type] = true;
+        return map;
+    }, {});
+    var needsPurchase = !!typeMap.nhap_hang;
+    var needsSupplierReturn = !!typeMap.tra_hang_nhap;
+    var needsOrder = !!typeMap.ban_hang || !!typeMap.rollback_ban_hang || !!typeMap.huy_hoa_don;
+    var needsInvoice = !!typeMap.ban_hang || !!typeMap.rollback_ban_hang || !!typeMap.huy_hoa_don;
+    var needsReturn = !!typeMap.tra_hang;
+    var needsCheck = !!typeMap.kiem_kho;
+    var needsDisposal = !!typeMap.xuat_huy;
+    var needsInternalIssue = !!typeMap.xuat_noi_bo;
+
+    var docResults = await Promise.all([
+        needsPurchase ? PhieuNhap.find({ ma_phieu_nhap: { $in: codes } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean() : Promise.resolve([]),
+        needsSupplierReturn ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: codes }, trang_thai: { $ne: 'cancelled' } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean() : Promise.resolve([]),
+        needsOrder ? DonHang.find({ ma_don_hang: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
+        needsInvoice ? HoaDonBanHang.find({ ma_hoa_don: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
+        needsReturn ? PhieuTraHang.find({ ma_phieu_tra: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
+        needsCheck ? PhieuKiemKho.find({ ma_kiem_kho: { $in: codes } }).lean() : Promise.resolve([]),
+        needsDisposal ? PhieuXuatHuy.find({ ma_xuat_huy: { $in: codes } }).lean() : Promise.resolve([]),
+        needsInternalIssue ? PhieuXuatNoiBo.find({ ma_xuat_noi_bo: { $in: codes } }).lean() : Promise.resolve([])
+    ]);
+
+    var purchases = docResults[0];
     var purchaseMap = mapBy(purchases, 'ma_phieu_nhap');
     var purchaseIds = purchases.map(function(doc) { return doc._id; });
-    var purchaseDetails = purchaseIds.length ? await CTPhieuNhap.find({ phieu_nhap_id: { $in: purchaseIds }, hang_hoa_id: productObjectId }).lean() : [];
+
+    var supplierReturns = docResults[1];
+    var supplierReturnMap = mapBy(supplierReturns, 'ma_phieu_tra_nhap');
+    var supplierReturnIds = supplierReturns.map(function(doc) { return doc._id; });
+
+    var orders = docResults[2];
+    var orderMap = mapBy(orders, 'ma_don_hang');
+    var orderIds = orders.map(function(doc) { return doc._id; });
+
+    var invoices = docResults[3];
+    var invoiceMap = mapBy(invoices, 'ma_hoa_don');
+    var invoiceIds = invoices.map(function(doc) { return doc._id; });
+
+    var returns = docResults[4];
+    var returnMap = mapBy(returns, 'ma_phieu_tra');
+    var returnIds = returns.map(function(doc) { return doc._id; });
+
+    var checks = docResults[5];
+    var checkMap = mapBy(checks, 'ma_kiem_kho');
+    var checkIds = checks.map(function(doc) { return doc._id; });
+
+    var disposals = docResults[6];
+    var disposalMap = mapBy(disposals, 'ma_xuat_huy');
+    var disposalIds = disposals.map(function(doc) { return doc._id; });
+
+    var internalIssues = docResults[7];
+    var internalIssueMap = mapBy(internalIssues, 'ma_xuat_noi_bo');
+    var internalIssueIds = internalIssues.map(function(doc) { return doc._id; });
+
+    var detailResults = await Promise.all([
+        purchaseIds.length ? CTPhieuNhap.find({ phieu_nhap_id: { $in: purchaseIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        supplierReturnIds.length ? CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: { $in: supplierReturnIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        orderIds.length ? CTDonHang.find({ don_hang_id: { $in: orderIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        invoiceIds.length ? CTHoaDonBanHang.find({ hoa_don_id: { $in: invoiceIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        returnIds.length ? CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        checkIds.length ? CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: checkIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        disposalIds.length ? CTXuatHuy.find({ phieu_xuat_huy_id: { $in: disposalIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([]),
+        internalIssueIds.length ? CTXuatNoiBo.find({ phieu_xuat_id: { $in: internalIssueIds }, hang_hoa_id: productObjectId }).lean() : Promise.resolve([])
+    ]);
+
+    var purchaseDetails = detailResults[0];
     var purchaseDetailMap = purchaseDetails.reduce(function(map, row) {
         map[String(row.phieu_nhap_id)] = row;
         return map;
     }, {});
 
-    var supplierReturns = await PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: codes }, trang_thai: { $ne: 'cancelled' } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean();
-    var supplierReturnMap = mapBy(supplierReturns, 'ma_phieu_tra_nhap');
-    var supplierReturnIds = supplierReturns.map(function(doc) { return doc._id; });
-    var supplierReturnDetails = supplierReturnIds.length ? await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: { $in: supplierReturnIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var supplierReturnDetails = detailResults[1];
     var supplierReturnDetailMap = supplierReturnDetails.reduce(function(map, row) {
         map[String(row.phieu_tra_nhap_id)] = row;
         return map;
     }, {});
 
-    var orders = await DonHang.find({ ma_don_hang: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
-    var orderMap = mapBy(orders, 'ma_don_hang');
-    var orderIds = orders.map(function(doc) { return doc._id; });
-    var orderDetails = orderIds.length ? await CTDonHang.find({ don_hang_id: { $in: orderIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var orderDetails = detailResults[2];
     var orderDetailMap = orderDetails.reduce(function(map, row) {
         map[String(row.don_hang_id)] = row;
         return map;
     }, {});
 
-    var invoices = await HoaDonBanHang.find({ ma_hoa_don: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
-    var invoiceMap = mapBy(invoices, 'ma_hoa_don');
-    var invoiceIds = invoices.map(function(doc) { return doc._id; });
-    var invoiceDetails = invoiceIds.length ? await CTHoaDonBanHang.find({ hoa_don_id: { $in: invoiceIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var invoiceDetails = detailResults[3];
     var invoiceDetailMap = invoiceDetails.reduce(function(map, row) {
         map[String(row.hoa_don_id)] = row;
         return map;
     }, {});
 
-    var returns = await PhieuTraHang.find({ ma_phieu_tra: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean();
-    var returnMap = mapBy(returns, 'ma_phieu_tra');
-    var returnIds = returns.map(function(doc) { return doc._id; });
-    var returnDetails = returnIds.length ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returnIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var returnDetails = detailResults[4];
     var returnDetailMap = returnDetails.reduce(function(map, row) {
         map[String(row.phieu_tra_hang_id)] = row;
         return map;
     }, {});
 
-    var checks = await PhieuKiemKho.find({
-        ma_kiem_kho: { $in: codes },
-        
-    }).lean();
-    var checkMap = mapBy(checks, 'ma_kiem_kho');
-    var checkIds = checks.map(function(doc) { return doc._id; });
-    var checkDetails = checkIds.length ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: checkIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var checkDetails = detailResults[5];
     var checkDetailMap = checkDetails.reduce(function(map, row) {
         map[String(row.phieu_kiem_kho_id)] = row;
         return map;
     }, {});
 
-    var disposals = await PhieuXuatHuy.find({ ma_xuat_huy: { $in: codes } }).lean();
-    var disposalMap = mapBy(disposals, 'ma_xuat_huy');
-    var disposalIds = disposals.map(function(doc) { return doc._id; });
-    var disposalDetails = disposalIds.length ? await CTXuatHuy.find({ phieu_xuat_huy_id: { $in: disposalIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var disposalDetails = detailResults[6];
     var disposalDetailMap = disposalDetails.reduce(function(map, row) {
         map[String(row.phieu_xuat_huy_id)] = row;
         return map;
     }, {});
 
-    var internalIssues = await PhieuXuatNoiBo.find({ ma_xuat_noi_bo: { $in: codes } }).lean();
-    var internalIssueMap = mapBy(internalIssues, 'ma_xuat_noi_bo');
-    var internalIssueIds = internalIssues.map(function(doc) { return doc._id; });
-    var internalIssueDetails = internalIssueIds.length ? await CTXuatNoiBo.find({ phieu_xuat_id: { $in: internalIssueIds }, hang_hoa_id: productObjectId }).lean() : [];
+    var internalIssueDetails = detailResults[7];
     var internalIssueDetailMap = internalIssueDetails.reduce(function(map, row) {
         map[String(row.phieu_xuat_id)] = row;
         return map;

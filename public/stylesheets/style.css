@@ -3271,6 +3271,13 @@ button.dropdown-item {
   min-width: 150px;
 }
 
+.lot-profit-spec-th,
+.lot-profit-spec-cell {
+  width: 72px;
+  max-width: 72px;
+  white-space: nowrap;
+}
+
 .lot-profit-date-trigger {
   width: 100%;
   border: 0;

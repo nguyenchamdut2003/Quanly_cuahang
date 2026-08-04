@@ -1,0 +1,54 @@
+<div class="lot-filter-bar" data-lot-filter>
+  <span>Trạng thái lô:</span>
+  <div class="lot-filter-segment">
+    <button class="lot-filter-btn is-active" type="button" data-lot-filter-value="all">Tất cả</button>
+    <button class="lot-filter-btn" type="button" data-lot-filter-value="available">Còn hàng</button>
+    <button class="lot-filter-btn" type="button" data-lot-filter-value="empty">Hết hàng</button>
+  </div>
+</div>
+<table class="admin-table product-inner-table">
+  <thead>
+    <tr>
+      <th>Mã lô</th>
+      <th>Tên lô</th>
+      <th>Kho</th>
+      <th>Ngày nhập</th>
+      <th>Hạn sử dụng</th>
+      <th class="text-right">Thực tế</th>
+      <th class="text-right">Có thể bán</th>
+      <th class="text-right">Hết hạn</th>
+      <th class="text-right">Giá vốn</th>
+      <th>Chứng từ nhập</th>
+      <th>Trạng thái</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (!selectedProductLots || selectedProductLots.length === 0) { %>
+      <tr><td colspan="11" class="empty-cell">Chưa có tồn theo lô.</td></tr>
+    <% } %>
+    <% (selectedProductLots || []).forEach(function(row) { %>
+      <%
+        var lot = row.lo_hang_id || {};
+        var statusValue = lot.trang_thai || '';
+        var statusLabel = statusValue === 'active' ? 'Còn hàng' : (statusValue === 'het_hang' ? 'Hết hàng' : (statusValue === 'huy' ? 'Đã hủy' : (statusValue || '---')));
+        var remainQty = row.so_luong !== undefined && row.so_luong !== null ? Number(row.so_luong || 0) : Number(lot.so_luong_con_lai || 0);
+        var costValue = row.gia_von !== undefined && row.gia_von !== null ? Number(row.gia_von || 0) : Number(lot.gia_von || lot.don_gia_nhap || 0);
+        var purchaseDoc = lot.phieu_nhap_id || null;
+      %>
+      <tr class="lot-data-row" data-lot-status="<%= statusValue %>" data-lot-qty="<%= remainQty %>">
+        <td><%- lot && lot._id ? refLink('lot', lot, lot.ma_lo || '---') : '---' %></td>
+        <td><%= lot && lot.ten_lo ? lot.ten_lo : '---' %></td>
+        <td><%= row.kho_ten || '---' %></td>
+        <td><%= lot && lot.ngay_nhap ? formatDate(lot.ngay_nhap) : '---' %></td>
+        <td><%= lot && lot.han_su_dung ? formatDate(lot.han_su_dung) : '---' %></td>
+        <td class="text-right"><%= remainQty.toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.ton_co_the_giao || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.ton_het_han || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= costValue.toLocaleString('vi-VN') %></td>
+        <td><%- purchaseDoc && purchaseDoc._id ? refLink('purchase', purchaseDoc, purchaseDoc.ma_phieu_nhap || '---') : '---' %></td>
+        <td><span class="lot-status-badge <%= statusValue === 'active' ? 'is-active' : (statusValue === 'het_hang' ? 'is-empty' : (statusValue === 'huy' ? 'is-cancelled' : '')) %>"><%- statusLabel %></span></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>

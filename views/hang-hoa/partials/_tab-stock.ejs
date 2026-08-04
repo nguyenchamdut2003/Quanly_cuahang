@@ -1,0 +1,35 @@
+<table class="admin-table product-inner-table">
+  <thead>
+    <tr>
+      <th>Kho</th>
+      <th class="text-right">Thực tế</th>
+      <th class="text-right">Có thể bán</th>
+      <th class="text-right">Hết hạn</th>
+      <th class="text-right">KH đặt</th>
+      <th>Dự kiến hết hàng</th>
+      <th>Trạng thái</th>
+      <th>Cập nhật</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (!selectedProductInventory || selectedProductInventory.length === 0) { %>
+      <tr><td colspan="8" class="empty-cell">Chưa có tồn kho theo kho.</td></tr>
+    <% } %>
+    <% (selectedProductInventory || []).forEach(function(row) { %>
+      <%
+        var warehouseStatus = row.trang_thai_kho || '';
+        var warehouseStatusLabel = warehouseStatus === 'active' ? 'Đang hoạt động' : (warehouseStatus === 'inactive' ? 'Ngừng hoạt động' : (warehouseStatus || '---'));
+      %>
+      <tr>
+        <td><%= row.kho_ten || '---' %></td>
+        <td class="text-right"><%= Number(row.ton_thuc_te || row.so_luong || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.ton_co_the_giao || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.ton_het_han || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.khach_dat || 0).toLocaleString('vi-VN') %></td>
+        <td><%= row.du_kien_het_hang ? formatDate(row.du_kien_het_hang) : '---' %></td>
+        <td><span class="lot-status-badge <%= warehouseStatus === 'active' ? 'is-active' : (warehouseStatus === 'inactive' ? 'is-cancelled' : '') %>"><%- warehouseStatusLabel %></span></td>
+        <td><%= formatDate(row.updated_at || row.created_at) %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>

@@ -141,41 +141,73 @@ async function index(req, res, next) {
             if (dateRange.end) productQuery.created_at.$lte = dateRange.end;
         }
 
-        var products = await measureAsync('hangHoa.index.loadProducts', function() {
-            return HangHoa.find(productQuery).sort({ created_at: -1, ma_hang: 1 }).lean();
-        });
-        var productIds = products.map(function(item) { return item._id; });
-        var lotManagedProductIds = products
-            .filter(function(item) { return !!item.quan_ly_theo_lo; })
-            .map(function(item) { return item._id; });
-
-        var inventoryRows = await measureAsync('hangHoa.index.loadInventory', function() {
-            return loadActiveInventoryTotalsByProductId(productIds, lotManagedProductIds);
-        });
-        var inventoryMap = inventoryRows || {};
-
         var stockRange = makeRangeFilter(filter.stockFrom, filter.stockTo);
+        var page = parseInt(requestQuery.page, 10);
+        if (!Number.isFinite(page) || page < 1) page = 1;
+        var products = [];
+        var inventoryMap = {};
+        var totalProducts = 0;
+        var totalPages = 1;
+        var start = 0;
+
         if (stockRange) {
+            products = await measureAsync('hangHoa.index.loadProductsForStockFilter', function() {
+                return HangHoa.find(productQuery).sort({ created_at: -1, ma_hang: 1 }).lean();
+            });
+            var stockFilterProductIds = products.map(function(item) { return item._id; });
+            var lotManagedProductIds = products
+                .filter(function(item) { return !!item.quan_ly_theo_lo; })
+                .map(function(item) { return item._id; });
+            inventoryMap = await measureAsync('hangHoa.index.loadInventoryForStockFilter', function() {
+                return loadActiveInventoryTotalsByProductId(stockFilterProductIds, lotManagedProductIds);
+            });
             products = products.filter(function(item) {
                 var qty = Number(inventoryMap[String(item._id)] || 0);
                 if (Object.prototype.hasOwnProperty.call(stockRange, '$gte') && qty < stockRange.$gte) return false;
                 if (Object.prototype.hasOwnProperty.call(stockRange, '$lte') && qty > stockRange.$lte) return false;
                 return true;
             });
+            totalProducts = products.length;
+            totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCT_PAGE_SIZE));
+            if (page > totalPages) page = totalPages;
+            start = (page - 1) * PRODUCT_PAGE_SIZE;
+            products = products.slice(start, start + PRODUCT_PAGE_SIZE);
+        } else {
+            totalProducts = await measureAsync('hangHoa.index.countProducts', function() {
+                return HangHoa.countDocuments(productQuery);
+            });
+            totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCT_PAGE_SIZE));
+            if (page > totalPages) page = totalPages;
+            start = (page - 1) * PRODUCT_PAGE_SIZE;
+            products = await measureAsync('hangHoa.index.loadPageProducts', function() {
+                return HangHoa.find(productQuery)
+                    .sort({ created_at: -1, ma_hang: 1 })
+                    .skip(start)
+                    .limit(PRODUCT_PAGE_SIZE)
+                    .populate({ path: 'nhom_hang_id', select: 'ten_nhom_hang ma_nhom_hang' })
+                    .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_nha_cung_cap ten_cong_ty ma_ncc' })
+                    .populate({ path: 'don_vi_tinh_id', select: 'ten_don_vi ma_don_vi' })
+                    .lean();
+            });
         }
 
         var storeId = await measureAsync('hangHoa.index.resolveStoreId', function() {
             return resolveStoreId(req);
         });
-        var groups = await measureAsync('hangHoa.index.loadGroups', function() {
-            return loadProductGroups(storeId);
-        });
-        var suppliers = await measureAsync('hangHoa.index.loadSuppliers', function() {
-            return NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
-        });
-        var units = await measureAsync('hangHoa.index.loadUnits', function() {
-            return loadUnitOptions();
-        });
+        var groups = [];
+        var suppliers = [];
+        var units = [];
+        if (stockRange) {
+            groups = await measureAsync('hangHoa.index.loadGroupsForStockFilter', function() {
+                return loadProductGroups(storeId);
+            });
+            suppliers = await measureAsync('hangHoa.index.loadSuppliersForStockFilter', function() {
+                return NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
+            });
+            units = await measureAsync('hangHoa.index.loadUnitsForStockFilter', function() {
+                return loadUnitOptions();
+            });
+        }
         var groupMap = groups.reduce(function(map, group) {
             map[String(group._id)] = group.ten_nhom_hang || '---';
             return map;
@@ -189,27 +221,21 @@ async function index(req, res, next) {
             return map;
         }, {});
 
-        var finalProductIds = products.map(function(item) { return item._id; });
-        var priceMaps = await measureAsync('hangHoa.index.loadPriceMaps', function() {
-            return buildProductListPriceMaps(finalProductIds);
-        });
-
         products = products.map(function(item) {
             item.ton_kho = Number(inventoryMap[String(item._id)] || 0);
-            item.nhom_hang_ten = groupMap[String(item.nhom_hang_id || '')] || '---';
-            item.nha_cung_cap_ten = supplierMap[String(item.nha_cung_cap_id || '')] || '---';
-            item.don_vi_tinh_ten = unitMap[String(item.don_vi_tinh_id || '')] || '---';
+            item.nhom_hang_ten = item.nhom_hang_id && item.nhom_hang_id.ten_nhom_hang
+                ? item.nhom_hang_id.ten_nhom_hang
+                : (groupMap[String(item.nhom_hang_id || '')] || '---');
+            item.nha_cung_cap_ten = item.nha_cung_cap_id && (item.nha_cung_cap_id.ten_ncc || item.nha_cung_cap_id.ten_nha_cung_cap || item.nha_cung_cap_id.ten_cong_ty)
+                ? (item.nha_cung_cap_id.ten_ncc || item.nha_cung_cap_id.ten_nha_cung_cap || item.nha_cung_cap_id.ten_cong_ty)
+                : (supplierMap[String(item.nha_cung_cap_id || '')] || '---');
+            item.don_vi_tinh_ten = item.don_vi_tinh_id && item.don_vi_tinh_id.ten_don_vi
+                ? item.don_vi_tinh_id.ten_don_vi
+                : (unitMap[String(item.don_vi_tinh_id || '')] || '---');
             item.gia_ban_hien_thi = Number(item.gia_co_dinh || 0);
-            return applyProductListPriceFields(item, priceMaps);
+            return item;
         });
         var filterQueryString = buildFilterQueryString(filter);
-        var totalProducts = products.length;
-        var totalPages = Math.max(1, Math.ceil(totalProducts / PRODUCT_PAGE_SIZE));
-        var page = parseInt(requestQuery.page, 10);
-        if (!Number.isFinite(page) || page < 1) page = 1;
-        if (page > totalPages) page = totalPages;
-        var start = (page - 1) * PRODUCT_PAGE_SIZE;
-        var pageProducts = products.slice(start, start + PRODUCT_PAGE_SIZE);
 
         var bangGiaList = await measureAsync('hangHoa.index.loadBangGia', function() {
             return BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }).lean();
@@ -222,7 +248,7 @@ async function index(req, res, next) {
             user: req.user,
             flash: requestQuery,
             bangGiaList: bangGiaList,
-            products: pageProducts,
+            products: products,
             groups: groups,
             units: units,
             suppliers: suppliers,
@@ -261,7 +287,55 @@ async function index(req, res, next) {
     }
 };
 
+async function tableMetrics(req, res, next) {
+    try {
+        var rawIds = String(req.query.ids || '').split(',').map(function(id) { return id.trim(); }).filter(Boolean);
+        var ids = rawIds
+            .filter(function(id) { return mongoose.Types.ObjectId.isValid(id); })
+            .slice(0, PRODUCT_PAGE_SIZE)
+            .map(function(id) { return new mongoose.Types.ObjectId(id); });
+        if (!ids.length) return res.json({ success: true, metrics: {} });
 
-module.exports = { index };
+        var products = await HangHoa.find({ _id: { $in: ids } }).select('_id quan_ly_theo_lo gia_von').lean();
+        var lotManagedProductIds = products
+            .filter(function(item) { return !!item.quan_ly_theo_lo; })
+            .map(function(item) { return item._id; });
+        var storeId = await resolveStoreId(req);
+        var inventoryMap = await loadActiveInventoryTotalsByProductId(products.map(function(item) { return item._id; }), lotManagedProductIds, storeId);
+        var priceMaps = await buildProductListPriceMaps(products.map(function(item) { return item._id; }));
+        var metrics = {};
+        products.forEach(function(item) {
+            applyProductListPriceFields(item, priceMaps);
+            metrics[String(item._id)] = {
+                ton_kho: Number(inventoryMap[String(item._id)] || 0),
+                gia_von_trung_binh: Number(item.gia_von_trung_binh_hien_thi || 0),
+                gia_ban_trung_binh: item.gia_ban_trung_binh_hien_thi == null ? null : Number(item.gia_ban_trung_binh_hien_thi || 0)
+            };
+        });
+        res.json({ success: true, metrics: metrics });
+    } catch (error) {
+        next(error);
+    }
+}
+
+async function filterOptions(req, res, next) {
+    try {
+        var storeId = await resolveStoreId(req);
+        var groups = await loadProductGroups(storeId);
+        var suppliers = await NhaCungCap.find({}).sort({ ten_ncc: 1 }).lean();
+        var units = await loadUnitOptions();
+        res.json({
+            success: true,
+            groups: groups,
+            suppliers: suppliers,
+            units: units
+        });
+    } catch (error) {
+        next(error);
+    }
+}
+
+
+module.exports = { index, tableMetrics, filterOptions };
 
 

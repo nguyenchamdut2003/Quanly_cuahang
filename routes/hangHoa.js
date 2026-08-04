@@ -5,7 +5,12 @@ var hangHoaController = require('../controllers/hanghoacontroller');
 
 router.use(isAuthenticated);
 
+router.get('/api/table-metrics', hangHoaController.tableMetrics);
+router.get('/api/filter-options', hangHoaController.filterOptions);
 router.get('/api/:id/detail', hangHoaController.apiProductDetail);
+router.get('/api/:id/card', hangHoaController.apiProductCard);
+router.get('/api/:id/stock', hangHoaController.apiProductStock);
+router.get('/api/:id/lots', hangHoaController.apiProductLots);
 router.post('/api/:id/mo-ta-ghi-chu', hangHoaController.apiUpdateProductNotes);
 router.get('/api/:id/loi-lo-theo-lo/export.xlsx', hangHoaController.exportLotProfitReport);
 router.get('/api/:id/loi-lo-theo-lo', hangHoaController.apiLotProfitReport);

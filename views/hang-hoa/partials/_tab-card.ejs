@@ -1,0 +1,49 @@
+<table class="admin-table product-inner-table">
+  <thead>
+    <tr>
+      <th>Chứng từ</th>
+      <th>Thời gian</th>
+      <th>Loại giao dịch</th>
+      <th>Đối tác</th>
+      <th class="text-right">Giá GD</th>
+      <th class="text-right">Giá vốn</th>
+      <th class="text-right">Số lượng</th>
+      <th class="text-right">Tồn cuối</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% if (!selectedProductHistories || selectedProductHistories.length === 0) { %>
+      <tr><td colspan="8" class="empty-cell">Chưa có phát sinh thẻ kho.</td></tr>
+    <% } %>
+    <% (selectedProductHistories || []).forEach(function(row) { %>
+      <tr>
+        <td>
+          <% if (row.ten_loai_chung_tu) { %>
+            <div class="muted-line" style="font-weight:700;color:#334155"><%= row.ten_loai_chung_tu %></div>
+          <% } %>
+          <% if (row.chung_tu_doc && row.chung_tu_type) { %>
+            <%- refLink(row.chung_tu_type, row.chung_tu_doc, row.ma_phieu || '---') %>
+          <% } else { %>
+            <%= row.ma_phieu || '---' %>
+          <% } %>
+        </td>
+        <td><%= formatDate(row.ngay || row.created_at) %></td>
+        <td>
+          <%= row.loai_giao_dich || row.loai_phieu || '---' %>
+          <% if (row.lo_hang_id) { %>
+            <div class="muted-line">Lô: <%- refLink('lot', row.lo_hang_id, row.lo_hang_id.ten_lo || row.lo_hang_id.ma_lo || 'Lô') %></div>
+          <% } %>
+          <% if (row.ten_quy_cach) { %>
+            <div class="muted-line">Thuộc tính: <%= row.ten_quy_cach %></div>
+          <% } %>
+        </td>
+        <td><%= row.doi_tac || '---' %></td>
+        <td class="text-right"><%= Number(row.gia_giao_dich || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.gia_von_the_kho || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(row.ton_kho_sau || 0).toLocaleString('vi-VN') %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>

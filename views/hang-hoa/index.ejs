@@ -97,7 +97,7 @@
                 </div>
                 <div>
                   <span>Nhà cung cấp</span>
-                  <select name="nha_cung_cap_id">
+                    <select name="nha_cung_cap_id" data-selected-value="">
                     <option value="">Chọn nhà cung cấp</option>
                     <% (suppliers || []).forEach(function(supplier) { %>
                       <option value="<%= supplier._id %>"><%= supplier.ten_ncc || '---' %></option>
@@ -226,7 +226,7 @@
 
           <section class="customer-filter-section">
             <h4>Nhà cung cấp</h4>
-            <select name="supplierId">
+            <select name="supplierId" data-selected-value="<%= filter.supplierId || 'all' %>">
               <option value="all">Chọn nhà cung cấp</option>
               <% (suppliers || []).forEach(function(supplier) { %>
                 <option value="<%= supplier._id %>" <%= filter.supplierId === String(supplier._id) ? 'selected' : '' %>><%= supplier.ten_ncc || '---' %></option>
@@ -290,9 +290,9 @@
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="product-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn hàng hóa"></td>
                   <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_hang || '---' %></a></td>
                   <td><strong><%= item.ten_hang || '---' %></strong></td>
-                  <td class="text-right"><%= Number(item.gia_von_trung_binh_hien_thi != null ? item.gia_von_trung_binh_hien_thi : 0).toLocaleString('vi-VN') %></td>
-                  <td class="text-right"><% if (item.gia_ban_trung_binh_hien_thi == null) { %>---<% } else { %><%= Number(item.gia_ban_trung_binh_hien_thi).toLocaleString('vi-VN') %><% } %></td>
-                  <td><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></td>
+                  <td class="text-right" data-product-metric="gia_von_trung_binh">Đang tải...</td>
+                  <td class="text-right" data-product-metric="gia_ban_trung_binh">Đang tải...</td>
+                  <td data-product-metric="ton_kho">Đang tải...</td>
                   <td><%= item.nhom_hang_ten || '---' %></td>
                   <td><%= item.nha_cung_cap_ten || '---' %></td>
                   <td><%= formatDate(item.created_at) %></td>
@@ -468,12 +468,99 @@
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var masterTable = document.querySelector('table[data-kv-master="hang-hoa"]');
+      function productMoney(value) {
+        return Number(value || 0).toLocaleString('vi-VN');
+      }
+      function loadVisibleProductMetrics() {
+        if (!masterTable) return;
+        var rows = Array.prototype.slice.call(masterTable.querySelectorAll('tr[data-kv-detail-id]')).slice(0, 10);
+        var ids = rows.map(function(row) { return row.getAttribute('data-kv-detail-id') || ''; }).filter(Boolean);
+        if (!ids.length) return;
+        fetch('/hang-hoa/api/table-metrics?ids=' + encodeURIComponent(ids.join(',')), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+          .then(function(response) { return response.json(); })
+          .then(function(data) {
+            if (!data || !data.success) throw new Error(data && data.message || 'Không tải được chỉ số hàng hóa.');
+            var metrics = data.metrics || {};
+            rows.forEach(function(row) {
+              var id = row.getAttribute('data-kv-detail-id') || '';
+              var metric = metrics[id] || {};
+              var costCell = row.querySelector('[data-product-metric="gia_von_trung_binh"]');
+              var saleCell = row.querySelector('[data-product-metric="gia_ban_trung_binh"]');
+              var stockCell = row.querySelector('[data-product-metric="ton_kho"]');
+              if (costCell) costCell.textContent = productMoney(metric.gia_von_trung_binh);
+              if (saleCell) saleCell.textContent = metric.gia_ban_trung_binh == null ? '---' : productMoney(metric.gia_ban_trung_binh);
+              if (stockCell) stockCell.textContent = productMoney(metric.ton_kho);
+            });
+          })
+          .catch(function() {
+            rows.forEach(function(row) {
+              row.querySelectorAll('[data-product-metric]').forEach(function(cell) {
+                cell.textContent = '---';
+              });
+            });
+          });
+      }
+      loadVisibleProductMetrics();
+      function fetchProductTabHtml(url) {
+        return fetch(url, {
+          credentials: 'same-origin',
+          headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(response) {
+          return response.text().then(function(html) {
+            if (!response.ok) throw new Error(html || 'Không tải được dữ liệu tab.');
+            return html;
+          });
+        });
+      }
+      function loadProductLazyPane(pane, url, force) {
+        if (!pane || !url) return Promise.resolve();
+        if (!force && pane.getAttribute('data-lazy-loaded') === '1') return Promise.resolve();
+        pane.innerHTML = '<div class="empty-cell">Đang tải dữ liệu...</div>';
+        return fetchProductTabHtml(url)
+          .then(function(html) {
+            pane.innerHTML = html;
+            pane.setAttribute('data-lazy-loaded', '1');
+            if (window.kvInlineBindDetailTabs) {
+              window.kvInlineBindDetailTabs(pane);
+            }
+          })
+          .catch(function(error) {
+            pane.innerHTML = '<div class="empty-cell">' + (error.message || 'Không tải được dữ liệu tab.') + '</div>';
+          });
+      }
+      function bindProductInlinePanel(rootEl) {
+        var root = rootEl.querySelector('.product-detail') || rootEl;
+        if (!root || root.getAttribute('data-product-lazy-bound') === '1') return;
+        root.setAttribute('data-product-lazy-bound', '1');
+        root.querySelectorAll('.detail-tab[data-tab-target]').forEach(function(tab) {
+          tab.addEventListener('click', function() {
+            var target = tab.getAttribute('data-tab-target') || '';
+            var pane = root.querySelector('.detail-pane[data-tab-panel="' + target + '"]');
+            if (!pane) return;
+            loadProductLazyPane(pane, pane.getAttribute('data-lazy-url') || '', false);
+          });
+        });
+        root.addEventListener('click', function(event) {
+          var pageLink = event.target.closest('[data-product-tab-page-url]');
+          if (!pageLink) return;
+          event.preventDefault();
+          if (pageLink.classList.contains('is-disabled') || pageLink.classList.contains('is-active')) return;
+          var pane = pageLink.closest('.detail-pane[data-tab-panel]');
+          loadProductLazyPane(pane, pageLink.getAttribute('data-product-tab-page-url') || pageLink.getAttribute('href') || '', true);
+        });
+      }
       if (masterTable && typeof KvInlineDetail !== 'undefined') {
         var kvHangHoa = new KvInlineDetail({
           table: masterTable,
           colspan: 9,
           buildUrl: function(id) {
             return '/hang-hoa/api/' + encodeURIComponent(id) + '/detail';
+          },
+          onOpen: function(id, root) {
+            bindProductInlinePanel(root);
           }
         });
         if (/^#p-/.test(location.hash)) {
@@ -1447,6 +1534,46 @@
       window.__productGroups = productGroupsSeed ? JSON.parse(productGroupsSeed.textContent || '[]') : [];
       refreshProductFormGroup('');
       refreshProductGroupWidget((productGroupFilterValue && productGroupFilterValue.value) || 'all');
+
+      function renderSupplierSelects(suppliers) {
+        suppliers = Array.isArray(suppliers) ? suppliers : [];
+        var filterSelect = document.querySelector('#hangHoaFilterForm select[name="supplierId"]');
+        var formSelect = productCreateForm ? productCreateForm.querySelector('select[name="nha_cung_cap_id"]') : null;
+        if (filterSelect) {
+          var current = filterSelect.getAttribute('data-selected-value') || filterSelect.value || 'all';
+          filterSelect.innerHTML = '<option value="all">Chọn nhà cung cấp</option>' + suppliers.map(function(supplier) {
+            var id = String(supplier._id || '');
+            var name = supplier.ten_ncc || supplier.ten_nha_cung_cap || supplier.ten_cong_ty || supplier.ma_ncc || '---';
+            return '<option value="' + escapeManageAttr(id) + '">' + escapeManageAttr(name) + '</option>';
+          }).join('');
+          filterSelect.value = current;
+        }
+        if (formSelect) {
+          var formCurrent = formSelect.getAttribute('data-selected-value') || formSelect.value || '';
+          formSelect.innerHTML = '<option value="">Chọn nhà cung cấp</option>' + suppliers.map(function(supplier) {
+            var id = String(supplier._id || '');
+            var name = supplier.ten_ncc || supplier.ten_nha_cung_cap || supplier.ten_cong_ty || supplier.ma_ncc || '---';
+            return '<option value="' + escapeManageAttr(id) + '">' + escapeManageAttr(name) + '</option>';
+          }).join('');
+          formSelect.value = formCurrent;
+        }
+      }
+
+      fetch('/hang-hoa/api/filter-options', {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+      })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+          if (!data || !data.success) return;
+          window.__productGroups = Array.isArray(data.groups) ? data.groups : [];
+          unitTypes = Array.isArray(data.units) ? data.units : [];
+          refreshProductFormGroup(productFormGroupValue ? productFormGroupValue.value : '');
+          refreshProductGroupWidget((productGroupFilterValue && productGroupFilterValue.value) || 'all');
+          refreshProductFormUnit(productFormUnitValue ? productFormUnitValue.value : '');
+          renderSupplierSelects(data.suppliers || []);
+        })
+        .catch(function() {});
 
       window.refreshProductFormGroup = refreshProductFormGroup;
       window.refreshProductFormUnit = refreshProductFormUnit;

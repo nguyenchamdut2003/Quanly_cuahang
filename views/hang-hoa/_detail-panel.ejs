@@ -7,8 +7,9 @@
       <button class="detail-tab" type="button" data-tab-target="product-stock">T&#7891;n kho</button>
       <% if (item.quan_ly_theo_lo) { %>
         <button class="detail-tab" type="button" data-tab-target="product-lots">L&ocirc; HSD</button>
-      <% } %>
-      <button class="detail-tab" type="button" data-tab-target="product-lot-profit">L&#7901;i l&#7895; theo l&ocirc;</button>
+        <% } %>
+          <button class="detail-tab" type="button" data-tab-target="product-lot-profit">L&#7901;i l&#7895; theo
+            l&ocirc;</button>
     </div>
   </div>
 
@@ -17,417 +18,196 @@
       <div class="product-info-head">
         <div class="product-thumb">HH</div>
         <div>
-          <h2><%= item.ten_hang || 'H&agrave;ng h&oacute;a' %></h2>
-          <p>Nh&oacute;m h&agrave;ng: <%= item.nhom_hang_ten || '---' %></p>
+          <h2>
+            <%= item.ten_hang || 'H&agrave;ng h&oacute;a' %>
+          </h2>
+          <p>Nh&oacute;m h&agrave;ng: <%= item.nhom_hang_ten || '---' %>
+          </p>
           <div class="tag-row">
             <span class="tag">H&agrave;ng h&oacute;a th&#432;&#7901;ng</span>
-            <span class="tag tag-green"><%- item.ban_truc_tiep ? 'B&aacute;n tr&#7921;c ti&#7871;p' : 'Kh&ocirc;ng b&aacute;n tr&#7921;c ti&#7871;p' %></span>
-            <span class="tag"><%- item.quan_ly_theo_lo ? 'Qu&#7843;n l&yacute; theo l&ocirc;' : 'Kh&ocirc;ng qu&#7843;n l&yacute; theo l&ocirc;' %></span>
+            <span class="tag tag-green"><%- item.ban_truc_tiep ? 'B&aacute;n tr&#7921;c ti&#7871;p'
+                : 'Kh&ocirc;ng b&aacute;n tr&#7921;c ti&#7871;p' %></span>
+            <span class="tag"><%- item.quan_ly_theo_lo ? 'Qu&#7843;n l&yacute; theo l&ocirc;'
+                : 'Kh&ocirc;ng qu&#7843;n l&yacute; theo l&ocirc;' %></span>
           </div>
         </div>
       </div>
 
       <div class="product-info-grid">
-        <div><span>M&atilde; h&agrave;ng</span><strong><%- refLink('product', item, item.ma_hang || '---') %></strong></div>
-        <div><span>Th&#7921;c t&#7871;</span><strong><%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>C&oacute; th&#7875; b&aacute;n</span><strong><%= Number(item.ton_co_the_giao || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>H&#7871;t h&#7841;n</span><strong><%= Number(item.ton_het_han || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>&#272;&#7883;nh m&#7913;c t&#7891;n</span><strong><%= Number(item.dinh_muc_toi_thieu || 0).toLocaleString('vi-VN') %> - 0</strong></div>
-        <div><span>Gi&aacute; v&#7889;n</span><strong><%= Number(item.gia_von_trung_binh_hien_thi != null ? item.gia_von_trung_binh_hien_thi : item.gia_von || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>Gi&aacute; b&aacute;n</span><strong><%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>&#272;&#417;n v&#7883; t&iacute;nh</span><strong><%= item.don_vi_tinh_ten || '---' %></strong></div>
-        <div><span>Nh&agrave; cung c&#7845;p</span><strong><%= item.nha_cung_cap_ten || '---' %></strong></div>
-        <div><span>Tr&#7841;ng th&aacute;i</span><strong><%- item.trang_thai === 'inactive' ? 'Ng&#7915;ng kinh doanh' : '&#272;ang kinh doanh' %></strong></div>
+        <div><span>M&atilde; h&agrave;ng</span><strong><%- refLink('product', item, item.ma_hang || '---' ) %></strong>
+        </div>
+        <div><span>Th&#7921;c t&#7871;</span><strong>
+            <%= Number(item.ton_kho || 0).toLocaleString('vi-VN') %>
+          </strong></div>
+        <div><span>C&oacute; th&#7875; b&aacute;n</span><strong>
+            <%= Number(item.ton_co_the_giao || 0).toLocaleString('vi-VN') %>
+          </strong></div>
+        <div><span>H&#7871;t h&#7841;n</span><strong>
+            <%= Number(item.ton_het_han || 0).toLocaleString('vi-VN') %>
+          </strong></div>
+        <div><span>&#272;&#7883;nh m&#7913;c t&#7891;n</span><strong>
+            <%= Number(item.dinh_muc_toi_thieu || 0).toLocaleString('vi-VN') %> - 0
+          </strong></div>
+        <div><span>Gi&aacute; v&#7889;n</span><strong>
+            <%= Number(item.gia_von_trung_binh_hien_thi !=null ? item.gia_von_trung_binh_hien_thi : item.gia_von ||
+              0).toLocaleString('vi-VN') %>
+          </strong></div>
+        <div><span>Gi&aacute; b&aacute;n</span><strong>
+            <%= Number(item.gia_ban_hien_thi || 0).toLocaleString('vi-VN') %>
+          </strong></div>
+        <div><span>&#272;&#417;n v&#7883; t&iacute;nh</span><strong>
+            <%= item.don_vi_tinh_ten || '---' %>
+          </strong></div>
+        <div><span>Nh&agrave; cung c&#7845;p</span><strong>
+            <%= item.nha_cung_cap_ten || '---' %>
+          </strong></div>
+        <div><span>Tr&#7841;ng th&aacute;i</span><strong><%- item.trang_thai==='inactive' ? 'Ng&#7915;ng kinh doanh'
+              : '&#272;ang kinh doanh' %></strong></div>
       </div>
       <% if (item.co_ton_nhung_khong_the_giao) { %>
         <div class="stock-warning-box">
           <strong>C&oacute; t&#7891;n th&#7921;c t&#7871; nh&#432;ng kh&ocirc;ng th&#7875; giao:</strong>
-          <span><%= item.ly_do_khong_the_giao || 'C&oacute; th&#7875; b&aacute;n = 0.' %></span>
+          <span>
+            <%= item.ly_do_khong_the_giao || 'C&oacute; th&#7875; b&aacute;n = 0.' %>
+          </span>
         </div>
-      <% } %>
-    </section>
-
-    <%
-      const moTaText = String(item.mo_ta || '').trim();
-      const ghiChuDatHangText = String(item.ghi_chu_dat_hang || '').trim();
-    %>
-    <section class="detail-pane product-note-pane" data-tab-panel="product-note">
-      <div class="product-note-toolbar">
-        <button type="button" class="btn btn-light btn-sm" data-product-note-edit>Chỉnh sửa</button>
-      </div>
-      <div class="product-note-cards">
-        <div class="product-note-card">
-          <h4 class="product-note-card-title">Mô tả</h4>
-          <div class="product-note-card-body" data-note-view="mo_ta">
-            <% if (moTaText) { %>
-              <div class="product-note-text"><%= moTaText %></div>
-            <% } else { %>
-              <p class="product-note-empty">Chưa có mô tả</p>
-            <% } %>
-          </div>
-        </div>
-        <div class="product-note-card">
-          <h4 class="product-note-card-title">Ghi chú đặt hàng</h4>
-          <div class="product-note-card-body" data-note-view="ghi_chu_dat_hang">
-            <% if (ghiChuDatHangText) { %>
-              <div class="product-note-text"><%= ghiChuDatHangText %></div>
-            <% } else { %>
-              <p class="product-note-empty">Chưa có ghi chú</p>
-            <% } %>
-          </div>
-        </div>
-      </div>
-      <div class="product-note-modal" data-product-note-modal hidden>
-        <div class="product-note-modal-backdrop" data-product-note-close></div>
-        <div class="product-note-modal-dialog" role="dialog" aria-labelledby="productNoteModalTitle_<%= item._id %>">
-          <div class="product-note-modal-header">
-            <h3 id="productNoteModalTitle_<%= item._id %>">Chỉnh sửa mô tả, ghi chú</h3>
-            <button type="button" class="product-note-modal-close" data-product-note-close aria-label="Đóng">&times;</button>
-          </div>
-          <div class="product-note-modal-body">
-            <label class="product-note-field">
-              <span>Mô tả</span>
-              <textarea rows="5" data-product-note-input="mo_ta" placeholder="Nhập mô tả hàng hóa"></textarea>
-            </label>
-            <label class="product-note-field">
-              <span>Ghi chú đặt hàng</span>
-              <textarea rows="5" data-product-note-input="ghi_chu_dat_hang" placeholder="Nhập ghi chú khi đặt hàng"></textarea>
-            </label>
-            <p class="product-note-modal-status muted-line" data-product-note-status></p>
-          </div>
-          <div class="product-note-modal-footer">
-            <button type="button" class="btn btn-light btn-sm" data-product-note-close>Bỏ qua</button>
-            <button type="button" class="btn btn-primary btn-sm" data-product-note-save>Lưu</button>
-          </div>
-        </div>
+        <% } %>
+      <div class="page-actions product-detail-footer page-actions--sm">
+        <button class="btn btn-danger btn-sm btn-trash-product" type="button" data-product-id="<%= item._id %>"
+          data-product-code="<%= item.ma_hang || '' %>" data-product-name="<%= item.ten_hang || '' %>">X&oacute;a</button>
+        <button class="btn btn-light btn-sm btn-copy-product" type="button"
+          data-product='<%- JSON.stringify(item) %>'>Sao ch&eacute;p</button>
+        <button class="btn btn-primary btn-sm btn-edit-product" type="button"
+          data-product='<%- JSON.stringify(item) %>'>Ch&#7881;nh s&#7917;a</button>
+        <button class="btn btn-light btn-sm btn-print-label" type="button"
+          data-product='<%- JSON.stringify(item) %>'>In tem m&atilde;</button>
+        <a class="btn btn-light btn-sm"
+          href="/hang-hoa/hd-nguyen-tac?keyword=<%= encodeURIComponent(item.ma_hang || item.ten_hang || '') %>"
+          target="_blank">H&#272; nguy&ecirc;n t&#7855;c</a>
       </div>
     </section>
 
-    <section class="detail-pane" data-tab-panel="product-card">
-      <table class="admin-table product-inner-table">
-        <thead>
-          <tr>
-            <th>Ch&#7913;ng t&#7915;</th>
-            <th>Th&#7901;i gian</th>
-            <th>Lo&#7841;i giao d&#7883;ch</th>
-            <th>&#272;&#7889;i t&aacute;c</th>
-            <th class="text-right">Gi&aacute; GD</th>
-            <th class="text-right">Gi&aacute; v&#7889;n</th>
-            <th class="text-right">S&#7889; l&#432;&#7907;ng</th>
-            <th class="text-right">T&#7891;n cu&#7889;i</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (!selectedProductHistories || selectedProductHistories.length === 0) { %>
-            <tr><td colspan="8" class="empty-cell">Ch&#432;a c&oacute; ph&aacute;t sinh th&#7867; kho.</td></tr>
-          <% } %>
-          <% (selectedProductHistories || []).forEach(function(row) { %>
-            <tr>
-              <td>
-                <% if (row.ten_loai_chung_tu) { %>
-                  <div class="muted-line" style="font-weight:700;color:#334155"><%= row.ten_loai_chung_tu %></div>
-                <% } %>
-                <% if (row.chung_tu_doc && row.chung_tu_type) { %>
-                  <%- refLink(row.chung_tu_type, row.chung_tu_doc, row.ma_phieu || '---') %>
-                <% } else { %>
-                  <%= row.ma_phieu || '---' %>
-                <% } %>
-              </td>
-              <td><%= formatDate(row.ngay || row.created_at) %></td>
-              <td>
-                <%= row.loai_giao_dich || row.loai_phieu || '---' %>
-                <% if (row.lo_hang_id) { %>
-                  <div class="muted-line">L&ocirc;: <%- refLink('lot', row.lo_hang_id, row.lo_hang_id.ten_lo || row.lo_hang_id.ma_lo || 'L&ocirc;') %></div>
-                <% } %>
-                <% if (row.ten_quy_cach) { %>
-                  <div class="muted-line">Thu&#7897;c t&iacute;nh: <%= row.ten_quy_cach %></div>
-                <% } %>
-              </td>
-              <td><%= row.doi_tac || '---' %></td>
-              <td class="text-right"><%= Number(row.gia_giao_dich || 0).toLocaleString('vi-VN') %></td>
-              <td class="text-right"><%= Number(row.gia_von_the_kho || 0).toLocaleString('vi-VN') %></td>
-              <td class="text-right"><%= Number(row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
-              <td class="text-right"><%= Number(row.ton_kho_sau || 0).toLocaleString('vi-VN') %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </section>
-
-    <section class="detail-pane" data-tab-panel="product-stock">
-      <table class="admin-table product-inner-table">
-        <thead>
-          <tr>
-            <th>Kho</th>
-            <th class="text-right">Th&#7921;c t&#7871;</th>
-            <th class="text-right">C&oacute; th&#7875; b&aacute;n</th>
-            <th class="text-right">H&#7871;t h&#7841;n</th>
-            <th class="text-right">KH &#273;&#7863;t</th>
-            <th>D&#7921; ki&#7871;n h&#7871;t h&agrave;ng</th>
-            <th>Tr&#7841;ng th&aacute;i</th>
-            <th>C&#7853;p nh&#7853;t</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (!selectedProductInventory || selectedProductInventory.length === 0) { %>
-            <tr><td colspan="8" class="empty-cell">Ch&#432;a c&oacute; t&#7891;n kho theo kho.</td></tr>
-          <% } %>
-          <% (selectedProductInventory || []).forEach(function(row) { %>
-            <%
-              var warehouseStatus = row.trang_thai_kho || '';
-              var warehouseStatusLabel = warehouseStatus === 'active' ? '&#272;ang ho&#7841;t &#273;&#7897;ng' : (warehouseStatus === 'inactive' ? 'Ng&#7915;ng ho&#7841;t &#273;&#7897;ng' : (warehouseStatus || '---'));
-            %>
-            <tr>
-              <td><%= row.kho_ten || '---' %></td>
-              <td class="text-right"><%= Number(row.ton_thuc_te || row.so_luong || 0).toLocaleString('vi-VN') %></td>
-              <td class="text-right">
-                <%= Number(row.ton_co_the_giao || 0).toLocaleString('vi-VN') %>
-                <% if (row.ly_do_khong_the_giao) { %>
-                  <div class="stock-reason-text"><%= row.ly_do_khong_the_giao %></div>
-                <% } %>
-              </td>
-              <td class="text-right"><%= Number(row.ton_het_han || 0).toLocaleString('vi-VN') %></td>
-              <td class="text-right"><%= Number(row.khach_dat || 0).toLocaleString('vi-VN') %></td>
-              <td><%= row.du_kien_het_hang ? formatDate(row.du_kien_het_hang) : '---' %></td>
-              <td><span class="lot-status-badge <%= warehouseStatus === 'active' ? 'is-active' : (warehouseStatus === 'inactive' ? 'is-cancelled' : '') %>"><%- warehouseStatusLabel %></span></td>
-              <td><%= formatDate(row.updated_at || row.created_at) %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </section>
-
-    <% if (item.quan_ly_theo_lo) { %>
-      <section class="detail-pane" data-tab-panel="product-lots">
-        <div class="lot-filter-bar" data-lot-filter>
-          <span>Tr&#7841;ng th&aacute;i l&ocirc;:</span>
-          <div class="lot-filter-segment">
-            <button class="lot-filter-btn is-active" type="button" data-lot-filter-value="all">T&#7845;t c&#7843;</button>
-            <button class="lot-filter-btn" type="button" data-lot-filter-value="available">C&ograve;n h&agrave;ng</button>
-            <button class="lot-filter-btn" type="button" data-lot-filter-value="empty">H&#7871;t h&agrave;ng</button>
-          </div>
+    <% const moTaText=String(item.mo_ta || '' ).trim(); const ghiChuDatHangText=String(item.ghi_chu_dat_hang || ''
+      ).trim(); %>
+      <section class="detail-pane product-note-pane" data-tab-panel="product-note">
+        <div class="product-note-toolbar">
+          <button type="button" class="btn btn-light btn-sm" data-product-note-edit>Chỉnh sửa</button>
         </div>
-        <table class="admin-table product-inner-table">
-          <thead>
-            <tr>
-              <th class="lot-col-expand"></th>
-              <th class="lot-col-ma-lo">M&atilde; l&ocirc;</th>
-              <th>T&ecirc;n l&ocirc;</th>
-              <th>Thu&#7897;c t&iacute;nh</th>
-              <th>Kho</th>
-              <th>Ng&agrave;y nh&#7853;p</th>
-              <th>H&#7841;n s&#7917; d&#7909;ng</th>
-              <th class="text-right">SL ban &#273;&#7847;u</th>
-              <th class="text-right">Th&#7921;c t&#7871;</th>
-              <th class="text-right">C&oacute; th&#7875; b&aacute;n</th>
-              <th class="text-right">H&#7871;t h&#7841;n</th>
-              <th class="text-right">Gi&aacute; v&#7889;n</th>
-              <th>Ch&#7913;ng t&#7915; nh&#7853;p</th>
-              <th>Tr&#7841;ng th&aacute;i</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% if (!selectedProductLots || selectedProductLots.length === 0) { %>
-              <tr><td colspan="14" class="empty-cell">Chưa có tồn theo lô.</td></tr>
-            <% } %>
-            <% (selectedProductLots || []).forEach(function(row) { %>
-              <%
-                var lot = row.lo_hang_id || {};
-                var lotId = lot && lot._id ? String(lot._id) : '';
-                var quyCachItems = Array.isArray(row.quy_cach_items) ? row.quy_cach_items : [];
-                var quyCachCount = quyCachItems.length;
-                var statusValue = lot.trang_thai || '';
-                var statusLabel = statusValue === 'active' ? 'C&ograve;n h&agrave;ng' : (statusValue === 'het_hang' ? 'H&#7871;t h&agrave;ng' : (statusValue === 'huy' ? '&#272;&atilde; h&#7911;y' : (statusValue || '---')));
-                var remainQty = row.so_luong !== undefined && row.so_luong !== null ? Number(row.so_luong || 0) : Number(lot.so_luong_con_lai || 0);
-                var sellableQty = Number(row.ton_co_the_giao || 0);
-                var expiredQty = Number(row.ton_het_han || 0);
-                var initialQty = Number(lot.so_luong_ban_dau || 0);
-                var costValue = row.gia_von !== undefined && row.gia_von !== null ? Number(row.gia_von || 0) : Number(lot.gia_von || lot.don_gia_nhap || 0);
-                var purchaseDoc = lot.phieu_nhap_id || null;
-                var expiryDate = lot.han_su_dung ? new Date(lot.han_su_dung) : null;
-                var expiryClass = '';
-                var expiryLabel = '';
-                if (expiryDate && !isNaN(expiryDate.getTime())) {
-                  var today = new Date();
-                  today.setHours(0, 0, 0, 0);
-                  var expDay = new Date(expiryDate);
-                  expDay.setHours(0, 0, 0, 0);
-                  var daysLeft = Math.ceil((expDay.getTime() - today.getTime()) / 86400000);
-                  if (daysLeft < 0) {
-                    expiryClass = 'is-expired';
-                    expiryLabel = 'H&#7871;t h&#7841;n';
-                  } else if (daysLeft <= 7) {
-                    expiryClass = 'is-warning';
-                    expiryLabel = 'S&#7855;p h&#7871;t h&#7841;n';
-                  } else {
-                    expiryClass = 'is-valid';
-                    expiryLabel = 'C&ograve;n h&#7841;n';
-                  }
-                }
-              %>
-              <tr class="lot-data-row" data-lot-status="<%= statusValue %>" data-lot-qty="<%= remainQty %>">
-                <td class="lot-col-expand">
-                  <% if (lotId) { %>
-                    <button type="button" class="lot-expand-btn" data-lot-expand="<%= lotId %>" aria-expanded="false" aria-label="Xem thuộc tính trong lô" title="Chi tiết lô">+</button>
-                  <% } %>
-                </td>
-                <td class="lot-col-ma-lo"<% if (lot && lot.ma_lo) { %> title="<%= lot.ma_lo %>"<% } %>>
-                  <% if (lot && lot._id) { %>
-                    <span class="lot-ma-lo-clip"><%- refLink('lot', lot, lot.ma_lo || '---') %></span>
-                  <% } else { %>
-                    ---
-                  <% } %>
-                </td>
-                <td><%= lot && lot.ten_lo ? lot.ten_lo : '---' %></td>
-                <td>
-                  <% if (quyCachCount > 0) { %>
-                    <span class="lot-qc-badge"><%= quyCachCount %> thu&#7897;c t&iacute;nh</span>
-                  <% } else { %>
-                    <span class="muted-line">Ch&#432;a t&aacute;ch thu&#7897;c t&iacute;nh</span>
-                  <% } %>
-                </td>
-                <td><%= row.kho_ten || '---' %></td>
-                <td><%= lot && lot.ngay_nhap ? formatDate(lot.ngay_nhap) : '---' %></td>
-                <td>
-                  <% if (expiryDate && !isNaN(expiryDate.getTime())) { %>
-                    <div><%= formatDate(lot.han_su_dung) %></div>
-                    <span class="lot-expiry-badge <%= expiryClass %>"><%- expiryLabel %></span>
-                  <% } else { %>
-                    ---
-                  <% } %>
-                </td>
-                <td class="text-right"><%= initialQty.toLocaleString('vi-VN') %></td>
-                <td class="text-right"><%= remainQty.toLocaleString('vi-VN') %></td>
-                <td class="text-right">
-                  <%= sellableQty.toLocaleString('vi-VN') %>
-                  <% if (row.ly_do_khong_the_giao) { %>
-                    <div class="stock-reason-text"><%= row.ly_do_khong_the_giao %></div>
-                  <% } %>
-                </td>
-                <td class="text-right"><%= expiredQty.toLocaleString('vi-VN') %></td>
-                <td class="text-right"><%= costValue.toLocaleString('vi-VN') %></td>
-                <td><%- purchaseDoc && purchaseDoc._id ? refLink('purchase', purchaseDoc, purchaseDoc.ma_phieu_nhap || '---') : '---' %></td>
-                <td><span class="lot-status-badge <%= statusValue === 'active' ? 'is-active' : (statusValue === 'het_hang' ? 'is-empty' : (statusValue === 'huy' ? 'is-cancelled' : '')) %>"><%- statusLabel %></span></td>
-              </tr>
-              <% if (lotId) { %>
-              <tr class="lot-detail-row" data-lot-detail="<%= lotId %>" hidden>
-                <td colspan="14">
-                  <div class="lot-detail-panel">
-                    <div class="lot-detail-panel-title">Thu&#7897;c t&iacute;nh trong l&ocirc;</div>
-                    <% if (quyCachCount > 0) { %>
-                      <table class="admin-table product-inner-table lot-detail-table">
-                        <thead>
-                          <tr>
-                            <th>Thu&#7897;c t&iacute;nh</th>
-                            <th class="text-right">Thực tế</th>
-                            <th class="text-right">Có thể bán</th>
-                            <th class="text-right">Hết hạn</th>
-                            <th class="text-right">Đơn giá</th>
-                            <th class="text-right">Thành tiền</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <% quyCachItems.forEach(function(qc) { %>
-                            <tr>
-                              <td><%= qc.ten_quy_cach || '---' %></td>
-                              <td class="text-right"><%= Number(qc.ton_thuc_te || qc.so_luong || 0).toLocaleString('vi-VN') %></td>
-                              <td class="text-right">
-                                <%= Number(qc.ton_co_the_giao || 0).toLocaleString('vi-VN') %>
-                                <% if (qc.ly_do_khong_the_giao) { %>
-                                  <div class="stock-reason-text"><%= qc.ly_do_khong_the_giao %></div>
-                                <% } %>
-                              </td>
-                              <td class="text-right"><%= Number(qc.ton_het_han || 0).toLocaleString('vi-VN') %></td>
-                              <td class="text-right"><%= Number(qc.don_gia || 0).toLocaleString('vi-VN') %></td>
-                              <td class="text-right"><%= Number(qc.thanh_tien || 0).toLocaleString('vi-VN') %></td>
-                            </tr>
-                          <% }) %>
-                        </tbody>
-                      </table>
-                    <% } else { %>
-                      <p class="lot-detail-empty">L&ocirc; ch&#432;a c&oacute; b&#7843;n ghi t&#7891;n theo thu&#7897;c t&iacute;nh. T&#7891;n &#273;ang ghi nh&#7853;n &#7903; c&#7845;p l&ocirc;: <strong><%= remainQty.toLocaleString('vi-VN') %></strong>.</p>
-                    <% } %>
-                  </div>
-                </td>
-              </tr>
-              <% } %>
-            <% }) %>
-            <% if (selectedProductLots && selectedProductLots.length > 0) { %>
-              <tr class="lot-filter-empty-row" style="display: none;"><td colspan="14" class="empty-cell">Không có lô phù hợp với bộ lọc.</td></tr>
-            <% } %>
-          </tbody>
-        </table>
-      </section>
-    <% } %>
-
-    <section class="detail-pane" data-tab-panel="product-lot-profit" id="lotProfitPane_<%= item._id %>">
-      <div class="lot-profit-toolbar">
-        <div class="lot-profit-filters">
-          <label>L&ocirc;
-            <select class="lot-profit-filter" data-field="lo_hang_id">
-              <option value="">T&#7845;t c&#7843;</option>
-            </select>
-          </label>
-          <button type="button" class="btn btn-primary btn-sm lot-profit-export">Xu&#7845;t file</button>
-        </div>
-        <p class="lot-profit-hint muted-line" data-lot-profit-meta>B&aacute;o c&aacute;o t&#7893;ng h&#7907;p theo l&ocirc;/thu&#7897;c t&iacute;nh (m&#7895;i l&ocirc; m&#7897;t d&ograve;ng).</p>
-      </div>
-      <div class="lot-profit-status" data-lot-profit-status></div>
-      <table class="admin-table product-inner-table lot-profit-table">
-        <thead>
-          <tr>
-            <th class="lot-profit-date-th">
-              <button type="button" class="lot-profit-date-trigger" data-lot-profit-date-toggle>
-                <span>Ng&agrave;y nh&#7853;p l&ocirc;</span>
-                <span class="lot-profit-date-arrow">▾</span>
-              </button>
-              <div class="lot-profit-date-menu" data-lot-profit-date-menu>
-                <label>T&#7915; ng&agrave;y
-                  <input class="lot-profit-filter" type="date" data-field="ngay_nhap_from">
-                </label>
-                <label>&#272;&#7871;n ng&agrave;y
-                  <input class="lot-profit-filter" type="date" data-field="ngay_nhap_to">
-                </label>
-                <div class="lot-profit-date-actions">
-                  <button type="button" class="btn btn-primary btn-sm" data-lot-profit-date-apply>&Aacute;p d&#7909;ng</button>
-                  <button type="button" class="btn btn-light btn-sm" data-lot-profit-date-clear>X&oacute;a</button>
+        <div class="product-note-cards">
+          <div class="product-note-card">
+            <h4 class="product-note-card-title">Mô tả</h4>
+            <div class="product-note-card-body" data-note-view="mo_ta">
+              <% if (moTaText) { %>
+                <div class="product-note-text">
+                  <%= moTaText %>
                 </div>
-              </div>
-            </th>
-            <th>T&ecirc;n h&agrave;ng</th>
-            <th>L&ocirc;</th>
-            <th>Thu&#7897;c t&iacute;nh</th>
-            <th class="text-right">S&#7889; l&#432;&#7907;ng nh&#7853;p</th>
-            <th class="text-right">&#272;G nh&#7853;p</th>
-            <th class="text-right">T&#7893;ng gi&aacute; v&#7889;n</th>
-            <th class="text-right">SL xu&#7845;t</th>
-            <th class="text-right">&#272;G xu&#7845;t BQ</th>
-            <th class="text-right">T&#7893;ng doanh thu</th>
-            <th class="text-right">L&#7907;i nhu&#7853;n</th>
-          </tr>
-        </thead>
-        <tbody data-lot-profit-body>
-          <tr><td colspan="11" class="empty-cell">&#272;ang t&#7843;i b&aacute;o c&aacute;o.</td></tr>
-        </tbody>
-        <tfoot data-lot-profit-foot style="display:none">
-          <tr class="lot-profit-total-row">
-            <td colspan="6" class="text-right"><strong>T&#7893;ng</strong></td>
-            <td class="text-right" data-sum-gia-von>0</td>
-            <td class="text-right" data-sum-sl-xuat>0</td>
-            <td></td>
-            <td class="text-right" data-sum-doanh-thu>0</td>
-            <td class="text-right" data-sum-loi-nhuan>0</td>
-          </tr>
-        </tfoot>
-      </table>
-    </section>
-  </div>
+                <% } else { %>
+                  <p class="product-note-empty">Chưa có mô tả</p>
+                  <% } %>
+            </div>
+          </div>
+          <div class="product-note-card">
+            <h4 class="product-note-card-title">Ghi chú đặt hàng</h4>
+            <div class="product-note-card-body" data-note-view="ghi_chu_dat_hang">
+              <% if (ghiChuDatHangText) { %>
+                <div class="product-note-text">
+                  <%= ghiChuDatHangText %>
+                </div>
+                <% } else { %>
+                  <p class="product-note-empty">Chưa có ghi chú</p>
+                  <% } %>
+            </div>
+          </div>
+        </div>
+        <div class="product-note-modal" data-product-note-modal hidden>
+          <div class="product-note-modal-backdrop" data-product-note-close></div>
+          <div class="product-note-modal-dialog" role="dialog" aria-labelledby="productNoteModalTitle_<%= item._id %>">
+            <div class="product-note-modal-header">
+              <h3 id="productNoteModalTitle_<%= item._id %>">Chỉnh sửa mô tả, ghi chú</h3>
+              <button type="button" class="product-note-modal-close" data-product-note-close
+                aria-label="Đóng">&times;</button>
+            </div>
+            <div class="product-note-modal-body">
+              <label class="product-note-field">
+                <span>Mô tả</span>
+                <textarea rows="5" data-product-note-input="mo_ta" placeholder="Nhập mô tả hàng hóa"></textarea>
+              </label>
+              <label class="product-note-field">
+                <span>Ghi chú đặt hàng</span>
+                <textarea rows="5" data-product-note-input="ghi_chu_dat_hang"
+                  placeholder="Nhập ghi chú khi đặt hàng"></textarea>
+              </label>
+              <p class="product-note-modal-status muted-line" data-product-note-status></p>
+            </div>
+            <div class="product-note-modal-footer">
+              <button type="button" class="btn btn-light btn-sm" data-product-note-close>Bỏ qua</button>
+              <button type="button" class="btn btn-primary btn-sm" data-product-note-save>Lưu</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-  <div class="page-actions product-detail-footer page-actions--sm">
-    <button class="btn btn-danger btn-sm btn-trash-product" type="button" data-product-id="<%= item._id %>" data-product-code="<%= item.ma_hang || '' %>" data-product-name="<%= item.ten_hang || '' %>">X&oacute;a</button>
-    <button class="btn btn-light btn-sm btn-copy-product" type="button" data-product='<%- JSON.stringify(item) %>'>Sao ch&eacute;p</button>
-    <button class="btn btn-primary btn-sm btn-edit-product" type="button" data-product='<%- JSON.stringify(item) %>'>Ch&#7881;nh s&#7917;a</button>
-    <button class="btn btn-light btn-sm btn-print-label" type="button" data-product='<%- JSON.stringify(item) %>'>In tem m&atilde;</button>
-    <a class="btn btn-light btn-sm" href="/hang-hoa/hd-nguyen-tac?keyword=<%= encodeURIComponent(item.ma_hang || item.ten_hang || '') %>" target="_blank">H&#272; nguy&ecirc;n t&#7855;c</a>
+      <section class="detail-pane" data-tab-panel="product-card" data-product-lazy-tab="product-card"
+        data-lazy-url="/hang-hoa/api/<%= item._id %>/card">
+        <div class="empty-cell">Chọn tab để tải thẻ kho.</div>
+      </section>
+
+      <section class="detail-pane" data-tab-panel="product-stock" data-product-lazy-tab="product-stock"
+        data-lazy-url="/hang-hoa/api/<%= item._id %>/stock">
+        <div class="empty-cell">Chọn tab để tải tồn kho.</div>
+      </section>
+
+      <% if (item.quan_ly_theo_lo) { %>
+        <section class="detail-pane" data-tab-panel="product-lots" data-product-lazy-tab="product-lots"
+          data-lazy-url="/hang-hoa/api/<%= item._id %>/lots">
+          <div class="empty-cell">Chọn tab để tải lô HSD.</div>
+        </section>
+        <% } %>
+
+          <section class="detail-pane" data-tab-panel="product-lot-profit" id="lotProfitPane_<%= item._id %>">
+            <div class="lot-profit-toolbar">
+              <div class="lot-profit-filters">
+                <label>Lô
+                  <select class="lot-profit-filter" data-field="lo_hang_id">
+                    <option value="">Tất cả</option>
+                  </select>
+                </label>
+                <button type="button" class="btn btn-primary btn-sm lot-profit-export">Xuất file</button>
+              </div>
+            </div>
+            <div class="lot-profit-status" data-lot-profit-status></div>
+            <table class="admin-table product-inner-table lot-profit-table">
+              <thead>
+                <tr>
+                  <th class="lot-profit-date-th">Ngày nhập lô</th>
+                  <th>Tên hàng</th>
+                  <th>Lô</th>
+                  <th class="lot-profit-spec-th">Thuộc tính</th>
+                  <th class="text-right">Số lượng nhập</th>
+                  <th class="text-right">ĐG nhập</th>
+                  <th class="text-right">Tổng giá vốn</th>
+                  <th class="text-right">SL xuất</th>
+                  <th class="text-right">ĐG xuất BQ</th>
+                  <th class="text-right">Tổng doanh thu</th>
+                  <th class="text-right">Lợi nhuận</th>
+                </tr>
+              </thead>
+              <tbody data-lot-profit-body>
+                <tr>
+                  <td colspan="11" class="empty-cell">Chọn tab để tải báo cáo.</td>
+                </tr>
+              </tbody>
+              <tfoot data-lot-profit-foot style="display:none">
+                <tr class="lot-profit-total-row">
+                  <td colspan="6" class="text-right"><strong>Tổng</strong></td>
+                  <td class="text-right" data-sum-gia-von>0</td>
+                  <td class="text-right" data-sum-sl-xuat>0</td>
+                  <td></td>
+                  <td class="text-right" data-sum-doanh-thu>0</td>
+                  <td class="text-right" data-sum-loi-nhuan>0</td>
+                </tr>
+              </tfoot>
+            </table>
+          </section>
   </div>
 </div>

@@ -96,9 +96,11 @@ function makeLotSpecKey(loHangId, spec = {}) {
   return `${String(loHangId)}::${attrId}::${attr}`;
 }
 
-async function loadProductLotOptions(hangHoaId) {
+async function loadProductLotOptions(hangHoaId, options = {}) {
   const map = new Map();
+  const storeId = toObjectId(options.cua_hang_id);
   const stockFilter = { hang_hoa_id: hangHoaId };
+  if (storeId) stockFilter.cua_hang_id = storeId;
   const stockLots = await TonKhoLo.find(stockFilter)
     .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
     .sort({ updated_at: -1, created_at: -1 })
@@ -119,7 +121,9 @@ async function loadProductLotOptions(hangHoaId) {
     });
   });
 
-  const directLots = await LoHang.find({ hang_hoa_id: hangHoaId })
+  const lotFilter = { hang_hoa_id: hangHoaId };
+  if (storeId) lotFilter.cua_hang_id = storeId;
+  const directLots = await LoHang.find(lotFilter)
     .select('ten_lo ma_lo han_su_dung kho_id ngay_nhap')
     .sort({ ngay_nhap: -1 })
     .lean();
@@ -173,26 +177,28 @@ async function loadLotImportStatsBySpec(hangHoaId, options = {}) {
   const map = new Map();
   const filterLoId = toObjectId(options.lo_hang_id);
 
+  const detailFilter = {
+    hang_hoa_id: hangHoaId,
+    lo_hang_id: { $exists: true, $ne: null }
+  };
+  if (filterLoId) detailFilter.lo_hang_id = filterLoId;
+
+  let details = await CTPhieuNhap.find(detailFilter)
+    .select('phieu_nhap_id lo_hang_id so_luong don_gia_nhap gia_tri_thuoc_tinh_id lot_info')
+    .lean();
+  const purchaseIds = [...new Set(details.map((row) => String(row.phieu_nhap_id || '')).filter(Boolean))];
+  if (!purchaseIds.length) return map;
+
   const completedPurchases = await PhieuNhap.find({
+    _id: { $in: purchaseIds },
     trang_thai: 'completed',
     $or: [
       { deleted_at: null },
       { deleted_at: { $exists: false } }
     ]
   }).select('_id').lean();
-  const purchaseIds = completedPurchases.map((row) => row._id);
-  if (!purchaseIds.length) return map;
-
-  const detailFilter = {
-    hang_hoa_id: hangHoaId,
-    phieu_nhap_id: { $in: purchaseIds },
-    lo_hang_id: { $exists: true, $ne: null }
-  };
-  if (filterLoId) detailFilter.lo_hang_id = filterLoId;
-
-  const details = await CTPhieuNhap.find(detailFilter)
-    .select('lo_hang_id so_luong don_gia_nhap gia_tri_thuoc_tinh_id lot_info')
-    .lean();
+  const completedPurchaseMap = new Set(completedPurchases.map((row) => String(row._id)));
+  details = details.filter((row) => completedPurchaseMap.has(String(row.phieu_nhap_id)));
 
   details.forEach((row) => {
     const lotId = toObjectId(row.lo_hang_id);
@@ -286,32 +292,38 @@ async function buildLotProfitReport(options = {}) {
   const ngayNhapTo = parseDateEnd(options.ngay_nhap_to);
   const storeId = toObjectId(options.cua_hang_id) || toObjectId(product.cua_hang_id);
   const filterOptions = {
-    lots: await loadProductLotOptions(hangHoaId)
+    lots: await loadProductLotOptions(hangHoaId, { cua_hang_id: storeId })
   };
 
   const importMap = await loadLotImportStatsBySpec(hangHoaId, { lo_hang_id: filterLoId });
   const salesMap = new Map();
 
-  const invoiceFilter = {
-    trang_thai: { $ne: 'cancelled' },
-    $or: [
-      { deleted_at: null },
-      { deleted_at: { $exists: false } }
-    ]
-  };
-  if (storeId) invoiceFilter.cua_hang_id = storeId;
-
-  const invoices = await HoaDonBanHang.find(invoiceFilter)
-    .select('_id ma_hoa_don ngay_ban')
+  const lineFilter = { hang_hoa_id: hangHoaId };
+  if (filterLoId) {
+    lineFilter.$or = [
+      { lo_hang_id: filterLoId },
+      { 'lot_allocations.lo_hang_id': filterLoId }
+    ];
+  }
+  const lines = await CTHoaDonBanHang.find(lineFilter)
+    .select('hoa_don_id lo_hang_id lot_allocations ten_quy_cach ten_thuoc_tinh gia_tri_thuoc_tinh_id so_luong don_gia')
     .lean();
-  const invoiceIds = invoices.map((row) => row._id);
+  const invoiceIds = [...new Set(lines.map((row) => String(row.hoa_don_id || '')).filter(Boolean))];
 
   if (invoiceIds.length) {
-    const invoiceMap = new Map(invoices.map((row) => [String(row._id), row]));
-    const lineFilter = { hang_hoa_id: hangHoaId, hoa_don_id: { $in: invoiceIds } };
-    const lines = await CTHoaDonBanHang.find(lineFilter)
-      .select('hoa_don_id lo_hang_id lot_allocations ten_quy_cach ten_thuoc_tinh gia_tri_thuoc_tinh_id so_luong don_gia')
+    const invoiceFilter = {
+      _id: { $in: invoiceIds },
+      trang_thai: { $ne: 'cancelled' },
+      $or: [
+        { deleted_at: null },
+        { deleted_at: { $exists: false } }
+      ]
+    };
+    if (storeId) invoiceFilter.cua_hang_id = storeId;
+    const invoices = await HoaDonBanHang.find(invoiceFilter)
+      .select('_id ma_hoa_don ngay_ban')
       .lean();
+    const invoiceMap = new Map(invoices.map((row) => [String(row._id), row]));
 
     lines.forEach((line) => {
       if (!invoiceMap.get(String(line.hoa_don_id))) return;

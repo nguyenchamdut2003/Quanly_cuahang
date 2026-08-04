@@ -161,11 +161,17 @@
     if (!productId) return;
 
     var loaded = false;
-    var money = function(v) { return Number(v || 0).toLocaleString('vi-VN'); };
+    var money = function(v) { return Math.round(Number(v || 0)).toLocaleString('vi-VN'); };
     var dateFmt = function(v) {
       if (!v) return '---';
       var d = new Date(v);
-      return Number.isNaN(d.getTime()) ? '---' : d.toLocaleDateString('vi-VN');
+      return Number.isNaN(d.getTime()) ? '---' : d.toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     };
     var escapeHtml = function(value) {
       return String(value || '')
@@ -250,7 +256,7 @@
           '<td>' + dateFmt(r.ngay_nhap) + '</td>' +
           '<td>' + escapeHtml(r.ten_hang || '---') + '</td>' +
           '<td>' + escapeHtml(r.lo_hien_thi || '---') + warn + '</td>' +
-          '<td>' + escapeHtml(r.ten_quy_cach || '---') + '</td>' +
+          '<td class="lot-profit-spec-cell">' + escapeHtml(r.ten_quy_cach || '---') + '</td>' +
           '<td class="text-right">' + money(r.so_luong_nhap) + '</td>' +
           '<td class="text-right">' + money(r.don_gia_nhap) + '</td>' +
           '<td class="text-right">' + money(r.tong_gia_von) + '</td>' +
@@ -340,7 +346,6 @@
       });
     });
 
-    loadReport();
   }
 
   function initLotExpandRows(root) {
