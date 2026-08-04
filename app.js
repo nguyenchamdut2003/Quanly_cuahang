@@ -22,6 +22,8 @@ var nhapHangRouter = require('./routes/nhapHang');
 var kiemKhoRouter = require('./routes/kiemKho');
 var banHangRouter = require('./routes/banHang');
 var donHangRouter = require('./routes/donHang');
+var doiTacGiaoHangRouter = require('./routes/doitacgiaohang/doitacgiaohang');
+var doiTacGiaoHangExportRouter = require('./routes/doitacgiaohang/export_doitacgiaohang');
 var soQuyRouter = require('./routes/soQuy');
 var baoCaoRouter = require('./routes/baoCao');
 var khachHangRouter = require('./routes/khachHang');
@@ -304,6 +306,8 @@ app.use('/api', apiKhoRouter);
 app.use('/api/address', apiAddressRouter);
 
 app.use('/api/don-hang', donHangRouter);
+app.use('/doi-tac-giao-hang', doiTacGiaoHangRouter);
+app.use('/doi-tac-giao-hang', doiTacGiaoHangExportRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);
 app.use('/bao-cao', baoCaoRouter);
