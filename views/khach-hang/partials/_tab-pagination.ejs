@@ -1,0 +1,14 @@
+<% if (pagination) { %>
+  <div class="customer-pagination">
+    <div>Hiển thị <strong><%= pagination.from %>-<%= pagination.to %></strong> / <strong><%= pagination.total %></strong> dòng</div>
+    <% if (pagination.totalPages > 1) { %>
+      <div class="customer-pagination__actions" aria-label="Phân trang">
+        <a class="customer-page-link <%= pagination.hasPrev ? '' : 'is-disabled' %>" href="<%= baseUrl %>?page=<%= Math.max(1, pagination.page - 1) %>" data-customer-tab-page-url="<%= baseUrl %>?page=<%= Math.max(1, pagination.page - 1) %>">‹</a>
+        <% for (var pageNumber = 1; pageNumber <= pagination.totalPages; pageNumber++) { %>
+          <a class="customer-page-link <%= pageNumber === pagination.page ? 'is-active' : '' %>" href="<%= baseUrl %>?page=<%= pageNumber %>" data-customer-tab-page-url="<%= baseUrl %>?page=<%= pageNumber %>"><%= pageNumber %></a>
+        <% } %>
+        <a class="customer-page-link <%= pagination.hasNext ? '' : 'is-disabled' %>" href="<%= baseUrl %>?page=<%= Math.min(pagination.totalPages, pagination.page + 1) %>" data-customer-tab-page-url="<%= baseUrl %>?page=<%= Math.min(pagination.totalPages, pagination.page + 1) %>">›</a>
+      </div>
+    <% } %>
+  </div>
+<% } %>

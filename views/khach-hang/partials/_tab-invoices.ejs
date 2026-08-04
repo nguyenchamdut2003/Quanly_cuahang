@@ -1,0 +1,35 @@
+<%
+  var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+  var customerInvoiceStatusLabel = {
+    processing: 'Đang xử lý',
+    completed: 'Hoàn thành',
+    failed: 'Không giao được',
+    cancelled: 'Đã hủy',
+    paid: 'Đã thanh toán',
+    partial: 'Thanh toán một phần',
+    unpaid: 'Chưa thanh toán'
+  };
+%>
+<table class="admin-table warehouse-table customer-invoices-table">
+  <thead><tr><th>Mã hóa đơn</th><th>Ngày bán</th><th>Tổng tiền</th><th>Thanh toán</th><th>Trạng thái</th><th>Đơn hàng</th><th>Thao tác</th></tr></thead>
+  <tbody>
+    <% if (!historyInvoices.length) { %>
+      <tr><td colspan="7" class="empty-cell">Chưa có hóa đơn</td></tr>
+    <% } %>
+    <% historyInvoices.forEach(function(invoice) { %>
+      <tr>
+        <td><%- refLink('invoice', invoice, invoice.ma_hoa_don || '---') %></td>
+        <td><%= formatDate(invoice.ngay_ban || invoice.created_at) %></td>
+        <td><%= money(invoice.tong_tien || 0) %></td>
+        <td><%= money(invoice.thanh_toan || 0) %></td>
+        <td><%= customerInvoiceStatusLabel[invoice.trang_thai] || invoice.trang_thai || '---' %></td>
+        <td><%- invoice.don_hang_id ? refLink('order', invoice.don_hang_id, invoice.don_hang_id.ma_don_hang || '---') : '---' %></td>
+        <td>
+          <a class="btn btn-light btn-sm" href="/don-hang/hoa-don">Xem</a>
+          <a class="btn btn-light btn-sm" href="/don-hang/tra-hang/create?invoice_id=<%= invoice._id %>">Trả hàng</a>
+        </td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>

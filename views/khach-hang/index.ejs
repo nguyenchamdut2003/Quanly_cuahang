@@ -860,6 +860,20 @@
         });
       }
 
+      function fetchCustomerHtml(url) {
+        return fetch(url, {
+          credentials: 'same-origin',
+          headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(response) {
+          return response.text().then(function(html) {
+            if (!response.ok) {
+              throw new Error(html || 'Không tải được dữ liệu tab.');
+            }
+            return html;
+          });
+        });
+      }
+
       function selectedCustomerBoxes() {
         return checkboxes.filter(function(box) { return box.checked; });
       }
@@ -1048,6 +1062,25 @@
       var kvCustomerTable = document.querySelector('table[data-kv-master="khach-hang"]');
       var kvCustomer = null;
 
+      function loadCustomerLazyPane(pane, url, force) {
+        if (!pane || !url) return Promise.resolve();
+        if (!force && pane.getAttribute('data-lazy-loaded') === '1') return Promise.resolve();
+        pane.setAttribute('data-lazy-loading', '1');
+        pane.innerHTML = '<div class="empty-cell">Đang tải dữ liệu...</div>';
+        return fetchCustomerHtml(url)
+          .then(function(html) {
+            pane.innerHTML = html;
+            pane.setAttribute('data-lazy-loaded', '1');
+            pane.removeAttribute('data-lazy-loading');
+            initGhnAddressSelects(pane);
+            if (window.KvDebtPeriodExport) window.KvDebtPeriodExport.bind(pane);
+          })
+          .catch(function(error) {
+            pane.removeAttribute('data-lazy-loading');
+            pane.innerHTML = '<div class="empty-cell">' + (error.message || 'Không tải được dữ liệu tab.') + '</div>';
+          });
+      }
+
       function bindCustomerInlinePanel(rootEl) {
         var wrap = rootEl.querySelector('.customer-inline-detail') || rootEl;
         if (window.KvDebtPeriodExport) window.KvDebtPeriodExport.bind(wrap);
@@ -1066,6 +1099,27 @@
         }
 
         initGhnAddressSelects(wrap);
+        detailBlock.querySelectorAll('.detail-tab[data-tab-target]').forEach(function(tab) {
+          if (tab.getAttribute('data-customer-tab-lazy-bound') === '1') return;
+          tab.setAttribute('data-customer-tab-lazy-bound', '1');
+          tab.addEventListener('click', function() {
+            var target = tab.getAttribute('data-tab-target') || '';
+            var pane = detailBlock.querySelector('.customer-detail-pane[data-tab-pane="' + target + '"]');
+            if (!pane) return;
+            loadCustomerLazyPane(pane, pane.getAttribute('data-lazy-url') || '', false);
+          });
+        });
+        if (detailBlock.getAttribute('data-customer-tab-page-bound') !== '1') {
+          detailBlock.setAttribute('data-customer-tab-page-bound', '1');
+          detailBlock.addEventListener('click', function(event) {
+            var pageLink = event.target.closest('[data-customer-tab-page-url]');
+            if (!pageLink) return;
+            event.preventDefault();
+            if (pageLink.classList.contains('is-disabled') || pageLink.classList.contains('is-active')) return;
+            var pane = pageLink.closest('.customer-detail-pane[data-tab-pane]');
+            loadCustomerLazyPane(pane, pageLink.getAttribute('data-customer-tab-page-url') || pageLink.getAttribute('href') || '', true);
+          });
+        }
         var deleteAction = detailBlock.querySelector('[data-customer-delete-action]');
         if (deleteAction && !deleteAction.getAttribute('data-customer-delete-bound')) {
           deleteAction.setAttribute('data-customer-delete-bound', '1');

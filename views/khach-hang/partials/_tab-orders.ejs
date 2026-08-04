@@ -1,0 +1,37 @@
+<%
+  var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+  var customerOrderStatusLabel = {
+    draft: 'Phiếu tạm',
+    shipping: 'Đang giao hàng',
+    completed: 'Hoàn thành',
+    cancelled: 'Đã hủy',
+    merged: 'Đã gộp'
+  };
+  var customerDeliveryStatusLabel = {
+    chua_giao: 'Chưa giao',
+    giao_mot_phan: 'Giao một phần',
+    giao_thieu: 'Giao thiếu',
+    giao_du: 'Giao đủ'
+  };
+%>
+<table class="admin-table warehouse-table customer-orders-table">
+  <thead><tr><th>Mã đơn hàng</th><th>Ngày đặt</th><th>Tổng tiền hàng</th><th>Khách cần trả</th><th>Khách đã trả</th><th>Trạng thái đơn</th><th>Giao hàng</th><th>Thao tác</th></tr></thead>
+  <tbody>
+    <% if (!historyOrders.length) { %>
+      <tr><td colspan="8" class="empty-cell">Chưa có đơn hàng</td></tr>
+    <% } %>
+    <% historyOrders.forEach(function(order) { %>
+      <tr>
+        <td><%- refLink('order', order, order.ma_don_hang || '---') %></td>
+        <td><%= formatDate(order.ngay_dat || order.created_at) %></td>
+        <td><%= money(order.tong_tien_hang || order.tong_tien || 0) %></td>
+        <td><%= money(order.tong_thanh_toan || order.tong_tien || 0) %></td>
+        <td><%= money(order.khach_thanh_toan || order.khach_da_tra || 0) %></td>
+        <td><%= customerOrderStatusLabel[order.trang_thai] || order.trang_thai || '---' %></td>
+        <td><%= customerDeliveryStatusLabel[order.trang_thai_giao_hang] || order.trang_thai_giao_hang || '---' %></td>
+        <td><a class="btn btn-light btn-sm" href="/don-hang?order=<%= order._id %>">Xem</a></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>

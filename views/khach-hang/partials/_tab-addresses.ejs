@@ -1,0 +1,141 @@
+<% var returnQuery = filterQueryString || ''; %>
+<div class="warehouse-section">
+  <table class="admin-table warehouse-table customer-address-table">
+    <thead>
+      <tr>
+        <th>Tên người nhận</th>
+        <th>SĐT</th>
+        <th>Tỉnh/thành</th>
+        <th>Phường/xã</th>
+        <th>Địa chỉ</th>
+        <th>Loại địa chỉ
+          <button class="btn btn-light js-open-address-type-modal" type="button">+</button>
+        </th>
+        <th>Mặc định</th>
+        <th>Thao tác</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="warehouse-edit-row warehouse-add-row">
+        <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="ten_nguoi_nhan" placeholder="Tên người nhận"></td>
+        <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="sdt_nguoi_nhan" placeholder="SĐT" maxlength="10" inputmode="numeric"></td>
+        <td>
+          <select form="addressAddForm_<%= selectedCustomer._id %>" class="js-ghn-province" name="tinh_thanh" data-selected-name="">
+            <option value="">Chọn Tỉnh/Thành</option>
+          </select>
+          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="tinh_thanh_id" class="js-ghn-province-id">
+        </td>
+        <td>
+          <select form="addressAddForm_<%= selectedCustomer._id %>" class="js-ghn-ward" name="phuong_xa" data-selected-name="">
+            <option value="">Chọn Phường/Xã</option>
+          </select>
+          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="phuong_xa_code" class="js-ghn-ward-code">
+          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen" class="js-ghn-district-name">
+          <input type="hidden" form="addressAddForm_<%= selectedCustomer._id %>" name="quan_huyen_id" class="js-ghn-district-id">
+        </td>
+        <td><input form="addressAddForm_<%= selectedCustomer._id %>" name="dia_chi_chi_tiet" placeholder="Địa chỉ chi tiết"></td>
+        <td>
+          <select class="js-address-type-select" form="addressAddForm_<%= selectedCustomer._id %>" name="loai_dia_chi">
+            <option value="khac">Khác</option>
+            <% (addressTypes || []).filter(function(type) { return type.ma_loai !== 'khac'; }).forEach(function(type) { %>
+              <option value="<%= type.ma_loai %>"><%= type.ten_loai %></option>
+            <% }) %>
+          </select>
+        </td>
+        <td>
+          <select form="addressAddForm_<%= selectedCustomer._id %>" name="mac_dinh">
+            <option value="">Không</option>
+            <option value="true">Có</option>
+          </select>
+        </td>
+        <td class="warehouse-action-cell">
+          <button
+            form="addressAddForm_<%= selectedCustomer._id %>"
+            class="btn btn-primary btn-sm js-address-add"
+            data-form-id="addressAddForm_<%= selectedCustomer._id %>"
+            data-action="/khach-hang/<%= selectedCustomer._id %>/addresses/add"
+            type="submit"
+          >Thêm</button>
+        </td>
+      </tr>
+      <% if (!customerAddresses || customerAddresses.length === 0) { %>
+        <tr>
+          <td colspan="8" class="empty-cell">Khách hàng này chưa có địa chỉ.</td>
+        </tr>
+      <% } %>
+      <% (customerAddresses || []).forEach(function(address) { %>
+        <% var addressFormId = 'addressForm_' + String(address._id); %>
+        <tr class="warehouse-edit-row">
+          <td><input form="<%= addressFormId %>" name="ten_nguoi_nhan" value="<%= address.ten_nguoi_nhan || '' %>" required></td>
+          <td><input form="<%= addressFormId %>" name="sdt_nguoi_nhan" value="<%= address.sdt_nguoi_nhan || '' %>" maxlength="10" inputmode="numeric"></td>
+          <td>
+            <select form="<%= addressFormId %>" class="js-ghn-province" name="tinh_thanh" data-selected-id="<%= address.tinh_thanh_id || '' %>" data-selected-name="<%= address.tinh_thanh || '' %>">
+              <% if (address.tinh_thanh) { %>
+                <option value="<%= address.tinh_thanh %>" selected><%= address.tinh_thanh %></option>
+              <% } else { %>
+                <option value="">Chọn Tỉnh/Thành</option>
+              <% } %>
+            </select>
+            <input type="hidden" form="<%= addressFormId %>" name="tinh_thanh_id" class="js-ghn-province-id" value="<%= address.tinh_thanh_id || '' %>">
+          </td>
+          <td>
+            <select form="<%= addressFormId %>" class="js-ghn-ward" name="phuong_xa" data-selected-id="<%= address.phuong_xa_code || '' %>" data-selected-name="<%= address.phuong_xa || '' %>">
+              <% if (address.phuong_xa) { %>
+                <option value="<%= address.phuong_xa %>" selected><%= address.phuong_xa %></option>
+              <% } else { %>
+                <option value="">Chọn Phường/Xã</option>
+              <% } %>
+            </select>
+            <input type="hidden" form="<%= addressFormId %>" name="phuong_xa_code" class="js-ghn-ward-code" value="<%= address.phuong_xa_code || '' %>">
+            <input type="hidden" form="<%= addressFormId %>" name="quan_huyen" class="js-ghn-district-name" value="<%= address.quan_huyen || '' %>">
+            <input type="hidden" form="<%= addressFormId %>" name="quan_huyen_id" class="js-ghn-district-id" value="<%= address.quan_huyen_id || '' %>">
+          </td>
+          <td><input form="<%= addressFormId %>" name="dia_chi_chi_tiet" value="<%= address.dia_chi_chi_tiet || '' %>"></td>
+          <td>
+            <select class="js-address-type-select" form="<%= addressFormId %>" name="loai_dia_chi">
+              <option value="khac" <%= address.loai_dia_chi === 'khac' ? 'selected' : '' %>>Khác</option>
+              <% (addressTypes || []).filter(function(type) { return type.ma_loai !== 'khac'; }).forEach(function(type) { %>
+                <option value="<%= type.ma_loai %>" <%= address.loai_dia_chi === type.ma_loai ? 'selected' : '' %>><%= type.ten_loai %></option>
+              <% }) %>
+            </select>
+          </td>
+          <td>
+            <select form="<%= addressFormId %>" name="mac_dinh">
+              <option value="" <%= address.mac_dinh ? '' : 'selected' %>>Không</option>
+              <option value="true" <%= address.mac_dinh ? 'selected' : '' %>>Có</option>
+            </select>
+          </td>
+          <td class="warehouse-action-cell">
+            <div class="warehouse-action-buttons">
+              <button
+                form="<%= addressFormId %>"
+                class="btn btn-light btn-sm"
+                type="submit"
+                onclick="return confirm('Bạn có muốn lưu chỉnh sửa địa chỉ này không?')"
+              >Lưu</button>
+              <button
+                form="addressDeleteForm_<%= address._id %>"
+                class="btn btn-danger btn-sm address-delete-btn"
+                type="submit"
+                data-address-delete-action="1"
+                style="display:inline-flex!important;visibility:visible!important;opacity:1!important"
+                onclick="return confirm('Bạn có chắc muốn xóa địa chỉ này không?')"
+              >Xóa</button>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+<form id="addressAddForm_<%= selectedCustomer._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/add">
+  <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+</form>
+<% (customerAddresses || []).forEach(function(address) { %>
+  <form id="addressForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/update">
+    <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+  </form>
+  <form id="addressDeleteForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/delete">
+    <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
+  </form>
+<% }) %>

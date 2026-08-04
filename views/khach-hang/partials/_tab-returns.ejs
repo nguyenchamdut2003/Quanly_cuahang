@@ -1,0 +1,29 @@
+<%
+  var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+  var customerReturnStatusLabel = {
+    draft: 'Phiếu tạm',
+    pending: 'Chờ xử lý',
+    completed: 'Đã trả',
+    cancelled: 'Đã hủy'
+  };
+%>
+<table class="admin-table warehouse-table customer-returns-table">
+  <thead><tr><th>Mã phiếu trả</th><th>Ngày trả</th><th>Hóa đơn gốc</th><th>Tổng tiền trả</th><th>Trạng thái</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
+  <tbody>
+    <% if (!historyReturns.length) { %>
+      <tr><td colspan="7" class="empty-cell">Chưa có phiếu trả hàng</td></tr>
+    <% } %>
+    <% historyReturns.forEach(function(ret) { %>
+      <tr>
+        <td><%= ret.ma_phieu_tra || '---' %></td>
+        <td><%= formatDate(ret.ngay_tra || ret.created_at) %></td>
+        <td><%- ret.hoa_don_id ? refLink('invoice', ret.hoa_don_id, ret.hoa_don_id.ma_hoa_don || '---') : '---' %></td>
+        <td><%= money(ret.can_tra_khach || ret.tong_tien_tra || 0) %></td>
+        <td><%= customerReturnStatusLabel[ret.trang_thai] || ret.trang_thai || '---' %></td>
+        <td><%= ret.ghi_chu || '---' %></td>
+        <td><a class="btn btn-light btn-sm" href="/don-hang/tra-hang?customer=<%= selectedCustomer._id %>">Xem</a></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>

@@ -1,0 +1,51 @@
+<%
+  var money = function(value) { return Number(value || 0).toLocaleString('vi-VN'); };
+  var debtTypeLabel = {
+    tang_no: 'Tăng nợ',
+    giam_no: 'Giảm nợ',
+    thanh_toan: 'Thanh toán'
+  };
+%>
+<div class="customer-debt-toolbar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+  <button
+    type="button"
+    class="btn btn-primary btn-sm js-debt-export-trigger"
+    data-export-kind="both"
+    data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+    data-extra-qs=""
+  >Xuất công nợ</button>
+  <button
+    type="button"
+    class="btn btn-light btn-sm js-debt-export-trigger"
+    data-export-kind="quan-tri"
+    data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+    data-extra-qs=""
+  >Quản trị</button>
+  <button
+    type="button"
+    class="btn btn-light btn-sm js-debt-export-trigger"
+    data-export-kind="doi-tac"
+    data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+    data-extra-qs=""
+  >Gửi đối tác</button>
+</div>
+<table class="admin-table warehouse-table">
+  <thead><tr><th class="text-center">Ngày</th><th class="text-center">Loại</th><th class="text-center">Số tiền</th><th class="text-center">Hóa đơn</th><th class="text-center">Đơn hàng</th><th class="text-center">Phiếu thu chi</th><th class="text-center">Ghi chú</th></tr></thead>
+  <tbody>
+    <% if (!historyDebts.length) { %>
+      <tr><td colspan="7" class="empty-cell">Chưa có công nợ</td></tr>
+    <% } %>
+    <% historyDebts.forEach(function(debt) { %>
+      <tr>
+        <td class="text-center"><%= formatDate(debt.ngay || debt.created_at) %></td>
+        <td class="text-center"><%= debtTypeLabel[debt.loai] || debt.loai || '---' %></td>
+        <td class="text-center"><%= money(debt.so_tien || 0) %></td>
+        <td class="text-center"><%- debt.hoa_don_id ? refLink('invoice', debt.hoa_don_id, debt.hoa_don_id.ma_hoa_don || '---') : '---' %></td>
+        <td class="text-center"><%- debt.don_hang_id ? refLink('order', debt.don_hang_id, debt.don_hang_id.ma_don_hang || '---') : '---' %></td>
+        <td class="text-center"><%- debt.phieu_thu_chi_id ? refLink('receipt', debt.phieu_thu_chi_id, debt.phieu_thu_chi_id.ma_phieu || debt.phieu_thu_chi_id.ma_phieu_thu_chi || '---') : '---' %></td>
+        <td class="text-center"><%= debt.ghi_chu || '---' %></td>
+      </tr>
+    <% }) %>
+  </tbody>
+</table>
+<%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>
