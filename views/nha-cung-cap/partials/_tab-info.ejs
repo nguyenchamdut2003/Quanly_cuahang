@@ -1,0 +1,77 @@
+        <div class="supplier-info-block">
+          <div class="supplier-info-avatar">NCC</div>
+          <div class="supplier-info-main">
+            <h2>
+              <%= selectedSupplier.ten_ncc || 'Nhà cung cấp' %>
+            </h2>
+            <p><%- refLink('supplier', selectedSupplier, selectedSupplier.ma_ncc || '---' ) %></p>
+            <div class="supplier-info-tags">
+              <span class="tag">Nhà cung cấp</span>
+              <span class="tag tag-green">
+                <%= selectedSupplier.trang_thai==='active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %>
+              </span>
+            </div>
+          </div>
+        </div>
+        <form id="supplierInlineEdit_<%= selectedSupplier._id %>" method="post"
+          action="/nha-cung-cap/<%= selectedSupplier._id %>/update" class="supplier-inline-edit-form">
+          <div class="store-fields supplier-detail-fields">
+            <div><span>Mã NCC</span><input name="ma_ncc" value="<%= selectedSupplier.ma_ncc || '' %>"></div>
+            <div><span>Tên nhà cung cấp *</span><input name="ten_ncc" value="<%= selectedSupplier.ten_ncc || '' %>"
+                required></div>
+            <div><span>Điện thoại</span><input name="sdt" value="<%= selectedSupplier.sdt || '' %>"></div>
+            <div><span>Email</span><input name="email" type="email" value="<%= selectedSupplier.email || '' %>"></div>
+            <div><span>Tên công ty</span><input name="ten_cong_ty" value="<%= selectedSupplier.ten_cong_ty || '' %>">
+            </div>
+            <div><span>Mã số thuế</span><input name="ma_so_thue" value="<%= selectedSupplier.ma_so_thue || '' %>"></div>
+            <div><span>Tổng mua</span>
+              <div>
+                <strong class="supplier-metric-readonly">
+                  <%= Number(selectedSupplier.tong_mua || 0).toLocaleString('vi-VN') %>
+                </strong>
+                <div class="supplier-metric-hint">Tự động tính từ phiếu đã nhập hàng</div>
+              </div>
+            </div>
+            <div><span>Đã thanh toán</span>
+              <div>
+                <strong class="supplier-metric-readonly">
+                  <%= Number(selectedSupplier.da_thanh_toan || 0).toLocaleString('vi-VN') %>
+                </strong>
+                <div class="supplier-metric-hint">Tổng mua − Tổng nợ (hoặc từ sổ thanh toán)</div>
+              </div>
+            </div>
+            <div><span>Tổng nợ</span>
+              <div>
+                <strong class="supplier-metric-readonly">
+                  <%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %>
+                </strong>
+                <div class="supplier-metric-hint">Tự động tính từ sổ công nợ NCC</div>
+              </div>
+            </div>
+            <div><span>Trạng thái</span>
+              <select name="trang_thai">
+                <option value="active" <%=selectedSupplier.trang_thai !=='inactive' ? 'selected' : '' %>>Đang hoạt động
+                </option>
+                <option value="inactive" <%=selectedSupplier.trang_thai==='inactive' ? 'selected' : '' %>>Ngừng hoạt
+                  động</option>
+              </select>
+            </div>
+            <div><span>Thời gian tạo</span><strong>
+                <%= formatDate(selectedSupplier.created_at) %>
+              </strong></div>
+            <div class="supplier-detail-field-full"><span>Ghi chú</span><input name="ghi_chu"
+                value="<%= selectedSupplier.ghi_chu || '' %>"></div>
+          </div>
+        </form>
+        <div class="supplier-detail-footer">
+          <a class="btn btn-primary btn-sm" href="/nha-cung-cap/<%= selectedSupplier._id %>/export/hoa-don-gop"
+            target="_blank" rel="noopener">Xuất chi tiết SP (hóa đơn gộp)</a>
+          <a class="btn btn-light btn-sm" href="/nha-cung-cap/<%= selectedSupplier._id %>/export/hang-hoa"
+            target="_blank" rel="noopener">Xuất danh mục hàng</a>
+          <a class="btn btn-light btn-sm" href="/nha-cung-cap/<%= selectedSupplier._id %>/export/info" target="_blank"
+            rel="noopener">Xuất thông tin</a>
+          <button class="btn btn-danger btn-sm" type="submit" form="supplierInlineDel_<%= selectedSupplier._id %>"
+            onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
+          <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>"
+            onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
+        </div>

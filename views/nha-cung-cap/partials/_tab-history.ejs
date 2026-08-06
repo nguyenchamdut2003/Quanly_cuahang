@@ -1,0 +1,77 @@
+        <div class="supplier-pane-table-wrap table-wrap">
+          <% var supplierPurchaseHistoryTotal=(supplierPurchaseHistory || []).reduce(function(sum, row) { var
+            sign=row.loai==='tra' ? -1 : 1; return sum + sign * Number(row.tong_cong || 0); }, 0); %>
+            <table class="admin-table warehouse-table">
+              <thead>
+                <tr>
+                  <th class="text-center">Mã phiếu</th>
+                  <th class="text-center">Thời gian</th>
+                  <th class="text-center">Người tạo</th>
+                  <th class="text-center">
+                    Tổng cộng
+                    <% if ((supplierPurchaseHistory || []).length> 0) { %>
+                      <div class="supplier-column-total <%= supplierPurchaseHistoryTotal < 0 ? 'is-return' : '' %>">
+                        <%= supplierPurchaseHistoryTotal.toLocaleString('vi-VN') %> VNĐ
+                      </div>
+                      <% } %>
+                  </th>
+                  <th class="text-center">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% if ((supplierPurchaseHistory || []).length===0) { %>
+                  <tr>
+                    <td colspan="5" class="empty-cell">Chưa có lịch sử nhập/trả hàng hóa.</td>
+                  </tr>
+                  <% } %>
+                    <% (supplierPurchaseHistory || []).forEach(function(row) { %>
+                      <% var isReturnHistory=row.loai==='tra' ; var historyHref='#' ; if (row.loai==='nhap' &&
+                        row.phieu_nhap_id) historyHref=refUrl('purchase', row.phieu_nhap_id); else if (row.loai==='tra'
+                        && row.phieu_tra_hang_nhap_id) historyHref='/tra-hang-nhap/' + row.phieu_tra_hang_nhap_id; var
+                        historyTypeLabel=typeof mapSupplierPurchaseHistoryType==='function' ?
+                        mapSupplierPurchaseHistoryType(row.loai) : (isReturnHistory ? 'Trả hàng hóa' : 'Nhập hàng hóa'
+                        ); %>
+                        <tr>
+                          <td class="text-center">
+                            <a href="<%= historyHref %>" class="table-code-link ref-link">
+                              <% if (!isReturnHistory) { %>
+                                <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
+                                <% } else { %>
+                                  <i class="fa-solid fa-arrow-rotate-left history-type-icon history-type-icon--return"
+                                    title="Trả hàng"></i>
+                                  <% } %>
+                                    <%= row.ma_phieu || '--' %>
+                            </a>
+                          </td>
+                          <td class="supplier-muted-cell text-center">
+                            <%= formatDate(row.thoi_gian) %>
+                          </td>
+                          <td class="text-center">
+                            <div class="history-creator">
+                              <span class="history-creator-avatar">
+                                <%= (row.nguoi_tao || 'U' ).charAt(0).toUpperCase() %>
+                              </span>
+                              <%= row.nguoi_tao || '--' %>
+                            </div>
+                          </td>
+                          <td class="text-center">
+                            <span class="history-amount <%= isReturnHistory ? 'is-return' : '' %>">
+                              <%= isReturnHistory ? '-' : '' %>
+                                <%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ
+                            </span>
+                          </td>
+                          <td class="text-center">
+                            <% var statusClass='status-pill' ; var statusLabelText=historyTypeLabel; if
+                              (row.trang_thai==='completed' ) statusClass +=' is-active' ; else if
+                              (row.trang_thai==='active' ) statusClass +=' is-active' ; else if
+                              (row.trang_thai==='draft' ) statusClass +=' is-draft' ; else if
+                              (row.trang_thai==='cancelled' ) statusClass +=' is-cancelled' ; %>
+                              <span class="<%= statusClass %>">
+                                <%= statusLabelText %>
+                              </span>
+                          </td>
+                        </tr>
+                        <% }) %>
+              </tbody>
+            </table>
+        </div>

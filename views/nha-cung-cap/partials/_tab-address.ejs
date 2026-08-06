@@ -1,0 +1,219 @@
+        <% var supplierAddressReturnQuery=filterQueryString || '' ; %>
+          <% var supplierAddressTotalProfit=(supplierAddresses || []).reduce(function(total, address) { return total +
+            Number(address.loi_nhuan || 0); }, 0); %>
+            <div class="warehouse-section">
+              <table class="admin-table warehouse-table supplier-address-table">
+                <thead>
+                  <tr>
+                    <th>Tên người nhận</th>
+                    <th>SĐT</th>
+                    <th>Tỉnh/thành</th>
+                    <th>Phường/xã</th>
+                    <th>Địa chỉ</th>
+                    <th>Loại địa chỉ
+                      <button class="btn btn-light js-open-address-type-modal" type="button">+</button>
+                    </th>
+                    <th>Lợi nhuận</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% var supplierAddressAddFormId='supplierAddressAdd_' + String(selectedSupplier._id); %>
+                    <tr class="warehouse-edit-row warehouse-add-row">
+                      <td>
+                        <input data-address-form="<%= supplierAddressAddFormId %>" name="returnQuery" type="hidden"
+                          value="<%= supplierAddressReturnQuery %>">
+                        <input data-address-form="<%= supplierAddressAddFormId %>" name="ten_nguoi_nhan"
+                          placeholder="Tên người nhận">
+                      </td>
+                      <td><input data-address-form="<%= supplierAddressAddFormId %>" name="sdt_nguoi_nhan"
+                          placeholder="SĐT"></td>
+                      <td>
+                        <select data-address-form="<%= supplierAddressAddFormId %>" class="js-ghn-province"
+                          name="tinh_thanh" data-selected-name="">
+                          <option value="">Chọn Tỉnh/Thành</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select data-address-form="<%= supplierAddressAddFormId %>" class="js-ghn-ward" name="phuong_xa"
+                          data-selected-name="">
+                          <option value="">Chọn Phường/Xã</option>
+                        </select>
+                      </td>
+                      <td><input data-address-form="<%= supplierAddressAddFormId %>" name="dia_chi_chi_tiet"
+                          placeholder="Địa chỉ chi tiết"></td>
+                      <td>
+                        <select class="js-address-type-select" data-address-form="<%= supplierAddressAddFormId %>"
+                          name="loai_dia_chi">
+                          <option value="khac">Khác</option>
+                          <% (addressTypes || []).filter(function(type) { return type.ma_loai !=='khac' ;
+                            }).forEach(function(type) { %>
+                            <option value="<%= type.ma_loai %>">
+                              <%= type.ten_loai %>
+                            </option>
+                            <% }) %>
+                        </select>
+                      </td>
+                      <td class="text-right" title="Tổng lợi nhuận của các vườn thuộc nhà cung cấp này">
+                        <strong class="<%= supplierAddressTotalProfit < 0 ? 'profit-negative' : 'profit-positive' %>">
+                          <%= supplierAddressTotalProfit.toLocaleString('vi-VN') %>
+                        </strong>
+                      </td>
+                      <td class="warehouse-action-cell">
+                        <button class="btn btn-primary btn-sm js-supplier-address-submit" type="button"
+                          data-form-id="<%= supplierAddressAddFormId %>"
+                          data-action="/nha-cung-cap/<%= selectedSupplier._id %>/dia-chi"
+                          data-confirm="Bạn có muốn thêm địa chỉ mới không?">✨ Thêm</button>
+                      </td>
+                    </tr>
+                    <% if (!supplierAddresses || supplierAddresses.length===0) { %>
+                      <tr>
+                        <td colspan="8" class="empty-cell">Nhà cung cấp này chưa có địa chỉ.</td>
+                      </tr>
+                      <% } %>
+                        <% (supplierAddresses || []).forEach(function(address) { %>
+                          <% var supplierAddressFormId='supplierAddressForm_' + String(address._id); %>
+                            <tr class="warehouse-edit-row">
+                              <td>
+                                <input data-address-form="<%= supplierAddressFormId %>" name="returnQuery" type="hidden"
+                                  value="<%= supplierAddressReturnQuery %>">
+                                <input data-address-form="<%= supplierAddressFormId %>" name="mac_dinh" type="hidden"
+                                  value="<%= address.mac_dinh ? 'true' : '' %>">
+                                <input data-address-form="<%= supplierAddressFormId %>" name="ten_nguoi_nhan"
+                                  value="<%= address.ten_nguoi_nhan || '' %>">
+                              </td>
+                              <td><input data-address-form="<%= supplierAddressFormId %>" name="sdt_nguoi_nhan"
+                                  value="<%= address.sdt_nguoi_nhan || '' %>"></td>
+                              <td>
+                                <select data-address-form="<%= supplierAddressFormId %>" class="js-ghn-province"
+                                  name="tinh_thanh" data-selected-name="<%= address.tinh_thanh || '' %>">
+                                  <% if (address.tinh_thanh) { %>
+                                    <option value="<%= address.tinh_thanh %>" selected>
+                                      <%= address.tinh_thanh %>
+                                    </option>
+                                    <% } else { %>
+                                      <option value="">Chọn Tỉnh/Thành</option>
+                                      <% } %>
+                                </select>
+                              </td>
+                              <td>
+                                <select data-address-form="<%= supplierAddressFormId %>" class="js-ghn-ward"
+                                  name="phuong_xa" data-selected-name="<%= address.phuong_xa || '' %>">
+                                  <% if (address.phuong_xa) { %>
+                                    <option value="<%= address.phuong_xa %>" selected>
+                                      <%= address.phuong_xa %>
+                                    </option>
+                                    <% } else { %>
+                                      <option value="">Chọn Phường/Xã</option>
+                                      <% } %>
+                                </select>
+                              </td>
+                              <td><input data-address-form="<%= supplierAddressFormId %>" name="dia_chi_chi_tiet"
+                                  value="<%= address.dia_chi_chi_tiet || address.so_nha || address.dia_chi_day_du || '' %>">
+                              </td>
+                              <td>
+                                <select class="js-address-type-select" data-address-form="<%= supplierAddressFormId %>"
+                                  name="loai_dia_chi">
+                                  <option value="khac" <%=address.loai_dia_chi==='khac' ? 'selected' : '' %>>Khác
+                                  </option>
+                                  <% (addressTypes || []).filter(function(type) { return type.ma_loai !=='khac' ;
+                                    }).forEach(function(type) { %>
+                                    <option value="<%= type.ma_loai %>" <%=address.loai_dia_chi===type.ma_loai
+                                      ? 'selected' : '' %>><%= type.ten_loai %>
+                                    </option>
+                                    <% }) %>
+                                </select>
+                              </td>
+                              <td class="text-right">
+                                <strong
+                                  class="<%= Number(address.loi_nhuan || 0) < 0 ? 'profit-negative' : 'profit-positive' %>">
+                                  <%= Number(address.loi_nhuan || 0).toLocaleString('vi-VN') %>
+                                </strong>
+                              </td>
+                              <td class="warehouse-action-cell">
+                                <div class="warehouse-action-buttons">
+                                  <button class="btn btn-light btn-sm js-supplier-address-profit-toggle" type="button"
+                                    data-address-id="<%= address._id %>">Chi tiết</button>
+                                  <button class="btn btn-light btn-sm js-supplier-address-submit" type="button"
+                                    data-form-id="<%= supplierAddressFormId %>"
+                                    data-action="/nha-cung-cap/dia-chi/<%= address._id %>/update"
+                                    data-confirm="Bạn có muốn lưu chỉnh sửa địa chỉ này không?">Lưu</button>
+                                  <button class="btn btn-danger btn-sm js-supplier-address-delete address-delete-btn"
+                                    type="button" data-address-delete-action="1"
+                                    data-return-query="<%= supplierAddressReturnQuery %>"
+                                    data-action="/nha-cung-cap/dia-chi/<%= address._id %>/delete"
+                                    style="display:inline-flex!important;visibility:visible!important;opacity:1!important">Xóa</button>
+                                </div>
+                              </td>
+                            </tr>
+                            <tr class="supplier-address-profit-detail-row" data-address-profit-row="<%= address._id %>"
+                              style="display:none">
+                              <td colspan="8">
+                                <div class="supplier-address-profit-detail">
+                                  <div class="supplier-address-profit-summary">
+                                    <span>Doanh thu: <strong>
+                                        <%= Number(address.doanh_thu || 0).toLocaleString('vi-VN') %>
+                                      </strong></span>
+                                    <span>Giá vốn: <strong>
+                                        <%= Number(address.gia_von || 0).toLocaleString('vi-VN') %>
+                                      </strong></span>
+                                    <span>Số lượng bán: <strong>
+                                        <%= Number(address.so_luong_ban || 0).toLocaleString('vi-VN') %>
+                                      </strong></span>
+                                    <span>Lợi nhuận: <strong
+                                        class="<%= Number(address.loi_nhuan || 0) < 0 ? 'profit-negative' : 'profit-positive' %>">
+                                        <%= Number(address.loi_nhuan || 0).toLocaleString('vi-VN') %>
+                                      </strong></span>
+                                  </div>
+                                  <% var addressProfitDetails=address.profit_detail_rows || []; %>
+                                    <% if (!addressProfitDetails.length) { %>
+                                      <div class="empty-cell">Chưa có dữ liệu bán hàng gắn với địa chỉ này.</div>
+                                      <% } else { %>
+                                        <table class="admin-table supplier-address-profit-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Hóa đơn</th>
+                                              <th>Ngày bán</th>
+                                              <th>Hàng hóa</th>
+                                              <th>Lô</th>
+                                              <th class="text-right">SL</th>
+                                              <th class="text-right">Doanh thu</th>
+                                              <th class="text-right">Giá vốn</th>
+                                              <th class="text-right">Lợi nhuận</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            <% addressProfitDetails.forEach(function(detail) { %>
+                                              <tr>
+                                                <td>
+                                                  <%= detail.ma_hoa_don || '---' %>
+                                                </td>
+                                                <td>
+                                                  <%= formatDate(detail.ngay_ban) %>
+                                                </td>
+                                                <td><%= [detail.ma_hang, detail.ten_hang].filter(Boolean).join(' - ') || '---' %></td>
+                                                <td><%= [detail.ma_lo, detail.ten_lo].filter(Boolean).join(' - ') || '---' %><%= detail.ten_quy_cach && detail.ten_quy_cach !== '---' ? (' / ' + detail.ten_quy_cach) : '' %></td>
+                                                <td class="text-right"><%= Number(detail.so_luong || 0).toLocaleString('vi-VN') %></td>
+                                                <td class="text-right">
+                                                  <%= Number(detail.doanh_thu || 0).toLocaleString('vi-VN') %>
+                                                </td>
+                                                <td class="text-right">
+                                                  <%= Number(detail.gia_von || 0).toLocaleString('vi-VN') %>
+                                                    <%= detail.thieu_gia_von ? ' *' : '' %>
+                                                </td>
+                                                <td class="text-right"><strong
+                                                    class="<%= Number(detail.loi_nhuan || 0) < 0 ? 'profit-negative' : 'profit-positive' %>">
+                                                    <%= Number(detail.loi_nhuan || 0).toLocaleString('vi-VN') %>
+                                                  </strong></td>
+                                              </tr>
+                                              <% }) %>
+                                          </tbody>
+                                        </table>
+                                        <% } %>
+                                </div>
+                              </td>
+                            </tr>
+                            <% }) %>
+                </tbody>
+              </table>
+            </div>

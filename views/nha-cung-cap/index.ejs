@@ -1104,10 +1104,81 @@
 
       var kvSupplierTable = document.querySelector('table[data-kv-master="nha-cung-cap"]');
       var kvSupplier = null;
+      function applySupplierDebtRowWarnings(root) {
+        var scope = root || document;
+        scope.querySelectorAll('[id^="supplierDebtHistoryTable_"]').forEach(function (table) {
+          var tbody = table.querySelector('tbody');
+          var warnDays = Number(table.getAttribute('data-warn-days') || 10);
+          var panel = table.closest('[data-supplier-detail]') || table.closest('.supplier-detail');
+          var sortCheck = panel ? panel.querySelector('.js-supplier-debt-sort-oldest') : null;
+          if (sortCheck && sortCheck.getAttribute('data-debt-sort-bound') !== '1') {
+            sortCheck.setAttribute('data-debt-sort-bound', '1');
+            sortCheck.addEventListener('change', function () {
+              sortCheck.checked = false;
+            });
+            sortCheck.checked = false;
+          }
+          if (tbody) {
+            tbody.querySelectorAll('.js-supplier-debt-row').forEach(function (row) {
+              var days = Number(row.getAttribute('data-debt-days'));
+              var hasDebt = row.getAttribute('data-has-debt') === '1';
+              if (hasDebt && Number.isFinite(days) && days >= warnDays) {
+                row.classList.add('supplier-debt-row-overdue');
+              }
+            });
+          }
+        });
+      }
+      function bindSupplierLazyTabs(rootEl) {
+        var root = rootEl && rootEl.querySelector ? rootEl : document;
+        var detailRoot = root.querySelector('[data-supplier-detail]') || root;
+        if (detailRoot.getAttribute && detailRoot.getAttribute('data-lazy-tabs-bound') === '1') return;
+        if (detailRoot.setAttribute) detailRoot.setAttribute('data-lazy-tabs-bound', '1');
+
+        function loadPane(pane) {
+          if (!pane || pane.getAttribute('data-lazy-loaded') === '1' || pane.getAttribute('data-lazy-loading') === '1') return;
+          var url = pane.getAttribute('data-lazy-tab-url') || '';
+          if (!url) return;
+          pane.setAttribute('data-lazy-loading', '1');
+          pane.innerHTML = '<div class="empty-cell supplier-lazy-tab-placeholder">Đang tải dữ liệu...</div>';
+          fetch(url + (window.location.search || ''), {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
+          })
+            .then(function(res) {
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              return res.text();
+            })
+            .then(function(html) {
+              pane.innerHTML = html;
+              pane.setAttribute('data-lazy-loaded', '1');
+              if (typeof syncAddressTypesFromDetail === 'function') syncAddressTypesFromDetail(pane);
+              if (typeof initGhnAddressSelects === 'function') initGhnAddressSelects(pane);
+              bindSupplierInlinePanel(root);
+              applySupplierDebtRowWarnings(pane);
+            })
+            .catch(function(err) {
+              pane.innerHTML = '<div class="empty-cell supplier-lazy-tab-placeholder">Không tải được dữ liệu. Vui lòng thử lại.</div>';
+              console.warn('[SUPPLIER_LAZY_TAB]', err && err.message ? err.message : err);
+            })
+            .finally(function() {
+              pane.removeAttribute('data-lazy-loading');
+            });
+        }
+
+        detailRoot.querySelectorAll('[data-detail-tab]').forEach(function(tab) {
+          tab.addEventListener('click', function() {
+            var key = tab.getAttribute('data-detail-tab') || '';
+            var pane = detailRoot.querySelector('[data-detail-pane="' + key + '"][data-lazy-tab-url]');
+            loadPane(pane);
+          });
+        });
+      }
       function bindSupplierInlinePanel(rootEl) {
         var wrap = rootEl.classList.contains('supplier-inline-detail') ? rootEl : rootEl.querySelector('.supplier-inline-detail');
         if (!wrap) return;
         if (window.KvDebtPeriodExport) window.KvDebtPeriodExport.bind(wrap);
+        applySupplierDebtRowWarnings(wrap);
       }
       if (kvSupplierTable && typeof KvInlineDetail !== 'undefined') {
         kvSupplier = new KvInlineDetail({
@@ -1118,6 +1189,7 @@
           },
           onOpen: function(id, root) {
             bindSupplierInlinePanel(root);
+            bindSupplierLazyTabs(root);
             if (typeof syncAddressTypesFromDetail === 'function') syncAddressTypesFromDetail(root);
             if (typeof initGhnAddressSelects === 'function') initGhnAddressSelects(root);
             if (window.__openSupplierDebtTab) {

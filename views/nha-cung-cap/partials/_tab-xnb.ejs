@@ -1,0 +1,75 @@
+        <div class="supplier-pane-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th class="text-center">Mã xuất dùng nội bộ</th>
+                <th class="text-center">Loại xuất</th>
+                <th class="text-center">Kho</th>
+                <th class="text-center">Tên hàng hóa</th>
+                <th class="text-center">Tổng SL</th>
+                <th class="text-center">Tổng giá trị</th>
+                <th class="text-center">Thời gian</th>
+                <th class="text-center">Người tạo</th>
+                <th class="text-center">Trạng thái</th>
+                <th class="text-center">Chứng từ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if ((supplierInternalExportHistory || []).length===0) { %>
+                <tr>
+                  <td colspan="10" class="empty-cell">Chưa có phiếu xuất dùng nội bộ cho nhà cung cấp này.</td>
+                </tr>
+                <% } %>
+                  <% (supplierInternalExportHistory || []).forEach(function(row) { %>
+                    <% var xnbStatusClass='status-pill' ; if (row.trang_thai==='completed' ) xnbStatusClass
+                      +=' is-active' ; else if (row.trang_thai==='draft' ) xnbStatusClass +=' is-draft' ; else if
+                      (row.trang_thai==='cancelled' ) xnbStatusClass +=' is-cancelled' ; %>
+                      <tr>
+                        <td class="text-center">
+                          <% if (row._id) { %>
+                            <a class="table-code-link ref-link" href="/xuat-dung-noi-bo?open=<%= row._id %>">
+                              <%= row.ma_xuat_noi_bo || '--' %>
+                            </a>
+                            <% } else { %>
+                              <strong>
+                                <%= row.ma_xuat_noi_bo || '--' %>
+                              </strong>
+                              <% } %>
+                        </td>
+                        <td class="text-center">
+                          <%= row.loai_xuat || '--' %>
+                        </td>
+                        <td class="text-center">
+                          <%= row.kho || '--' %>
+                        </td>
+                        <td class="text-center">
+                          <%= row.ten_hang_hoa || 'Không có' %>
+                        </td>
+                        <td class="text-center">
+                          <%= Number(row.tong_so_luong || 0).toLocaleString('vi-VN') %>
+                        </td>
+                        <td class="text-center">
+                          <%= Number(row.tong_gia_tri || 0).toLocaleString('vi-VN') %> VNĐ
+                        </td>
+                        <td class="supplier-muted-cell text-center">
+                          <%= formatDate(row.thoi_gian) %>
+                        </td>
+                        <td class="text-center">
+                          <%= row.nguoi_tao || '--' %>
+                        </td>
+                        <td class="text-center"><span class="<%= xnbStatusClass %>">
+                            <%= mapXuatNoiBoStatus ? mapXuatNoiBoStatus(row.trang_thai) : (row.trang_thai || '--' ) %>
+                          </span></td>
+                        <td class="text-center">
+                          <% if (row._id) { %>
+                            <a class="btn btn-light btn-sm" href="/chung-tu-kho/xuat-noi-bo/<%= row._id %>"
+                              target="_blank">Mở</a>
+                            <% } else { %>
+                              --
+                              <% } %>
+                        </td>
+                      </tr>
+                      <% }) %>
+            </tbody>
+          </table>
+        </div>
