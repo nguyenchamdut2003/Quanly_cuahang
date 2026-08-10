@@ -748,13 +748,14 @@ async function enrichStockCardRows(rows, productId) {
     var needsCheck = !!typeMap.kiem_kho;
     var needsDisposal = !!typeMap.xuat_huy;
     var needsInternalIssue = !!typeMap.xuat_noi_bo;
+    var activeDataFilter = { trang_thai_du_lieu: { $ne: 'inactive' } };
 
     var docResults = await Promise.all([
-        needsPurchase ? PhieuNhap.find({ ma_phieu_nhap: { $in: codes } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean() : Promise.resolve([]),
-        needsSupplierReturn ? PhieuTraHangNhap.find({ ma_phieu_tra_nhap: { $in: codes }, trang_thai: { $ne: 'cancelled' } }).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean() : Promise.resolve([]),
-        needsOrder ? DonHang.find({ ma_don_hang: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
-        needsInvoice ? HoaDonBanHang.find({ ma_hoa_don: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
-        needsReturn ? PhieuTraHang.find({ ma_phieu_tra: { $in: codes } }).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
+        needsPurchase ? PhieuNhap.find(Object.assign({ ma_phieu_nhap: { $in: codes } }, activeDataFilter)).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean() : Promise.resolve([]),
+        needsSupplierReturn ? PhieuTraHangNhap.find(Object.assign({ ma_phieu_tra_nhap: { $in: codes }, trang_thai: { $ne: 'cancelled' } }, activeDataFilter)).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ten_cong_ty ma_ncc' }).lean() : Promise.resolve([]),
+        needsOrder ? DonHang.find(Object.assign({ ma_don_hang: { $in: codes } }, activeDataFilter)).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
+        needsInvoice ? HoaDonBanHang.find(Object.assign({ ma_hoa_don: { $in: codes } }, activeDataFilter)).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
+        needsReturn ? PhieuTraHang.find(Object.assign({ ma_phieu_tra: { $in: codes } }, activeDataFilter)).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
         needsCheck ? PhieuKiemKho.find({ ma_kiem_kho: { $in: codes } }).lean() : Promise.resolve([]),
         needsDisposal ? PhieuXuatHuy.find({ ma_xuat_huy: { $in: codes } }).lean() : Promise.resolve([]),
         needsInternalIssue ? PhieuXuatNoiBo.find({ ma_xuat_noi_bo: { $in: codes } }).lean() : Promise.resolve([])
@@ -932,6 +933,16 @@ async function enrichStockCardRows(rows, productId) {
         card.ten_loai_chung_tu = labelChungTuDocumentType(card.chung_tu_type, row.loai_phieu, code);
 
         return card;
+    }).filter(function(card) {
+        if (!card) return false;
+        var code = String(card.ma_phieu || '').trim();
+        if (card.loai_phieu === 'nhap_hang') return Boolean(purchaseMap[code]);
+        if (card.loai_phieu === 'tra_hang_nhap') return Boolean(supplierReturnMap[code]);
+        if (card.loai_phieu === 'tra_hang') return Boolean(returnMap[code]);
+        if (card.loai_phieu === 'ban_hang' || card.loai_phieu === 'rollback_ban_hang' || card.loai_phieu === 'huy_hoa_don') {
+            return Boolean(orderMap[code] || invoiceMap[code]);
+        }
+        return true;
     });
 }
 

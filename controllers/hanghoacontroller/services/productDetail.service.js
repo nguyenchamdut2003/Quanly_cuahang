@@ -286,6 +286,35 @@ function makeSlicePagination(page, limit, skip, rowCount, hasNext) {
     };
 }
 
+function stockCardGroupKey(row) {
+    if (!row) return '';
+    var docId = row.chung_tu_doc && row.chung_tu_doc._id ? String(row.chung_tu_doc._id) : '';
+    return [
+        row.chung_tu_type || row.loai_phieu || '',
+        docId || row.ma_phieu || ''
+    ].join('|');
+}
+
+function paginateStockCardRowsByDocument(rows, paging) {
+    var groups = [];
+    var groupMap = {};
+    (rows || []).forEach(function(row) {
+        var key = stockCardGroupKey(row);
+        if (!groupMap[key]) {
+            groupMap[key] = [];
+            groups.push(groupMap[key]);
+        }
+        groupMap[key].push(row);
+    });
+    var pageGroups = groups.slice(paging.skip, paging.skip + paging.limit);
+    return {
+        rows: pageGroups.reduce(function(list, group) {
+            return list.concat(group);
+        }, []),
+        total: groups.length
+    };
+}
+
 async function resolveProductForTab(productId, req) {
     productId = normalizeIdParam(productId);
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) return null;
@@ -319,32 +348,26 @@ async function loadProductCardTab(productId, req) {
     var rows = await LichSuKho.find(historyQuery)
         .select('lo_hang_id loai_phieu ma_phieu ngay created_at ten_quy_cach gia_tri_thay_doi so_luong_thay_doi ton_kho_sau kho_id')
         .sort({ ngay: -1, created_at: -1 })
-        .skip(paging.skip)
-        .limit(paging.limit + 1)
         .lean();
-    var hasNext = rows.length > paging.limit;
-    rows = rows.slice(0, paging.limit);
+    rows = await enrichStockCardRows(rows, tab.item._id);
+    rows = await filterTrashedKiemKhoStockRows(rows);
+    var paged = paginateStockCardRowsByDocument(rows, paging);
+    rows = paged.rows;
     var lotIds = uniqueValues(rows, 'lo_hang_id').filter(function(id) {
         return mongoose.Types.ObjectId.isValid(id);
     });
-    var relatedResults = await Promise.all([
-        lotIds.length
-            ? LoHang.find({ _id: { $in: lotIds } }).select('ten_lo ma_lo han_su_dung ngay_nhap').lean()
-            : Promise.resolve([]),
-        enrichStockCardRows(rows, tab.item._id)
-    ]);
-    var lotDocs = relatedResults[0];
-    rows = relatedResults[1];
+    var lotDocs = lotIds.length
+        ? await LoHang.find({ _id: { $in: lotIds } }).select('ten_lo ma_lo han_su_dung ngay_nhap').lean()
+        : [];
     var lotMap = mapBy(lotDocs, '_id');
     rows = rows.map(function(row) {
         var lotId = String(row.lo_hang_id || '');
         if (lotMap[lotId]) row.lo_hang_id = lotMap[lotId];
         return row;
     });
-    rows = await filterTrashedKiemKhoStockRows(rows);
     return {
         selectedProductHistories: rows,
-        pagination: makeSlicePagination(paging.page, paging.limit, paging.skip, rows.length, hasNext),
+        pagination: makePagination(paging.page, paging.limit, paged.total),
         baseUrl: '/hang-hoa/api/' + encodeURIComponent(String(tab.item._id)) + '/card',
         formatDate: formatDate
     };
