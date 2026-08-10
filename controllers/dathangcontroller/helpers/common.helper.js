@@ -402,7 +402,7 @@ function legacyReturnLineKey(row = {}) {
 }
 
 function buildOrderFilter(query = {}) {
-    const filter = {};
+    const filter = { trang_thai_du_lieu: 'active' };
     if (query.q && query.q.trim() !== '') {
         filter.ma_don_hang = { $regex: query.q.trim(), $options: 'i' };
     }
@@ -780,7 +780,7 @@ async function loadReturnInvoiceContext(invoiceId) {
         throw err;
     }
 
-    const invoice = await HoaDonBanHang.findById(id)
+    const invoice = await HoaDonBanHang.findOne({ _id: id, trang_thai_du_lieu: 'active' })
         .populate('khach_hang_id')
         .populate('kho_id')
         .populate('cua_hang_id')
@@ -1100,7 +1100,8 @@ async function buildFullOrderFilter(query = {}) {
     if (query?.phuong_thuc_tt && query.phuong_thuc_tt.trim() !== '') {
         const invoices = await HoaDonBanHang.find({
             phuong_thuc_tt: query.phuong_thuc_tt.trim(),
-            don_hang_id: { $ne: null }
+            don_hang_id: { $ne: null },
+            trang_thai_du_lieu: 'active'
         }).select('don_hang_id');
         applyOrderIdFilter(filter, invoices.map(item => item.don_hang_id).filter(Boolean));
     }
@@ -1907,6 +1908,7 @@ async function recordCustomerPaymentReceipts(data, payment) {
 async function computeOrderPaymentBalance(orderId, orderFallback = {}) {
     const invoices = await HoaDonBanHang.find({
         don_hang_id: orderId,
+        trang_thai_du_lieu: 'active',
         trang_thai: { $ne: 'cancelled' }
     }).select('thanh_toan').lean();
     const tong_da_thu_receipts = await getOrderPaidAmount(orderId);
@@ -1944,6 +1946,7 @@ async function computeDeliveryPaymentDue(orderId, batchPayable, orderFallback = 
 
     const invoices = await HoaDonBanHang.find({
         don_hang_id: orderId,
+        trang_thai_du_lieu: 'active',
         trang_thai: { $ne: 'cancelled' }
     }).select('thanh_toan').lean();
     const invoicedPayable = invoices.reduce((sum, row) => sum + Number(row.thanh_toan || 0), 0);
@@ -1966,6 +1969,7 @@ async function computeDeliveryPaymentDue(orderId, batchPayable, orderFallback = 
 async function getOrderInvoiceDebtSummary(orderId) {
     const invoices = await HoaDonBanHang.find({
         don_hang_id: orderId,
+        trang_thai_du_lieu: 'active',
         trang_thai: { $ne: 'cancelled' }
     })
         .sort({ created_at: 1 })
@@ -2556,7 +2560,7 @@ async function mergeInvoicesInSession(req, session) {
     const sourceInvoiceIds = invoiceIds.filter(id => id !== receivingInvoiceId);
     const note = String(body.ghi_chu || '').trim();
 
-    const invoices = await HoaDonBanHang.find({ _id: { $in: invoiceIds } })
+    const invoices = await HoaDonBanHang.find({ _id: { $in: invoiceIds }, trang_thai_du_lieu: 'active' })
         .populate('khach_hang_id')
         .session(session);
     if (invoices.length !== invoiceIds.length) {
@@ -3231,7 +3235,7 @@ function applyInvoiceDebtWarningList(invoices, settings) {
 }
 
 async function buildInvoiceFilter(query = {}) {
-    const filter = {};
+    const filter = { trang_thai_du_lieu: 'active' };
     if (query.q && query.q.trim() !== '') {
         filter.ma_hoa_don = { $regex: query.q.trim(), $options: 'i' };
     }
@@ -3261,7 +3265,7 @@ async function buildInvoiceFilter(query = {}) {
         const shipmentInvoiceIds = shipments.map(item => item.hoa_don_id).filter(Boolean);
         const shipmentOrderIds = shipments.map(item => item.don_hang_id).filter(Boolean);
         if (shipmentOrderIds.length) {
-            const invoicesByOrder = await HoaDonBanHang.find({ don_hang_id: { $in: shipmentOrderIds } }).select('_id');
+            const invoicesByOrder = await HoaDonBanHang.find({ don_hang_id: { $in: shipmentOrderIds }, trang_thai_du_lieu: 'active' }).select('_id');
             shipmentInvoiceIds.push(...invoicesByOrder.map(item => item._id));
         }
         if (invoiceTypes.includes('giao_hang') && !invoiceTypes.includes('khong_giao_hang')) {
@@ -3274,9 +3278,7 @@ async function buildInvoiceFilter(query = {}) {
         }
     }
 
-    const deletedGuard = {};
-    if (!Object.keys(filter).length) return deletedGuard;
-    return { $and: [filter, deletedGuard] };
+    return filter;
 }
 
 async function decorateInvoices(invoices) {
@@ -3362,7 +3364,14 @@ async function decorateInvoices(invoices) {
 }
 
 async function buildReturnFilter(query = {}) {
-    const filter = {};
+    const filter = {
+        $or: [
+            { trang_thai_du_lieu: 'active' },
+            { trang_thai_du_lieu: { $exists: false } },
+            { trang_thai_du_lieu: null },
+            { trang_thai_du_lieu: '' }
+        ]
+    };
     if (query.q && query.q.trim() !== '') filter.ma_phieu_tra = { $regex: query.q.trim(), $options: 'i' };
     const statuses = cleanArray(query.trang_thai);
     if (statuses.length) filter.trang_thai = { $in: statuses };
@@ -3383,9 +3392,7 @@ async function buildReturnFilter(query = {}) {
         }).select('_id');
         filter.khach_hang_id = { $in: customers.map(item => item._id) };
     }
-    const deletedGuard = {};
-    if (!Object.keys(filter).length) return deletedGuard;
-    return { $and: [filter, deletedGuard] };
+    return filter;
 }
 
 async function getOrderCreateData() {
@@ -3432,7 +3439,7 @@ async function mergeOrdersInSession(req, session) {
     const sourceOrderIds = orderIds.filter(id => id !== receivingOrderId);
     const note = String(body.ghi_chu || '').trim();
 
-    const orders = await DonHang.find({ _id: { $in: orderIds } })
+    const orders = await DonHang.find({ _id: { $in: orderIds }, trang_thai_du_lieu: 'active' })
         .populate('khach_hang_id')
         .session(session);
     if (orders.length !== orderIds.length) {
@@ -3477,6 +3484,7 @@ async function mergeOrdersInSession(req, session) {
 
     const invoices = await HoaDonBanHang.find({
         don_hang_id: { $in: orderIds },
+        trang_thai_du_lieu: 'active',
         trang_thai: { $ne: 'cancelled' }
     }).session(session);
     if (invoices.length) {

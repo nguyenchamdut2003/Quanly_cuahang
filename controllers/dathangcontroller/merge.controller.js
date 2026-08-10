@@ -244,6 +244,7 @@ exports.getGopDonCandidates = async (req, res, next) => {
         const days = Math.max(1, Math.min(90, Number(req.query.days || 7)));
         const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         const filter = {
+            trang_thai_du_lieu: 'active',
             ngay_dat: { $gte: fromDate },
             trang_thai: { $nin: ['cancelled', 'completed', 'merged'] },
             trang_thai_giao_hang: 'chua_giao'
@@ -327,6 +328,7 @@ exports.getGopHoaDonCandidates = async (req, res, next) => {
         const days = Math.max(1, Math.min(90, Number(req.query.days || 7)));
         const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         const filter = {
+            trang_thai_du_lieu: 'active',
             ngay_ban: { $gte: fromDate },
             trang_thai: { $nin: ['cancelled', 'merged'] }
         };

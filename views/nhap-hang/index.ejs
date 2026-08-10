@@ -152,6 +152,8 @@
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .kv-btn.danger{border-color:#f04438;color:#b42318;background:#fff}
     .kv-btn.danger:disabled{opacity:.45;cursor:not-allowed}
+    .toolbar-actions .purchase-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+    .toolbar-actions .purchase-delete-btn:hover{background:#b42318!important;border-color:#b42318!important}
     .supplier-code-link{color:#0070f4;text-decoration:none;font-weight:700}
     .supplier-code-link:hover{text-decoration:underline}
     .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-x:auto;overflow-y:auto}
@@ -392,7 +394,7 @@
             </select>
           </div>
           <div class="toolbar-actions">
-            <button type="button" class="kv-btn danger" id="openPurchaseTrashModal" disabled>Xóa</button>
+            <button type="button" class="kv-btn danger purchase-delete-btn" id="openPurchaseTrashModal"><i class="fa-solid fa-trash-can"></i> Xóa</button>
             <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
             <button type="button" class="kv-btn" id="openPurchaseMergeModal">Gộp đơn</button>
             <button class="kv-btn" type="button">Xuất file ▾</button>
@@ -676,14 +678,14 @@
   <div id="purchaseTrashModalOverlay" class="purchase-trash-overlay" aria-hidden="true">
     <div class="purchase-trash-modal" role="dialog" aria-labelledby="purchaseTrashModalTitle" aria-modal="true">
       <div class="purchase-trash-head">
-        <h3 id="purchaseTrashModalTitle">Đưa vào thùng rác</h3>
+        <h3 id="purchaseTrashModalTitle">Xóa phiếu nhập</h3>
         <button type="button" class="purchase-trash-close" id="purchaseTrashModalClose" aria-label="Đóng">×</button>
       </div>
       <div class="purchase-trash-body" id="purchaseTrashModalBody">
-        <p class="purchase-trash-desc">Các bảng/dữ liệu liên quan bên dưới sẽ được đưa vào thùng rác cùng phiếu nhập (ẩn khỏi danh sách, có thể khôi phục sau).</p>
+        <p class="purchase-trash-desc">Bạn có chắc chắn muốn xóa các phiếu nhập đã chọn không?</p>
         <div id="purchaseTrashAlert"></div>
-        <ul class="purchase-trash-selected" id="purchaseTrashSelectedList"></ul>
-        <table class="purchase-trash-table">
+        <ul class="purchase-trash-selected" id="purchaseTrashSelectedList" style="display:none"></ul>
+        <table class="purchase-trash-table" style="display:none">
           <thead>
             <tr>
               <th>Bảng / loại dữ liệu</th>
@@ -697,8 +699,8 @@
         </table>
       </div>
       <div class="purchase-trash-foot">
-        <button type="button" class="kv-btn" id="purchaseTrashCancel">Hủy</button>
-        <button type="button" class="kv-btn danger" id="purchaseTrashConfirm" disabled>Đưa vào thùng rác</button>
+        <button type="button" class="kv-btn" id="purchaseTrashCancel">Không</button>
+        <button type="button" class="kv-btn danger" id="purchaseTrashConfirm">Xóa</button>
       </div>
     </div>
   </div>
@@ -1839,7 +1841,7 @@
 
       function updateDeleteButtonState() {
         if (!openBtn) return;
-        openBtn.disabled = getSelectedPurchaseIds().length === 0;
+        openBtn.disabled = false;
       }
 
       function closeTrashModal() {
@@ -1848,7 +1850,7 @@
         overlay.setAttribute('aria-hidden', 'true');
         pendingIds = [];
         previewData = null;
-        if (confirmBtn) confirmBtn.disabled = true;
+        if (confirmBtn) confirmBtn.disabled = false;
       }
 
       function renderAlert(preview) {
@@ -1908,47 +1910,29 @@
           overlay.classList.add('is-open');
           overlay.setAttribute('aria-hidden', 'false');
         }
-        if (impactBody) impactBody.innerHTML = '<tr><td colspan="5" class="purchase-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
+        if (impactBody) impactBody.innerHTML = '';
         if (alertBox) alertBox.innerHTML = '';
         if (selectedList) selectedList.innerHTML = '';
-        if (confirmBtn) confirmBtn.disabled = true;
-
-        fetch('/nhap-hang/trash/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phieu_nhap_ids: pendingIds })
-        })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Không tải được thông tin xóa');
-            previewData = data.data;
-            renderSelectedList(previewData);
-            renderAlert(previewData);
-            renderImpactRows(previewData);
-            if (confirmBtn) confirmBtn.disabled = !previewData.can_proceed;
-          })
-          .catch(function(err) {
-            if (impactBody) impactBody.innerHTML = '<tr><td colspan="5">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
-            alert(err.message || 'Không tải được thông tin xóa');
-          });
+        if (confirmBtn) confirmBtn.disabled = false;
+        previewData = { can_proceed: true };
       }
 
       function confirmTrash() {
-        if (!previewData || !previewData.can_proceed || !pendingIds.length) return;
+        if (!pendingIds.length) return;
         if (confirmBtn) confirmBtn.disabled = true;
-        fetch('/nhap-hang/trash/move', {
+        fetch('/nhap-hang/deactivate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phieu_nhap_ids: pendingIds })
         })
           .then(function(res) { return res.json(); })
           .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Không đưa vào thùng rác được');
-            alert(data.message || 'Đã đưa vào thùng rác');
+            if (!data.success) throw new Error(data.message || 'Không xóa được phiếu nhập');
+            alert(data.message || 'Đã xóa phiếu nhập');
             window.location.reload();
           })
           .catch(function(err) {
-            alert(err.message || 'Không đưa vào thùng rác được');
+            alert(err.message || 'Không xóa được phiếu nhập');
             if (confirmBtn) confirmBtn.disabled = false;
           });
       }

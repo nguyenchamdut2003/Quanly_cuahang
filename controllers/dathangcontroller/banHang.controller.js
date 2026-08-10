@@ -15,7 +15,7 @@ exports.index = async (req, res, next) => {
             CuaHang.find(),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
             DiaChiKhachHang.find({ trang_thai: 'active' }),
-            DonHang.find({ trang_thai: 'draft' })
+            DonHang.find({ trang_thai: 'draft', trang_thai_du_lieu: 'active' })
                 .populate('khach_hang_id')
                 .sort({ ngay_tao: -1, created_at: -1 })
                 .limit(20)
@@ -128,7 +128,7 @@ exports.postAdd = async (req, res, next) => {
         let donHang;
 
         if (draft_order_id && /^[0-9a-fA-F]{24}$/.test(draft_order_id)) {
-            donHang = await DonHang.findOne({ _id: draft_order_id, trang_thai: 'draft' });
+            donHang = await DonHang.findOne({ _id: draft_order_id, trang_thai: 'draft', trang_thai_du_lieu: 'active' });
             if (!donHang) {
                 return res.status(404).json({ success: false, message: 'Không tìm thấy đơn nháp' });
             }
@@ -285,7 +285,7 @@ exports.postDraft = async (req, res, next) => {
         let donHang;
 
         if (draft_order_id && /^[0-9a-fA-F]{24}$/.test(draft_order_id)) {
-            donHang = await DonHang.findOne({ _id: draft_order_id, trang_thai: 'draft' });
+            donHang = await DonHang.findOne({ _id: draft_order_id, trang_thai: 'draft', trang_thai_du_lieu: 'active' });
             if (!donHang) {
                 return res.status(404).json({ success: false, message: 'Không tìm thấy đơn nháp' });
             }
@@ -348,7 +348,7 @@ exports.deleteDraftId = async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Mã đơn nháp không hợp lệ' });
         }
 
-        const donHang = await DonHang.findOne({ _id: id, trang_thai: 'draft' });
+        const donHang = await DonHang.findOne({ _id: id, trang_thai: 'draft', trang_thai_du_lieu: 'active' });
         if (!donHang) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy đơn nháp' });
         }

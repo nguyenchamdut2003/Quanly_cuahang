@@ -121,6 +121,8 @@
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .kv-btn.danger{border-color:#ef4444;color:#ef4444}
     .kv-btn:disabled{opacity:.5;cursor:not-allowed}
+    .actions .return-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+    .actions .return-delete-btn:hover{background:#b42318!important;border-color:#b42318!important}
     .return-open-link{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#0070f4;font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;box-sizing:border-box;white-space:nowrap}
     .return-open-link:hover{border-color:#0070f4;background:#f7fbff;text-decoration:none}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
@@ -286,7 +288,7 @@
         <div class="toolbar">
           <div class="search"><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"></div>
           <div class="actions">
-            <button type="button" class="kv-btn danger" id="returnTrashOpenBtn" disabled>Xóa</button>
+            <button type="button" class="kv-btn danger return-delete-btn" id="returnTrashOpenBtn"><i class="fa-solid fa-trash-can"></i> Xóa</button>
             <a class="kv-btn primary" href="/tra-hang-nhap/create">+ Trả hàng nhập</a>
             <a class="kv-btn" href="/tra-hang-nhap/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
           </div>
@@ -556,10 +558,9 @@
       </div>
       <div class="return-trash-body">
         <div id="returnTrashAlerts"></div>
-        <div><strong>Phiếu đã chọn</strong></div>
-        <ul class="return-trash-list" id="returnTrashSelectedList"></ul>
-        <div><strong>Dữ liệu bị kéo theo</strong></div>
-        <table class="return-trash-impact">
+        <p class="return-trash-question">Bạn có chắc chắn muốn xóa các phiếu trả hàng nhập đã chọn không?</p>
+        <ul class="return-trash-list" id="returnTrashSelectedList" style="display:none"></ul>
+        <table class="return-trash-impact" style="display:none">
           <thead>
             <tr>
               <th>Dữ liệu</th>
@@ -573,8 +574,8 @@
         </table>
       </div>
       <div class="return-trash-foot">
-        <button type="button" class="kv-btn" id="returnTrashCancelBtn">Hủy</button>
-        <button type="button" class="kv-btn danger" id="returnTrashConfirmBtn" disabled>Đưa vào thùng rác</button>
+        <button type="button" class="kv-btn" id="returnTrashCancelBtn">Không</button>
+        <button type="button" class="kv-btn danger" id="returnTrashConfirmBtn">Xóa</button>
       </div>
     </div>
   </div>
@@ -625,7 +626,7 @@
       }
       function updateReturnTrashButtonState() {
         var ids = getSelectedReturnIds();
-        if (returnTrashOpenBtn) returnTrashOpenBtn.disabled = ids.length === 0;
+        if (returnTrashOpenBtn) returnTrashOpenBtn.disabled = false;
         var all = document.querySelectorAll('.return-select-check');
         var checked = document.querySelectorAll('.return-select-check:checked');
         var header = document.getElementById('returnCheckAll');
@@ -640,7 +641,7 @@
         returnTrashModal.setAttribute('aria-hidden', 'true');
         returnTrashPendingIds = [];
         returnTrashPreview = null;
-        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = true;
+        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = false;
       }
       function renderReturnTrashAlerts(preview) {
         if (!returnTrashAlerts) return;
@@ -688,31 +689,14 @@
         if (returnTrashImpactBody) returnTrashImpactBody.innerHTML = '<tr><td colspan="3">Đang kiểm tra dữ liệu liên quan...</td></tr>';
         if (returnTrashAlerts) returnTrashAlerts.innerHTML = '';
         if (returnTrashSelectedList) returnTrashSelectedList.innerHTML = '';
-        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = true;
-        fetch('/tra-hang-nhap/trash/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ phieu_tra_hang_nhap_ids: returnTrashPendingIds })
-        })
-          .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
-          .then(function(result) {
-            if (!result.ok || !result.data.success) throw new Error((result.data && result.data.message) || 'Không tải được thông tin xóa');
-            returnTrashPreview = result.data.data;
-            renderReturnTrashSelected(returnTrashPreview);
-            renderReturnTrashAlerts(returnTrashPreview);
-            renderReturnTrashImpact(returnTrashPreview);
-            if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = !returnTrashPreview.can_proceed;
-          })
-          .catch(function(err) {
-            if (returnTrashImpactBody) returnTrashImpactBody.innerHTML = '<tr><td colspan="3">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
-            alert(err.message || 'Không tải được thông tin xóa');
-          });
+        if (returnTrashImpactBody) returnTrashImpactBody.innerHTML = '';
+        if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = false;
+        returnTrashPreview = { can_proceed: true };
       }
       function confirmReturnTrash() {
-        if (!returnTrashPreview || !returnTrashPreview.can_proceed || !returnTrashPendingIds.length) return;
+        if (!returnTrashPendingIds.length) return;
         if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = true;
-        fetch('/tra-hang-nhap/trash/move', {
+        fetch('/tra-hang-nhap/deactivate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           credentials: 'same-origin',
@@ -720,12 +704,12 @@
         })
           .then(function(res) { return res.json().then(function(data) { return { ok: res.ok, data: data }; }); })
           .then(function(result) {
-            if (!result.ok || !result.data.success) throw new Error((result.data && result.data.message) || 'Không đưa vào thùng rác được');
-            alert(result.data.message || 'Đã đưa vào thùng rác');
+            if (!result.ok || !result.data.success) throw new Error((result.data && result.data.message) || 'Không xóa được phiếu trả hàng nhập');
+            alert(result.data.message || 'Đã xóa phiếu trả hàng nhập');
             window.location.reload();
           })
           .catch(function(err) {
-            alert(err.message || 'Không đưa vào thùng rác được');
+            alert(err.message || 'Không xóa được phiếu trả hàng nhập');
             if (returnTrashConfirmBtn) returnTrashConfirmBtn.disabled = false;
           });
       }

@@ -27,6 +27,40 @@ var movePurchasesToTrash = disabledTrashOperation;
 var PURCHASE_DEBT_WARN_DEFAULT_DAYS = 10;
 var NHAP_HANG_PAGE_SIZE = 10;
 
+function activePurchaseDataFilter(extra) {
+  var base = extra || {};
+  return {
+    $and: [
+      base,
+      {
+        $or: [
+          { trang_thai_du_lieu: 'active' },
+          { trang_thai_du_lieu: { $exists: false } },
+          { trang_thai_du_lieu: null },
+          { trang_thai_du_lieu: '' }
+        ]
+      }
+    ]
+  };
+}
+
+function activePurchaseReturnDataFilter(extra) {
+  var base = extra || {};
+  return {
+    $and: [
+      base,
+      {
+        $or: [
+          { trang_thai_du_lieu: 'active' },
+          { trang_thai_du_lieu: { $exists: false } },
+          { trang_thai_du_lieu: null },
+          { trang_thai_du_lieu: '' }
+        ]
+      }
+    ]
+  };
+}
+
 function hasFilterQueryValue(value) {
   return String(value ?? '').trim() !== '';
 }
@@ -273,6 +307,8 @@ exports.index = async function(req, res, next) {
     query.trang_thai = { $in: filter.statuses };
     if (filter.nha_cung_cap_id) query.nha_cung_cap_id = filter.nha_cung_cap_id;
 
+    query = activePurchaseDataFilter(query);
+
     var importSlips = await loadSortedPurchases(query, filter.sort);
 
     importSlips.forEach(function(slip) {
@@ -324,10 +360,10 @@ exports.index = async function(req, res, next) {
 
     var returnBySlip = {};
     if (slipIds.length > 0 && mongoose.models.PhieuTraHangNhap) {
-      var returnRows = await mongoose.models.PhieuTraHangNhap.find({
+      var returnRows = await mongoose.models.PhieuTraHangNhap.find(activePurchaseReturnDataFilter({
         phieu_nhap_id: { $in: slipIds },
         trang_thai: { $ne: 'cancelled' }
-      }).select('phieu_nhap_id ma_phieu_tra_nhap').lean();
+      })).select('phieu_nhap_id ma_phieu_tra_nhap').lean();
       returnRows.forEach(function(row) {
         var slipKey = String(row.phieu_nhap_id || '');
         if (slipKey && !returnBySlip[slipKey]) returnBySlip[slipKey] = row;
@@ -698,7 +734,7 @@ async function loadPurchaseWithItems(id, storeId) {
   if (!mongoose.Types.ObjectId.isValid(String(id || ''))) return null;
   var filter = { _id: id };
   if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
-  var ticket = await PhieuNhap.findOne(filter)
+  var ticket = await PhieuNhap.findOne(activePurchaseDataFilter(filter))
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du dia_chi_chi_tiet phuong_xa tinh_thanh sdt email' })
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty ma_so_thue sdt email ghi_chu tong_no tong_mua' })
     .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
@@ -1194,7 +1230,7 @@ async function paySupplierLegacyUnused(req, res, next) {
     var storeId = await resolveStoreId(req);
     var filter = { _id: req.params.id };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
-    var purchase = await PhieuNhap.findOne(filter).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' });
+    var purchase = await PhieuNhap.findOne(activePurchaseDataFilter(filter)).populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' });
     if (!purchase) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
     if (!purchase.nha_cung_cap_id) return res.status(400).json({ success: false, message: 'Phiếu nhập chưa có nhà cung cấp' });
     if (purchase.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu nhập đã hủy' });
@@ -1300,7 +1336,7 @@ exports.paySupplier = async function(req, res, next) {
     await session.withTransaction(async function() {
       var filter = { _id: req.params.id };
       if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
-      var purchase = await PhieuNhap.findOne(filter)
+      var purchase = await PhieuNhap.findOne(activePurchaseDataFilter(filter))
         .session(session)
         .populate({ path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' });
       if (!purchase) throw new Error('Không tìm thấy phiếu nhập');
@@ -1950,6 +1986,34 @@ exports.moveToTrash = async function(req, res, next) {
   }
 };
 
+exports.deactivateSelected = async function(req, res, next) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var ids = Array.isArray(req.body && req.body.phieu_nhap_ids)
+      ? req.body.phieu_nhap_ids
+      : (Array.isArray(req.body && req.body.ids) ? req.body.ids : []);
+    ids = ids.map(function(id) { return String(id || '').trim(); }).filter(function(id) {
+      return mongoose.Types.ObjectId.isValid(id);
+    });
+    if (!ids.length) {
+      return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot phieu nhap.' });
+    }
+    var filter = { _id: { $in: ids } };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
+    var result = await PhieuNhap.updateMany(
+      activePurchaseDataFilter(filter),
+      { $set: { trang_thai_du_lieu: 'inactive', updated_at: new Date() } }
+    );
+    return res.json({
+      success: true,
+      message: 'Da xoa phieu nhap da chon.',
+      data: { modified_count: result.modifiedCount || result.nModified || 0 }
+    });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Khong xoa duoc phieu nhap.' });
+  }
+};
+
 /** Deep clone Mixed snapshot (lot_info) — không giữ reference tới chi tiết gốc */
 function clonePurchaseDetailSnapshot(value) {
   if (value == null) return undefined;
@@ -2415,14 +2479,14 @@ exports.exportOneExcel = async function(req, res, next) {
 exports.traHangNhapPage = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
-    var returns = await mongoose.models.PhieuTraHangNhap.find(storeId ? { cua_hang_id: storeId } : {})
+    var returns = await mongoose.models.PhieuTraHangNhap.find(activePurchaseReturnDataFilter(storeId ? { cua_hang_id: storeId } : {}))
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .sort({ ngay_tra: -1 })
       .lean();
 
     var suppliers = await mongoose.models.NhaCungCap.find(storeId ? { cua_hang_id: storeId } : {}).lean();
-    var receipts = await mongoose.models.PhieuNhap.find(storeId ? { cua_hang_id: storeId, trang_thai: 'completed' } : { trang_thai: 'completed' }).lean();
+    var receipts = await mongoose.models.PhieuNhap.find(activePurchaseDataFilter(storeId ? { cua_hang_id: storeId, trang_thai: 'completed' } : { trang_thai: 'completed' })).lean();
     var products = await mongoose.models.HangHoa.find(storeId ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' }).lean();
 
     res.render('nhap-hang/tra-hang-nhap', {

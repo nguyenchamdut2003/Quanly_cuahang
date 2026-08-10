@@ -53,6 +53,40 @@ const RETURN_IMPORT_STATUS_MAP = {
 };
 const RETURN_IMPORT_PAGE_SIZE = 10;
 
+function activePurchaseDataFilter(extra) {
+  const base = extra || {};
+  return {
+    $and: [
+      base,
+      {
+        $or: [
+          { trang_thai_du_lieu: 'active' },
+          { trang_thai_du_lieu: { $exists: false } },
+          { trang_thai_du_lieu: null },
+          { trang_thai_du_lieu: '' }
+        ]
+      }
+    ]
+  };
+}
+
+function activeReturnImportDataFilter(extra) {
+  const base = extra || {};
+  return {
+    $and: [
+      base,
+      {
+        $or: [
+          { trang_thai_du_lieu: 'active' },
+          { trang_thai_du_lieu: { $exists: false } },
+          { trang_thai_du_lieu: null },
+          { trang_thai_du_lieu: '' }
+        ]
+      }
+    ]
+  };
+}
+
 const RETURN_IMPORT_EXPORT_COLUMNS = [
   { header: 'Mã trả hàng nhập', key: 'ma_phieu_tra_nhap' },
   { header: 'Thời gian trả', key: 'thoi_gian_tra' },
@@ -444,7 +478,7 @@ async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}
   const filter = { kho_id: khoId, trang_thai: 'completed' };
   if (isObjectId(storeId)) filter.cua_hang_id = storeId;
 
-  const purchases = await PhieuNhap.find(filter)
+  const purchases = await PhieuNhap.find(activePurchaseDataFilter(filter))
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
     .select('ma_phieu_nhap ngay_nhap created_at kho_id nha_cung_cap_id cua_hang_id trang_thai han_tra_hang_nhap so_ngay_duoc_tra_hang_nhap')
     .sort({ ngay_nhap: -1, created_at: -1 })
@@ -655,7 +689,7 @@ async function buildListFilter(req, storeId) {
 
   if (isObjectId(req.query.nguoi_tao)) query.nguoi_tao_id = req.query.nguoi_tao;
   if (isObjectId(req.query.nguoi_tra)) query.nguoi_tra_id = req.query.nguoi_tra;
-  return query;
+  return activeReturnImportDataFilter(query);
 }
 
 async function loadExportReturns(filter) {
@@ -862,7 +896,7 @@ async function validateReturnItems(params) {
   if (!isObjectId(khoId)) throw new Error('Vui lòng chọn kho trả hàng');
 
   const purchase = isObjectId(phieuNhapId)
-    ? await PhieuNhap.findById(phieuNhapId).select(
+    ? await PhieuNhap.findOne(activePurchaseDataFilter({ _id: phieuNhapId })).select(
       '_id cua_hang_id nha_cung_cap_id kho_id trang_thai ngay_nhap created_at han_tra_hang_nhap so_ngay_duoc_tra_hang_nhap'
     ).lean()
     : null;
@@ -1087,7 +1121,9 @@ async function completeInventory(returnDoc, rows, userId, options = {}) {
       ma_phieu: returnDoc.ma_phieu_tra_nhap,
       ghi_chu: returnDoc.ghi_chu || 'Trả hàng nhập',
       ten_quy_cach: tenQc || undefined,
-      sync_quy_cach: Boolean(row.lo_hang_id && tenQc),
+      ton_kho_lo_quy_cach_id: row.ton_kho_lo_quy_cach_id || undefined,
+      gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || undefined,
+      sync_quy_cach: Boolean(row.lo_hang_id && (tenQc || row.ton_kho_lo_quy_cach_id || row.gia_tri_thuoc_tinh_id)),
       session: options.session
     });
   }
@@ -1488,6 +1524,32 @@ exports.moveToTrash = async function(req, res) {
   }
 };
 
+exports.deactivateSelected = async function(req, res) {
+  try {
+    const storeId = await resolveStoreId(req);
+    let ids = req.body && (req.body.phieu_tra_hang_nhap_ids || req.body.ids);
+    ids = Array.isArray(ids) ? ids : [];
+    ids = ids.map(id => String(id || '').trim()).filter(isObjectId);
+    if (!ids.length) {
+      return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot phieu tra hang nhap.' });
+    }
+    const filter = { _id: { $in: ids } };
+    if (isObjectId(storeId)) filter.cua_hang_id = storeId;
+    const result = await PhieuTraHangNhap.updateMany(
+      activeReturnImportDataFilter(filter),
+      { $set: { trang_thai_du_lieu: 'inactive', updated_at: new Date() } }
+    );
+    return res.json({
+      success: true,
+      message: 'Da xoa phieu tra hang nhap da chon.',
+      data: { modified_count: result.modifiedCount || result.nModified || 0 }
+    });
+  } catch (error) {
+    const status = Number(error && error.statusCode) || 400;
+    return res.status(status).json({ success: false, message: error.message || 'Khong xoa duoc phieu tra hang nhap.' });
+  }
+};
+
 exports.createPage = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
@@ -1506,7 +1568,7 @@ exports.createPage = async function(req, res, next) {
       ? String(copyDraft.phieu_nhap_id)
       : String(req.query?.phieu_nhap_id || '').trim();
     const selectedPurchase = !copyDraft && isObjectId(selectedPurchaseId)
-      ? await PhieuNhap.findById(selectedPurchaseId).select('_id kho_id nha_cung_cap_id').lean()
+      ? await PhieuNhap.findOne(activePurchaseDataFilter({ _id: selectedPurchaseId })).select('_id kho_id nha_cung_cap_id').lean()
       : null;
     const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
     res.render('tra-hang-nhap/create', {
@@ -1787,7 +1849,7 @@ async function buildReturnLinesOnlyGridItems(lines, khoId) {
 
 async function loadReturnCopyDraft(req, storeId, copyFromId) {
   if (!isObjectId(copyFromId) || !isObjectId(storeId)) return null;
-  const source = await PhieuTraHangNhap.findOne({ _id: copyFromId, cua_hang_id: storeId })
+  const source = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: copyFromId, cua_hang_id: storeId }))
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
     .lean();
   if (!source) return null;
@@ -1809,7 +1871,7 @@ async function loadReturnCopyDraft(req, storeId, copyFromId) {
   if (isObjectId(phieuNhapId) && isObjectId(khoId)) {
     const purchaseFilter = { _id: phieuNhapId, kho_id: khoId };
     if (isObjectId(storeId)) purchaseFilter.cua_hang_id = storeId;
-    const purchase = await PhieuNhap.findOne(purchaseFilter)
+    const purchase = await PhieuNhap.findOne(activePurchaseDataFilter(purchaseFilter))
       .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
       .lean();
@@ -1878,7 +1940,7 @@ exports.apiPurchaseReturnDetail = async function(req, res) {
     if (isObjectId(storeId)) purchaseFilter.cua_hang_id = storeId;
     const requestedKhoId = String(req.query.kho_id || '').trim();
     if (isObjectId(requestedKhoId)) purchaseFilter.kho_id = requestedKhoId;
-    const purchase = await PhieuNhap.findOne(purchaseFilter)
+    const purchase = await PhieuNhap.findOne(activePurchaseDataFilter(purchaseFilter))
       .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
       .lean();
@@ -1978,7 +2040,7 @@ exports.createSubmit = async function(req, res, next) {
     let supplierId = isObjectId(body.nha_cung_cap_id) ? String(body.nha_cung_cap_id) : '';
     const phieuNhapId = isObjectId(body.phieu_nhap_id) ? String(body.phieu_nhap_id) : '';
     if (phieuNhapId) {
-      const purchase = await PhieuNhap.findById(phieuNhapId).select('nha_cung_cap_id kho_id').lean();
+      const purchase = await PhieuNhap.findOne(activePurchaseDataFilter({ _id: phieuNhapId })).select('nha_cung_cap_id kho_id').lean();
       if (!purchase) return res.status(400).json({ success: false, message: 'Phiếu nhập gốc không hợp lệ' });
       const purchaseSupplierId = purchase.nha_cung_cap_id ? getObjectIdValue(purchase.nha_cung_cap_id) : '';
       if (supplierId && purchaseSupplierId && supplierId !== purchaseSupplierId) {
@@ -2094,13 +2156,15 @@ exports.createSubmit = async function(req, res, next) {
       print_url: '/tra-hang-nhap/' + returnDoc._id + '/in'
     });
   } catch (error) {
-    return res.status(400).json({ success: false, message: error.message || 'Không thể lưu phiếu trả hàng nhập' });
+    const message = error && error.message ? error.message : 'Khong the luu phieu tra hang nhap';
+    console.error('[TRA_HANG_NHAP][CREATE_FAIL]', message, error && error.stack ? error.stack : error);
+    return res.status(400).json({ success: false, message: message });
   }
 };
 
 exports.detail = async function(req, res, next) {
   try {
-    const ret = await PhieuTraHangNhap.findOne({ _id: req.params.id })
+    const ret = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id }))
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .populate('kho_id')
@@ -2121,7 +2185,7 @@ exports.detail = async function(req, res, next) {
 
 exports.complete = async function(req, res) {
   try {
-    const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id });
+    const returnDoc = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id }));
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
     if (returnDoc.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (returnDoc.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
@@ -2191,7 +2255,7 @@ exports.createReceipt = async function(req, res) {
     session = await mongoose.startSession();
     let result;
     await session.withTransaction(async () => {
-      const returnDoc = await PhieuTraHangNhap.findOne({ _id: req.params.id }).session(session);
+      const returnDoc = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id })).session(session);
       if (!returnDoc) throw new Error('Không tìm thấy phiếu trả hàng nhập');
       if (returnDoc.trang_thai === 'cancelled') throw new Error('Phiếu đã hủy, không thể tạo phiếu thu');
       if (returnDoc.trang_thai !== 'completed') throw new Error('Chỉ tạo phiếu thu cho phiếu đã trả hàng');
@@ -2263,7 +2327,7 @@ exports.exportOneExcel = async function(req, res, next) {
     const storeId = await resolveStoreId(req);
     const query = { _id: req.params.id };
     if (isObjectId(storeId)) query.cua_hang_id = storeId;
-    const ticket = await PhieuTraHangNhap.findOne(query)
+    const ticket = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter(query))
       .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
       .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
@@ -2319,7 +2383,7 @@ async function loadReturnWithItems(id, storeId) {
   if (!isObjectId(id)) return null;
   const filter = { _id: id };
   if (isObjectId(storeId)) filter.cua_hang_id = storeId;
-  const ticket = await PhieuTraHangNhap.findOne(filter)
+  const ticket = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter(filter))
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du sdt email' })
     .populate({ path: 'kho_id', select: 'ten_kho ma_kho' })
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc ten_cong_ty ma_so_thue sdt email' })

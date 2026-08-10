@@ -1,22 +1,52 @@
+<%
+  var cardGroups = [];
+  var cardGroupMap = {};
+  (selectedProductHistories || []).forEach(function(row, index) {
+    var docId = row.chung_tu_doc && row.chung_tu_doc._id ? String(row.chung_tu_doc._id) : '';
+    var groupKey = [row.chung_tu_type || row.loai_phieu || '', docId || row.ma_phieu || ''].join('|');
+    if (!cardGroupMap[groupKey]) {
+      cardGroupMap[groupKey] = {
+        key: 'card-' + index,
+        row: row,
+        rows: [],
+        total_qty: 0
+      };
+      cardGroups.push(cardGroupMap[groupKey]);
+    }
+    cardGroupMap[groupKey].rows.push(row);
+    cardGroupMap[groupKey].total_qty += Number(row.so_luong_thay_doi || 0);
+  });
+%>
+<!-- product-card-grouped-v2 -->
 <table class="admin-table product-inner-table">
   <thead>
     <tr>
-      <th>Chứng từ</th>
-      <th>Thời gian</th>
-      <th>Loại giao dịch</th>
-      <th>Đối tác</th>
-      <th class="text-right">Giá GD</th>
-      <th class="text-right">Giá vốn</th>
-      <th class="text-right">Số lượng</th>
-      <th class="text-right">Tồn cuối</th>
+      <th class="lot-col-expand"></th>
+      <th>Ch&#7913;ng t&#7915;</th>
+      <th>Th&#7901;i gian</th>
+      <th>Lo&#7841;i giao d&#7883;ch</th>
+      <th>&#272;&#7889;i t&aacute;c</th>
+      <th class="text-right">Gi&aacute; GD</th>
+      <th class="text-right">Gi&aacute; v&#7889;n</th>
+      <th class="text-right">S&#7889; l&#432;&#7907;ng</th>
+      <th class="text-right">T&#7891;n cu&#7889;i</th>
     </tr>
   </thead>
   <tbody>
-    <% if (!selectedProductHistories || selectedProductHistories.length === 0) { %>
-      <tr><td colspan="8" class="empty-cell">Chưa có phát sinh thẻ kho.</td></tr>
+    <% if (!cardGroups || cardGroups.length === 0) { %>
+      <tr><td colspan="9" class="empty-cell">Ch&#432;a c&oacute; ph&aacute;t sinh th&#7867; kho.</td></tr>
     <% } %>
-    <% (selectedProductHistories || []).forEach(function(row) { %>
-      <tr>
+    <% cardGroups.forEach(function(group) { %>
+      <%
+        var row = group.row || {};
+        var hasDetails = group.rows.length > 1;
+      %>
+      <tr class="card-data-row">
+        <td class="lot-col-expand">
+          <% if (hasDetails) { %>
+            <button type="button" class="lot-expand-btn" data-card-expand="<%= group.key %>" aria-expanded="false" aria-label="Xem chi ti&#7871;t phi&#7871;u" title="Chi ti&#7871;t phi&#7871;u">+</button>
+          <% } %>
+        </td>
         <td>
           <% if (row.ten_loai_chung_tu) { %>
             <div class="muted-line" style="font-weight:700;color:#334155"><%= row.ten_loai_chung_tu %></div>
@@ -30,19 +60,61 @@
         <td><%= formatDate(row.ngay || row.created_at) %></td>
         <td>
           <%= row.loai_giao_dich || row.loai_phieu || '---' %>
-          <% if (row.lo_hang_id) { %>
-            <div class="muted-line">Lô: <%- refLink('lot', row.lo_hang_id, row.lo_hang_id.ten_lo || row.lo_hang_id.ma_lo || 'Lô') %></div>
+          <% if (!hasDetails && row.lo_hang_id) { %>
+            <div class="muted-line">L&ocirc;: <%- refLink('lot', row.lo_hang_id, row.lo_hang_id.ten_lo || row.lo_hang_id.ma_lo || 'L&ocirc;') %></div>
           <% } %>
-          <% if (row.ten_quy_cach) { %>
-            <div class="muted-line">Thuộc tính: <%= row.ten_quy_cach %></div>
+          <% if (!hasDetails && row.ten_quy_cach) { %>
+            <div class="muted-line">Thu&#7897;c t&iacute;nh: <%= row.ten_quy_cach %></div>
+          <% } %>
+          <% if (hasDetails) { %>
+            <div class="muted-line"><%= group.rows.length %> d&ograve;ng chi ti&#7871;t</div>
           <% } %>
         </td>
         <td><%= row.doi_tac || '---' %></td>
         <td class="text-right"><%= Number(row.gia_giao_dich || 0).toLocaleString('vi-VN') %></td>
         <td class="text-right"><%= Number(row.gia_von_the_kho || 0).toLocaleString('vi-VN') %></td>
-        <td class="text-right"><%= Number(row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(hasDetails ? group.total_qty : row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
         <td class="text-right"><%= Number(row.ton_kho_sau || 0).toLocaleString('vi-VN') %></td>
       </tr>
+      <% if (hasDetails) { %>
+        <tr class="lot-detail-row card-detail-row" data-card-detail="<%= group.key %>" hidden>
+          <td colspan="9">
+            <div class="lot-detail-panel">
+              <div class="lot-detail-panel-title">Chi ti&#7871;t phi&#7871;u</div>
+              <table class="admin-table product-inner-table lot-detail-table">
+                <thead>
+                  <tr>
+                    <th>L&ocirc;</th>
+                    <th>Thu&#7897;c t&iacute;nh</th>
+                    <th class="text-right">Gi&aacute; GD</th>
+                    <th class="text-right">Gi&aacute; v&#7889;n</th>
+                    <th class="text-right">S&#7889; l&#432;&#7907;ng</th>
+                    <th class="text-right">T&#7891;n cu&#7889;i</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% group.rows.forEach(function(detail) { %>
+                    <tr>
+                      <td>
+                        <% if (detail.lo_hang_id) { %>
+                          <%- refLink('lot', detail.lo_hang_id, detail.lo_hang_id.ten_lo || detail.lo_hang_id.ma_lo || 'L&ocirc;') %>
+                        <% } else { %>
+                          ---
+                        <% } %>
+                      </td>
+                      <td><%= detail.ten_quy_cach || '---' %></td>
+                      <td class="text-right"><%= Number(detail.gia_giao_dich || 0).toLocaleString('vi-VN') %></td>
+                      <td class="text-right"><%= Number(detail.gia_von_the_kho || 0).toLocaleString('vi-VN') %></td>
+                      <td class="text-right"><%= Number(detail.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
+                      <td class="text-right"><%= Number(detail.ton_kho_sau || 0).toLocaleString('vi-VN') %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      <% } %>
     <% }) %>
   </tbody>
 </table>

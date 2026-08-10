@@ -9,6 +9,7 @@
     if (!root) return;
     bindLotStatusFilters(root);
     initLotExpandRows(root);
+    initCardExpandRows(root);
     initLotProfitReport(root);
     initProductNotes(root);
     if (root.querySelector('[data-tab-target]')) {
@@ -273,6 +274,130 @@
       foot.querySelector('[data-sum-loi-nhuan]').textContent = money(sumLn);
     }
 
+    function renderLotProfitGroupedRows(data) {
+      var body = pane.querySelector('[data-lot-profit-body]');
+      var foot = pane.querySelector('[data-lot-profit-foot]');
+      if (!body || !foot) return;
+      var rows = data && data.rows || [];
+      if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="12" class="empty-cell">Ch&#432;a c&oacute; d&#7919; li&#7879;u xu&#7845;t b&aacute;n theo l&ocirc; n&agrave;y.</td></tr>';
+        foot.style.display = 'none';
+        return;
+      }
+
+      var groupMap = {};
+      var groups = [];
+      rows.forEach(function(r, index) {
+        var lotKey = String(r.lo_hang_id || r.lo_hien_thi || r.ten_lo || r.ma_lo || '') + '|' + String(r.ngay_nhap || '');
+        if (!groupMap[lotKey]) {
+          groupMap[lotKey] = {
+            key: 'lot-profit-' + index,
+            row: Object.assign({}, r),
+            rows: [],
+            so_luong_nhap: 0,
+            tong_gia_von: 0,
+            so_luong_xuat: 0,
+            tong_doanh_thu: 0,
+            loi_nhuan: 0,
+            thieu_gia_nhap: false
+          };
+          groups.push(groupMap[lotKey]);
+        }
+        var group = groupMap[lotKey];
+        group.rows.push(r);
+        group.so_luong_nhap += Number(r.so_luong_nhap || 0);
+        group.tong_gia_von += Number(r.tong_gia_von || 0);
+        group.so_luong_xuat += Number(r.so_luong_xuat || 0);
+        group.tong_doanh_thu += Number(r.tong_doanh_thu || 0);
+        group.loi_nhuan += Number(r.loi_nhuan || 0);
+        group.thieu_gia_nhap = group.thieu_gia_nhap || Boolean(r.thieu_gia_nhap);
+      });
+
+      var sumGv = 0;
+      var sumDt = 0;
+      var sumLn = 0;
+      var sumSlXuat = 0;
+      body.innerHTML = groups.map(function(group) {
+        var r = group.row;
+        var hasDetails = group.rows.length > 1;
+        r.so_luong_nhap = group.so_luong_nhap;
+        r.tong_gia_von = group.tong_gia_von;
+        r.so_luong_xuat = group.so_luong_xuat;
+        r.tong_doanh_thu = group.tong_doanh_thu;
+        r.loi_nhuan = group.loi_nhuan;
+        r.don_gia_nhap = group.so_luong_nhap > 0 ? group.tong_gia_von / group.so_luong_nhap : Number(r.don_gia_nhap || 0);
+        r.don_gia_xuat_binh_quan = group.so_luong_xuat > 0 ? group.tong_doanh_thu / group.so_luong_xuat : 0;
+        sumGv += Number(r.tong_gia_von || 0);
+        sumDt += Number(r.tong_doanh_thu || 0);
+        sumLn += Number(r.loi_nhuan || 0);
+        sumSlXuat += Number(r.so_luong_xuat || 0);
+        var warn = group.thieu_gia_nhap ? ' <span class="stock-warning-text" title="Ch&#432;a c&oacute; d&ograve;ng nh&#7853;p">*</span>' : '';
+        var details = '';
+        if (hasDetails) {
+          details = '<tr class="lot-detail-row lot-profit-detail-row" data-lot-profit-detail="' + group.key + '" hidden>' +
+            '<td colspan="12"><div class="lot-detail-panel">' +
+            '<div class="lot-detail-panel-title">Chi ti&#7871;t l&ocirc;</div>' +
+            '<table class="admin-table product-inner-table lot-detail-table"><thead><tr>' +
+            '<th>Thu&#7897;c t&iacute;nh</th><th class="text-right">S&#7889; l&#432;&#7907;ng nh&#7853;p</th><th class="text-right">&#272;G nh&#7853;p</th>' +
+            '<th class="text-right">T&#7893;ng gi&aacute; v&#7889;n</th><th class="text-right">SL xu&#7845;t</th><th class="text-right">&#272;G xu&#7845;t BQ</th>' +
+            '<th class="text-right">T&#7893;ng doanh thu</th><th class="text-right">L&#7907;i nhu&#7853;n</th>' +
+            '</tr></thead><tbody>' +
+            group.rows.map(function(detail) {
+              return '<tr>' +
+                '<td>' + escapeHtml(detail.ten_quy_cach || '---') + '</td>' +
+                '<td class="text-right">' + money(detail.so_luong_nhap) + '</td>' +
+                '<td class="text-right">' + money(detail.don_gia_nhap) + '</td>' +
+                '<td class="text-right">' + money(detail.tong_gia_von) + '</td>' +
+                '<td class="text-right">' + money(detail.so_luong_xuat) + '</td>' +
+                '<td class="text-right">' + money(detail.don_gia_xuat_binh_quan) + '</td>' +
+                '<td class="text-right">' + money(detail.tong_doanh_thu) + '</td>' +
+                '<td class="text-right' + (Number(detail.loi_nhuan || 0) < 0 ? ' stock-warning-text' : '') + '">' + money(detail.loi_nhuan) + '</td>' +
+              '</tr>';
+            }).join('') +
+            '</tbody></table></div></td></tr>';
+        }
+        return '<tr>' +
+          '<td class="lot-col-expand">' + (hasDetails ? '<button type="button" class="lot-expand-btn" data-lot-profit-expand="' + group.key + '" aria-expanded="false" aria-label="Xem chi ti&#7871;t l&ocirc;" title="Chi ti&#7871;t l&ocirc;">+</button>' : '') + '</td>' +
+          '<td>' + dateFmt(r.ngay_nhap) + '</td>' +
+          '<td>' + escapeHtml(r.ten_hang || '---') + '</td>' +
+          '<td>' + escapeHtml(r.lo_hien_thi || '---') + warn + '</td>' +
+          '<td class="lot-profit-spec-cell">' + (hasDetails ? escapeHtml(group.rows.length + ' thuộc tính') : escapeHtml(r.ten_quy_cach || '---')) + '</td>' +
+          '<td class="text-right">' + money(r.so_luong_nhap) + '</td>' +
+          '<td class="text-right">' + money(r.don_gia_nhap) + '</td>' +
+          '<td class="text-right">' + money(r.tong_gia_von) + '</td>' +
+          '<td class="text-right">' + money(r.so_luong_xuat) + '</td>' +
+          '<td class="text-right">' + money(r.don_gia_xuat_binh_quan) + '</td>' +
+          '<td class="text-right">' + money(r.tong_doanh_thu) + '</td>' +
+          '<td class="text-right' + (Number(r.loi_nhuan || 0) < 0 ? ' stock-warning-text' : '') + '">' + money(r.loi_nhuan) + '</td>' +
+          '</tr>' + details;
+      }).join('');
+      foot.style.display = '';
+      foot.querySelector('[data-sum-gia-von]').textContent = money(sumGv);
+      foot.querySelector('[data-sum-sl-xuat]').textContent = money(sumSlXuat);
+      foot.querySelector('[data-sum-doanh-thu]').textContent = money(sumDt);
+      foot.querySelector('[data-sum-loi-nhuan]').textContent = money(sumLn);
+      bindLotProfitExpandRows();
+    }
+
+    function bindLotProfitExpandRows() {
+      pane.querySelectorAll('[data-lot-profit-expand]').forEach(function(btn) {
+        if (btn._lotProfitExpandBound) return;
+        btn._lotProfitExpandBound = true;
+        btn.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          var id = btn.getAttribute('data-lot-profit-expand');
+          if (!id) return;
+          var detailRow = pane.querySelector('[data-lot-profit-detail="' + id + '"]');
+          if (!detailRow) return;
+          var willOpen = detailRow.hidden;
+          detailRow.hidden = !willOpen;
+          btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+          btn.textContent = willOpen ? '-' : '+';
+        });
+      });
+    }
+
     async function loadReport() {
       var status = pane.querySelector('[data-lot-profit-status]');
       if (status) status.textContent = 'Đang tải...';
@@ -291,7 +416,7 @@
           var metaEl = pane.querySelector('[data-lot-profit-meta]');
           if (metaEl) metaEl.textContent = data.meta.ghi_chu_gia_nhap + ' (' + (data.meta.tong_dong || 0) + ' dòng)';
         }
-        renderRows(data);
+        renderLotProfitGroupedRows(data);
         if (status) status.textContent = '';
         loaded = true;
       } catch (err) {
@@ -350,11 +475,14 @@
 
   function initLotExpandRows(root) {
     if (!root) return;
-    var pane = root.querySelector('[data-tab-panel="product-lots"]');
-    if (!pane || pane._lotExpandBound) return;
-    pane._lotExpandBound = true;
+    var pane = root.matches && root.matches('[data-tab-panel="product-lots"]')
+      ? root
+      : root.querySelector('[data-tab-panel="product-lots"]');
+    if (!pane) return;
 
     pane.querySelectorAll('[data-lot-expand]').forEach(function(btn) {
+      if (btn._lotExpandBound) return;
+      btn._lotExpandBound = true;
       btn.addEventListener('click', function(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -365,7 +493,7 @@
         var willOpen = detailRow.hidden;
         detailRow.hidden = !willOpen;
         btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-        btn.textContent = willOpen ? '−' : '+';
+        btn.textContent = willOpen ? '-' : '+';
       });
     });
   }
@@ -420,6 +548,31 @@
         });
       });
       applyFilter('all');
+    });
+  }
+
+  function initCardExpandRows(root) {
+    if (!root) return;
+    var pane = root.matches && root.matches('[data-tab-panel="product-card"]')
+      ? root
+      : root.querySelector('[data-tab-panel="product-card"]');
+    if (!pane) return;
+
+    pane.querySelectorAll('[data-card-expand]').forEach(function(btn) {
+      if (btn._cardExpandBound) return;
+      btn._cardExpandBound = true;
+      btn.addEventListener('click', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var cardId = btn.getAttribute('data-card-expand');
+        if (!cardId) return;
+        var detailRow = pane.querySelector('[data-card-detail="' + cardId + '"]');
+        if (!detailRow) return;
+        var willOpen = detailRow.hidden;
+        detailRow.hidden = !willOpen;
+        btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        btn.textContent = willOpen ? '-' : '+';
+      });
     });
   }
 

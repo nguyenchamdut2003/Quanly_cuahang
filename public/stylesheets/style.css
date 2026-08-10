@@ -3100,6 +3100,17 @@ button.dropdown-item {
   color: #1d4ed8;
 }
 
+.lot-code-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lot-code-cell .lot-ma-lo-clip {
+  min-width: 0;
+}
+
 .lot-qc-badge {
   display: inline-block;
   padding: 2px 8px;

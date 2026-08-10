@@ -261,6 +261,27 @@ function buildReturnListQueryString(query, overrides) {
     return params.toString();
 }
 
+function normalizeReturnIds(input) {
+    const rawIds = Array.isArray(input)
+        ? input
+        : (input ? [input] : []);
+    return rawIds
+        .map(id => String(id || '').trim())
+        .filter(id => mongoose.Types.ObjectId.isValid(id));
+}
+
+function activeReturnDataFilter(extra = {}) {
+    return {
+        ...extra,
+        $or: [
+            { trang_thai_du_lieu: 'active' },
+            { trang_thai_du_lieu: { $exists: false } },
+            { trang_thai_du_lieu: null },
+            { trang_thai_du_lieu: '' }
+        ]
+    };
+}
+
 exports.getTraHang = async (req, res, next) => {
     try {
         const filter = await buildReturnFilter(req.query);
@@ -293,6 +314,40 @@ exports.getTraHang = async (req, res, next) => {
             },
             qs: function(overrides) {
                 return buildReturnListQueryString(req.query || {}, overrides || {});
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.postTraHangDeactivateSelected = async (req, res, next) => {
+    try {
+        const ids = normalizeReturnIds(req.body && req.body.phieu_tra_hang_ids);
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một phiếu trả hàng.' });
+        }
+
+        const result = await PhieuTraHang.updateMany(
+            {
+                _id: { $in: ids },
+                $or: [
+                    { trang_thai_du_lieu: 'active' },
+                    { trang_thai_du_lieu: { $exists: false } },
+                    { trang_thai_du_lieu: null },
+                    { trang_thai_du_lieu: '' }
+                ]
+            },
+            { $set: { trang_thai_du_lieu: 'inactive', updated_at: new Date() } },
+            { runValidators: true }
+        );
+
+        return res.json({
+            success: true,
+            message: 'Đã xóa phiếu trả hàng',
+            data: {
+                requested: ids.length,
+                modified: result.modifiedCount || 0
             }
         });
     } catch (error) {
@@ -353,7 +408,7 @@ exports.getTraHangInvoicesSearch = async (req, res, next) => {
     try {
         const page = Math.max(Number(req.query.page || 1), 1);
         const limit = Math.min(Math.max(Number(req.query.limit || 7), 1), 50);
-        const filter = { trang_thai: { $ne: 'cancelled' } };
+        const filter = { trang_thai_du_lieu: 'active', trang_thai: { $ne: 'cancelled' } };
         if (req.user?.cua_hang_id) filter.cua_hang_id = req.user.cua_hang_id;
 
         if (req.query.invoice_code && req.query.invoice_code.trim() !== '') {
@@ -388,7 +443,7 @@ exports.getTraHangInvoicesSearch = async (req, res, next) => {
             }).select('_id');
             const customerIds = customers.map(item => item._id);
             const [customerInvoices, recipientShipments] = await Promise.all([
-                customerIds.length ? HoaDonBanHang.find({ khach_hang_id: { $in: customerIds } }).select('_id') : [],
+                customerIds.length ? HoaDonBanHang.find({ khach_hang_id: { $in: customerIds }, trang_thai_du_lieu: 'active' }).select('_id') : [],
                 VanDon.find({
                     hoa_don_id: { $ne: null },
                     $or: [
@@ -422,7 +477,7 @@ exports.getTraHangInvoicesSearch = async (req, res, next) => {
         const returnableInvoiceIds = await getReturnableInvoiceIds(filter);
         const pagedIds = returnableInvoiceIds.slice((page - 1) * limit, page * limit);
         const invoices = pagedIds.length
-            ? await HoaDonBanHang.find({ _id: { $in: pagedIds } })
+            ? await HoaDonBanHang.find({ _id: { $in: pagedIds }, trang_thai_du_lieu: 'active' })
             .populate('khach_hang_id')
             .populate('nguoi_ban_id')
             .sort({ ngay_ban: -1, created_at: -1 })
@@ -471,7 +526,7 @@ exports.getTraHangInvoiceId = async (req, res, next) => {
 
 exports.getTraHangIdDetail = async (req, res, next) => {
     try {
-        const returnSlip = await PhieuTraHang.findOne({ _id: req.params.id })
+        const returnSlip = await PhieuTraHang.findOne(activeReturnDataFilter({ _id: req.params.id }))
             .populate('hoa_don_id')
             .populate('khach_hang_id')
             .populate('nguoi_tao_id')
@@ -561,13 +616,13 @@ exports.postTraHangAdd = async (req, res, next) => {
 
         let invoice = null;
         if (hoa_don_id) {
-            invoice = await HoaDonBanHang.findById(hoa_don_id).lean();
+            invoice = await HoaDonBanHang.findOne({ _id: hoa_don_id, trang_thai_du_lieu: 'active' }).lean();
             if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
             if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
                 return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể trả hàng' });
             }
             const invoiceItems = await CTHoaDonBanHang.find({ hoa_don_id }).lean();
-            const returns = await PhieuTraHang.find({ hoa_don_id, trang_thai: { $ne: 'cancelled' } }).select('_id').lean();
+            const returns = await PhieuTraHang.find(activeReturnDataFilter({ hoa_don_id, trang_thai: { $ne: 'cancelled' } })).select('_id').lean();
             const returnedItems = returns.length
                 ? await CTPhieuTraHang.find({ phieu_tra_hang_id: { $in: returns.map(row => row._id) }, loai_dong: { $ne: 'hang_doi' } }).select('ct_hoa_don_id hang_hoa_id lo_hang_id so_luong').lean()
                 : [];
@@ -972,7 +1027,7 @@ exports.postTraHangAdd = async (req, res, next) => {
 
 exports.patchTraHangId = async (req, res, next) => {
     try {
-        const slip = await PhieuTraHang.findOne({ _id: req.params.id });
+        const slip = await PhieuTraHang.findOne(activeReturnDataFilter({ _id: req.params.id }));
         if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
         if (slip.trang_thai === 'cancelled') {
             return res.status(400).json({ success: false, message: 'Phiếu đã hủy, không thể sửa' });
@@ -995,7 +1050,7 @@ exports.postTraHangIdCancel = async (req, res, next) => {
             message: result && result.already_cancelled ? 'Phiếu đã hủy' : 'Đã hủy phiếu trả hàng',
             data: result
         });
-        const slip = await PhieuTraHang.findOne({ _id: req.params.id });
+        const slip = await PhieuTraHang.findOne(activeReturnDataFilter({ _id: req.params.id }));
         if (!slip) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng' });
         if (slip.trang_thai === 'cancelled') {
             return res.json({ success: true, message: 'Phiếu đã hủy' });

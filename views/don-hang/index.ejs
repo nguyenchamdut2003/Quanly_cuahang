@@ -60,6 +60,8 @@
     .search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 34px;font-size:13px;outline:none}
     .search button{position:absolute;right:4px;top:4px;width:24px;height:23px;border:0;background:#fff;color:#374151;cursor:pointer}
     .actions{display:flex;align-items:center;gap:8px}.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.btn.primary{border-color:#0070f4;color:#0070f4}.icon{width:31px;height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;display:inline-flex;align-items:center;justify-content:center}
+    .actions .order-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+    .actions .order-delete-btn:hover{background:#b42318!important;border-color:#b42318!important}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow:auto}.table{width:100%;min-width:1080px;border-collapse:collapse}.table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:700;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px}.table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827}.table tbody tr{cursor:pointer}.table tbody tr:hover{background:#f7fbff}.order-row.active td{background:#f1f8ff;border-top:2px solid #0070f4}.num{text-align:right}.check-col,.star-col{width:36px;text-align:center}.row-check{width:15px;height:15px;accent-color:#0070f4}.star-col{color:#8b95a1}.empty{height:100%;min-height:520px;text-align:center;color:#111827}.empty-wrap{height:520px;display:flex;align-items:center;justify-content:center;flex-direction:column}.empty-icon{width:94px;height:94px;border-radius:50%;background:#eef6ff;display:flex;align-items:center;justify-content:center;color:#0070f4;font-size:34px;margin-bottom:18px}.empty h3{font-size:16px;margin:0 0 12px}.empty p{font-size:14px;line-height:1.4;margin:0}.empty a{color:#0070f4;text-decoration:none}
     .status-badge{height:22px;border-radius:4px;background:#e8f3ff;color:#006dff;padding:0 7px;display:inline-flex;align-items:center;font-size:12px;font-weight:700}.status-badge.completed{background:#dff7e9;color:#008a3d}.status-badge.cancelled{background:#fee4e2;color:#b42318}.status-badge.shipping{background:#fff4d6;color:#9a6700}
     .date-range{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}.date-range input{height:30px;border:1px solid #cfd8e3;border-radius:6px;padding:0 8px;font-size:12px}
@@ -121,7 +123,7 @@
     .btn.danger:disabled{opacity:.45;cursor:not-allowed}
     .order-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
     .order-trash-overlay.is-open{display:flex}
-    .order-trash-modal{width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+    .order-trash-modal{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
     .order-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
     .order-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
     .order-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
@@ -136,7 +138,9 @@
     .order-trash-table th{background:#f8fafc;border-bottom:1px solid #e4eaf2;padding:8px 10px;text-align:left;font-size:12px;color:#475467}
     .order-trash-table td{border-bottom:1px solid #eef2f6;padding:8px 10px;color:#111827}
     .order-trash-table .num{text-align:right;font-weight:700}
-    .order-trash-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee}
+    .order-trash-foot{display:flex!important;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee;flex:0 0 auto;background:#fff}
+    .order-trash-foot .btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:74px;visibility:visible!important;opacity:1!important}
+    .order-trash-foot .btn.danger{background:#d92d20;color:#fff;border-color:#d92d20}
     .order-trash-loading{text-align:center;padding:28px 12px;color:#667085;font-size:13px}
     .order-pagination{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:12px}
     .order-page-size{font-weight:700}
@@ -182,9 +186,9 @@
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu đặt"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
             <a class="btn primary" href="/don-hang/create"><i class="fa-solid fa-plus"></i> Đặt hàng</a>
-            <button type="button" class="btn danger" id="openOrderTrashModal" disabled>Xóa</button>
             <button type="button" class="btn" id="openOrderMergeModal"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
             <button type="button" class="btn" id="openOrderExportModal"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></button>
+            <button type="button" class="btn order-delete-btn" id="openOrderTrashModal"><i class="fa-regular fa-trash-can"></i> Xóa</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -230,27 +234,15 @@
   <div id="orderTrashModalOverlay" class="order-trash-overlay" aria-hidden="true">
     <div class="order-trash-modal" role="dialog" aria-labelledby="orderTrashModalTitle" aria-modal="true">
       <div class="order-trash-head">
-        <h3 id="orderTrashModalTitle">Đưa vào thùng rác</h3>
+        <h3 id="orderTrashModalTitle">Xóa đơn hàng</h3>
         <button type="button" class="order-trash-close" id="orderTrashModalClose" aria-label="Đóng">×</button>
       </div>
       <div class="order-trash-body" id="orderTrashModalBody">
-        <p class="order-trash-desc">Các bảng/dữ liệu liên quan bên dưới sẽ được đưa vào thùng rác cùng đơn đặt hàng (ẩn khỏi danh sách, có thể khôi phục sau).</p>
-        <div id="orderTrashAlert"></div>
-        <ul class="order-trash-selected" id="orderTrashSelectedList"></ul>
-        <table class="order-trash-table">
-          <thead>
-            <tr>
-              <th>Bảng / loại dữ liệu</th>
-              <th class="num">Số bản ghi</th>
-              <th>Ví dụ</th>
-            </tr>
-          </thead>
-          <tbody id="orderTrashImpactRows"></tbody>
-        </table>
+        <p class="order-trash-desc">Bạn có chắc chắn muốn xóa các đơn hàng đã chọn không?</p>
       </div>
       <div class="order-trash-foot">
-        <button type="button" class="btn" id="orderTrashCancel">Hủy</button>
-        <button type="button" class="btn danger" id="orderTrashConfirm" disabled>Đưa vào thùng rác</button>
+        <button type="button" class="btn" id="orderTrashCancel">Không</button>
+        <button type="button" class="btn danger" id="orderTrashConfirm">Có</button>
       </div>
     </div>
   </div>
@@ -1438,8 +1430,7 @@
       }
 
       function updateDeleteButtonState() {
-        if (!openBtn) return;
-        openBtn.disabled = getSelectedOrderIds().length === 0;
+        return;
       }
 
       function closeTrashModal() {
@@ -1504,44 +1495,41 @@
         if (impactBody) impactBody.innerHTML = '<tr><td colspan="3" class="order-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
         if (alertBox) alertBox.innerHTML = '';
         if (selectedList) selectedList.innerHTML = '';
-        if (confirmBtn) confirmBtn.disabled = true;
-
-        fetch('/don-hang/trash/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ don_hang_ids: pendingIds })
-        })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Không tải được thông tin xóa');
-            previewData = data.data;
-            renderSelectedList(previewData);
-            renderAlert(previewData);
-            renderImpactRows(previewData);
-            if (confirmBtn) confirmBtn.disabled = !previewData.can_proceed;
-          })
-          .catch(function(err) {
-            if (impactBody) impactBody.innerHTML = '<tr><td colspan="3">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
-            alert(err.message || 'Không tải được thông tin xóa');
-          });
+        previewData = {
+          can_proceed: true,
+          items: pendingIds.map(function(id) {
+            var row = document.querySelector('[data-order-id="' + id + '"]');
+            return {
+              don_hang_id: id,
+              ma_don_hang: row ? row.getAttribute('data-order-code') : ''
+            };
+          }),
+          aggregate_groups: [
+            { label: 'don_hang', count: pendingIds.length, samples: ['trang_thai_du_lieu = inactive'] }
+          ]
+        };
+        renderSelectedList(previewData);
+        renderAlert(previewData);
+        renderImpactRows(previewData);
+        if (confirmBtn) confirmBtn.disabled = false;
       }
 
       function confirmTrash() {
         if (!previewData || !previewData.can_proceed || !pendingIds.length) return;
         if (confirmBtn) confirmBtn.disabled = true;
-        fetch('/don-hang/trash/move', {
+        fetch('/don-hang/deactivate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ don_hang_ids: pendingIds })
         })
           .then(function(res) { return res.json(); })
           .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Không đưa vào thùng rác được');
-            alert(data.message || 'Đã đưa vào thùng rác');
+            if (!data.success) throw new Error(data.message || 'Không xóa được đơn hàng');
+            alert(data.message || 'Đã xóa đơn hàng');
             window.location.reload();
           })
           .catch(function(err) {
-            alert(err.message || 'Không đưa vào thùng rác được');
+            alert(err.message || 'Không xóa được đơn hàng');
             if (confirmBtn) confirmBtn.disabled = false;
           });
       }

@@ -261,6 +261,11 @@ function buildInvoiceListQueryString(query, overrides) {
     return params.toString();
 }
 
+function normalizeInvoiceIds(ids) {
+    if (!Array.isArray(ids)) return [];
+    return [...new Set(ids.map(id => String(id || '').trim()).filter(id => mongoose.Types.ObjectId.isValid(id)))];
+}
+
 exports.getHoaDon = async (req, res, next) => {
     try {
         const normalizedFilters = normalizeInvoicePageFilters(req.query);
@@ -370,7 +375,7 @@ exports.getHoaDonCreate = async (req, res, next) => {
 
         const orderId = String(req.query?.don_hang_id || '').trim();
         if (/^[0-9a-fA-F]{24}$/.test(orderId)) {
-            sourceOrder = await DonHang.findById(orderId)
+            sourceOrder = await DonHang.findOne({ _id: orderId, trang_thai_du_lieu: 'active' })
                 .populate('khach_hang_id')
                 .populate('cua_hang_id')
                 .populate('kho_id')
@@ -386,7 +391,7 @@ exports.getHoaDonCreate = async (req, res, next) => {
                     [sourceOrderItems, sourceShipment, existingInvoice] = await Promise.all([
                         CTDonHang.find({ don_hang_id: sourceOrder._id }).populate('hang_hoa_id').lean(),
                         VanDon.findOne({ don_hang_id: sourceOrder._id }).lean(),
-                        HoaDonBanHang.findOne({ don_hang_id: sourceOrder._id }).lean()
+                        HoaDonBanHang.findOne({ don_hang_id: sourceOrder._id, trang_thai_du_lieu: 'active' }).lean()
                     ]);
                 }
             }
@@ -394,7 +399,7 @@ exports.getHoaDonCreate = async (req, res, next) => {
 
         const copyFromId = String(req.query?.copy_from || '').trim();
         if (!sourceOrder && /^[0-9a-fA-F]{24}$/.test(copyFromId)) {
-            sourceInvoice = await HoaDonBanHang.findById(copyFromId)
+            sourceInvoice = await HoaDonBanHang.findOne({ _id: copyFromId, trang_thai_du_lieu: 'active' })
                 .populate('khach_hang_id')
                 .populate('cua_hang_id')
                 .populate('kho_id')
@@ -833,7 +838,7 @@ exports.createInvoice = async function(req, res, next) {
         res.json({ success: true, message: 'mã tạo hóa đơn', ma_hoa_don, id: invoice._id, data: { invoice, shipment } });
     } catch (error) {
         if (error?.code === 11000 && error?.keyPattern?.don_hang_id && req.body?.don_hang_id) {
-            const existingInvoice = await HoaDonBanHang.findOne({ don_hang_id: req.body.don_hang_id }).lean();
+            const existingInvoice = await HoaDonBanHang.findOne({ don_hang_id: req.body.don_hang_id, trang_thai_du_lieu: 'active' }).lean();
             if (existingInvoice) {
                 return res.status(409).json({
                     success: false,
@@ -865,7 +870,7 @@ exports.createInvoice = async function(req, res, next) {
 
 exports.getHoaDonId = async (req, res, next) => {
     try {
-        const invoice = await HoaDonBanHang.findById(req.params.id)
+        const invoice = await HoaDonBanHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' })
             .populate('khach_hang_id')
             .populate('don_hang_id')
             .populate('kho_id')
@@ -882,7 +887,7 @@ exports.getHoaDonId = async (req, res, next) => {
 
 exports.getHoaDonIdDetail = async (req, res, next) => {
     try {
-        const invoice = await HoaDonBanHang.findById(req.params.id)
+        const invoice = await HoaDonBanHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' })
             .populate('khach_hang_id')
             .populate('cua_hang_id')
             .populate('kho_id')
@@ -945,7 +950,7 @@ exports.getHoaDonIdDetail = async (req, res, next) => {
 
 exports.postHoaDonIdSave = async (req, res, next) => {
     try {
-        const invoice = await HoaDonBanHang.findById(req.params.id);
+        const invoice = await HoaDonBanHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
         if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
             return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể lưu' });
@@ -1177,7 +1182,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
 
 exports.postHoaDonIdDuplicate = async (req, res, next) => {
     try {
-        const sourceInvoice = await HoaDonBanHang.findById(req.params.id).lean();
+        const sourceInvoice = await HoaDonBanHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' }).lean();
         if (!sourceInvoice) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
         }
@@ -1231,7 +1236,7 @@ exports.postHoaDonIdDuplicate = async (req, res, next) => {
 
 exports.postHoaDonIdCancel = async (req, res, next) => {
     try {
-        const invoice = await HoaDonBanHang.findById(req.params.id);
+        const invoice = await HoaDonBanHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
         if (normalizeInvoiceStatus(invoice.trang_thai) === 'cancelled') {
             return res.json({ success: true, message: 'Hóa đơn đã hủy' });
@@ -1305,10 +1310,58 @@ exports.postHoaDonIdCancel = async (req, res, next) => {
     }
 };
 
+exports.postHoaDonDeactivateSelected = async (req, res, next) => {
+    try {
+        const ids = normalizeInvoiceIds(req.body?.hoa_don_ids || req.body?.ids || []);
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot hoa don de xoa' });
+        }
+
+        const invoices = await HoaDonBanHang.find({
+            _id: { $in: ids },
+            trang_thai_du_lieu: 'active'
+        });
+
+        if (!invoices.length) {
+            return res.status(404).json({ success: false, message: 'Khong tim thay hoa don active de xoa' });
+        }
+
+        let restoredLineCount = 0;
+        for (const invoice of invoices) {
+            if (invoice.da_tru_ton_kho && invoice.kho_id) {
+                const invoiceLines = await CTHoaDonBanHang.find({ hoa_don_id: invoice._id }).lean();
+                for (const line of invoiceLines) {
+                    await restoreStockLine(invoice.kho_id, line, {
+                        nguoi_tao_id: req.user?._id,
+                        loai_phieu: 'ban_hang',
+                        ma_phieu: invoice.ma_hoa_don || String(invoice._id),
+                        ghi_chu: `Hoan ton xoa mem HD ${invoice.ma_hoa_don || invoice._id}`
+                    });
+                    restoredLineCount += 1;
+                }
+                invoice.da_tru_ton_kho = false;
+            }
+            invoice.trang_thai_du_lieu = 'inactive';
+            await invoice.save();
+        }
+
+        res.json({
+            success: true,
+            message: `Da xoa ${invoices.length} hoa don va hoan ton ${restoredLineCount} dong hang`,
+            data: {
+                affected: invoices.length,
+                restored_lines: restoredLineCount
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 
 exports.postHoaDonIdPhieuThu = async (req, res, next) => {
     try {
-        const invoice = await HoaDonBanHang.findById(req.params.id);
+        const invoice = await HoaDonBanHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!invoice) return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn' });
         if (invoice.trang_thai === 'cancelled') {
             return res.status(400).json({ success: false, message: 'Hóa đơn đã hủy, không thể thu tiền' });

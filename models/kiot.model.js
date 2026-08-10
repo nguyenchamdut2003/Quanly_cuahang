@@ -606,6 +606,12 @@ const PhieuNhapSchema = new Schema({
     default: 'draft'
   },
 
+  trang_thai_du_lieu: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  },
+
   is_merged_purchase: {
     type: Boolean,
     default: false
@@ -745,6 +751,7 @@ const PhieuTraHangNhapSchema = new Schema({
   tinh_vao_cong_no: { type: Boolean, default: true },
   tong_tien_tra: { type: Number, default: 0 },
   trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'completed' },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active' },
   ly_do: { type: String },
   ghi_chu: { type: String },
   nguoi_tra_id: { type: ObjectId, ref: 'NguoiDung' },
@@ -814,7 +821,7 @@ const LichSuKhoSchema = new Schema({
 
   loai_phieu: {
     type: String,
-    enum: ['nhap_hang', 'tra_hang_nhap', 'tra_hang', 'kiem_kho', 'ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
+    enum: ['nhap_hang', 'tra_hang_nhap', 'tra_hang', 'kiem_kho', 'ban_hang', 'huy_hoa_don', 'rollback_ban_hang', 'dieu_chinh_ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
     required: true
   },
 
@@ -1144,6 +1151,7 @@ const DonHangSchema = new Schema({
   cod_enabled: { type: Boolean, default: false },
   cod_amount: { type: Number, default: 0 },
   trang_thai: { type: String },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active' },
   trang_thai_giao_hang: { type: String, enum: ['chua_giao', 'giao_mot_phan', 'giao_thieu', 'giao_du'], default: 'chua_giao' },
   ngay_giao_thuc_te: { type: Date },
   is_merged_order: {
@@ -1256,6 +1264,7 @@ const HoaDonBanHangSchema = new Schema({
   thanh_toan: { type: Number },
   phuong_thuc_tt: { type: String },
   trang_thai: { type: String },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active' },
   ghi_chu: { type: String },
   cua_hang_id: { type: ObjectId, ref: 'CuaHang' },
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' },
@@ -1647,6 +1656,7 @@ const PhieuTraHangSchema = new Schema({
   can_tra_khach: { type: Number, default: 0 },
   ly_do: { type: String },
   trang_thai: { type: String },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active' },
   ghi_chu: { type: String },
   hinh_thuc_nhan_hang_tra: {
     type: String,

@@ -258,8 +258,8 @@ exports.getVanDon = async (req, res, next) => {
         }
         if (req.query?.cod === 'yes' || req.query?.cod === 'no') {
             const invoices = await HoaDonBanHang.find(req.query.cod === 'yes'
-                ? { thanh_toan: { $gt: 0 } }
-                : { $or: [{ thanh_toan: { $exists: false } }, { thanh_toan: 0 }, { thanh_toan: null }] }
+                ? { trang_thai_du_lieu: 'active', thanh_toan: { $gt: 0 } }
+                : { trang_thai_du_lieu: 'active', $or: [{ thanh_toan: { $exists: false } }, { thanh_toan: 0 }, { thanh_toan: null }] }
             ).select('_id');
             filter.hoa_don_id = { $in: invoices.map(item => item._id) };
         }

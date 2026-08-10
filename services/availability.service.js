@@ -172,6 +172,7 @@ async function getReservedQuantitiesByOrder({
     {
       $match: {
         'don_hang.kho_id': khoId,
+        'don_hang.trang_thai_du_lieu': 'active',
         'don_hang.trang_thai': { $nin: ['cancelled', 'merged'] },
         'don_hang.trang_thai_giao_hang': { $ne: 'giao_du' },
         $or: [

@@ -427,10 +427,7 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
                     const lotKey = qc.lo_hang_id
                         ? buildLotKey(productId, qc.lo_hang_id)
                         : '';
-                    const qcKhachDat = Math.max(
-                        Number(reserved.byVariant[variantKey]?.so_luong_khach_dat || 0),
-                        lotKey ? Number(reserved.byLot[lotKey]?.so_luong_khach_dat || 0) : 0
-                    );
+                    const qcKhachDat = Number(reserved.byVariant[variantKey]?.so_luong_khach_dat || 0);
                     return Object.assign({}, qc, {
                         ton_kho: qcTonThucTe,
                         ton_thuc_te: qcTonThucTe,

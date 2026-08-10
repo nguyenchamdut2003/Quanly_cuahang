@@ -10,6 +10,7 @@ router.get('/create', nhapHangController.createPage);
 router.get('/api/nha-cung-cap/:id/hang-hoa', nhapHangController.apiSupplierProducts);
 router.get('/api/nha-cung-cap/:id/dia-chi', nhapHangController.apiSupplierAddresses);
 router.post('/create', nhapHangController.createSubmit);
+router.post('/deactivate', nhapHangController.deactivateSelected);
 router.post('/trash/preview', nhapHangController.previewTrash);
 router.post('/trash/move', nhapHangController.moveToTrash);
 router.post('/gop-phieu-nhap', nhapHangController.mergePurchases);

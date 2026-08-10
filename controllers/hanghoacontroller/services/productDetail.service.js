@@ -319,7 +319,6 @@ async function loadProductCardTab(productId, req) {
     var rows = await LichSuKho.find(historyQuery)
         .select('lo_hang_id loai_phieu ma_phieu ngay created_at ten_quy_cach gia_tri_thay_doi so_luong_thay_doi ton_kho_sau kho_id')
         .sort({ ngay: -1, created_at: -1 })
-        .hint({ hang_hoa_id: 1, ngay: -1, created_at: -1 })
         .skip(paging.skip)
         .limit(paging.limit + 1)
         .lean();
@@ -477,13 +476,45 @@ async function loadProductLotsTab(productId, req) {
         map[String(warehouse._id)] = warehouse.ten_kho || warehouse.ma_kho || '---';
         return map;
     }, {});
+    var lotIds = rows.map(function(row) {
+        var lot = row.lo_hang_id || null;
+        return lot && lot._id ? lot._id : lot;
+    }).filter(function(id) {
+        return mongoose.Types.ObjectId.isValid(id);
+    });
+    var qcByLotAndWarehouse = {};
+    if (lotIds.length) {
+        var qcQuery = {
+            hang_hoa_id: tab.item._id,
+            lo_hang_id: { $in: lotIds }
+        };
+        if (tab.hasStoreScope) qcQuery.cua_hang_id = tab.storeId;
+        if (warehouseIds.length) qcQuery.kho_id = { $in: warehouseIds };
+        var qcRows = await TonKhoLoQuyCach.find(qcQuery)
+            .select('kho_id lo_hang_id ten_quy_cach ten_thuoc_tinh so_luong gia_von don_gia_nhap thanh_tien')
+            .sort({ ten_quy_cach: 1, updated_at: -1 })
+            .lean();
+        qcRows.forEach(function(qc) {
+            var key = String(qc.lo_hang_id || '') + '|' + String(qc.kho_id || '');
+            if (!qcByLotAndWarehouse[key]) qcByLotAndWarehouse[key] = [];
+            qcByLotAndWarehouse[key].push({
+                ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '---',
+                so_luong: normalizeStockNumber(qc.so_luong),
+                don_gia_nhap: normalizeStockNumber(qc.don_gia_nhap),
+                gia_von: normalizeStockNumber(qc.gia_von),
+                thanh_tien: normalizeStockNumber(qc.thanh_tien)
+            });
+        });
+    }
     rows = rows.map(function(row) {
         row.kho_ten = warehouseMap[String(row.kho_id || '')] || '---';
         var lot = row.lo_hang_id || {};
+        var lotId = lot && lot._id ? lot._id : lot;
         var rawQty = normalizeStockNumber(row.so_luong !== undefined && row.so_luong !== null ? row.so_luong : lot.so_luong_con_lai);
         var remainQty = normalizeStockNumber(lot.so_luong_con_lai !== undefined && lot.so_luong_con_lai !== null ? lot.so_luong_con_lai : rawQty);
         row.ton_co_the_giao = isSellableLot(lot) ? Math.max(Math.min(rawQty, remainQty), 0) : 0;
         row.ton_het_han = isExpiredLot(lot) ? rawQty : 0;
+        row.quy_cach_rows = qcByLotAndWarehouse[String(lotId || '') + '|' + String(row.kho_id || '')] || [];
         return row;
     });
     return {

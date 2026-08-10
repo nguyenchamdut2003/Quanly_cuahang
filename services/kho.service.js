@@ -351,26 +351,41 @@ async function dieuChinhTonQuyCach(params, direction) {
 }
 
 async function truTonKhoQuyCach(params, inventory, quantity) {
+  const session = params.session;
   const khoId = toObjectId(params.kho_id, 'kho_id');
   const hangHoaId = toObjectId(params.hang_hoa_id, 'hang_hoa_id');
   const loHangId = optionalObjectId(params.lo_hang_id, 'lo_hang_id');
-  const warehouse = await getWarehouse(khoId);
+  const qcStockId = optionalObjectId(params.ton_kho_lo_quy_cach_id, 'ton_kho_lo_quy_cach_id');
+  const warehouse = await withSessionQuery(Kho.findById(khoId), session);
+  if (!warehouse) throw new Error('Không tìm thấy kho');
   const tenQuyCach = await resolveTenQuyCachFromParams(params);
   if (!tenQuyCach) {
     throw new Error('Thiếu quy cách để trừ tồn');
   }
 
-  const qcFilter = {
-    kho_id: khoId,
-    hang_hoa_id: hangHoaId,
-    $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }],
-    so_luong: { $gt: 0 }
-  };
-  if (loHangId) qcFilter.lo_hang_id = loHangId;
+  let qcRows = [];
+  if (qcStockId) {
+    const qcStock = await withSessionQuery(TonKhoLoQuyCach.findById(qcStockId).populate('lo_hang_id'), session);
+    if (!qcStock) throw new Error('Không tìm thấy tồn quy cách trong lô');
+    if (String(qcStock.kho_id) !== String(khoId)) throw new Error('Tồn quy cách không thuộc kho trả');
+    if (String(qcStock.hang_hoa_id) !== String(hangHoaId)) throw new Error('Tồn quy cách không khớp hàng hóa');
+    if (loHangId && String(qcStock.lo_hang_id?._id || qcStock.lo_hang_id) !== String(loHangId)) {
+      throw new Error('Tồn quy cách không khớp lô hàng');
+    }
+    if (Number(qcStock.so_luong || 0) > 0) qcRows = [qcStock];
+  } else {
+    const qcFilter = {
+      kho_id: khoId,
+      hang_hoa_id: hangHoaId,
+      $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }],
+      so_luong: { $gt: 0 }
+    };
+    if (loHangId) qcFilter.lo_hang_id = loHangId;
 
-  let qcRows = await TonKhoLoQuyCach.find(qcFilter)
-    .populate('lo_hang_id')
-    .sort({ updated_at: 1, created_at: 1 });
+    qcRows = await withSessionQuery(TonKhoLoQuyCach.find(qcFilter)
+      .populate('lo_hang_id')
+      .sort({ updated_at: 1, created_at: 1 }), session);
+  }
   qcRows = qcRows.filter(row => isSellableLot(row.lo_hang_id)).sort(sortLotsFefo);
 
   let remaining = quantity;
@@ -381,7 +396,7 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
     const lotId = qcStock.lo_hang_id?._id || qcStock.lo_hang_id;
     if (!lotId) continue;
 
-    const lot = qcStock.lo_hang_id?._id ? qcStock.lo_hang_id : await LoHang.findById(lotId);
+    const lot = qcStock.lo_hang_id?._id ? qcStock.lo_hang_id : await withSessionQuery(LoHang.findById(lotId), session);
     const qcQty = Number(qcStock.so_luong || 0);
     const take = Math.min(qcQty, remaining);
     if (take <= 0) continue;
@@ -390,9 +405,9 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
     qcStock.so_luong = beforeQc - take;
     qcStock.thanh_tien = qcStock.so_luong * (Number(qcStock.don_gia_nhap || qcStock.gia_von) || 0);
     if (!qcStock.ten_quy_cach && qcStock.ten_thuoc_tinh) qcStock.ten_quy_cach = qcStock.ten_thuoc_tinh;
-    await qcStock.save();
+    await qcStock.save(withSessionOptions({}, session));
 
-    await syncTonKhoSauQuyCach(khoId, hangHoaId, lotId, warehouse);
+    await syncTonKhoSauQuyCach(khoId, hangHoaId, lotId, warehouse, undefined, { session });
 
     pushAllocation(allocations, lot, take);
     remaining -= take;
@@ -409,18 +424,27 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
       ton_kho_truoc: beforeQc,
       ton_kho_sau: qcStock.so_luong,
       gia_tri_thay_doi: -(take * (Number(qcStock.gia_von) || 0)),
-      ghi_chu: params.ghi_chu
+      ghi_chu: params.ghi_chu,
+      session
     });
   }
 
   if (remaining > 0) {
+    if (qcStockId) {
+      throw new Error('Tồn kho quy cách không đủ để trừ');
+    }
     if (!params.allow_negative) {
       throw new Error('Tồn kho quy cách không đủ để trừ');
     }
     const targetLotId = loHangId || (qcRows[0] && (qcRows[0].lo_hang_id?._id || qcRows[0].lo_hang_id));
     let qcStock = null;
     if (targetLotId) {
-      qcStock = await resolveQuyCachStock(khoId, hangHoaId, targetLotId, tenQuyCach);
+      qcStock = await withSessionQuery(TonKhoLoQuyCach.findOne({
+        kho_id: khoId,
+        hang_hoa_id: hangHoaId,
+        lo_hang_id: targetLotId,
+        $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
+      }), session);
     }
     if (!qcStock) {
       const findFilter = {
@@ -429,10 +453,10 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
         $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
       };
       if (targetLotId) findFilter.lo_hang_id = targetLotId;
-      qcStock = await TonKhoLoQuyCach.findOne(findFilter);
+      qcStock = await withSessionQuery(TonKhoLoQuyCach.findOne(findFilter), session);
     }
     if (!qcStock && targetLotId) {
-      qcStock = await TonKhoLoQuyCach.create({
+      const createdRows = await TonKhoLoQuyCach.create([{
         cua_hang_id: warehouse.cua_hang_id,
         kho_id: khoId,
         hang_hoa_id: hangHoaId,
@@ -443,21 +467,22 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
         don_gia_nhap: Number(params.gia_von) || 0,
         gia_von: Number(params.gia_von) || 0,
         thanh_tien: 0
-      });
+      }], withSessionOptions({}, session));
+      qcStock = createdRows[0];
     }
     if (qcStock) {
       const lotId = qcStock.lo_hang_id?._id || qcStock.lo_hang_id || targetLotId;
-      const lot = lotId ? await LoHang.findById(lotId) : null;
+      const lot = lotId ? await withSessionQuery(LoHang.findById(lotId), session) : null;
       const beforeQc = Number(qcStock.so_luong || 0);
       qcStock.so_luong = beforeQc - remaining;
       qcStock.thanh_tien = qcStock.so_luong * (Number(qcStock.don_gia_nhap || qcStock.gia_von) || 0);
       if (!qcStock.ten_quy_cach && qcStock.ten_thuoc_tinh) qcStock.ten_quy_cach = qcStock.ten_thuoc_tinh;
-      await qcStock.save();
+      await qcStock.save(withSessionOptions({}, session));
       if (lotId) {
-        await syncTonKhoSauQuyCach(khoId, hangHoaId, lotId, warehouse);
+        await syncTonKhoSauQuyCach(khoId, hangHoaId, lotId, warehouse, undefined, { session });
       } else {
         inventory.so_luong -= remaining;
-        await inventory.save();
+        await inventory.save(withSessionOptions({}, session));
       }
       if (lot) pushAllocation(allocations, lot, remaining);
       await ghiLichSuKho({
@@ -473,17 +498,18 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
         ton_kho_truoc: beforeQc,
         ton_kho_sau: qcStock.so_luong,
         gia_tri_thay_doi: -(remaining * (Number(qcStock.gia_von) || 0)),
-        ghi_chu: (params.ghi_chu || '') + ' (trừ âm tồn)'
+        ghi_chu: (params.ghi_chu || '') + ' (trừ âm tồn)',
+        session
       });
       remaining = 0;
     } else {
       inventory.so_luong -= remaining;
-      await inventory.save();
+      await inventory.save(withSessionOptions({}, session));
       remaining = 0;
     }
   }
 
-  const refreshed = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: hangHoaId });
+  const refreshed = await withSessionQuery(TonKho.findOne({ kho_id: khoId, hang_hoa_id: hangHoaId }), session);
   if (!params.allow_negative && (!refreshed || refreshed.so_luong < 0)) {
     throw new Error('Tồn kho không đủ để trừ');
   }

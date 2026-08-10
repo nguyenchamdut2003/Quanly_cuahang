@@ -355,7 +355,7 @@ exports.getCreate = async (req, res, next) => {
         let copyFromError = '';
         const copyFromId = String(req.query?.copy_from || '').trim();
         if (/^[0-9a-fA-F]{24}$/.test(copyFromId)) {
-            sourceOrder = await DonHang.findById(copyFromId)
+            sourceOrder = await DonHang.findOne({ _id: copyFromId, trang_thai_du_lieu: 'active' })
                 .populate('khach_hang_id')
                 .populate('cua_hang_id')
                 .populate('kho_id')
@@ -685,7 +685,7 @@ exports.getId = async function(req, res) {
 
 exports.getIdDetail = async (req, res, next) => {
     try {
-        const order = await DonHang.findById(req.params.id)
+        const order = await DonHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' })
             .populate('khach_hang_id')
             .populate('cua_hang_id')
             .populate('nguoi_tao_id');
@@ -737,7 +737,7 @@ exports.getIdDetail = async (req, res, next) => {
 
 exports.putIdDetail = async (req, res, next) => {
     try {
-        const order = await DonHang.findById(req.params.id);
+        const order = await DonHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         if (order.trang_thai === 'cancelled' || order.trang_thai === 'merged') {
             return res.status(400).json({ success: false, message: 'Đơn đã hủy, không thể sửa' });
@@ -775,7 +775,7 @@ exports.postIdStatus = async (req, res, next) => {
         if (!allowed.includes(trang_thai)) {
             return res.status(400).json({ success: false, message: 'Trạng thái đơn hàng không hợp lệ' });
         }
-        const order = await DonHang.findById(req.params.id);
+        const order = await DonHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         if (order.trang_thai === 'merged') {
             return res.status(400).json({ success: false, message: `Đơn này đã được gộp vào ${order.merged_to_ma_don_hang || 'đơn khác'}, không thể cập nhật trạng thái.` });
@@ -795,11 +795,36 @@ exports.postIdStatus = async (req, res, next) => {
     }
 };
 
+exports.postDeactivateSelected = async (req, res, next) => {
+    try {
+        const ids = Array.isArray(req.body?.don_hang_ids)
+            ? req.body.don_hang_ids
+                .map(id => String(id || '').trim())
+                .filter(id => /^[0-9a-fA-F]{24}$/.test(id))
+            : [];
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn đơn hàng cần xóa' });
+        }
+        const result = await DonHang.updateMany(
+            { _id: { $in: ids }, trang_thai_du_lieu: 'active' },
+            { $set: { trang_thai_du_lieu: 'inactive' } },
+            { runValidators: true }
+        );
+        res.json({
+            success: true,
+            message: 'Đã xóa đơn hàng đã chọn',
+            modifiedCount: result.modifiedCount || 0
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 
 
 exports.postIdDuplicate = async (req, res, next) => {
     try {
-        const sourceOrder = await DonHang.findById(req.params.id).lean();
+        const sourceOrder = await DonHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' }).lean();
         if (!sourceOrder) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy đơn đặt hàng' });
         }
@@ -903,7 +928,7 @@ exports.postIdDuplicate = async (req, res, next) => {
 
 exports.postIdPhieuThu = async (req, res, next) => {
     try {
-        const order = await DonHang.findById(req.params.id);
+        const order = await DonHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         if (order.trang_thai === 'cancelled' || order.trang_thai === 'merged') {
             return res.status(400).json({ success: false, message: 'Đơn đã hủy, không thể thu tiền' });
@@ -1028,7 +1053,7 @@ exports.confirmOrderDelivery = async function(req, res, next) {
             return res.status(400).json({ success: false, message: 'Vui lòng chọn hàng cần giao' });
         }
 
-        const order = await DonHang.findById(req.params.id);
+        const order = await DonHang.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
         if (!order) {
             return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         }

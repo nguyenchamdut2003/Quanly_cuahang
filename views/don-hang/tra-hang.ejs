@@ -43,6 +43,12 @@
     .invoice-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:30px;z-index:1000}.invoice-modal-backdrop.open{display:flex}.invoice-modal{width:1435px;max-width:calc(100vw - 64px);min-height:625px;background:#fff;border-radius:14px;box-shadow:0 22px 48px rgba(0,0,0,.35);padding:28px 36px 32px;position:relative}.invoice-modal h2{margin:0 0 28px;font-size:20px}.invoice-close{position:absolute;right:28px;top:24px;border:0;background:transparent;color:#7a8794;font-size:28px;cursor:pointer}.invoice-modal-grid{display:grid;grid-template-columns:268px minmax(0,1fr);gap:42px}.invoice-filter-card{background:#fff;border-radius:6px;box-shadow:0 10px 26px rgba(15,23,42,.14);padding:14px 20px 20px;margin-bottom:32px}.invoice-filter-card h3{margin:0 0 18px;font-size:16px}.invoice-filter-input{width:100%;height:44px;border:0;border-bottom:1px solid #c2cad3;font-size:16px;outline:none;color:#111827}.invoice-filter-input::placeholder{color:#7a8794}.invoice-pick-table{border:1px solid #d7dde5;border-radius:5px;overflow:hidden}.invoice-pick-table table{width:100%;border-collapse:collapse;table-layout:fixed}.invoice-pick-table th{height:53px;background:#338cf2;color:#fff;text-align:left;padding:0 14px;font-size:16px}.invoice-pick-table td{height:56px;border-bottom:1px solid #dde3ea;padding:0 14px;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.invoice-pick-table a{color:#006dff;text-decoration:none}.invoice-choose{height:34px;border:1px solid #c5cdd7;background:#fff;border-radius:5px;padding:0 28px;font-size:16px;cursor:pointer}.invoice-pager{height:74px;display:flex;align-items:center;justify-content:flex-end;gap:18px}.invoice-page-btn{min-width:42px;height:42px;border-radius:8px;border:0;background:#fff;color:#111827;font-size:16px;cursor:pointer}.invoice-page-btn.active{background:#0070f4;color:#fff;font-weight:800}.invoice-page-btn:disabled{color:#b8c0ca;cursor:not-allowed}.quick-return{position:absolute;right:36px;bottom:32px;height:49px;border:0;border-radius:8px;background:#0070f4;color:#fff;font-size:17px;font-weight:800;padding:0 30px;cursor:pointer}
     .type-badge{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:4px;background:#e8f3ff;color:#075cad;font-size:12px;font-weight:800}.type-badge.exchange{background:#fff7ed;color:#c2410c}.detail-section-title{margin:14px 0 6px;font-size:13px;font-weight:800;color:#111827}.items-table.return-table th{background:#eefdf3}.items-table.exchange-table th{background:#fff7ed}.items-table.vat-chua-table th{background:#eef6ff}.muted-empty{height:38px;color:#667085;text-align:center}.settlement-line{font-size:14px;font-weight:900}.settlement-refund{color:#006dff}.settlement-collect{color:#c2410c}.settlement-none{color:#15803d}.return-detail>.items-table:not(.return-table):not(.exchange-table):not(.vat-chua-table){display:none}.legacy-summary{display:none}.return-detail .items-table .num{text-align:left}
     .return-trash-overlay{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:center;justify-content:center;z-index:1200;padding:24px}.return-trash-overlay.open{display:flex}.return-trash-modal{width:760px;max-width:calc(100vw - 32px);max-height:calc(100vh - 48px);background:#fff;border-radius:8px;box-shadow:0 24px 64px rgba(15,23,42,.32);display:flex;flex-direction:column;overflow:hidden}.return-trash-head{height:56px;border-bottom:1px solid #e5e9ee;display:flex;align-items:center;justify-content:space-between;padding:0 18px}.return-trash-head h3{margin:0;font-size:18px}.return-trash-close{width:32px;height:32px;border:0;background:#fff;color:#667085;font-size:24px;cursor:pointer}.return-trash-body{padding:16px 18px;overflow:auto}.return-trash-desc{margin:0 0 12px;color:#475467;font-size:13px}.return-trash-alert{border:1px solid #fed7aa;background:#fff7ed;color:#9a3412;border-radius:6px;padding:10px 12px;margin-bottom:12px;font-size:13px}.return-trash-selected{margin:0 0 12px;padding-left:18px;font-size:13px;color:#111827}.return-trash-table{width:100%;border-collapse:collapse;border:1px solid #d7dde5;border-radius:6px;overflow:hidden}.return-trash-table th{height:34px;background:#eef6ff;text-align:left;font-size:12px;padding:0 10px;border-bottom:1px solid #d7dde5}.return-trash-table td{height:36px;border-bottom:1px solid #eef2f6;padding:0 10px;font-size:12px}.return-trash-foot{height:58px;border-top:1px solid #e5e9ee;display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:0 18px}.btn.danger{background:#ef4444;border-color:#ef4444;color:#fff}
+    .return-trash-modal{width:min(420px,calc(100vw - 32px))}
+    .return-trash-foot{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;min-height:58px!important;height:auto!important;padding:12px 18px!important;background:#fff!important;flex:0 0 auto!important;visibility:visible!important;opacity:1!important}
+    .return-trash-foot .btn{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:76px!important;height:36px!important;visibility:visible!important;opacity:1!important}
+    .return-trash-foot .btn.danger{background:#d92d20!important;border-color:#d92d20!important;color:#fff!important}
+    .actions .return-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+    .actions .return-delete-btn:hover{background:#b42318!important;border-color:#b42318!important}
     .return-pagination{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:12px}
     .return-page-size{font-weight:700}
     .return-pagination-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -84,9 +90,9 @@
         <div class="toolbar">
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã phiếu trả"><button><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
-            <button type="button" class="btn" id="returnTrashBtn" onclick="trashSelectedReturns()" disabled><i class="fa-regular fa-trash-can"></i> Xóa</button>
             <button type="button" class="btn primary" onclick="openInvoiceModal()"><i class="fa-solid fa-plus"></i> Trả hàng</button>
             <a href="/don-hang/tra-hang/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
+            <button type="button" class="btn return-delete-btn" id="returnTrashBtn" onclick="trashSelectedReturns()"><i class="fa-regular fa-trash-can"></i> Xóa</button>
           </div>
         </div>
         <div class="table-wrap">
@@ -158,21 +164,15 @@
   <div id="returnTrashModalOverlay" class="return-trash-overlay" aria-hidden="true">
     <div class="return-trash-modal" role="dialog" aria-labelledby="returnTrashModalTitle" aria-modal="true">
       <div class="return-trash-head">
-        <h3 id="returnTrashModalTitle">Đưa vào thùng rác</h3>
+        <h3 id="returnTrashModalTitle">Xóa phiếu trả hàng</h3>
         <button type="button" class="return-trash-close" id="returnTrashModalClose" aria-label="Đóng">&times;</button>
       </div>
       <div class="return-trash-body">
-        <p class="return-trash-desc">Các dữ liệu liên quan bên dưới sẽ được hoàn tác nghiệp vụ và đưa vào thùng rác cùng phiếu trả hàng bán.</p>
-        <div id="returnTrashAlert"></div>
-        <ul class="return-trash-selected" id="returnTrashSelectedList"></ul>
-        <table class="return-trash-table">
-          <thead><tr><th>Bảng / loại dữ liệu</th><th class="num">Số bản ghi</th><th>Ví dụ</th></tr></thead>
-          <tbody id="returnTrashImpactRows"></tbody>
-        </table>
+        <p class="return-trash-desc">Bạn có chắc chắn muốn xóa các phiếu trả hàng đã chọn không?</p>
       </div>
       <div class="return-trash-foot">
-        <button type="button" class="btn" id="returnTrashCancel">Bỏ qua</button>
-        <button type="button" class="btn danger" id="returnTrashConfirm" disabled>Đưa vào thùng rác</button>
+        <button type="button" class="btn" id="returnTrashCancel">Không</button>
+        <button type="button" class="btn danger" id="returnTrashConfirm">Xóa</button>
       </div>
     </div>
   </div>
@@ -452,7 +452,6 @@
       const trashBtn = document.getElementById('returnTrashBtn');
       const selectAll = document.getElementById('returnSelectAll');
       const checks = Array.from(document.querySelectorAll('.return-select-check'));
-      if (trashBtn) trashBtn.disabled = selected.length === 0;
       if (selectAll) {
         selectAll.checked = checks.length > 0 && selected.length === checks.length;
         selectAll.indeterminate = selected.length > 0 && selected.length < checks.length;
@@ -473,7 +472,7 @@
       }
       pendingReturnTrashIds = [];
       const confirmBtn = document.getElementById('returnTrashConfirm');
-      if (confirmBtn) confirmBtn.disabled = true;
+      if (confirmBtn) confirmBtn.disabled = false;
     }
 
     function renderReturnTrashPreview(preview) {
@@ -516,7 +515,7 @@
       if (!selectedIds.length) return closeReturnTrashModal();
       const confirmBtn = document.getElementById('returnTrashConfirm');
       if (confirmBtn) confirmBtn.disabled = true;
-      const res = await fetch('/don-hang/tra-hang/trash/move', {
+      const res = await fetch('/don-hang/tra-hang/deactivate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phieu_tra_hang_ids: selectedIds })
@@ -524,7 +523,7 @@
       const data = await res.json();
       if (!data.success) {
         if (confirmBtn) confirmBtn.disabled = false;
-        return alert(data.message || 'Không đưa vào thùng rác được');
+        return alert(data.message || 'Không xóa được phiếu trả hàng');
       }
       location.reload();
     }
@@ -532,26 +531,14 @@
     async function trashReturnSlips(ids) {
       const selectedIds = Array.isArray(ids) ? ids.filter(Boolean) : [];
       if (!selectedIds.length) return alert('Vui lòng chọn ít nhất một phiếu trả hàng.');
-      const previewRes = await fetch('/don-hang/tra-hang/trash/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phieu_tra_hang_ids: selectedIds })
-      });
-      const previewData = await previewRes.json();
-      if (!previewData.success) return alert(previewData.message || 'Không tải được dữ liệu ảnh hưởng');
       pendingReturnTrashIds = selectedIds;
-      renderReturnTrashPreview(previewData.data || {});
-      return;
-      if (!selectedIds.length) return alert('Vui lòng chọn ít nhất một phiếu trả hàng.');
-      if (!confirm('Đưa ' + selectedIds.length + ' phiếu trả hàng vào thùng rác?')) return;
-      const res = await fetch('/don-hang/tra-hang/trash/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phieu_tra_hang_ids: selectedIds })
-      });
-      const data = await res.json();
-      if (!data.success) return alert(data.message || 'Không đưa vào thùng rác được');
-      location.reload();
+      const overlay = document.getElementById('returnTrashModalOverlay');
+      const confirmBtn = document.getElementById('returnTrashConfirm');
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (overlay) {
+        overlay.classList.add('open');
+        overlay.setAttribute('aria-hidden', 'false');
+      }
     }
 
     document.addEventListener('DOMContentLoaded', () => {

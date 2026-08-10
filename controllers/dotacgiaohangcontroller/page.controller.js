@@ -6,7 +6,7 @@ const { normalizeAddress } = require('../../utils/address');
 
 exports.getDoiTacGiaoHang = async (req, res, next) => {
     try {
-        const partners = await DoiTacGiaoHang.find().sort({ created_at: -1 });
+        const partners = await DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ created_at: -1 });
         const partnerIds = partners.map(partner => partner._id);
         const shipments = partnerIds.length
             ? await VanDon.find({ doi_tac_giao_hang_id: { $in: partnerIds } })
@@ -22,6 +22,20 @@ exports.getDoiTacGiaoHang = async (req, res, next) => {
             if (shipmentMap[key]) shipmentMap[key].push(item);
         });
         res.render('don-hang/doi-tac-giao-hang', { title: 'Đối tác giao hàng', partners, shipmentMap });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.postDoiTacGiaoHangIdDeactivate = async (req, res, next) => {
+    try {
+        const partner = await DoiTacGiaoHang.findByIdAndUpdate(
+            req.params.id,
+            { $set: { trang_thai: 'inactive' } },
+            { new: true, runValidators: true }
+        );
+        if (!partner) return res.status(404).json({ success: false, message: 'Không tìm thấy đối tác giao hàng' });
+        res.json({ success: true, message: 'Đã ngừng hoạt động đối tác giao hàng' });
     } catch (error) {
         next(error);
     }

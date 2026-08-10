@@ -1169,12 +1169,10 @@
             sum.soLuongKhaDung += metrics.soLuongKhaDung;
             return sum;
           }, { tonThucTe: 0, soLuongKhachDat: 0, soLuongKhaDung: 0 });
-          const productReserved = Math.max(0, firstNumber(item.so_luong_khach_dat, 0));
-          const reserved = Math.max(lotMetrics.soLuongKhachDat, productReserved);
           return {
             tonThucTe: lotMetrics.tonThucTe,
-            soLuongKhachDat: reserved,
-            soLuongKhaDung: lotMetrics.tonThucTe - reserved
+            soLuongKhachDat: lotMetrics.soLuongKhachDat,
+            soLuongKhaDung: lotMetrics.soLuongKhaDung
           };
         }
         return inventoryMetrics(item, stockFor(item.hang_hoa_id));
