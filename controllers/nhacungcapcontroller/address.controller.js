@@ -16,7 +16,10 @@ exports.listAddresses = async function (req, res, next) {
         .json({ success: false, message: "invalid_supplier" });
     }
 
-    var addresses = await DiaChiNhaCungCap.find({ nha_cung_cap_id: supplierId })
+    var addresses = await DiaChiNhaCungCap.find({
+      nha_cung_cap_id: supplierId,
+      trang_thai: "active",
+    })
       .sort({ created_at: -1 })
       .lean();
     res.json({ success: true, data: addresses });
@@ -137,7 +140,11 @@ exports.removeAddress = async function (req, res, next) {
       return res.redirect("/nha-cung-cap?error=invalid_address");
     var supplierId = String(existingAddress.nha_cung_cap_id || "");
 
-    await DiaChiNhaCungCap.findByIdAndDelete(addressId);
+    await DiaChiNhaCungCap.findByIdAndUpdate(
+      addressId,
+      { $set: { trang_thai: "inactive", mac_dinh: false } },
+      { runValidators: true },
+    );
     res.redirect(
       buildSupplierReturnUrl(supplierId, req?.body?.returnQuery, {
         success: "deleted_address",

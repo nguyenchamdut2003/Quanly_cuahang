@@ -99,7 +99,10 @@ async function loadCustomerAddressesTab(options) {
     var selectedCustomer = await findCustomer(options.customerId);
     if (!selectedCustomer) return null;
     var filter = normalizeFilterQuery(options.query || {});
-    var customerAddresses = await DiaChiKhachHang.find({ khach_hang_id: selectedCustomer._id }).sort({ created_at: -1 }).lean();
+    var customerAddresses = await DiaChiKhachHang.find({
+        khach_hang_id: selectedCustomer._id,
+        trang_thai: 'active'
+    }).sort({ created_at: -1 }).lean();
     var addressTypes = await loadAddressTypes();
 
     return Object.assign(makeTabContext({

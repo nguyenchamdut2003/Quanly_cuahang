@@ -78,7 +78,10 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     var debtWarnSettings = normalizeDebtWarnSettings(filter);
     var filterQueryString = buildFilterQueryString(filter);
 
-    var supplierAddresses = await DiaChiNhaCungCap.find({ nha_cung_cap_id: selectedSupplier._id }).sort({ created_at: -1 }).lean();
+    var supplierAddresses = await DiaChiNhaCungCap.find({
+        nha_cung_cap_id: selectedSupplier._id,
+        trang_thai: 'active'
+    }).sort({ created_at: -1 }).lean();
     var addressProfitReport = await buildProfitBySupplierAddressReport({
         cua_hang_id: storeId,
         supplier_id: selectedSupplier._id,
@@ -353,7 +356,10 @@ async function loadSupplierDetailTabRenderLocals(req, supplierId, tab) {
     var storeId = base.storeId;
 
     if (tab === 'address') {
-        var supplierAddresses = await DiaChiNhaCungCap.find({ nha_cung_cap_id: selectedSupplier._id }).sort({ created_at: -1 }).lean();
+        var supplierAddresses = await DiaChiNhaCungCap.find({
+            nha_cung_cap_id: selectedSupplier._id,
+            trang_thai: 'active'
+        }).sort({ created_at: -1 }).lean();
         var addressProfitReport = await buildProfitBySupplierAddressReport({
             cua_hang_id: storeId,
             supplier_id: selectedSupplier._id,

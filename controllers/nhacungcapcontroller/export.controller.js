@@ -52,7 +52,10 @@ exports.exportExcel = async function(req, res, next) {
           suppliers = sortSuppliersByDebtDaySort(suppliers, filter.debtDaySort);
           var supplierIds = suppliers.map(function(supplier) { return supplier._id; });
           var addresses = supplierIds.length
-              ? await DiaChiNhaCungCap.find({ nha_cung_cap_id: { $in: supplierIds } })
+              ? await DiaChiNhaCungCap.find({
+                  nha_cung_cap_id: { $in: supplierIds },
+                  trang_thai: 'active'
+              })
                   .sort({ mac_dinh: -1, created_at: -1 })
                   .lean()
               : [];

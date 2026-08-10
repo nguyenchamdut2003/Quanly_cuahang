@@ -3396,7 +3396,7 @@ async function getOrderCreateData() {
             .sort({ ten_hang: 1 }),
         CuaHang.find().sort({ ten_cua_hang: 1 }),
         DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
-        DiaChiKhachHang.find(),
+        DiaChiKhachHang.find({ trang_thai: 'active' }),
         BangGia.find({ trang_thai: 'active' }).sort({ ten_bang_gia: 1 }),
         CTBangGia.find().select('bang_gia_id hang_hoa_id gia_ban').lean()
     ]);

@@ -37,7 +37,10 @@ async function buildCustomerDetailWorkbook(customerId) {
         if (!customer) { var invalidCustomer = new Error('invalid_customer'); invalidCustomer.code = 'invalid_customer'; throw invalidCustomer; }
         customer.nhom_khach_hang_ten = groupMap[String(customer.nhom_khach_hang_id || '')] || '---';
 
-        var addresses = await DiaChiKhachHang.find({ khach_hang_id: customer._id }).sort({ mac_dinh: -1, created_at: -1 }).lean();
+        var addresses = await DiaChiKhachHang.find({
+            khach_hang_id: customer._id,
+            trang_thai: 'active'
+        }).sort({ mac_dinh: -1, created_at: -1 }).lean();
         var history = await loadFullCustomerHistory(customer._id);
 
         var workbook = new ExcelJS.Workbook();

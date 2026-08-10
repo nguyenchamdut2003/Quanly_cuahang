@@ -70,7 +70,10 @@ async function buildCustomerListWorkbook(query) {
         }
         var customerIds = customers.map(function(customer) { return customer._id; });
         var addresses = customerIds.length
-            ? await DiaChiKhachHang.find({ khach_hang_id: { $in: customerIds } }).sort({ mac_dinh: -1, created_at: -1 }).lean()
+            ? await DiaChiKhachHang.find({
+                khach_hang_id: { $in: customerIds },
+                trang_thai: 'active'
+            }).sort({ mac_dinh: -1, created_at: -1 }).lean()
             : [];
         var addressMap = addresses.reduce(function(map, address) {
             var key = String(address.khach_hang_id);

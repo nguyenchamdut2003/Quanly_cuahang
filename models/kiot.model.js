@@ -154,7 +154,12 @@ const DiaChiKhachHangSchema = new Schema({
   phuong_xa_code: { type: String },
   loai_dia_chi: { type: String, },
   ghi_chu: { type: String },
-  mac_dinh: { type: Boolean, default: false }
+  mac_dinh: { type: Boolean, default: false },
+  trang_thai: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  }
 }, {
   collection: 'dia_chi_khach_hang',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -220,7 +225,12 @@ const DiaChiNccSchema = new Schema({
   phuong_xa: { type: String },
   loai_dia_chi: { type: String, },
   ghi_chu: { type: String },
-  mac_dinh: { type: Boolean, default: false }
+  mac_dinh: { type: Boolean, default: false },
+  trang_thai: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active'
+  }
 }, {
   collection: 'dia_chi_ncc',
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }

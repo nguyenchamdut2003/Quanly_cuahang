@@ -926,7 +926,10 @@ exports.apiSupplierAddresses = async function(req, res, next) {
     if (!mongoose.Types.ObjectId.isValid(supplierId)) {
       return res.status(400).json({ success: false, message: 'nha_cung_cap_id khong hop le' });
     }
-    var items = await DiaChiNcc.find({ nha_cung_cap_id: supplierId })
+    var items = await DiaChiNcc.find({
+        nha_cung_cap_id: supplierId,
+        trang_thai: 'active'
+      })
       .sort({ mac_dinh: -1, created_at: -1 })
       .select('ma_dia_chi ten_nguoi_nhan sdt_nguoi_nhan so_nha dia_chi_day_du tinh_thanh quan_huyen phuong_xa loai_dia_chi mac_dinh ghi_chu')
       .lean();
@@ -2162,10 +2165,17 @@ async function buildPurchasePrintData(req, title) {
   var selectedSupplierAddressId = loaded.ticket.dia_chi_ncc_id && (loaded.ticket.dia_chi_ncc_id._id || loaded.ticket.dia_chi_ncc_id);
   if (supplierId) {
     if (selectedSupplierAddressId) {
-      supplierAddress = await DiaChiNcc.findOne({ _id: selectedSupplierAddressId, nha_cung_cap_id: supplierId }).lean();
+      supplierAddress = await DiaChiNcc.findOne({
+        _id: selectedSupplierAddressId,
+        nha_cung_cap_id: supplierId,
+        trang_thai: 'active'
+      }).lean();
     }
     if (!supplierAddress) {
-      supplierAddress = await DiaChiNcc.findOne({ nha_cung_cap_id: supplierId })
+      supplierAddress = await DiaChiNcc.findOne({
+        nha_cung_cap_id: supplierId,
+        trang_thai: 'active'
+      })
         .sort({ mac_dinh: -1, created_at: -1 })
         .lean();
     }

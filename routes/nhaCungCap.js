@@ -34,7 +34,7 @@ router.post('/address-types/:typeId/delete', nhaCungCapController.removeAddressT
 router.get('/:id/dia-chi', nhaCungCapController.listAddresses);
 router.post('/:id/dia-chi', nhaCungCapController.addAddress);
 router.post('/dia-chi/:addressId/update', nhaCungCapController.updateAddress);
-router.post('/dia-chi/:addressId/delete', nhaCungCapController.removeAddress);
+router.post('/dia-chi/:addressId/deactivate', nhaCungCapController.removeAddress);
 router.get('/:id', nhaCungCapController.redirectDetail);
 
 module.exports = router;

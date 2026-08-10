@@ -422,7 +422,10 @@ async function allocationPage(req, res, next) {
         }
         var customerIds = customersRaw.map(function(item) { return item._id; });
         var addresses = customerIds.length
-            ? await DiaChiKhachHang.find({ khach_hang_id: { $in: customerIds } }).lean()
+            ? await DiaChiKhachHang.find({
+                khach_hang_id: { $in: customerIds },
+                trang_thai: 'active'
+            }).lean()
             : [];
         var addressesByCustomer = addresses.reduce(function(map, address) {
             var key = String(address.khach_hang_id || '');

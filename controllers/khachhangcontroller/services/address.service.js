@@ -50,7 +50,11 @@ async function updateAddress(options) {
 }
 
 async function removeAddress(options) {
-    await DiaChiKhachHang.findOneAndDelete({ _id: options.addressId, khach_hang_id: options.customerId });
+    await DiaChiKhachHang.findOneAndUpdate(
+        { _id: options.addressId, khach_hang_id: options.customerId },
+        { $set: { trang_thai: 'inactive', mac_dinh: false } },
+        { runValidators: true }
+    );
 }
 
 module.exports = {

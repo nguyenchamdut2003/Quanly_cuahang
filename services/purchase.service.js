@@ -813,7 +813,11 @@ async function createPurchase(data = {}, options = {}) {
   const supplierAddressId = supplierId ? cleanId(data.dia_chi_ncc_id) : undefined;
   if (supplierAddressId) {
     const address = await withSessionQuery(
-      DiaChiNcc.findOne({ _id: supplierAddressId, nha_cung_cap_id: supplierId }).select('_id'),
+      DiaChiNcc.findOne({
+        _id: supplierAddressId,
+        nha_cung_cap_id: supplierId,
+        trang_thai: 'active'
+      }).select('_id'),
       session
     ).lean();
     if (!address) throw new Error('Dia chi nha cung cap khong hop le');

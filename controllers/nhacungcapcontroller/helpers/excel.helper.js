@@ -161,7 +161,10 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             { header: 'Ghi chú', key: 'ghi_chu', width: 28 },
             { header: 'Tạo lúc', key: 'tao_luc', width: 20 }
         ];
-        var addrList = await DiaChiNhaCungCap.find({ nha_cung_cap_id: supplier._id }).sort({ created_at: -1 }).lean();
+        var addrList = await DiaChiNhaCungCap.find({
+            nha_cung_cap_id: supplier._id,
+            trang_thai: 'active'
+        }).sort({ created_at: -1 }).lean();
         addrList.forEach(function(a) {
             wsA.addRow({
                 ma_dia_chi: a.ma_dia_chi || '',

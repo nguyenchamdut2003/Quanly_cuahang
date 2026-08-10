@@ -719,7 +719,10 @@ exports.getDiaChiDoiTuong = async (req, res, next) => {
 
 exports.getKhachHangIdDiaChi = async (req, res, next) => {
     try {
-        const data = await DiaChiKhachHang.find({ khach_hang_id: req.params.id })
+        const data = await DiaChiKhachHang.find({
+            khach_hang_id: req.params.id,
+            trang_thai: 'active'
+        })
             .sort({ mac_dinh: -1, created_at: -1 })
             .lean();
         res.json({ success: true, data });
@@ -730,7 +733,10 @@ exports.getKhachHangIdDiaChi = async (req, res, next) => {
 
 exports.getNhaCungCapIdDiaChi = async (req, res, next) => {
     try {
-        const data = await DiaChiNcc.find({ nha_cung_cap_id: req.params.id })
+        const data = await DiaChiNcc.find({
+            nha_cung_cap_id: req.params.id,
+            trang_thai: 'active'
+        })
             .sort({ mac_dinh: -1, created_at: -1 })
             .lean();
         res.json({ success: true, data });

@@ -14,7 +14,7 @@ exports.index = async (req, res, next) => {
                 .populate('nha_cung_cap_id', 'ma_ncc ten_ncc ten_cong_ty'),
             CuaHang.find(),
             DoiTacGiaoHang.find({ trang_thai: 'active' }).sort({ ten_doi_tac: 1 }),
-            DiaChiKhachHang.find(),
+            DiaChiKhachHang.find({ trang_thai: 'active' }),
             DonHang.find({ trang_thai: 'draft' })
                 .populate('khach_hang_id')
                 .sort({ ngay_tao: -1, created_at: -1 })

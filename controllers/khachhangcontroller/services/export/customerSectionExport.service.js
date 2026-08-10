@@ -54,7 +54,10 @@ async function buildCustomerSectionWorkbook(customerId, section) {
                 map[type.ma_loai] = type.ten_loai || type.ma_loai;
                 return map;
             }, {});
-            var addresses = await DiaChiKhachHang.find({ khach_hang_id: customer._id }).sort({ mac_dinh: -1, created_at: -1 }).lean();
+            var addresses = await DiaChiKhachHang.find({
+                khach_hang_id: customer._id,
+                trang_thai: 'active'
+            }).sort({ mac_dinh: -1, created_at: -1 }).lean();
             addExportSheet(workbook, 'Danh sách địa chỉ', [
                 { header: 'Mã địa chỉ', key: 'ma_dia_chi', width: 16 },
                 { header: 'Tên người nhận', key: 'ten_nguoi_nhan', width: 24 },

@@ -38,7 +38,7 @@ router.get('/:id/export/:section.xlsx', khachHangController.exportSectionExcel);
 router.get('/:id/export.xlsx', khachHangController.exportOneExcel);
 router.post('/:id/addresses/add', khachHangController.addAddress);
 router.post('/:id/addresses/:addressId/update', khachHangController.updateAddress);
-router.post('/:id/addresses/:addressId/delete', khachHangController.removeAddress);
+router.post('/:id/addresses/:addressId/deactivate', khachHangController.removeAddress);
 router.get('/:id', khachHangController.redirectDetail);
 
 module.exports = router;

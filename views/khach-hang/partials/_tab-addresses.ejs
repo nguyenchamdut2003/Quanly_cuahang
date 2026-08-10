@@ -135,7 +135,7 @@
   <form id="addressForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/update">
     <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
   </form>
-  <form id="addressDeleteForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/delete">
+  <form id="addressDeleteForm_<%= address._id %>" method="post" action="/khach-hang/<%= selectedCustomer._id %>/addresses/<%= address._id %>/deactivate">
     <input type="hidden" name="returnQuery" value="<%= returnQuery %>">
   </form>
 <% }) %>
