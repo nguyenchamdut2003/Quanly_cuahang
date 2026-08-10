@@ -41,7 +41,6 @@ function defaultRedirectForUser(user) {
 function renderLogin(res, options) {
   var data = options || {};
   return res.status(data.status || 200).render('auth/login', {
-    title: 'Đăng nhập',
     email: data.email || '',
     error: data.error || '',
     success: data.success || '',
@@ -52,7 +51,6 @@ function renderLogin(res, options) {
 function renderRegister(res, options) {
   var data = options || {};
   return res.status(data.status || 200).render('auth/register', {
-    title: 'Đăng ký',
     ho_ten: data.ho_ten || '',
     sdt: data.sdt || '',
     email: data.email || '',
@@ -268,7 +266,6 @@ exports.getGoogleCallback = async function(req, res, next) {
 
 exports.getPendingPermission = function(req, res) {
   res.render('auth/pending-permission', {
-    title: 'Cho phan quyen',
     user: req.user || null
   });
 };

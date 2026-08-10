@@ -1469,7 +1469,6 @@ exports.index = async function(req, res, next) {
     });
 
     res.render('tra-hang-nhap/index', {
-      title: 'Trả hàng nhập',
       activeMenu: 'mua-hang',
       user: req.user,
       returns,
@@ -1572,7 +1571,6 @@ exports.createPage = async function(req, res, next) {
       : null;
     const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
     res.render('tra-hang-nhap/create', {
-      title: 'Trả hàng nhập',
       activeMenu: 'mua-hang',
       user: req.user,
       nextCode,
@@ -2407,7 +2405,6 @@ async function buildReturnPrintData(req, title) {
   if (!loaded) return null;
   const store = loaded.ticket.cua_hang_id || null;
   return {
-    title: title || 'In phiếu trả hàng nhập',
     activeMenu: 'mua-hang',
     user: req.user,
     store,

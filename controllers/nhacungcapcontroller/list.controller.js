@@ -121,7 +121,6 @@ exports.index = async function(req, res, next) {
               supplier.metrics_pending = true;
           });
           var locals = {
-              title: 'Nhà cung cấp',
               pageTitle: 'Nhà cung cấp',
               activeMenu: 'nha-cung-cap',
   

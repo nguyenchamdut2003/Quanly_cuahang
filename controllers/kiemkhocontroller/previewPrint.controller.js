@@ -18,7 +18,7 @@ exports.getInTonHeThongPreviewPdf = async function(req, res, next) {
         const data = await previewService.loadTonPreview({ session: req.session, user: req.user });
         if (!data) return res.status(410).send(PREVIEW_EXPIRED_MESSAGE);
         const viewPath = path.join(__dirname, '..', '..', 'views', 'kiem-kho', 'print-ton-he-thong.ejs');
-        const locals = { title: 'Phiếu số lượng tồn hiện tại', embeddedPrint: false, ...data };
+        const locals = { embeddedPrint: false, ...data };
         const html = await pdfService.renderViewToHtml(viewPath, locals);
         const buffer = await pdfService.generatePdfFromHtml(html, { format: 'A4', printBackground: true, margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' } });
         res.setHeader('Content-Type', 'application/pdf');
@@ -43,7 +43,7 @@ exports.getInGiaTriKhoPreviewPdf = async function(req, res, next) {
         const data = await previewService.loadGiaTriPreview({ session: req.session, user: req.user });
         if (!data) return res.status(410).send(PREVIEW_EXPIRED_MESSAGE);
         const viewPath = path.join(__dirname, '..', '..', 'views', 'kiem-kho', 'print-gia-tri-kho.ejs');
-        const locals = { title: 'Phiếu giá trị kho', embeddedPrint: false, ...data };
+        const locals = { embeddedPrint: false, ...data };
         const html = await pdfService.renderViewToHtml(viewPath, locals);
         const buffer = await pdfService.generatePdfFromHtml(html, { format: 'A4', printBackground: true, margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' } });
         res.setHeader('Content-Type', 'application/pdf');
@@ -58,7 +58,7 @@ exports.getInGiaTriKhoPreview = async function(req, res, next) {
     try {
         const data = await previewService.loadGiaTriPreview({ session: req.session, user: req.user });
         if (!data) return res.status(410).send(PREVIEW_EXPIRED_MESSAGE);
-        res.render('kiem-kho/print-gia-tri-kho', { title: 'Phiếu giá trị kho', embeddedPrint: String(req.query.embed || '') === '1', ...data });
+        res.render('kiem-kho/print-gia-tri-kho', { embeddedPrint: String(req.query.embed || '') === '1', ...data });
     } catch (error) {
         next(error);
     }
@@ -68,7 +68,7 @@ exports.getInTonHeThongPreview = async function(req, res, next) {
     try {
         const data = await previewService.loadTonPreview({ session: req.session, user: req.user });
         if (!data) return res.status(410).send(PREVIEW_EXPIRED_MESSAGE);
-        res.render('kiem-kho/print-ton-he-thong', { title: 'Phiếu số lượng tồn hiện tại', embeddedPrint: String(req.query.embed || '') === '1', ...data });
+        res.render('kiem-kho/print-ton-he-thong', { embeddedPrint: String(req.query.embed || '') === '1', ...data });
     } catch (error) {
         next(error);
     }

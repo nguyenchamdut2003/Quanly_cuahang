@@ -1,4 +1,4 @@
-﻿const {
+const {
     mongoose,
     getReservedQuantitiesByOrder,
     getReservedQuantitiesForSale,
@@ -242,7 +242,6 @@ async function index(req, res, next) {
         });
 
         var locals = {
-            title: 'HÃ ng hÃ³a',
             pageTitle: 'HÃ ng hÃ³a',
             activeMenu: 'hang-hoa',
             user: req.user,

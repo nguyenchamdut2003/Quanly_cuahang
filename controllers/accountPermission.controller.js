@@ -13,7 +13,6 @@ exports.index = async function(req, res, next) {
       .lean();
 
     res.render('phan-quyen/index', {
-      title: 'Phan quyen tai khoan',
       users: users,
       roleOptions: ROLE_OPTIONS,
       success: req.query && req.query.success,

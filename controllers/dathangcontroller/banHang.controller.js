@@ -84,7 +84,6 @@ exports.index = async (req, res, next) => {
         });
 
         res.render('ban-hang/index', {
-            title: 'Bán hàng',
             customers,
             products,
             stores,

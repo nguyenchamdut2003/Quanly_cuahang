@@ -210,7 +210,6 @@ exports.index = async function(req, res, next) {
     var storeId = await resolveStoreId(req);
     if (!storeId) {
       return res.render('vat-chua/index', {
-        title: 'Vật chứa',
         pageTitle: 'Vật chứa',
         activeMenu: 'vat-chua',
         user: req.user,
@@ -281,7 +280,6 @@ exports.index = async function(req, res, next) {
     var openDetailVatChuaId = await resolveOpenDetailVatChuaId(storeId, requestQuery.nhap_vat_chua);
 
     res.render('vat-chua/index', {
-      title: 'Vật chứa',
       pageTitle: 'Vật chứa',
       activeMenu: 'vat-chua',
       user: req.user,

@@ -1171,7 +1171,6 @@ async function loadProductContractData(req) {
     }, 0);
 
     return {
-        title: 'HĐ nguyên tắc hàng hóa',
         activeMenu: 'hang-hoa',
         user: req.user,
         store: store,

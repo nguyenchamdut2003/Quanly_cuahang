@@ -1,4 +1,4 @@
-﻿const {
+const {
     mongoose,
     getReservedQuantitiesByOrder,
     getReservedQuantitiesForSale,
@@ -130,7 +130,6 @@ async function attributesPage(req, res, next) {
         countsAgg.forEach(function(row) { valueCounts[String(row._id)] = row.count; });
 
         res.render('hang-hoa/thuoc-tinh', {
-            title: 'Thuá»™c tÃ­nh hÃ ng hÃ³a',
             pageTitle: 'Thuá»™c tÃ­nh hÃ ng hÃ³a',
             activeMenu: 'hang-hoa',
             user: req.user,

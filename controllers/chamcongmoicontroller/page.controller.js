@@ -14,7 +14,6 @@ const index = async function(req, res, next) {
     }).sort({ ten_nhan_vien: 1 }).lean();
 
     res.render('chamcong/index', {
-      title: 'Chấm công mới',
       activeMenu: 'nhan-vien',
       user: req.user,
       employees: employees.map(serializeEmployee),

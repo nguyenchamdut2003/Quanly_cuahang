@@ -319,7 +319,6 @@ exports.getHoaDon = async (req, res, next) => {
         const skip = (page - 1) * pageSize;
         invoices = invoices.slice(skip, skip + pageSize);
         res.render('don-hang/hoa-don', {
-            title: 'H�a don',
             invoices,
             partners,
             users,
@@ -423,7 +422,6 @@ exports.getHoaDonCreate = async (req, res, next) => {
         }
 
         res.render('don-hang/hoa-don-create', {
-            title: 'H�a don',
             ...data,
             currentStoreId: storeId || '',
             warehouses,

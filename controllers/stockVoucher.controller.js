@@ -95,7 +95,6 @@ async function loadSale(id) {
     .populate('lo_hang_id')
     .lean();
   return {
-    title: 'Phiếu xuất kho bán hàng',
     heading: 'PHIẾU XUẤT KHO BÁN HÀNG',
     movement: 'Xuất kho',
     code: ticket.ma_don_hang,
@@ -134,7 +133,6 @@ async function loadRetailInvoice(id) {
     .populate('lo_hang_id')
     .lean();
   return {
-    title: 'Hóa đơn bán hàng',
     heading: 'HÓA ĐƠN BÁN HÀNG',
     movement: 'Bán hàng',
     code: invoice.ma_hoa_don,
@@ -182,7 +180,6 @@ async function loadSalesReturn(id) {
     .lean();
   var returnItems = items.filter(function(row) { return row.loai_dong !== 'hang_doi'; });
   return {
-    title: 'Phiếu nhập kho hàng trả',
     heading: 'PHIẾU NHẬP KHO HÀNG TRẢ',
     movement: 'Nhập kho',
     code: ticket.ma_phieu_tra,
@@ -221,7 +218,6 @@ async function loadPurchaseReturn(id) {
     .populate('don_vi_tinh_id')
     .lean();
   return {
-    title: 'Phiếu xuất trả nhà cung cấp',
     heading: 'PHIẾU XUẤT TRẢ NHÀ CUNG CẤP',
     movement: 'Xuất kho',
     code: ticket.ma_phieu_tra_nhap,
@@ -279,7 +275,6 @@ async function loadInventoryCheck(id) {
   var khoId = ticket.kho_id && ticket.kho_id._id ? ticket.kho_id._id : ticket.kho_id;
   var giaTriItems = await enrichInventoryCheckPrintLines(khoId, items, kiotModels);
   return {
-    title: 'Phiếu kiểm kho / điều chỉnh kho',
     heading: 'PHIẾU KIỂM KHO / ĐIỀU CHỈNH KHO',
     movement: 'Kiểm kho',
     code: ticket.ma_kiem_kho,
@@ -314,7 +309,6 @@ async function loadDestroy(id) {
   if (!ticket) return null;
   var items = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id }).populate('hang_hoa_id').populate('lo_hang_id').lean();
   return {
-    title: 'Phiếu xuất hủy',
     heading: 'PHIẾU XUẤT HỦY',
     movement: 'Xuất kho',
     code: ticket.ma_xuat_huy,
@@ -339,7 +333,6 @@ async function loadInternalIssue(id) {
   if (!ticket) return null;
   var items = await CTXuatNoiBo.find({ phieu_xuat_id: ticket._id }).populate('hang_hoa_id').populate('lo_hang_id').lean();
   return {
-    title: 'Phiếu xuất kho nội bộ',
     heading: 'PHIẾU XUẤT KHO NỘI BỘ',
     movement: 'Xuất kho',
     code: ticket.ma_xuat_noi_bo,
@@ -369,7 +362,6 @@ async function loadAllocation(id) {
   if (!ticket) return null;
   var items = await CTPhanBoHang.find({ phan_bo_hang_id: ticket._id }).populate('hang_hoa_id').populate('lo_hang_id').lean();
   return {
-    title: 'Phiếu phân bổ / xuất phân bổ',
     heading: 'PHIẾU PHÂN BỔ / PHIẾU XUẤT PHÂN BỔ',
     movement: 'Xuất kho',
     code: ticket.ma_phan_bo,
@@ -402,7 +394,6 @@ async function loadManualAdjustment(id) {
   if (!row || row.loai_phieu !== 'dieu_chinh') return null;
   var qty = Number(row.so_luong_thay_doi || 0);
   return {
-    title: 'Phiếu điều chỉnh kho',
     heading: 'PHIẾU ĐIỀU CHỈNH KHO',
     movement: qty >= 0 ? 'Nhập kho' : 'Xuất kho',
     code: row.ma_phieu || String(row._id),
@@ -453,7 +444,6 @@ async function buildVoucherData(req) {
     ? String(req.query && req.query.variant || '').trim()
     : '';
   return {
-    title: voucher.title,
     activeMenu: 'hang-hoa',
     user: req.user,
     voucher: voucher

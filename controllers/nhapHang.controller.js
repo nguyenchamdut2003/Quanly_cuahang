@@ -449,7 +449,6 @@ exports.index = async function(req, res, next) {
     }
 
     res.render('nhap-hang/index', {
-      title: 'Nhập hàng',
       pageTitle: 'Nhập hàng',
       activeMenu: 'mua-hang',
       user: req.user,
@@ -889,7 +888,6 @@ exports.createPage = async function(req, res, next) {
     }
 
     res.render('nhap-hang/create', {
-      title: 'Nhập hàng',
       pageTitle: 'Nhập hàng',
       activeMenu: 'mua-hang',
       user: req.user,
@@ -2245,7 +2243,6 @@ async function buildPurchasePrintData(req, title) {
     }
   }
   return {
-    title: title,
     activeMenu: 'mua-hang',
     user: req.user,
     store: store,
@@ -2490,7 +2487,6 @@ exports.traHangNhapPage = async function(req, res, next) {
     var products = await mongoose.models.HangHoa.find(storeId ? { cua_hang_id: storeId, trang_thai: 'active' } : { trang_thai: 'active' }).lean();
 
     res.render('nhap-hang/tra-hang-nhap', {
-      title: 'Trả hàng nhập',
       activeMenu: 'mua-hang',
       user: req.user,
       returns: returns,

@@ -399,7 +399,6 @@ exports.index = async function(req, res, next) {
       .lean();
     var refs = await loadReferenceData(storeId);
     res.render('nhan-vien/index', {
-      title: 'Danh sách nhân viên',
       activeMenu: 'nhan-vien',
       user: req.user,
       employees: employees,

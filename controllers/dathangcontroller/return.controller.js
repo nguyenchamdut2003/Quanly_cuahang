@@ -300,7 +300,6 @@ exports.getTraHang = async (req, res, next) => {
             .limit(pageSize);
         const users = await NguoiDung.find().sort({ ho_ten: 1, username: 1 });
         res.render('don-hang/tra-hang', {
-            title: 'Trả hàng',
             returns,
             users,
             filters: req.query || {},
@@ -388,7 +387,6 @@ exports.getTraHangCreate = async (req, res, next) => {
             }
         }
         res.render('don-hang/tra-hang-create', {
-            title: 'Trả hàng',
             invoices,
             products,
             partners,

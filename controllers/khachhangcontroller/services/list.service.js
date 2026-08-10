@@ -83,7 +83,6 @@ async function loadCustomerListPage(options) {
     var pageCustomers = customers.slice(start, start + CUSTOMER_PAGE_SIZE);
 
     return {
-        title: 'Khách hàng',
         pageTitle: 'Khách hàng',
         activeMenu: 'khach-hang',
         user: options.user,

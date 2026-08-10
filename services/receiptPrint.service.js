@@ -575,7 +575,6 @@ async function buildReceiptPrintViewData(req, title, options = {}) {
         embeddedPrint: options.embeddedPrint != null ? options.embeddedPrint : embeddedPrint
     });
     return {
-        title: title || `In ${printData.receiptTypeLabel} ${loaded.receipt.ma_phieu || ''}`,
         ...printData,
         receiptId: String(loaded.receipt._id)
     };

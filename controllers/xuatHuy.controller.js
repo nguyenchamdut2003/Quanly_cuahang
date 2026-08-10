@@ -519,7 +519,6 @@ exports.index = async function(req, res, next) {
     });
 
     res.render('xuat-huy/index', {
-      title: 'Xuất hủy',
       activeMenu: 'hang-hoa',
       user: req.user,
       tickets,
@@ -619,7 +618,6 @@ exports.createPage = async function(req, res, next) {
     }
     const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
     res.render('xuat-huy/create', {
-      title: 'Xuất hủy',
       activeMenu: 'hang-hoa',
       user: req.user,
       warehouses,

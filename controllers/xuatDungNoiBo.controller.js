@@ -1,4 +1,4 @@
-﻿const mongoose = require('mongoose');
+const mongoose = require('mongoose');
 const ExcelJS = require('exceljs');
 const {
     PhieuXuatNoiBo,
@@ -528,7 +528,6 @@ exports.index = async (req, res, next) => {
             .limit(pageSize);
 
         res.render('xuat-dung-noi-bo/index', {
-            title: 'Xuất dùng nội bộ',
             tickets,
             users,
             loaiXuatList,
@@ -624,7 +623,6 @@ exports.getCreate = async (req, res, next) => {
         const loaiXuatList = await loadLoaiXuatList();
         const nextCode = await makeXnbCode();
         res.render('xuat-dung-noi-bo/create', {
-            title: 'Xuất dùng nội bộ',
             currentStoreId: storeId || '',
             nextCode,
             users,

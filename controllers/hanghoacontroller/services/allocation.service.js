@@ -1,4 +1,4 @@
-﻿const {
+const {
     mongoose,
     getReservedQuantitiesByOrder,
     getReservedQuantitiesForSale,
@@ -448,7 +448,6 @@ async function allocationPage(req, res, next) {
             .select('ma_vat_chua ten_vat_chua so_luong_ton')
             .lean();
         res.render('hang-hoa/phan-bo', {
-            title: 'PhÃ¢n bá»• hÃ ng tá»“n kho',
             pageTitle: 'PhÃ¢n bá»• hÃ ng tá»“n kho',
             activeMenu: 'hang-hoa',
             user: req.user,

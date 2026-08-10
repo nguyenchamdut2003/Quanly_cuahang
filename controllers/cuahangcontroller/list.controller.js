@@ -27,7 +27,6 @@ const index = async function(req, res, next) {
             : null;
 
         res.render('cua-hang/index', {
-            title: 'Cửa hàng',
             pageTitle: 'Cửa hàng',
             activeMenu: 'cua-hang',
             user: req.user,

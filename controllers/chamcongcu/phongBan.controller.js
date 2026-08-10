@@ -65,7 +65,6 @@ exports.index = async function(req, res, next) {
     var filter = buildListQuery(storeId, req.query);
     var items = await PhongBan.find(filter).sort({ ten_phong_ban: 1 }).lean();
     res.render('phong-ban/index', {
-      title: 'Phòng ban',
       activeMenu: 'nhan-vien',
       user: req.user,
       phongBans: items,

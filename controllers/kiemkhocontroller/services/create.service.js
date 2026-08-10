@@ -22,7 +22,7 @@ async function loadCreatePageData({ query, user }) {
         copyDraft = await loadKiemKhoCopyDraft(copyFromId);
         if (!copyDraft) copyFromError = 'Không tải được phiếu kiểm kho để sao chép.';
     }
-    return { title: 'Kiểm kho mới', user, stores, warehouses, products, copyDraftJson: copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '', copyFromError };
+    return { user, stores, warehouses, products, copyDraftJson: copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '', copyFromError };
 }
 
 async function createKiemKho({ body, user }) {

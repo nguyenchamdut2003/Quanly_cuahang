@@ -34,7 +34,6 @@ const getLoiNhuanLo = async (req, res, next) => {
     try {
         const report = await buildLotProfitAggregateReport(req.query || {}, res.locals.currentStore || null);
         return res.render('bao-cao/loi-nhuan-lo', {
-            title: reportTitles['loi-nhuan-lo'],
             heading: reportTitles['loi-nhuan-lo'],
             reportType: 'loi-nhuan-lo',
             report

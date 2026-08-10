@@ -75,7 +75,6 @@ exports.index = async function(req, res, next) {
     var filter = buildListQuery(storeId, req.query);
     var items = await ChucDanh.find(filter).sort({ ten_chuc_danh: 1 }).lean();
     res.render('chuc-danh/index', {
-      title: 'Chức danh',
       activeMenu: 'nhan-vien',
       user: req.user,
       chucDanhs: items,

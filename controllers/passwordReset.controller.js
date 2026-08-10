@@ -7,7 +7,6 @@ function isValidEmail(value) {
 function renderForgotPassword(res, options) {
   var data = options || {};
   return res.status(data.status || 200).render('auth/forgot-password', {
-    title: 'Quên mật khẩu',
     email: data.email || '',
     error: data.error || '',
     success: data.success || ''
@@ -18,7 +17,6 @@ function renderVerifyResetCode(req, res, options) {
   var data = options || {};
   var state = req.session && req.session.passwordReset || {};
   return res.status(data.status || 200).render('auth/verify-reset-code', {
-    title: 'Xác nhận mã OTP',
     emailMasked: data.emailMasked || state.emailMasked || '',
     error: data.error || '',
     success: data.success || '',
@@ -29,7 +27,6 @@ function renderVerifyResetCode(req, res, options) {
 function renderResetPassword(res, options) {
   var data = options || {};
   return res.status(data.status || 200).render('auth/reset-password', {
-    title: 'Đặt lại mật khẩu',
     error: data.error || ''
   });
 }

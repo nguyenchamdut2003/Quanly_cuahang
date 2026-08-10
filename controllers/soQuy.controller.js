@@ -435,7 +435,6 @@ exports.index = async (req, res, next) => {
         });
 
         res.render('so-quy/index', {
-            title: 'Sổ quỹ tiền mặt',
             list,
             cashBooks,
             filterCashBooks,

@@ -262,7 +262,7 @@ exports.index = async function(req, res, next) {
     }
 
     const dashboard = await getDashboardData(req.user);
-    res.render('index', { title: 'Tổng quan - KiotViet ERP', user: req.user, dashboard });
+    res.render('index', { user: req.user, dashboard });
   } catch (error) {
     next(error);
   }

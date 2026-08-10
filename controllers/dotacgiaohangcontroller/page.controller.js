@@ -21,7 +21,7 @@ exports.getDoiTacGiaoHang = async (req, res, next) => {
             const key = String(item.doi_tac_giao_hang_id || '');
             if (shipmentMap[key]) shipmentMap[key].push(item);
         });
-        res.render('don-hang/doi-tac-giao-hang', { title: 'Đối tác giao hàng', partners, shipmentMap });
+        res.render('don-hang/doi-tac-giao-hang', { partners, shipmentMap });
     } catch (error) {
         next(error);
     }

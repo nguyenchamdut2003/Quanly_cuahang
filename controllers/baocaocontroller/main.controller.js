@@ -66,7 +66,6 @@ const getReportType = async (req, res, next) => {
         if (reportType === 'ton-kho-lo') {
             const report = await buildLotStockReport(req.query || {});
             return res.render('bao-cao/ton-kho-lo', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
@@ -75,7 +74,6 @@ const getReportType = async (req, res, next) => {
         if (reportType === 'loi-nhuan-lo') {
             const report = await buildLotProfitAggregateReport(req.query || {}, res.locals.currentStore || null);
             return res.render('bao-cao/loi-nhuan-lo', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
@@ -84,7 +82,6 @@ const getReportType = async (req, res, next) => {
         if (reportType === 'cuoi-ngay') {
             const report = await buildEndOfDayReport(req.query || {});
             return res.render('bao-cao/cuoi-ngay', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
@@ -93,7 +90,6 @@ const getReportType = async (req, res, next) => {
         if (reportType === 'ban-hang') {
             const report = await buildSalesReport(req.query || {});
             return res.render('bao-cao/ban-hang', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
@@ -102,7 +98,6 @@ const getReportType = async (req, res, next) => {
         if (reportType === 'dat-hang') {
             const report = await buildOrderReport(req.query || {});
             return res.render('bao-cao/dat-hang', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
@@ -113,7 +108,6 @@ const getReportType = async (req, res, next) => {
                 cua_hang_id: res.locals.currentStore?._id
             }));
             return res.render('bao-cao/khach-hang', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
@@ -124,14 +118,12 @@ const getReportType = async (req, res, next) => {
                 cua_hang_id: res.locals.currentStore?._id
             }));
             return res.render('bao-cao/nha-cung-cap', {
-                title: reportTitles[reportType],
                 heading: reportTitles[reportType],
                 reportType,
                 report
             });
         }
         res.render('bao-cao/index', {
-            title: reportTitles[reportType],
             heading: reportTitles[reportType],
             reportType
         });

@@ -3,7 +3,7 @@
   <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><%= title %></title>
+    <title>Báo cáo</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel='stylesheet' href='/stylesheets/style.css' />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -45,7 +45,7 @@
 
     <div class="report-container">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-        <h1><i class="fa-solid fa-chart-line"></i> <%= locals.heading || title || 'Báo cáo' %></h1>
+        <h1><i class="fa-solid fa-chart-line"></i> <%= locals.heading || 'Báo cáo' %></h1>
         <div class="report-tabs">
           <button class="tab-btn active" onclick="loadData('day', this)">Theo ngày</button>
           <button class="tab-btn" onclick="loadData('week', this)">Theo tuần</button>

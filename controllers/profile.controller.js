@@ -14,7 +14,7 @@ function isValidPassword(password) {
 exports.index = async function(req, res, next) {
     try {
         // req.user đã có sẵn từ passport
-        res.render('profile/index', { title: 'Thông tin cá nhân', user: req.user });
+        res.render('profile/index', { user: req.user });
     } catch (error) {
         next(error);
     }

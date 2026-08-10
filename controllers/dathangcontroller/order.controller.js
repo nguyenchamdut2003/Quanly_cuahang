@@ -1,4 +1,4 @@
-﻿const {
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -310,7 +310,6 @@ exports.index = async (req, res, next) => {
             VatChua.find(vatChuaQuery).sort({ ten_vat_chua: 1 }).select('ten_vat_chua ma_vat_chua').lean()
         ]);
         res.render('don-hang/index', {
-            title: 'Đặt hàng',
             orders,
             partners,
             users,
@@ -376,7 +375,6 @@ exports.getCreate = async (req, res, next) => {
             }
         }
         res.render('don-hang/create', {
-            title: 'Đặt hàng',
             ...data,
             currentStoreId: storeId || '',
             warehouses,

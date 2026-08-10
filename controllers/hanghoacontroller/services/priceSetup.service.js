@@ -1,4 +1,4 @@
-﻿const {
+const {
     mongoose,
     getReservedQuantitiesByOrder,
     getReservedQuantitiesForSale,
@@ -191,7 +191,6 @@ async function priceSetup(req, res, next) {
             : 'Thiết lập giá';
 
         res.render('hang-hoa/thiet-lap-gia', {
-            title: 'Thiết lập giá',
             pageTitle: pageTitleText,
             activeMenu: 'hang-hoa',
             user: req.user,

@@ -143,7 +143,7 @@ exports.index = async (req, res, next) => {
             NguoiDung.find().sort({ ho_ten: 1, username: 1 })
         ]);
 
-        res.render('phieu-nhap/index', { title: 'Nhập hàng', tickets: list, users, filters: req.query || {} });
+        res.render('phieu-nhap/index', { tickets: list, users, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
@@ -182,7 +182,7 @@ exports.getTraHangNhap = async (req, res, next) => {
             PhieuNhap.find().sort({ created_at: -1 }),
             HangHoa.find().sort({ ten_hang: 1 })
         ]);
-        res.render('phieu-nhap/tra-hang-nhap', { title: 'Trả hàng nhập', returns, suppliers, receipts, products });
+        res.render('phieu-nhap/tra-hang-nhap', { returns, suppliers, receipts, products });
     } catch (error) {
         next(error);
     }
@@ -246,7 +246,7 @@ exports.getCreate = async (req, res, next) => {
             CuaHang.find().sort({ ten_cua_hang: 1 }),
             HangHoa.find().sort({ ten_hang: 1 })
         ]);
-        res.render('phieu-nhap/create', { title: 'Nhập hàng', suppliers, stores, products });
+        res.render('phieu-nhap/create', { suppliers, stores, products });
     } catch (error) {
         next(error);
     }

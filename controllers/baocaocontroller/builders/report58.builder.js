@@ -1,4 +1,4 @@
-﻿const path = require('path');
+const path = require('path');
 const pdfService = require('../../../services/pdf.service');
 const report58Excel = require('../../../services/report58Excel.service');
 const report58Data = require('../../../services/report58Data.service');
@@ -20,7 +20,6 @@ function buildReport58ViewData(query = {}, extras = {}) {
     const store = extras.store || null;
     const year = query.year || (range.to ? String(range.to).slice(0, 4) : String(new Date().getFullYear()));
     return {
-        title: reportTitles['58'],
         heading: reportTitles['58'],
         reportType: '58',
         range,

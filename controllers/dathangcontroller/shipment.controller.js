@@ -1,4 +1,4 @@
-﻿const {
+const {
     DonHang,
     CTDonHang,
     HoaDonBanHang,
@@ -279,7 +279,7 @@ exports.getVanDon = async (req, res, next) => {
             SoQuy.find(cashBookQuery).sort({ ten_so_quy: 1 }).lean()
         ]);
         res.locals.cashBooks = cashBooks;
-        res.render('don-hang/van-don', { title: 'Vận đơn', shipments, partners, filters: req.query || {} });
+        res.render('don-hang/van-don', { shipments, partners, filters: req.query || {} });
     } catch (error) {
         next(error);
     }
