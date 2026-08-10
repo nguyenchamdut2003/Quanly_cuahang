@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     body {
       overflow: hidden;
@@ -854,6 +855,7 @@
 </head>
 
 <body>
+  <div id="appRoot">
   <%- include('../partials/header') %>
     <main class="order-create">
       <section class="left">
@@ -1015,6 +1017,9 @@
       </section>
     </main>
     <div id="qtyWarningTooltip" class="qty-warning-tooltip" aria-hidden="true"></div>
+  </div>
+    <%- include('../partials/global-loading') %>
+    <script src="/javascripts/global-loading.js"></script>
     <script>
       let cart = [];
       let expandedLotKeyByItem = {};
@@ -1258,49 +1263,57 @@
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho trước khi thêm hàng.');
         const p = availableProducts.find(x => x._id === id);
         if (!p) return;
-        const stock = inventoryMetrics(p, stockFor(id)).tonThucTe;
-        const ex = cart.find(i => i.hang_hoa_id === id);
-        if (ex) {
-          if (ex.has_quy_cach || ex.has_lot_items) {
-            alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
+        const loadingShown = window.showGlobalLoading && window.showGlobalLoading('Đang thêm mặt hàng...');
+        if (loadingShown === false) return;
+        try {
+          const stock = inventoryMetrics(p, stockFor(id)).tonThucTe;
+          const ex = cart.find(i => i.hang_hoa_id === id);
+          if (ex) {
+            if (ex.has_quy_cach || ex.has_lot_items) {
+              alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
+            } else {
+              ex.so_luong += 1;
+              if (ex.so_luong > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
+            }
           } else {
-            ex.so_luong += 1;
-            if (ex.so_luong > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
+            const hasQuyCach = Boolean(p.has_quy_cach && (p.quy_cach_items || []).length);
+            const hasLotItems = Boolean(!hasQuyCach && p.quan_ly_theo_lo && (p.lot_items || []).length);
+            const meta = await fetchSalePriceMeta(id, {});
+            const newItem = {
+              hang_hoa_id: id,
+              ma_hang: p.ma_hang,
+              ten_hang: p.ten_hang,
+              so_luong: (hasQuyCach || hasLotItems) ? 0 : 1,
+              ton_kho: stock,
+              ton_thuc_te: p.ton_thuc_te,
+              so_luong_khach_dat: p.so_luong_khach_dat,
+              so_luong_kha_dung: p.so_luong_kha_dung,
+              don_gia_ban: Number(meta.gia_ban || 0) || priceFor(id),
+              cho_phep_sua_gia: meta.cho_phep_sua_gia !== false,
+              chiet_khau: 0,
+              kieu_chiet_khau: 'vnd',
+              has_quy_cach: hasQuyCach,
+              has_lot_items: hasLotItems,
+              quy_cach_items: hasQuyCach ? (p.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_dat: '', chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : [],
+              lot_items: hasLotItems ? (p.lot_items || []).map(lot => Object.assign({}, lot, { so_luong_dat: '', chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : []
+            };
+            if (hasQuyCach) {
+              await Promise.all(newItem.quy_cach_items.map(qc => applyPriceToDetailRow(id, qc)));
+            }
+            if (hasLotItems) {
+              await Promise.all(newItem.lot_items.map(lot => applyPriceToDetailRow(id, lot)));
+            }
+            cart.push(newItem);
+            if (!hasQuyCach && !hasLotItems && stock < 1) alert('Đơn này đang đặt vượt tồn hiện có.');
           }
-        } else {
-          const hasQuyCach = Boolean(p.has_quy_cach && (p.quy_cach_items || []).length);
-          const hasLotItems = Boolean(!hasQuyCach && p.quan_ly_theo_lo && (p.lot_items || []).length);
-          const meta = await fetchSalePriceMeta(id, {});
-          const newItem = {
-            hang_hoa_id: id,
-            ma_hang: p.ma_hang,
-            ten_hang: p.ten_hang,
-            so_luong: (hasQuyCach || hasLotItems) ? 0 : 1,
-            ton_kho: stock,
-            ton_thuc_te: p.ton_thuc_te,
-            so_luong_khach_dat: p.so_luong_khach_dat,
-            so_luong_kha_dung: p.so_luong_kha_dung,
-            don_gia_ban: Number(meta.gia_ban || 0) || priceFor(id),
-            cho_phep_sua_gia: meta.cho_phep_sua_gia !== false,
-            chiet_khau: 0,
-            kieu_chiet_khau: 'vnd',
-            has_quy_cach: hasQuyCach,
-            has_lot_items: hasLotItems,
-            quy_cach_items: hasQuyCach ? (p.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_dat: '', chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : [],
-            lot_items: hasLotItems ? (p.lot_items || []).map(lot => Object.assign({}, lot, { so_luong_dat: '', chiet_khau: 0, kieu_chiet_khau: 'vnd' })) : []
-          };
-          if (hasQuyCach) {
-            await Promise.all(newItem.quy_cach_items.map(qc => applyPriceToDetailRow(id, qc)));
+          productSearch.value = '';
+          productResults.style.display = 'none';
+          renderCart();
+        } finally {
+          if (loadingShown && window.hideGlobalLoading) {
+            window.hideGlobalLoading();
           }
-          if (hasLotItems) {
-            await Promise.all(newItem.lot_items.map(lot => applyPriceToDetailRow(id, lot)));
-          }
-          cart.push(newItem);
-          if (!hasQuyCach && !hasLotItems && stock < 1) alert('Đơn này đang đặt vượt tồn hiện có.');
         }
-        productSearch.value = '';
-        productResults.style.display = 'none';
-        renderCart();
       }
       function itemDetailRows(item) {
         if (item.has_quy_cach) return item.quy_cach_items || [];
@@ -2120,6 +2133,9 @@
           vat_chua_so_luong: invoiceVatChuaQty ? invoiceVatChuaQty.value : '',
           ...paymentFields
         };
+        let didNavigate = false;
+        const loadingShown = window.showGlobalLoading && window.showGlobalLoading('Đang thanh toán...');
+        if (loadingShown === false) return;
         try {
           if (payButton) {
             payButton.disabled = true;
@@ -2134,11 +2150,15 @@
             result = { success: false, message: text || 'Máy chủ trả về dữ liệu không hợp lệ' };
           }
           if (!result.success) return alert(result.message || 'Không tạo được hóa đơn');
+          didNavigate = true;
           window.location.href = '/don-hang/hoa-don';
         } catch (err) {
           alert(err.message || 'Lỗi khi tạo hóa đơn');
         } finally {
-          if (payButton) {
+          if (loadingShown && !didNavigate && window.hideGlobalLoading) {
+            window.hideGlobalLoading();
+          }
+          if (payButton && !didNavigate) {
             payButton.disabled = false;
             payButton.textContent = 'THANH TOÁN';
           }

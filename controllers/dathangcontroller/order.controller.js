@@ -690,7 +690,10 @@ exports.getIdDetail = async (req, res, next) => {
         if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng' });
         const [items, shipment, invoices] = await Promise.all([
             CTDonHang.find({ don_hang_id: order._id }).populate('hang_hoa_id').populate('lo_hang_id'),
-            VanDon.findOne({ don_hang_id: order._id }).populate('doi_tac_giao_hang_id').populate('cua_hang_id'),
+            VanDon.findOne({ don_hang_id: order._id })
+                .populate('doi_tac_giao_hang_id')
+                .populate('cua_hang_id')
+                .populate('dia_chi_khach_hang_id'),
             HoaDonBanHang.find({ don_hang_id: order._id })
                 .select('_id ma_hoa_don trang_thai thanh_toan ngay_ban created_at')
                 .sort({ created_at: -1 })

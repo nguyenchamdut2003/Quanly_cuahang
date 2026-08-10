@@ -13,6 +13,7 @@
   <title>Trả hàng nhập</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     body.admin-body{overflow:hidden;background:#f3f6f9}
     .create-page{height:calc(100vh - 60px);width:min(100%,1992px);margin:0 auto;background:#f3f6f9;display:grid;grid-template-columns:minmax(0,1450px) 360px}
@@ -71,6 +72,7 @@
   </style>
 </head>
 <body class="admin-body">
+  <div id="appRoot">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
   <main class="create-page">
     <section class="left">
@@ -192,14 +194,17 @@
       <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
       </div>
       <div class="page-actions page-actions--grid2 footer-actions">
-        <button class="btn" type="button" onclick="submitReturn('draft')">Lưu tạm</button>
-        <button class="btn primary" type="button" onclick="submitReturn('completed')">Hoàn thành</button>
+        <button class="btn" id="saveDraftBtn" type="button" onclick="submitReturn('draft')">Lưu tạm</button>
+        <button class="btn primary" id="saveCompleteBtn" type="button" onclick="submitReturn('completed')">Hoàn thành</button>
       </div>
     </aside>
   </main>
+  </div>
+  <%- include('../partials/global-loading') %>
   <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
   <script id="copy-draft-embed" type="application/json"><%- copyDraftJson %></script>
   <% } %>
+  <script src="/javascripts/global-loading.js"></script>
   <script>
     window.__returnAllowNoPurchase = false;
     let copyDraft = null;
@@ -683,17 +688,39 @@
           ghi_chu: it.ghi_chu || ''
         })))
       };
-      const res = await fetch('/tra-hang-nhap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!data.success) return showError(data.message || 'Không thể lưu phiếu trả hàng nhập');
-      if (data.print_url && confirm('Đã lưu phiếu. Bạn có muốn in phiếu trả hàng nhập không?')) {
-        window.open(data.print_url, '_blank');
+      const loadingMessage = mode === 'completed' ? 'Đang hoàn thành phiếu trả hàng nhập...' : 'Đang lưu tạm phiếu trả hàng nhập...';
+      const loadingShown = window.showGlobalLoading && window.showGlobalLoading(loadingMessage);
+      if (loadingShown === false) return;
+      const draftBtn = document.getElementById('saveDraftBtn');
+      const completeBtn = document.getElementById('saveCompleteBtn');
+      if (draftBtn) draftBtn.disabled = true;
+      if (completeBtn) completeBtn.disabled = true;
+      let shouldNavigate = false;
+      try {
+        const res = await fetch('/tra-hang-nhap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.success) {
+          showError(data.message || 'Không thể lưu phiếu trả hàng nhập');
+          return;
+        }
+        shouldNavigate = true;
+        if (data.print_url && confirm('Đã lưu phiếu. Bạn có muốn in phiếu trả hàng nhập không?')) {
+          window.open(data.print_url, '_blank');
+        }
+        location.href = data.redirect || '/tra-hang-nhap';
+      } catch (error) {
+        showError('Lỗi kết nối khi lưu phiếu trả hàng nhập');
+      } finally {
+        if (!shouldNavigate) {
+          if (window.hideGlobalLoading) window.hideGlobalLoading();
+          if (draftBtn) draftBtn.disabled = false;
+          if (completeBtn) completeBtn.disabled = false;
+        }
       }
-      location.href = data.redirect || '/tra-hang-nhap';
     }
 
     search.addEventListener('input', renderSearch);

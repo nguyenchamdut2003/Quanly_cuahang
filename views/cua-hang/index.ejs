@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/buttons.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     .store-import-wrap{position:relative;display:inline-flex}
     .store-import-menu{position:absolute;top:calc(100% + 6px);right:0;min-width:180px;display:none;z-index:20;border:1px solid #d0d5dd;border-radius:8px;background:#fff;box-shadow:0 14px 30px rgba(16,24,40,.15);overflow:hidden}
@@ -22,9 +23,10 @@
   </style>
 </head>
 <body class="admin-body">
-  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <div id="appRoot">
+    <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-  <main class="admin-shell store-page">
+    <main class="admin-shell store-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
 
     <div id="addStoreModalOverlay" class="modal-overlay" data-auto-open="<%= formMode === 'create' ? '1' : '0' %>">
@@ -334,7 +336,10 @@
         </div>
       </section>
     </div>
-  </main>
+    </main>
+  </div>
+  <%- include('../partials/global-loading') %>
+  <script src="/javascripts/global-loading.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       var addStoreModalOverlay = document.getElementById('addStoreModalOverlay');
@@ -346,6 +351,17 @@
       var ghnProvincePromise = null;
       var ghnWardCache = {};
       var ghnWardPromiseCache = {};
+
+      if (storeCreateForm) {
+        storeCreateForm.addEventListener('submit', function(event) {
+          if (typeof storeCreateForm.checkValidity === 'function' && !storeCreateForm.checkValidity()) {
+            return;
+          }
+          if (window.showGlobalLoading && window.showGlobalLoading('Đang tạo cửa hàng...') === false) {
+            event.preventDefault();
+          }
+        });
+      }
 
       function normalizeText(value) {
         return String(value || '')
@@ -1051,6 +1067,9 @@
             return;
           }
 
+          if (window.showGlobalLoading && window.showGlobalLoading('Đang thêm cửa hàng từ file...') === false) {
+            return;
+          }
           storeImportForm.submit();
         });
       }

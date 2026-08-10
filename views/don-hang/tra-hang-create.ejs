@@ -32,6 +32,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     :root{
       --text-xs:12px;
@@ -142,6 +143,7 @@
   </style>
 </head>
 <body>
+  <div id="appRoot">
   <div class="topbar">
     <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input id="itemSearch" placeholder="Tìm hàng trả (F3)" onfocus="handleItemSearch(true)" oninput="handleItemSearch()"><div id="productResults" class="product-results"></div></div>
     <button class="btn-pick-invoice" type="button" onclick="openInvoiceModal()"><i class="fa-solid fa-file-invoice"></i> Chọn hóa đơn</button>
@@ -278,6 +280,8 @@
       </div>
     </section>
   </main>
+  </div>
+  <%- include('../partials/global-loading') %>
   <div id="invoiceModal" class="modal-backdrop">
     <div class="modal">
       <button type="button" class="close" onclick="closeInvoiceModal()">&times;</button>
@@ -317,6 +321,7 @@
   <% if (typeof prefillInvoiceJson === 'string' && prefillInvoiceJson) { %>
   <script id="prefill-invoice-embed" type="application/json"><%- prefillInvoiceJson %></script>
   <% } %>
+  <script src="/javascripts/global-loading.js"></script>
   <script>
     const $ = (id) => document.getElementById(id);
     let copyDraft = null;
@@ -1618,10 +1623,13 @@
         ghi_chu: (returnNote.value || '').trim(),
         ...buildReturnPaymentSubmitFields()
       };
+      const loadingShown = window.showGlobalLoading && window.showGlobalLoading('Đang tạo phiếu trả hàng...');
+      if (loadingShown === false) return;
       button.disabled = true;
       button.textContent = 'ĐANG XỬ LÝ...';
       status.style.color = '#006dff';
       status.textContent = 'Đang gửi yêu cầu tạo phiếu trả hàng...';
+      let shouldNavigate = false;
       try {
         const res = await fetch('/don-hang/tra-hang/add', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
         const text = await res.text();
@@ -1634,6 +1642,7 @@
         if(!res.ok || !result.success) throw new Error(result.message || 'Không tạo được phiếu trả hàng');
         status.style.color = '#008a3d';
         status.textContent = result.message || 'Đã tạo phiếu trả hàng';
+        shouldNavigate = true;
         setTimeout(() => { window.location.href = '/don-hang/tra-hang'; }, 500);
       } catch (error) {
         status.style.color = '#d92d20';
@@ -1641,6 +1650,8 @@
         alert(status.textContent);
         button.disabled = false;
         button.textContent = 'TRẢ HÀNG';
+      } finally {
+        if (!shouldNavigate && window.hideGlobalLoading) window.hideGlobalLoading();
       }
     }
     async function applyCopyDraft() {
@@ -1724,6 +1735,3 @@
   </script>
 </body>
 </html>
-
-
-

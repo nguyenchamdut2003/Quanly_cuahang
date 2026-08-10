@@ -6,6 +6,7 @@
   <title>Khách hàng</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     .customer-address-toolbar{display:flex;justify-content:flex-end;gap:8px;margin:0 0 10px}
     .customer-import-wrap{position:relative;display:inline-flex}
@@ -292,9 +293,10 @@
   </style>
 </head>
 <body class="admin-body">
-  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <div id="appRoot">
+    <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-  <main class="admin-shell customer-page">
+    <main class="admin-shell customer-page">
     <%
       function buildCustomerPageUrl(pageNumber) {
         var parts = [];
@@ -757,8 +759,8 @@
         </div>
       </section>
     </div>
-  </main>
-  <div class="store-delete-modal-overlay" id="customerDeleteModalOverlay" aria-hidden="true">
+    </main>
+    <div class="store-delete-modal-overlay" id="customerDeleteModalOverlay" aria-hidden="true">
     <div class="store-delete-modal" role="dialog" aria-modal="true" aria-labelledby="customerDeleteModalTitle">
       <div class="store-delete-modal-header">
         <h3 id="customerDeleteModalTitle">Chuyển khách hàng vào thùng rác</h3>
@@ -784,7 +786,7 @@
       </div>
     </div>
   </div>
-  <div id="groupModalOverlay" class="group-modal-overlay">
+    <div id="groupModalOverlay" class="group-modal-overlay">
     <div class="group-modal">
       <div class="group-modal-header">
         <h3 id="groupModalTitle">Sửa nhóm khách hàng</h3>
@@ -806,10 +808,13 @@
       </div>
     </div>
   </div>
-  <%- include('../partials/address-type-modal', { addressTypeListId: 'addressTypeManageList' }) %>
+    <%- include('../partials/address-type-modal', { addressTypeListId: 'addressTypeManageList' }) %>
+    <%- include('../partials/debt-period-export-modal') %>
+  </div>
+  <%- include('../partials/global-loading') %>
   <script id="customerGroupsSeed" type="application/json"><%- JSON.stringify(customerGroups || []) %></script>
   <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
-  <%- include('../partials/debt-period-export-modal') %>
+  <script src="/javascripts/global-loading.js"></script>
   <script src="/js/debt-period-export.js"></script>
   <script src="/js/kv-inline-detail.js"></script>
   <script>
@@ -2179,6 +2184,16 @@
               if (mstInput) mstInput.focus();
             }
           }
+
+          if (event.defaultPrevented) return;
+          if (typeof customerCreateForm.checkValidity === 'function' && !customerCreateForm.checkValidity()) return;
+
+          var action = String(customerCreateForm.getAttribute('action') || '');
+          if (/\/khach-hang\/add(?:$|\?)/.test(action)) {
+            if (window.showGlobalLoading && window.showGlobalLoading('Đang thêm khách hàng...') === false) {
+              event.preventDefault();
+            }
+          }
         });
       }
       
@@ -2296,6 +2311,9 @@
             return;
           }
 
+          if (window.showGlobalLoading && window.showGlobalLoading('Đang thêm khách hàng từ file...') === false) {
+            return;
+          }
           customerImportForm.submit();
         });
       }

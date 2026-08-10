@@ -125,6 +125,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     *{box-sizing:border-box}html.so-quy-page,body.so-quy-page{height:100%;overflow:hidden;margin:0}body.so-quy-page{background:#f3f6f9;display:flex;flex-direction:column}.so-quy-page .kv-header{flex-shrink:0}.page{display:flex;flex-direction:column;min-height:0;height:calc(100vh - 48px);padding:16px 20px 20px;min-width:0;overflow:hidden}.main{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}.toolbar{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}.toolbar-left{display:flex;align-items:center;gap:16px;min-width:0;flex:1}.search{position:relative;width:500px;max-width:100%;flex:1}.search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#667085}.search input{width:100%;height:37px;border:1px solid #cfd8e3;border-radius:8px;padding:0 12px 0 38px;font-size:15px}.actions{display:flex;gap:8px;flex-wrap:wrap}.cash-time-filter{position:relative}.cash-time-filter-trigger.is-active{border-color:#0070f4;color:#0070f4}.cash-time-filter-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:20;min-width:280px;background:#fff;border:1px solid #cfd8e3;border-radius:8px;padding:14px;box-shadow:0 10px 24px rgba(15,23,42,.12)}.cash-time-filter-panel.is-open{display:block}.cash-time-filter-panel label{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:14px;font-weight:600;color:#111827;cursor:pointer}.cash-time-filter-panel input[type=radio]{accent-color:#0070f4}.cash-time-range{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}.cash-time-range input{height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 10px;font-size:14px}.cash-time-filter-panel .cashbook-specific-select{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:8px;padding:0 10px;font-size:14px;margin:2px 0 12px;background:#fff}
 .cash-time-filter-panel .cashbook-specific-select:disabled{opacity:.55;background:#f8fafc}
@@ -199,6 +200,7 @@
   </style>
 </head>
 <body class="so-quy-page">
+  <div id="appRoot">
   <%- include('../partials/header') %>
   <form class="page" method="GET" action="/so-quy">
     <% if (soQuyFilterValue !== 'all') { %>
@@ -362,7 +364,7 @@
         </div>
         <div class="modal-foot-actions">
           <button type="button" class="modal-btn" onclick="closeReceiptModal()">Bỏ qua</button>
-          <button type="submit" class="modal-btn save">Lưu</button>
+          <button type="submit" class="modal-btn save" id="receiptSaveBtn">Lưu</button>
         </div>
       </div>
     </form>
@@ -375,7 +377,10 @@
       <div class="page-actions modal-foot"><button type="button" class="modal-btn" onclick="closeReceiptDetailModal()">Đóng</button></div>
     </div>
   </div>
+  </div>
+  <%- include('../partials/global-loading') %>
 
+  <script src="/javascripts/global-loading.js"></script>
   <script>
     const receipts = <%- JSON.stringify(safeList.map(item => ({_id:String(item._id),ma_phieu:item.ma_phieu,loai_phieu:item.loai_phieu,loai_thu_chi:item.loai_thu_chi||'',gia_tri:item.gia_tri||0,chi_tiet_thanh_toan:item.chi_tiet_thanh_toan||{},phuong_thuc_thanh_toan:item.phuong_thuc_thanh_toan||'',nhom_doi_tuong:item.nhom_doi_tuong||'',trang_thai:item.trang_thai||'',hach_toan:!!item.hach_toan,doi_tuong:item.doi_tuong||'',ghi_chu:item.ghi_chu||'',ngay_lap:item.ngay_lap,so_quy:item.so_quy_id?.ten_so_quy||'Chưa phân sổ',chung_tu:codeOf(item)}))) %>;
     const customers = <%- JSON.stringify(safeCustomers.map(item => ({_id:String(item._id),name:item.ten_khach_hang,code:item.ma_khach_hang,phone:item.sdt||''}))) %>;
@@ -1118,10 +1123,26 @@
         if(selectedRelatedDoc&&Number(data.gia_tri)>Number(selectedRelatedDoc.amount||0))return alert('Số tiền không được vượt số còn lại của chứng từ ('+fmtMoney(selectedRelatedDoc.amount)+').');
       }
       DOC_HIDDEN_IDS.forEach(id=>{const field=document.getElementById(id);if(!field||!field.name)return;if(field.value)data[field.name]=field.value;else delete data[field.name]});
-      const res=await fetch('/so-quy/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-      const result=await res.json();
-      if(!result.success){showReceiptPaymentMessage(result.message||'Không tạo được phiếu','error');focusReceiptPaymentError(result.message);return}
-      location.reload();
+      const saveBtn=document.getElementById('receiptSaveBtn');
+      const loadingMessage=data.loai_phieu==='chi'?'Đang tạo phiếu chi...':'Đang tạo phiếu thu...';
+      const loadingShown=window.showGlobalLoading&&window.showGlobalLoading(loadingMessage);
+      if(loadingShown===false)return;
+      if(saveBtn)saveBtn.disabled=true;
+      let shouldReload=false;
+      try{
+        const res=await fetch('/so-quy/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        const result=await res.json();
+        if(!result.success){showReceiptPaymentMessage(result.message||'Không tạo được phiếu','error');focusReceiptPaymentError(result.message);return}
+        shouldReload=true;
+        location.reload();
+      }catch(error){
+        showReceiptPaymentMessage((error&&error.message)||'Lỗi kết nối khi tạo phiếu','error');
+      }finally{
+        if(!shouldReload){
+          if(window.hideGlobalLoading)window.hideGlobalLoading();
+          if(saveBtn)saveBtn.disabled=false;
+        }
+      }
     }
     document.addEventListener('DOMContentLoaded',()=>{
       ['receiptCashAmount','receiptTransferAmount','receiptRefundAmount'].forEach(id=>{

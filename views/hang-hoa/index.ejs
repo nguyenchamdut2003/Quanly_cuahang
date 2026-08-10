@@ -6,6 +6,7 @@
   <title>Hàng hóa</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     #productCreateForm .product-vn-num { text-align: right; }
     .product-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
@@ -36,9 +37,10 @@
   </style>
 </head>
 <body class="admin-body">
-  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <div id="appRoot">
+    <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-  <main class="admin-shell customer-page">
+    <main class="admin-shell customer-page">
     <%
       function buildProductPageUrl(pageNumber) {
         var parts = [];
@@ -320,7 +322,7 @@
         </div>
       </section>
     </div>
-  </main>
+    </main>
 
   <div id="productTrashModalOverlay" class="product-trash-overlay" aria-hidden="true">
     <div class="product-trash-modal" role="dialog" aria-modal="true" aria-labelledby="productTrashModalTitle">
@@ -461,8 +463,11 @@
       </div>
     </div>
   </div>
+  </div>
+  <%- include('../partials/global-loading') %>
   <script id="productGroupsSeed" type="application/json"><%- JSON.stringify(groups || []) %></script>
   <script id="unitTypesSeed" type="application/json"><%- JSON.stringify(units || []) %></script>
+  <script src="/javascripts/global-loading.js"></script>
   <script src="/js/kv-inline-detail.js"></script>
 
   <script>
@@ -810,13 +815,20 @@
       if (addProductModalOverlay && addProductModalOverlay.getAttribute('data-auto-open') === '1') openAddProductModal();
       initProductVNInputs();
       if (productCreateForm) {
-        productCreateForm.addEventListener('submit', function() {
+        productCreateForm.addEventListener('submit', function(event) {
           PRODUCT_VN_NUM_FIELDS.forEach(function(name) {
             var input = productCreateForm.querySelector('[name="' + name + '"]');
             if (!input) return;
             var parsed = parseProductNum(input.value);
             input.value = parsed === '' ? '0' : parsed;
           });
+          if (typeof productCreateForm.checkValidity === 'function' && !productCreateForm.checkValidity()) return;
+          var action = String(productCreateForm.getAttribute('action') || '');
+          if (/\/hang-hoa\/add(?:$|\?)/.test(action)) {
+            if (window.showGlobalLoading && window.showGlobalLoading('Đang thêm hàng hóa...') === false) {
+              event.preventDefault();
+            }
+          }
         });
       }
       toggleFixedPrice();

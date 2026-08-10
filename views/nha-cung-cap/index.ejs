@@ -6,6 +6,7 @@
   <title>Nhà cung cấp</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
     .detail-pane{display:none}
     .detail-pane.is-active{display:block}
@@ -569,9 +570,10 @@
   </style>
 </head>
 <body class="admin-body">
-  <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <div id="appRoot">
+    <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
 
-  <main class="admin-shell store-page supplier-page">
+    <main class="admin-shell store-page supplier-page">
     <%- include('../partials/flash-message', { flash: flash }) %>
     <% filterQueryString = filterQueryString || ''; %>
 
@@ -783,8 +785,8 @@
         <% } %>
       </section>
     </div>
-  </main>
-  <div id="supplierGroupModalOverlay" class="group-modal-overlay">
+    </main>
+    <div id="supplierGroupModalOverlay" class="group-modal-overlay">
     <div class="group-modal">
       <div class="group-modal-header">
         <h3 id="supplierGroupModalTitle">Sửa nhóm nhà cung cấp</h3>
@@ -806,10 +808,13 @@
       </div>
     </div>
   </div>
-  <%- include('../partials/address-type-modal', { addressTypeListId: 'addressTypeList' }) %>
+    <%- include('../partials/address-type-modal', { addressTypeListId: 'addressTypeList' }) %>
+    <%- include('../partials/debt-period-export-modal') %>
+  </div>
+  <%- include('../partials/global-loading') %>
   <script id="supplierGroupsSeed" type="application/json"><%- JSON.stringify(supplierGroups || []) %></script>
   <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
-  <%- include('../partials/debt-period-export-modal') %>
+  <script src="/javascripts/global-loading.js"></script>
   <script src="/js/debt-period-export.js"></script>
   <script src="/js/kv-inline-detail.js"></script>
   <script>
@@ -841,6 +846,15 @@
       if (addSupplierModalCancel) addSupplierModalCancel.addEventListener('click', closeAddSupplierModal);
       if (addSupplierModalOverlay && addSupplierModalOverlay.getAttribute('data-auto-open') === '1') {
         openAddSupplierModal();
+      }
+
+      if (supplierCreateForm) {
+        supplierCreateForm.addEventListener('submit', function(event) {
+          if (typeof supplierCreateForm.checkValidity === 'function' && !supplierCreateForm.checkValidity()) return;
+          if (window.showGlobalLoading && window.showGlobalLoading('Đang thêm nhà cung cấp...') === false) {
+            event.preventDefault();
+          }
+        });
       }
 
       function parseSupplierMoney(value) {
@@ -2302,6 +2316,9 @@
             return;
           }
 
+          if (window.showGlobalLoading && window.showGlobalLoading('Đang thêm nhà cung cấp từ file...') === false) {
+            return;
+          }
           supplierImportForm.submit();
         });
       }

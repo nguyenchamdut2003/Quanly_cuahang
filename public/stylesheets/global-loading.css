@@ -1,0 +1,30 @@
+.global-loading-overlay[hidden] {
+  display: none;
+}
+
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  cursor: wait;
+}
+
+.global-loading-text {
+  padding: 14px 24px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.16);
+}
+
+body.is-processing {
+  overflow: hidden;
+}

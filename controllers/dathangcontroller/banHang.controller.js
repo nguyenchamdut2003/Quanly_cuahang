@@ -4,8 +4,6 @@ const {
 } = require('../../models/kiot.model');
 const { luuPhiVanChuyenKhachHang } = require('../../services/phiGiaoHang.service');
 
-
-
 exports.index = async (req, res, next) => {
     try {
         const [customersRaw, products, stores, partners, addresses, draftOrdersRaw] = await Promise.all([
