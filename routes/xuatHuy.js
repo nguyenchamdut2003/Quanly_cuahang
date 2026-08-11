@@ -9,6 +9,7 @@ router.get('/', controller.index);
 router.get('/export.xlsx', controller.exportExcel);
 router.get('/create', controller.createPage);
 router.post('/', controller.createSubmit);
+router.post('/deactivate', controller.deactivateSelected);
 router.get('/:id/export.xlsx', controller.exportOneExcel);
 router.get('/:id', controller.redirectDetail);
 router.post('/:id/complete', controller.complete);

@@ -43,6 +43,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Xuất hủy</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
@@ -56,7 +57,10 @@
     .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;padding:0 10px;font-size:13px;outline:none;margin-top:6px}
     .main{min-width:0;display:flex;flex-direction:column;gap:10px}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
     .search{flex:1;max-width:470px}.search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 12px;font-size:13px;outline:none}
-    .actions{display:flex;align-items:center;gap:8px}.kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.kv-btn.primary{border-color:#0070f4;color:#0070f4}
+    .actions{display:flex;align-items:center;gap:8px}.kv-btn,.btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}.kv-btn.primary,.btn.primary{border-color:#0070f4;color:#0070f4}
+    .actions .order-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+    .actions .order-delete-btn:hover{background:#b42318!important;border-color:#b42318!important}
+    .row-check{width:15px;height:15px;accent-color:#0070f4;cursor:pointer}
     .table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-y:auto;overflow-x:visible;min-width:0}
     table{width:100%;table-layout:fixed;border-collapse:collapse;min-width:0}
     th{min-height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:6px 10px;white-space:normal;word-break:break-word;line-height:1.25}
@@ -111,6 +115,17 @@
     .xh-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
     .xh-page-link.is-disabled{color:#94a3b8;background:#f8fafc;cursor:not-allowed}
     .xh-page-current{font-weight:800;color:#111827}
+    .invoice-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
+    .invoice-trash-overlay.is-open{display:flex}
+    .invoice-trash-modal{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+    .invoice-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
+    .invoice-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .invoice-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
+    .invoice-trash-body{padding:14px 22px 18px;overflow:auto}
+    .invoice-trash-desc{margin:0 0 12px;font-size:13px;line-height:1.5;color:#475467}
+    .invoice-trash-foot{display:flex!important;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee;flex:0 0 auto;background:#fff}
+    .invoice-trash-foot .btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:74px;visibility:visible!important;opacity:1!important}
+    .invoice-trash-foot .btn.danger{background:#d92d20;color:#fff;border-color:#d92d20}
     @media(max-width:1100px){.xh-shell{padding:12px 30px;grid-template-columns:220px minmax(0,1fr)}}
     @media(max-width:1024px){.xh-detail-split{flex-direction:column;align-items:stretch;gap:20px}.xh-summary-box{flex:none;width:100%;max-width:100%;min-width:0}}
 
@@ -288,13 +303,14 @@
           <div class="actions">
             <a class="kv-btn primary" href="/xuat-huy/create">+ Xuất hủy</a>
             <a class="kv-btn" href="/xuat-huy/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>">Xuất file ▾</a>
+            <button type="button" class="btn order-delete-btn" id="xhDeleteSelectedBtn"><i class="fa-regular fa-trash-can"></i> Xóa</button>
           </div>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th class="check-col"><input type="checkbox"></th>
+                <th class="check-col"><input class="row-check" type="checkbox" id="selectAllXhTickets"></th>
                 <th class="star-col">☆</th>
                 <th class="code-col">Mã xuất hủy</th>
                 <th class="time-col">Thời gian</th>
@@ -309,7 +325,7 @@
               <% if (safeTickets.length) { %>
                 <% safeTickets.forEach(function(t) { %>
                   <tr class="xh-row" data-detail-id="<%= t._id %>">
-                    <td class="check-col"><input type="checkbox"></td>
+                    <td class="check-col"><input class="row-check xh-ticket-check" type="checkbox" value="<%= t._id %>"></td>
                     <td class="star-col">☆</td>
                     <td class="ellipsis"><%= t.ma_xuat_huy || '' %></td>
                     <td><%= formatDate(t.ngay_xuat || t.created_at) %></td>
@@ -400,7 +416,7 @@
                         </div>
                         <div class="page-actions page-actions--bordered">
                           <div class="page-actions__left">
-                            <button type="button" class="btn btn-light btn-cancel-outline js-xh-cancel" data-id="<%= t._id %>" data-status="<%= t.trang_thai || '' %>" <%= t.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
+                            <button type="button" class="btn btn-light btn-cancel-outline js-xh-cancel" data-id="<%= t._id %>" data-code="<%= t.ma_xuat_huy || '' %>">Hủy</button>
                             <a class="btn btn-light btn-copy-outline" href="/xuat-huy/create?copy_from=<%= t._id %>">Sao chép</a>
                             <a class="btn btn-primary" href="/xuat-huy/<%= t._id %>/export.xlsx">Xuất file</a>
                             <a class="btn btn-light" href="/chung-tu-kho/xuat-huy/<%= t._id %>" target="_blank" rel="noopener">Chứng từ</a>
@@ -448,6 +464,21 @@
       </main>
     </div>
   </form>
+  <div id="xhTrashModalOverlay" class="invoice-trash-overlay" aria-hidden="true">
+    <div class="invoice-trash-modal" role="dialog" aria-labelledby="xhTrashModalTitle" aria-modal="true">
+      <div class="invoice-trash-head">
+        <h3 id="xhTrashModalTitle">Xóa phiếu xuất hủy</h3>
+        <button type="button" class="invoice-trash-close" id="xhTrashModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-trash-body" id="xhTrashModalBody">
+        <p class="invoice-trash-desc" id="xhTrashModalDesc">Bạn có chắc chắn muốn xóa các phiếu xuất hủy đã chọn không?</p>
+      </div>
+      <div class="invoice-trash-foot">
+        <button type="button" class="btn" id="xhTrashCancelBtn">Không</button>
+        <button type="button" class="btn danger" id="xhTrashConfirmBtn">Có</button>
+      </div>
+    </div>
+  </div>
   <script>
     function submitXhFilters() {
       var pageInput = document.getElementById('xhPageInput');
@@ -499,39 +530,122 @@
         try { window.history.replaceState({}, '', path); } catch (err) {}
       }
 
+      var selectAll = document.getElementById('selectAllXhTickets');
+      var ticketChecks = Array.prototype.slice.call(document.querySelectorAll('.xh-ticket-check'));
+      var deleteBtn = document.getElementById('xhDeleteSelectedBtn');
+      var trashOverlay = document.getElementById('xhTrashModalOverlay');
+      var trashDesc = document.getElementById('xhTrashModalDesc');
+      var trashClose = document.getElementById('xhTrashModalClose');
+      var trashCancel = document.getElementById('xhTrashCancelBtn');
+      var trashConfirm = document.getElementById('xhTrashConfirmBtn');
+      var pendingTrashIds = [];
+
+      function selectedTicketIds() {
+        return ticketChecks.filter(function(cb) { return cb.checked; }).map(function(cb) { return cb.value; }).filter(Boolean);
+      }
+
+      function syncSelectAll() {
+        if (!selectAll) return;
+        var checkedCount = selectedTicketIds().length;
+        selectAll.checked = ticketChecks.length > 0 && checkedCount === ticketChecks.length;
+        selectAll.indeterminate = checkedCount > 0 && checkedCount < ticketChecks.length;
+      }
+
+      function openTrashModal(ids, message) {
+        pendingTrashIds = ids || [];
+        if (trashDesc) trashDesc.textContent = message || 'Bạn có chắc chắn muốn xóa các phiếu xuất hủy đã chọn không?';
+        if (trashConfirm) {
+          trashConfirm.disabled = false;
+          trashConfirm.textContent = 'Có';
+        }
+        if (trashOverlay) {
+          trashOverlay.classList.add('is-open');
+          trashOverlay.setAttribute('aria-hidden', 'false');
+        }
+      }
+
+      function closeTrashModal() {
+        pendingTrashIds = [];
+        if (trashOverlay) {
+          trashOverlay.classList.remove('is-open');
+          trashOverlay.setAttribute('aria-hidden', 'true');
+        }
+      }
+
+      if (selectAll) {
+        selectAll.addEventListener('change', function() {
+          ticketChecks.forEach(function(cb) { cb.checked = selectAll.checked; });
+          syncSelectAll();
+        });
+      }
+      ticketChecks.forEach(function(cb) {
+        cb.addEventListener('click', function(e) { e.stopPropagation(); });
+        cb.addEventListener('change', syncSelectAll);
+      });
+      syncSelectAll();
+
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+          var ids = selectedTicketIds();
+          if (!ids.length) {
+            alert('Vui lòng chọn ít nhất một phiếu xuất hủy.');
+            return;
+          }
+          openTrashModal(ids, 'Bạn có chắc chắn muốn xóa các phiếu xuất hủy đã chọn không?');
+        });
+      }
+
       document.body.addEventListener('click', function(e) {
         var cancelBtn = e.target.closest('.js-xh-cancel');
         if (!cancelBtn) return;
-        if (cancelBtn.disabled) return;
-        var st = cancelBtn.getAttribute('data-status') || '';
-        if (st === 'cancelled') return;
-        if (!confirm('Bạn có chắc muốn hủy phiếu xuất hủy này không?')) return;
         var cid = cancelBtn.getAttribute('data-id');
-        cancelBtn.disabled = true;
-        fetch('/xuat-huy/' + cid + '/cancel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          credentials: 'same-origin',
-          body: '{}'
-        })
-          .then(function(res) {
-            return res.json().then(function(data) {
-              return { ok: res.ok, data: data };
-            });
-          })
-          .then(function(result) {
-            if (!result.ok || !result.data.success) {
-              alert((result.data && result.data.message) || 'Không hủy được phiếu');
-              cancelBtn.disabled = (cancelBtn.getAttribute('data-status') === 'cancelled');
-              return;
-            }
-            location.reload();
-          })
-          .catch(function() {
-            alert('Không kết nối được máy chủ');
-            cancelBtn.disabled = false;
-          });
+        var code = cancelBtn.getAttribute('data-code') || '';
+        if (!cid) return;
+        openTrashModal([cid], 'Bạn có chắc chắn muốn hủy phiếu ' + (code || 'xuất hủy này') + ' không?');
       });
+
+      if (trashClose) trashClose.addEventListener('click', closeTrashModal);
+      if (trashCancel) trashCancel.addEventListener('click', closeTrashModal);
+      if (trashOverlay) {
+        trashOverlay.addEventListener('click', function(e) {
+          if (e.target === trashOverlay) closeTrashModal();
+        });
+      }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeTrashModal();
+      });
+      if (trashConfirm) {
+        trashConfirm.addEventListener('click', function() {
+          if (!pendingTrashIds.length) return;
+          trashConfirm.disabled = true;
+          trashConfirm.textContent = 'Đang xóa...';
+          fetch('/xuat-huy/deactivate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ ids: pendingTrashIds })
+          })
+            .then(function(res) {
+              return res.json().then(function(data) {
+                return { ok: res.ok, data: data };
+              });
+            })
+            .then(function(result) {
+              if (!result.ok || !result.data.success) {
+                alert((result.data && result.data.message) || 'Không xóa được phiếu xuất hủy.');
+                trashConfirm.disabled = false;
+                trashConfirm.textContent = 'Có';
+                return;
+              }
+              location.reload();
+            })
+            .catch(function() {
+              alert('Không kết nối được máy chủ');
+              trashConfirm.disabled = false;
+              trashConfirm.textContent = 'Có';
+            });
+        });
+      }
     });
   </script>
 </body>

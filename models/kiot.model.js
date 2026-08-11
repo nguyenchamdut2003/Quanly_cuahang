@@ -2068,6 +2068,7 @@ const PhieuXuatHuySchema = new Schema({
   tong_so_luong: { type: Number, default: 0 },
   tong_gia_tri: { type: Number, default: 0 },
   trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'draft' },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
   ghi_chu: { type: String },
 }, { collection: "phieu_xuat_huy", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 

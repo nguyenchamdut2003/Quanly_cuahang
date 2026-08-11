@@ -23,6 +23,12 @@
     @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}}
     .footer-actions{display:flex;justify-content:flex-end;width:100%}
     .footer-actions .btn.primary{width:100%;min-width:0}
+    .loading-state{height:calc(100vh - 210px);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:#475569}
+    .loading-spinner,.btn-spinner{width:18px;height:18px;border:2px solid rgba(0,112,244,.18);border-top-color:#0070f4;border-radius:50%;animation:xhSpin .75s linear infinite}
+    .btn-spinner{display:none;width:16px;height:16px;border-color:rgba(255,255,255,.35);border-top-color:#fff}
+    .btn.is-loading{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+    .btn.is-loading .btn-spinner{display:inline-block}
+    @keyframes xhSpin{to{transform:rotate(360deg)}}
   </style>
 </head>
 <body class="admin-body">
@@ -49,7 +55,7 @@
       <div class="field"><label>Tổng số lượng</label><div class="readonly blue" id="tongSoLuong">0</div></div>
       <div class="field"><label>Tổng giá trị</label><div class="readonly blue" id="tongGiaTri">0</div></div>
       <textarea id="ghiChu" class="note" placeholder="Ghi chú"></textarea>
-      <div class="page-actions footer-actions"><button class="btn primary" type="button" id="submitCompleteBtn" onclick="submitTicket()">Hoàn thành</button></div>
+      <div class="page-actions footer-actions"><button class="btn primary" type="button" id="submitCompleteBtn" onclick="submitTicket()"><span class="btn-spinner"></span><span class="btn-text">Hoàn thành</span></button></div>
     </aside>
   </main>
   <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
@@ -104,6 +110,17 @@
       search.disabled = true;
       renderItems();
       renderTotals();
+    }
+    function renderItemsLoading(message) {
+      body.innerHTML = '<tr><td colspan="10"><div class="loading-state"><span class="loading-spinner"></span><b>' + (message || 'Đang tải danh sách hàng hóa...') + '</b></div></td></tr>';
+    }
+    function setSubmitLoading(loading) {
+      const submitBtn = document.getElementById('submitCompleteBtn');
+      if (!submitBtn) return;
+      const text = submitBtn.querySelector('.btn-text');
+      submitBtn.disabled = Boolean(loading);
+      submitBtn.classList.toggle('is-loading', Boolean(loading));
+      if (text) text.textContent = loading ? 'Đang hoàn thành...' : 'Hoàn thành';
     }
     function formatDateOnly(value) {
       if (!value) return '';
@@ -178,20 +195,30 @@
       resetAll();
       if (!id) return;
       clearError();
-      const res = await fetch('/api/phieu-nhap/' + id + '/chi-tiet-xuat-huy');
-      const data = await res.json();
-      if (!data.success) return showError(data.message || 'Không tải được chi tiết phiếu nhập');
-      const ticket = data.data && data.data.phieu_nhap || {};
-      document.getElementById('khoId').value = ticket.kho_id || '';
-      const kho = ticket.kho || {};
-      document.getElementById('khoText').textContent = kho.ten_kho || kho.ma_kho || 'Kho nhập';
-      allItems = (data.data.items || []).map(row => Object.assign({}, row, {
-        so_luong: '',
-        quy_cach_items: (row.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_huy: qc.so_luong_huy || '' }))
-      }));
-      items = allItems.slice();
-      search.disabled = false;
-      renderItems();
+      search.disabled = true;
+      renderItemsLoading('Đang tải danh sách hàng của phiếu nhập...');
+      try {
+        const res = await fetch('/api/phieu-nhap/' + id + '/chi-tiet-xuat-huy');
+        const data = await res.json();
+        if (!data.success) {
+          resetAll();
+          return showError(data.message || 'Không tải được chi tiết phiếu nhập');
+        }
+        const ticket = data.data && data.data.phieu_nhap || {};
+        document.getElementById('khoId').value = ticket.kho_id || '';
+        const kho = ticket.kho || {};
+        document.getElementById('khoText').textContent = kho.ten_kho || kho.ma_kho || 'Kho nhập';
+        allItems = (data.data.items || []).map(row => Object.assign({}, row, {
+          so_luong: '',
+          quy_cach_items: (row.quy_cach_items || []).map(qc => Object.assign({}, qc, { so_luong_huy: qc.so_luong_huy || '' }))
+        }));
+        items = allItems.slice();
+        search.disabled = false;
+        renderItems();
+      } catch (error) {
+        resetAll();
+        showError('Lỗi kết nối khi tải chi tiết phiếu nhập');
+      }
     }
 
     async function changeLot(idx, lotId) {
@@ -334,13 +361,8 @@
         }
       }
 
-      const submitBtn = document.getElementById('submitCompleteBtn');
-      const originalText = submitBtn ? submitBtn.textContent : 'Hoàn thành';
       isSubmitting = true;
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Đang tạo phiếu';
-      }
+      setSubmitLoading(true);
 
       const payload = {
         submitMode: 'completed',
@@ -357,19 +379,13 @@
         const data = await res.json();
         if (!data.success) {
           isSubmitting = false;
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-          }
+          setSubmitLoading(false);
           return showError(data.message || 'Không thể lưu phiếu xuất hủy');
         }
         location.href = data.redirect || '/xuat-huy';
       } catch (error) {
         isSubmitting = false;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalText;
-        }
+        setSubmitLoading(false);
         showError('Lỗi kết nối khi tạo phiếu xuất hủy');
       }
     }

@@ -285,7 +285,7 @@ function endOfDay(value) {
 }
 
 async function buildFilter(req, storeId) {
-  const query = {};
+  const query = { trang_thai_du_lieu: 'active' };
   if (isObjectId(storeId)) query.cua_hang_id = storeId;
   const q = String(req.query.q || '').trim();
   if (q) query.ma_xuat_huy = { $regex: q, $options: 'i' };
@@ -306,6 +306,27 @@ async function buildFilter(req, storeId) {
     if (to) query.ngay_xuat.$lte = endOfDay(to + 'T00:00:00');
   }
   return query;
+}
+
+function missingDestroyDataStatusFilter(extra) {
+  return Object.assign({}, extra || {}, {
+    $or: [
+      { trang_thai_du_lieu: { $exists: false } },
+      { trang_thai_du_lieu: null },
+      { trang_thai_du_lieu: '' }
+    ]
+  });
+}
+
+async function ensureDestroyDataStatusDefault() {
+  await PhieuXuatHuy.updateMany(
+    missingDestroyDataStatusFilter({ trang_thai: 'cancelled' }),
+    { $set: { trang_thai_du_lieu: 'inactive' } }
+  );
+  await PhieuXuatHuy.updateMany(
+    missingDestroyDataStatusFilter({ trang_thai: { $ne: 'cancelled' } }),
+    { $set: { trang_thai_du_lieu: 'active' } }
+  );
 }
 
 async function loadWarehousesAndUsers(storeId) {
@@ -471,6 +492,7 @@ async function reverseInventory(ticket, rows, userId) {
 
 exports.index = async function(req, res, next) {
   try {
+    await ensureDestroyDataStatusDefault();
     const storeId = await resolveStoreId(req);
     const query = await buildFilter(req, storeId);
     let page = parsePage(req.query);
@@ -546,6 +568,7 @@ exports.index = async function(req, res, next) {
 
 exports.exportExcel = async function(req, res, next) {
   try {
+    await ensureDestroyDataStatusDefault();
     const storeId = await resolveStoreId(req);
     const query = await buildFilter(req, storeId);
     const { tickets, detailMap } = await loadExportTickets(query);
@@ -557,8 +580,9 @@ exports.exportExcel = async function(req, res, next) {
 
 exports.exportOneExcel = async function(req, res, next) {
   try {
+    await ensureDestroyDataStatusDefault();
     const storeId = await resolveStoreId(req);
-    const query = { _id: req.params.id };
+    const query = { _id: req.params.id, trang_thai_du_lieu: 'active' };
     if (isObjectId(storeId)) query.cua_hang_id = storeId;
     if (!isObjectId(req.params.id)) return res.status(404).send('Không tìm thấy phiếu xuất hủy');
 
@@ -578,7 +602,8 @@ exports.exportOneExcel = async function(req, res, next) {
 
 async function loadDestroyCopyDraft(copyFromId) {
   if (!isObjectId(copyFromId)) return null;
-  const ticket = await PhieuXuatHuy.findById(copyFromId).lean();
+  await ensureDestroyDataStatusDefault();
+  const ticket = await PhieuXuatHuy.findOne({ _id: copyFromId, trang_thai_du_lieu: 'active' }).lean();
   if (!ticket || ticket.trang_thai === 'cancelled') return null;
   const lines = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id })
     .populate({ path: 'hang_hoa_id', select: 'ma_hang ten_hang' })
@@ -644,7 +669,7 @@ exports.createSubmit = async function(req, res) {
     if (!reason) return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do hủy' });
     const kho = await Kho.findById(khoId).lean();
     if (!kho) return res.status(400).json({ success: false, message: 'Kho hủy không hợp lệ' });
-    const purchase = await PhieuNhap.findOne({ _id: phieuNhapId, trang_thai: 'completed' }).select('kho_id').lean();
+    const purchase = await PhieuNhap.findOne({ _id: phieuNhapId, trang_thai: 'completed', trang_thai_du_lieu: 'active' }).select('kho_id').lean();
     if (!purchase) return res.status(400).json({ success: false, message: 'Phiếu nhập gốc không hợp lệ' });
     if (String(purchase.kho_id || '') !== String(khoId)) {
       return res.status(400).json({ success: false, message: 'Không cho chọn kho khác với kho của phiếu nhập gốc' });
@@ -689,6 +714,7 @@ exports.createSubmit = async function(req, res) {
       tong_so_luong: totals.qty,
       tong_gia_tri: totals.value,
       trang_thai: mode,
+      trang_thai_du_lieu: 'active',
       ghi_chu: String(body.ghi_chu || '').trim()
     });
     await persistDetails(ticket._id, rows);
@@ -701,7 +727,8 @@ exports.createSubmit = async function(req, res) {
 
 exports.detail = async function(req, res, next) {
   try {
-    const ticket = await PhieuXuatHuy.findById(req.params.id).populate('kho_id').populate('nguoi_tao_id').lean();
+    await ensureDestroyDataStatusDefault();
+    const ticket = await PhieuXuatHuy.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' }).populate('kho_id').populate('nguoi_tao_id').lean();
     if (!ticket) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất hủy' });
     const items = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id }).populate('hang_hoa_id').populate('lo_hang_id').lean();
     return res.json({ success: true, data: { ticket, items } });
@@ -712,7 +739,8 @@ exports.detail = async function(req, res, next) {
 
 exports.complete = async function(req, res) {
   try {
-    const ticket = await PhieuXuatHuy.findById(req.params.id);
+    await ensureDestroyDataStatusDefault();
+    const ticket = await PhieuXuatHuy.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
     if (!ticket) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất hủy' });
     if (ticket.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (ticket.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
@@ -737,16 +765,42 @@ exports.complete = async function(req, res) {
 
 exports.cancel = async function(req, res) {
   try {
-    const ticket = await PhieuXuatHuy.findById(req.params.id);
+    await ensureDestroyDataStatusDefault();
+    const ticket = await PhieuXuatHuy.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' });
     if (!ticket) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất hủy' });
-    if (ticket.trang_thai === 'cancelled') return res.json({ success: true, message: 'Phiếu đã hủy' });
     const rows = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id }).lean();
     if (ticket.trang_thai === 'completed') await reverseInventory(ticket, rows, req.user?._id);
-    ticket.trang_thai = 'cancelled';
+    ticket.trang_thai_du_lieu = 'inactive';
     await ticket.save();
     return res.json({ success: true, message: 'Đã hủy phiếu xuất hủy' });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Không thể hủy phiếu' });
+  }
+};
+
+exports.deactivateSelected = async function(req, res) {
+  try {
+    await ensureDestroyDataStatusDefault();
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(isObjectId) : [];
+    if (!ids.length) {
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn phiếu xuất hủy cần xóa' });
+    }
+    const storeId = await resolveStoreId(req);
+    const filter = { _id: { $in: ids }, trang_thai_du_lieu: 'active' };
+    if (isObjectId(storeId)) filter.cua_hang_id = storeId;
+    const tickets = await PhieuXuatHuy.find(filter);
+    if (!tickets.length) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất hủy cần xóa' });
+    }
+    for (const ticket of tickets) {
+      const rows = await CTXuatHuy.find({ phieu_xuat_huy_id: ticket._id }).lean();
+      if (ticket.trang_thai === 'completed') await reverseInventory(ticket, rows, req.user?._id);
+      ticket.trang_thai_du_lieu = 'inactive';
+      await ticket.save();
+    }
+    return res.json({ success: true, message: 'Đã xóa phiếu xuất hủy' });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message || 'Không thể xóa phiếu xuất hủy' });
   }
 };
 
@@ -801,7 +855,7 @@ exports.apiWarehouseProducts = async function(req, res) {
 exports.apiPurchasesWithStock = async function(req, res) {
   try {
     const storeId = await resolveStoreId(req);
-    const filter = { trang_thai: 'completed' };
+    const filter = { trang_thai: 'completed', trang_thai_du_lieu: 'active' };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
     const purchases = await PhieuNhap.find(filter)
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
@@ -877,7 +931,7 @@ exports.apiPurchaseDestroyDetail = async function(req, res) {
     const storeId = await resolveStoreId(req);
     const purchaseId = String(req.params.id || '').trim();
     if (!isObjectId(purchaseId)) return res.status(400).json({ success: false, message: 'Phiếu nhập không hợp lệ' });
-    const filter = { _id: purchaseId, trang_thai: 'completed' };
+    const filter = { _id: purchaseId, trang_thai: 'completed', trang_thai_du_lieu: 'active' };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
     const purchase = await PhieuNhap.findOne(filter)
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
