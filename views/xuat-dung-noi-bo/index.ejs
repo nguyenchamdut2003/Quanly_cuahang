@@ -126,7 +126,6 @@
         <label class="radio-filter"><input type="radio"><span>Tùy chỉnh <i class="fa-regular fa-calendar"></i></span></label>
       </div>
       <div class="filter-block"><div class="filter-title">Người tạo</div><select class="filter-control" name="nguoi_tao_id" onchange="submitFilters()"><option value="">Chọn người tạo</option><% users.forEach(u=>{ %><option value="<%= u._id %>" <%= filters.nguoi_tao_id == u._id ? 'selected' : '' %>><%= u.ho_ten || u.email %></option><% }) %></select></div>
-      <div class="filter-block"><div class="filter-title">Người xuất dùng nội bộ</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người xuất"></div>
       <div class="filter-block"><div class="filter-title">Loại xuất</div><select class="filter-control" name="loai_xuat" onchange="submitFilters()"><option value="">Chọn loại xuất</option><% (loaiXuatList || []).forEach(function(loai) { %><option value="<%= loai.ten_loai %>" <%= filters.loai_xuat === loai.ten_loai ? 'selected' : '' %>><%= loai.ten_loai %></option><% }) %></select></div>
       <div class="filter-block"><div class="filter-title">Người nhận</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người nhận"></div>
       <div class="xnb-filter-actions">

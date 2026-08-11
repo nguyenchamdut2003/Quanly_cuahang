@@ -281,20 +281,44 @@ async function normalizeVatChuaXnbItems(rawItems, storeId) {
     });
 }
 
+function queryValue(query, key) {
+    const raw = query && query[key];
+    const value = Array.isArray(raw) ? raw.find(item => String(item || '').trim()) : raw;
+    return String(value || '').trim();
+}
+
 function buildFilter(query) {
     const filter = { trang_thai_du_lieu: 'active' };
-    const statuses = Array.isArray(query.trang_thai)
+    const allowedStatuses = ['draft', 'completed', 'cancelled'];
+    const rawStatuses = Array.isArray(query.trang_thai)
         ? query.trang_thai
-        : (query.trang_thai ? [query.trang_thai] : ['draft', 'completed']);
+        : (query.trang_thai ? [query.trang_thai] : []);
+    const statuses = rawStatuses
+        .map(status => String(status || '').trim())
+        .filter(status => allowedStatuses.includes(status));
+    const selectedStatuses = statuses.length ? statuses : ['draft', 'completed'];
 
-    if (statuses.length) filter.trang_thai = { $in: statuses };
-    if (query.q && query.q.trim()) {
-        filter.ma_xuat_noi_bo = { $regex: query.q.trim(), $options: 'i' };
-    }
-    if (query.loai_xuat) filter.loai_xuat = query.loai_xuat;
-    if (query.nguoi_tao_id) filter.nguoi_tao_id = query.nguoi_tao_id;
-    if (query.nguoi_nhan) filter.nguoi_nhan = { $regex: query.nguoi_nhan.trim(), $options: 'i' };
-    return { filter, statuses };
+    filter.trang_thai = { $in: selectedStatuses };
+    const q = queryValue(query, 'q');
+    const loaiXuat = queryValue(query, 'loai_xuat');
+    const nguoiTaoId = queryValue(query, 'nguoi_tao_id');
+    const nguoiNhan = queryValue(query, 'nguoi_nhan');
+
+    if (q) filter.ma_xuat_noi_bo = { $regex: q, $options: 'i' };
+    if (loaiXuat) filter.loai_xuat = loaiXuat;
+    if (nguoiTaoId) filter.nguoi_tao_id = nguoiTaoId;
+    if (nguoiNhan) filter.nguoi_nhan = { $regex: nguoiNhan, $options: 'i' };
+    return {
+        filter,
+        statuses: selectedStatuses,
+        filters: {
+            q,
+            trang_thai: selectedStatuses,
+            loai_xuat: loaiXuat,
+            nguoi_tao_id: nguoiTaoId,
+            nguoi_nhan: nguoiNhan
+        }
+    };
 }
 
 function parsePage(query) {
@@ -529,7 +553,7 @@ async function sendXuatNoiBoWorkbook(res, filename, tickets, detailMap) {
 exports.index = async (req, res, next) => {
     try {
         await ensureXnbDataStatusDefault();
-        const { filter, statuses } = buildFilter(req.query);
+        const { filter, statuses, filters } = buildFilter(req.query);
         let page = parsePage(req.query);
         const pageSize = XNB_PAGE_SIZE;
         const [total, totalAgg, users, loaiXuatList] = await Promise.all([
@@ -556,7 +580,7 @@ exports.index = async (req, res, next) => {
             tickets,
             users,
             loaiXuatList,
-            filters: req.query,
+            filters,
             selectedStatuses: statuses,
             statusMap: STATUS_MAP,
             tongGiaTriXuat: totalAgg[0] ? Number(totalAgg[0].totalValue || 0) : 0,
@@ -569,7 +593,7 @@ exports.index = async (req, res, next) => {
                 to: Math.min(skip + pageSize, total)
             },
             qs: function(overrides) {
-                return buildListQueryString(req.query || {}, overrides || {});
+                return buildListQueryString(filters || {}, overrides || {});
             }
         });
     } catch (error) {

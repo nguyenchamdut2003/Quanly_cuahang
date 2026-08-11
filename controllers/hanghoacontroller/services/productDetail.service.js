@@ -325,6 +325,21 @@ function paginateStockCardRowsByDocument(rows, paging) {
     };
 }
 
+function filterAggregateStockRowsWhenDetailed(rows) {
+    var hasDetailedRowsByDocument = {};
+    (rows || []).forEach(function(row) {
+        var key = stockCardGroupKey(row);
+        if (key && row.loai_phieu === 'xuat_huy' && row.cap_ton && row.cap_ton !== 'tong') {
+            hasDetailedRowsByDocument[key] = true;
+        }
+    });
+
+    return (rows || []).filter(function(row) {
+        var key = stockCardGroupKey(row);
+        return !(key && row.loai_phieu === 'xuat_huy' && row.cap_ton === 'tong' && hasDetailedRowsByDocument[key]);
+    });
+}
+
 async function resolveProductForTab(productId, req) {
     productId = normalizeIdParam(productId);
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) return null;
@@ -356,9 +371,10 @@ async function loadProductCardTab(productId, req) {
     if (tab.hasStoreScope) historyQuery.cua_hang_id = tab.storeId;
 
     var rows = await LichSuKho.find(historyQuery)
-        .select('lo_hang_id loai_phieu ma_phieu ngay created_at ten_quy_cach gia_tri_thay_doi so_luong_thay_doi ton_kho_sau kho_id')
+        .select('lo_hang_id loai_phieu ma_phieu ngay created_at ten_quy_cach cap_ton gia_tri_thay_doi so_luong_thay_doi ton_kho_sau kho_id')
         .sort({ ngay: -1, created_at: -1 })
         .lean();
+    rows = filterAggregateStockRowsWhenDetailed(rows);
     rows = await enrichStockCardRows(rows, tab.item._id);
     rows = await filterTrashedKiemKhoStockRows(rows);
     var paged = paginateStockCardRowsByDocument(rows, paging);

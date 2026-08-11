@@ -914,7 +914,7 @@ async function enrichStockCardRows(rows, productId) {
             detail = doc ? disposalDetailMap[String(doc._id)] : null;
             card.doi_tac = doc && doc.ly_do_huy ? doc.ly_do_huy : '';
             card.gia_giao_dich = 0;
-            card.gia_von_the_kho = Number(detail && detail.gia_von || card.gia_von_the_kho || 0);
+            card.gia_von_the_kho = Number(card.gia_von_the_kho || (detail && detail.gia_von) || 0);
             card.chung_tu_type = 'stock_disposal';
             card.chung_tu_doc = doc;
         } else if (row.loai_phieu === 'xuat_noi_bo') {
