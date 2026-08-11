@@ -43,6 +43,14 @@ function normalizeSpecLabel(value) {
   return text || '---';
 }
 
+function activeDataFilter(extra) {
+  return Object.assign({ trang_thai_du_lieu: { $ne: 'inactive' } }, extra || {});
+}
+
+function isActivePurchaseRef(purchase) {
+  return !purchase || purchase.trang_thai_du_lieu !== 'inactive';
+}
+
 function specFromImportRow(row) {
   let tenQuyCach = '';
   const lotInfo = row.lot_info;
@@ -102,12 +110,17 @@ async function loadProductLotOptions(hangHoaId, options = {}) {
   const stockFilter = { hang_hoa_id: hangHoaId };
   if (storeId) stockFilter.cua_hang_id = storeId;
   const stockLots = await TonKhoLo.find(stockFilter)
-    .populate({ path: 'lo_hang_id', select: 'ten_lo ma_lo han_su_dung ngay_nhap' })
+    .populate({
+      path: 'lo_hang_id',
+      select: 'ten_lo ma_lo han_su_dung ngay_nhap trang_thai_du_lieu phieu_nhap_id',
+      populate: { path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' }
+    })
     .sort({ updated_at: -1, created_at: -1 })
     .lean();
 
   stockLots.forEach((row) => {
     const lot = row.lo_hang_id || {};
+    if (lot.trang_thai_du_lieu === 'inactive' || !isActivePurchaseRef(lot.phieu_nhap_id)) return;
     const id = String(lot._id || row.lo_hang_id || '');
     if (!id || map.has(id)) return;
     map.set(id, {
@@ -121,13 +134,15 @@ async function loadProductLotOptions(hangHoaId, options = {}) {
     });
   });
 
-  const lotFilter = { hang_hoa_id: hangHoaId };
+  const lotFilter = activeDataFilter({ hang_hoa_id: hangHoaId });
   if (storeId) lotFilter.cua_hang_id = storeId;
   const directLots = await LoHang.find(lotFilter)
-    .select('ten_lo ma_lo han_su_dung kho_id ngay_nhap')
+    .select('ten_lo ma_lo han_su_dung kho_id ngay_nhap phieu_nhap_id')
+    .populate({ path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' })
     .sort({ ngay_nhap: -1 })
     .lean();
   directLots.forEach((lot) => {
+    if (!isActivePurchaseRef(lot.phieu_nhap_id)) return;
     const id = String(lot._id || '');
     if (!id || map.has(id)) return;
     map.set(id, {
@@ -186,12 +201,25 @@ async function loadLotImportStatsBySpec(hangHoaId, options = {}) {
   let details = await CTPhieuNhap.find(detailFilter)
     .select('phieu_nhap_id lo_hang_id so_luong don_gia_nhap gia_tri_thuoc_tinh_id lot_info')
     .lean();
+  const lotIds = [...new Set(details.map((row) => String(row.lo_hang_id || '')).filter(Boolean))];
+  const activeLots = lotIds.length
+    ? await LoHang.find(activeDataFilter({ _id: { $in: lotIds } }))
+      .select('_id phieu_nhap_id')
+      .populate({ path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' })
+      .lean()
+    : [];
+  const activeLotMap = new Set(activeLots
+    .filter((lot) => isActivePurchaseRef(lot.phieu_nhap_id))
+    .map((lot) => String(lot._id)));
+  details = details.filter((row) => activeLotMap.has(String(row.lo_hang_id || '')));
+
   const purchaseIds = [...new Set(details.map((row) => String(row.phieu_nhap_id || '')).filter(Boolean))];
   if (!purchaseIds.length) return map;
 
   const completedPurchases = await PhieuNhap.find({
     _id: { $in: purchaseIds },
     trang_thai: 'completed',
+    trang_thai_du_lieu: { $ne: 'inactive' },
     $or: [
       { deleted_at: null },
       { deleted_at: { $exists: false } }
@@ -288,6 +316,16 @@ async function buildLotProfitReport(options = {}) {
   }
 
   const filterLoId = toObjectId(options.lo_hang_id);
+  if (!product.quan_ly_theo_lo) {
+    return {
+      rows: [],
+      product,
+      filters: { applied: options },
+      filterOptions: { lots: [] },
+      meta: { message: 'Hang hoa khong quan ly theo lo', tong_dong: 0 }
+    };
+  }
+
   const ngayNhapFrom = parseDateStart(options.ngay_nhap_from);
   const ngayNhapTo = parseDateEnd(options.ngay_nhap_to);
   const storeId = toObjectId(options.cua_hang_id) || toObjectId(product.cua_hang_id);
@@ -351,11 +389,16 @@ async function buildLotProfitReport(options = {}) {
 
   const lotIds = [...new Set([...allKeys].map((key) => key.split('::')[0]))];
   const lotDocs = lotIds.length
-    ? await LoHang.find({ _id: { $in: lotIds } }).select('ten_lo ma_lo ngay_nhap don_gia_nhap gia_von').lean()
+    ? await LoHang.find(activeDataFilter({ _id: { $in: lotIds } }))
+      .select('ten_lo ma_lo ngay_nhap don_gia_nhap gia_von phieu_nhap_id')
+      .populate({ path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' })
+      .lean()
     : [];
-  const lotDocMap = new Map(lotDocs.map((row) => [String(row._id), row]));
+  const lotDocMap = new Map(lotDocs
+    .filter((row) => isActivePurchaseRef(row.phieu_nhap_id))
+    .map((row) => [String(row._id), row]));
 
-  const rows = [...allKeys].map((key) => {
+  const rows = [...allKeys].filter((key) => lotDocMap.has(key.split('::')[0])).map((key) => {
     const lotId = key.split('::')[0];
     const lotDoc = lotDocMap.get(lotId) || { _id: lotId };
     return buildAggregatedRow(
