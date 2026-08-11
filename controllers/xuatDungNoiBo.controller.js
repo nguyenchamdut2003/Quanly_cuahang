@@ -14,8 +14,8 @@ const {
     TonKhoLoQuyCach,
     VatChua
 } = require('../models/kiot.model');
-const { truTonKho } = require('../services/kho.service');
-const { createXuatVatChuaAndDecreaseStock } = require('../services/vatChuaExport.service');
+const { congTonKho, truTonKho } = require('../services/kho.service');
+const { cancelXuatVatChuaBySource, createXuatVatChuaAndDecreaseStock } = require('../services/vatChuaExport.service');
 const { loadAverageCostByVatChuaIds } = require('../services/vatChuaImport.service');
 const { resolveStoreId } = require('../utils/storeScope');
 
@@ -41,10 +41,10 @@ async function loadProductsForXnbKho(khoId, keyword) {
             .lean(),
         TonKho.find({ kho_id: khoId }).lean(),
         TonKhoLo.find({ kho_id: khoId, so_luong: { $gt: 0 } })
-            .populate('lo_hang_id', 'ma_lo ten_lo trang_thai han_su_dung')
+            .populate('lo_hang_id', 'ma_lo ten_lo trang_thai ngay_nhap han_su_dung')
             .lean(),
         TonKhoLoQuyCach.find({ kho_id: khoId, so_luong: { $gt: 0 } })
-            .populate('lo_hang_id', 'ma_lo ten_lo trang_thai han_su_dung')
+            .populate('lo_hang_id', 'ma_lo ten_lo trang_thai ngay_nhap han_su_dung')
             .lean()
     ]);
 
@@ -65,13 +65,16 @@ async function loadProductsForXnbKho(khoId, keyword) {
         const lot = row.lo_hang_id;
         if (lot && lot.trang_thai === 'huy') return map;
         const key = String(row.hang_hoa_id);
-        const lotName = lot ? ([lot.ten_lo, lot.ma_lo ? `Ma: ${lot.ma_lo}` : ''].filter(Boolean).join(' - ') || '') : '';
+        const lotName = lot ? (String(lot.ten_lo || '').trim() || String(lot.ma_lo || '').trim()) : '';
         if (!map[key]) map[key] = [];
         map[key].push({
             lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
             ten_quy_cach: String(row.ten_quy_cach || row.ten_thuoc_tinh || '').trim(),
             ten_thuoc_tinh: String(row.ten_thuoc_tinh || row.ten_quy_cach || '').trim(),
             lot_label: lotName,
+            lot_name: lotName,
+            lot_ngay_nhap: lot ? lot.ngay_nhap : null,
+            lot_han_su_dung: lot ? lot.han_su_dung : null,
             ton_hien_tai: Number(row.so_luong || 0),
             gia_von: Number(row.gia_von || row.don_gia_nhap || 0)
         });
@@ -118,6 +121,27 @@ const STATUS_MAP = {
     cancelled: 'Đã hủy'
 };
 const XNB_PAGE_SIZE = 10;
+
+function missingDataStatusFilter() {
+    return {
+        $or: [
+            { trang_thai_du_lieu: { $exists: false } },
+            { trang_thai_du_lieu: null },
+            { trang_thai_du_lieu: '' }
+        ]
+    };
+}
+
+async function ensureXnbDataStatusDefault() {
+    await PhieuXuatNoiBo.updateMany(
+        Object.assign({ trang_thai: 'cancelled' }, missingDataStatusFilter()),
+        { $set: { trang_thai_du_lieu: 'inactive' } }
+    );
+    await PhieuXuatNoiBo.updateMany(
+        Object.assign({ trang_thai: { $ne: 'cancelled' } }, missingDataStatusFilter()),
+        { $set: { trang_thai_du_lieu: 'active' } }
+    );
+}
 
 const EXPORT_STATUS_MAP = {
     draft: 'Phiếu tạm',
@@ -258,7 +282,7 @@ async function normalizeVatChuaXnbItems(rawItems, storeId) {
 }
 
 function buildFilter(query) {
-    const filter = {};
+    const filter = { trang_thai_du_lieu: 'active' };
     const statuses = Array.isArray(query.trang_thai)
         ? query.trang_thai
         : (query.trang_thai ? [query.trang_thai] : ['draft', 'completed']);
@@ -504,6 +528,7 @@ async function sendXuatNoiBoWorkbook(res, filename, tickets, detailMap) {
 
 exports.index = async (req, res, next) => {
     try {
+        await ensureXnbDataStatusDefault();
         const { filter, statuses } = buildFilter(req.query);
         let page = parsePage(req.query);
         const pageSize = XNB_PAGE_SIZE;
@@ -679,10 +704,11 @@ exports.postLoaiXuatIdUpdate = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy loại xuất.' });
         }
 
+        await ensureXnbDataStatusDefault();
         await LoaiXuatNoiBo.findByIdAndUpdate(id, { ten_loai: tenLoai }, { runValidators: true });
         if (existing.ten_loai && existing.ten_loai !== tenLoai) {
             await PhieuXuatNoiBo.updateMany(
-                { loai_xuat: existing.ten_loai },
+                { loai_xuat: existing.ten_loai, trang_thai_du_lieu: 'active' },
                 { $set: { loai_xuat: tenLoai } }
             );
         }
@@ -709,7 +735,8 @@ exports.postLoaiXuatIdDelete = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Không tìm thấy loại xuất.' });
         }
 
-        const inUse = await PhieuXuatNoiBo.countDocuments({ loai_xuat: existing.ten_loai });
+        await ensureXnbDataStatusDefault();
+        const inUse = await PhieuXuatNoiBo.countDocuments({ loai_xuat: existing.ten_loai, trang_thai_du_lieu: 'active' });
         if (inUse > 0) {
             await LoaiXuatNoiBo.findByIdAndUpdate(id, { trang_thai: 'inactive' });
             return res.json({
@@ -836,6 +863,7 @@ exports.postAdd = async (req, res, next) => {
             vat_chua_items: normalizedVatChuaItems,
             cong_don_vao_the: false,
             trang_thai: finalStatus,
+            trang_thai_du_lieu: 'active',
             ghi_chu: ghi_chu || ''
         });
 
@@ -906,8 +934,73 @@ exports.postAdd = async (req, res, next) => {
     }
 };
 
+async function cancelXnbTicket(ticketId, userId) {
+    if (!mongoose.Types.ObjectId.isValid(String(ticketId || ''))) {
+        return { skipped: true };
+    }
+    const ticket = await PhieuXuatNoiBo.findOne({ _id: ticketId, trang_thai_du_lieu: 'active' });
+    if (!ticket) {
+        return { skipped: true };
+    }
+
+    if (ticket.trang_thai === 'completed') {
+        const details = await CTXuatNoiBo.find({ phieu_xuat_id: ticket._id }).lean();
+        for (const item of details) {
+            const qty = Number(item.so_luong || 0);
+            if (qty <= 0 || !item.hang_hoa_id) continue;
+            await congTonKho({
+                kho_id: ticket.kho_id,
+                hang_hoa_id: item.hang_hoa_id,
+                lo_hang_id: item.lo_hang_id || null,
+                ten_quy_cach: item.ten_quy_cach || '',
+                sync_quy_cach: Boolean(item.ten_quy_cach),
+                so_luong: qty,
+                gia_von: Number(item.gia_von || 0),
+                nguoi_tao_id: userId,
+                loai_phieu: 'xuat_noi_bo',
+                ma_phieu: ticket.ma_xuat_noi_bo,
+                ghi_chu: 'Huy xuat dung noi bo ' + (ticket.ma_xuat_noi_bo || '')
+            });
+            await HangHoa.findByIdAndUpdate(item.hang_hoa_id, { $inc: { ton_kho: qty } });
+        }
+
+        await cancelXuatVatChuaBySource(ticket.cua_hang_id, 'xuat_noi_bo', ticket._id);
+    }
+
+    ticket.trang_thai_du_lieu = 'inactive';
+    await ticket.save();
+    return { skipped: false };
+}
+
+exports.deleteSelected = async (req, res, next) => {
+    try {
+        await ensureXnbDataStatusDefault();
+        const rawIds = Array.isArray(req.body && req.body.ids) ? req.body.ids : [];
+        const ids = Array.from(new Set(rawIds.map(function(id) { return String(id || '').trim(); })))
+            .filter(function(id) { return mongoose.Types.ObjectId.isValid(id); });
+        if (!ids.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn phiếu cần xóa.' });
+        }
+
+        let modifiedCount = 0;
+        for (const id of ids) {
+            const result = await cancelXnbTicket(id, req.user && req.user._id);
+            if (!result.skipped) modifiedCount += 1;
+        }
+
+        return res.json({
+            success: true,
+            modified_count: modifiedCount,
+            message: modifiedCount ? 'Đã xóa phiếu xuất dùng nội bộ.' : 'Không có phiếu nào cần xóa.'
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 exports.getExportCsv = async (req, res, next) => {
     try {
+        await ensureXnbDataStatusDefault();
         const { filter } = buildFilter(req.query);
         const tickets = await PhieuXuatNoiBo.find(filter)
             .populate('cua_hang_id')
@@ -937,6 +1030,7 @@ exports.getExportCsv = async (req, res, next) => {
 
 exports.getExportXlsx = async (req, res, next) => {
     try {
+        await ensureXnbDataStatusDefault();
         const { filter } = buildFilter(req.query);
         const { tickets, detailMap } = await loadExportTickets(filter);
         await sendXuatNoiBoWorkbook(res, 'xuat-noi-bo.xlsx', tickets, detailMap);
@@ -947,6 +1041,7 @@ exports.getExportXlsx = async (req, res, next) => {
 
 exports.getDetails = async (req, res, next) => {
     try {
+        await ensureXnbDataStatusDefault();
         const { filter } = buildFilter(req.query);
         const tickets = await PhieuXuatNoiBo.find(filter).select('_id').lean();
         const ticketIds = tickets.map(ticket => ticket._id);
@@ -985,7 +1080,8 @@ exports.getIdDetails = async (req, res, next) => {
             return res.status(404).json({ success: false, message: 'Khong tim thay phieu xuat noi bo' });
         }
 
-        const ticket = await PhieuXuatNoiBo.findById(req.params.id)
+        await ensureXnbDataStatusDefault();
+        const ticket = await PhieuXuatNoiBo.findOne({ _id: req.params.id, trang_thai_du_lieu: 'active' })
             .populate('cua_hang_id')
             .populate('kho_id')
             .lean();

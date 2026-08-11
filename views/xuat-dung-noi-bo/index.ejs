@@ -8,39 +8,49 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
   <style>
-    .xnb-page{height:calc(100vh - 98px);background:#f3f6f9;display:grid;grid-template-columns:245px minmax(0,1fr);gap:14px;padding:14px 18px}
-    .xnb-sidebar{background:#fff;border-radius:4px;padding:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:auto}
-    .xnb-title{font-size:18px;font-weight:700;color:#111827;margin:0 0 16px}
-    .filter-block{margin-bottom:18px}.filter-title{font-size:13px;font-weight:700;color:#374151;margin-bottom:9px}
-    .check-filter{display:flex;align-items:center;gap:8px;margin:10px 0;color:#4b5563;font-size:13px;font-weight:600}
-    .check-filter input,.radio-filter input{width:15px;height:15px;accent-color:#1684f8}
-    .radio-filter{display:flex;align-items:center;gap:8px;margin:8px 0}
-    .radio-filter span{flex:1;height:32px;display:flex;align-items:center;justify-content:space-between;border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:0 10px;color:#374151;font-size:13px}
-    .filter-control{width:100%;height:34px;border:1px solid #dde3ea;border-radius:6px;background:#fff;color:#374151;padding:0 10px;font-size:13px;outline:none}
-    .xnb-main{min-width:0;display:flex;flex-direction:column;gap:10px}
-    .xnb-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .xnb-search{position:relative;max-width:520px;flex:1}
-    .xnb-search i{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af}
-    .xnb-search input{width:100%;height:36px;border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:0 40px 0 36px;font-size:14px;outline:none}
-    .xnb-search button{position:absolute;right:5px;top:5px;width:26px;height:26px;border:none;background:#fff;color:#6b7280;border-radius:4px;cursor:pointer}
-    .toolbar-actions{display:flex;align-items:center;gap:8px}
-    .kv-btn{height:36px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#374151;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
+    .xnb-page{min-height:calc(100vh - 58px);box-sizing:border-box;background:#f8fafc;display:grid;grid-template-columns:300px minmax(0,1fr);gap:0;padding:0}
+    .xnb-sidebar{background:#f8fafc;border-right:1px solid #e2e8f0;padding:16px 14px;overflow:auto}
+    .xnb-title{font-size:20px;font-weight:800;color:#1e293b;margin:0 0 16px}
+    .filter-block{display:grid;gap:8px;margin:0 0 16px;padding-bottom:16px;border-bottom:1px solid #f1f5f9}
+    .filter-block:last-child{border-bottom:0}
+    .filter-title{font-size:13px;font-weight:700;color:#475569;margin:0}
+    .check-filter{display:flex;align-items:center;gap:8px;margin:2px 0;color:#334155;font-size:13px;font-weight:500}
+    .check-filter input,.radio-filter input{width:15px;height:15px;accent-color:#3b82f6}
+    .radio-filter{display:flex;align-items:center;gap:8px;margin:2px 0;color:#334155;font-size:13px;font-weight:500}
+    .radio-filter span{flex:1;height:36px;display:flex;align-items:center;justify-content:space-between;border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:0 12px;color:#1e293b;font-size:13px}
+    .filter-control{width:100%;height:36px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#1e293b;padding:0 12px;font-size:13px;outline:none}
+    .filter-control:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+    .xnb-filter-actions{display:grid;gap:8px;margin-top:2px}
+    .xnb-filter-actions .btn{width:100%;height:46px;font-size:14px;font-weight:800}
+    .xnb-main{min-width:0;min-height:0;display:flex;flex-direction:column;padding:14px 16px 0;background:#f8fafc}
+    .xnb-toolbar{display:flex;align-items:center;gap:10px;min-width:0;margin-bottom:8px}
+    .xnb-search{position:relative;width:min(300px,23vw);flex:0 0 auto}
+    .xnb-search i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#64748b}
+    .xnb-search input{width:100%;height:44px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;padding:0 44px 0 42px;font-size:14px;outline:none}
+    .xnb-search input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+    .xnb-search button{position:absolute;right:8px;top:8px;width:28px;height:28px;border:none;background:#fff;color:#64748b;border-radius:4px;cursor:pointer}
+    .toolbar-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+    .kv-btn{height:40px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 14px;color:#374151;font-size:14px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
     .kv-btn.small{height:30px;padding:0 10px;font-size:12px}
     .kv-btn.primary{border-color:#86bfff;color:#0070f4}.kv-btn:hover{background:#f8fbff;border-color:#8fc2ff;color:#0070f4}
-    .xnb-table-wrap{flex:1;min-height:0;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:auto}
-    .xnb-summary{height:46px;background:#fff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:space-between;padding:0 16px;color:#374151;font-size:13px}
-    .xnb-summary strong{font-size:18px;color:#111827}
-    .xnb-table{width:100%;min-width:1050px;border-collapse:collapse}
-    .xnb-table th{position:sticky;top:0;background:#eaf3ff;color:#374151;font-size:13px;font-weight:700;text-align:left;padding:10px 12px;border-bottom:1px solid #d8e8fb}
-    .xnb-table td{height:46px;padding:0 12px;border-bottom:1px solid #edf0f3;color:#374151;font-size:13px}
+    .kv-btn.danger{border-color:#fecaca;background:#b42318;color:#fff}.kv-btn.danger:hover{background:#991b1b;border-color:#fca5a5;color:#fff}
+    .toolbar-actions .xnb-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+    .toolbar-actions .xnb-delete-btn:hover{background:#b42318!important;border-color:#b42318!important;color:#fff!important}
+    .kv-btn[hidden]{display:none}
+    .xnb-table-wrap{background:#fff;border:1px solid #e2e8f0;border-radius:4px 4px 0 0;box-shadow:0 8px 22px rgba(15,23,42,.04);overflow:auto}
+    .xnb-toolbar-summary{height:44px;min-width:360px;flex:1;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 14px;color:#374151;font-size:13px;background:#fff;border:1px solid #cbd5e1;border-radius:8px}
+    .xnb-toolbar-summary strong{font-size:18px;color:#111827;white-space:nowrap}
+    .xnb-table{width:100%;min-width:980px;border-collapse:collapse}
+    .xnb-table th{position:sticky;top:0;background:#f1f7ff;color:#1e293b;font-size:13px;font-weight:800;text-align:left;padding:12px 14px;border-bottom:1px solid #d8e8fb}
+    .xnb-table td{height:54px;padding:0 14px;border-bottom:1px solid #edf0f3;color:#1e293b;font-size:13px}
     .xnb-row{cursor:pointer}.xnb-row:hover td{background:#f8fbff}
-    .check-col,.star-col{width:36px;text-align:center}.row-check{width:16px;height:16px;accent-color:#0070f4}
+    .check-col{width:36px;text-align:center}.row-check{width:16px;height:16px;accent-color:#0070f4}
     .num{text-align:right;font-weight:600;color:#4b5563}.badge-status{display:inline-flex;align-items:center;height:24px;border-radius:5px;background:#eef2f7;color:#374151;padding:0 8px;font-size:12px;font-weight:700}
     .empty-state{height:100%;min-height:460px;display:flex;align-items:center;justify-content:center;text-align:center;color:#374151}
     .empty-box i{width:72px;height:72px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#e9f5ff;color:#4d9fe8;font-size:34px;box-shadow:0 0 0 12px rgba(233,245,255,.55);margin-bottom:22px}
     .empty-box strong{display:block;margin-bottom:8px;font-size:15px}
-    .xnb-detail-row td{height:auto;padding:0;background:#fff}
-    .xnb-detail{border-top:1px solid #dbe4ee;background:#fff;padding:12px}
+    .xnb-detail-row td{height:auto;padding:0;background:#fff;border:1px solid #1677ff;border-top:0}
+    .xnb-detail{background:#fff;padding:18px 22px 20px}
     .xnb-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
     .xnb-detail-title{font-size:15px;font-weight:800;color:#111827}
     .xnb-detail-total{display:flex;gap:18px;font-size:13px;color:#475467}.xnb-detail-total b{color:#111827;font-size:15px}
@@ -58,7 +68,18 @@
     .summary-body{padding:16px;overflow:auto}
     .summary-total{display:flex;justify-content:flex-end;gap:22px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:12px 14px;margin-bottom:12px;font-size:13px;color:#475467}
     .summary-total b{color:#111827;font-size:16px}
-    .xnb-footer{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:13px}
+    .xnb-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
+    .xnb-trash-overlay.is-open{display:flex}
+    .xnb-trash-modal{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+    .xnb-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
+    .xnb-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .xnb-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
+    .xnb-trash-body{padding:14px 22px 18px;overflow:auto}
+    .xnb-trash-desc{margin:0;font-size:13px;line-height:1.5;color:#475467}
+    .xnb-trash-foot{display:flex!important;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee;flex:0 0 auto;background:#fff}
+    .xnb-trash-foot .btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:74px;visibility:visible!important;opacity:1!important}
+    .xnb-trash-foot .btn.danger{background:#d92d20;color:#fff;border-color:#d92d20}
+    .xnb-footer{min-height:50px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;color:#475569;font-size:14px;background:#fff;border:1px solid #e2e8f0;border-top:0;border-radius:0 0 4px 4px;padding:0 12px;margin-bottom:14px}
     .xnb-page-size{font-weight:600}
     .xnb-pagination{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
     .xnb-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
@@ -108,6 +129,10 @@
       <div class="filter-block"><div class="filter-title">Người xuất dùng nội bộ</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người xuất"></div>
       <div class="filter-block"><div class="filter-title">Loại xuất</div><select class="filter-control" name="loai_xuat" onchange="submitFilters()"><option value="">Chọn loại xuất</option><% (loaiXuatList || []).forEach(function(loai) { %><option value="<%= loai.ten_loai %>" <%= filters.loai_xuat === loai.ten_loai ? 'selected' : '' %>><%= loai.ten_loai %></option><% }) %></select></div>
       <div class="filter-block"><div class="filter-title">Người nhận</div><input class="filter-control" name="nguoi_nhan" value="<%= filters.nguoi_nhan || '' %>" placeholder="Chọn người nhận"></div>
+      <div class="xnb-filter-actions">
+        <button class="btn btn-primary" type="submit">Áp dụng lọc</button>
+        <a class="btn btn-light" href="/xuat-dung-noi-bo">Xóa lọc</a>
+      </div>
     </aside>
 
     <main class="xnb-main">
@@ -117,28 +142,29 @@
           <input name="q" value="<%= filters.q || '' %>" placeholder="Theo mã xuất dùng nội bộ">
           <button type="submit"><i class="fa-solid fa-sliders"></i></button>
         </div>
-        <div class="toolbar-actions">
-          <a class="kv-btn primary" href="/xuat-dung-noi-bo/create"><i class="fa-solid fa-plus"></i> Xuất dùng nội bộ</a>
-          <a class="kv-btn" href="/xuat-dung-noi-bo/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></a>
+        <div class="xnb-toolbar-summary">
+          <span>Tổng giá trị xuất dùng nội bộ</span>
+          <span class="summary-actions">
+            <strong><%= formatVnd(tongGiaTriXuatValue) %></strong>
+            <button class="kv-btn small" type="button" id="summaryDetailBtn"><i class="fa-regular fa-eye"></i> Chi tiết</button>
+          </span>
         </div>
-      </div>
-      <div class="xnb-summary">
-        <span>Tổng giá trị xuất dùng nội bộ</span>
-        <span class="summary-actions">
-          <strong><%= formatVnd(tongGiaTriXuatValue) %></strong>
-          <button class="kv-btn small" type="button" id="summaryDetailBtn"><i class="fa-regular fa-eye"></i> Chi tiết</button>
-        </span>
+        <div class="toolbar-actions">
+          <a class="kv-btn primary" href="/xuat-dung-noi-bo/create"><i class="fa-solid fa-plus"></i> Xuất dùng</a>
+          <a class="kv-btn" href="/xuat-dung-noi-bo/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>"><i class="fa-solid fa-file-export"></i> Xuất file</a>
+          <button class="kv-btn danger xnb-delete-btn" type="button" id="deleteSelectedBtn"><i class="fa-regular fa-trash-can"></i> Xóa</button>
+        </div>
       </div>
       <div class="xnb-table-wrap">
         <table class="xnb-table">
-          <thead><tr><th class="check-col"><input class="row-check" type="checkbox"></th><th class="star-col"><i class="fa-regular fa-star"></i></th><th>Mã xuất dùng nội bộ</th><th>Loại xuất</th><th class="num">Tổng giá trị</th><th>Thời gian</th><th>Cửa hàng</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
+          <thead><tr><th class="check-col"><input class="row-check" type="checkbox" id="selectAllTickets"></th><th>Mã xuất dùng nội bộ</th><th>Loại xuất</th><th class="num">Tổng giá trị</th><th>Thời gian</th><th>Cửa hàng</th><th>Ghi chú</th><th>Trạng thái</th></tr></thead>
           <tbody>
             <% if (tickets.length) { %>
               <% tickets.forEach(t => { %>
-                <tr class="xnb-row" data-detail-id="<%= t._id %>"><td class="check-col"><input class="row-check" type="checkbox"></td><td class="star-col"><i class="fa-regular fa-star"></i></td><td><strong><%= t.ma_xuat_noi_bo %></strong></td><td><%= t.loai_xuat || '' %></td><td class="num"><%= formatVnd(t.tong_gia_tri || 0) %></td><td><%= t.ngay_xuat ? t.ngay_xuat.toLocaleString('vi-VN') : '' %></td><td><%= t.cua_hang_id ? t.cua_hang_id.ten_cua_hang : '' %></td><td><%= t.ghi_chu || '' %></td><td><span class="badge-status"><%= statusMap[t.trang_thai] || t.trang_thai %></span></td></tr>
+                <tr class="xnb-row" data-detail-id="<%= t._id %>"><td class="check-col"><input class="row-check ticket-check" type="checkbox" value="<%= t._id %>"></td><td><strong><%= t.ma_xuat_noi_bo %></strong></td><td><%= t.loai_xuat || '' %></td><td class="num"><%= formatVnd(t.tong_gia_tri || 0) %></td><td><%= t.ngay_xuat ? t.ngay_xuat.toLocaleString('vi-VN') : '' %></td><td><%= t.cua_hang_id ? t.cua_hang_id.ten_cua_hang : '' %></td><td><%= t.ghi_chu || '' %></td><td><span class="badge-status"><%= statusMap[t.trang_thai] || t.trang_thai %></span></td></tr>
               <% }) %>
             <% } else { %>
-              <tr><td colspan="9"><div class="empty-state"><div class="empty-box"><i class="fa-solid fa-inbox"></i><strong>Không tìm thấy kết quả</strong><div>Không tìm thấy giao dịch nào phù hợp trong tháng này.<br>Nhấn vào đây để tiếp tục tìm kiếm.</div></div></div></td></tr>
+              <tr><td colspan="8"><div class="empty-state"><div class="empty-box"><i class="fa-solid fa-inbox"></i><strong>Không tìm thấy kết quả</strong><div>Không tìm thấy giao dịch nào phù hợp trong tháng này.<br>Nhấn vào đây để tiếp tục tìm kiếm.</div></div></div></td></tr>
             <% } %>
           </tbody>
         </table>
@@ -166,6 +192,21 @@
       </div>
     </main>
   </form>
+  <div id="xnbTrashModalOverlay" class="xnb-trash-overlay" aria-hidden="true">
+    <div class="xnb-trash-modal" role="dialog" aria-labelledby="xnbTrashModalTitle" aria-modal="true">
+      <div class="xnb-trash-head">
+        <h3 id="xnbTrashModalTitle">Xóa phiếu xuất dùng nội bộ</h3>
+        <button type="button" class="xnb-trash-close" id="xnbTrashClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="xnb-trash-body">
+        <p class="xnb-trash-desc" id="xnbTrashModalDesc">Bạn có chắc chắn muốn xóa các phiếu xuất dùng nội bộ đã chọn không?</p>
+      </div>
+      <div class="xnb-trash-foot">
+        <button type="button" class="btn" id="xnbTrashCancel">Không</button>
+        <button type="button" class="btn danger" id="xnbTrashConfirm">Có</button>
+      </div>
+    </div>
+  </div>
   <div class="summary-modal" id="summaryModal">
     <div class="summary-card">
       <div class="summary-head">
@@ -205,6 +246,99 @@
     document.addEventListener('DOMContentLoaded', function() {
       const table = document.querySelector('.xnb-table');
       if (!table) return;
+
+      const selectAllTickets = document.getElementById('selectAllTickets');
+      const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+      const ticketChecks = Array.prototype.slice.call(table.querySelectorAll('.ticket-check'));
+      const xnbTrashModalOverlay = document.getElementById('xnbTrashModalOverlay');
+      const xnbTrashModalDesc = document.getElementById('xnbTrashModalDesc');
+      const xnbTrashClose = document.getElementById('xnbTrashClose');
+      const xnbTrashCancel = document.getElementById('xnbTrashCancel');
+      const xnbTrashConfirm = document.getElementById('xnbTrashConfirm');
+      let pendingTrashIds = [];
+
+      function selectedTicketIds() {
+        return ticketChecks.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
+      }
+
+      function syncDeleteButton() {
+        const selectedCount = selectedTicketIds().length;
+        if (selectAllTickets) {
+          selectAllTickets.checked = ticketChecks.length > 0 && selectedCount === ticketChecks.length;
+          selectAllTickets.indeterminate = selectedCount > 0 && selectedCount < ticketChecks.length;
+        }
+      }
+
+      if (selectAllTickets) {
+        selectAllTickets.addEventListener('change', function() {
+          ticketChecks.forEach(function(input) { input.checked = selectAllTickets.checked; });
+          syncDeleteButton();
+        });
+      }
+      ticketChecks.forEach(function(input) {
+        input.addEventListener('change', syncDeleteButton);
+      });
+      function openXnbTrashModal(ids, message) {
+        pendingTrashIds = (ids || []).filter(Boolean);
+        if (!pendingTrashIds.length || !xnbTrashModalOverlay) return;
+        if (xnbTrashModalDesc) {
+          xnbTrashModalDesc.textContent = message || 'Bạn có chắc chắn muốn xóa các phiếu xuất dùng nội bộ đã chọn không?';
+        }
+        xnbTrashModalOverlay.classList.add('is-open');
+        xnbTrashModalOverlay.setAttribute('aria-hidden', 'false');
+      }
+
+      function closeXnbTrashModal() {
+        pendingTrashIds = [];
+        if (xnbTrashModalOverlay) {
+          xnbTrashModalOverlay.classList.remove('is-open');
+          xnbTrashModalOverlay.setAttribute('aria-hidden', 'true');
+        }
+        if (xnbTrashConfirm) {
+          xnbTrashConfirm.disabled = false;
+          xnbTrashConfirm.textContent = 'Có';
+        }
+      }
+
+      async function submitXnbTrash() {
+        if (!pendingTrashIds.length || !xnbTrashConfirm) return;
+        xnbTrashConfirm.disabled = true;
+        xnbTrashConfirm.textContent = 'Đang xóa...';
+        try {
+          const res = await fetch('/xuat-dung-noi-bo/deactivate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ ids: pendingTrashIds })
+          });
+          const result = await res.json();
+          if (!res.ok || !result.success) throw new Error(result.message || 'Không xóa được phiếu.');
+          window.location.reload();
+        } catch (error) {
+          alert(error.message || 'Không xóa được phiếu.');
+          xnbTrashConfirm.disabled = false;
+          xnbTrashConfirm.textContent = 'Có';
+        }
+      }
+
+      if (deleteSelectedBtn) {
+        deleteSelectedBtn.addEventListener('click', function() {
+          const ids = selectedTicketIds();
+          if (!ids.length) {
+            alert('Vui lòng chọn ít nhất một phiếu xuất dùng nội bộ.');
+            return;
+          }
+          openXnbTrashModal(ids, 'Bạn có chắc chắn muốn xóa các phiếu xuất dùng nội bộ đã chọn không?');
+        });
+      }
+      if (xnbTrashClose) xnbTrashClose.addEventListener('click', closeXnbTrashModal);
+      if (xnbTrashCancel) xnbTrashCancel.addEventListener('click', closeXnbTrashModal);
+      if (xnbTrashConfirm) xnbTrashConfirm.addEventListener('click', submitXnbTrash);
+      if (xnbTrashModalOverlay) {
+        xnbTrashModalOverlay.addEventListener('click', function(event) {
+          if (event.target === xnbTrashModalOverlay) closeXnbTrashModal();
+        });
+      }
+      syncDeleteButton();
 
       const formatNumber = value => Number(value || 0).toLocaleString('vi-VN');
       const formatMoney = value => formatNumber(value) + ' VNĐ';
@@ -249,6 +383,7 @@
         const ticketId = encodeURIComponent(ticket.id || '');
         const detailActions = ticketId
           ? '<div class="xnb-detail-actions">' +
+              '<button class="kv-btn xnb-detail-cancel-btn" type="button" data-ticket-id="' + escapeHtml(ticket.id || '') + '" data-ticket-code="' + escapeHtml(ticket.ma_xuat_noi_bo || '') + '"><i class="fa-regular fa-trash-can"></i> Hủy</button>' +
               '<a class="kv-btn" href="/xuat-dung-noi-bo/' + ticketId + '/export.xlsx"><i class="fa-solid fa-file-excel"></i> Xuất Excel</a>' +
               '<a class="kv-btn" target="_blank" href="/chung-tu-kho/xuat-noi-bo/' + ticketId + '">Chứng từ</a>' +
             '</div>'
@@ -286,7 +421,7 @@
           detailRow.className = 'xnb-detail-row';
           detailRow.id = 'detail-' + id;
           detailRow.style.display = 'none';
-          detailRow.innerHTML = '<td colspan="9"></td>';
+          detailRow.innerHTML = '<td colspan="8"></td>';
           row.parentNode.insertBefore(detailRow, row.nextSibling);
         }
         return detailRow;
@@ -318,6 +453,14 @@
           if (event.target.closest('a,button,input,label')) return;
           toggleDetail(row);
         });
+      });
+
+      document.addEventListener('click', function(event) {
+        const cancelBtn = event.target.closest('.xnb-detail-cancel-btn');
+        if (!cancelBtn) return;
+        const ticketId = cancelBtn.getAttribute('data-ticket-id');
+        const ticketCode = cancelBtn.getAttribute('data-ticket-code') || '';
+        openXnbTrashModal([ticketId], 'Bạn có chắc chắn muốn hủy phiếu ' + ticketCode + ' không?');
       });
 
       const summaryModal = document.getElementById('summaryModal');

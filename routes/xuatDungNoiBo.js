@@ -12,6 +12,8 @@ router.post('/loai-xuat/add', xuatDungNoiBoController.postLoaiXuatAdd);
 router.post('/loai-xuat/:id/update', xuatDungNoiBoController.postLoaiXuatIdUpdate);
 router.post('/loai-xuat/:id/delete', xuatDungNoiBoController.postLoaiXuatIdDelete);
 router.post('/add', xuatDungNoiBoController.postAdd);
+router.post('/deactivate', xuatDungNoiBoController.deleteSelected);
+router.post('/delete-selected', xuatDungNoiBoController.deleteSelected);
 router.get('/export.csv', xuatDungNoiBoController.getExportCsv);
 router.get('/export.xlsx', xuatDungNoiBoController.getExportXlsx);
 router.get('/details', xuatDungNoiBoController.getDetails);

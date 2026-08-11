@@ -762,7 +762,7 @@ async function enrichStockCardRows(rows, productId) {
         needsReturn ? PhieuTraHang.find(Object.assign({ ma_phieu_tra: { $in: codes } }, activeDataFilter)).populate({ path: 'khach_hang_id', select: 'ten_khach_hang ten_cong_ty ma_khach_hang' }).lean() : Promise.resolve([]),
         needsCheck ? PhieuKiemKho.find(Object.assign({ ma_kiem_kho: { $in: codes } }, activeDataFilter)).lean() : Promise.resolve([]),
         needsDisposal ? PhieuXuatHuy.find({ ma_xuat_huy: { $in: codes } }).lean() : Promise.resolve([]),
-        needsInternalIssue ? PhieuXuatNoiBo.find({ ma_xuat_noi_bo: { $in: codes } }).lean() : Promise.resolve([])
+        needsInternalIssue ? PhieuXuatNoiBo.find({ ma_xuat_noi_bo: { $in: codes }, trang_thai_du_lieu: 'active' }).lean() : Promise.resolve([])
     ]);
 
     var purchases = docResults[0];
@@ -944,6 +944,7 @@ async function enrichStockCardRows(rows, productId) {
         if (card.loai_phieu === 'tra_hang_nhap') return Boolean(supplierReturnMap[code]);
         if (card.loai_phieu === 'tra_hang') return Boolean(returnMap[code]);
         if (card.loai_phieu === 'kiem_kho') return Boolean(checkMap[code]);
+        if (card.loai_phieu === 'xuat_noi_bo') return Boolean(internalIssueMap[code]);
         if (card.loai_phieu === 'ban_hang' || card.loai_phieu === 'rollback_ban_hang' || card.loai_phieu === 'huy_hoa_don') {
             return Boolean(orderMap[code] || invoiceMap[code]);
         }

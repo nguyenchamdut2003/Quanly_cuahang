@@ -2029,6 +2029,7 @@ const PhieuXuatNoiBoSchema = new Schema({
   vat_chua_items: { type: [VatChuaNhapXuatItemSchema], default: [] },
   cong_don_vao_the: { type: Boolean, default: false },
   trang_thai: { type: String, enum: ['draft', 'completed', 'cancelled'], default: 'draft' },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
   ghi_chu: { type: String },
 }, { collection: "phieu_xuat_noi_bo", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 

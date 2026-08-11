@@ -325,7 +325,7 @@ async function loadDestroy(id) {
 }
 
 async function loadInternalIssue(id) {
-  var ticket = await PhieuXuatNoiBo.findById(id)
+  var ticket = await PhieuXuatNoiBo.findOne({ _id: id, trang_thai_du_lieu: 'active' })
     .populate('cua_hang_id')
     .populate('kho_id')
     .populate('nguoi_tao_id')

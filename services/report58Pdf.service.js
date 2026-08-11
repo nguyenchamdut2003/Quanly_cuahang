@@ -681,7 +681,7 @@ async function loadExportFromDestroy(id, store) {
 }
 
 async function loadExportFromInternal(id, store) {
-    const ticket = await PhieuXuatNoiBo.findOne({ _id: id, ...storeFilter(store) })
+    const ticket = await PhieuXuatNoiBo.findOne({ _id: id, ...storeFilter(store), trang_thai_du_lieu: 'active' })
         .populate('kho_id', 'ten_kho')
         .populate('nguoi_tao_id', 'ho_ten email')
         .lean();
@@ -2212,7 +2212,7 @@ async function loadExportVoucherOptions(store = null) {
         PhieuXuatHuy.find({ ...sf, trang_thai: { $nin: ['cancelled', 'draft'] } })
             .select('ma_xuat_huy ngay_xuat tong_gia_tri')
             .sort({ ngay_xuat: -1 }).limit(50).lean(),
-        PhieuXuatNoiBo.find({ ...sf, trang_thai: { $nin: ['cancelled', 'draft'] } })
+        PhieuXuatNoiBo.find({ ...sf, trang_thai: { $nin: ['cancelled', 'draft'] }, trang_thai_du_lieu: 'active' })
             .select('ma_xuat_noi_bo ngay_xuat tong_gia_tri')
             .sort({ ngay_xuat: -1 }).limit(50).lean(),
         PhieuKiemKho.find({

@@ -55,6 +55,10 @@
     .input{width:100%;height:34px;border:1px solid #dfe5ed;border-radius:6px;padding:0 10px;font-size:13px;outline:none;background:#fff}.textarea{height:38px;padding:9px 10px;resize:vertical}
     .readonly{height:34px;display:flex;align-items:center;color:#4b5563;font-size:13px}.total{display:flex;align-items:center;justify-content:space-between;margin:20px 0;font-weight:700;color:#374151}.total strong{font-size:18px}
     .side-footer{padding:18px;border-top:1px solid #e8edf3}.btn{height:42px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer}.btn.secondary{background:#fff;border:1px solid #aeb9c7;color:#426080}.btn.primary{background:#0070f4;border:1px solid #0070f4;color:#fff}
+    .btn[disabled]{opacity:.65;cursor:not-allowed}
+    .btn .btn-spinner{display:none;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:xnbSpin .7s linear infinite;margin-right:7px;vertical-align:-2px}
+    .btn.is-loading .btn-spinner{display:inline-block}
+    @keyframes xnbSpin{to{transform:rotate(360deg)}}
     .xnb-create .address-type-wrapper{position:relative}
     .xnb-create .address-type-header{display:flex;gap:8px;align-items:center}
     .xnb-create .address-type-trigger{flex:1;height:34px;border:1px solid #dfe5ed;border-radius:6px;background:#fff;padding:0 10px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#374151;cursor:pointer}
@@ -166,7 +170,7 @@
         <div class="field"><label><input type="checkbox" id="congDonVaoThe" disabled> Cộng dồn vào thẻ từng thành viên (chưa hỗ trợ dữ liệu nhận)</label></div>
         <div class="field"><textarea class="input textarea" id="ghiChu" placeholder="Ghi chú"></textarea></div>
       </div>
-      <div class="page-actions page-actions--grid2 side-footer"><button class="btn secondary" type="button" onclick="saveXnb('draft')">Lưu tạm</button><button class="btn primary" type="button" onclick="saveXnb('completed')">Hoàn thành</button></div>
+      <div class="page-actions page-actions--grid2 side-footer"><button class="btn secondary" type="button" id="saveDraftBtn" onclick="saveXnb('draft')"><span class="btn-spinner"></span><span class="btn-text">Lưu tạm</span></button><button class="btn primary" type="button" id="completeBtn" onclick="saveXnb('completed')"><span class="btn-spinner"></span><span class="btn-text">Hoàn thành</span></button></div>
     </aside>
   </div>
 
@@ -220,6 +224,13 @@
       return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
     }
 
+    function formatDateOnly(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleDateString('vi-VN');
+    }
+
     function itemHasLotGrid(item) {
       if (!item || !item.has_quy_cach) return false;
       const rows = item.quy_cach_items || [];
@@ -235,6 +246,9 @@
           map.set(lotKey, {
             lotKey: lotKey,
             lot_label: row.lot_label || '',
+            lot_name: row.lot_name || row.lot_label || '',
+            lot_ngay_nhap: row.lot_ngay_nhap || '',
+            lot_han_su_dung: row.lot_han_su_dung || '',
             items: []
           });
         }
@@ -253,10 +267,11 @@
       const xuat = lot.items.reduce(function(sum, entry) {
         return sum + Number(entry.row.so_luong_xuat || 0);
       }, 0);
-      const datePart = lot.lot_label || '—';
-      return { ton: ton, xuat: xuat, datePart: datePart };
+      const importDate = formatDateOnly(lot.lot_ngay_nhap);
+      const expiryDate = formatDateOnly(lot.lot_han_su_dung);
+      const datePart = [importDate, expiryDate ? ('HSD: ' + expiryDate) : ''].filter(Boolean).join(' - ');
+      return { ton: ton, xuat: xuat, lotName: lot.lot_name || lot.lot_label || 'Lô không tên', datePart: datePart };
     }
-
     function maxLotColumnsInItems() {
       return items.reduce(function(max, item) {
         if (!itemHasLotGrid(item)) return max;
@@ -482,6 +497,9 @@
                 ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
                 ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
                 lot_label: qc.lot_label || '',
+                lot_name: qc.lot_name || qc.lot_label || '',
+                lot_ngay_nhap: qc.lot_ngay_nhap || '',
+                lot_han_su_dung: qc.lot_han_su_dung || '',
                 ton_hien_tai: Number(qc.ton_hien_tai || 0),
                 gia_von: Number(qc.gia_von || p.gia_von || 0),
                 so_luong_xuat: ''
@@ -792,9 +810,8 @@
         if (!lot) return '<td class="num lot-cell lot-cell-empty"></td>';
         const summary = lotGroupSummary(lot);
         const active = expandedLotKey === lot.lotKey;
-        const mainText = summary.xuat > 0 ? ('Xuất: ' + summary.xuat.toLocaleString('vi-VN')) : ('Tồn: ' + summary.ton.toLocaleString('vi-VN'));
         return '<td class="num lot-cell' + (active ? ' is-active' : '') + '" data-hang-hoa-id="' + escapeHtml(item.hang_hoa_id) + '" data-lot-key="' + escapeHtml(lot.lotKey) + '" onclick="handleLotCellClick(this)">' +
-          '<div class="lot-cell-main">' + mainText + '</div>' +
+          '<div class="lot-cell-main">' + escapeHtml(summary.lotName) + '</div>' +
           '<div class="lot-cell-sub">' + escapeHtml(summary.datePart) + '</div>' +
         '</td>';
       }).join('');
@@ -926,7 +943,23 @@
       });
     }
 
+    let isSavingXnb = false;
+
+    function setXnbSaving(status, saving) {
+      isSavingXnb = saving;
+      const draftBtn = document.getElementById('saveDraftBtn');
+      const completeBtn = document.getElementById('completeBtn');
+      [draftBtn, completeBtn].forEach(function(btn) {
+        if (!btn) return;
+        btn.disabled = saving;
+        btn.classList.remove('is-loading');
+      });
+      const activeBtn = status === 'completed' ? completeBtn : draftBtn;
+      if (saving && activeBtn) activeBtn.classList.add('is-loading');
+    }
+
     async function saveXnb(status){
+      if (isSavingXnb) return;
       if(!items.length && !vatChuaItems.length) return alert('Vui lòng chọn ít nhất 1 hàng hóa hoặc vật chứa');
       if(!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
       if(!(storeIdInput && storeIdInput.value)) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu trên.');
@@ -939,12 +972,16 @@
       const payloadVatChuaItems = buildPayloadVatChuaItems();
       if (!payloadItems.length && !payloadVatChuaItems.length) return alert('Vui lòng nhập số lượng xuất cho ít nhất 1 hàng hóa hoặc vật chứa.');
       const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items:payloadItems,vat_chua_items:payloadVatChuaItems};
+      setXnbSaving(status, true);
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         const result = await res.json();
         alert(result.message || (result.success ? 'Đã lưu phiếu' : 'Không lưu được phiếu'));
         if(result.success) window.location.href='/xuat-dung-noi-bo';
       }catch(e){alert('Lỗi khi lưu phiếu xuất dùng nội bộ');}
+      finally {
+        setXnbSaving(status, false);
+      }
     }
   </script>
 </body>

@@ -682,7 +682,8 @@ function buildSupplierInternalExportFilter(supplier, storeId) {
     if (!names.length) return null;
     var filter = {
         loai_nguoi_nhan: 'nha_cung_cap',
-        nguoi_nhan: { $in: names }
+        nguoi_nhan: { $in: names },
+        trang_thai_du_lieu: 'active'
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         filter.cua_hang_id = storeId;
