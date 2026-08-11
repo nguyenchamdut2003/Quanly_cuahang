@@ -1016,6 +1016,12 @@ async function cancelPurchase(id, storeId, userId) {
       }
 
       purchase.trang_thai = 'cancelled';
+      purchase.trang_thai_du_lieu = 'inactive';
+      await LoHang.updateMany(
+        { phieu_nhap_id: purchase._id },
+        { $set: { trang_thai_du_lieu: 'inactive', updated_at: new Date() } },
+        withSessionOptions({}, session)
+      );
       await purchase.save(withSessionOptions({}, session));
       result = purchase;
     });

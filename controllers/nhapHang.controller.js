@@ -1143,7 +1143,7 @@ exports.apiProductLots = async function(req, res, next) {
     if (!mongoose.Types.ObjectId.isValid(productId)) {
       return res.status(400).json({ success: false, message: 'Mã hàng hóa không hợp lệ' });
     }
-    var query = { hang_hoa_id: productId, trang_thai: { $ne: 'huy' } };
+    var query = { hang_hoa_id: productId, trang_thai: { $ne: 'huy' }, trang_thai_du_lieu: { $ne: 'inactive' } };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
     if (mongoose.Types.ObjectId.isValid(String(req.query.kho_id || ''))) query.kho_id = String(req.query.kho_id);
     var items = await LoHang.find(query)
@@ -1996,16 +1996,15 @@ exports.deactivateSelected = async function(req, res, next) {
     if (!ids.length) {
       return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot phieu nhap.' });
     }
-    var filter = { _id: { $in: ids } };
-    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) filter.cua_hang_id = storeId;
-    var result = await PhieuNhap.updateMany(
-      activePurchaseDataFilter(filter),
-      { $set: { trang_thai_du_lieu: 'inactive', updated_at: new Date() } }
-    );
+    var modifiedCount = 0;
+    for (var i = 0; i < ids.length; i++) {
+      await purchaseService.cancelPurchase(ids[i], storeId, req.user && req.user._id);
+      modifiedCount += 1;
+    }
     return res.json({
       success: true,
       message: 'Da xoa phieu nhap da chon.',
-      data: { modified_count: result.modifiedCount || result.nModified || 0 }
+      data: { modified_count: modifiedCount }
     });
   } catch (error) {
     return res.status(400).json({ success: false, message: error.message || 'Khong xoa duoc phieu nhap.' });

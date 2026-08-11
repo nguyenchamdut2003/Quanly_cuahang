@@ -6,6 +6,7 @@
     <title>Kiểm kho mới</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel='stylesheet' href='/stylesheets/style.css' />
+    <link rel="stylesheet" href="/stylesheets/global-loading.css">
     <style>
       .kiemkho-container {
         display: grid;
@@ -91,6 +92,10 @@
         cursor: pointer;
         margin-top: 20px;
       }
+      .btn-finish:disabled {
+        opacity: 0.75;
+        cursor: wait;
+      }
       .btn-print-ton {
         width: 100%;
         padding: 12px;
@@ -144,11 +149,27 @@
         border: 1px dashed #ddd;
         border-radius: 6px;
       }
+      .kk-list-loading {
+        min-height: 128px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #666;
+        border: 1px dashed #ddd;
+        border-radius: 6px;
+        padding: 40px 16px;
+      }
+      .kk-list-loading i {
+        color: #1677ff;
+        font-size: 18px;
+      }
     </style>
   </head>
   <body>
     <%- include('../partials/header') %>
 
+    <div id="appRoot">
     <div class="kiemkho-container">
       <div class="left-panel">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
@@ -218,10 +239,13 @@
         </button>
       </div>
     </div>
+    </div>
 
     <% if (typeof copyDraftJson === 'string' && copyDraftJson) { %>
     <script id="copy-draft-embed" type="application/json"><%- copyDraftJson %></script>
     <% } %>
+    <%- include('../partials/global-loading') %>
+    <script src="/javascripts/global-loading.js"></script>
     <script>
       let copyDraft = null;
       (function() {
@@ -237,6 +261,8 @@
       const resultsDiv = document.getElementById('kkResults');
       const storeSelect = document.getElementById('storeId');
       const khoSelect = document.getElementById('khoId');
+      const finishButton = document.querySelector('.btn-finish');
+      let hangKiemKhoLoadToken = 0;
 
       function rowKey(item) {
         return String(item.hang_hoa_id || '') + '::' + String(item.lo_hang_id || '') + '::' + String(item.ten_quy_cach || '');
@@ -311,6 +337,7 @@
 
       async function loadKhoByStore() {
         const storeId = storeSelect.value;
+        hangKiemKhoLoadToken += 1;
         khoSelect.innerHTML = '<option value="">Chọn kho</option>';
         khoSelect.disabled = true;
         kkItems = [];
@@ -330,15 +357,22 @@
       }
 
       async function loadHangKiemKho() {
+        const loadToken = ++hangKiemKhoLoadToken;
         kkItems = [];
-        renderKK();
 
-        if (!khoSelect.value) return;
+        if (!khoSelect.value) {
+          renderKK();
+          return;
+        }
+
+        renderKKLoading();
 
         try {
           const res = await fetch('/api/kho/' + encodeURIComponent(khoSelect.value) + '/hang-kiem-kho');
           const result = await res.json();
+          if (loadToken !== hangKiemKhoLoadToken) return;
           if (!result.success) {
+            renderKK();
             alert(result.message || 'Không tải được hàng kiểm kho.');
             return;
           }
@@ -363,6 +397,8 @@
           }));
           renderKK();
         } catch (error) {
+          if (loadToken !== hangKiemKhoLoadToken) return;
+          renderKK();
           alert('Không tải được hàng kiểm kho.');
         }
       }
@@ -433,6 +469,13 @@
         if (row) row.scrollIntoView({ block: 'center', behavior: 'smooth' });
         searchInput.value = '';
         resultsDiv.style.display = 'none';
+      }
+
+      function renderKKLoading() {
+        const body = document.getElementById('kkBody');
+        body.innerHTML = '<div class="kk-list-loading" role="status" aria-live="polite"><i class="fa-solid fa-spinner fa-spin"></i><span>Đang tải danh sách mặt hàng...</span></div>';
+        document.getElementById('totalThucTe').innerText = 0;
+        document.getElementById('totalLech').innerText = 0;
       }
 
       function renderKK() {
@@ -617,6 +660,10 @@
           }))
         };
 
+        const loadingShown = window.showGlobalLoading && window.showGlobalLoading('Đang hoàn thành phiếu kiểm kho...');
+        if (loadingShown === false) return;
+        if (finishButton) finishButton.disabled = true;
+
         try {
           const res = await fetch('/kiem-kho', {
             method: 'POST',
@@ -631,9 +678,13 @@
             alert(result.message);
             window.location.href = '/kiem-kho';
           } else {
+            if (loadingShown) window.hideGlobalLoading();
+            if (finishButton) finishButton.disabled = false;
             alert(result.message || 'Không thể lưu phiếu kiểm kho.');
           }
         } catch (err) {
+          if (loadingShown) window.hideGlobalLoading();
+          if (finishButton) finishButton.disabled = false;
           alert('Lỗi khi lưu phiếu kiểm kho');
         }
       }

@@ -8,71 +8,105 @@
     <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
     <style>
-      body{background:#f2f4f7}
-      .kk-page{height:calc(100vh - 98px);display:grid;grid-template-columns:302px minmax(0,1fr);gap:14px;padding:10px 30px 0}
-      .kk-sidebar{background:#fff;border-radius:8px;padding:18px 14px;overflow:auto;border:1px solid #edf0f5}
-      .kk-main{min-width:0;display:flex;flex-direction:column}
-      .kk-top{min-height:44px;display:grid;grid-template-columns:240px minmax(320px,590px) 1fr auto;align-items:center;gap:10px;margin-bottom:6px}
-      .kk-title{font-size:22px;font-weight:800;color:#050505;line-height:1.2}
-      .kk-search{height:36px;border:1px solid #c7d0dc;border-radius:8px;background:#fff;display:flex;align-items:center;padding:0 12px;gap:10px}
-      .kk-search input{border:0;outline:0;flex:1;font-size:14px}
+      body{background:#f8fafc;overflow-x:hidden}
+      .kk-page{height:calc(100vh - 58px);display:grid;grid-template-columns:240px minmax(0,1fr);gap:0;padding:0;background:#f8fafc}
+      .kk-sidebar{background:#f8fafc;padding:16px 12px;overflow:auto;border-right:1px solid #e2e8f0}
+      .kk-main{min-width:0;display:flex;flex-direction:column;padding:10px 12px;background:#f8fafc}
+      .kk-top{min-height:36px;display:grid;grid-template-columns:220px minmax(280px,400px) minmax(0,1fr) auto;align-items:center;gap:12px;margin-bottom:8px}
+      .kk-title{font-size:22px;font-weight:800;color:#1e293b;line-height:1.2;white-space:nowrap}
+      .kk-search{height:36px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;display:flex;align-items:center;padding:0 14px;gap:10px;transition:all .2s}
+      .kk-search:focus-within{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+      .kk-search input{border:0;outline:0;flex:1;min-width:0;font-size:14px}
       .kk-search button{border:0;background:transparent;color:#344054;cursor:pointer}
-      .kk-actions{display:flex;align-items:center;gap:8px}
+      .kk-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
       .kk-btn{height:36px;border:1px solid #c7d0dc;background:#fff;border-radius:8px;color:#1f2937;padding:0 13px;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
       .kk-btn.primary{border-color:#006dff;color:#006dff}
       .kk-btn.danger{border-color:#fecdca;color:#b42318}
       .kk-btn:disabled{opacity:.55;cursor:not-allowed}
-      .filter-title{font-size:14px;font-weight:800;margin:0 0 10px;color:#050505}
-      .filter-block{margin-bottom:20px}
-      .radio-row,.check-row{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:14px;color:#111827}
-      .radio-row input,.check-row input{width:15px;height:15px;accent-color:#0070f4}
-      .filter-line{height:36px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;color:#111827}
+      .kk-actions .kk-delete-btn{display:inline-flex!important;background:#d92d20!important;color:#fff!important;border-color:#d92d20!important;visibility:visible!important;opacity:1!important}
+      .kk-actions .kk-delete-btn:hover:not(:disabled){background:#b42318!important;border-color:#b42318!important}
+      .kk-actions .kk-delete-btn:disabled{opacity:.55!important}
+      .filter-title{font-size:13px;font-weight:700;margin:0 0 8px;color:#475569}
+      .filter-block{display:grid;gap:8px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f1f5f9}
+      .filter-block:last-child{border-bottom:0}
+      .radio-row,.check-row{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:500;color:#334155}
+      .radio-row input,.check-row input{width:14px;height:14px;accent-color:#3b82f6;margin:0;flex:0 0 auto}
+      .check-row{min-height:28px}
+      .filter-line{height:36px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 12px;color:#1e293b;min-width:0}
+      .filter-line:focus-within{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
       .filter-line input,.filter-line select{border:0;outline:0;width:100%;height:34px;background:transparent;color:#667085}
       .date-range{display:none;margin:8px 0 0 23px;gap:6px}
       .date-range.show{display:grid}
-      .kk-table-wrap{background:#fff;flex:1;overflow:auto;border:1px solid #e5e7eb;border-radius:8px 8px 0 0}
-      .kk-table{width:100%;min-width:1180px;border-collapse:collapse;font-size:13px}
-      .kk-table th{height:37px;background:#e8f3ff;border-bottom:1px solid #a8cdfc;text-align:left;color:#050505;font-weight:800;padding:0 10px;white-space:nowrap}
-      .kk-table td{height:42px;border-bottom:1px solid #e5e7eb;padding:0 10px;vertical-align:middle}
+      .kk-table-wrap{background:#fff;flex:1;overflow-x:hidden!important;overflow-y:auto;border:1px solid #dbe4ef;border-radius:10px 10px 0 0;box-shadow:0 2px 8px rgba(15,23,42,.05);max-width:100%}
+      .kk-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}
+      .kk-table th{height:38px;background:#f1f6fb;border-bottom:1px solid #dbe4ef;text-align:left;color:#334155;font-size:12px;font-weight:800;padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .kk-table td{height:42px;border-bottom:1px solid #edf2f7;padding:0 10px;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .kk-table tbody tr:hover td{background:#f9fbfe}
       .kk-table .num{text-align:right}
-      .select-col{width:26px;text-align:center}
+      .kk-table th:nth-child(1),.kk-table td:nth-child(1){width:34px}
+      .kk-table th:nth-child(2),.kk-table td:nth-child(2){width:14%}
+      .kk-table th:nth-child(3),.kk-table td:nth-child(3){width:12%}
+      .kk-table th:nth-child(4),.kk-table td:nth-child(4){width:12%}
+      .kk-table th:nth-child(5),.kk-table td:nth-child(5){width:9%}
+      .kk-table th:nth-child(6),.kk-table td:nth-child(6){width:11%}
+      .kk-table th:nth-child(7),.kk-table td:nth-child(7){width:12%}
+      .kk-table th:nth-child(8),.kk-table td:nth-child(8){width:10%}
+      .kk-table th:nth-child(9),.kk-table td:nth-child(9){width:10%}
+      .kk-table th:nth-child(10),.kk-table td:nth-child(10){width:auto}
+      .select-col{text-align:center}
       .row-check{width:14px;height:14px;accent-color:#0070f4}
       .ticket-row{cursor:pointer}
-      .ticket-row.active{outline:2px solid #006dff;outline-offset:-2px}
-      .star{color:#8391a7;font-size:16px}
-      .note-cell{max-width:120px;white-space:normal;line-height:20px;padding-top:8px!important}
+      .ticket-row.active td{background:#f4f9ff;border-top:1px solid #bfdbfe;border-bottom:1px solid #bfdbfe}
+      .note-cell{line-height:20px}
       .detail-row{display:none}
       .detail-row.open{display:table-row}
-      .detail-cell{padding:0!important;border:2px solid #006dff!important;border-top:0!important;background:#fff}
-      .detail-panel{padding:16px 24px 18px}
-      .detail-tab{display:inline-flex;height:28px;align-items:center;border-bottom:2px solid #006dff;color:#006dff;font-weight:700;margin-bottom:14px}
-      .detail-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin:0 0 14px}
+      .detail-cell{padding:0!important;border:0!important;background:#fff;overflow:visible!important;white-space:normal!important}
+      .detail-panel{margin:0;background:#fff;padding:0;max-width:100%;overflow:visible}
+      .detail-tab{display:inline-flex;height:42px;align-items:center;border-bottom:2px solid #1677ff;color:#1677ff;font-size:13px;font-weight:700;margin:0 18px}
+      .detail-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:800;margin:16px 18px 14px;min-width:0;color:#1e293b}
+      .detail-title span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .status-pill{font-size:13px;color:#047857;background:#dcfce7;border-radius:4px;padding:3px 7px;font-weight:700}
-      .detail-meta{display:flex;gap:12px;align-items:center;font-size:14px;margin:8px 0;color:#111827}
-      .meta-sep{height:14px;width:1px;background:#d1d5db}
-      .detail-table{width:100%;border-collapse:collapse;margin-top:22px;font-size:13px}
-      .detail-table th{height:34px;background:#f0f1f3;border-bottom:1px solid #cfd5dd;text-align:left;padding:0 10px}
-      .detail-table td{height:39px;border-bottom:0;padding:0 10px}
+      .detail-info-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 24px;margin:0 18px 18px}
+      .detail-info-item{min-width:0;border-bottom:1px solid #e2e8f0;padding-bottom:8px}
+      .detail-info-item span{display:block;color:#475569;font-size:13px;margin-bottom:6px}
+      .detail-info-item strong{display:block;color:#0f172a;font-size:14px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .detail-info-item.is-note{grid-column:span 2}
+      .detail-meta,.detail-bottom{display:none}
+      .detail-table{width:calc(100% - 36px);max-width:calc(100% - 36px);table-layout:fixed;border-collapse:collapse;margin:22px 18px 0;font-size:13px}
+      .detail-table th{height:34px;background:#f1f6fb;border-bottom:1px solid #dbe4ef;text-align:left;padding:0 10px;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .detail-table td{height:39px;border-bottom:0;padding:0 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .detail-table .num{text-align:right}
-      .filter-input{height:30px;border:1px solid #cbd5e1;border-radius:6px;padding:0 10px;color:#667085;width:100%;max-width:200px}
+      .detail-table th:nth-child(1),.detail-table td:nth-child(1){width:16%!important}
+      .detail-table th:nth-child(2),.detail-table td:nth-child(2){width:18%!important}
+      .detail-table th:nth-child(3),.detail-table td:nth-child(3){width:12%!important}
+      .detail-table th:nth-child(4),.detail-table td:nth-child(4){width:10%!important}
+      .detail-table th:nth-child(5),.detail-table td:nth-child(5){width:11%!important}
+      .detail-table th:nth-child(6),.detail-table td:nth-child(6){width:10%!important}
+      .detail-table th:nth-child(7),.detail-table td:nth-child(7){width:9%!important}
+      .detail-table th:nth-child(8),.detail-table td:nth-child(8){width:14%!important}
       .product-code{color:#006dff;text-decoration:none}
-      .detail-bottom{display:grid;grid-template-columns:minmax(360px,1fr) 330px;gap:28px;margin-top:14px;align-items:start}
-      .detail-note{height:92px;border:1px solid #cbd5e1;border-radius:7px;padding:10px 12px;color:#667085}
-      .detail-total{display:grid;grid-template-columns:1fr 90px;gap:12px;font-size:14px;line-height:30px}
-      .detail-link-btn{border:0;background:transparent;color:#111827;font-weight:700;display:inline-flex;gap:7px;align-items:center;cursor:pointer;text-decoration:none}
-      .small-outline{height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:0 12px;display:inline-flex;align-items:center;gap:7px;font-weight:700}
-      .kk-footer{min-height:38px;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;color:#344054;flex-wrap:wrap;padding:8px 2px 0}
+      .detail-link-btn{min-height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;color:#111827;font-weight:700;display:inline-flex;gap:7px;align-items:center;cursor:pointer;text-decoration:none!important;white-space:nowrap;padding:0 12px}
+      .detail-link-btn:hover{text-decoration:none!important}
+      .small-outline{min-height:32px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:0 12px;display:inline-flex;align-items:center;gap:7px;font-weight:700;text-decoration:none!important;white-space:nowrap}
+      .small-outline:hover{text-decoration:none!important}
+      .detail-actions{gap:10px;flex-wrap:wrap;margin:16px 18px 0;align-items:center;justify-content:flex-end!important;overflow:visible;max-width:calc(100% - 36px);box-sizing:border-box}
+      .detail-action-left,.detail-action-right{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;min-width:0;margin:0!important}
+      .detail-action-right{flex:0 1 auto}
+      .detail-action-left{flex:0 1 auto}
+      .kk-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid #dbe4ef;border-top:0;border-radius:0 0 10px 10px;background:#fff;color:#475467;font-size:14px;flex-wrap:wrap}
       .kk-page-size{font-weight:600;color:#475569}
-      .kk-pagination{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-      .kk-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#0f172a;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
+      .kk-pagination{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+      .kk-page-link{min-width:34px;height:34px;padding:0 10px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
       .kk-page-link.is-disabled{color:#94a3b8;background:#f8fafc;cursor:not-allowed}
       .kk-page-current{display:inline-flex;align-items:center;gap:6px;font-weight:700;color:#1f2937}
       .page-size{height:24px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;padding:0 25px 0 8px}
       .empty-row{height:140px!important;text-align:center;color:#667085}
       @media (max-width:1200px){
-        .kk-page{grid-template-columns:260px minmax(0,1fr)}
+        .kk-page{grid-template-columns:240px minmax(0,1fr)}
         .kk-top{grid-template-columns:1fr;align-items:stretch}
         .kk-actions{justify-content:flex-start;flex-wrap:wrap}
+        .detail-info-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+        .detail-info-item.is-note{grid-column:span 2}
       }
       .kk-export-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1200;align-items:center;justify-content:center;padding:20px}
       .kk-export-modal{background:#fff;border-radius:10px;width:min(720px,calc(100vw - 32px));max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 18px 44px rgba(15,23,42,.28)}
@@ -90,7 +124,7 @@
       .kk-export-error{color:#d92d20;font-size:13px;margin:0 0 10px;display:none}
       .kk-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
       .kk-trash-overlay.is-open{display:flex}
-      .kk-trash-modal{width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+      .kk-trash-modal{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
       .kk-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
       .kk-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
       .kk-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
@@ -105,7 +139,13 @@
       .kk-trash-table th{background:#f8fafc;border-bottom:1px solid #e4eaf2;padding:8px 10px;text-align:left;font-size:12px;color:#475467}
       .kk-trash-table td{border-bottom:1px solid #eef2f6;padding:8px 10px;color:#111827}
       .kk-trash-table .num{text-align:right;font-weight:700}
-      .kk-trash-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee}
+      .kk-trash-foot{display:flex!important;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee;flex:0 0 auto;background:#fff}
+      .kk-trash-foot .btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:74px;visibility:visible!important;opacity:1!important}
+      .kk-trash-foot .btn.danger{background:#d92d20;color:#fff;border-color:#d92d20}
+      .kk-trash-action{height:31px;min-width:74px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex!important;align-items:center;justify-content:center;gap:7px;cursor:pointer;text-decoration:none;visibility:visible!important;opacity:1}
+      .kk-trash-action.danger{background:#d92d20;border-color:#d92d20;color:#fff}
+      .kk-trash-action.danger:hover:not(:disabled){background:#b42318;border-color:#b42318}
+      .kk-trash-action:disabled{opacity:.55!important;cursor:not-allowed}
       .kk-trash-loading{text-align:center;padding:28px 12px;color:#667085;font-size:13px}
     </style>
   </head>
@@ -171,7 +211,7 @@
           </div>
           <div></div>
           <div class="kk-actions">
-            <button type="button" class="kk-btn danger" id="openKkTrashModal" disabled><i class="fa-regular fa-trash-can"></i> Xóa</button>
+            <button type="button" class="kk-btn danger kk-delete-btn" id="openKkTrashModal" disabled><i class="fa-solid fa-trash-can"></i> Xóa</button>
             <a class="kk-btn primary" href="/kiem-kho/create"><i class="fa-solid fa-plus"></i> Kiểm kho</a>
             <button type="button" class="kk-btn" id="openKkExportModal"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down" style="font-size:10px"></i></button>
           </div>
@@ -182,7 +222,6 @@
             <thead>
               <tr>
                 <th class="select-col"><input class="row-check" id="kkSelectAll" type="checkbox"></th>
-                <th style="width:36px"><i class="fa-regular fa-star star"></i></th>
                 <th>Mã kiểm kho</th>
                 <th>Thời gian</th>
                 <th>Ngày cân bằng</th>
@@ -196,7 +235,7 @@
             </thead>
             <tbody>
               <% if (!tickets.length) { %>
-                <tr><td class="empty-row" colspan="11">Không tìm thấy phiếu kiểm kho phù hợp</td></tr>
+                <tr><td class="empty-row" colspan="10">Không tìm thấy phiếu kiểm kho phù hợp</td></tr>
               <% } %>
               <% tickets.forEach((t, index) => {
                 const summary = t.summary || {};
@@ -207,7 +246,6 @@
               %>
                 <tr class="ticket-row <%= index === 0 ? 'active' : '' %>" data-detail-id="detail-<%= t._id %>" onclick="toggleTicketDetail('<%= t._id %>')">
                   <td class="select-col"><input class="row-check kk-select-check" type="checkbox" value="<%= t._id %>" onclick="event.stopPropagation()"></td>
-                  <td><i class="fa-regular fa-star star"></i></td>
                   <td><%= t.ma_kiem_kho || '' %></td>
                   <td><%= fmtDateTime(t.ngay_kiem || t.created_at) %></td>
                   <td><%= statusCompleted ? fmtDateTime(t.updated_at || t.ngay_kiem || t.created_at) : '' %></td>
@@ -219,12 +257,25 @@
                   <td class="note-cell"><%= t.ghi_chu || '' %></td>
                 </tr>
                 <tr id="detail-<%= t._id %>" class="detail-row <%= index === 0 ? 'open' : '' %>">
-                  <td class="detail-cell" colspan="11">
+                  <td class="detail-cell" colspan="10">
                     <div class="detail-panel">
                       <div class="detail-tab">Thông tin</div>
                       <div class="detail-title">
                         <span><%= t.ma_kiem_kho || '' %></span>
                         <span class="status-pill"><%= statusText %></span>
+                      </div>
+                      <div class="detail-info-grid">
+                        <div class="detail-info-item"><span>Người tạo</span><strong><%= creatorName || 'N/A' %></strong></div>
+                        <div class="detail-info-item"><span>Ngày tạo</span><strong><%= fmtDateTime(t.ngay_kiem || t.created_at) || '---' %></strong></div>
+                        <div class="detail-info-item"><span>Người cân bằng</span><strong><%= statusCompleted ? (creatorName || 'N/A') : '---' %></strong></div>
+                        <div class="detail-info-item"><span>Ngày cân bằng</span><strong><%= statusCompleted ? (fmtDateTime(t.updated_at || t.ngay_kiem || t.created_at) || '---') : '---' %></strong></div>
+                        <div class="detail-info-item"><span>SL thực tế</span><strong><%= fmtNumber(t.tong_so_luong_thuc_te || summary.actual) %></strong></div>
+                        <div class="detail-info-item"><span>Tổng thực tế</span><strong><%= fmtNumber(t.tong_gia_tri_thuc_te || 0) %></strong></div>
+                        <div class="detail-info-item"><span>SL lệch tăng</span><strong><%= fmtNumber(summary.positive || 0) %></strong></div>
+                        <div class="detail-info-item"><span>SL lệch giảm</span><strong><%= fmtNumber(summary.negative || 0) %></strong></div>
+                        <div class="detail-info-item"><span>Tổng chênh lệch</span><strong><%= fmtNumber(t.tong_so_luong_lech || 0) %></strong></div>
+                        <div class="detail-info-item"><span>Giá trị lệch</span><strong><%= fmtNumber(t.tong_gia_tri_lech || summary.value || 0) %></strong></div>
+                        <div class="detail-info-item is-note"><span>Ghi chú</span><strong><%= t.ghi_chu || '---' %></strong></div>
                       </div>
                       <div class="detail-meta">
                         <span>Người tạo: <strong><%= creatorName || 'N/A' %></strong></span>
@@ -251,11 +302,6 @@
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td><input class="filter-input" placeholder="Tìm mã hàng"></td>
-                            <td><input class="filter-input" placeholder="Tìm tên hàng"></td>
-                            <td></td><td></td><td></td><td></td><td></td><td></td>
-                          </tr>
                           <% detailItems.forEach(item => {
                             const product = item.hang_hoa_id || {};
                             const lot = item.lo_hang_id || {};
@@ -294,7 +340,6 @@
                           <a class="detail-link-btn" href="/kiem-kho/<%= t._id %>/export.csv"><i class="fa-solid fa-file-export"></i> Xuất file</a>
                         </div>
                         <div class="page-actions__right detail-action-right">
-                          <button class="small-outline" type="button"><i class="fa-regular fa-floppy-disk"></i> Lưu</button>
                           <a class="small-outline" href="/chung-tu-kho/kiem-kho/<%= t._id %>?variant=thuc-te" target="_blank" rel="noopener"><i class="fa-solid fa-print"></i> In SL thực tế</a>
                           <a class="small-outline" href="/chung-tu-kho/kiem-kho/<%= t._id %>?variant=gia-tri-kho" target="_blank" rel="noopener"><i class="fa-solid fa-print"></i> In giá trị kho</a>
                           <a class="small-outline" href="/chung-tu-kho/kiem-kho/<%= t._id %>" target="_blank"><i class="fa-solid fa-file-lines"></i> Chứng từ đầy đủ</a>
@@ -335,14 +380,14 @@
     <div id="kkTrashModalOverlay" class="kk-trash-overlay" aria-hidden="true">
       <div class="kk-trash-modal" role="dialog" aria-labelledby="kkTrashModalTitle" aria-modal="true">
         <div class="kk-trash-head">
-          <h3 id="kkTrashModalTitle">Đưa phiếu kiểm kho vào thùng rác</h3>
+          <h3 id="kkTrashModalTitle">Xóa phiếu kiểm kho</h3>
           <button type="button" class="kk-trash-close" id="kkTrashModalClose" aria-label="Đóng">×</button>
         </div>
         <div class="kk-trash-body">
-          <p class="kk-trash-desc">Phiếu kiểm kho được chọn sẽ được đưa vào thùng rác, coi như đã xóa khỏi hệ thống và không còn tính vào hàng hóa/tồn kho. Dữ liệu chỉ bị xóa khỏi DB khi quá 30 ngày hoặc khi xóa vĩnh viễn trong Thùng rác.</p>
+          <p class="kk-trash-desc">Bạn có chắc chắn muốn xóa các phiếu kiểm kho đã chọn không?</p>
           <div id="kkTrashAlert"></div>
-          <ul class="kk-trash-selected" id="kkTrashSelectedList"></ul>
-          <table class="kk-trash-table">
+          <ul class="kk-trash-selected" id="kkTrashSelectedList" style="display:none"></ul>
+          <table class="kk-trash-table" style="display:none">
             <thead>
               <tr>
                 <th>Dữ liệu liên quan</th>
@@ -355,8 +400,24 @@
           </table>
         </div>
         <div class="kk-trash-foot">
-          <button type="button" class="kk-btn" id="kkTrashCancel">Bỏ qua</button>
-          <button type="button" class="kk-btn danger" id="kkTrashConfirm" disabled>Đưa vào thùng rác</button>
+          <button type="button" class="btn" id="kkTrashCancel">Không</button>
+          <button type="button" class="btn danger" id="kkTrashConfirm">Có</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="kkCancelModalOverlay" class="kk-trash-overlay" aria-hidden="true">
+      <div class="kk-trash-modal" role="dialog" aria-labelledby="kkCancelModalTitle" aria-modal="true">
+        <div class="kk-trash-head">
+          <h3 id="kkCancelModalTitle">Hủy phiếu kiểm kho</h3>
+          <button type="button" class="kk-trash-close" id="kkCancelModalClose" aria-label="Đóng">×</button>
+        </div>
+        <div class="kk-trash-body">
+          <p class="kk-trash-desc">Bạn có chắc chắn muốn hủy phiếu kiểm kho này không?</p>
+        </div>
+        <div class="kk-trash-foot">
+          <button type="button" class="btn" id="kkCancelModalCancel">Không</button>
+          <button type="button" class="btn danger" id="kkCancelModalConfirm">Có</button>
         </div>
       </div>
     </div>
@@ -412,12 +473,40 @@
     </form>
 
     <script>
-      async function cancelKiemKho(id) {
-        if (!confirm('Hủy phiếu kiểm kho này? Hệ thống sẽ đảo lại chênh lệch tồn kho đã ghi nhận.')) return;
-        const res = await fetch('/kiem-kho/' + id + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        const data = await res.json();
-        if (!data.success) return alert(data.message || 'Không hủy được phiếu kiểm kho');
-        location.reload();
+      var pendingCancelKiemKhoId = '';
+      function cancelKiemKho(id) {
+        pendingCancelKiemKhoId = String(id || '');
+        var overlay = document.getElementById('kkCancelModalOverlay');
+        var confirmBtn = document.getElementById('kkCancelModalConfirm');
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (overlay) {
+          overlay.classList.add('is-open');
+          overlay.setAttribute('aria-hidden', 'false');
+        }
+      }
+
+      function closeKkCancelModal() {
+        var overlay = document.getElementById('kkCancelModalOverlay');
+        if (overlay) {
+          overlay.classList.remove('is-open');
+          overlay.setAttribute('aria-hidden', 'true');
+        }
+        pendingCancelKiemKhoId = '';
+      }
+
+      async function confirmKkCancelModal() {
+        if (!pendingCancelKiemKhoId) return;
+        var confirmBtn = document.getElementById('kkCancelModalConfirm');
+        if (confirmBtn) confirmBtn.disabled = true;
+        try {
+          const res = await fetch('/kiem-kho/' + pendingCancelKiemKhoId + '/cancel', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.message || 'Không hủy được phiếu kiểm kho');
+          location.reload();
+        } catch (error) {
+          alert(error.message || 'Không hủy được phiếu kiểm kho');
+          if (confirmBtn) confirmBtn.disabled = false;
+        }
       }
       function toggleDateRange() {
         const custom = document.querySelector('input[name="date_mode"][value="custom"]').checked;
@@ -436,6 +525,24 @@
         }
       }
 
+      (function initKkCancelModal() {
+        var overlay = document.getElementById('kkCancelModalOverlay');
+        var closeBtn = document.getElementById('kkCancelModalClose');
+        var cancelBtn = document.getElementById('kkCancelModalCancel');
+        var confirmBtn = document.getElementById('kkCancelModalConfirm');
+        if (closeBtn) closeBtn.addEventListener('click', closeKkCancelModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeKkCancelModal);
+        if (confirmBtn) confirmBtn.addEventListener('click', confirmKkCancelModal);
+        if (overlay) {
+          overlay.addEventListener('click', function(event) {
+            if (event.target === overlay) closeKkCancelModal();
+          });
+        }
+        document.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape' && overlay && overlay.classList.contains('is-open')) closeKkCancelModal();
+        });
+      })();
+
     (function initKkTrashModal() {
       var openBtn = document.getElementById('openKkTrashModal');
       var overlay = document.getElementById('kkTrashModalOverlay');
@@ -448,7 +555,6 @@
       var selectAll = document.getElementById('kkSelectAll');
       var rowChecks = Array.prototype.slice.call(document.querySelectorAll('.kk-select-check'));
       var pendingIds = [];
-      var previewData = null;
 
       function escapeHtml(value) {
         return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
@@ -476,7 +582,6 @@
         overlay.classList.remove('is-open');
         overlay.setAttribute('aria-hidden', 'true');
         pendingIds = [];
-        previewData = null;
         if (confirmBtn) confirmBtn.disabled = true;
       }
 
@@ -494,11 +599,13 @@
         alertBox.innerHTML = html;
       }
 
-      function renderSelectedList(preview) {
+      function renderSelectedList(ids) {
         if (!selectedList) return;
-        selectedList.innerHTML = (preview.items || []).map(function(item) {
-          var label = [item.ma_kiem_kho, item.kho].filter(Boolean).join(' - ');
-          return '<li>' + escapeHtml(label || item.phieu_kiem_kho_id) + '</li>';
+        selectedList.innerHTML = ids.map(function(id) {
+          var cb = document.querySelector('.kk-select-check[value="' + id + '"]');
+          var row = cb ? cb.closest('tr') : null;
+          var codeCell = row ? row.children[1] : null;
+          return '<li>' + escapeHtml(codeCell ? codeCell.textContent.trim() : id) + '</li>';
         }).join('');
       }
 
@@ -528,51 +635,60 @@
           overlay.classList.add('is-open');
           overlay.setAttribute('aria-hidden', 'false');
         }
-        if (impactBody) impactBody.innerHTML = '<tr><td colspan="2" class="kk-trash-loading">Đang kiểm tra dữ liệu liên quan...</td></tr>';
         if (alertBox) alertBox.innerHTML = '';
-        if (selectedList) selectedList.innerHTML = '';
-        if (confirmBtn) confirmBtn.disabled = true;
+        renderSelectedList(pendingIds);
+        if (confirmBtn) confirmBtn.disabled = false;
+      }
 
-        fetch('/kiem-kho/trash/preview', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phieu_kiem_kho_ids: pendingIds })
-        })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Không tải được thông tin xóa');
-            previewData = data.data;
-            renderSelectedList(previewData);
-            renderAlert(previewData);
-            renderImpactRows(previewData);
-            if (confirmBtn) confirmBtn.disabled = !previewData.can_proceed;
-          })
-          .catch(function(err) {
-            if (impactBody) impactBody.innerHTML = '<tr><td colspan="2">' + escapeHtml(err.message || 'Lỗi') + '</td></tr>';
-            alert(err.message || 'Không tải được thông tin xóa');
+      function parseJsonResponse(res) {
+        return res.text().then(function(text) {
+          var data = {};
+          try {
+            data = JSON.parse(text || '{}');
+          } catch (error) {
+            throw new Error('ENDPOINT_NOT_JSON');
+          }
+          if (!res.ok) throw new Error(data.message || 'Khong xoa duoc phieu kiem kho');
+          return data;
+        });
+      }
+
+      function fallbackCancelSelected(ids) {
+        return ids.reduce(function(chain, id) {
+          return chain.then(function() {
+            return fetch('/kiem-kho/' + encodeURIComponent(id) + '/cancel', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' }
+            }).then(parseJsonResponse);
           });
+        }, Promise.resolve()).then(function() {
+          return { success: true, message: 'Da xoa phieu kiem kho' };
+        });
       }
 
       function confirmTrash() {
-        if (!previewData || !previewData.can_proceed || !pendingIds.length) return;
+        if (!pendingIds.length) return;
         if (confirmBtn) confirmBtn.disabled = true;
         fetch('/kiem-kho/trash/move', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phieu_kiem_kho_ids: pendingIds })
         })
-          .then(function(res) { return res.json(); })
+          .then(parseJsonResponse)
+          .catch(function(err) {
+            if (err && err.message === 'ENDPOINT_NOT_JSON') return fallbackCancelSelected(pendingIds);
+            throw err;
+          })
           .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Không xóa được phiếu kiểm kho');
-            alert(data.message || 'Đã xóa phiếu kiểm kho');
+            if (!data.success) throw new Error(data.message || 'Khong xoa duoc phieu kiem kho');
+            alert(data.message || 'Da xoa phieu kiem kho');
             window.location.reload();
           })
           .catch(function(err) {
-            alert(err.message || 'Không xóa được phiếu kiểm kho');
+            alert(err.message || 'Khong xoa duoc phieu kiem kho');
             if (confirmBtn) confirmBtn.disabled = false;
           });
       }
-
       if (selectAll) {
         selectAll.addEventListener('click', function(e) {
           e.stopPropagation();

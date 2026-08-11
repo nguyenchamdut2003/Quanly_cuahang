@@ -13,6 +13,9 @@ router.get('/in-ton-he-thong-preview', kiemKhoController.getInTonHeThongPreview)
 router.get('/', kiemKhoController.index);
 router.get('/export.csv', kiemKhoController.getExportCsv);
 router.post('/export-excel', kiemKhoController.postExportExcel);
+router.post('/deactivate', kiemKhoController.moveToTrash);
+router.post('/trash/preview', kiemKhoController.previewTrash);
+router.post('/trash/move', kiemKhoController.moveToTrash);
 router.get('/:id/export.csv', kiemKhoController.getIdExportCsv);
 router.get('/create', kiemKhoController.getCreate);
 router.post('/:id/cancel', kiemKhoController.postIdCancel);

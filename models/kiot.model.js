@@ -1018,6 +1018,13 @@ const LoHangSchema = new Schema({
     default: 'active'
   },
 
+  trang_thai_du_lieu: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active',
+    index: true
+  },
+
   ghi_chu: {
     type: String
   }
@@ -1772,6 +1779,7 @@ const PhieuKiemKhoSchema = new Schema({
   chi_nhanh_id: { type: ObjectId, ref: 'ChiNhanh' },
   kho_id: { type: ObjectId, ref: 'Kho' },
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
+  trang_thai_du_lieu: { type: String, enum: ['active', 'inactive'], default: 'active', index: true },
   stock_rollback_at: { type: Date, default: null }
 }, { collection: "phieu_kiem_kho", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 

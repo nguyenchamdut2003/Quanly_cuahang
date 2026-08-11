@@ -163,9 +163,19 @@ async function loadProductBasicDetailById(productId, req) {
             return mongoose.Types.ObjectId.isValid(id);
         });
         var lotDocs = lotIds.length
-            ? await LoHang.find({ _id: { $in: lotIds } }).select('han_su_dung trang_thai so_luong_con_lai').lean()
+            ? await LoHang.find({ _id: { $in: lotIds }, trang_thai_du_lieu: { $ne: 'inactive' } })
+                .select('han_su_dung trang_thai so_luong_con_lai phieu_nhap_id')
+                .populate({ path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' })
+                .lean()
             : [];
+        lotDocs = lotDocs.filter(function(lot) {
+            var purchase = lot.phieu_nhap_id || null;
+            return !purchase || purchase.trang_thai_du_lieu !== 'inactive';
+        });
         var lotMap = mapBy(lotDocs, '_id');
+        lotRows = lotRows.filter(function(row) {
+            return Boolean(lotMap[String(row.lo_hang_id)]);
+        });
         item.ton_co_the_giao = lotRows.reduce(function(sum, row) {
             var lot = lotMap[String(row.lo_hang_id)] || {};
             var qty = normalizeStockNumber(row.so_luong !== undefined && row.so_luong !== null ? row.so_luong : lot.so_luong_con_lai);
@@ -421,14 +431,23 @@ async function loadProductStockTab(productId, req) {
             return mongoose.Types.ObjectId.isValid(id);
         });
         var lotDocs = lotIds.length
-            ? await LoHang.find({ _id: { $in: lotIds } }).select('han_su_dung trang_thai so_luong_con_lai kho_id').lean()
+            ? await LoHang.find({ _id: { $in: lotIds }, trang_thai_du_lieu: { $ne: 'inactive' } })
+                .select('han_su_dung trang_thai so_luong_con_lai kho_id phieu_nhap_id')
+                .populate({ path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' })
+                .lean()
             : [];
+        lotDocs = lotDocs.filter(function(lot) {
+            var purchase = lot.phieu_nhap_id || null;
+            return !purchase || purchase.trang_thai_du_lieu !== 'inactive';
+        });
         var lotMap = mapBy(lotDocs, '_id');
         lotRows.forEach(function(row) {
             var warehouseId = String(row.kho_id || '');
             var lot = lotMap[String(row.lo_hang_id)] || {};
-            if (!stockSummaryByWarehouse[warehouseId]) stockSummaryByWarehouse[warehouseId] = { sellable: 0, expired: 0 };
+            if (!lotMap[String(row.lo_hang_id)]) return;
+            if (!stockSummaryByWarehouse[warehouseId]) stockSummaryByWarehouse[warehouseId] = { actual: 0, sellable: 0, expired: 0 };
             var qty = normalizeStockNumber(row.so_luong !== undefined && row.so_luong !== null ? row.so_luong : lot.so_luong_con_lai);
+            stockSummaryByWarehouse[warehouseId].actual += qty;
             if (isSellableLot(lot)) stockSummaryByWarehouse[warehouseId].sellable += qty;
             if (isExpiredLot(lot)) stockSummaryByWarehouse[warehouseId].expired += qty;
             if (lot.han_su_dung) {
@@ -453,11 +472,12 @@ async function loadProductStockTab(productId, req) {
         var rawQty = normalizeStockNumber(row.so_luong);
         var summary = stockSummaryByWarehouse[warehouseId] || null;
         var reservedQty = reservedByWarehouse[warehouseId] || 0;
+        var activeLotQty = tab.item.quan_ly_theo_lo && summary ? summary.actual : rawQty;
         row.kho_ten = warehouseMap[warehouseId] || '---';
         row.trang_thai_kho = warehouseStatusMap[warehouseId] || '---';
         row.khach_dat = reservedQty;
         row.du_kien_het_hang = expiryMap[warehouseId] || productDefaultExpiry || null;
-        row.ton_thuc_te = rawQty;
+        row.ton_thuc_te = activeLotQty;
         row.ton_co_the_giao = Math.max((tab.item.quan_ly_theo_lo && summary ? summary.sellable : rawQty) - reservedQty, 0);
         row.ton_het_han = tab.item.quan_ly_theo_lo && summary ? summary.expired : 0;
         return row;
@@ -472,15 +492,34 @@ async function loadProductLotsTab(productId, req) {
     var paging = normalizeTabPagination(req.query || {});
     var lotStockQuery = { hang_hoa_id: tab.item._id };
     if (tab.hasStoreScope) lotStockQuery.cua_hang_id = tab.storeId;
+    var activeLotIds = [];
+    if (tab.item.quan_ly_theo_lo) {
+        var activeLotQuery = {
+            hang_hoa_id: tab.item._id,
+            trang_thai_du_lieu: { $ne: 'inactive' }
+        };
+        if (tab.hasStoreScope) activeLotQuery.cua_hang_id = tab.storeId;
+        var activeLots = await LoHang.find(activeLotQuery)
+            .select('_id phieu_nhap_id')
+            .populate({ path: 'phieu_nhap_id', select: 'trang_thai_du_lieu' })
+            .lean();
+        activeLotIds = activeLots
+            .filter(function(lot) {
+                var purchase = lot.phieu_nhap_id || null;
+                return !purchase || purchase.trang_thai_du_lieu !== 'inactive';
+            })
+            .map(function(lot) { return lot._id; });
+        lotStockQuery.lo_hang_id = activeLotIds.length ? { $in: activeLotIds } : { $in: [] };
+    }
 
     var total = tab.item.quan_ly_theo_lo ? await TonKhoLo.countDocuments(lotStockQuery) : 0;
     var rows = tab.item.quan_ly_theo_lo
         ? await TonKhoLo.find(lotStockQuery)
             .populate({
                 path: 'lo_hang_id',
-                select: 'ma_lo ten_lo ngay_nhap han_su_dung so_luong_ban_dau so_luong_con_lai don_gia_nhap gia_von trang_thai phieu_nhap_id nha_cung_cap_id',
+                select: 'ma_lo ten_lo ngay_nhap han_su_dung so_luong_ban_dau so_luong_con_lai don_gia_nhap gia_von trang_thai trang_thai_du_lieu phieu_nhap_id nha_cung_cap_id',
                 populate: [
-                    { path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap' },
+                    { path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap trang_thai_du_lieu' },
                     { path: 'nha_cung_cap_id', select: 'ten_ncc ten_nha_cung_cap ten_cong_ty ma_ncc' }
                 ]
             })

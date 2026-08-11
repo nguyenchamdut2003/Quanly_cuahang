@@ -8,6 +8,7 @@ async function cancelKiemKho({ id, userId }) {
     if (phieu.trang_thai === 'cancelled') return { status: 200, body: { success: true, message: 'Phiếu đã hủy' } };
     await rollbackKiemKhoStock(phieu, userId);
     phieu.trang_thai = 'cancelled';
+    phieu.trang_thai_du_lieu = 'inactive';
     await phieu.save();
     return { status: 200, body: { success: true, message: 'Đã hủy phiếu kiểm kho' } };
 }

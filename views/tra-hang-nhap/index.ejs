@@ -220,14 +220,17 @@
     .pay-total-summary{font-size:13px;font-weight:600;color:#111827;padding:4px 0}
     .pay-summary-error{font-size:12px;color:#b45309;font-weight:600;padding:4px 0}
     .receipt-pay-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid #e5e9ee}
-    .return-trash-modal{position:fixed;inset:0;background:rgba(15,23,42,.48);display:none;align-items:center;justify-content:center;z-index:1400;padding:18px}
+    .return-trash-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1450;padding:16px}
     .return-trash-modal.is-open{display:flex}
-    .return-trash-card{width:min(720px,calc(100vw - 36px));max-height:calc(100vh - 48px);overflow:auto;background:#fff;border-radius:8px;box-shadow:0 20px 50px rgba(15,23,42,.28)}
-    .return-trash-head,.return-trash-foot{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #e5e9ee}
-    .return-trash-foot{border-top:1px solid #e5e9ee;border-bottom:0;justify-content:flex-end;gap:8px}
-    .return-trash-head h3{margin:0;font-size:18px;font-weight:800}
-    .return-trash-close{border:0;background:#fff;font-size:24px;line-height:1;cursor:pointer;color:#667085}
-    .return-trash-body{padding:16px 18px}
+    .return-trash-card{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
+    .return-trash-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 12px;border-bottom:1px solid #e5e9ee}
+    .return-trash-foot{display:flex!important;align-items:center;justify-content:flex-end;gap:8px;padding:12px 22px 18px;border-top:1px solid #e5e9ee;flex:0 0 auto;background:#fff}
+    .return-trash-foot .kv-btn{display:inline-flex!important;align-items:center;justify-content:center;min-width:74px;visibility:visible!important;opacity:1!important}
+    .return-trash-foot .kv-btn.danger{background:#d92d20;color:#fff;border-color:#d92d20}
+    .return-trash-head h3{margin:0;font-size:18px;font-weight:800;color:#111827}
+    .return-trash-close{border:0;background:transparent;color:#667085;font-size:26px;line-height:1;cursor:pointer}
+    .return-trash-body{padding:14px 22px 18px;overflow:auto}
+    .return-trash-question{margin:0 0 12px;font-size:13px;line-height:1.5;color:#475467}
     .return-trash-alert{border-radius:6px;padding:9px 10px;margin:7px 0;font-size:13px;line-height:1.4}
     .return-trash-alert.is-warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
     .return-trash-alert.is-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
@@ -575,7 +578,7 @@
       </div>
       <div class="return-trash-foot">
         <button type="button" class="kv-btn" id="returnTrashCancelBtn">Không</button>
-        <button type="button" class="kv-btn danger" id="returnTrashConfirmBtn">Xóa</button>
+        <button type="button" class="kv-btn danger" id="returnTrashConfirmBtn">Có</button>
       </div>
     </div>
   </div>

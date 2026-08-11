@@ -5,7 +5,7 @@ function getSelectedStatuses(query) {
 }
 
 function buildKiemKhoFilter(query = {}) {
-    const filter = {};
+    const filter = activeKiemKhoDocumentFilter();
     const q = String(query.q || '').trim();
     const dateMode = query.date_mode || 'this_month';
     const statuses = getSelectedStatuses(query);
@@ -42,7 +42,7 @@ function buildKiemKhoFilter(query = {}) {
 }
 
 function activeKiemKhoDocumentFilter(extra) {
-    return Object.assign({}, extra || {}, {});
+    return Object.assign({ trang_thai_du_lieu: { $ne: 'inactive' } }, extra || {});
 }
 
 module.exports = {
