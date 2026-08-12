@@ -109,8 +109,8 @@ function buildKiemKhoExportRow(ticket, detail, summary) {
     const ticketSummary = summary || { positive: 0, negative: 0, actual: 0, value: 0 };
     return {
         ma_kiem_kho: ticket.ma_kiem_kho || '',
-        thoi_gian: formatKiemKhoExportDateTime(ticket.created_at),
-        ngay_can_bang: ticket.trang_thai === 'completed' ? formatKiemKhoExportDateTime(ticket.updated_at || ticket.ngay_kiem || ticket.created_at) : '',
+        thoi_gian: formatKiemKhoExportDateTime(ticket.ngay_kiem || ticket.created_at),
+        ngay_can_bang: ticket.trang_thai === 'completed' ? formatKiemKhoExportDateTime(ticket.ngay_kiem || ticket.updated_at || ticket.created_at) : '',
         kho: ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '',
         cua_hang: ticket.cua_hang_id ? (ticket.cua_hang_id.ten_cua_hang || '') : '',
         nguoi_tao: getKiemKhoCreatorName(ticket.nguoi_tao_id),
@@ -173,7 +173,7 @@ function applyKiemKhoExportWorksheetFormat(worksheet, columnCount) {
 
 async function loadKiemKhoExportData(query) {
     const { filter } = buildKiemKhoFilter(query || {});
-    const tickets = await PhieuKiemKho.find(filter).populate('cua_hang_id').populate('kho_id').populate('nguoi_tao_id').sort({ created_at: -1 });
+    const tickets = await PhieuKiemKho.find(filter).populate('cua_hang_id').populate('kho_id').populate('nguoi_tao_id').sort({ ngay_kiem: -1, created_at: -1 });
     const ticketIds = tickets.map(function(ticket) { return ticket._id; });
     const details = ticketIds.length
         ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: ticketIds } }).populate({ path: 'hang_hoa_id', populate: [{ path: 'thuong_hieu_id' }, { path: 'don_vi_tinh_id' }] }).populate('lo_hang_id').sort({ created_at: 1 })

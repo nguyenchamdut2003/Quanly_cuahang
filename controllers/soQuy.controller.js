@@ -199,6 +199,7 @@ function relatedCode(item) {
         || item.bang_luong_id?.ma_bang_luong
         || item.ct_bang_luong_id?.ma_nhan_vien
         || item.nhap_vat_chua_id?.ma_nhap_vat_chua
+        || item.chung_tu_khac
         || item.ma_chung_tu_goc
         || '';
 }
@@ -483,7 +484,7 @@ exports.getExportCsv = async (req, res, next) => {
                 item.chi_tiet_thanh_toan?.tien_mat || 0,
                 item.chi_tiet_thanh_toan?.chuyen_khoan || 0,
                 item.so_quy_id?.ten_so_quy || '',
-                item.ma_chung_tu_goc || '',
+                relatedCode(item),
                 item.phuong_thuc_thanh_toan || '',
                 item.ghi_chu || ''
             ];
@@ -673,6 +674,7 @@ exports.postAdd = async (req, res, next) => {
             bang_luong_id: body.bang_luong_id,
             ct_bang_luong_id: body.ct_bang_luong_id,
             ma_chung_tu_goc: body.ma_chung_tu_goc,
+            chung_tu_khac: body.chung_tu_khac,
             ma_phieu: body.ma_phieu,
             ghi_chu: body.ghi_chu,
             nguoi_tao_id: req.user?._id,

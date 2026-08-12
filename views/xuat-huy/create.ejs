@@ -1,13 +1,5 @@
 <%
   const creatorName = user ? (user.ho_ten || user.email || 'Người dùng') : 'Người dùng';
-  const ngayTaoHienThi = new Date().toLocaleString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -46,7 +38,7 @@
     <aside class="right">
       <div id="errorBox" class="error"></div>
       <div class="field"><label>Người tạo</label><div><%= creatorName %></div></div>
-      <div class="field"><label>Ngày tạo</label><div class="readonly-box"><%= ngayTaoHienThi %></div></div>
+      <div class="field"><label>Ngày tạo</label><input id="ngayXuat" class="control" type="datetime-local" value="<%= todayValue %>"></div>
       <div class="field"><label>Phiếu nhập gốc</label><select id="phieuNhapId" class="control"><option value="">Đang tải phiếu nhập...</option></select></div>
       <div class="field"><label>Kho hủy</label><input type="hidden" id="khoId"><div id="khoText" class="readonly-box">Tự động theo phiếu nhập</div></div>
       <div class="field"><label>Mã xuất hủy</label><input id="maPhieu" class="control" value="<%= nextCode %>" placeholder="Mã phiếu tự động"></div>
@@ -78,6 +70,17 @@
     const money = raw => Math.max(0, Math.floor(Number(String(raw || '').replace(/\./g, '').replace(/,/g, '')) || 0));
     const body = document.getElementById('itemsBody');
     const search = document.getElementById('itemSearch');
+
+    function formatInputNumber(value) {
+      const number = Number(value || 0);
+      return number > 0 ? Math.floor(number).toLocaleString('vi-VN') : '';
+    }
+
+    function formatNumericInput(input) {
+      if (!input) return;
+      const value = money(input.value);
+      input.value = value > 0 ? value.toLocaleString('vi-VN') : '';
+    }
 
     function lineQty(it) {
       if (it.has_quy_cach && Array.isArray(it.quy_cach_items)) {
@@ -149,7 +152,7 @@
         <tr>
           <th>${qc.ten_quy_cach}</th>
           <td class="num">${fmt(qc.ton_hien_tai || 0)}</td>
-          <td><input class="cell-input" type="number" min="0" max="${qc.ton_hien_tai || 0}" value="${qc.so_luong_huy || ''}" onchange="updateQuyCach(${realIndex}, ${qcIdx}, this.value)"></td>
+          <td><input class="cell-input" type="text" inputmode="numeric" value="${formatInputNumber(qc.so_luong_huy || 0)}" oninput="formatNumericInput(this)" onchange="updateQuyCach(${realIndex}, ${qcIdx}, this.value)"></td>
           <td class="num">${fmtMoney(qc.gia_von || 0)}</td>
           <td class="num"><b>${fmtMoney(Number(qc.so_luong_huy || 0) * Number(qc.gia_von || 0))}</b></td>
         </tr>
@@ -254,10 +257,10 @@
         const line = lineValue(it);
         const qtyCell = it.has_quy_cach
           ? `<span class="num">${fmt(qty)}</span>`
-          : `<input class="cell-input" type="number" min="0" max="${it.ton_hien_tai || 0}" value="${it.so_luong || ''}" onchange="updateItem(${realIndex},'so_luong',this.value)">`;
+          : `<input class="cell-input" type="text" inputmode="numeric" value="${formatInputNumber(it.so_luong || 0)}" oninput="formatNumericInput(this)" onchange="updateItem(${realIndex},'so_luong',this.value)">`;
         const costCell = it.has_quy_cach
           ? '<span>Theo thuộc tính</span>'
-          : `<input class="cell-input" inputmode="numeric" value="${it.gia_von}" onchange="updateItem(${realIndex},'gia_von',this.value)">`;
+          : `<input class="cell-input" type="text" inputmode="numeric" value="${formatInputNumber(it.gia_von || 0)}" oninput="formatNumericInput(this)" onchange="updateItem(${realIndex},'gia_von',this.value)">`;
         html += `<tr>
           <td class="center">${idx + 1}</td>
           <td>${it.ma_hang}</td>
@@ -369,6 +372,7 @@
         phieu_nhap_id: purchaseId,
         kho_id: khoId,
         ma_xuat_huy: document.getElementById('maPhieu').value,
+        ngay_xuat: document.getElementById('ngayXuat').value,
         ly_do_huy: reason,
         ghi_chu: document.getElementById('ghiChu').value,
         items_json: JSON.stringify(sendItems)

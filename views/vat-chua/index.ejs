@@ -449,7 +449,7 @@
           </div>
         </form>
         <div class="page-actions modal-footer">
-          <button class="btn btn-light" type="button" id="addVatChuaModalCancel">Hủy</button>
+          <button class="btn btn-light" type="button" id="addVatChuaModalCancel">Bỏ qua</button>
           <button class="btn btn-primary" type="submit" form="vatChuaCreateForm">Lưu</button>
         </div>
       </div>
@@ -746,7 +746,7 @@
           <div id="vcStocktakeError" class="vc-form-error"></div>
         </form>
         <div class="page-actions modal-footer">
-          <button class="btn btn-light" type="button" id="vcStocktakeModalCancel">Hủy</button>
+          <button class="btn btn-light" type="button" id="vcStocktakeModalCancel">Bỏ qua</button>
           <button class="btn btn-primary" type="submit" form="vcStocktakeForm" id="vcStocktakeModalSave">Cân bằng kho</button>
         </div>
       </div>
@@ -778,7 +778,7 @@
           <div id="vcDestroyError" class="vc-form-error"></div>
         </form>
         <div class="page-actions modal-footer">
-          <button class="btn btn-light" type="button" id="vcDestroyModalCancel">Hủy</button>
+          <button class="btn btn-light" type="button" id="vcDestroyModalCancel">Bỏ qua</button>
           <button class="btn btn-danger" type="submit" form="vcDestroyForm" id="vcDestroyModalSave">Xuất hủy</button>
         </div>
       </div>
@@ -1498,9 +1498,6 @@
       if (importCloseBtn) importCloseBtn.addEventListener('click', closeImportModal);
       if (importCancelBtn) importCancelBtn.addEventListener('click', closeImportModal);
       if (overlay) {
-        overlay.addEventListener('click', function(e) {
-          if (e.target === overlay) closeModal();
-        });
         if (overlay.getAttribute('data-auto-open') === '1') openModal();
       }
       if (importOverlay) {
@@ -1512,24 +1509,11 @@
         }
         if (importOverlay.getAttribute('data-auto-open') === '1') openImportModal();
       }
-      if (stocktakeOverlay) {
-        stocktakeOverlay.addEventListener('click', function(e) {
-          if (e.target === stocktakeOverlay) closeStocktakeModal();
-        });
-      }
-      if (destroyOverlay) {
-        destroyOverlay.addEventListener('click', function(e) {
-          if (e.target === destroyOverlay) closeDestroyModal();
-        });
-      }
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
-          closeModal();
           closeImportModal();
           closeEditImportModal();
           closeReturnImportModal();
-          closeStocktakeModal();
-          closeDestroyModal();
           var vcDocOverlay = document.getElementById('vcDocumentModalOverlay');
           if (vcDocOverlay) vcDocOverlay.classList.remove('is-visible');
           closeVcImportTrashModal();

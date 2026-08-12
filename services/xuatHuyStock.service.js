@@ -110,6 +110,7 @@ async function writeHistory(params) {
     nguoi_tao_id: params.nguoi_tao_id,
     loai_phieu: params.loai_phieu || 'xuat_huy',
     ma_phieu: params.ma_phieu,
+    ngay: params.ngay,
     so_luong_thay_doi: params.so_luong_thay_doi,
     ton_kho_truoc: params.ton_kho_truoc,
     ton_kho_sau: params.ton_kho_sau,
@@ -137,6 +138,7 @@ async function applyXuatHuyLine(ticket, row, userId) {
     nguoi_tao_id: userId,
     loai_phieu: 'xuat_huy',
     ma_phieu: ticket.ma_xuat_huy,
+    ngay: ticket.ngay_xuat || ticket.created_at,
     ghi_chu: row.ghi_chu || ticket.ly_do_huy || ticket.ghi_chu || 'Xuất hủy'
   };
 
@@ -240,6 +242,7 @@ async function reverseXuatHuyLine(ticket, row, userId) {
     nguoi_tao_id: userId,
     loai_phieu: 'xuat_huy',
     ma_phieu: ticket.ma_xuat_huy,
+    ngay: ticket.ngay_xuat || ticket.created_at,
     ghi_chu: 'Đảo hủy phiếu xuất hủy ' + (ticket.ma_xuat_huy || '')
   };
 

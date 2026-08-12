@@ -1928,11 +1928,14 @@ const PhieuThuChiSchema = new Schema({
   ct_bang_luong_id: { type: ObjectId, ref: 'ChiTietBangLuong' },
   chamcongmoi_bang_luong_id: { type: ObjectId, ref: 'ChamCongMoiBangLuong' },
   ma_chung_tu_goc: { type: String },
+  chung_tu_khac: { type: String },
   allocation_type: { type: String },
   overpayment_amount: { type: Number, default: 0 },
   allocations: [{
     phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
+    nhap_vat_chua_id: { type: ObjectId, ref: 'NhapVatChua' },
     ma_phieu_nhap: { type: String },
+    ma_nhap_vat_chua: { type: String },
     so_tien: { type: Number, default: 0 },
     con_no_truoc: { type: Number, default: 0 },
     con_no_sau: { type: Number, default: 0 }

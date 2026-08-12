@@ -443,10 +443,10 @@ function buildRelatedVoucherRows(receipt) {
         });
     }
 
-    if (!rows.length && String(receipt.ma_chung_tu_goc || '').trim()) {
+    if (!rows.length && String(receipt.chung_tu_khac || receipt.ma_chung_tu_goc || '').trim()) {
         pushRow({
             typeLabel: 'Chứng từ khác',
-            code: receipt.ma_chung_tu_goc,
+            code: receipt.chung_tu_khac || receipt.ma_chung_tu_goc,
             docDate: receipt.ngay_lap,
             partner: formatSubject(receipt),
             docValue: null,

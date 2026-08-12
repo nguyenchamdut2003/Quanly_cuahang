@@ -27,7 +27,7 @@ async function buildStockAdjustmentContext({ kho, item }) {
     return { systemQuantity, tenQuyCach, syncQuyCach };
 }
 
-async function applyKiemKhoDifference({ difference, kho, item, cost, userId, maPhieu, ghiChu, differenceReason, tenQuyCach, syncQuyCach }) {
+async function applyKiemKhoDifference({ difference, kho, item, cost, userId, maPhieu, ngay, ghiChu, differenceReason, tenQuyCach, syncQuyCach }) {
     if (difference > 0) {
         await congTonKho({
             kho_id: kho._id,
@@ -41,6 +41,7 @@ async function applyKiemKhoDifference({ difference, kho, item, cost, userId, maP
             nguoi_tao_id: userId,
             loai_phieu: 'kiem_kho',
             ma_phieu: maPhieu,
+            ngay,
             ghi_chu: differenceReason || ghiChu
         });
     } else if (difference < 0) {
@@ -55,6 +56,7 @@ async function applyKiemKhoDifference({ difference, kho, item, cost, userId, maP
             nguoi_tao_id: userId,
             loai_phieu: 'kiem_kho',
             ma_phieu: maPhieu,
+            ngay,
             ghi_chu: differenceReason || ghiChu
         });
     }

@@ -237,7 +237,7 @@
                         <span>Cho phép trả dư / ứng trước NCC</span>
                       </label>
                       <% var supplierUnpaidPurchaseDebtTotal=Number((supplierUnpaidPurchases || []).reduce(function(sum,
-                        p) { return sum + Number(p.con_no_ncc || 0); }, 0)); %>
+                        p) { return sum + Number(p.con_no_ncc != null ? p.con_no_ncc : p.con_no || 0); }, 0)); %>
                         <% if (supplierUnpaidPurchaseDebtTotal !==Number(selectedSupplier.tong_no || 0)) { %>
                           <div class="supplier-pay-reconcile-note">
                             Nợ theo phiếu nhập: <strong>
@@ -252,14 +252,14 @@
                               <table class="admin-table warehouse-table">
                                 <thead>
                                   <tr>
-                                    <th>Mã hóa đơn</th>
-                                    <th>Thời gian</th>
-                                    <th class="text-right">Giá trị phiếu nhập</th>
-                                    <th class="text-right">Đã trả trước</th>
-                                    <th class="text-right">Còn cần trả <i class="fa-regular fa-circle-question"></i>
+                                    <th>Ma chung tu</th>
+                                    <th>Thoi gian</th>
+                                    <th class="text-right">Gia tri chung tu</th>
+                                    <th class="text-right">Da tra truoc</th>
+                                    <th class="text-right">Con can tra <i class="fa-regular fa-circle-question"></i>
                                     </th>
-                                    <th class="text-right">Tiền trả</th>
-                                    <th class="text-right">Còn nợ</th>
+                                    <th class="text-right">Tien tra</th>
+                                    <th class="text-right">Con no</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -269,39 +269,46 @@
                                         <div class="supplier-pay-empty">
                                           <span class="supplier-pay-empty-icon"><i
                                               class="fa-regular fa-inbox"></i></span>
-                                          <span>Không có kết quả phù hợp</span>
+                                          <span>Khong co ket qua phu hop</span>
                                         </div>
                                       </td>
                                     </tr>
                                     <% } %>
                                       <% (supplierUnpaidPurchases || []).forEach(function(purchase) { %>
+                                        <% var purchaseDebt = Number(purchase.con_no_ncc != null ? purchase.con_no_ncc : purchase.con_no || 0); %>
+                                        <% var purchaseType = purchase.doc_type || 'phieu_nhap'; %>
                                         <tr class="js-supplier-pay-row"
-                                          data-debt="<%= Number(purchase.con_no_ncc || 0) %>">
+                                          data-debt="<%= purchaseDebt %>">
                                           <td>
-                                            <%= purchase.ma_phieu_nhap || '--' %>
+                                            <%= purchase.ma_chung_tu || purchase.ma_phieu_nhap || purchase.ma_nhap_vat_chua || '--' %>
+                                            <div class="supplier-muted-cell"><%= purchaseType === 'nhap_vat_chua' ? 'Nhap vat chua' : 'Phieu nhap' %></div>
                                           </td>
                                           <td>
-                                            <%= formatDate(purchase.ngay_nhap || purchase.created_at) %>
+                                            <%= formatDate(purchase.ngay_chung_tu || purchase.ngay_nhap || purchase.created_at) %>
                                           </td>
                                           <td class="text-right">
-                                            <%= Number(purchase.can_tra_ncc || purchase.tong_tien ||
+                                            <%= Number(purchase.gia_tri_phai_tra || purchase.can_tra_ncc || purchase.tong_tien ||
                                               0).toLocaleString('vi-VN') %>
                                           </td>
                                           <td class="text-right">
-                                            <%= Number(purchase.da_tra_ncc || 0).toLocaleString('vi-VN') %>
+                                            <%= Number(purchase.da_thanh_toan != null ? purchase.da_thanh_toan : purchase.da_tra_ncc || 0).toLocaleString('vi-VN') %>
                                           </td>
                                           <td class="text-right">
-                                            <%= Number(purchase.con_no_ncc || 0).toLocaleString('vi-VN') %>
+                                            <%= purchaseDebt.toLocaleString('vi-VN') %>
                                           </td>
                                           <td class="text-right">
                                             <input class="supplier-pay-row-input js-supplier-pay-row-paid-input"
                                               inputmode="numeric" autocomplete="off" value="0"
-                                              data-purchase-id="<%= purchase._id %>"
+                                              data-doc-type="<%= purchaseType %>"
+                                              data-doc-id="<%= purchase.doc_id || purchase._id %>"
+                                              data-purchase-id="<%= purchaseType === 'phieu_nhap' ? purchase._id : '' %>"
                                               data-purchase-code="<%= purchase.ma_phieu_nhap || '' %>"
-                                              data-debt="<%= Number(purchase.con_no_ncc || 0) %>">
+                                              data-vat-chua-id="<%= purchaseType === 'nhap_vat_chua' ? purchase._id : '' %>"
+                                              data-vat-chua-code="<%= purchase.ma_nhap_vat_chua || '' %>"
+                                              data-debt="<%= purchaseDebt %>">
                                           </td>
                                           <td class="text-right js-supplier-pay-row-left">
-                                            <%= Number(purchase.con_no_ncc || 0).toLocaleString('vi-VN') %>
+                                            <%= purchaseDebt.toLocaleString('vi-VN') %>
                                           </td>
                                         </tr>
                                         <% }) %>
@@ -362,6 +369,8 @@
               <form id="supplierDiscountForm_<%= selectedSupplier._id %>" class="supplier-discount-form"
                 data-action="/nha-cung-cap/<%= selectedSupplier._id %>/discount-debt"
                 data-current-debt="<%= Number(selectedSupplier.tong_no || 0) %>">
+                <input type="hidden" name="payment_v2" value="1">
+                <input type="hidden" name="chi_tiet_thanh_toan[tien_tra_khach]" value="0">
                 <div class="supplier-pay-grid">
                   <label class="supplier-pay-field">
                     <span>Thời gian</span>
@@ -381,10 +390,39 @@
                       </option>
                     </select>
                   </label>
+                  <label class="supplier-pay-field">
+                    <span>Tiền mặt</span>
+                    <input class="js-supplier-discount-cash" name="chi_tiet_thanh_toan[tien_mat]" inputmode="numeric"
+                      autocomplete="off" value="" placeholder="Tiền mặt">
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Sổ tiền mặt</span>
+                    <select class="js-supplier-discount-cash-book" name="chi_tiet_thanh_toan[so_quy_tien_mat_id]">
+                      <option value="">-- Chọn sổ tiền mặt --</option>
+                      <% (cashBooks || []).filter(function(cashBook) { return (cashBook.loai_so_quy || 'tien_mat') === 'tien_mat'; }).forEach(function(cashBook) { %>
+                        <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= cashBook.ten_so_quy || 'Sổ tiền mặt' %></option>
+                      <% }) %>
+                    </select>
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Chuyển khoản</span>
+                    <input class="js-supplier-discount-transfer" name="chi_tiet_thanh_toan[chuyen_khoan]"
+                      inputmode="numeric" autocomplete="off" value="" placeholder="Chuyển khoản">
+                  </label>
+                  <label class="supplier-pay-field">
+                    <span>Tài khoản ngân hàng</span>
+                    <select class="js-supplier-discount-bank-book" name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]">
+                      <option value="">-- Chọn tài khoản chuyển khoản --</option>
+                      <% (cashBooks || []).filter(function(cashBook) { return cashBook.loai_so_quy === 'chuyen_khoan'; }).forEach(function(cashBook) { %>
+                        <% var bankInfo = cashBook.thong_tin_ngan_hang || {}; %>
+                        <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= (bankInfo.ten_ngan_hang || cashBook.ten_so_quy || 'Tài khoản') + (bankInfo.so_tai_khoan ? (' - ' + bankInfo.so_tai_khoan) : '') %></option>
+                      <% }) %>
+                    </select>
+                  </label>
                   <label class="supplier-pay-field supplier-pay-field-full">
                     <span>Chiết khấu từ nhà cung cấp</span>
                     <input class="js-supplier-discount-amount" name="gia_tri" inputmode="numeric" autocomplete="off"
-                      value="">
+                      value="" readonly>
                     <small class="supplier-pay-remaining-hint">Còn nợ: <span class="js-supplier-discount-remaining">
                         <%= Number(selectedSupplier.tong_no || 0).toLocaleString('vi-VN') %>
                       </span></small>

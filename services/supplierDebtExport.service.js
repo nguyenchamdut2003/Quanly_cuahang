@@ -6,7 +6,10 @@ const {
     CTPhieuNhap,
     PhieuTraHangNhap,
     CongNoNhaCungCap,
-    GiaoDichCongNoNhaCungCap
+    GiaoDichCongNoNhaCungCap,
+    NhapVatChua,
+    XuatVatChua,
+    PhieuThuChi
 } = require('../models/kiot.model');
 const {
     SUMMARY_EXPORT_COLUMNS,
@@ -69,6 +72,18 @@ function getDebtDocumentInfo(row) {
         return {
             label: 'Phiếu nhập',
             code: row.phieu_nhap_id.ma_phieu_nhap || '--'
+        };
+    }
+    if (row.nhap_vat_chua_id) {
+        return {
+            label: 'Nhap vat chua',
+            code: row.nhap_vat_chua_id.ma_nhap_vat_chua || '--'
+        };
+    }
+    if (row.xuat_vat_chua_id) {
+        return {
+            label: 'Tra vat chua',
+            code: row.xuat_vat_chua_id.ma_xuat_vat_chua || '--'
         };
     }
     return { label: 'Khác', code: '--' };
@@ -202,6 +217,56 @@ function resolvePartnerRowAmounts(purchase, returnInfo) {
     return { tongTienNhap, giamTru, daThanhToan, conPhaiTra };
 }
 
+async function loadUnpaidVatChuaImportsForPartner(supplierId, storeId) {
+    const match = {
+        doi_tuong_type: 'nha_cung_cap',
+        doi_tuong_id: supplierId,
+        trang_thai: 'active',
+        tong_tien: { $gt: 0 },
+        deleted_at: null
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) match.cua_hang_id = storeId;
+    const rows = await NhapVatChua.find(match)
+        .select('ma_nhap_vat_chua created_at tong_tien tong_so_luong items')
+        .sort({ created_at: 1 })
+        .lean();
+    const ids = rows.map((row) => row._id).filter(Boolean);
+    if (!ids.length) return [];
+    const receiptMatch = {
+        loai_phieu: 'chi',
+        nha_cung_cap_id: supplierId,
+        trang_thai: { $ne: 'cancelled' },
+        $or: [
+            { nhap_vat_chua_id: { $in: ids } },
+            { 'allocations.nhap_vat_chua_id': { $in: ids } }
+        ]
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) receiptMatch.cua_hang_id = storeId;
+    const receipts = await PhieuThuChi.find(receiptMatch).select('nhap_vat_chua_id gia_tri allocations').lean();
+    const paidMap = receipts.reduce((map, receipt) => {
+        let hasAllocation = false;
+        (receipt.allocations || []).forEach((alloc) => {
+            if (!alloc || !alloc.nhap_vat_chua_id) return;
+            hasAllocation = true;
+            const key = String(alloc.nhap_vat_chua_id);
+            map[key] = Number(map[key] || 0) + Number(alloc.so_tien || 0);
+        });
+        if (receipt.nhap_vat_chua_id && !hasAllocation) {
+            const key = String(receipt.nhap_vat_chua_id);
+            map[key] = Number(map[key] || 0) + Number(receipt.gia_tri || 0);
+        }
+        return map;
+    }, {});
+    return rows.map((row) => {
+        const value = Number(row.tong_tien || 0);
+        const paid = Math.min(value, Number(paidMap[String(row._id)] || 0));
+        return Object.assign({}, row, {
+            da_thanh_toan: paid,
+            con_phai_tra: Math.max(0, value - paid)
+        });
+    }).filter((row) => Number(row.con_phai_tra || 0) > 0);
+}
+
 async function buildSupplierDebtAdminPack(supplier, storeId) {
     const workbook = new ExcelJS.Workbook();
     const safeMa = slugifyFilePart(supplier.ma_ncc);
@@ -225,27 +290,69 @@ async function buildSupplierDebtAdminPack(supplier, storeId) {
 
     const debtRows = await CongNoNhaCungCap.find(debtMatch)
         .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
+        .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua' })
         .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap' })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
         .sort({ ngay: 1, created_at: 1 })
         .lean();
 
+    const txMatch = { nha_cung_cap_id: supplier._id, deleted_at: null, trang_thai: 'active' };
+    const vatChuaReturnMatch = {
+        doi_tuong_type: 'nha_cung_cap',
+        doi_tuong_id: supplier._id,
+        loai_xuat: 'tra_hang_nhap',
+        trang_thai: 'active',
+        deleted_at: null
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        txMatch.cua_hang_id = storeId;
+        vatChuaReturnMatch.cua_hang_id = storeId;
+    }
+    const txRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.find(txMatch)
+        .select('ma_giao_dich loai_giao_dich huong_cong_no gia_tri ngay_giao_dich created_at ghi_chu')
+        .sort({ ngay_giao_dich: 1, created_at: 1 })
+        .lean() : [];
+    const vatChuaReturnRows = await XuatVatChua.find(vatChuaReturnMatch)
+        .select('ma_xuat_vat_chua tong_tien created_at ghi_chu')
+        .sort({ created_at: 1 })
+        .lean();
+
+    const ledgerRows = debtRows.map((row) => ({
+        date: row.ngay || row.created_at,
+        kind: row.loai,
+        amount: Number(row.so_tien || 0),
+        docInfo: getDebtDocumentInfo(row),
+        note: row.ghi_chu || ''
+    })).concat(txRows.map((row) => ({
+        date: row.ngay_giao_dich || row.created_at,
+        kind: row.huong_cong_no === 'tang_no' ? 'tang_no' : 'giam_no',
+        amount: Number(row.gia_tri || 0),
+        docInfo: { label: row.loai_giao_dich || 'giao_dich_cong_no', code: row.ma_giao_dich || '--' },
+        note: row.ghi_chu || ''
+    }))).concat(vatChuaReturnRows.map((row) => ({
+        date: row.created_at,
+        kind: 'giam_no',
+        amount: Number(row.tong_tien || 0),
+        docInfo: { label: 'Tra vat chua', code: row.ma_xuat_vat_chua || '--' },
+        note: row.ghi_chu || ''
+    }))).sort((a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime());
+
     let runningDebt = 0;
-    debtRows.forEach((row) => {
-        const amount = Number(row.so_tien || 0);
-        if (row.loai === 'tang_no') runningDebt += amount;
-        if (row.loai === 'giam_no' || row.loai === 'thanh_toan') runningDebt -= amount;
-        const docInfo = getDebtDocumentInfo(row);
+    ledgerRows.forEach((row) => {
+        const amount = Number(row.amount || 0);
+        if (row.kind === 'tang_no') runningDebt += amount;
+        if (row.kind === 'giam_no' || row.kind === 'thanh_toan') runningDebt -= amount;
+        const docInfo = row.docInfo || { label: 'Khac', code: '--' };
         ws.addRow({
-            ngay: formatExportDate(row.ngay || row.created_at),
+            ngay: formatExportDate(row.date),
             nha_cung_cap: supplier.ten_ncc || supplier.ma_ncc || '',
-            loai_phat_sinh: mapCongNoLoai(row.loai),
+            loai_phat_sinh: mapCongNoLoai(row.kind),
             loai_chung_tu: docInfo.label,
             ma_chung_tu: docInfo.code,
-            tang_no: row.loai === 'tang_no' ? amount : 0,
-            giam_no: row.loai === 'giam_no' || row.loai === 'thanh_toan' ? amount : 0,
+            tang_no: row.kind === 'tang_no' ? amount : 0,
+            giam_no: row.kind === 'giam_no' || row.kind === 'thanh_toan' ? amount : 0,
             no_con_lai: runningDebt,
-            ghi_chu: row.ghi_chu || ''
+            ghi_chu: row.note || ''
         });
     });
 
@@ -266,6 +373,7 @@ async function buildSupplierDebtPartnerPack(supplier, storeId) {
     const purchaseIds = purchases.map((row) => row._id);
     const returnMap = await loadReturnDeductionsByPurchase(purchaseIds, storeId);
     const productSummaryMap = await loadPurchaseProductSummaries(purchaseIds);
+    const unpaidVatChuaImports = await loadUnpaidVatChuaImportsForPartner(supplier._id, storeId);
     const supplierName = supplier.ten_ncc || supplier.ten_cong_ty || supplier.ma_ncc || '';
 
     let totalConPhaiTra = 0;
@@ -293,8 +401,28 @@ async function buildSupplierDebtPartnerPack(supplier, storeId) {
             });
         });
     });
+    unpaidVatChuaImports.forEach((row, index) => {
+        totalConPhaiTra += Number(row.con_phai_tra || 0);
+        const items = Array.isArray(row.items) && row.items.length ? row.items : [{ ten_vat_chua: 'Nhap vat chua', so_luong: row.tong_so_luong }];
+        items.forEach((item, itemIndex) => {
+            const isFirstItem = itemIndex === 0;
+            ws.addRow({
+                stt: purchases.length + index + 1,
+                ngay_phieu: isFirstItem ? formatExportDate(row.created_at) : '',
+                ma_phieu_nhap: isFirstItem ? (row.ma_nhap_vat_chua || '') : '',
+                ten_ncc: isFirstItem ? supplierName : '',
+                san_pham: item.ten_vat_chua || 'Nhap vat chua',
+                so_luong: Number(item.so_luong || 0),
+                tong_tien_nhap: isFirstItem ? Number(row.tong_tien || 0) : '',
+                giam_tru_tra_hang: isFirstItem ? 0 : '',
+                da_thanh_toan: isFirstItem ? Number(row.da_thanh_toan || 0) : '',
+                con_phai_tra: isFirstItem ? Number(row.con_phai_tra || 0) : '',
+                ghi_chu_doi_soat: isFirstItem ? 'Nhap vat chua' : ''
+            });
+        });
+    });
 
-    if (purchases.length) {
+    if (purchases.length || unpaidVatChuaImports.length) {
         ws.addRow({});
         const totalRow = ws.addRow({
             stt: '',
@@ -406,6 +534,28 @@ async function loadSupplierLedgerRows(supplierId, storeId) {
             });
         });
     }
+
+    const vatChuaReturnMatch = {
+        doi_tuong_type: 'nha_cung_cap',
+        doi_tuong_id: supplierId,
+        loai_xuat: 'tra_hang_nhap',
+        trang_thai: 'active',
+        deleted_at: null
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        vatChuaReturnMatch.cua_hang_id = storeId;
+    }
+    const vatChuaReturnRows = await XuatVatChua.find(vatChuaReturnMatch)
+        .select('created_at tong_tien')
+        .sort({ created_at: 1 })
+        .lean();
+    vatChuaReturnRows.forEach((row) => {
+        normalized.push({
+            ngay: row.created_at,
+            loai: 'giam_no',
+            so_tien: row.tong_tien
+        });
+    });
 
     normalized.sort((a, b) => new Date(a.ngay || 0).getTime() - new Date(b.ngay || 0).getTime());
     return normalized;

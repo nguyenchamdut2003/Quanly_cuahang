@@ -164,6 +164,13 @@
         color: #1677ff;
         font-size: 18px;
       }
+      .kk-date-input {
+        width: 150px;
+        padding: 6px 8px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+      }
     </style>
   </head>
   <body>
@@ -191,7 +198,7 @@
       <div class="right-panel">
         <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
           <span><strong>Người tạo:</strong> <%= user.ho_ten %></span>
-          <span><%= new Date().toLocaleString('vi-VN') %></span>
+          <input id="ngayKiem" class="kk-date-input" type="datetime-local" value="<%= todayValue %>">
         </div>
 
         <div class="form-group">
@@ -649,6 +656,7 @@
         const data = {
           cua_hang_id: document.getElementById('storeId').value,
           kho_id: document.getElementById('khoId').value,
+          ngay_kiem: document.getElementById('ngayKiem').value,
           ghi_chu: document.getElementById('ghiChu').value,
           items: kkItems.map(item => ({
             hang_hoa_id: item.hang_hoa_id,

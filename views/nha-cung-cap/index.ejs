@@ -492,6 +492,8 @@
       outline: none;
     }
     .supplier-pay-field textarea { min-height: 48px; resize: vertical; }
+    .supplier-pay-field:has(select[name="phuong_thuc_thanh_toan"]),
+    .supplier-pay-field:has(select[name="so_quy_id"]) { display: none; }
     .supplier-pay-field input:focus,
     .supplier-pay-field select:focus,
     .supplier-pay-field textarea:focus { border-color: #0070f4; box-shadow: 0 0 0 1px #0070f4; }
@@ -1251,6 +1253,24 @@
       function setSupplierPayInputValue(input, value) {
         if (input) input.value = formatSupplierMoney(value);
       }
+      function formatSupplierMoneyInput(input) {
+        if (!input) return;
+        var value = parseSupplierMoney(input.value);
+        input.value = value === '' ? '' : formatSupplierMoney(value);
+      }
+      function clearZeroSupplierMoneyInput(input) {
+        if (!input) return;
+        if (parseSupplierMoney(input.value) === 0) input.value = '';
+      }
+      function findSupplierMoneyInput(target) {
+        return target.closest('.js-supplier-pay-cash,.js-supplier-pay-transfer,.js-supplier-pay-row-paid-input,.js-supplier-discount-amount,.js-supplier-discount-cash,.js-supplier-discount-transfer');
+      }
+      function disableSupplierLegacyPayFields(root) {
+        Array.prototype.slice.call((root || document).querySelectorAll('select[name="phuong_thuc_thanh_toan"],select[name="so_quy_id"]')).forEach(function(select) {
+          select.disabled = true;
+          select.removeAttribute('required');
+        });
+      }
       function syncSupplierPayV2Total(form) {
         if (!form) return 0;
         var cash = parseSupplierMoneyAmount((form.querySelector('.js-supplier-pay-cash') || {}).value);
@@ -1269,11 +1289,18 @@
         Array.prototype.slice.call(form.querySelectorAll('.js-supplier-pay-row-paid-input')).forEach(function(input) {
           var paid = parseSupplierMoneyAmount(input.value);
           if (paid <= 0) return;
-          rows.push({
-            phieu_nhap_id: input.getAttribute('data-purchase-id') || '',
-            ma_phieu_nhap: input.getAttribute('data-purchase-code') || '',
+          var docType = input.getAttribute('data-doc-type') || 'phieu_nhap';
+          var row = {
             so_tien: paid
-          });
+          };
+          if (docType === 'nhap_vat_chua') {
+            row.nhap_vat_chua_id = input.getAttribute('data-vat-chua-id') || input.getAttribute('data-doc-id') || '';
+            row.ma_nhap_vat_chua = input.getAttribute('data-vat-chua-code') || '';
+          } else {
+            row.phieu_nhap_id = input.getAttribute('data-purchase-id') || input.getAttribute('data-doc-id') || '';
+            row.ma_phieu_nhap = input.getAttribute('data-purchase-code') || '';
+          }
+          rows.push(row);
         });
         return rows;
       }
@@ -1348,6 +1375,7 @@
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
         var form = modal.querySelector('.supplier-pay-form');
+        disableSupplierLegacyPayFields(form || modal);
         var amountInput = form ? form.querySelector('.js-supplier-pay-amount') : null;
         if (amountInput) {
           amountInput.value = '';
@@ -1367,8 +1395,17 @@
         if (!form) return;
         var debt = Number(form.getAttribute('data-current-debt') || 0);
         var amountInput = form.querySelector('.js-supplier-discount-amount');
-        var amount = parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
-        if (amountInput && amount) amountInput.value = formatSupplierMoney(amount);
+        var cashInput = form.querySelector('.js-supplier-discount-cash');
+        var transferInput = form.querySelector('.js-supplier-discount-transfer');
+        var cash = parseSupplierMoneyAmount(cashInput ? cashInput.value : 0);
+        var transfer = parseSupplierMoneyAmount(transferInput ? transferInput.value : 0);
+        var splitAmount = cash + transfer;
+        var amount = splitAmount || parseSupplierMoneyAmount(amountInput ? amountInput.value : 0);
+        if (amountInput) amountInput.value = amount ? formatSupplierMoney(amount) : '';
+        var cashBook = form.querySelector('.js-supplier-discount-cash-book');
+        var bankBook = form.querySelector('.js-supplier-discount-bank-book');
+        if (cashBook) cashBook.disabled = cash <= 0;
+        if (bankBook) bankBook.disabled = transfer <= 0;
         var remaining = form.querySelector('.js-supplier-discount-remaining');
         if (remaining) remaining.textContent = formatSupplierMoney(Math.max(0, debt - amount));
       }
@@ -1378,10 +1415,14 @@
         modal.setAttribute('aria-hidden', 'false');
         var form = modal.querySelector('.supplier-discount-form');
         var amountInput = form ? form.querySelector('.js-supplier-discount-amount') : null;
+        var cashInput = form ? form.querySelector('.js-supplier-discount-cash') : null;
+        var transferInput = form ? form.querySelector('.js-supplier-discount-transfer') : null;
+        if (cashInput) cashInput.value = '';
+        if (transferInput) transferInput.value = '';
         if (amountInput) {
           amountInput.value = '';
-          amountInput.focus();
         }
+        if (cashInput) cashInput.focus();
         updateSupplierDiscountRemaining(form);
       }
       function closeSupplierDiscountModal(modal) {
@@ -1521,7 +1562,14 @@
       document.addEventListener('input', function(event) {
         var discountAmountInput = event.target.closest('.js-supplier-discount-amount');
         if (discountAmountInput) {
+          formatSupplierMoneyInput(discountAmountInput);
           updateSupplierDiscountRemaining(discountAmountInput.closest('.supplier-discount-form'));
+          return;
+        }
+        var discountPayInput = event.target.closest('.js-supplier-discount-cash,.js-supplier-discount-transfer');
+        if (discountPayInput) {
+          formatSupplierMoneyInput(discountPayInput);
+          updateSupplierDiscountRemaining(discountPayInput.closest('.supplier-discount-form'));
           return;
         }
         var amountInput = event.target.closest('.js-supplier-pay-amount');
@@ -1532,13 +1580,20 @@
         }
         var v2PayInput = event.target.closest('.js-supplier-pay-cash,.js-supplier-pay-transfer');
         if (v2PayInput) {
+          formatSupplierMoneyInput(v2PayInput);
           var v2Form = v2PayInput.closest('.supplier-pay-form');
           updateSupplierPayAllocation(v2Form, 'amount');
           return;
         }
         var rowInput = event.target.closest('.js-supplier-pay-row-paid-input');
         if (!rowInput) return;
+        formatSupplierMoneyInput(rowInput);
         updateSupplierPayAllocation(rowInput.closest('.supplier-pay-form'), 'row');
+      });
+      document.addEventListener('focusin', function(event) {
+        var moneyInput = findSupplierMoneyInput(event.target);
+        if (!moneyInput) return;
+        clearZeroSupplierMoneyInput(moneyInput);
       });
       document.addEventListener('change', function(event) {
         var overpaymentToggle = event.target.closest('.js-supplier-pay-allow-overpayment');

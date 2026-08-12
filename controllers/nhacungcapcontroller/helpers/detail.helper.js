@@ -1,7 +1,7 @@
 const { mongoose, querystring, NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, DiaChiNhaCungCap, PhieuXuatNoiBo, CTXuatNoiBo, NhapVatChua, XuatVatChua, PhieuThuChi, buildSupplierHangHoaExportPack, buildSupplierPurchaseInvoiceExportPack, handleSupplierDebtExport, formatDate, getUserName, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, resolveStoreId, normalizeIdParam, loadAddressTypes } = require('./common.helper');
 const { normalizeFilterQuery, buildFilterQueryString } = require('./filter.helper');
 const { aggregateSupplierPurchaseTotals, applySupplierTotalsFromMap, normalizeDebtWarnSettings } = require('./metrics.helper');
-const { isVisibleSupplierDebtRow, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierUnpaidPurchases, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks } = require('./debt.helper');
+const { isVisibleSupplierDebtRow, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierPayableDocuments, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks } = require('./debt.helper');
 const { buildProfitBySupplierAddressReport } = require('../../../services/profitReport.service');
 
 async function loadSelectedSupplierBase(req, supplierId) {
@@ -79,16 +79,25 @@ async function loadVatChuaPaymentMap(debtRows, supplierId, storeId) {
         trang_thai: { $ne: 'cancelled' },
         nha_cung_cap_id: supplierId,
         $or: [
-            { nhap_vat_chua_id: { $in: ids.map(function(id) { return new mongoose.Types.ObjectId(id); }) } }
+            { nhap_vat_chua_id: { $in: ids.map(function(id) { return new mongoose.Types.ObjectId(id); }) } },
+            { 'allocations.nhap_vat_chua_id': { $in: ids.map(function(id) { return new mongoose.Types.ObjectId(id); }) } }
         ]
     };
     if (codes.length) query.$or.push({ ma_chung_tu_goc: { $in: codes } });
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
 
-    var rows = await PhieuThuChi.find(query).select('nhap_vat_chua_id ma_chung_tu_goc gia_tri').lean();
+    var rows = await PhieuThuChi.find(query).select('nhap_vat_chua_id ma_chung_tu_goc gia_tri allocations').lean();
     return rows.reduce(function(map, row) {
         var id = getRelatedId(row.nhap_vat_chua_id) || codeToId[String(row.ma_chung_tu_goc || '').trim()];
-        if (!id) return map;
+        var allocations = Array.isArray(row.allocations) ? row.allocations : [];
+        var hasAllocation = false;
+        allocations.forEach(function(alloc) {
+            var allocId = getRelatedId(alloc && alloc.nhap_vat_chua_id);
+            if (!allocId) return;
+            hasAllocation = true;
+            map[allocId] = Number(map[allocId] || 0) + Number(alloc.so_tien || 0);
+        });
+        if (!id || hasAllocation) return map;
         map[id] = Number(map[id] || 0) + Number(row.gia_tri || 0);
         return map;
     }, {});
@@ -103,8 +112,7 @@ function applyVatChuaPaymentAmount(sourceRow, amountInfo, vatChuaPaymentMap) {
     var paidForDoc = Math.min(paid, value);
     return Object.assign({}, amountInfo, {
         da_thanh_toan: paidForDoc,
-        con_lai: Math.max(0, value - paidForDoc),
-        tong_no: Math.max(0, Number(amountInfo.tong_no || 0) - paidForDoc)
+        con_lai: Math.max(0, value - paidForDoc)
     });
 }
 
@@ -391,7 +399,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     var supplierDebtHistory = enrichSupplierDebtHistory(mappedDebtAsc.reverse(), debtWarnSettings.warnMinDays);
 
     var supplierInternalExportHistory = await loadSupplierInternalExportHistory(selectedSupplier, storeId);
-    var supplierUnpaidPurchases = await loadSupplierUnpaidPurchases(selectedSupplier._id, storeId);
+    var supplierUnpaidPurchases = await loadSupplierPayableDocuments(selectedSupplier._id, storeId);
     var debtReconciliation = buildDebtReconciliation(sumInvoiceDebt(supplierUnpaidPurchases), selectedSupplier.tong_no);
     var cashBooks = await loadActiveCashBooks();
     var addressTypes = await loadAddressTypes();
@@ -472,7 +480,7 @@ async function loadSupplierDetailTabRenderLocals(req, supplierId, tab) {
         var filter = normalizeFilterQuery(req?.query || {});
         var debtWarnSettings = normalizeDebtWarnSettings(filter);
         locals.supplierDebtHistory = await loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettings);
-        locals.supplierUnpaidPurchases = await loadSupplierUnpaidPurchases(selectedSupplier._id, storeId);
+        locals.supplierUnpaidPurchases = await loadSupplierPayableDocuments(selectedSupplier._id, storeId);
         locals.debtReconciliation = buildDebtReconciliation(sumInvoiceDebt(locals.supplierUnpaidPurchases), selectedSupplier.tong_no);
         locals.cashBooks = await loadActiveCashBooks();
         locals.debtWarnMinDays = debtWarnSettings.warnMinDays;

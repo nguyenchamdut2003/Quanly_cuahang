@@ -521,7 +521,7 @@ async function fetchVoucherFormData(query = {}, store = null, mau = '') {
         || '';
     const address = receipt.khach_hang_id?.dia_chi || '';
     const reason = receipt.loai_thu_chi || receipt.ghi_chu || '';
-    const relatedDoc = receipt.ma_chung_tu_goc || '';
+    const relatedDoc = receipt.chung_tu_khac || receipt.ma_chung_tu_goc || '';
 
     return {
         missingPhieu: false,

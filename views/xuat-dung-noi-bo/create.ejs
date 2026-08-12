@@ -50,7 +50,7 @@
     .vat-chua-table{width:100%;border-collapse:collapse}
     .vat-chua-table th{height:32px;background:#eef7ff;text-align:left;padding:0 10px;border-bottom:1px solid #cde4ff;color:#374151;font-size:13px}
     .vat-chua-table td{height:38px;border-bottom:1px solid #e5e9ee;padding:0 10px;color:#374151;font-size:13px}
-    .side-head{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;border-bottom:1px solid #e8edf3;color:#6b7280;font-size:13px}
+    .side-head{height:52px;display:flex;align-items:center;justify-content:flex-end;padding:0 20px;border-bottom:1px solid #e8edf3;color:#6b7280;font-size:13px}.side-date-input{width:174px;height:30px;border:1px solid #dfe5ed;border-radius:6px;padding:0 8px;font-size:13px;color:#374151;background:#fff}
     .side-body{padding:18px;flex:1;overflow:auto}.field{margin-bottom:16px}.field label{display:block;color:#374151;font-size:13px;font-weight:700;margin-bottom:7px}
     .input{width:100%;height:34px;border:1px solid #dfe5ed;border-radius:6px;padding:0 10px;font-size:13px;outline:none;background:#fff}.textarea{height:38px;padding:9px 10px;resize:vertical}
     .readonly{height:34px;display:flex;align-items:center;color:#4b5563;font-size:13px}.total{display:flex;align-items:center;justify-content:space-between;margin:20px 0;font-weight:700;color:#374151}.total strong{font-size:18px}
@@ -127,7 +127,7 @@
       </div>
     </section>
     <aside class="right">
-      <div class="side-head"><%= new Date().toLocaleString('vi-VN') %></div>
+      <div class="side-head"><input id="ngayXuat" class="side-date-input" type="datetime-local" value="<%= todayValue %>"></div>
       <div class="side-body">
         <div class="field"><label>Mã xuất dùng nội bộ</label><input class="input" disabled value="<%= typeof nextCode !== 'undefined' ? nextCode : '' %>" placeholder="Mã phiếu tự động"></div>
         <div class="field"><label>Trạng thái</label><div class="readonly">Phiếu tạm</div></div>
@@ -231,6 +231,23 @@
       return date.toLocaleDateString('vi-VN');
     }
 
+    function parseFormattedNumber(value) {
+      const raw = String(value || '').replace(/\./g, '').replace(/,/g, '').trim();
+      const number = Number(raw);
+      return Number.isFinite(number) ? number : 0;
+    }
+
+    function formatInputNumber(value) {
+      const number = Number(value || 0);
+      return number > 0 ? Math.floor(number).toLocaleString('vi-VN') : '';
+    }
+
+    function formatNumericInput(input) {
+      if (!input) return;
+      const value = parseFormattedNumber(input.value);
+      input.value = value > 0 ? Math.floor(value).toLocaleString('vi-VN') : '';
+    }
+
     function itemHasLotGrid(item) {
       if (!item || !item.has_quy_cach) return false;
       const rows = item.quy_cach_items || [];
@@ -245,8 +262,10 @@
         if (!map.has(lotKey)) {
           map.set(lotKey, {
             lotKey: lotKey,
+            ten_lo: row.ten_lo || '',
+            ma_lo: row.ma_lo || '',
             lot_label: row.lot_label || '',
-            lot_name: row.lot_name || row.lot_label || '',
+            lot_name: row.ten_lo || row.lot_name || '',
             lot_ngay_nhap: row.lot_ngay_nhap || '',
             lot_han_su_dung: row.lot_han_su_dung || '',
             items: []
@@ -270,7 +289,7 @@
       const importDate = formatDateOnly(lot.lot_ngay_nhap);
       const expiryDate = formatDateOnly(lot.lot_han_su_dung);
       const datePart = [importDate, expiryDate ? ('HSD: ' + expiryDate) : ''].filter(Boolean).join(' - ');
-      return { ton: ton, xuat: xuat, lotName: lot.lot_name || lot.lot_label || 'Lô không tên', datePart: datePart };
+      return { ton: ton, xuat: xuat, lotName: lot.ten_lo || lot.lot_name || lot.ma_lo || lot.lot_label || 'Lô không tên', datePart: datePart };
     }
     function maxLotColumnsInItems() {
       return items.reduce(function(max, item) {
@@ -296,7 +315,12 @@
         return;
       }
       const lotHeaders = Array.from({ length: maxLots }, function(_, index) {
-        return '<th class="num lot-col">Lô ' + (index + 1) + '</th>';
+        const lotName = items.reduce(function(label, item) {
+          if (label || !itemHasLotGrid(item)) return label;
+          const lot = groupLotsForItem(item)[index];
+          return lot ? lotGroupSummary(lot).lotName : '';
+        }, '');
+        return '<th class="num lot-col">' + escapeHtml(lotName || ('Lô ' + (index + 1))) + '</th>';
       }).join('');
       thead.innerHTML = '<tr>' +
         '<th style="width:60px">STT</th>' +
@@ -496,8 +520,10 @@
                 lo_hang_id: qc.lo_hang_id || '',
                 ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
                 ten_thuoc_tinh: qc.ten_thuoc_tinh || qc.ten_quy_cach || '',
+                ten_lo: qc.ten_lo || '',
+                ma_lo: qc.ma_lo || '',
                 lot_label: qc.lot_label || '',
-                lot_name: qc.lot_name || qc.lot_label || '',
+                lot_name: qc.ten_lo || qc.lot_name || '',
                 lot_ngay_nhap: qc.lot_ngay_nhap || '',
                 lot_han_su_dung: qc.lot_han_su_dung || '',
                 ton_hien_tai: Number(qc.ton_hien_tai || 0),
@@ -700,7 +726,7 @@
           '<td>' + escapeHtml(item.ma_vat_chua) + '</td>' +
           '<td>' + escapeHtml(item.ten_vat_chua) + '</td>' +
           '<td class="num">' + Number(item.so_luong_ton || 0).toLocaleString('vi-VN') + '</td>' +
-          '<td class="num"><input class="qty-input" type="number" min="1" max="' + Number(item.so_luong_ton || 0) + '" value="' + Number(item.so_luong || 1) + '" onchange="updateVatChuaQty(\'' + idAttr + '\',this.value)"></td>' +
+          '<td class="num"><input class="qty-input" type="text" inputmode="numeric" value="' + formatInputNumber(item.so_luong || 1) + '" oninput="formatNumericInput(this)" onchange="updateVatChuaQty(\'' + idAttr + '\',this.value)"></td>' +
           '<td><button class="remove" type="button" onclick="removeVatChuaItem(\'' + idAttr + '\')"><i class="fa-solid fa-xmark"></i></button></td>' +
         '</tr>';
       }).join('');
@@ -710,7 +736,7 @@
     function updateVatChuaQty(id, val) {
       const item = vatChuaItems.find(function(row) { return row.vat_chua_id === id; });
       if (!item) return;
-      const qty = Math.max(1, Math.floor(Number(val) || 1));
+      const qty = Math.max(1, Math.floor(parseFormattedNumber(val) || 1));
       if (qty > Number(item.so_luong_ton || 0)) {
         alert('Số lượng vật chứa vượt tồn.');
         renderVatChuaItems();
@@ -758,7 +784,7 @@
       return '<tr>' +
         '<th>' + escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '--') + '</th>' +
         '<td class="num">' + Number(qc.ton_hien_tai || 0).toLocaleString('vi-VN') + '</td>' +
-        '<td class="num"><input class="qc-input" type="number" min="0" max="' + Number(qc.ton_hien_tai || 0) + '" value="' + (qc.so_luong_xuat || '') + '" onchange="updateQuyCachQty(\'' + idAttr + '\',' + qcIdx + ',this.value)"></td>' +
+        '<td class="num"><input class="qc-input" type="text" inputmode="numeric" value="' + formatInputNumber(qc.so_luong_xuat || 0) + '" oninput="formatNumericInput(this)" onchange="updateQuyCachQty(\'' + idAttr + '\',' + qcIdx + ',this.value)"></td>' +
         '<td class="num">' + Number(qc.gia_von || item.gia_von || 0).toLocaleString('vi-VN') + '</td>' +
         '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
       '</tr>';
@@ -791,7 +817,7 @@
             return '<tr>' +
               '<th>' + escapeHtml(label || '--') + '</th>' +
               '<td class="num">' + Number(qc.ton_hien_tai || 0).toLocaleString('vi-VN') + '</td>' +
-              '<td class="num"><input class="qc-input" type="number" min="0" max="' + Number(qc.ton_hien_tai || 0) + '" value="' + (qc.so_luong_xuat || '') + '" onchange="updateQuyCachQty(\'' + idAttr + '\',' + qcIdx + ',this.value)"></td>' +
+              '<td class="num"><input class="qc-input" type="text" inputmode="numeric" value="' + formatInputNumber(qc.so_luong_xuat || 0) + '" oninput="formatNumericInput(this)" onchange="updateQuyCachQty(\'' + idAttr + '\',' + qcIdx + ',this.value)"></td>' +
               '<td class="num">' + Number(qc.gia_von || item.gia_von || 0).toLocaleString('vi-VN') + '</td>' +
               '<td class="num"><b>' + value.toLocaleString('vi-VN') + '</b></td>' +
             '</tr>';
@@ -832,7 +858,7 @@
       const value = itemValue(item);
       const cost = itemCost(item);
       const idAttr = escapeAttr(item.hang_hoa_id);
-      const qtyCell = '<input class="qty-input" type="number" min="1" max="' + item.ton_kho + '" value="' + item.so_luong + '" onchange="updateQty(\'' + idAttr + '\',this.value)">';
+      const qtyCell = '<input class="qty-input" type="text" inputmode="numeric" value="' + formatInputNumber(item.so_luong || 0) + '" oninput="formatNumericInput(this)" onchange="updateQty(\'' + idAttr + '\',this.value)">';
       if (maxLots > 0) {
         return '<tr>' +
           '<td>' + (index + 1) + '</td>' +
@@ -881,7 +907,7 @@
     function updateQty(id,val){
       const item = items.find(i => i.hang_hoa_id === id);
       if (!item) return;
-      const qty = Math.max(1, Number(val) || 1);
+      const qty = Math.max(1, parseFormattedNumber(val) || 1);
       if (qty > Number(item.ton_kho || 0)) {
         alert('Số lượng vượt tồn kho trong kho.');
         renderItems();
@@ -894,7 +920,7 @@
       const item = items.find(i => i.hang_hoa_id === id);
       if (!item || !item.quy_cach_items || !item.quy_cach_items[qcIdx]) return;
       const qc = item.quy_cach_items[qcIdx];
-      const qty = Math.max(0, Number(val) || 0);
+      const qty = Math.max(0, parseFormattedNumber(val) || 0);
       if (qty > Number(qc.ton_hien_tai || 0)) {
         alert('Số lượng vượt tồn của thuộc tính này.');
         renderItems();
@@ -971,7 +997,7 @@
       const payloadItems = buildPayloadItems();
       const payloadVatChuaItems = buildPayloadVatChuaItems();
       if (!payloadItems.length && !payloadVatChuaItems.length) return alert('Vui lòng nhập số lượng xuất cho ít nhất 1 hàng hóa hoặc vật chứa.');
-      const data = {trang_thai:status,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items:payloadItems,vat_chua_items:payloadVatChuaItems};
+      const data = {trang_thai:status,ngay_xuat:document.getElementById('ngayXuat').value,loai_xuat:loaiXuat,loai_nguoi_nhan:loaiNguoiNhan,nguoi_nhan:receiverName,cua_hang_id:document.getElementById('storeId').value,kho_id:document.getElementById('khoId').value,ghi_chu:document.getElementById('ghiChu').value,items:payloadItems,vat_chua_items:payloadVatChuaItems};
       setXnbSaving(status, true);
       try{
         const res = await fetch('/xuat-dung-noi-bo/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});

@@ -42,7 +42,7 @@ async function loadKiemKhoListPage(query) {
         .populate('cua_hang_id')
         .populate('kho_id')
         .populate('nguoi_tao_id')
-        .sort({ created_at: -1 })
+        .sort({ ngay_kiem: -1, created_at: -1 })
         .skip(skip)
         .limit(pageSize);
     const ticketIds = list.map(item => item._id);

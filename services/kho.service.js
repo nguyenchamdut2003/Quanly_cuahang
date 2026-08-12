@@ -129,7 +129,7 @@ async function ghiLichSuKho(params) {
     ton_kho_sau: Number(params.ton_kho_sau) || 0,
     gia_tri_thay_doi: Number(params.gia_tri_thay_doi) || 0,
     ghi_chu: params.ghi_chu,
-    ngay: new Date()
+    ngay: params.ngay ? new Date(params.ngay) : new Date()
   };
 
   if (loHangId) {
@@ -340,6 +340,7 @@ async function dieuChinhTonQuyCach(params, direction) {
     nguoi_tao_id: params.nguoi_tao_id,
     loai_phieu: params.loai_phieu,
     ma_phieu: params.ma_phieu,
+    ngay: params.ngay,
     so_luong_thay_doi: direction * quantity,
     ton_kho_truoc: beforeQc,
     ton_kho_sau: nextQc,
@@ -420,6 +421,7 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
       nguoi_tao_id: params.nguoi_tao_id,
       loai_phieu: params.loai_phieu,
       ma_phieu: params.ma_phieu,
+      ngay: params.ngay,
       so_luong_thay_doi: -take,
       ton_kho_truoc: beforeQc,
       ton_kho_sau: qcStock.so_luong,
@@ -494,6 +496,7 @@ async function truTonKhoQuyCach(params, inventory, quantity) {
         nguoi_tao_id: params.nguoi_tao_id,
         loai_phieu: params.loai_phieu,
         ma_phieu: params.ma_phieu,
+        ngay: params.ngay,
         so_luong_thay_doi: -remaining,
         ton_kho_truoc: beforeQc,
         ton_kho_sau: qcStock.so_luong,
@@ -605,6 +608,7 @@ async function congTonKho(params) {
     nguoi_tao_id: params.nguoi_tao_id,
     loai_phieu: params.loai_phieu,
     ma_phieu: params.ma_phieu,
+    ngay: params.ngay,
     so_luong_thay_doi: quantity,
     ton_kho_sau: inventory.so_luong,
     gia_tri_thay_doi: quantity * cost,
@@ -703,6 +707,7 @@ async function truTonKho(params) {
         nguoi_tao_id: params.nguoi_tao_id,
         loai_phieu: params.loai_phieu,
         ma_phieu: params.ma_phieu,
+        ngay: params.ngay,
         so_luong_thay_doi: -take,
         ton_kho_sau: inventory.so_luong - (quantity - remaining),
         gia_tri_thay_doi: -(take * (Number(row.gia_von) || 0)),
@@ -772,6 +777,7 @@ async function truTonKho(params) {
     nguoi_tao_id: params.nguoi_tao_id,
     loai_phieu: params.loai_phieu,
     ma_phieu: params.ma_phieu,
+    ngay: params.ngay,
     so_luong_thay_doi: -quantity,
     ton_kho_sau: inventory.so_luong,
     gia_tri_thay_doi: -(quantity * unitCost),

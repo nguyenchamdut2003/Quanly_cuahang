@@ -149,16 +149,21 @@ function normalizeAllocations(value) {
   return value.map(item => {
 
     const phieuNhapId = optionalId(item && item.phieu_nhap_id);
+    const nhapVatChuaId = optionalId(item && item.nhap_vat_chua_id);
 
     const amount = parseMoney(item && item.so_tien);
 
-    if (!phieuNhapId || amount <= 0) return null;
+    if ((!phieuNhapId && !nhapVatChuaId) || amount <= 0) return null;
 
     return {
 
-      phieu_nhap_id: phieuNhapId,
+      phieu_nhap_id: phieuNhapId || undefined,
+
+      nhap_vat_chua_id: nhapVatChuaId || undefined,
 
       ma_phieu_nhap: String(item.ma_phieu_nhap || '').trim(),
+
+      ma_nhap_vat_chua: String(item.ma_nhap_vat_chua || '').trim(),
 
       so_tien: amount,
 
@@ -211,6 +216,10 @@ function sanitizeDocumentRefs(data) {
   const maChungTu = String(data.ma_chung_tu_goc || '').trim();
 
   if (maChungTu) refs.ma_chung_tu_goc = maChungTu;
+
+  const chungTuKhac = String(data.chung_tu_khac || '').trim();
+
+  if (docType === 'khac' && chungTuKhac) refs.chung_tu_khac = chungTuKhac;
 
 
 
@@ -599,6 +608,8 @@ async function taoPhieuThuChi(data = {}, options = {}) {
     chamcongmoi_bang_luong_id: optionalId(data.chamcongmoi_bang_luong_id),
 
     ma_chung_tu_goc: docRefs.ma_chung_tu_goc,
+
+    chung_tu_khac: docRefs.chung_tu_khac,
 
     allocation_type: data.allocation_type,
 

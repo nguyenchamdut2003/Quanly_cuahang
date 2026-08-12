@@ -5,7 +5,7 @@ const { buildCsvContent } = require('../../helpers/export.helper');
 
 async function buildKiemKhoListCsv(query) {
     const { filter } = buildKiemKhoFilter(query);
-    const tickets = await PhieuKiemKho.find(filter).populate('kho_id').populate('nguoi_tao_id').sort({ created_at: -1 });
+    const tickets = await PhieuKiemKho.find(filter).populate('kho_id').populate('nguoi_tao_id').sort({ ngay_kiem: -1, created_at: -1 });
     const ticketIds = tickets.map(item => item._id);
     const details = ticketIds.length ? await CTPhieuKiemKho.find({ phieu_kiem_kho_id: { $in: ticketIds } }) : [];
     const summaryMap = details.reduce((acc, item) => {
@@ -22,7 +22,7 @@ async function buildKiemKhoListCsv(query) {
     tickets.forEach(ticket => {
         const summary = summaryMap[String(ticket._id)] || {};
         const creator = ticket.nguoi_tao_id ? (ticket.nguoi_tao_id.ho_ten || ticket.nguoi_tao_id.username || ticket.nguoi_tao_id.email || '') : '';
-        rows.push([ticket.ma_kiem_kho || '', ticket.created_at ? ticket.created_at.toISOString() : '', ticket.trang_thai === 'completed' && ticket.updated_at ? ticket.updated_at.toISOString() : '', ticket.kho_id ? ticket.kho_id.ten_kho : '', creator, ticket.tong_so_luong_thuc_te || summary.actual || 0, ticket.tong_so_luong_lech || 0, summary.positive || 0, summary.negative || 0, ticket.tong_gia_tri_lech || summary.value || 0, ticket.trang_thai || '', ticket.ghi_chu || '']);
+        rows.push([ticket.ma_kiem_kho || '', ticket.ngay_kiem ? ticket.ngay_kiem.toISOString() : (ticket.created_at ? ticket.created_at.toISOString() : ''), ticket.trang_thai === 'completed' && (ticket.ngay_kiem || ticket.updated_at) ? (ticket.ngay_kiem || ticket.updated_at).toISOString() : '', ticket.kho_id ? ticket.kho_id.ten_kho : '', creator, ticket.tong_so_luong_thuc_te || summary.actual || 0, ticket.tong_so_luong_lech || 0, summary.positive || 0, summary.negative || 0, ticket.tong_gia_tri_lech || summary.value || 0, ticket.trang_thai || '', ticket.ghi_chu || '']);
     });
     return { filename: 'kiem-kho.csv', content: buildCsvContent(rows) };
 }
@@ -47,10 +47,10 @@ async function buildKiemKhoDetailCsv(id) {
     details.forEach(item => {
         const product = item.hang_hoa_id || {};
         const lot = item.lo_hang_id || {};
-        rows.push([ticket.ma_kiem_kho || '', ticket.created_at ? ticket.created_at.toISOString() : '', ticket.trang_thai === 'completed' && ticket.updated_at ? ticket.updated_at.toISOString() : '', ticket.tong_so_luong_thuc_te || totalActual || 0, ticket.tong_gia_tri_thuc_te || 0, ticket.tong_so_luong_lech || 0, positiveDiff, negativeDiff, ticket.ghi_chu || '', ticket.trang_thai || '', product.ma_hang || '', product.ten_hang || '', product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '', product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi : '', lotDisplayFromPopulated(lot), lot.ma_lo || '', item.ten_quy_cach || '', item.ton_kho_he_thong || 0, item.so_luong_thuc_te || 0, item.so_luong_lech || 0, item.gia_tri_lech || 0]);
+        rows.push([ticket.ma_kiem_kho || '', ticket.ngay_kiem ? ticket.ngay_kiem.toISOString() : (ticket.created_at ? ticket.created_at.toISOString() : ''), ticket.trang_thai === 'completed' && (ticket.ngay_kiem || ticket.updated_at) ? (ticket.ngay_kiem || ticket.updated_at).toISOString() : '', ticket.tong_so_luong_thuc_te || totalActual || 0, ticket.tong_gia_tri_thuc_te || 0, ticket.tong_so_luong_lech || 0, positiveDiff, negativeDiff, ticket.ghi_chu || '', ticket.trang_thai || '', product.ma_hang || '', product.ten_hang || '', product.thuong_hieu_id ? product.thuong_hieu_id.ten_thuong_hieu : '', product.don_vi_tinh_id ? product.don_vi_tinh_id.ten_don_vi : '', lotDisplayFromPopulated(lot), lot.ma_lo || '', item.ten_quy_cach || '', item.ton_kho_he_thong || 0, item.so_luong_thuc_te || 0, item.so_luong_lech || 0, item.gia_tri_lech || 0]);
     });
     if (!details.length) {
-        rows.push([ticket.ma_kiem_kho || '', ticket.created_at ? ticket.created_at.toISOString() : '', ticket.trang_thai === 'completed' && ticket.updated_at ? ticket.updated_at.toISOString() : '', ticket.tong_so_luong_thuc_te || 0, ticket.tong_gia_tri_thuc_te || 0, ticket.tong_so_luong_lech || 0, 0, 0, ticket.ghi_chu || '', ticket.trang_thai || '', '', '', '', '', '', '', '', '', '', '', '']);
+        rows.push([ticket.ma_kiem_kho || '', ticket.ngay_kiem ? ticket.ngay_kiem.toISOString() : (ticket.created_at ? ticket.created_at.toISOString() : ''), ticket.trang_thai === 'completed' && (ticket.ngay_kiem || ticket.updated_at) ? (ticket.ngay_kiem || ticket.updated_at).toISOString() : '', ticket.tong_so_luong_thuc_te || 0, ticket.tong_gia_tri_thuc_te || 0, ticket.tong_so_luong_lech || 0, 0, 0, ticket.ghi_chu || '', ticket.trang_thai || '', '', '', '', '', '', '', '', '', '', '', '']);
     }
     return { filename: `${ticket.ma_kiem_kho || 'kiem-kho'}.csv`, content: buildCsvContent(rows) };
 }

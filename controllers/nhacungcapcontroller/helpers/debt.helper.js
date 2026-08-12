@@ -1,4 +1,4 @@
-const { mongoose, PhieuNhap, SoQuy, Counter, parseMoney, SUPPLIER_DEBT_WARN_DEFAULT_DAYS } = require('./common.helper');
+const { mongoose, PhieuNhap, NhapVatChua, PhieuThuChi, SoQuy, Counter, parseMoney, SUPPLIER_DEBT_WARN_DEFAULT_DAYS } = require('./common.helper');
 
 function isVisibleSupplierDebtRow(row) {
     if (!row) return false;
@@ -225,9 +225,96 @@ async function loadSupplierUnpaidPurchases(supplierId, storeId) {
         .lean();
 }
 
+async function loadVatChuaPaidByImportIds(importIds, supplierId, storeId) {
+    var ids = (Array.isArray(importIds) ? importIds : [])
+        .filter(function(id) { return id && mongoose.Types.ObjectId.isValid(String(id)); })
+        .map(function(id) { return new mongoose.Types.ObjectId(String(id)); });
+    if (!ids.length) return {};
+
+    var match = {
+        loai_phieu: 'chi',
+        nha_cung_cap_id: supplierId,
+        trang_thai: { $ne: 'cancelled' },
+        $or: [
+            { nhap_vat_chua_id: { $in: ids } },
+            { 'allocations.nhap_vat_chua_id': { $in: ids } }
+        ]
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) match.cua_hang_id = storeId;
+
+    var rows = await PhieuThuChi.find(match)
+        .select('nhap_vat_chua_id gia_tri allocations')
+        .lean();
+    return rows.reduce(function(map, receipt) {
+        var directId = receipt.nhap_vat_chua_id ? String(receipt.nhap_vat_chua_id) : '';
+        var allocations = Array.isArray(receipt.allocations) ? receipt.allocations : [];
+        var hasVatChuaAllocation = false;
+        allocations.forEach(function(alloc) {
+            var id = alloc && alloc.nhap_vat_chua_id ? String(alloc.nhap_vat_chua_id) : '';
+            if (!id) return;
+            hasVatChuaAllocation = true;
+            map[id] = Number(map[id] || 0) + Math.max(0, Number(alloc.so_tien || 0));
+        });
+        if (directId && !hasVatChuaAllocation) {
+            map[directId] = Number(map[directId] || 0) + Math.max(0, Number(receipt.gia_tri || 0));
+        }
+        return map;
+    }, {});
+}
+
+async function loadSupplierPayableDocuments(supplierId, storeId) {
+    var purchases = await loadSupplierUnpaidPurchases(supplierId, storeId);
+    var vatChuaQuery = {
+        doi_tuong_type: 'nha_cung_cap',
+        doi_tuong_id: supplierId,
+        trang_thai: 'active',
+        tong_tien: { $gt: 0 }
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) vatChuaQuery.cua_hang_id = storeId;
+    var vatChuaRows = await NhapVatChua.find(vatChuaQuery)
+        .sort({ created_at: 1 })
+        .select('ma_nhap_vat_chua created_at tong_tien tong_so_luong')
+        .lean();
+    var vatChuaPaidMap = await loadVatChuaPaidByImportIds(vatChuaRows.map(function(row) { return row._id; }), supplierId, storeId);
+    var docs = purchases.map(function(row) {
+        return Object.assign({}, row, {
+            doc_type: 'phieu_nhap',
+            doc_id: row._id,
+            ma_chung_tu: row.ma_phieu_nhap || '',
+            ngay_chung_tu: row.ngay_nhap || row.created_at,
+            gia_tri_phai_tra: Number(row.can_tra_ncc || row.tong_tien || 0),
+            da_thanh_toan: Number(row.da_tra_ncc || 0),
+            con_no: Math.max(0, Number(row.con_no_ncc || 0))
+        });
+    });
+    vatChuaRows.forEach(function(row) {
+        var value = Math.max(0, Number(row.tong_tien || 0));
+        var paid = Math.min(value, Math.max(0, Number(vatChuaPaidMap[String(row._id)] || 0)));
+        var debt = Math.max(0, value - paid);
+        if (debt <= 0) return;
+        docs.push({
+            _id: row._id,
+            doc_type: 'nhap_vat_chua',
+            doc_id: row._id,
+            ma_chung_tu: row.ma_nhap_vat_chua || '',
+            ma_nhap_vat_chua: row.ma_nhap_vat_chua || '',
+            ngay_chung_tu: row.created_at,
+            tong_tien: value,
+            gia_tri_phai_tra: value,
+            da_thanh_toan: paid,
+            con_no: debt,
+            con_no_ncc: debt
+        });
+    });
+    docs.sort(function(a, b) {
+        return new Date(a.ngay_chung_tu || a.created_at || 0).getTime() - new Date(b.ngay_chung_tu || b.created_at || 0).getTime();
+    });
+    return docs;
+}
+
 function sumInvoiceDebt(purchases) {
     return (Array.isArray(purchases) ? purchases : []).reduce(function(sum, row) {
-        return sum + Math.max(0, Number(row.con_no_ncc || 0));
+        return sum + Math.max(0, Number(row.con_no_ncc != null ? row.con_no_ncc : row.con_no || 0));
     }, 0);
 }
 
@@ -304,6 +391,8 @@ module.exports = {
   resolveSupplierDaThanhToan,
   normalizeSupplierPaymentInput,
   loadSupplierUnpaidPurchases,
+  loadVatChuaPaidByImportIds,
+  loadSupplierPayableDocuments,
   sumInvoiceDebt,
   buildDebtReconciliation,
   makeSupplierDebtTransactionCode,

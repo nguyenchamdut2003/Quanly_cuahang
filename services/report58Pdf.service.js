@@ -273,7 +273,7 @@ function collectRelatedDocuments(receipt) {
         });
     }
     if (!docs.length) {
-        const fallback = safeText(receipt.ma_chung_tu_goc);
+        const fallback = safeText(receipt.chung_tu_khac) || safeText(receipt.ma_chung_tu_goc);
         if (fallback) docs.push({ label: 'Chứng từ gốc', code: fallback });
     }
     return docs;

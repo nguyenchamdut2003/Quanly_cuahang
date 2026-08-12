@@ -32,6 +32,15 @@ async function makeXnbCode() {
     return 'XNB' + String(next).padStart(6, '0');
 }
 
+function formatDateTimeLocal(date = new Date()) {
+    const pad = value => String(value).padStart(2, '0');
+    return [
+        date.getFullYear(),
+        pad(date.getMonth() + 1),
+        pad(date.getDate())
+    ].join('-') + 'T' + [pad(date.getHours()), pad(date.getMinutes())].join(':');
+}
+
 async function loadProductsForXnbKho(khoId, keyword) {
     const [products, tonKhoRows, tonKhoLoRows, quyCachRows] = await Promise.all([
         HangHoa.find({ trang_thai: { $ne: 'inactive' } })
@@ -65,14 +74,17 @@ async function loadProductsForXnbKho(khoId, keyword) {
         const lot = row.lo_hang_id;
         if (lot && lot.trang_thai === 'huy') return map;
         const key = String(row.hang_hoa_id);
-        const lotName = lot ? (String(lot.ten_lo || '').trim() || String(lot.ma_lo || '').trim()) : '';
+        const tenLo = lot ? String(lot.ten_lo || '').trim() : '';
+        const maLo = lot ? String(lot.ma_lo || '').trim() : '';
         if (!map[key]) map[key] = [];
         map[key].push({
             lo_hang_id: row.lo_hang_id ? String(row.lo_hang_id._id || row.lo_hang_id) : '',
             ten_quy_cach: String(row.ten_quy_cach || row.ten_thuoc_tinh || '').trim(),
             ten_thuoc_tinh: String(row.ten_thuoc_tinh || row.ten_quy_cach || '').trim(),
-            lot_label: lotName,
-            lot_name: lotName,
+            ten_lo: tenLo,
+            ma_lo: maLo,
+            lot_label: tenLo || maLo,
+            lot_name: tenLo,
             lot_ngay_nhap: lot ? lot.ngay_nhap : null,
             lot_han_su_dung: lot ? lot.han_su_dung : null,
             ton_hien_tai: Number(row.so_luong || 0),
@@ -507,7 +519,7 @@ async function loadExportTickets(filter) {
     const tickets = await PhieuXuatNoiBo.find(filter)
         .populate('kho_id')
         .populate('nguoi_tao_id')
-        .sort({ created_at: -1 });
+        .sort({ ngay_xuat: -1, created_at: -1 });
     const ticketIds = tickets.map(ticket => ticket._id);
     const details = ticketIds.length
         ? await CTXuatNoiBo.find({ phieu_xuat_id: { $in: ticketIds } })
@@ -572,7 +584,7 @@ exports.index = async (req, res, next) => {
             .populate('cua_hang_id')
             .populate('kho_id')
             .populate('nguoi_tao_id')
-            .sort({ created_at: -1 })
+            .sort({ ngay_xuat: -1, created_at: -1 })
             .skip(skip)
             .limit(pageSize);
 
@@ -678,7 +690,8 @@ exports.getCreate = async (req, res, next) => {
             warehouses,
             customers,
             suppliers,
-            loaiXuatList
+            loaiXuatList,
+            todayValue: formatDateTimeLocal()
         });
     } catch (error) {
         next(error);
@@ -791,12 +804,18 @@ exports.postAdd = async (req, res, next) => {
             nguoi_nhan,
             ghi_chu,
             trang_thai,
-            cong_don_vao_the
+            cong_don_vao_the,
+            ngay_xuat
         } = req.body || {};
         const items = parseItems(req.body?.items);
         const sessionStoreId = await resolveStoreId(req);
         const effectiveStoreId = cua_hang_id || sessionStoreId;
+        const ngayXuat = ngay_xuat ? new Date(ngay_xuat) : new Date();
         let normalizedVatChuaItems = [];
+
+        if (Number.isNaN(ngayXuat.getTime())) {
+            return res.status(400).json({ success: false, message: 'Ngày tạo không hợp lệ' });
+        }
 
         if (!kho_id) {
             return res.status(400).json({ success: false, message: 'Vui lòng chọn kho.' });
@@ -876,6 +895,7 @@ exports.postAdd = async (req, res, next) => {
         const ma_xuat_noi_bo = await makeXnbCode();
         const phieu = await PhieuXuatNoiBo.create({
             ma_xuat_noi_bo,
+            ngay_xuat: ngayXuat,
             loai_xuat: loai_xuat || 'xuat_dung_noi_bo',
             cua_hang_id: effectiveStoreId || kho.cua_hang_id,
             kho_id: kho._id,
@@ -915,6 +935,7 @@ exports.postAdd = async (req, res, next) => {
                         nguoi_tao_id: req.user?._id,
                         loai_phieu: 'xuat_noi_bo',
                         ma_phieu: ma_xuat_noi_bo,
+                        ngay: ngayXuat,
                         ghi_chu: ghi_chu || 'Xuat dung noi bo'
                     });
                 } catch (_) {
@@ -1029,7 +1050,7 @@ exports.getExportCsv = async (req, res, next) => {
         const tickets = await PhieuXuatNoiBo.find(filter)
             .populate('cua_hang_id')
             .populate('kho_id')
-            .sort({ created_at: -1 });
+            .sort({ ngay_xuat: -1, created_at: -1 });
 
         const rows = [['ma_xuat_noi_bo', 'loai_xuat', 'tong_so_luong', 'tong_gia_tri', 'kho', 'trang_thai']];
         tickets.forEach(t => {

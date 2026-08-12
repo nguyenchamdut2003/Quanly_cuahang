@@ -63,6 +63,15 @@ function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || '').trim());
 }
 
+function formatDateTimeLocal(date = new Date()) {
+  const pad = value => String(value).padStart(2, '0');
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate())
+  ].join('-') + 'T' + [pad(date.getHours()), pad(date.getMinutes())].join(':');
+}
+
 async function resolveStoreId(req) {
   const sessionStoreId = req && req.session ? String(req.session.cua_hang_id || '').trim() : '';
   if (isObjectId(sessionStoreId)) return sessionStoreId;
@@ -647,7 +656,7 @@ exports.createPage = async function(req, res, next) {
       user: req.user,
       warehouses,
       nextCode: await makeCode(),
-      todayValue: new Date().toISOString().slice(0, 16),
+      todayValue: formatDateTimeLocal(),
       copyDraftJson,
       copyFromError
     });
@@ -664,6 +673,10 @@ exports.createSubmit = async function(req, res) {
     const khoId = String(body.kho_id || '').trim();
     const phieuNhapId = String(body.phieu_nhap_id || '').trim();
     const reason = String(body.ly_do_huy || '').trim();
+    const ngayXuat = body.ngay_xuat ? new Date(body.ngay_xuat) : new Date();
+    if (Number.isNaN(ngayXuat.getTime())) {
+      return res.status(400).json({ success: false, message: 'Ngày tạo không hợp lệ' });
+    }
     if (!isObjectId(khoId)) return res.status(400).json({ success: false, message: 'Vui lòng chọn kho hủy' });
     if (!isObjectId(phieuNhapId)) return res.status(400).json({ success: false, message: 'Vui lòng chọn phiếu nhập gốc' });
     if (!reason) return res.status(400).json({ success: false, message: 'Vui lòng nhập lý do hủy' });
@@ -705,7 +718,7 @@ exports.createSubmit = async function(req, res) {
     const code = String(body.ma_xuat_huy || '').trim() || await makeCode();
     const ticket = await PhieuXuatHuy.create({
       ma_xuat_huy: code,
-      ngay_xuat: body.ngay_xuat ? new Date(body.ngay_xuat) : new Date(),
+      ngay_xuat: ngayXuat,
       cua_hang_id: storeId || kho.cua_hang_id,
       chi_nhanh_id: kho.chi_nhanh_id,
       kho_id: khoId,

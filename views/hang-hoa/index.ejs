@@ -1056,16 +1056,6 @@
       if (productTrashModalClose) productTrashModalClose.addEventListener('click', closeProductTrashModal);
       if (productTrashCancel) productTrashCancel.addEventListener('click', closeProductTrashModal);
       if (productTrashConfirm) productTrashConfirm.addEventListener('click', confirmProductTrashMove);
-      if (productTrashModalOverlay) {
-        productTrashModalOverlay.addEventListener('click', function(event) {
-          if (event.target === productTrashModalOverlay) closeProductTrashModal();
-        });
-      }
-      document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape' && productTrashModalOverlay && productTrashModalOverlay.classList.contains('is-open')) {
-          closeProductTrashModal();
-        }
-      });
 
       var productFormUnitTrigger = document.getElementById('productFormUnitTrigger');
       var productFormUnitLabel = document.getElementById('productFormUnitLabel');
@@ -1447,11 +1437,6 @@
           openUnitTypeModal('add');
         });
       }
-      if (unitTypeModalOverlay) {
-        unitTypeModalOverlay.addEventListener('click', function(event) {
-          if (event.target === unitTypeModalOverlay) closeUnitTypeModal();
-        });
-      }
       if (unitTypeModalClose) unitTypeModalClose.addEventListener('click', closeUnitTypeModal);
       if (unitTypeModalCancel) unitTypeModalCancel.addEventListener('click', closeUnitTypeModal);
 
@@ -1503,11 +1488,6 @@
         productGroupModalAddBtn.addEventListener('click', function(event) {
           event.preventDefault();
           openProductGroupModal('add');
-        });
-      }
-      if (productGroupModalOverlay) {
-        productGroupModalOverlay.addEventListener('click', function(event) {
-          if (event.target === productGroupModalOverlay) closeProductGroupModal();
         });
       }
       if (productGroupModalClose) productGroupModalClose.addEventListener('click', closeProductGroupModal);
@@ -1629,13 +1609,6 @@
       if (openBtn)   openBtn.addEventListener('click', openModal);
       if (closeBtn)  closeBtn.addEventListener('click', closeModal);
       if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-
-      // Close on backdrop click
-      if (overlay) {
-        overlay.addEventListener('click', function(e) {
-          if (e.target === overlay) closeModal();
-        });
-      }
 
       // Deselect all
       if (deselectBtn) {

@@ -24,18 +24,26 @@ function buildKiemKhoFilter(query = {}) {
 
     const now = new Date();
     if (dateMode === 'this_month') {
-        filter.created_at = {
+        const range = {
             $gte: new Date(now.getFullYear(), now.getMonth(), 1),
             $lt: new Date(now.getFullYear(), now.getMonth() + 1, 1)
         };
+        filter.$or = [
+            { ngay_kiem: range },
+            { $and: [{ $or: [{ ngay_kiem: null }, { ngay_kiem: { $exists: false } }] }, { created_at: range }] }
+        ];
     } else if (dateMode === 'custom' && (query.from_date || query.to_date)) {
-        filter.created_at = {};
-        if (query.from_date) filter.created_at.$gte = new Date(query.from_date);
+        const range = {};
+        if (query.from_date) range.$gte = new Date(query.from_date);
         if (query.to_date) {
             const toDate = new Date(query.to_date);
             toDate.setDate(toDate.getDate() + 1);
-            filter.created_at.$lt = toDate;
+            range.$lt = toDate;
         }
+        filter.$or = [
+            { ngay_kiem: range },
+            { $and: [{ $or: [{ ngay_kiem: null }, { ngay_kiem: { $exists: false } }] }, { created_at: range }] }
+        ];
     }
 
     return { filter, q, dateMode, statuses };
