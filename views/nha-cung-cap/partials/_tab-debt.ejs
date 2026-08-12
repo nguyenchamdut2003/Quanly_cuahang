@@ -60,7 +60,7 @@
                         <% } else if (row.nhap_vat_chua_id) { %>
                           <a class="table-code-link" href="/vat-chua?nhap_vat_chua=<%= encodeURIComponent(String(row.nhap_vat_chua_id._id || row.nhap_vat_chua_id)) %>"><%= row.ma_phieu || '--' %></a>
                         <% } else if (row.xuat_vat_chua_id) { %>
-                          <%= row.ma_phieu || '--' %>
+                          <a class="table-code-link" href="/vat-chua?xuat_vat_chua=<%= encodeURIComponent(String(row.xuat_vat_chua_id._id || row.xuat_vat_chua_id)) %>"><%= row.ma_phieu || '--' %></a>
                         <% } else if (row.phieu_thu_chi_id) { %>
                           <%- refLink('receipt', row.phieu_thu_chi_id, row.ma_phieu || '--') %>
                         <% } else { %>

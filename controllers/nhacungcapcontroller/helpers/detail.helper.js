@@ -1,4 +1,4 @@
-const { mongoose, querystring, NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, DiaChiNhaCungCap, PhieuXuatNoiBo, CTXuatNoiBo, NhapVatChua, XuatVatChua, buildSupplierHangHoaExportPack, buildSupplierPurchaseInvoiceExportPack, handleSupplierDebtExport, formatDate, getUserName, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, resolveStoreId, normalizeIdParam, loadAddressTypes } = require('./common.helper');
+const { mongoose, querystring, NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, DiaChiNhaCungCap, PhieuXuatNoiBo, CTXuatNoiBo, NhapVatChua, XuatVatChua, PhieuThuChi, buildSupplierHangHoaExportPack, buildSupplierPurchaseInvoiceExportPack, handleSupplierDebtExport, formatDate, getUserName, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, resolveStoreId, normalizeIdParam, loadAddressTypes } = require('./common.helper');
 const { normalizeFilterQuery, buildFilterQueryString } = require('./filter.helper');
 const { aggregateSupplierPurchaseTotals, applySupplierTotalsFromMap, normalizeDebtWarnSettings } = require('./metrics.helper');
 const { isVisibleSupplierDebtRow, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierUnpaidPurchases, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks } = require('./debt.helper');
@@ -51,6 +51,71 @@ function buildSupplierDetailBaseLocals(req, base) {
         mapCongNoDirection: mapCongNoDirection,
         mapXuatNoiBoStatus: mapXuatNoiBoStatus
     };
+}
+
+function getRelatedId(value) {
+    if (!value) return '';
+    if (typeof value === 'object') return String(value._id || value.id || '');
+    return String(value);
+}
+
+async function loadVatChuaPaymentMap(debtRows, supplierId, storeId) {
+    var codeToId = {};
+    var ids = Array.from(new Set((debtRows || []).map(function(row) {
+        var id = getRelatedId(row && row.nhap_vat_chua_id);
+        var code = row && row.nhap_vat_chua_id && typeof row.nhap_vat_chua_id === 'object'
+            ? String(row.nhap_vat_chua_id.ma_nhap_vat_chua || '').trim()
+            : '';
+        if (id && code) codeToId[code] = id;
+        return id;
+    }).filter(function(id) {
+        return mongoose.Types.ObjectId.isValid(id);
+    })));
+    if (!ids.length) return {};
+    var codes = Object.keys(codeToId);
+
+    var query = {
+        loai_phieu: 'chi',
+        trang_thai: { $ne: 'cancelled' },
+        nha_cung_cap_id: supplierId,
+        $or: [
+            { nhap_vat_chua_id: { $in: ids.map(function(id) { return new mongoose.Types.ObjectId(id); }) } }
+        ]
+    };
+    if (codes.length) query.$or.push({ ma_chung_tu_goc: { $in: codes } });
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
+
+    var rows = await PhieuThuChi.find(query).select('nhap_vat_chua_id ma_chung_tu_goc gia_tri').lean();
+    return rows.reduce(function(map, row) {
+        var id = getRelatedId(row.nhap_vat_chua_id) || codeToId[String(row.ma_chung_tu_goc || '').trim()];
+        if (!id) return map;
+        map[id] = Number(map[id] || 0) + Number(row.gia_tri || 0);
+        return map;
+    }, {});
+}
+
+function applyVatChuaPaymentAmount(sourceRow, amountInfo, vatChuaPaymentMap) {
+    var docId = getRelatedId(sourceRow && sourceRow.nhap_vat_chua_id);
+    if (!docId || !(sourceRow && sourceRow.loai === 'tang_no')) return amountInfo;
+    var paid = Math.max(0, Number(vatChuaPaymentMap && vatChuaPaymentMap[docId] || 0));
+    if (paid <= 0) return amountInfo;
+    var value = Math.max(0, Number(amountInfo.gia_tri || 0));
+    var paidForDoc = Math.min(paid, value);
+    return Object.assign({}, amountInfo, {
+        da_thanh_toan: paidForDoc,
+        con_lai: Math.max(0, value - paidForDoc),
+        tong_no: Math.max(0, Number(amountInfo.tong_no || 0) - paidForDoc)
+    });
+}
+
+function isLinkedReceiptDebtRow(row) {
+    if (!(row && row.phieu_thu_chi_id)) return false;
+    return !!(
+        row.phieu_nhap_id
+        || row.nhap_vat_chua_id
+        || row.phieu_tra_nhap_id
+        || row.phieu_tra_hang_nhap_id
+    );
 }
 
 async function loadSupplierDetailShellRenderLocals(req, supplierId) {
@@ -244,6 +309,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     var vatChuaReturnRows = await XuatVatChua.find(vatChuaReturnQuery)
         .sort({ created_at: -1 })
         .lean();
+    var vatChuaPaymentMap = await loadVatChuaPaymentMap(debtRows, selectedSupplier._id, storeId);
     var runningDebt = 0;
     var debtAsc = debtRows.map(function(row) {
         return { source: 'legacy', row: row, date: getDebtEventTime(row) };
@@ -258,6 +324,9 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
             var txAmount = Number(sourceRow.gia_tri || 0);
             if (sourceRow.huong_cong_no === 'tang_no') runningDebt += txAmount;
             if (sourceRow.huong_cong_no === 'giam_no') runningDebt -= txAmount;
+            if (isLinkedReceiptDebtRow(sourceRow)) return null;
+            var isPaymentTransaction = sourceRow.loai_giao_dich === 'thanh_toan';
+            var isDebtIncreaseTransaction = sourceRow.huong_cong_no === 'tang_no';
             return {
                 phieu_nhap_id: sourceRow.phieu_nhap_id,
                 nhap_vat_chua_id: sourceRow.nhap_vat_chua_id,
@@ -268,8 +337,8 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
                 thoi_gian: sourceRow.ngay_giao_dich || sourceRow.created_at,
                 loai: sourceRow.huong_cong_no === 'tang_no' ? 'tang_no' : 'giam_no',
                 gia_tri: txAmount,
-                da_thanh_toan: sourceRow.loai_giao_dich === 'thanh_toan' ? txAmount : 0,
-                con_lai: Math.max(0, Number(runningDebt || 0)),
+                da_thanh_toan: isPaymentTransaction ? txAmount : 0,
+                con_lai: isDebtIncreaseTransaction ? Math.max(0, Number(runningDebt || 0)) : 0,
                 tong_no: Number(runningDebt || 0),
                 no_con_lai: runningDebt,
                 no_sau_da_luu: Number(sourceRow.no_sau || 0),
@@ -282,12 +351,12 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
             return {
                 xuat_vat_chua_id: sourceRow._id,
                 ma_phieu: sourceRow.ma_xuat_vat_chua || '--',
-                loai_chung_tu: 'Trả vật chứa',
+                loai_chung_tu: 'Tr\u1ea3 v\u1eadt ch\u1ee9a',
                 thoi_gian: sourceRow.created_at,
                 loai: 'giam_no',
                 gia_tri: returnAmount,
                 da_thanh_toan: 0,
-                con_lai: Math.max(0, returnAmount),
+                con_lai: 0,
                 tong_no: Number(runningDebt || 0),
                 no_con_lai: runningDebt,
                 ghi_chu: sourceRow.ghi_chu || ''
@@ -295,15 +364,20 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         }
         var soTien = Number(sourceRow.so_tien || 0);
         runningDebt += getLegacySupplierDebtDelta(sourceRow, soTien);
+        if (isLinkedReceiptDebtRow(sourceRow)) return null;
         var docInfo = getDebtDocumentInfo(sourceRow);
-        var amountInfo = getSupplierDebtAmountInfo(sourceRow, soTien, runningDebt);
+        var amountInfo = applyVatChuaPaymentAmount(
+            sourceRow,
+            getSupplierDebtAmountInfo(sourceRow, soTien, runningDebt),
+            vatChuaPaymentMap
+        );
         return {
             phieu_nhap_id: sourceRow.phieu_nhap_id,
             nhap_vat_chua_id: sourceRow.nhap_vat_chua_id,
             phieu_tra_nhap_id: sourceRow.phieu_tra_nhap_id,
             phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
             ma_phieu: docInfo.code,
-            loai_chung_tu: docInfo.type === 'tra_vat_chua' ? 'Trả vật chứa' : docInfo.label,
+            loai_chung_tu: docInfo.type === 'tra_vat_chua' ? 'Tr\u1ea3 v\u1eadt ch\u1ee9a' : docInfo.label,
             thoi_gian: getDebtDisplayDate(sourceRow),
             loai: sourceRow.loai || 'tang_no',
             gia_tri: amountInfo.gia_tri,
@@ -313,7 +387,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
             no_con_lai: runningDebt,
             ghi_chu: sourceRow.ghi_chu || ''
         };
-    });
+    }).filter(Boolean);
     var supplierDebtHistory = enrichSupplierDebtHistory(mappedDebtAsc.reverse(), debtWarnSettings.warnMinDays);
 
     var supplierInternalExportHistory = await loadSupplierInternalExportHistory(selectedSupplier, storeId);
@@ -559,6 +633,7 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
     var vatChuaReturnRows = await XuatVatChua.find(vatChuaReturnQuery)
         .sort({ created_at: -1 })
         .lean();
+    var vatChuaPaymentMap = await loadVatChuaPaymentMap(debtRows, selectedSupplier._id, storeId);
     var runningDebt = 0;
     var debtAsc = debtRows.map(function(row) {
         return { source: 'legacy', row: row, date: getDebtEventTime(row) };
@@ -573,6 +648,9 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
             var txAmount = Number(sourceRow.gia_tri || 0);
             if (sourceRow.huong_cong_no === 'tang_no') runningDebt += txAmount;
             if (sourceRow.huong_cong_no === 'giam_no') runningDebt -= txAmount;
+            if (isLinkedReceiptDebtRow(sourceRow)) return null;
+            var isPaymentTransaction = sourceRow.loai_giao_dich === 'thanh_toan';
+            var isDebtIncreaseTransaction = sourceRow.huong_cong_no === 'tang_no';
             return {
                 phieu_nhap_id: sourceRow.phieu_nhap_id,
                 nhap_vat_chua_id: sourceRow.nhap_vat_chua_id,
@@ -583,8 +661,8 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
                 thoi_gian: sourceRow.ngay_giao_dich || sourceRow.created_at,
                 loai: sourceRow.huong_cong_no === 'tang_no' ? 'tang_no' : 'giam_no',
                 gia_tri: txAmount,
-                da_thanh_toan: sourceRow.loai_giao_dich === 'thanh_toan' ? txAmount : 0,
-                con_lai: Math.max(0, Number(runningDebt || 0)),
+                da_thanh_toan: isPaymentTransaction ? txAmount : 0,
+                con_lai: isDebtIncreaseTransaction ? Math.max(0, Number(runningDebt || 0)) : 0,
                 tong_no: Number(runningDebt || 0),
                 no_con_lai: runningDebt,
                 no_sau_da_luu: Number(sourceRow.no_sau || 0),
@@ -597,12 +675,12 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
             return {
                 xuat_vat_chua_id: sourceRow._id,
                 ma_phieu: sourceRow.ma_xuat_vat_chua || '--',
-                loai_chung_tu: 'Tráº£ váº­t chá»©a',
+                loai_chung_tu: 'Tr\u1ea3 v\u1eadt ch\u1ee9a',
                 thoi_gian: sourceRow.created_at,
                 loai: 'giam_no',
                 gia_tri: returnAmount,
                 da_thanh_toan: 0,
-                con_lai: Math.max(0, returnAmount),
+                con_lai: 0,
                 tong_no: Number(runningDebt || 0),
                 no_con_lai: runningDebt,
                 ghi_chu: sourceRow.ghi_chu || ''
@@ -610,15 +688,20 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
         }
         var soTien = Number(sourceRow.so_tien || 0);
         runningDebt += getLegacySupplierDebtDelta(sourceRow, soTien);
+        if (isLinkedReceiptDebtRow(sourceRow)) return null;
         var docInfo = getDebtDocumentInfo(sourceRow);
-        var amountInfo = getSupplierDebtAmountInfo(sourceRow, soTien, runningDebt);
+        var amountInfo = applyVatChuaPaymentAmount(
+            sourceRow,
+            getSupplierDebtAmountInfo(sourceRow, soTien, runningDebt),
+            vatChuaPaymentMap
+        );
         return {
             phieu_nhap_id: sourceRow.phieu_nhap_id,
             nhap_vat_chua_id: sourceRow.nhap_vat_chua_id,
             phieu_tra_nhap_id: sourceRow.phieu_tra_nhap_id,
             phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
             ma_phieu: docInfo.code,
-            loai_chung_tu: docInfo.type === 'tra_vat_chua' ? 'Tráº£ váº­t chá»©a' : docInfo.label,
+            loai_chung_tu: docInfo.type === 'tra_vat_chua' ? 'Tr\u1ea3 v\u1eadt ch\u1ee9a' : docInfo.label,
             thoi_gian: getDebtDisplayDate(sourceRow),
             loai: sourceRow.loai || 'tang_no',
             gia_tri: amountInfo.gia_tri,
@@ -628,7 +711,7 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
             no_con_lai: runningDebt,
             ghi_chu: sourceRow.ghi_chu || ''
         };
-    });
+    }).filter(Boolean);
     return enrichSupplierDebtHistory(mappedDebtAsc.reverse(), debtWarnSettings.warnMinDays);
 }
 

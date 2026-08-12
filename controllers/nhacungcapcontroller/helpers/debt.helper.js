@@ -60,6 +60,7 @@ function getSupplierDebtAmountInfo(row, amount, runningDebt) {
     var value = Number(amount || 0);
     var paid = 0;
     var remaining = Math.max(0, Number(runningDebt || 0));
+    var isDebtDecrease = row && (row.loai === 'giam_no' || row.loai === 'thanh_toan');
 
     if (docInfo.type === 'phieu_nhap') {
         value = Number(doc.can_tra_ncc || doc.tong_tien || amount || 0);
@@ -69,8 +70,11 @@ function getSupplierDebtAmountInfo(row, amount, runningDebt) {
         value = Number(doc.ncc_can_tra || doc.tong_tien_tra || amount || 0);
         paid = Number(doc.ncc_da_tra || 0);
         remaining = Math.max(0, value - paid);
-    } else if (row.loai === 'giam_no' || row.loai === 'thanh_toan') {
-        paid = value;
+    }
+
+    if (isDebtDecrease) {
+        if (row.loai === 'thanh_toan') paid = value;
+        remaining = 0;
     }
 
     return {
@@ -84,6 +88,9 @@ function getSupplierDebtAmountInfo(row, amount, runningDebt) {
 function getLegacySupplierDebtDelta(row, amount) {
     var value = Number(amount || 0);
     var receiptType = row && row.phieu_thu_chi_id && row.phieu_thu_chi_id.loai_phieu;
+    if (row && row.loai === 'tang_no' && row.phieu_nhap_id && typeof row.phieu_nhap_id === 'object') {
+        value = Number(row.phieu_nhap_id.can_tra_ncc || row.phieu_nhap_id.tong_tien || row.phieu_nhap_id.con_no_ncc || amount || 0);
+    }
     if (receiptType === 'thu') return value;
     if (row && row.loai === 'tang_no') return value;
     if (row && (row.loai === 'giam_no' || row.loai === 'thanh_toan')) return -value;

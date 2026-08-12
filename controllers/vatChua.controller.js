@@ -189,17 +189,17 @@ async function loadActiveVatChuaForStore(storeId) {
     .lean();
 }
 
-async function resolveOpenDetailVatChuaId(storeId, nhapVatChuaIdRaw) {
-  var nhapId = normalizeObjectId(nhapVatChuaIdRaw);
-  if (!nhapId || !storeId) return '';
-  var nhap = await NhapVatChua.findOne({ _id: nhapId, cua_hang_id: storeId })
-    
+async function resolveOpenDetailVatChuaId(storeId, docIdRaw, docKind) {
+  var docId = normalizeObjectId(docIdRaw);
+  if (!docId || !storeId) return '';
+  var Model = docKind === 'xuat' ? XuatVatChua : NhapVatChua;
+  var doc = await Model.findOne({ _id: docId, cua_hang_id: storeId })
     .select('items.vat_chua_id')
     .lean();
-  if (!nhap || !Array.isArray(nhap.items) || !nhap.items.length) return '';
-  var firstLine = nhap.items.find(function(line) {
+  if (!doc || !Array.isArray(doc.items) || !doc.items.length) return '';
+  var firstLine = doc.items.find(function(line) {
     return line && line.vat_chua_id;
-  }) || nhap.items[0];
+  }) || doc.items[0];
   return firstLine && firstLine.vat_chua_id ? String(firstLine.vat_chua_id) : '';
 }
 
@@ -277,7 +277,9 @@ exports.index = async function(req, res, next) {
 
     var suppliers = await loadSuppliersForStore(storeId);
     var activeVatChuaList = await loadActiveVatChuaForStore(storeId);
-    var openDetailVatChuaId = await resolveOpenDetailVatChuaId(storeId, requestQuery.nhap_vat_chua);
+    var openDetailVatChuaId = requestQuery.xuat_vat_chua
+      ? await resolveOpenDetailVatChuaId(storeId, requestQuery.xuat_vat_chua, 'xuat')
+      : await resolveOpenDetailVatChuaId(storeId, requestQuery.nhap_vat_chua, 'nhap');
 
     res.render('vat-chua/index', {
       pageTitle: 'Vật chứa',

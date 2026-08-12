@@ -1,4 +1,4 @@
-const { mongoose, PhieuNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, parseMoney } = require('./common.helper');
+const { mongoose, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, NhapVatChua, XuatVatChua, parseMoney } = require('./common.helper');
 const { hasFilterQueryValue } = require('./filter.helper');
 const { isVisibleSupplierDebtRow, resolveSupplierDaThanhToan } = require('./debt.helper');
 
@@ -9,6 +9,10 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         trang_thai: 'completed',
         nha_cung_cap_id: { $exists: true, $ne: null }
     };
+    var purchaseReturnMatch = {
+        trang_thai: 'completed',
+        nha_cung_cap_id: { $exists: true, $ne: null }
+    };
     var debtMatch = {
         nha_cung_cap_id: { $exists: true, $ne: null }
     };
@@ -16,17 +20,34 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         nha_cung_cap_id: { $exists: true, $ne: null },
         trang_thai: 'active'
     };
+    var vatChuaImportMatch = {
+        doi_tuong_type: 'nha_cung_cap',
+        doi_tuong_id: { $exists: true, $ne: null },
+        trang_thai: 'active'
+    };
+    var vatChuaReturnMatch = {
+        doi_tuong_type: 'nha_cung_cap',
+        doi_tuong_id: { $exists: true, $ne: null },
+        loai_xuat: 'tra_hang_nhap',
+        trang_thai: 'active'
+    };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
         var storeObjectId = new mongoose.Types.ObjectId(String(storeId));
         purchaseMatch.cua_hang_id = storeObjectId;
+        purchaseReturnMatch.cua_hang_id = storeObjectId;
         debtMatch.cua_hang_id = storeObjectId;
         debtTransactionMatch.cua_hang_id = storeObjectId;
+        vatChuaImportMatch.cua_hang_id = storeObjectId;
+        vatChuaReturnMatch.cua_hang_id = storeObjectId;
     }
     var supplierObjectIds = normalizeSupplierObjectIds(supplierIds);
     if (supplierObjectIds.length) {
         purchaseMatch.nha_cung_cap_id = { $in: supplierObjectIds };
+        purchaseReturnMatch.nha_cung_cap_id = { $in: supplierObjectIds };
         debtMatch.nha_cung_cap_id = { $in: supplierObjectIds };
         debtTransactionMatch.nha_cung_cap_id = { $in: supplierObjectIds };
+        vatChuaImportMatch.doi_tuong_id = { $in: supplierObjectIds };
+        vatChuaReturnMatch.doi_tuong_id = { $in: supplierObjectIds };
     }
     var purchaseRows = await PhieuNhap.aggregate([
         { $match: purchaseMatch },
@@ -39,7 +60,7 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         }
     ]);
     var debtRows = await CongNoNhaCungCap.find(debtMatch)
-        .populate({ path: 'phieu_nhap_id', select: '_id' })
+        .populate({ path: 'phieu_nhap_id', select: '_id tong_tien can_tra_ncc con_no_ncc' })
         .populate({ path: 'nhap_vat_chua_id', select: '_id' })
         .populate({ path: 'phieu_tra_nhap_id', select: '_id' })
         .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
@@ -49,6 +70,33 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         .populate({ path: 'phieu_tra_hang_nhap_id', select: 'trang_thai' })
         .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
         .lean() : [];
+    var vatChuaImportRows = await NhapVatChua.aggregate([
+        { $match: vatChuaImportMatch },
+        {
+            $group: {
+                _id: '$doi_tuong_id',
+                tong_mua_vat_chua: { $sum: { $ifNull: ['$tong_tien', 0] } }
+            }
+        }
+    ]);
+    var purchaseReturnRows = PhieuTraHangNhap ? await PhieuTraHangNhap.aggregate([
+        { $match: purchaseReturnMatch },
+        {
+            $group: {
+                _id: '$nha_cung_cap_id',
+                tong_tra_hang: { $sum: { $ifNull: ['$ncc_can_tra', '$tong_tien_tra'] } }
+            }
+        }
+    ]) : [];
+    var vatChuaReturnRows = await XuatVatChua.aggregate([
+        { $match: vatChuaReturnMatch },
+        {
+            $group: {
+                _id: '$doi_tuong_id',
+                tong_tra_vat_chua: { $sum: { $ifNull: ['$tong_tien', 0] } }
+            }
+        }
+    ]);
     var map = {};
     purchaseRows.forEach(function(r) {
         if (!r._id) return;
@@ -59,11 +107,20 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
             da_tra_phieu_nhap: Number(r.da_tra_phieu_nhap || 0)
         };
     });
+    purchaseReturnRows.forEach(function(r) {
+        if (!r._id) return;
+        var key = String(r._id);
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0, da_tra_phieu_nhap: 0 };
+        map[key].tong_mua -= Number(r.tong_tra_hang || 0);
+    });
     debtRows.filter(isVisibleSupplierDebtRow).forEach(function(r) {
         if (!r.nha_cung_cap_id) return;
         var key = String(r.nha_cung_cap_id);
         if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0, da_tra_phieu_nhap: 0 };
         var amount = Number(r.so_tien || 0);
+        if (r.loai === 'tang_no' && r.phieu_nhap_id && typeof r.phieu_nhap_id === 'object') {
+            amount = Number(r.phieu_nhap_id.can_tra_ncc || r.phieu_nhap_id.tong_tien || r.phieu_nhap_id.con_no_ncc || r.so_tien || 0);
+        }
         if (r.loai === 'tang_no') map[key].tong_no += amount;
         if (r.loai === 'giam_no' || r.loai === 'thanh_toan') map[key].tong_no -= amount;
         if (r.loai === 'thanh_toan') map[key].da_tra_tong = Number(map[key].da_tra_tong || 0) + amount;
@@ -76,6 +133,20 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         if (r.huong_cong_no === 'tang_no') map[key].tong_no += amount;
         if (r.huong_cong_no === 'giam_no') map[key].tong_no -= amount;
         if (r.loai_giao_dich === 'thanh_toan') map[key].da_tra_tong += amount;
+    });
+    vatChuaImportRows.forEach(function(r) {
+        if (!r._id) return;
+        var key = String(r._id);
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0, da_tra_phieu_nhap: 0 };
+        map[key].tong_mua += Number(r.tong_mua_vat_chua || 0);
+    });
+    vatChuaReturnRows.forEach(function(r) {
+        if (!r._id) return;
+        var key = String(r._id);
+        if (!map[key]) map[key] = { tong_mua: 0, tong_no: 0, da_tra_tong: 0, da_tra_phieu_nhap: 0 };
+        var amount = Number(r.tong_tra_vat_chua || 0);
+        map[key].tong_mua -= amount;
+        map[key].tong_no -= amount;
     });
     Object.keys(map).forEach(function(key) {
         if (Number(map[key].da_tra_tong || 0) <= 0) {
@@ -131,7 +202,6 @@ async function aggregateSupplierDebtDayInfo(storeId, supplierIds) {
 
 function applySupplierTotalsFromMap(supplier, totalsMap) {
     if (!supplier) return;
-    var currentDebt = Number(supplier.tong_no || 0);
     var t = totalsMap[String(supplier._id)];
     if (t) {
         supplier.tong_mua = t.tong_mua;
@@ -142,7 +212,7 @@ function applySupplierTotalsFromMap(supplier, totalsMap) {
         supplier.tong_no_theo_so = 0;
         supplier.da_tra_tong = 0;
     }
-    supplier.tong_no = currentDebt;
+    supplier.tong_no = supplier.tong_no_theo_so;
     supplier.da_thanh_toan = resolveSupplierDaThanhToan(supplier);
 }
 

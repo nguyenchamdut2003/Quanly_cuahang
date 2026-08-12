@@ -818,6 +818,11 @@
           var detailUrl = new URL(window.location.href);
           if (detailUrl.searchParams.has('nhap_vat_chua')) {
             detailUrl.searchParams.delete('nhap_vat_chua');
+          }
+          if (detailUrl.searchParams.has('xuat_vat_chua')) {
+            detailUrl.searchParams.delete('xuat_vat_chua');
+          }
+          if (!detailUrl.searchParams.has('nhap_vat_chua') && !detailUrl.searchParams.has('xuat_vat_chua')) {
             window.history.replaceState({}, '', detailUrl.pathname + (detailUrl.searchParams.toString() ? '?' + detailUrl.searchParams.toString() : ''));
           }
         } catch (_) {}

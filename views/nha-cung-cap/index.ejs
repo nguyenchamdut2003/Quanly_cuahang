@@ -78,6 +78,8 @@
     }
     .supplier-metrics-loading { color: #64748b; }
     .supplier-metrics-error { color: #b42318; font-weight: 700; }
+    .supplier-money-positive { color: #047857; font-weight: 700; }
+    .supplier-money-negative { color: #dc2626; font-weight: 700; }
     .supplier-list-panel {
       overflow: visible;
     }
@@ -719,7 +721,7 @@
                 <td colspan="4" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
                 <td data-summary-field="tong-mua"><strong><%= Number(supplierSummaryTotals.totalPurchase || 0).toLocaleString('vi-VN') %></strong></td>
                 <td data-summary-field="da-thanh-toan"><strong><%= Number(supplierSummaryTotals.totalPaid || 0).toLocaleString('vi-VN') %></strong></td>
-                <td data-summary-field="tong-no"><strong><%= Number(supplierSummaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
+                <td data-summary-field="tong-no"><strong class="<%= Number(supplierSummaryTotals.totalDebt || 0) > 0 ? 'supplier-money-positive' : (Number(supplierSummaryTotals.totalDebt || 0) < 0 ? 'supplier-money-negative' : '') %>"><%= Number(supplierSummaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
                 <td></td>
               </tr>
               <% if (suppliers.length === 0) { %>
@@ -745,7 +747,7 @@
                   <td data-field="da-thanh-toan" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>"><%= Number(supplier.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
                   <td data-field="tong-no" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>">
                     <div class="supplier-debt-cell">
-                      <span data-debt-value><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></span>
+                      <span data-debt-value class="<%= Number(supplier.tong_no || 0) > 0 ? 'supplier-money-positive' : (Number(supplier.tong_no || 0) < 0 ? 'supplier-money-negative' : '') %>"><%= Number(supplier.tong_no || 0).toLocaleString('vi-VN') %></span>
                       <% if (supplier.debt_warning) { %>
                         <button
                           type="button"
@@ -868,6 +870,18 @@
         var number = Math.max(0, Math.floor(Number(value || 0)));
         return number.toLocaleString('vi-VN');
       }
+      function formatSupplierSignedMoney(value) {
+        if (value === '' || value == null) return '';
+        var number = Math.floor(Number(value || 0));
+        return Number.isFinite(number) ? number.toLocaleString('vi-VN') : '';
+      }
+      function setSupplierMoneyTone(element, value) {
+        if (!element) return;
+        var number = Number(value || 0);
+        element.classList.remove('supplier-money-positive', 'supplier-money-negative');
+        if (number > 0) element.classList.add('supplier-money-positive');
+        if (number < 0) element.classList.add('supplier-money-negative');
+      }
       function bindVnMoneyFilterInputs(root) {
         var scope = root || document;
         scope.querySelectorAll('.js-vn-money-filter').forEach(function(input) {
@@ -978,7 +992,8 @@
         if (field === 'tong-no') {
           var debtValue = cell.querySelector('[data-debt-value]');
           if (debtValue) {
-            debtValue.textContent = formatSupplierMoney(value);
+            debtValue.textContent = formatSupplierSignedMoney(value);
+            setSupplierMoneyTone(debtValue, value);
             return;
           }
         }
@@ -1023,7 +1038,10 @@
         var totalDebtCell = document.querySelector('[data-summary-field="tong-no"] strong');
         if (totalPurchaseCell) totalPurchaseCell.textContent = formatSupplierMoney(totals.tongMua);
         if (totalPaidCell) totalPaidCell.textContent = formatSupplierMoney(totals.daThanhToan);
-        if (totalDebtCell) totalDebtCell.textContent = formatSupplierMoney(totals.tongNo);
+        if (totalDebtCell) {
+          totalDebtCell.textContent = formatSupplierSignedMoney(totals.tongNo);
+          setSupplierMoneyTone(totalDebtCell, totals.tongNo);
+        }
       }
 
       function markSupplierMetricsError(rows) {
@@ -1229,10 +1247,6 @@
       }
       function formatSupplierMoneyDisplay(value) {
         return formatSupplierMoney(value);
-      }
-      function formatSupplierSignedMoney(value) {
-        var number = Math.floor(Number(value || 0));
-        return number.toLocaleString('vi-VN');
       }
       function setSupplierPayInputValue(input, value) {
         if (input) input.value = formatSupplierMoney(value);
