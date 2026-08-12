@@ -40,6 +40,9 @@
       <%
         var row = group.row || {};
         var hasDetails = group.rows.length > 1;
+        var groupEndingStock = group.rows.reduce(function(sum, item) {
+          return sum + Number(item.ton_kho_sau || 0);
+        }, 0);
       %>
       <tr class="card-data-row">
         <td class="lot-col-expand">
@@ -74,7 +77,7 @@
         <td class="text-right"><%= Number(row.gia_giao_dich || 0).toLocaleString('vi-VN') %></td>
         <td class="text-right"><%= Number(row.gia_von_the_kho || 0).toLocaleString('vi-VN') %></td>
         <td class="text-right"><%= Number(hasDetails ? group.total_qty : row.so_luong_thay_doi || 0).toLocaleString('vi-VN') %></td>
-        <td class="text-right"><%= Number(row.ton_kho_sau || 0).toLocaleString('vi-VN') %></td>
+        <td class="text-right"><%= Number(hasDetails ? groupEndingStock : row.ton_kho_sau || 0).toLocaleString('vi-VN') %></td>
       </tr>
       <% if (hasDetails) { %>
         <tr class="lot-detail-row card-detail-row" data-card-detail="<%= group.key %>" hidden>
