@@ -61,6 +61,17 @@ function normalizeBankInfo(raw) {
   };
 }
 
+function normalizeCashBookImage(raw) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  var url = normalizeString(raw.url);
+  var publicId = normalizeString(raw.public_id);
+  if (!url && !publicId) return undefined;
+  return {
+    url: url,
+    public_id: publicId
+  };
+}
+
 function buildCashBookDisplayName(payload) {
   if (payload.loai_so_quy === 'chuyen_khoan') {
     return payload.thong_tin_ngan_hang.ten_ngan_hang + ' - ' + payload.thong_tin_ngan_hang.so_tai_khoan;
@@ -98,6 +109,8 @@ function normalizeCashBookPayload(body) {
     thong_tin_ngan_hang: bankInfo,
     trang_thai: status
   };
+  var image = normalizeCashBookImage(body.anh_so_quy);
+  if (image) payload.anh_so_quy = image;
   payload.ten_so_quy = buildCashBookDisplayName(payload);
   return payload;
 }
@@ -181,6 +194,7 @@ function formatCashBook(row, balances) {
     loai_so_quy: row.loai_so_quy || 'tien_mat',
     mac_dinh: Boolean(row.mac_dinh),
     thong_tin_ngan_hang: Object.assign({}, EMPTY_BANK_INFO, row.thong_tin_ngan_hang || {}),
+    anh_so_quy: normalizeCashBookImage(row.anh_so_quy) || null,
     trang_thai: row.trang_thai || 'active',
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -212,7 +226,7 @@ function buildListFilter(query) {
 async function listCashBooks(params) {
   var filter = buildListFilter(params && params.query);
   var rows = await SoQuy.find(filter)
-    .select('ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang trang_thai created_at updated_at')
+    .select('ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang anh_so_quy trang_thai created_at updated_at')
     .sort({ mac_dinh: -1, loai_so_quy: 1, ten_so_quy: 1 })
     .lean();
   return rows;
@@ -262,6 +276,7 @@ async function updateCashBook(params) {
     loai_so_quy: Object.prototype.hasOwnProperty.call(body, 'loai_so_quy') ? body.loai_so_quy : current.loai_so_quy,
     mac_dinh: Object.prototype.hasOwnProperty.call(body, 'mac_dinh') ? body.mac_dinh : current.mac_dinh,
     trang_thai: Object.prototype.hasOwnProperty.call(body, 'trang_thai') ? body.trang_thai : current.trang_thai,
+    anh_so_quy: Object.prototype.hasOwnProperty.call(body, 'anh_so_quy') ? body.anh_so_quy : current.anh_so_quy,
     thong_tin_ngan_hang: Object.assign(
       {},
       currentBankInfo,

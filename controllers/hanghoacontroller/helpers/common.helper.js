@@ -656,6 +656,36 @@ function mapBy(rows, key) {
     }, {});
 }
 
+function objectIdText(value) {
+    return String(value && value._id ? value._id : (value || '')).trim();
+}
+
+function normalizedStockSpec(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function stockDetailMatchesHistory(detail, history) {
+    if (!detail || !history) return false;
+    var detailLotId = objectIdText(detail.lo_hang_id);
+    var historyLotId = objectIdText(history.lo_hang_id);
+    if (detailLotId && historyLotId && detailLotId !== historyLotId) return false;
+
+    var detailAttrId = objectIdText(detail.gia_tri_thuoc_tinh_id);
+    var historyAttrId = objectIdText(history.gia_tri_thuoc_tinh_id);
+    if (detailAttrId && historyAttrId && detailAttrId !== historyAttrId) return false;
+
+    var detailSpec = normalizedStockSpec(detail.ten_quy_cach || detail.ten_thuoc_tinh);
+    var historySpec = normalizedStockSpec(history.ten_quy_cach || history.ten_thuoc_tinh);
+    if (detailSpec && historySpec && detailSpec !== historySpec) return false;
+
+    return true;
+}
+
+function findStockDetailForHistory(details, history) {
+    var rows = Array.isArray(details) ? details : [];
+    return rows.find(function(detail) { return stockDetailMatchesHistory(detail, history); }) || rows[0] || null;
+}
+
 function labelStockTransactionType(type, quantity) {
     var labels = {
         nhap_hang: 'Nhập hàng',
@@ -833,6 +863,12 @@ async function enrichStockCardRows(rows, productId) {
     }, {});
 
     var returnDetails = detailResults[4];
+    var returnDetailListMap = returnDetails.reduce(function(map, row) {
+        var key = String(row.phieu_tra_hang_id);
+        if (!map[key]) map[key] = [];
+        map[key].push(row);
+        return map;
+    }, {});
     var returnDetailMap = returnDetails.reduce(function(map, row) {
         map[String(row.phieu_tra_hang_id)] = row;
         return map;
@@ -896,10 +932,13 @@ async function enrichStockCardRows(rows, productId) {
             card.chung_tu_doc = doc;
         } else if (row.loai_phieu === 'tra_hang') {
             doc = returnMap[code];
-            detail = doc ? returnDetailMap[String(doc._id)] : null;
+            detail = doc ? findStockDetailForHistory(returnDetailListMap[String(doc._id)], row) || returnDetailMap[String(doc._id)] : null;
             card.doi_tac = partnerName(doc, 'Khách lẻ');
             card.gia_giao_dich = Number(detail && detail.don_gia || card.gia_giao_dich || 0);
             card.gia_von_the_kho = unitPriceFromValue(row.gia_tri_thay_doi, qty);
+            if (detail && Number(detail.so_luong || 0) > 0 && Math.abs(qty) > Number(detail.so_luong || 0)) {
+                card.so_luong_thay_doi = qty < 0 ? -Number(detail.so_luong || 0) : Number(detail.so_luong || 0);
+            }
             card.chung_tu_type = 'customer_return';
             card.chung_tu_doc = doc;
         } else if (row.loai_phieu === 'kiem_kho') {

@@ -1832,6 +1832,16 @@ const SoQuySchema = new Schema({
       trim: true
     }
   },
+  anh_so_quy: {
+    url: {
+      type: String,
+      trim: true
+    },
+    public_id: {
+      type: String,
+      trim: true
+    }
+  },
   trang_thai: {
     type: String,
     enum: ['active', 'inactive'],

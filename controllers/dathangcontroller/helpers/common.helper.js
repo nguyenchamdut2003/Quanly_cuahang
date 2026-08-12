@@ -591,12 +591,17 @@ async function restoreStockLine(khoId, line, options = {}) {
         : [];
 
     if (allocs.length) {
+        let remainingQty = qty;
         for (const alloc of allocs) {
+            if (remainingQty <= 0) break;
+            const allocQty = Math.min(Number(alloc.so_luong || 0), remainingQty);
+            if (allocQty <= 0) continue;
             await congTonKho({
                 ...base,
                 lo_hang_id: alloc.lo_hang_id,
-                so_luong: Number(alloc.so_luong || 0)
+                so_luong: allocQty
             });
+            remainingQty -= allocQty;
         }
         return;
     }
@@ -629,12 +634,17 @@ async function deductStockLine(khoId, line, options = {}) {
         : [];
 
     if (allocs.length) {
+        let remainingQty = qty;
         for (const alloc of allocs) {
+            if (remainingQty <= 0) break;
+            const allocQty = Math.min(Number(alloc.so_luong || 0), remainingQty);
+            if (allocQty <= 0) continue;
             await truTonKho({
                 ...base,
                 lo_hang_id: alloc.lo_hang_id,
-                so_luong: Number(alloc.so_luong || 0)
+                so_luong: allocQty
             });
+            remainingQty -= allocQty;
         }
         return;
     }
@@ -646,6 +656,20 @@ async function deductStockLine(khoId, line, options = {}) {
     });
 }
 
+function sliceLotAllocationsByQuantity(allocations, quantity) {
+    let remainingQty = Number(quantity || 0);
+    if (remainingQty <= 0 || !Array.isArray(allocations)) return [];
+    return allocations.reduce((rows, allocation) => {
+        if (remainingQty <= 0) return rows;
+        const allocationQty = Number(allocation && allocation.so_luong || 0);
+        if (allocationQty <= 0) return rows;
+        const qty = Math.min(allocationQty, remainingQty);
+        rows.push(Object.assign({}, allocation, { so_luong: qty }));
+        remainingQty -= qty;
+        return rows;
+    }, []);
+}
+
 function buildReturnStockLine(item, invoiceLineMeta = {}) {
     const invoiceLine = item.invoiceLine || {};
     return {
@@ -655,7 +679,7 @@ function buildReturnStockLine(item, invoiceLineMeta = {}) {
         gia_tri_thuoc_tinh_id: invoiceLineMeta.gia_tri_thuoc_tinh_id || invoiceLine.gia_tri_thuoc_tinh_id,
         ten_quy_cach: invoiceLineMeta.ten_quy_cach || invoiceLineMeta.ten_thuoc_tinh || invoiceLine.ten_quy_cach || invoiceLine.ten_thuoc_tinh || '',
         ten_thuoc_tinh: invoiceLineMeta.ten_thuoc_tinh || invoiceLineMeta.ten_quy_cach || invoiceLine.ten_thuoc_tinh || invoiceLine.ten_quy_cach || '',
-        lot_allocations: invoiceLine.lot_allocations
+        lot_allocations: sliceLotAllocationsByQuantity(invoiceLine.lot_allocations, item.so_luong)
     };
 }
 
@@ -3372,6 +3396,9 @@ async function buildReturnFilter(query = {}) {
             { trang_thai_du_lieu: '' }
         ]
     };
+    if (query.return && mongoose.Types.ObjectId.isValid(String(query.return))) {
+        filter._id = query.return;
+    }
     if (query.q && query.q.trim() !== '') filter.ma_phieu_tra = { $regex: query.q.trim(), $options: 'i' };
     const statuses = cleanArray(query.trang_thai);
     if (statuses.length) filter.trang_thai = { $in: statuses };

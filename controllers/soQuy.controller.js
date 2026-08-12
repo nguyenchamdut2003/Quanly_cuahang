@@ -384,8 +384,8 @@ exports.index = async (req, res, next) => {
                 .populate('khach_hang_id')
                 .populate('nha_cung_cap_id')
                 .populate('so_quy_id')
-                .populate('chi_tiet_thanh_toan.so_quy_tien_mat_id', 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang trang_thai')
-                .populate('chi_tiet_thanh_toan.so_quy_chuyen_khoan_id', 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang trang_thai')
+                .populate('chi_tiet_thanh_toan.so_quy_tien_mat_id', 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang anh_so_quy trang_thai')
+                .populate('chi_tiet_thanh_toan.so_quy_chuyen_khoan_id', 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang anh_so_quy trang_thai')
                 .populate('don_hang_id')
                 .populate('hoa_don_id')
                 .populate('phieu_nhap_id')
@@ -529,8 +529,8 @@ const RECEIPT_DETAIL_POPULATES = [
     { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' },
     { path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' },
     { path: 'so_quy_id', select: 'ten_so_quy ma_so_quy' },
-    { path: 'chi_tiet_thanh_toan.so_quy_tien_mat_id', select: 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang trang_thai' },
-    { path: 'chi_tiet_thanh_toan.so_quy_chuyen_khoan_id', select: 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang trang_thai' },
+    { path: 'chi_tiet_thanh_toan.so_quy_tien_mat_id', select: 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang anh_so_quy trang_thai' },
+    { path: 'chi_tiet_thanh_toan.so_quy_chuyen_khoan_id', select: 'ten_so_quy loai_so_quy mac_dinh thong_tin_ngan_hang anh_so_quy trang_thai' },
     { path: 'cua_hang_id', select: 'ten_cua_hang' },
     {
         path: 'hoa_don_id',

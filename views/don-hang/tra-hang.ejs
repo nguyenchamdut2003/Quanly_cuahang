@@ -568,6 +568,10 @@
       if (trashCancel) trashCancel.addEventListener('click', closeReturnTrashModal);
       if (trashConfirm) trashConfirm.addEventListener('click', confirmReturnTrashMove);
       updateReturnTrashButton();
+      const openReturnId = new URLSearchParams(window.location.search).get('return');
+      if (openReturnId && document.querySelector('[data-return-row="' + openReturnId + '"]')) {
+        toggleReturnDetail(openReturnId);
+      }
     });
 
     async function cancelReturnSlip(id) {

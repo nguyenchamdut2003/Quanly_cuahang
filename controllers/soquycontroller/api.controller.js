@@ -2,6 +2,27 @@ var { calculateCashBookBalances } = require('../../services/cashBookBalance.serv
 var hrLog = require('../../utils/hrPayrollLogger');
 var catalog = require('../../services/soQuyCatalog.service');
 var { resolveStoreId } = require('../../utils/storeScope');
+var { uploadImageBuffer } = require('../../utils/cloudinaryUpload');
+
+function parseBodyObject(body) {
+  var parsed = Object.assign({}, body || {});
+  if (typeof parsed.thong_tin_ngan_hang === 'string') {
+    try {
+      parsed.thong_tin_ngan_hang = JSON.parse(parsed.thong_tin_ngan_hang);
+    } catch (error) {
+      parsed.thong_tin_ngan_hang = {};
+    }
+  }
+  return parsed;
+}
+
+async function buildCashBookBody(req) {
+  var body = parseBodyObject(req.body || {});
+  if (req.file) {
+    body.anh_so_quy = await uploadImageBuffer(req.file, { folder: 'quanly-cuahang/so-quy' });
+  }
+  return body;
+}
 
 async function buildCashBookResponse(row) {
   var balances = await calculateCashBookBalances({
@@ -46,6 +67,7 @@ exports.getActive = async function(req, res, next) {
         loai_so_quy: row.loai_so_quy || 'tien_mat',
         mac_dinh: !!row.mac_dinh,
         thong_tin_ngan_hang: row.thong_tin_ngan_hang || {},
+        anh_so_quy: row.anh_so_quy || null,
         trang_thai: row.trang_thai || 'active'
       };
     });
@@ -68,7 +90,7 @@ exports.getActive = async function(req, res, next) {
 exports.create = async function(req, res, next) {
   try {
     var row = await catalog.createCashBook({
-      body: req.body || {}
+      body: await buildCashBookBody(req)
     });
     var data = await buildCashBookResponse(row.toObject ? row.toObject() : row);
     return res.json({ success: true, message: 'Tạo sổ quỹ thành công', data: data });
@@ -81,7 +103,7 @@ exports.putId = async function(req, res, next) {
   try {
     var row = await catalog.updateCashBook({
       id: req.params.id,
-      body: req.body || {}
+      body: await buildCashBookBody(req)
     });
     var data = await buildCashBookResponse(row.toObject ? row.toObject() : row);
     return res.json({ success: true, message: 'Cập nhật sổ quỹ thành công', data: data });
