@@ -844,8 +844,8 @@
       return `
         <tr data-edit-qc-parent="${escapeHtml(rowId)}">
           <td><input data-edit-qc-field="ten_quy_cach" value="${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '')}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
-          <td><input data-edit-qc-field="so_luong" inputmode="numeric" value="${money(qc.so_luong || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
-          <td><input data-edit-qc-field="don_gia_nhap" inputmode="numeric" value="${money(qc.don_gia_nhap || qc.gia_von || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td><input data-edit-qc-field="so_luong" class="js-purchase-edit-number" inputmode="numeric" value="${money(qc.so_luong || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td><input data-edit-qc-field="don_gia_nhap" class="js-purchase-edit-number" inputmode="numeric" value="${money(qc.don_gia_nhap || qc.gia_von || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
           <td class="num" data-edit-qc-total>${moneyText(qc.thanh_tien || ((qc.so_luong || 0) * (qc.don_gia_nhap || qc.gia_von || 0)))}</td>
           <td><input data-edit-qc-field="ghi_chu" value="${escapeHtml(qc.ghi_chu || '')}" ${disabled ? 'disabled' : ''}></td>
           <td><button type="button" class="kv-btn danger" style="height:28px;padding:0 8px" onclick="removeEditQuyCachRow(this)" ${disabled ? 'disabled' : ''}>Xóa</button></td>
@@ -855,6 +855,7 @@
       const box = document.querySelector(`[data-edit-qc-box="${editQcDataValue(rowId)}"] tbody`);
       if (!box) return;
       box.insertAdjacentHTML('beforeend', editQuyCachRowHtml(rowId, { so_luong: 1 }, false));
+      bindPurchaseEditNumberInputs(box);
       calculatePurchaseEditTotals();
     }
     function removeEditQuyCachRow(button) {
@@ -901,6 +902,20 @@
         applyLiveVNFormat(el);
         updatePaySupplierTotals();
       });
+    }
+    function bindPurchaseEditNumberInput(el) {
+      if (!el || el.dataset.vnEditBound === '1') return;
+      el.dataset.vnEditBound = '1';
+      el.addEventListener('focus', function() {
+        if (numberValue(el.value) === 0) el.value = '';
+      });
+      el.addEventListener('input', function() {
+        applyLiveVNFormat(el);
+        calculatePurchaseEditTotals();
+      });
+    }
+    function bindPurchaseEditNumberInputs(root) {
+      (root || document).querySelectorAll('.js-purchase-edit-number').forEach(bindPurchaseEditNumberInput);
     }
     function setPaySupplierError(message) {
       const el = document.getElementById('paySupplierError');
@@ -1070,7 +1085,7 @@
               <label for="editVatChuaId">Vật chứa</label>
               <div class="vat-chua-combo">
                 <select id="editVatChuaId" title="Chọn vật chứa">${vatChuaOptions}</select>
-                <input id="editVatChuaQty" class="vat-chua-qty" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa" value="${escapeHtml(vcQty)}">
+                <input id="editVatChuaQty" class="vat-chua-qty js-purchase-edit-number" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa" value="${escapeHtml(vcQty ? money(vcQty) : '')}">
               </div>
             </div>
             <p class="lot-note">Để trống nếu không nhập vật chứa. Khi lưu, tồn vật chứa được điều chỉnh theo thay đổi.</p>
@@ -1099,9 +1114,9 @@
               <td>${index + 1}</td>
               <td>${escapeHtml(product.ma_hang || '')}</td>
               <td>${escapeHtml(product.ten_hang || '')}</td>
-              <td><input data-edit-field="so_luong" type="number" min="1" step="1" value="${Number(row.so_luong || 1)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
-              <td><input data-edit-field="don_gia_nhap" inputmode="numeric" value="${money(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
-              <td><input data-edit-field="giam_gia_dong" inputmode="numeric" value="${money(row.giam_gia_dong || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="so_luong" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.so_luong || 1)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="don_gia_nhap" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="giam_gia_dong" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.giam_gia_dong || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><select data-edit-field="kieu_giam_gia_dong" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${discountType === 'vnd' ? 'selected' : ''}>VND</option><option value="percent" ${discountType === 'percent' ? 'selected' : ''}>%</option></select></td>
               <td class="num" data-edit-total>${moneyText(row.thanh_tien || 0)}</td>
               <td><input data-edit-field="ghi_chu" value="${escapeHtml(row.ghi_chu || '')}" ${readonly ? 'disabled' : ''}></td>
@@ -1118,10 +1133,10 @@
             <div class="edit-field"><label>Nhà cung cấp</label><select id="editSupplier" ${readonly ? 'disabled' : ''}>${supplierOptions}</select></div>
             <div class="edit-field"><label>Kho nhập</label><select id="editWarehouse" ${readonly ? 'disabled' : ''}>${warehouseOptions}</select></div>
             <div class="edit-field"><label>Ngày nhập</label><input id="editImportDate" type="date" value="${toDateInput(ticket.ngay_nhap || ticket.created_at)}" ${readonly ? 'disabled' : ''}></div>
-            <div class="edit-field"><label>Giảm giá phiếu</label><input id="editDiscount" inputmode="numeric" value="${money(ticket.giam_gia || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Giảm giá phiếu</label><input id="editDiscount" class="js-purchase-edit-number" inputmode="numeric" value="${money(ticket.giam_gia || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
             <div class="edit-field"><label>Kiểu giảm giá</label><select id="editDiscountType" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${ticket.kieu_giam_gia !== 'percent' ? 'selected' : ''}>VND</option><option value="percent" ${ticket.kieu_giam_gia === 'percent' ? 'selected' : ''}>%</option></select></div>
-            <div class="edit-field"><label>Cần trả NCC</label><input id="editPayable" inputmode="numeric" value="${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}" oninput="this.dataset.touched='1';calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
-            <div class="edit-field"><label>Đã trả NCC</label><input id="editPaid" inputmode="numeric" value="${money(ticket.da_tra_ncc || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Cần trả NCC</label><input id="editPayable" class="js-purchase-edit-number" inputmode="numeric" value="${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}" oninput="this.dataset.touched='1';calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Đã trả NCC</label><input id="editPaid" class="js-purchase-edit-number" inputmode="numeric" value="${money(ticket.da_tra_ncc || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
             <div class="edit-field full"><label>Ghi chú phiếu</label><textarea id="purchaseNote" ${readonly ? 'disabled' : ''}>${escapeHtml(ticket.ghi_chu || '')}</textarea></div>
           </div>
           ${vatChuaSection}
@@ -1138,6 +1153,7 @@
           </div>
           <p class="lot-note">${readonly ? 'Phiếu đã hủy: không thể chỉnh sửa.' : 'Phiếu đã nhập hàng: khi đổi số lượng hoặc kho, hệ thống sẽ điều chỉnh tồn kho theo chênh lệch.'}</p>
         `;
+        bindPurchaseEditNumberInputs(body);
         calculatePurchaseEditTotals();
       } catch (error) {
         body.innerHTML = `<span style="color:#d92d20">${error.message}</span>`;
@@ -1152,7 +1168,7 @@
       if (qcItems.length) {
         const qtyInput = rowEl.querySelector('[data-edit-field="so_luong"]');
         const priceInput = rowEl.querySelector('[data-edit-field="don_gia_nhap"]');
-        if (qtyInput) qtyInput.value = String(Math.floor(qcQty));
+        if (qtyInput) qtyInput.value = money(Math.floor(qcQty));
         if (priceInput) priceInput.value = qcQty > 0 ? money(Math.round(qcTotal / qcQty)) : '0';
         document.querySelectorAll(editQcParentSelector(rowId)).forEach(qcRow => {
           const qty = numberValue(qcRow.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0);

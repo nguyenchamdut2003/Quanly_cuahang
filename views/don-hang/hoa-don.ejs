@@ -361,6 +361,20 @@
         refreshInvoiceReceiptPaySummary();
       });
     }
+    function bindInvoiceEditNumberInput(el) {
+      if (!el || el.dataset.vnInvoiceEditBound === '1') return;
+      el.dataset.vnInvoiceEditBound = '1';
+      el.addEventListener('focus', function() {
+        if (numberValue(el.value) === 0) el.value = '';
+      });
+      el.addEventListener('input', function() {
+        applyLiveVNFormat(el);
+        calculateInvoiceEditTotals();
+      });
+    }
+    function bindInvoiceEditNumberInputs(root) {
+      (root || document).querySelectorAll('.js-invoice-edit-number').forEach(bindInvoiceEditNumberInput);
+    }
     function paymentBookLabel(book) {
       const bank = book && book.thong_tin_ngan_hang ? book.thong_tin_ngan_hang : {};
       if (String(book?.loai_so_quy || '') === 'chuyen_khoan') {
@@ -922,7 +936,7 @@
               <label for="editInvoiceVatChuaId">Vật chứa</label>
               <div class="vat-chua-combo">
                 <select id="editInvoiceVatChuaId" title="Chọn vật chứa">${vatChuaOptions}</select>
-                <input id="editInvoiceVatChuaQty" class="vat-chua-qty" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa" value="${escapeHtml(vcQty)}">
+                <input id="editInvoiceVatChuaQty" class="vat-chua-qty js-invoice-edit-number" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa" value="${escapeHtml(vcQty ? money(vcQty) : '')}">
               </div>
             </div>
             <p class="lot-note">Để trống nếu không xuất vật chứa. Khi lưu, tồn vật chứa được điều chỉnh theo thay đổi.</p>
@@ -935,9 +949,9 @@
               <td>${index + 1}</td>
               <td>${escapeHtml(product.ma_hang || '')}</td>
               <td>${escapeHtml(product.ten_hang || '')}</td>
-              <td><input data-edit-field="so_luong" type="number" min="1" step="1" value="${Number(row.so_luong || 1)}" oninput="calculateInvoiceEditTotals()"></td>
-              <td><input data-edit-field="don_gia" inputmode="numeric" value="${money(row.don_gia || 0)}" oninput="calculateInvoiceEditTotals()"></td>
-              <td><input data-edit-field="chiet_khau" inputmode="numeric" value="${money(row.chiet_khau || 0)}" oninput="calculateInvoiceEditTotals()"></td>
+              <td><input data-edit-field="so_luong" class="js-invoice-edit-number" inputmode="numeric" value="${money(row.so_luong || 1)}" oninput="calculateInvoiceEditTotals()"></td>
+              <td><input data-edit-field="don_gia" class="js-invoice-edit-number" inputmode="numeric" value="${money(row.don_gia || 0)}" oninput="calculateInvoiceEditTotals()"></td>
+              <td><input data-edit-field="chiet_khau" class="js-invoice-edit-number" inputmode="numeric" value="${money(row.chiet_khau || 0)}" oninput="calculateInvoiceEditTotals()"></td>
               <td class="num" data-edit-total>${moneyText(row.thanh_tien || 0)}</td>
             </tr>`;
         }).join('');
@@ -975,6 +989,7 @@
           </div>
           <p class="lot-note">Khi đổi số lượng, hệ thống sẽ điều chỉnh tồn kho theo chênh lệch (nếu hóa đơn đã trừ tồn).</p>
         `;
+        bindInvoiceEditNumberInputs(body);
         calculateInvoiceEditTotals();
       } catch (error) {
         body.innerHTML = `<span style="color:#d92d20">${escapeHtml(error.message || 'Không tải được hóa đơn')}</span>`;
@@ -987,9 +1002,9 @@
       try {
         const items = Array.from(document.querySelectorAll('#invoiceEditModal [data-edit-row]')).map(rowEl => ({
           _id: rowEl.dataset.editRow,
-          so_luong: rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0,
-          don_gia: rowEl.querySelector('[data-edit-field="don_gia"]')?.value || 0,
-          chiet_khau: rowEl.querySelector('[data-edit-field="chiet_khau"]')?.value || 0
+          so_luong: numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0),
+          don_gia: numberValue(rowEl.querySelector('[data-edit-field="don_gia"]')?.value || 0),
+          chiet_khau: numberValue(rowEl.querySelector('[data-edit-field="chiet_khau"]')?.value || 0)
         }));
         const payload = {
           items,
@@ -999,7 +1014,7 @@
         const editVatChuaEl = document.getElementById('editInvoiceVatChuaId');
         if (editVatChuaEl) {
           payload.vat_chua_id = editVatChuaEl.value || '';
-          payload.vat_chua_so_luong = document.getElementById('editInvoiceVatChuaQty')?.value || '';
+          payload.vat_chua_so_luong = numberValue(document.getElementById('editInvoiceVatChuaQty')?.value || 0);
         }
         const res = await fetch('/don-hang/hoa-don/' + currentInvoiceEditId + '/save', {
           method: 'POST',
