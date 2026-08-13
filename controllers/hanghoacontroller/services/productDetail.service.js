@@ -340,6 +340,32 @@ function filterAggregateStockRowsWhenDetailed(rows) {
     });
 }
 
+function attachStockCardRunningTotals(rows) {
+    rows = rows || [];
+    var groups = [];
+    var groupMap = {};
+
+    rows.forEach(function(row) {
+        var key = stockCardGroupKey(row);
+        if (!groupMap[key]) {
+            groupMap[key] = { rows: [], total_qty: 0 };
+            groups.push(groupMap[key]);
+        }
+        groupMap[key].rows.push(row);
+        groupMap[key].total_qty += Number(row.so_luong_thay_doi || 0);
+    });
+
+    var runningStock = 0;
+    groups.slice().reverse().forEach(function(group) {
+        runningStock += group.total_qty;
+        group.rows.forEach(function(row) {
+            row.ton_cuoi_the_kho = runningStock;
+        });
+    });
+
+    return rows;
+}
+
 async function resolveProductForTab(productId, req) {
     productId = normalizeIdParam(productId);
     if (!productId || !mongoose.Types.ObjectId.isValid(productId)) return null;
@@ -377,6 +403,7 @@ async function loadProductCardTab(productId, req) {
     rows = filterAggregateStockRowsWhenDetailed(rows);
     rows = await enrichStockCardRows(rows, tab.item._id);
     rows = await filterTrashedKiemKhoStockRows(rows);
+    rows = attachStockCardRunningTotals(rows);
     var paged = paginateStockCardRowsByDocument(rows, paging);
     rows = paged.rows;
     var lotIds = uniqueValues(rows, 'lo_hang_id').filter(function(id) {
