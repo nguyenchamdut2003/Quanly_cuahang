@@ -11,9 +11,11 @@
   const selectedStatuses = Array.isArray(safeFilters.trang_thai) ? safeFilters.trang_thai : (safeFilters.trang_thai ? [safeFilters.trang_thai] : []);
   const fmt = value => Number(value || 0).toLocaleString('vi-VN');
   const fmtMoney = value => fmt(value) + ' VNĐ';
+  const supplierPayableTotal = ticket => Number(ticket && ticket.ncc_can_tra != null && ticket.ncc_can_tra !== '' ? ticket.ncc_can_tra : (ticket && (ticket.tong_tien_tra ?? ticket.tong_tien_hang) || 0)) || 0;
   const supplierRemainDue = ticket => {
     if (!ticket) return 0;
-    const payable = Number(ticket.ncc_can_tra != null && ticket.ncc_can_tra !== '' ? ticket.ncc_can_tra : (ticket.tong_tien_tra ?? ticket.tong_tien_hang ?? 0)) || 0;
+    if (ticket.ncc_con_phai_tra != null && ticket.ncc_con_phai_tra !== '') return Math.max(0, Number(ticket.ncc_con_phai_tra || 0));
+    const payable = supplierPayableTotal(ticket);
     const paid = Number(ticket.ncc_da_tra ?? 0) || 0;
     return Math.max(0, payable - paid);
   };
@@ -309,6 +311,7 @@
                 <th class="num money-col">Giảm giá</th>
                 <th class="num money-col">NCC cần trả</th>
                 <th class="num money-col">NCC đã trả</th>
+                <th class="num money-col">NCC còn phải trả</th>
                 <th class="status-col">Trạng thái</th>
               </tr>
             </thead>
@@ -323,12 +326,13 @@
                     <td class="ellipsis"><%= r.nha_cung_cap_id ? (r.nha_cung_cap_id.ten_ncc || '--') : '--' %></td>
                     <td class="num"><%= fmtMoney(r.tong_tien_hang || r.tong_tien_tra || 0) %></td>
                     <td class="num"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmtMoney(r.giam_gia || 0) %></td>
-                    <td class="num"><%= fmtMoney(supplierRemainDue(r)) %></td>
+                    <td class="num"><%= fmtMoney(supplierPayableTotal(r)) %></td>
                     <td class="num"><%= fmtMoney(r.ncc_da_tra || 0) %></td>
+                    <td class="num"><%= fmtMoney(supplierRemainDue(r)) %></td>
                     <td><span class="status-badge <%= badgeClass(r.trang_thai) %>"><%= statusLabel(r.trang_thai) %></span></td>
                   </tr>
                   <tr class="detail-row" id="detail-<%= r._id %>" style="display:none">
-                    <td colspan="10">
+                    <td colspan="11">
                       <div class="detail-card">
                         <div class="detail-tabs"><span class="detail-tab">Thông tin</span></div>
                         <div class="detail-head">
@@ -464,13 +468,17 @@
                             </div>
                             <div class="return-summary-row">
                               <span>NCC cần trả</span>
-                              <span class="summary-val"><%= fmtMoney(r.ncc_can_tra != null ? r.ncc_can_tra : (r.tong_tien_tra || 0)) %></span>
+                              <span class="summary-val"><%= fmtMoney(supplierPayableTotal(r)) %></span>
                             </div>
                             <div class="return-summary-row">
                               <span>NCC đã trả</span>
                               <span class="summary-val"><%= fmtMoney(r.ncc_da_tra || 0) %></span>
                             </div>
                             <% var nccRemain = supplierRemainDue(r); %>
+                            <div class="return-summary-row">
+                              <span>NCC còn phải trả</span>
+                              <span class="summary-val"><%= fmtMoney(nccRemain) %></span>
+                            </div>
                             <% if (r.trang_thai === 'completed' && nccRemain > 0) { %>
                               <div class="receipt-pay-action">
                                 <button type="button" class="btn btn-primary js-return-receipt-pay" data-id="<%= r._id %>" data-due="<%= nccRemain %>">Tạo phiếu thu</button>
@@ -491,7 +499,7 @@
                 <% }) %>
               <% } else { %>
                 <tr>
-                  <td colspan="10" class="empty">
+                  <td colspan="11" class="empty">
                     <div class="empty-box">
                       <div class="empty-icon">▤</div>
                       <div class="empty-title">Không tìm thấy kết quả</div>

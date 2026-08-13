@@ -27,7 +27,7 @@
                     <% (supplierPurchaseHistory || []).forEach(function(row) { %>
                       <% var isReturnHistory=row.loai==='tra' ; var historyHref='#' ; if (row.loai==='nhap' &&
                         row.phieu_nhap_id) historyHref=refUrl('purchase', row.phieu_nhap_id); else if (row.loai==='tra'
-                        && row.phieu_tra_hang_nhap_id) historyHref='/tra-hang-nhap/' + row.phieu_tra_hang_nhap_id; var
+                        && row.phieu_tra_hang_nhap_id) historyHref='/tra-hang-nhap?q=' + encodeURIComponent(String(row.ma_phieu || '')) + '&openReturn=' + encodeURIComponent(String(row.phieu_tra_hang_nhap_id)); var
                         historyTypeLabel=typeof mapSupplierPurchaseHistoryType==='function' ?
                         mapSupplierPurchaseHistoryType(row.loai) : (isReturnHistory ? 'Trả hàng hóa' : 'Nhập hàng hóa'
                         ); %>

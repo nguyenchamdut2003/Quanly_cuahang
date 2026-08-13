@@ -740,6 +740,7 @@ const PhieuTraHangNhapSchema = new Schema({
   kieu_giam_gia: { type: String, enum: ['vnd', 'percent'], default: 'vnd' },
   ncc_can_tra: { type: Number, default: 0 },
   ncc_da_tra: { type: Number, default: 0 },
+  ncc_con_phai_tra: { type: Number, default: 0 },
   so_quy_id: { type: ObjectId, ref: 'SoQuy' },
   chi_tiet_thanh_toan: {
     tien_mat: { type: Number, default: 0, min: 0 },

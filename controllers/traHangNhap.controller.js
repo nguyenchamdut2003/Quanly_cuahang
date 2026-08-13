@@ -99,6 +99,7 @@ const RETURN_IMPORT_EXPORT_COLUMNS = [
   { header: 'Giảm giá', key: 'giam_gia', style: { numFmt: '#,##0.##' } },
   { header: 'NCC cần trả', key: 'ncc_can_tra', style: { numFmt: '#,##0' } },
   { header: 'NCC đã trả', key: 'ncc_da_tra', style: { numFmt: '#,##0' } },
+  { header: 'NCC còn phải trả', key: 'ncc_con_phai_tra', style: { numFmt: '#,##0' } },
   { header: 'Tính vào công nợ', key: 'tinh_vao_cong_no' },
   { header: 'Tổng tiền trả', key: 'tong_tien_tra', style: { numFmt: '#,##0' } },
   { header: 'Lý do', key: 'ly_do' },
@@ -364,6 +365,14 @@ function parseMoney(raw) {
   return Math.floor(value);
 }
 
+function resolveSupplierReturnRemaining(ticket) {
+  if (!ticket) return 0;
+  if (ticket.ncc_con_phai_tra != null && ticket.ncc_con_phai_tra !== '') {
+    return Math.max(0, Number(ticket.ncc_con_phai_tra || 0));
+  }
+  return Math.max(0, Number(ticket.ncc_can_tra || 0) - Number(ticket.ncc_da_tra || 0));
+}
+
 function parseItems(raw) {
   let parsed = raw;
   if (typeof raw === 'string') {
@@ -603,6 +612,7 @@ function buildExportRow(ticket, detail) {
     giam_gia: Number(ticket.giam_gia || 0),
     ncc_can_tra: Number(ticket.ncc_can_tra || 0),
     ncc_da_tra: Number(ticket.ncc_da_tra || 0),
+    ncc_con_phai_tra: resolveSupplierReturnRemaining(ticket),
     tinh_vao_cong_no: ticket.tinh_vao_cong_no ? 'Có' : 'Không',
     tong_tien_tra: Number(ticket.tong_tien_tra || 0),
     ly_do: ticket.ly_do || '',
@@ -1132,8 +1142,9 @@ async function completeInventory(returnDoc, rows, userId, options = {}) {
 async function applySupplierDebt(returnDoc, options = {}) {
   if (!returnDoc.tinh_vao_cong_no || !returnDoc.nha_cung_cap_id) return;
   const session = options.session;
-  const amount = Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0));
-  if (amount <= 0) return;
+  const returnValue = Math.max(0, Number(returnDoc.ncc_can_tra || 0));
+  const amount = Math.max(0, Number(returnDoc.ncc_da_tra || 0));
+  if (returnValue <= 0) return;
   await CongNoNhaCungCap.create([{
     cua_hang_id: returnDoc.cua_hang_id,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
@@ -1144,7 +1155,9 @@ async function applySupplierDebt(returnDoc, options = {}) {
     ghi_chu: 'Giảm nợ từ phiếu trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
     ngay: returnDoc.ngay_tra || new Date()
   }], withSessionOption(session));
-  const supplier = await NhaCungCap.findById(returnDoc.nha_cung_cap_id).select('tong_no').session(session || null).lean();
+  const supplier = amount > 0
+    ? await NhaCungCap.findById(returnDoc.nha_cung_cap_id).select('tong_no').session(session || null).lean()
+    : null;
   if (supplier && typeof supplier.tong_no === 'number') {
     await NhaCungCap.updateOne(
       { _id: returnDoc.nha_cung_cap_id },
@@ -2113,6 +2126,7 @@ exports.createSubmit = async function(req, res, next) {
           kieu_giam_gia: discountType,
           ncc_can_tra: totals.ncc_can_tra,
           ncc_da_tra: nccDaTra,
+          ncc_con_phai_tra: Math.max(0, Number(totals.ncc_can_tra || 0) - Number(nccDaTra || 0)),
           so_quy_id: !payment.isV2 && isObjectId(cashBookId) ? cashBookId : undefined,
           chi_tiet_thanh_toan: payment.detail,
           tinh_vao_cong_no: true,
@@ -2228,6 +2242,7 @@ exports.complete = async function(req, res) {
           returnDoc.so_quy_id = payment.isV2 ? undefined : cashBookId;
           returnDoc.chi_tiet_thanh_toan = payment.detail;
         }
+        returnDoc.ncc_con_phai_tra = Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0));
         await returnDoc.save({ session });
         await applySupplierDebt(returnDoc, { session });
         await requireSupplierRefundReceipt(returnDoc, req.user?._id, {
@@ -2271,6 +2286,7 @@ exports.createReceipt = async function(req, res) {
 
       const currentDetail = returnDoc.chi_tiet_thanh_toan || {};
       returnDoc.ncc_da_tra = Math.min(Number(returnDoc.ncc_can_tra || 0), Number(returnDoc.ncc_da_tra || 0) + payment.amount);
+      returnDoc.ncc_con_phai_tra = Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0));
       returnDoc.so_quy_id = payment.isV2 ? undefined : cashBookId;
       returnDoc.chi_tiet_thanh_toan = {
         tien_mat: Number(currentDetail.tien_mat || 0) + Number(payment.detail.tien_mat || 0),
@@ -2357,7 +2373,7 @@ exports.exportCsv = async function(req, res, next) {
       .lean();
     const escape = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
     const csv = [
-      ['ma_tra_hang_nhap', 'thoi_gian', 'nha_cung_cap', 'tong_tien_hang', 'giam_gia', 'ncc_can_tra', 'ncc_da_tra', 'trang_thai'],
+      ['ma_tra_hang_nhap', 'thoi_gian', 'nha_cung_cap', 'tong_tien_hang', 'giam_gia', 'ncc_can_tra', 'ncc_da_tra', 'ncc_con_phai_tra', 'trang_thai'],
       ...rows.map(row => [
         row.ma_phieu_tra_nhap || '',
         row.ngay_tra ? row.ngay_tra.toISOString() : '',
@@ -2366,6 +2382,7 @@ exports.exportCsv = async function(req, res, next) {
         row.giam_gia || 0,
         row.ncc_can_tra || 0,
         row.ncc_da_tra || 0,
+        resolveSupplierReturnRemaining(row),
         row.trang_thai || ''
       ])
     ].map(row => row.map(escape).join(',')).join('\n');

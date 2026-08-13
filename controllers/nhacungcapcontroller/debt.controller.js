@@ -42,6 +42,8 @@ exports.payDebt = async function(req, res, next) {
                   throw new Error('Không tìm thấy nhà cung cấp');
               }
   
+              var totalsMap = await aggregateSupplierPurchaseTotals(storeId, [supplier._id]);
+              applySupplierTotalsFromMap(supplier, totalsMap);
               var purchases = await loadSupplierPayableDocuments(supplier._id, storeId);
               var invoiceDebt = sumInvoiceDebt(purchases);
               var payableDebt = Math.max(0, Number(supplier.tong_no || 0));

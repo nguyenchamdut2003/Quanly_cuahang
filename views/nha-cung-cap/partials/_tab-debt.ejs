@@ -54,7 +54,7 @@
                       data-debt-time="<%= row.thoi_gian ? new Date(row.thoi_gian).getTime() : 0 %>">
                                             <td class="text-center">
                         <% if (row.phieu_tra_nhap_id) { %>
-                          <a class="table-code-link" href="/tra-hang-nhap/<%= encodeURIComponent(String(row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id)) %>"><%= row.ma_phieu || '--' %></a>
+                          <a class="table-code-link" href="/tra-hang-nhap?q=<%= encodeURIComponent(String(row.ma_phieu || '')) %>&openReturn=<%= encodeURIComponent(String(row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id)) %>"><%= row.ma_phieu || '--' %></a>
                         <% } else if (row.phieu_nhap_id) { %>
                           <%- refLink('purchase', row.phieu_nhap_id, row.ma_phieu || '--') %>
                         <% } else if (row.nhap_vat_chua_id) { %>
