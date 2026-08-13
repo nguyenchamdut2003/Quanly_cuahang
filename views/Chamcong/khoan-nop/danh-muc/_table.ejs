@@ -1,0 +1,74 @@
+<%
+  var nhomKhoanLabels = {
+    thue: 'Thue',
+    bao_hiem: 'Bao hiem',
+    cong_doan: 'Cong doan',
+    khac: 'Khac'
+  };
+  var loaiKhoanLabels = {
+    thue_tncn: 'Thue TNCN',
+    bhxh: 'BHXH',
+    bhyt: 'BHYT',
+    bhtn: 'BHTN',
+    cong_doan: 'Cong doan',
+    khac: 'Khac'
+  };
+  var noiNopLabels = {
+    co_quan_thue: 'Co quan thue',
+    co_quan_bhxh: 'Co quan BHXH',
+    lien_doan_lao_dong: 'Lien doan lao dong',
+    khac: 'Khac'
+  };
+%>
+<section class="hr-table-panel">
+  <table class="hr-table">
+    <thead>
+      <tr>
+        <th>Ma khoan</th>
+        <th>Ten khoan</th>
+        <th>Nhom khoan</th>
+        <th>Loai khoan</th>
+        <th>Noi nop</th>
+        <th>Trang thai</th>
+        <th style="width:100px">Thao tac</th>
+      </tr>
+    </thead>
+    <tbody id="knTableBody">
+      <% if (!(danhMucKhoanNops || []).length) { %>
+        <tr><td colspan="7" class="hr-empty">Chua co khoan nop. <a id="knEmptyAdd">Nhan vao day de them khoan nop</a>.</td></tr>
+      <% } %>
+      <% (danhMucKhoanNops || []).forEach(function(item) { %>
+        <tr
+          data-id="<%= item._id %>"
+          data-ma-khoan="<%= item.ma_khoan || '' %>"
+          data-ten-khoan="<%= item.ten_khoan || '' %>"
+          data-nhom-khoan="<%= item.nhom_khoan || '' %>"
+          data-loai-khoan="<%= item.loai_khoan || '' %>"
+          data-noi-nop="<%= item.noi_nop || '' %>"
+          data-mo-ta="<%= item.mo_ta || '' %>"
+          data-thu-tu="<%= item.thu_tu_hien_thi || 0 %>"
+          data-trang-thai="<%= item.trang_thai || 'active' %>"
+        >
+          <td><%= item.ma_khoan || '---' %></td>
+          <td><strong><%= item.ten_khoan || '---' %></strong></td>
+          <td><%= nhomKhoanLabels[item.nhom_khoan] || item.nhom_khoan || '---' %></td>
+          <td><%= loaiKhoanLabels[item.loai_khoan] || item.loai_khoan || '---' %></td>
+          <td><%= noiNopLabels[item.noi_nop] || item.noi_nop || '---' %></td>
+          <td>
+            <span class="status-pill <%= item.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+              <%= item.trang_thai === 'active' ? 'Dang su dung' : 'Ngung su dung' %>
+            </span>
+          </td>
+          <td>
+            <div class="hr-actions">
+              <button type="button" class="hr-btn-icon kn-edit" title="Sua"><i class="fa-regular fa-pen-to-square"></i></button>
+              <button type="button" class="hr-btn-icon kn-status" title="Doi trang thai">
+                <i class="fa-solid <%= item.trang_thai === 'active' ? 'fa-ban' : 'fa-rotate-left' %>"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>

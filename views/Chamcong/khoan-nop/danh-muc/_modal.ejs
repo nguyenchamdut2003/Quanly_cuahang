@@ -1,0 +1,51 @@
+<div class="modal-overlay" id="knModal">
+  <div class="modal-card">
+    <div class="modal-head" id="knModalTitle">Them khoan nop</div>
+    <form id="knForm" class="modal-body">
+      <input type="hidden" id="knId">
+      <label>Ma khoan *<input id="knMaKhoan" required></label>
+      <label>Ten khoan *<input id="knTenKhoan" required></label>
+      <label>Nhom khoan *
+        <select id="knNhomKhoan" required>
+          <option value="">Chon nhom khoan</option>
+          <option value="thue">thue</option>
+          <option value="bao_hiem">bao_hiem</option>
+          <option value="cong_doan">cong_doan</option>
+          <option value="khac">khac</option>
+        </select>
+      </label>
+      <label>Loai khoan *
+        <select id="knLoaiKhoan" required>
+          <option value="">Chon loai khoan</option>
+          <option value="thue_tncn">thue_tncn</option>
+          <option value="bhxh">bhxh</option>
+          <option value="bhyt">bhyt</option>
+          <option value="bhtn">bhtn</option>
+          <option value="cong_doan">cong_doan</option>
+          <option value="khac">khac</option>
+        </select>
+      </label>
+      <label>Noi nop *
+        <select id="knNoiNop" required>
+          <option value="">Chon noi nop</option>
+          <option value="co_quan_thue">co_quan_thue</option>
+          <option value="co_quan_bhxh">co_quan_bhxh</option>
+          <option value="lien_doan_lao_dong">lien_doan_lao_dong</option>
+          <option value="khac">khac</option>
+        </select>
+      </label>
+      <label>Mo ta<textarea id="knMoTa"></textarea></label>
+      <label>Thu tu hien thi<input id="knThuTu" type="number" min="0" step="1" value="0"></label>
+      <label>Trang thai
+        <select id="knTrangThai">
+          <option value="active">active</option>
+          <option value="inactive">inactive</option>
+        </select>
+      </label>
+    </form>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-light" id="knCancelBtn">Bo qua</button>
+      <button type="submit" class="btn btn-primary" form="knForm" id="knSaveBtn">Luu</button>
+    </div>
+  </div>
+</div>

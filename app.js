@@ -44,6 +44,10 @@ var traHangNhapRouter = require('./routes/traHangNhap');
 var apiSoQuyRouter = require('./routes/apiSoQuy');
 var shortcutRouter = require('./routes/shortcut');
 var systemRouter = require('./routes/system');
+var chamCongDanhMucNhanSuRouter = require('./routes/chamcongroutes/danhmuc-nhansu.routes');
+var chamCongKhoanNopRouter = require('./routes/chamcongroutes/khoannop.routes');
+var chamCongRouter = require('./routes/chamcongroutes/chamcong.routes');
+var chamCongNhanVienRouter = require('./routes/chamcongroutes/nhanvien.routes');
 var { isPerformanceEnabled } = require('./utils/performance.util');
 
 var app = express();
@@ -292,6 +296,10 @@ app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);
 app.use('/xuat-dung-noi-bo', xuatDungNoiBoRouter);
 app.use('/xuat-huy', xuatHuyRouter);
+app.use('/', chamCongDanhMucNhanSuRouter);
+app.use('/cham-cong', chamCongRouter);
+app.use('/chamcongmoi/api/nhan-vien', chamCongNhanVienRouter);
+app.use('/chamcongmoi/khoan-nop', chamCongKhoanNopRouter);
 app.use('/system', systemRouter);
 app.use('/', shortcutRouter);
 

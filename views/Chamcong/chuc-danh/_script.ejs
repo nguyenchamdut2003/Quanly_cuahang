@@ -1,0 +1,101 @@
+<script>
+  const cdModal = document.getElementById('cdModal');
+  const cdKeyword = document.getElementById('cdKeyword');
+  let cdEditId = '';
+
+  function openCdModal(item) {
+    cdEditId = item && item._id ? String(item._id) : '';
+    document.getElementById('cdModalTitle').textContent = cdEditId ? 'Sua chuc danh' : 'Them chuc danh';
+    document.getElementById('cdId').value = cdEditId;
+    document.getElementById('cdMa').value = item && item.ma_chuc_danh ? item.ma_chuc_danh : '';
+    document.getElementById('cdTen').value = item && item.ten_chuc_danh ? item.ten_chuc_danh : '';
+    document.getElementById('cdMoTa').value = item && item.mo_ta ? item.mo_ta : '';
+    document.getElementById('cdTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    cdModal.classList.add('is-open');
+  }
+
+  function closeCdModal() {
+    cdModal.classList.remove('is-open');
+  }
+
+  function reloadCdPage() {
+    if (window.location.pathname === '/cham-cong') {
+      window.location.href = '/cham-cong?tab=positions';
+      return;
+    }
+    location.reload();
+  }
+
+  function reloadCdWithKeyword() {
+    const params = new URLSearchParams();
+    const kw = cdKeyword.value.trim();
+    if (kw) params.set('keyword', kw);
+    if (window.location.pathname === '/cham-cong') {
+      params.set('tab', 'positions');
+      window.location.href = '/cham-cong?' + params.toString();
+      return;
+    }
+    window.location.href = '/chuc-danh' + (params.toString() ? '?' + params.toString() : '');
+  }
+
+  document.getElementById('cdAddBtn').addEventListener('click', () => openCdModal(null));
+  document.getElementById('cdEmptyAdd')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openCdModal(null);
+  });
+  document.getElementById('cdCancelBtn').addEventListener('click', closeCdModal);
+  cdModal.addEventListener('click', (e) => {
+    if (e.target === cdModal) closeCdModal();
+  });
+  cdKeyword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') reloadCdWithKeyword();
+  });
+
+  document.querySelectorAll('.cd-edit').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const row = this.closest('tr');
+      openCdModal({
+        _id: row.dataset.id,
+        ma_chuc_danh: row.children[0].textContent.trim() === '---' ? '' : row.children[0].textContent.trim(),
+        ten_chuc_danh: row.querySelector('strong')?.textContent.trim() || '',
+        mo_ta: row.children[2].textContent.trim() === '---' ? '' : row.children[2].textContent.trim(),
+        trang_thai: row.querySelector('.status-pill')?.classList.contains('is-inactive') ? 'inactive' : 'active'
+      });
+    });
+  });
+
+  document.querySelectorAll('.cd-inactive').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const id = this.closest('tr').dataset.id;
+      if (!confirm('Ngung su dung chuc danh nay?')) return;
+      const res = await fetch('/api/chuc-danh/' + id + '/inactive', {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json' }
+      });
+      const json = await res.json();
+      if (!json.success) return alert(json.message || 'Loi');
+      reloadCdPage();
+    });
+  });
+
+  document.getElementById('cdForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const payload = {
+      ma_chuc_danh: document.getElementById('cdMa').value.trim(),
+      ten_chuc_danh: document.getElementById('cdTen').value.trim(),
+      mo_ta: document.getElementById('cdMoTa').value.trim(),
+      trang_thai: document.getElementById('cdTrangThai').value
+    };
+    if (!payload.ten_chuc_danh) return alert('Vui long nhap ten chuc danh');
+    const url = cdEditId ? ('/api/chuc-danh/' + cdEditId) : '/api/chuc-danh';
+    const method = cdEditId ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!json.success) return alert(json.message || 'Loi luu chuc danh');
+    reloadCdPage();
+  });
+</script>

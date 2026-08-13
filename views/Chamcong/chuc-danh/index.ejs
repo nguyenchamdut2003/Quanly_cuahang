@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chuc danh</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <%- include('../partials/_catalog-styles') %>
+</head>
+<body class="admin-body">
+  <%- include('../../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="admin-shell store-page">
+    <%- include('../../partials/flash-message', { flash: flash }) %>
+    <%- include('../partials/_tabs', { activeTab: 'positions', asLinks: true }) %>
+    <div class="hr-toolbar">
+      <h1>Chuc danh</h1>
+      <button type="button" class="btn btn-primary" id="cdAddBtn">+ Chuc danh</button>
+      <div class="hr-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="cdKeyword" placeholder="Tim kiem chuc danh" value="<%= filter.keyword || '' %>">
+      </div>
+    </div>
+
+    <%- include('./_table', { chucDanhs: chucDanhs }) %>
+  </main>
+
+  <%- include('./_modal') %>
+  <%- include('./_script') %>
+</body>
+</html>

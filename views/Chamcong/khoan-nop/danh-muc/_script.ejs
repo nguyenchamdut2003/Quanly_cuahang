@@ -1,0 +1,132 @@
+<script>
+  const knModal = document.getElementById('knModal');
+  const knForm = document.getElementById('knForm');
+  const knKeyword = document.getElementById('knKeyword');
+  let knEditId = '';
+
+  function getRowItem(row) {
+    return {
+      _id: row.dataset.id || '',
+      ma_khoan: row.dataset.maKhoan || '',
+      ten_khoan: row.dataset.tenKhoan || '',
+      nhom_khoan: row.dataset.nhomKhoan || '',
+      loai_khoan: row.dataset.loaiKhoan || '',
+      noi_nop: row.dataset.noiNop || '',
+      mo_ta: row.dataset.moTa || '',
+      thu_tu_hien_thi: row.dataset.thuTu || '0',
+      trang_thai: row.dataset.trangThai || 'active'
+    };
+  }
+
+  function openKnModal(item) {
+    knEditId = item && item._id ? String(item._id) : '';
+    document.getElementById('knModalTitle').textContent = knEditId ? 'Sua khoan nop' : 'Them khoan nop';
+    document.getElementById('knId').value = knEditId;
+    document.getElementById('knMaKhoan').value = item && item.ma_khoan ? item.ma_khoan : '';
+    document.getElementById('knTenKhoan').value = item && item.ten_khoan ? item.ten_khoan : '';
+    document.getElementById('knNhomKhoan').value = item && item.nhom_khoan ? item.nhom_khoan : '';
+    document.getElementById('knLoaiKhoan').value = item && item.loai_khoan ? item.loai_khoan : '';
+    document.getElementById('knNoiNop').value = item && item.noi_nop ? item.noi_nop : '';
+    document.getElementById('knMoTa').value = item && item.mo_ta ? item.mo_ta : '';
+    document.getElementById('knThuTu').value = item && item.thu_tu_hien_thi ? item.thu_tu_hien_thi : '0';
+    document.getElementById('knTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    knModal.classList.add('is-open');
+  }
+
+  function closeKnModal() {
+    knModal.classList.remove('is-open');
+  }
+
+  function reloadKnPage() {
+    if (window.location.pathname === '/cham-cong') {
+      window.location.href = '/cham-cong?tab=contributions';
+      return;
+    }
+    location.reload();
+  }
+
+  function reloadKnWithKeyword() {
+    const params = new URLSearchParams();
+    const kw = knKeyword.value.trim();
+    if (kw) params.set('keyword', kw);
+    if (window.location.pathname === '/cham-cong') {
+      params.set('tab', 'contributions');
+      window.location.href = '/cham-cong?' + params.toString();
+      return;
+    }
+    window.location.href = '/chamcongmoi/khoan-nop/danh-muc' + (params.toString() ? '?' + params.toString() : '');
+  }
+
+  document.getElementById('knAddBtn').addEventListener('click', () => openKnModal(null));
+  document.getElementById('knEmptyAdd')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openKnModal(null);
+  });
+  document.getElementById('knCancelBtn').addEventListener('click', closeKnModal);
+  knModal.addEventListener('click', (e) => {
+    if (e.target === knModal) closeKnModal();
+  });
+  knKeyword.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') reloadKnWithKeyword();
+  });
+
+  document.querySelectorAll('.kn-edit').forEach(btn => {
+    btn.addEventListener('click', function() {
+      openKnModal(getRowItem(this.closest('tr')));
+    });
+  });
+
+  document.querySelectorAll('.kn-status').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const item = getRowItem(this.closest('tr'));
+      const nextStatus = item.trang_thai === 'active' ? 'inactive' : 'active';
+      const message = nextStatus === 'active'
+        ? 'Kich hoat lai khoan nop nay?'
+        : 'Ngung su dung khoan nop nay?';
+      if (!confirm(message)) return;
+
+      const res = await fetch('/chamcongmoi/khoan-nop/danh-muc/' + encodeURIComponent(item._id) + '/trang-thai', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ trang_thai: nextStatus })
+      });
+      const json = await res.json();
+      if (!json.success) return alert(json.message || 'Loi cap nhat trang thai');
+      reloadKnPage();
+    });
+  });
+
+  knForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const payload = {
+      ma_khoan: document.getElementById('knMaKhoan').value.trim(),
+      ten_khoan: document.getElementById('knTenKhoan').value.trim(),
+      nhom_khoan: document.getElementById('knNhomKhoan').value,
+      loai_khoan: document.getElementById('knLoaiKhoan').value,
+      noi_nop: document.getElementById('knNoiNop').value,
+      mo_ta: document.getElementById('knMoTa').value.trim(),
+      thu_tu_hien_thi: document.getElementById('knThuTu').value,
+      trang_thai: document.getElementById('knTrangThai').value
+    };
+
+    if (!payload.ma_khoan) return alert('Vui long nhap ma khoan');
+    if (!payload.ten_khoan) return alert('Vui long nhap ten khoan');
+    if (!payload.nhom_khoan) return alert('Vui long chon nhom khoan');
+    if (!payload.loai_khoan) return alert('Vui long chon loai khoan');
+    if (!payload.noi_nop) return alert('Vui long chon noi nop');
+
+    const url = knEditId
+      ? '/chamcongmoi/khoan-nop/danh-muc/' + encodeURIComponent(knEditId)
+      : '/chamcongmoi/khoan-nop/danh-muc';
+    const method = knEditId ? 'PUT' : 'POST';
+
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!json.success) return alert(json.message || 'Loi luu khoan nop');
+    reloadKnPage();
+  });
+</script>

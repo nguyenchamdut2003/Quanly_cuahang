@@ -1,0 +1,69 @@
+<%
+  var currentTab = (typeof activeTab !== 'undefined' && activeTab) ? activeTab : 'attendance';
+  var tabs = [
+    { key: 'attendance', label: 'Chấm công', href: '/cham-cong?tab=attendance' },
+    { key: 'employees', label: 'Nhân viên', href: '/cham-cong?tab=employees' },
+    { key: 'departments', label: 'Phòng ban', href: '/cham-cong?tab=departments' },
+    { key: 'positions', label: 'Chức danh', href: '/cham-cong?tab=positions' },
+    { key: 'contributions', label: 'Danh mục khoản nộp', href: '/cham-cong?tab=contributions' },
+    { key: 'payroll', label: 'Bảng lương cần thanh toán', href: '/cham-cong?tab=payroll' },
+    { key: 'payroll-paid', label: 'Bảng lương đã thanh toán', href: '/cham-cong?tab=payroll-paid' }
+  ];
+  var useLinks = (typeof asLinks !== 'undefined') ? !!asLinks : false;
+%>
+<style>
+  .cc-tab-header.detail-tabs{
+    height:42px;
+    padding:0 18px;
+    border-bottom:1px solid #e2e8f0;
+    background:#fff;
+    justify-content:flex-start;
+    overflow-x:auto;
+  }
+  .cc-tab-header .detail-tab-list{
+    height:100%;
+    gap:18px;
+    flex-wrap:nowrap;
+  }
+  .cc-tab-header .detail-tab{
+    display:inline-flex;
+    align-items:center;
+    text-decoration:none;
+    height:100%;
+    border:0;
+    background:transparent;
+    color:#475569;
+    font-size:13px;
+    font-weight:700;
+    padding:0;
+    white-space:nowrap;
+    cursor:pointer;
+  }
+  .cc-tab-header .detail-tab.is-active{
+    color:#1677ff;
+    box-shadow:inset 0 -2px 0 #1677ff;
+    background:transparent;
+  }
+  .cc-tab-header .detail-tab:hover:not(.is-active){
+    color:#1677ff;
+    background:transparent;
+  }
+</style>
+<div class="detail-tabs cc-tab-header">
+  <div class="detail-tab-list">
+    <% tabs.forEach(function(tab) { %>
+      <% if (useLinks) { %>
+        <a
+          class="detail-tab <%= currentTab === tab.key ? 'is-active' : '' %>"
+          href="<%= tab.href %>"
+        ><%= tab.label %></a>
+      <% } else { %>
+        <button
+          class="detail-tab <%= currentTab === tab.key ? 'is-active' : '' %>"
+          type="button"
+          data-tab="<%= tab.key %>"
+        ><%= tab.label %></button>
+      <% } %>
+    <% }) %>
+  </div>
+</div>

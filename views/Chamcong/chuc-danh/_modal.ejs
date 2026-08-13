@@ -1,0 +1,21 @@
+<div class="modal-overlay" id="cdModal">
+  <div class="modal-card">
+    <div class="modal-head" id="cdModalTitle">Them chuc danh</div>
+    <form id="cdForm" class="modal-body">
+      <input type="hidden" id="cdId">
+      <label>Ma chuc danh<input id="cdMa" placeholder="De trong tu dong"></label>
+      <label>Ten chuc danh *<input id="cdTen" required></label>
+      <label>Mo ta<textarea id="cdMoTa"></textarea></label>
+      <label>Trang thai
+        <select id="cdTrangThai">
+          <option value="active">Dang su dung</option>
+          <option value="inactive">Ngung su dung</option>
+        </select>
+      </label>
+    </form>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-light" id="cdCancelBtn">Bo qua</button>
+      <button type="submit" class="btn btn-primary" form="cdForm" id="cdSaveBtn">Luu</button>
+    </div>
+  </div>
+</div>

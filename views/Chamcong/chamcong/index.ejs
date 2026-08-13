@@ -1,0 +1,1867 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chấm công mới</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <%- include('../partials/_catalog-styles') %>
+  <style>
+    .cc-page{background:#f3f6f9;min-height:calc(100vh - 98px);padding:24px}
+    .cc-shell{background:#fff;border:1px solid #d7dde5;border-radius:8px;min-height:calc(100vh - 150px);display:flex;flex-direction:column}
+    .cc-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #e5e9ee}
+    .cc-head h1{margin:0;font-size:20px;font-weight:800;color:#111827;flex:1}
+    .cc-pane{display:none;flex:1;min-height:0}
+    .cc-pane.is-active{display:flex;flex-direction:column}
+    .cc-toolbar{display:flex;align-items:end;gap:10px;padding:14px 18px;border-bottom:1px solid #e5e9ee;flex-wrap:wrap}
+    .cc-field{display:grid;gap:5px}
+    .cc-field label{font-size:12px;color:#475467;font-weight:700}
+    .cc-select,.cc-input,.cc-textarea{border:1px solid #cfd8e3;border-radius:7px;background:#fff;padding:0 10px;font-size:13px;color:#111827}
+    .cc-select,.cc-input{height:34px}
+    .cc-textarea{height:68px;padding:8px 10px;resize:vertical}
+    .cc-select{min-width:260px}
+    .cc-btn{height:34px;border:1px solid #cfd8e3;background:#fff;border-radius:7px;padding:0 12px;font-size:13px;font-weight:700;color:#344054;cursor:pointer}
+    .cc-btn-primary{border-color:#0070f4;background:#0070f4;color:#fff}
+    .cc-btn-danger{border-color:#fca5a5;background:#fff;color:#b42318}
+    .cc-btn-icon{width:34px;padding:0}
+    .cc-week-label{font-size:13px;color:#475467;font-weight:700;margin-left:auto}
+    .cc-toolbar-status{min-width:120px;max-width:320px;font-size:12px;color:#475467;text-align:right;line-height:1.35}
+    .cc-toolbar-status.is-error{color:#b42318}
+    .cc-toolbar-status.is-ok{color:#047857}
+    .cc-btn-primary:disabled{opacity:.65;cursor:not-allowed}
+    .cc-board-wrap{padding:18px;overflow:auto;flex:1}
+    .cc-board{display:grid;grid-template-columns:repeat(7,minmax(136px,1fr));border:1px solid #d7dde5;border-radius:8px;overflow:hidden;min-width:980px}
+    .cc-day{border-right:1px solid #d7dde5;background:#fff;min-height:290px;display:flex;flex-direction:column}
+    .cc-day:last-child{border-right:0}
+    .cc-day-head{background:#e8f3ff;border-bottom:1px solid #c9ddf6;padding:10px 12px}
+    .cc-day-title{display:flex;justify-content:space-between;gap:8px;font-size:13px;font-weight:800;color:#111827}
+    .cc-day-date{font-size:12px;color:#475467;margin-top:4px}
+    .cc-today{display:inline-flex;align-items:center;height:18px;border-radius:9px;background:#0070f4;color:#fff;padding:0 7px;font-size:10px;font-weight:800}
+    .cc-payroll-warning{border:0;background:#fff7ed;color:#b45309;border-radius:999px;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .cc-payroll-warning:hover{background:#ffedd5}
+    .cc-row-highlight{background:#fff7ed!important}
+    .cc-ref-link{color:#0070f4;text-decoration:none;font-weight:700}
+    .cc-ref-link:hover{text-decoration:underline}
+    .cc-day-body{display:grid;gap:10px;padding:12px;align-content:start;flex:1}
+    .cc-day-body label{display:grid;gap:5px;font-size:12px;color:#475467;font-weight:700}
+    .cc-check{display:flex!important;grid-template-columns:none!important;align-items:center;gap:8px;color:#111827}
+    .cc-check input{width:16px;height:16px;accent-color:#0070f4}
+    .cc-shift-list{display:grid;gap:8px}
+    .cc-overtime-input{height:32px;border:1px solid #cfd8e3;border-radius:7px;padding:0 8px;font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+    .cc-work-unit{font-size:12px;color:#047857;font-weight:800}
+    .cc-month .cc-day-body{min-height:120px}
+    .cc-time{height:32px;border:1px solid #cfd8e3;border-radius:7px;padding:0 8px;font-size:13px}
+    .cc-note{height:58px;border:1px solid #cfd8e3;border-radius:7px;padding:8px;font-size:13px;resize:none}
+    .cc-empty{padding:44px 20px;text-align:center;color:#64748b;font-size:14px}
+    .cc-status{min-height:20px;font-size:13px;color:#475467;padding:0 18px 16px}
+    .cc-status.is-error{color:#b42318}
+    .cc-status.is-ok{color:#047857}
+    .cc-table-wrap{padding:18px;overflow:auto;flex:1}
+    .cc-table{width:100%;min-width:1280px;border-collapse:collapse;table-layout:fixed}
+    .cc-table th{height:36px;background:#e8f3ff;border-bottom:1px solid #c9ddf6;text-align:left;font-size:12px;color:#111827;padding:0 8px}
+    .cc-table td{border-bottom:1px solid #e5e9ee;padding:8px;font-size:12px;color:#111827;vertical-align:middle;overflow-wrap:anywhere}
+    .cc-table tbody tr:hover{background:#f8fbff}
+    .cc-table th:nth-child(1),.cc-table td:nth-child(1){width:90px}
+    .cc-table th:nth-child(2),.cc-table td:nth-child(2){width:180px}
+    .cc-table th:nth-child(10),.cc-table td:nth-child(10),
+    .cc-table th:nth-child(11),.cc-table td:nth-child(11){text-align:right}
+    .cc-table th:nth-child(12),.cc-table td:nth-child(12){width:86px}
+    .cc-table th:nth-child(13),.cc-table td:nth-child(13){width:92px}
+    .cc-pill{display:inline-flex;align-items:center;height:22px;border-radius:5px;padding:0 8px;font-size:11px;font-weight:800}
+    .cc-pill.is-active{background:#dcfce7;color:#166534}
+    .cc-pill.is-inactive{background:#fee2e2;color:#991b1b}
+    .cc-actions{display:flex;gap:6px}
+    .cc-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1300;padding:16px}
+    .cc-modal.is-open{display:flex}
+    .cc-dialog{width:min(900px,100%);background:#fff;border-radius:8px;box-shadow:0 20px 50px rgba(0,0,0,.2);max-height:92vh;display:flex;flex-direction:column}
+    .cc-dialog-head{padding:15px 18px;border-bottom:1px solid #e5e9ee;font-size:17px;font-weight:800}
+    .cc-dialog-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 18px;overflow:auto}
+    .cc-dialog-body .span-2{grid-column:span 2}
+    .cc-dialog-actions{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid #e5e9ee}
+    .cc-salary-label{display:flex!important;grid-template-columns:none!important;align-items:center;gap:8px}
+    .cc-salary-label input{width:16px;height:16px;accent-color:#0070f4}
+    .cc-money-input{text-align:right;font-variant-numeric:tabular-nums}
+    .cc-payroll-note{font-size:12px;color:#667085;max-width:420px;line-height:1.45}
+    .cc-payroll-detail{min-width:220px;vertical-align:top}
+    .cc-payroll-day-lines{display:grid;gap:6px}
+    .cc-payroll-day-line{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 8px;border:1px solid #e4eaf2;border-radius:6px;background:#f8fafc;font-size:12px;color:#344054}
+    .cc-payroll-day-line strong{font-weight:700;color:#111827;white-space:nowrap}
+    .cc-payroll-day-line span{color:#475467;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .cc-payroll-day-note{display:block;margin-top:2px;font-size:11px;color:#667085}
+    .cc-payroll-warn{display:block;font-size:11px;color:#b45309;margin-top:6px}
+    .cc-payroll-table td{vertical-align:top}
+    .cc-payroll-table th:nth-child(1),.cc-payroll-table td:nth-child(1){width:96px}
+    .cc-payroll-table th:nth-child(2),.cc-payroll-table td:nth-child(2){width:88px}
+    .cc-payroll-table th:nth-child(3),.cc-payroll-table td:nth-child(3){width:140px}
+    .cc-payroll-table th:nth-child(4),.cc-payroll-table td:nth-child(4){width:72px;white-space:nowrap}
+    .cc-payroll-table th:nth-child(5),.cc-payroll-table td:nth-child(5){width:52px;text-align:center}
+    .cc-payroll-table th:nth-child(6),.cc-payroll-table td:nth-child(6){width:auto}
+    .cc-payroll-table th:nth-child(7),.cc-payroll-table td:nth-child(7){width:52px;text-align:center}
+    .cc-payroll-table th:nth-child(8),.cc-payroll-table td:nth-child(8),
+    .cc-payroll-table th:nth-child(9),.cc-payroll-table td:nth-child(9),
+    .cc-payroll-table th:nth-child(10),.cc-payroll-table td:nth-child(10){width:96px;text-align:right}
+    .cc-payroll-table th:nth-child(11),.cc-payroll-table td:nth-child(11){width:132px}
+    .cc-payroll-pay{display:grid;gap:8px;justify-items:start}
+    .cc-pill-pay-wait{background:#eff6ff;color:#1d4ed8}
+    .cc-pill-pay-done{background:#dcfce7;color:#166534}
+    .cc-payroll-pay-note{font-size:11px;color:#667085}
+    .cc-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px 18px}
+    .cc-pay-grid .span-2{grid-column:span 2}
+    .cc-pay-total{font-size:22px;font-weight:800;color:#0070f4}
+    .cc-pay-summary{font-size:15px;font-weight:800;color:#111827}
+    .cc-pay-error{font-size:12px;color:#b42318;line-height:1.45}
+    .cc-nav-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .cc-nav-label{font-size:12px;color:#667085;font-weight:700;white-space:nowrap}
+    .cc-nav-switch{border:0;background:transparent;font-size:12px;color:#667085;font-weight:700;white-space:nowrap;cursor:pointer;padding:0 4px;border-radius:6px;height:28px}
+    .cc-nav-switch.is-active{color:#0070f4;background:#e8f3ff}
+    .cc-board-view[hidden]{display:none!important}
+    .cc-board-section{display:grid;gap:10px;margin-bottom:22px}
+    .cc-board-section:last-child{margin-bottom:0}
+    .cc-board-title{margin:0;font-size:14px;font-weight:800;color:#111827}
+    .cc-board-section .cc-board{min-width:980px}
+    .cc-board-section.cc-month-section .cc-board{min-width:700px}
+    @media (max-width: 760px){
+      .cc-page{padding:12px}
+      .cc-toolbar{align-items:stretch}
+      .cc-field,.cc-select{width:100%;min-width:0}
+      .cc-week-label{margin-left:0;width:100%}
+      .cc-dialog-body{grid-template-columns:1fr}
+      .cc-dialog-body .span-2{grid-column:auto}
+    }
+  </style>
+</head>
+<body>
+  <%- include('../../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="cc-page">
+    <section class="cc-shell">
+      <%- include('../partials/_tabs', { activeTab: 'attendance' }) %>
+
+      <section id="ccAttendancePane" class="cc-pane is-active">
+        <div class="cc-toolbar">
+          <div class="cc-field">
+            <label for="ccEmployee">Nhân viên</label>
+            <select id="ccEmployee" class="cc-select">
+              <option value="">Chọn nhân viên</option>
+              <% employees.forEach(function(item) { %>
+                <option value="<%= item._id %>" <%= String(item._id) === String(selectedEmployeeId) ? 'selected' : '' %>>
+                  <%= item.ma_nhan_vien ? item.ma_nhan_vien + ' - ' : '' %><%= item.ten_nhan_vien %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <button type="button" id="ccQuickAddEmployee" class="cc-btn cc-btn-icon" title="Thêm nhân viên" aria-label="Thêm nhân viên">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+          <div id="ccWeekNav" class="cc-nav-group">
+            <button type="button" id="ccViewWeek" class="cc-nav-switch is-active">Tuần</button>
+            <button type="button" id="ccPrevWeek" class="cc-btn cc-btn-icon" title="Tuần trước" aria-label="Tuần trước">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button type="button" id="ccThisWeek" class="cc-btn">7 ngày gần nhất</button>
+            <button type="button" id="ccNextWeek" class="cc-btn cc-btn-icon" title="Tuần sau" aria-label="Tuần sau">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+          <div id="ccMonthNav" class="cc-nav-group" hidden>
+            <button type="button" id="ccViewMonth" class="cc-nav-switch">Tháng</button>
+            <button type="button" id="ccPrevMonth" class="cc-btn cc-btn-icon" title="Khối tháng trước" aria-label="Khối tháng trước">
+              <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <button type="button" id="ccThisMonth" class="cc-btn">7 tháng gần nhất</button>
+            <button type="button" id="ccNextMonth" class="cc-btn cc-btn-icon" title="Khối tháng sau" aria-label="Khối tháng sau">
+              <i class="fa-solid fa-chevron-right"></i>
+            </button>
+          </div>
+          <div id="ccWeekLabel" class="cc-week-label"></div>
+          <div id="ccToolbarStatus" class="cc-toolbar-status" aria-live="polite"></div>
+          <button type="button" id="ccSave" class="cc-btn cc-btn-primary">Lưu chấm công</button>
+        </div>
+        <div id="ccBoardWrap" class="cc-board-wrap">
+          <div class="cc-empty">Chọn nhân viên để chấm công tuần hiện tại.</div>
+        </div>
+      </section>
+
+      <section id="ccEmployeesPane" class="cc-pane">
+        <div class="cc-toolbar">
+          <div class="cc-field">
+            <label for="ccEmployeeKeyword">Tìm kiếm</label>
+            <input id="ccEmployeeKeyword" class="cc-input" type="search" placeholder="Mã, tên, SĐT, email, CCCD">
+          </div>
+          <label class="cc-field">
+            <span>&nbsp;</span>
+            <button type="button" id="ccEmployeeSearch" class="cc-btn">Tìm</button>
+          </label>
+          <button type="button" id="ccAddEmployee" class="cc-btn cc-btn-primary">
+            <i class="fa-solid fa-plus"></i> Thêm nhân viên
+          </button>
+        </div>
+        <div class="cc-table-wrap">
+          <table class="cc-table">
+            <thead>
+              <tr>
+                <th>Mã NV</th>
+                <th>Tên nhân viên</th>
+                <th>SĐT</th>
+                <th>Email</th>
+                <th>CCCD</th>
+                <th>Ngày sinh</th>
+                <th>Giới tính</th>
+                <th>Chức vụ</th>
+                <th>Ngày bắt đầu</th>
+                <th>Lương/ngày</th>
+                <th>Lương/tháng</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="ccEmployeeRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ccPayrollPane" class="cc-pane">
+        <div class="cc-toolbar">
+          <div class="cc-field">
+            <label for="ccPayrollEmployee">Lọc theo nhân viên</label>
+            <select id="ccPayrollEmployee" class="cc-select">
+              <option value="">Tất cả nhân viên</option>
+              <% employees.forEach(function(item) { %>
+                <option value="<%= item._id %>">
+                  <%= item.ma_nhan_vien ? item.ma_nhan_vien + ' - ' : '' %><%= item.ten_nhan_vien %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <button type="button" id="ccPayrollRefresh" class="cc-btn">Tải lại</button>
+          <span class="cc-payroll-note">Chấm công lưu theo từng ngày ở tab <strong>Chấm công</strong>. Bảng lương tự gom theo tháng và hiển thị chi tiết ngày công.</span>
+        </div>
+        <div class="cc-table-wrap">
+          <table class="cc-table cc-payroll-table">
+            <thead>
+              <tr>
+                <th>Mã bảng lương</th>
+                <th>Mã NV</th>
+                <th>Tên nhân viên</th>
+                <th>Tháng</th>
+                <th>Ngày công</th>
+                <th>Chi tiết ngày công</th>
+                <th>Tháng công</th>
+                <th>Lương/ngày</th>
+                <th>Lương/tháng</th>
+                <th>Cần thanh toán</th>
+                <th>Thanh toán</th>
+              </tr>
+            </thead>
+            <tbody id="ccPayrollRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ccPayrollPaidPane" class="cc-pane">
+        <div class="cc-toolbar">
+          <div class="cc-field">
+            <label for="ccPayrollPaidEmployee">Lọc theo nhân viên</label>
+            <select id="ccPayrollPaidEmployee" class="cc-select">
+              <option value="">Tất cả nhân viên</option>
+              <% employees.forEach(function(item) { %>
+                <option value="<%= item._id %>">
+                  <%= item.ma_nhan_vien ? item.ma_nhan_vien + ' - ' : '' %><%= item.ten_nhan_vien %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <button type="button" id="ccPayrollPaidRefresh" class="cc-btn">Tải lại</button>
+          <span class="cc-payroll-note">Danh sách bảng lương đã tạo phiếu chi và hoàn tất thanh toán.</span>
+        </div>
+        <div class="cc-table-wrap">
+          <table class="cc-table cc-payroll-table cc-payroll-paid-table">
+            <thead>
+              <tr>
+                <th>Mã bảng lương</th>
+                <th>Mã NV</th>
+                <th>Tên nhân viên</th>
+                <th>Tháng</th>
+                <th>Ngày công</th>
+                <th>Chi tiết ngày công</th>
+                <th>Tháng công</th>
+                <th>Lương/ngày</th>
+                <th>Lương/tháng</th>
+                <th>Đã thanh toán</th>
+                <th>Phiếu chi</th>
+              </tr>
+            </thead>
+            <tbody id="ccPayrollPaidRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="ccDepartmentsPane" class="cc-pane">
+        <div class="cc-toolbar">
+          <h2 style="margin:0;font-size:18px;font-weight:800;color:#111827;flex:1">Phong ban</h2>
+          <button type="button" class="cc-btn cc-btn-primary" id="pbAddBtn"><i class="fa-solid fa-plus"></i> Phong ban</button>
+          <div class="hr-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" id="pbKeyword" placeholder="Tim kiem phong ban" value="<%= filter && filter.keyword ? filter.keyword : '' %>">
+          </div>
+        </div>
+        <div class="cc-table-wrap">
+          <%- include('../phong-ban/_table', { phongBans: phongBans }) %>
+        </div>
+      </section>
+
+      <section id="ccPositionsPane" class="cc-pane">
+        <div class="cc-toolbar">
+          <h2 style="margin:0;font-size:18px;font-weight:800;color:#111827;flex:1">Chuc danh</h2>
+          <button type="button" class="cc-btn cc-btn-primary" id="cdAddBtn"><i class="fa-solid fa-plus"></i> Chuc danh</button>
+          <div class="hr-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" id="cdKeyword" placeholder="Tim kiem chuc danh" value="<%= filter && filter.keyword ? filter.keyword : '' %>">
+          </div>
+        </div>
+        <div class="cc-table-wrap">
+          <%- include('../chuc-danh/_table', { chucDanhs: chucDanhs }) %>
+        </div>
+      </section>
+
+      <section id="ccContributionsPane" class="cc-pane">
+        <div class="cc-toolbar">
+          <h2 style="margin:0;font-size:18px;font-weight:800;color:#111827;flex:1">Danh muc khoan nop</h2>
+          <button type="button" class="cc-btn cc-btn-primary" id="knAddBtn"><i class="fa-solid fa-plus"></i> Khoan nop</button>
+          <div class="hr-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="search" id="knKeyword" placeholder="Tim kiem khoan nop" value="<%= filter && filter.keyword ? filter.keyword : '' %>">
+          </div>
+        </div>
+        <div class="cc-table-wrap">
+          <%- include('../khoan-nop/danh-muc/_table', { danhMucKhoanNops: danhMucKhoanNops }) %>
+        </div>
+      </section>
+
+      <div id="ccStatus" class="cc-status"></div>
+    </section>
+  </main>
+
+  <div id="ccPayrollPayModal" class="cc-modal">
+    <div class="cc-dialog" style="width:min(520px,100%)">
+      <div class="cc-dialog-head">Tạo phiếu chi</div>
+      <div class="cc-pay-grid">
+        <label class="cc-field span-2">
+          <span>Cần thanh toán</span>
+          <div class="cc-pay-total" id="ccPayDue">0</div>
+        </label>
+        <label class="cc-field">
+          <span>Tiền mặt</span>
+          <input id="ccPayCash" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+        </label>
+        <label class="cc-field">
+          <span>Chuyển khoản</span>
+          <input id="ccPayTransfer" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+        </label>
+        <label class="cc-field span-2">
+          <span>Tổng chi</span>
+          <div class="cc-pay-summary" id="ccPayTotal">0</div>
+        </label>
+        <label class="cc-field span-2">
+          <span>Thực chi</span>
+          <div class="cc-pay-total" id="ccPayActual">0</div>
+        </label>
+        <label class="cc-field span-2" id="ccPayTransferBookWrap" hidden>
+          <span>Chọn sổ quỹ cho tiền chuyển khoản</span>
+          <select id="ccPayTransferBook" class="cc-select"></select>
+        </label>
+        <div class="span-2" id="ccPayErrorWrap" hidden>
+          <div class="cc-pay-error" id="ccPayErrors"></div>
+        </div>
+      </div>
+      <div class="cc-dialog-actions">
+        <button type="button" id="ccPaySubmit" class="cc-btn cc-btn-primary">Tạo phiếu chi</button>
+        <button type="button" id="ccPayClose" class="cc-btn">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ccEmployeeModal" class="cc-modal">
+    <div class="cc-dialog">
+      <div id="ccEmployeeModalTitle" class="cc-dialog-head">Thêm nhân viên</div>
+      <div class="cc-dialog-body">
+        <div class="cc-field">
+          <label for="ccFormName">Tên nhân viên</label>
+          <input id="ccFormName" class="cc-input" type="text">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormPhone">Số điện thoại</label>
+          <input id="ccFormPhone" class="cc-input" type="text">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormEmail">Email</label>
+          <input id="ccFormEmail" class="cc-input" type="email">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormCccd">CCCD</label>
+          <input id="ccFormCccd" class="cc-input" type="text">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormBirth">Ngày sinh</label>
+          <input id="ccFormBirth" class="cc-input" type="date">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormGender">Giới tính</label>
+          <select id="ccFormGender" class="cc-select">
+            <option value="">Chọn giới tính</option>
+            <option value="nam">Nam</option>
+            <option value="nu">Nữ</option>
+            <option value="khac">Khác</option>
+          </select>
+        </div>
+        <div class="cc-field">
+          <label for="ccFormRole">Chức vụ</label>
+          <input id="ccFormRole" class="cc-input" type="text">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormStart">Ngày bắt đầu</label>
+          <input id="ccFormStart" class="cc-input" type="date">
+        </div>
+        <div class="cc-field">
+          <label class="cc-salary-label" for="ccFormHasDaySalary">
+            <input id="ccFormHasDaySalary" name="ccSalaryType" type="radio" value="ngay" checked>
+            <span>Lương theo ngày</span>
+          </label>
+          <input id="ccFormDaySalary" class="cc-input cc-money-input" type="text" inputmode="numeric" autocomplete="off" value="0">
+        </div>
+        <div class="cc-field">
+          <label class="cc-salary-label" for="ccFormHasMonthSalary">
+            <input id="ccFormHasMonthSalary" name="ccSalaryType" type="radio" value="thang">
+            <span>Lương theo tháng</span>
+          </label>
+          <input id="ccFormMonthSalary" class="cc-input cc-money-input" type="text" inputmode="numeric" autocomplete="off" value="0">
+        </div>
+        <div class="cc-field">
+          <label for="ccFormStatus">Trạng thái</label>
+          <select id="ccFormStatus" class="cc-select">
+            <option value="active">Đang làm</option>
+            <option value="inactive">Đã nghỉ</option>
+          </select>
+        </div>
+        <div class="cc-field span-2">
+          <label for="ccFormNote">Ghi chú</label>
+          <textarea id="ccFormNote" class="cc-textarea"></textarea>
+        </div>
+      </div>
+      <div class="cc-dialog-actions">
+        <button type="button" id="ccCancelEmployee" class="cc-btn">Hủy</button>
+        <button type="button" id="ccSaveEmployee" class="cc-btn cc-btn-primary">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <%- include('../phong-ban/_modal') %>
+  <%- include('../chuc-danh/_modal') %>
+  <%- include('../khoan-nop/danh-muc/_modal') %>
+  <%- include('../phong-ban/_script') %>
+  <%- include('../chuc-danh/_script') %>
+  <%- include('../khoan-nop/danh-muc/_script') %>
+
+  <script>
+    (function() {
+      const employeeSelect = document.getElementById('ccEmployee');
+      const boardWrap = document.getElementById('ccBoardWrap');
+      const weekLabel = document.getElementById('ccWeekLabel');
+      const thisWeekBtn = document.getElementById('ccThisWeek');
+      const thisMonthBtn = document.getElementById('ccThisMonth');
+      const weekNav = document.getElementById('ccWeekNav');
+      const monthNav = document.getElementById('ccMonthNav');
+      const viewWeekBtn = document.getElementById('ccViewWeek');
+      const viewMonthBtn = document.getElementById('ccViewMonth');
+      const saveBtn = document.getElementById('ccSave');
+      const statusEl = document.getElementById('ccStatus');
+      const toolbarStatusEl = document.getElementById('ccToolbarStatus');
+      const modal = document.getElementById('ccEmployeeModal');
+      const employeeRows = document.getElementById('ccEmployeeRows');
+      const payrollRows = document.getElementById('ccPayrollRows');
+      const payrollPaidRows = document.getElementById('ccPayrollPaidRows');
+      let weekStart = '<%= weekStart %>';
+      let monthStart = '';
+      let currentMode = 'ngay';
+      let dualBoardView = 'ngay';
+      let hasDualSalary = false;
+      let currentDays = [];
+      let currentMonths = [];
+      let employeeEditId = '';
+      let pendingPayrollPayId = '';
+      let pendingPayrollPayDue = 0;
+      let payrollPayCashBookId = '';
+      const payrollPayModal = document.getElementById('ccPayrollPayModal');
+
+      function parseMoneyInput(value) {
+        const digits = String(value == null ? '' : value).replace(/[^\d]/g, '');
+        if (!digits) return 0;
+        return Number(digits);
+      }
+
+      function formatMoneyInput(value) {
+        return parseMoneyInput(value).toLocaleString('vi-VN');
+      }
+
+      function formatMoneyInputLive(input) {
+        if (!input) return;
+        const start = input.selectionStart == null ? String(input.value || '').length : input.selectionStart;
+        const raw = String(input.value || '');
+        const digitsBefore = raw.slice(0, start).replace(/[^\d]/g, '').length;
+        const formatted = formatMoneyInput(raw);
+        input.value = formatted;
+        let pos = 0;
+        let seen = 0;
+        while (pos < formatted.length && seen < digitsBefore) {
+          if (/\d/.test(formatted.charAt(pos))) seen += 1;
+          pos += 1;
+        }
+        input.setSelectionRange(pos, pos);
+      }
+
+      function bindMoneyInput(input) {
+        if (!input || input.dataset.moneyBound === '1') return;
+        input.dataset.moneyBound = '1';
+        input.addEventListener('input', function() {
+          formatMoneyInputLive(input);
+        });
+        input.addEventListener('focus', function() {
+          if (parseMoneyInput(input.value) === 0) input.value = '';
+        });
+        input.addEventListener('blur', function() {
+          input.value = formatMoneyInput(input.value);
+        });
+      }
+
+      function parseWorkUnitInput(value) {
+        const normalized = String(value == null ? '' : value).replace(',', '.').replace(/[^0-9.]/g, '');
+        const num = Number(normalized);
+        if (!Number.isFinite(num)) return 0;
+        return Math.max(0, num);
+      }
+
+      function workUnitText(value) {
+        const num = parseWorkUnitInput(value);
+        return num.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+      }
+
+      function dayWorkUnits(day) {
+        const morning = day && day.ca_sang ? 0.5 : 0;
+        const afternoon = day && day.ca_chieu ? 0.5 : 0;
+        return morning + afternoon + parseWorkUnitInput(day ? day.tang_ca_cong : 0);
+      }
+
+      function firstDayOfMonth(value) {
+        const date = value && String(value).length === 7 ? parseMonth(value) : parseDate(value || formatDate(new Date()));
+        return formatDate(new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1)));
+      }
+
+      function monthKeyFromDate(value) {
+        return formatMonth(parseDate(value || formatDate(new Date())));
+      }
+
+      function syncSalaryInput(checkboxId, inputId) {
+        const checkbox = document.getElementById(checkboxId);
+        const input = document.getElementById(inputId);
+        input.disabled = !checkbox.checked;
+        if (!checkbox.checked) {
+          input.value = '0';
+          return;
+        }
+        if (!parseMoneyInput(input.value)) input.value = '0';
+        else input.value = formatMoneyInput(input.value);
+      }
+
+      function syncSalaryInputs() {
+        syncSalaryInput('ccFormHasDaySalary', 'ccFormDaySalary');
+        syncSalaryInput('ccFormHasMonthSalary', 'ccFormMonthSalary');
+      }
+
+      function setStatus(message, type) {
+        const text = message || '';
+        statusEl.textContent = text;
+        statusEl.className = 'cc-status' + (type ? ' is-' + type : '');
+        if (toolbarStatusEl) {
+          toolbarStatusEl.textContent = text;
+          toolbarStatusEl.className = 'cc-toolbar-status' + (type ? ' is-' + type : '');
+        }
+      }
+
+      function normalizeTimeInput(value) {
+        const raw = String(value == null ? '' : value).trim();
+        if (!raw) return '';
+        const match24 = raw.match(/^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+        if (match24) {
+          return String(Number(match24[1])).padStart(2, '0') + ':' + match24[2];
+        }
+        const match12 = raw.match(/^(\d{1,2}):([0-5]\d)\s*(AM|PM)$/i);
+        if (match12) {
+          let hour = Number(match12[1]) % 12;
+          if (/pm/i.test(match12[3])) hour += 12;
+          return String(hour).padStart(2, '0') + ':' + match12[2];
+        }
+        return raw;
+      }
+
+      function collectDayRows() {
+        return Array.from(document.querySelectorAll('.cc-day[data-date]')).map(function(dayEl) {
+          const caSangInput = dayEl.querySelector('.cc-ca-sang');
+          const caChieuInput = dayEl.querySelector('.cc-ca-chieu');
+          const tangCaInput = dayEl.querySelector('.cc-tang-ca-cong');
+          const noteInput = dayEl.querySelector('textarea.cc-note');
+          const caSang = !!(caSangInput && caSangInput.checked);
+          const caChieu = !!(caChieuInput && caChieuInput.checked);
+          const tangCaCong = parseWorkUnitInput(tangCaInput ? tangCaInput.value : '');
+          return {
+            ngay_cham_cong: dayEl.dataset.date || '',
+            dong_y: caSang || caChieu || tangCaCong > 0,
+            ca_sang: caSang,
+            ca_chieu: caChieu,
+            tang_ca_cong: tangCaCong,
+            ghi_chu: noteInput ? noteInput.value.trim() : ''
+          };
+        }).filter(function(row) { return !!row.ngay_cham_cong; });
+      }
+
+      function collectMonthRows() {
+        return Array.from(document.querySelectorAll('.cc-month[data-month]')).map(function(monthEl) {
+          const dongYInput = monthEl.querySelector('.cc-dong-y-thang');
+          const noteInput = monthEl.querySelector('.cc-ghi-chu-thang');
+          return {
+            thang_cham_cong: monthEl.dataset.month || '',
+            dong_y: !!(dongYInput && dongYInput.checked),
+            ghi_chu: noteInput ? noteInput.value.trim() : ''
+          };
+        }).filter(function(row) { return !!row.thang_cham_cong; });
+      }
+
+      function setSaveLoading(isLoading) {
+        if (!saveBtn) return;
+        saveBtn.disabled = !!isLoading;
+        saveBtn.textContent = isLoading ? 'Đang lưu...' : 'Lưu chấm công';
+      }
+
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+        });
+      }
+
+      async function fetchJson(url, options) {
+        const res = await fetch(url, options);
+        const text = await res.text();
+        let json;
+        try {
+          json = text ? JSON.parse(text) : {};
+        } catch (error) {
+          json = { success: false, message: text || 'Máy chủ trả về dữ liệu không hợp lệ' };
+        }
+        if (!res.ok && json.success !== false) {
+          json.success = false;
+          json.message = json.message || ('Lỗi máy chủ ' + res.status);
+        }
+        return json;
+      }
+
+      function parseDate(value) {
+        const parts = String(value || '').split('-').map(Number);
+        return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+      }
+
+      function formatDate(date) {
+        return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0') + '-' + String(date.getUTCDate()).padStart(2, '0');
+      }
+
+      function addDays(value, days) {
+        const date = parseDate(value);
+        date.setUTCDate(date.getUTCDate() + days);
+        return formatDate(date);
+      }
+
+      function parseMonth(value) {
+        const parts = String(value || '').split('-').map(Number);
+        return new Date(Date.UTC(parts[0], parts[1] - 1, 1));
+      }
+
+      function formatMonth(date) {
+        return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+      }
+
+      function addMonths(value, months) {
+        const date = parseMonth(value);
+        date.setUTCMonth(date.getUTCMonth() + months);
+        return formatMonth(date);
+      }
+
+      function startOfWeek(date) {
+        const day = date.getUTCDay() || 7;
+        date.setUTCDate(date.getUTCDate() + 1 - day);
+        return formatDate(date);
+      }
+
+      function genderText(value) {
+        if (value === 'nam') return 'Nam';
+        if (value === 'nu') return 'Nữ';
+        if (value === 'khac') return 'Khác';
+        return '';
+      }
+
+      function moneyText(value) {
+        return Number(value || 0).toLocaleString('vi-VN');
+      }
+
+      function saveStatusText(warnings) {
+        warnings = Array.isArray(warnings) ? warnings : [];
+        if (!warnings.length) return 'Đã lưu chấm công.';
+        return 'Đã lưu chấm công. Cảnh báo: ' + warnings.map(function(item) {
+          return item.message || ('Đã có bảng lương ' + (item.ma_bang_luong || ''));
+        }).join('; ');
+      }
+
+      function formatWeekButton(start, end) {
+        if (!start || !end) return 'Tuần này';
+        const startDate = parseDate(start);
+        const endDate = parseDate(end);
+        const startText = String(startDate.getUTCDate()).padStart(2, '0') + '/' + String(startDate.getUTCMonth() + 1).padStart(2, '0');
+        const endText = String(endDate.getUTCDate()).padStart(2, '0') + '/' + String(endDate.getUTCMonth() + 1).padStart(2, '0');
+        return startText + ' - ' + endText;
+      }
+
+      function formatMonthButton(start, end) {
+        if (!start || !end) return '7 tháng gần nhất';
+        const startDate = parseMonth(start);
+        const endDate = parseMonth(end);
+        const startText = String(startDate.getUTCMonth() + 1).padStart(2, '0') + '/' + startDate.getUTCFullYear();
+        const endText = String(endDate.getUTCMonth() + 1).padStart(2, '0') + '/' + endDate.getUTCFullYear();
+        return startText + ' - ' + endText;
+      }
+
+      function formatPayrollMonth(value) {
+        const parts = String(value || '').split('-');
+        if (parts.length !== 2) return String(value || '');
+        return parts[1] + '/' + parts[0];
+      }
+
+      function payrollWarningButton(payroll) {
+        if (!payroll) return '';
+        return `<button type="button" class="cc-payroll-warning" title="${escapeHtml(payroll.message || 'Đã có bảng lương')}" data-payroll-id="${escapeHtml(payroll.id || '')}" data-payroll-code="${escapeHtml(payroll.ma_bang_luong || '')}">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </button>`;
+      }
+
+      function cssEscape(value) {
+        if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(String(value || ''));
+        return String(value || '').replace(/["\\]/g, '\\$&');
+      }
+
+      function switchTab(tab, skipLoad) {
+        document.querySelectorAll('.detail-tab[data-tab]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.tab === tab));
+        document.getElementById('ccAttendancePane').classList.toggle('is-active', tab === 'attendance');
+        document.getElementById('ccEmployeesPane').classList.toggle('is-active', tab === 'employees');
+        document.getElementById('ccPayrollPane').classList.toggle('is-active', tab === 'payroll');
+        document.getElementById('ccPayrollPaidPane').classList.toggle('is-active', tab === 'payroll-paid');
+        document.getElementById('ccDepartmentsPane').classList.toggle('is-active', tab === 'departments');
+        document.getElementById('ccPositionsPane').classList.toggle('is-active', tab === 'positions');
+        document.getElementById('ccContributionsPane').classList.toggle('is-active', tab === 'contributions');
+        if (skipLoad) return;
+        if (window.history && window.history.replaceState) {
+          const url = new URL(window.location.href);
+          if (tab && tab !== 'attendance') url.searchParams.set('tab', tab);
+          else url.searchParams.delete('tab');
+          window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+        }
+        if (tab === 'employees') loadEmployeeTable();
+        if (tab === 'payroll') loadPayrollTable();
+        if (tab === 'payroll-paid') loadPaidPayrollTable();
+      }
+
+      function isDualAttendanceMode() {
+        return hasDualSalary || currentMode === 'ca_hai';
+      }
+
+      function updateToolbarNav(mode) {
+        const showWeek = mode === 'ngay' || mode === 'ca_hai';
+        const showMonth = mode === 'thang' || mode === 'ca_hai';
+        if (weekNav) weekNav.hidden = !showWeek;
+        if (monthNav) monthNav.hidden = !showMonth;
+        updateDualNavState();
+      }
+
+      function updateDualNavState() {
+        const dual = isDualAttendanceMode();
+        if (viewWeekBtn) {
+          viewWeekBtn.classList.toggle('is-active', dual ? dualBoardView === 'ngay' : currentMode === 'ngay');
+        }
+        if (viewMonthBtn) {
+          viewMonthBtn.classList.toggle('is-active', dual ? dualBoardView === 'thang' : currentMode === 'thang');
+        }
+      }
+
+      function syncDualBoardStateFromDom() {
+        if (!isDualAttendanceMode()) return;
+        if (dualBoardView === 'thang') {
+          const monthRows = collectMonthRows();
+          if (!monthRows.length) return;
+          const monthMap = {};
+          monthRows.forEach(function(row) {
+            monthMap[row.thang_cham_cong] = row;
+          });
+          currentMonths = (currentMonths || []).map(function(month) {
+            const row = monthMap[month.key];
+            if (!row) return month;
+            return Object.assign({}, month, {
+              dong_y: row.dong_y,
+              ghi_chu: row.ghi_chu
+            });
+          });
+          return;
+        }
+        const dayRows = collectDayRows();
+        if (!dayRows.length) return;
+        const dayMap = {};
+        dayRows.forEach(function(row) {
+          dayMap[row.ngay_cham_cong] = row;
+        });
+        currentDays = (currentDays || []).map(function(day) {
+          const row = dayMap[day.key];
+          if (!row) return day;
+          return Object.assign({}, day, {
+            dong_y: row.dong_y,
+            ca_sang: row.ca_sang,
+            ca_chieu: row.ca_chieu,
+            tang_ca_cong: row.tang_ca_cong,
+            ghi_chu: row.ghi_chu
+          });
+        });
+      }
+
+      function showDualAttendanceView(view) {
+        dualBoardView = view === 'thang' ? 'thang' : 'ngay';
+        if (!employeeSelect.value) {
+          boardWrap.innerHTML = '<div class="cc-empty">Chọn nhân viên để chấm công.</div>';
+          updateDualNavState();
+          return;
+        }
+        if (dualBoardView === 'thang') {
+          boardWrap.innerHTML = buildMonthBoardHtml(currentMonths);
+        } else {
+          boardWrap.innerHTML = buildDayBoardHtml(currentDays);
+        }
+        updateDualNavState();
+      }
+
+      function switchDualBoardView(view) {
+        if (!isDualAttendanceMode()) return;
+        syncDualBoardStateFromDom();
+        showDualAttendanceView(view);
+      }
+
+      function collectDualSavePayload() {
+        syncDualBoardStateFromDom();
+        return {
+          days: (currentDays || []).map(function(day) {
+            return {
+              ngay_cham_cong: day.key || '',
+              dong_y: !!day.dong_y,
+              ca_sang: !!day.ca_sang,
+              ca_chieu: !!day.ca_chieu,
+              tang_ca_cong: parseWorkUnitInput(day.tang_ca_cong),
+              ghi_chu: day.ghi_chu || ''
+            };
+          }).filter(function(row) { return !!row.ngay_cham_cong; }),
+          months: (currentMonths || []).map(function(month) {
+            return {
+              thang_cham_cong: month.key || '',
+              dong_y: !!month.dong_y,
+              ghi_chu: month.ghi_chu || ''
+            };
+          }).filter(function(row) { return !!row.thang_cham_cong; })
+        };
+      }
+
+      function renderDualBoardView(days, months, view) {
+        currentDays = days || [];
+        currentMonths = months || [];
+        showDualAttendanceView(view);
+      }
+
+      function buildDayBoardHtmlLegacy(days) {
+        if (!Array.isArray(days) || !days.length) {
+          return '<div class="cc-empty">Chưa có dữ liệu ngày.</div>';
+        }
+        return '<div class="cc-board">' + days.map(function(day) {
+          return `
+            <div class="cc-day" data-date="${escapeHtml(day.key)}">
+              <div class="cc-day-head">
+                <div class="cc-day-title">
+                  <span>${escapeHtml(day.label)}</span>
+                  <span>${payrollWarningButton(day.dong_y ? day.payroll : null)}${day.is_today ? '<span class="cc-today">Hôm nay</span>' : ''}</span>
+                </div>
+                <div class="cc-day-date">${escapeHtml(day.day)}</div>
+              </div>
+              <div class="cc-day-body">
+                <label class="cc-check">
+                  <input class="cc-dong-y" type="checkbox" ${day.dong_y ? 'checked' : ''}>
+                  <span>Đồng ý ngày này</span>
+                </label>
+                <label>Giờ vào
+                  <input class="cc-time cc-gio-vao" type="time" value="${escapeHtml(day.gio_vao || '')}">
+                </label>
+                <label>Giờ ra
+                  <input class="cc-time cc-gio-ra" type="time" value="${escapeHtml(day.gio_ra || '')}">
+                </label>
+                <label>Ghi chú
+                  <textarea class="cc-note">${escapeHtml(day.ghi_chu || '')}</textarea>
+                </label>
+              </div>
+            </div>
+          `;
+        }).join('') + '</div>';
+      }
+
+      function buildMonthBoardHtml(months) {
+        if (!Array.isArray(months) || !months.length) {
+          return '<div class="cc-empty">Chưa có dữ liệu tháng.</div>';
+        }
+        return '<div class="cc-board">' + months.map(function(month) {
+          return `
+            <div class="cc-day cc-month" data-month="${escapeHtml(month.key)}">
+              <div class="cc-day-head">
+                <div class="cc-day-title">
+                  <span>${escapeHtml(month.label)}</span>
+                  <span>${payrollWarningButton(month.dong_y ? month.payroll : null)}${month.is_current ? '<span class="cc-today">Tháng này</span>' : ''}</span>
+                </div>
+                <div class="cc-day-date">${escapeHtml(month.key)}</div>
+              </div>
+              <div class="cc-day-body">
+                <label class="cc-check">
+                  <input class="cc-dong-y-thang" type="checkbox" ${month.dong_y ? 'checked' : ''}>
+                  <span>Đồng ý tháng này</span>
+                </label>
+                <label>Ghi chú
+                  <textarea class="cc-note cc-ghi-chu-thang">${escapeHtml(month.ghi_chu || '')}</textarea>
+                </label>
+              </div>
+            </div>
+          `;
+        }).join('') + '</div>';
+      }
+
+      function buildDayBoardHtml(days) {
+        if (!Array.isArray(days) || !days.length) {
+          return '<div class="cc-empty">Chua co du lieu ngay.</div>';
+        }
+        const groups = {};
+        days.forEach(function(day, index) {
+          const weekIndex = Number(day.week_index || Math.floor(index / 7) + 1);
+          if (!groups[weekIndex]) groups[weekIndex] = [];
+          groups[weekIndex].push(day);
+        });
+        return Object.keys(groups).sort(function(a, b) { return Number(a) - Number(b); }).map(function(weekIndex) {
+          return '<section class="cc-board-section"><h3 class="cc-board-title">Tuần ' + escapeHtml(weekIndex) + '</h3><div class="cc-board">' + groups[weekIndex].map(function(day) {
+            const totalCong = Number(day.so_cong != null ? day.so_cong : dayWorkUnits(day));
+            return `
+              <div class="cc-day" data-date="${escapeHtml(day.key)}">
+                <div class="cc-day-head">
+                  <div class="cc-day-title">
+                    <span>${escapeHtml(day.label)}</span>
+                    <span>${payrollWarningButton(day.dong_y ? day.payroll : null)}${day.is_today ? '<span class="cc-today">HÃ´m nay</span>' : ''}</span>
+                  </div>
+                  <div class="cc-day-date">${escapeHtml(day.day)}</div>
+                </div>
+                <div class="cc-day-body">
+                  <div class="cc-shift-list">
+                    <label class="cc-check">
+                      <input class="cc-ca-sang" type="checkbox" ${day.ca_sang ? 'checked' : ''}>
+                      <span>Ca sáng (0.5 công)</span>
+                    </label>
+                    <label class="cc-check">
+                      <input class="cc-ca-chieu" type="checkbox" ${day.ca_chieu ? 'checked' : ''}>
+                      <span>Ca chiều (0.5 công)</span>
+                    </label>
+                  </div>
+                  <label>Tăng ca
+                    <input class="cc-overtime-input cc-tang-ca-cong" type="text" inputmode="decimal" value="${escapeHtml(workUnitText(day.tang_ca_cong || 0))}" placeholder="0">
+                  </label>
+                  <div class="cc-work-unit">Tổng: ${escapeHtml(workUnitText(totalCong))} công</div>
+                  <label>Ghi chú
+                    <textarea class="cc-note">${escapeHtml(day.ghi_chu || '')}</textarea>
+                  </label>
+                </div>
+              </div>
+            `;
+          }).join('') + '</div></section>';
+        }).join('');
+      }
+
+      function renderDayBoard(days) {
+        currentDays = days || [];
+        currentMonths = [];
+        if (!employeeSelect.value) {
+          boardWrap.innerHTML = '<div class="cc-empty">Chọn nhân viên để chấm công tuần hiện tại.</div>';
+          return;
+        }
+        boardWrap.innerHTML = buildDayBoardHtml(currentDays);
+      }
+
+      function renderMonthBoard(months) {
+        currentMonths = months || [];
+        currentDays = [];
+        if (!employeeSelect.value) {
+          boardWrap.innerHTML = '<div class="cc-empty">Chọn nhân viên để chấm công.</div>';
+          return;
+        }
+        boardWrap.innerHTML = buildMonthBoardHtml(currentMonths);
+      }
+
+      function renderDualBoard(days, months) {
+        renderDualBoardView(days, months, dualBoardView);
+      }
+
+      async function loadWeek(options) {
+        options = options || {};
+        const employeeId = employeeSelect.value;
+        if (!options.keepStatus) setStatus('');
+        if (!employeeId) {
+          renderDayBoard([]);
+          weekLabel.textContent = '';
+          thisWeekBtn.textContent = '7 ngày gần nhất';
+          if (thisMonthBtn) thisMonthBtn.textContent = '7 tháng gần nhất';
+          dualBoardView = 'ngay';
+          hasDualSalary = false;
+          updateToolbarNav('ngay');
+          return;
+        }
+        const params = new URLSearchParams({ nhan_vien_id: employeeId, week_start: weekStart });
+        if (monthStart) params.set('month_start', monthStart);
+        const json = await fetchJson('/chamcongmoi/api/tuan?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) {
+          if (!options.silent) setStatus(json.message || 'Không tải được chấm công', 'error');
+          return false;
+        }
+        currentMode = json.mode || 'ngay';
+        hasDualSalary = !!(json.has_day_salary && json.has_month_salary) || currentMode === 'ca_hai';
+        if (!hasDualSalary) dualBoardView = currentMode === 'thang' ? 'thang' : 'ngay';
+        updateToolbarNav(currentMode);
+        if (isDualAttendanceMode()) {
+          weekStart = json.week.tu_ngay;
+          monthStart = json.month_range.tu_thang;
+          thisWeekBtn.textContent = formatWeekButton(json.week.tu_ngay, json.week.den_ngay);
+          if (thisMonthBtn) {
+            thisMonthBtn.textContent = formatMonthButton(json.month_range.tu_thang, json.month_range.den_thang);
+          }
+          weekLabel.textContent = '';
+          currentDays = json.days || [];
+          currentMonths = json.months || [];
+          showDualAttendanceView(dualBoardView);
+          return true;
+        }
+        if (currentMode === 'thang') {
+          monthStart = json.month_range.tu_thang;
+          if (thisMonthBtn) {
+            thisMonthBtn.textContent = formatMonthButton(json.month_range.tu_thang, json.month_range.den_thang);
+          }
+          weekLabel.textContent = '';
+          renderMonthBoard(json.months);
+          return true;
+        }
+        weekStart = json.week.tu_ngay;
+        monthStart = json.month_range && json.month_range.tu_thang ? json.month_range.tu_thang : monthKeyFromDate(weekStart);
+        thisWeekBtn.textContent = formatPayrollMonth(monthStart);
+        thisWeekBtn.textContent = formatWeekButton(json.week.tu_ngay, json.week.den_ngay);
+        thisWeekBtn.textContent = formatPayrollMonth(monthStart);
+        weekLabel.textContent = '';
+        renderDayBoard(json.days);
+        return true;
+      }
+
+      async function saveWeek() {
+        const employeeId = employeeSelect.value;
+        if (!employeeId) {
+          setStatus('Chọn nhân viên trước khi lưu.', 'error');
+          return;
+        }
+        setSaveLoading(true);
+        setStatus('Đang lưu chấm công...', '');
+        try {
+          let payload;
+          if (currentMode === 'thang') {
+            payload = {
+              nhan_vien_id: employeeId,
+              mode: 'thang',
+              months: collectMonthRows()
+            };
+          } else if (isDualAttendanceMode()) {
+            const dualPayload = collectDualSavePayload();
+            const invalidDay = dualPayload.days.find(function(row) {
+              return false;
+            });
+            if (invalidDay) {
+              setStatus('Ngày ' + invalidDay.ngay_cham_cong + ' thiếu giờ vào/ra hợp lệ.', 'error');
+              return;
+            }
+            payload = {
+              nhan_vien_id: employeeId,
+              mode: 'ca_hai',
+              days: dualPayload.days,
+              months: dualPayload.months
+            };
+          } else {
+            const days = collectDayRows();
+            const invalidDay = days.find(function(row) {
+              return false;
+            });
+            if (invalidDay) {
+              setStatus('Ngày ' + invalidDay.ngay_cham_cong + ' thiếu giờ vào/ra hợp lệ.', 'error');
+              return;
+            }
+            payload = { nhan_vien_id: employeeId, days: days };
+          }
+
+          const json = await fetchJson('/chamcongmoi/api/tuan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+          });
+          if (!json.success) {
+            setStatus(json.message || 'Lưu chấm công thất bại', 'error');
+            return;
+          }
+          const savedCount = Number(json.saved != null ? json.saved : 0);
+          const statusType = json.warnings && json.warnings.length ? 'error' : 'ok';
+          let countLabel = '';
+          if (isDualAttendanceMode()) {
+            const parts = [];
+            const savedDays = Number(json.saved_days != null ? json.saved_days : 0);
+            const savedMonths = Number(json.saved_months != null ? json.saved_months : 0);
+            if (savedDays) parts.push(savedDays + ' ngày');
+            if (savedMonths) parts.push(savedMonths + ' tháng');
+            countLabel = parts.length ? (' (' + parts.join(', ') + ').') : (savedCount ? (' (' + savedCount + ' mục).') : '');
+          } else {
+            const unitLabel = currentMode === 'thang' ? 'tháng' : 'ngày';
+            countLabel = savedCount ? (' (' + savedCount + ' ' + unitLabel + ').') : '';
+          }
+          const statusMessage = saveStatusText(json.warnings) + countLabel;
+          setStatus(statusMessage, statusType);
+          await Promise.all([
+            loadPayrollTable(null, { silent: true }),
+            loadWeek({ keepStatus: true, silent: true })
+          ]);
+        } catch (error) {
+          setStatus('Lưu chấm công thất bại: ' + (error && error.message ? error.message : error), 'error');
+        } finally {
+          setSaveLoading(false);
+        }
+      }
+
+      async function refreshEmployees(selectedId) {
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien', {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) return;
+        employeeSelect.innerHTML = '<option value="">Chọn nhân viên</option>' + json.items.map(function(item) {
+          const selected = String(item._id) === String(selectedId || employeeSelect.value) ? ' selected' : '';
+          return `<option value="${escapeHtml(item._id)}"${selected}>${escapeHtml(item.label)}</option>`;
+        }).join('');
+        const payrollSelect = document.getElementById('ccPayrollEmployee');
+        const payrollSelected = payrollSelect.value;
+        payrollSelect.innerHTML = '<option value="">Tất cả nhân viên</option>' + json.items.map(function(item) {
+          const selected = String(item._id) === String(payrollSelected) ? ' selected' : '';
+          return `<option value="${escapeHtml(item._id)}"${selected}>${escapeHtml(item.label)}</option>`;
+        }).join('');
+        const payrollPaidSelect = document.getElementById('ccPayrollPaidEmployee');
+        const payrollPaidSelected = payrollPaidSelect.value;
+        payrollPaidSelect.innerHTML = '<option value="">Tất cả nhân viên</option>' + json.items.map(function(item) {
+          const selected = String(item._id) === String(payrollPaidSelected) ? ' selected' : '';
+          return `<option value="${escapeHtml(item._id)}"${selected}>${escapeHtml(item.label)}</option>`;
+        }).join('');
+      }
+
+      function moneyTextVnd(value) {
+        return Number(value || 0).toLocaleString('vi-VN') + ' VNĐ';
+      }
+
+      function payrollDocHref(payrollId) {
+        if (!payrollId) return '';
+        return '/chamcongmoi?tab=payroll-paid&bang_luong=' + encodeURIComponent(String(payrollId));
+      }
+
+      function receiptDocHref(receiptId) {
+        if (!receiptId) return '';
+        return '/so-quy?receipt=' + encodeURIComponent(String(receiptId));
+      }
+
+      function renderPayrollCodeCell(item, mode) {
+        const code = item.ma_bang_luong || '';
+        if (!code) return '---';
+        if (mode === 'paid' && item._id) {
+          return '<a class="cc-ref-link" href="' + payrollDocHref(item._id) + '">' + escapeHtml(code) + '</a>';
+        }
+        return escapeHtml(code);
+      }
+
+      function renderPayrollPaidCell(item) {
+        const receipt = item.phieu_chi || {};
+        if (!receipt.ma_phieu) {
+          return '<span class="cc-payroll-pay-note">---</span>';
+        }
+        const receiptHref = receipt._id ? receiptDocHref(receipt._id) : '';
+        const codeHtml = receiptHref
+          ? '<a class="cc-ref-link" href="' + receiptHref + '">' + escapeHtml(receipt.ma_phieu) + '</a>'
+          : escapeHtml(receipt.ma_phieu);
+        const dateText = receipt.ngay_lap_text ? ('<span class="cc-payroll-pay-note">' + escapeHtml(receipt.ngay_lap_text) + '</span>') : '';
+        return '<div class="cc-payroll-pay"><strong>' + codeHtml + '</strong>' + dateText + '<span class="cc-payroll-pay-note">' + escapeHtml(moneyText(receipt.gia_tri)) + '</span></div>';
+      }
+
+      function renderPayrollTableRow(item, mode) {
+        const warnHtml = item.canh_bao_luong
+          ? '<span class="cc-payroll-warn">' + escapeHtml(item.canh_bao_luong) + '</span>'
+          : '';
+        const lastCell = mode === 'paid'
+          ? renderPayrollPaidCell(item)
+          : renderPayrollPaymentCell(item);
+        return `
+          <tr data-payroll-id="${escapeHtml(item._id || '')}" data-payroll-code="${escapeHtml(item.ma_bang_luong || '')}">
+            <td>${renderPayrollCodeCell(item, mode)}</td>
+            <td>${escapeHtml(item.ma_nhan_vien || '')}</td>
+            <td>${escapeHtml(item.ten_nhan_vien || '')}</td>
+            <td>${escapeHtml(formatPayrollMonth(item.thang_bang_luong) || item.thang_text || '')}</td>
+            <td class="cc-payroll-count">${escapeHtml(item.so_ngay_cong || 0)}</td>
+            <td class="cc-payroll-detail">${renderPayrollDayDetails(item)}${warnHtml}</td>
+            <td>${escapeHtml(item.so_thang_cong || 0)}</td>
+            <td>${escapeHtml(moneyText(item.luong_theo_ngay))}</td>
+            <td>${escapeHtml(moneyText(item.luong_theo_thang))}</td>
+            <td>${escapeHtml(moneyText(item.tong_tien))}</td>
+            <td class="cc-payroll-pay-cell">${lastCell}</td>
+          </tr>
+        `;
+      }
+
+      function renderPayrollPaymentCell(item) {
+        if (item.da_thanh_toan) {
+          const receipt = item.phieu_chi || {};
+          const receiptLink = receipt._id && receipt.ma_phieu
+            ? (' (<a class="cc-ref-link" href="' + receiptDocHref(receipt._id) + '">' + escapeHtml(receipt.ma_phieu) + '</a>)')
+            : (receipt.ma_phieu ? (' (' + escapeHtml(receipt.ma_phieu) + ')') : '');
+          return '<div class="cc-payroll-pay"><span class="cc-pill cc-pill-pay-done">Đã thanh toán' + receiptLink + '</span></div>';
+        }
+        let actionHtml = '';
+        if (item.co_the_thanh_toan) {
+          actionHtml = '<button type="button" class="cc-btn cc-btn-primary cc-payroll-pay-btn" data-payroll-id="' + escapeHtml(item._id || '') + '">Thanh toán</button>';
+        } else {
+          actionHtml = '<span class="cc-payroll-pay-note">Chưa có tiền thanh toán</span>';
+        }
+        return '<div class="cc-payroll-pay"><span class="cc-pill cc-pill-pay-wait">Chưa thanh toán</span>' + actionHtml + '</div>';
+      }
+
+      function readPayrollPaymentInput() {
+        const tien_mat = parseMoneyInput(document.getElementById('ccPayCash')?.value);
+        const chuyen_khoan = parseMoneyInput(document.getElementById('ccPayTransfer')?.value);
+        return {
+          tien_mat: tien_mat,
+          chuyen_khoan: chuyen_khoan,
+          tong_chi: tien_mat + chuyen_khoan
+        };
+      }
+
+      function refreshPayrollPaymentSummary() {
+        const payment = readPayrollPaymentInput();
+        const errors = [];
+        if (payment.tong_chi <= 0) errors.push('Vui lòng nhập số tiền thanh toán');
+        if (payment.tong_chi > pendingPayrollPayDue) errors.push('Tổng chi không được vượt số cần thanh toán');
+        if (payment.tong_chi > 0 && payment.tong_chi < pendingPayrollPayDue) errors.push('Số tiền thanh toán phải bằng số cần thanh toán');
+        const totalEl = document.getElementById('ccPayTotal');
+        const actualEl = document.getElementById('ccPayActual');
+        const errWrap = document.getElementById('ccPayErrorWrap');
+        const errEl = document.getElementById('ccPayErrors');
+        if (totalEl) totalEl.textContent = moneyTextVnd(payment.tong_chi);
+        if (actualEl) actualEl.textContent = moneyTextVnd(payment.tong_chi);
+        if (errWrap && errEl) {
+          if (errors.length) {
+            errWrap.hidden = false;
+            errEl.textContent = errors.join('. ');
+          } else {
+            errWrap.hidden = true;
+            errEl.textContent = '';
+          }
+        }
+        const transferWrap = document.getElementById('ccPayTransferBookWrap');
+        if (transferWrap) transferWrap.hidden = !(payment.chuyen_khoan > 0);
+      }
+
+      async function loadPayrollPayBooks(type) {
+        const json = await fetchJson('/api/so-quy/active?loai_so_quy=' + encodeURIComponent(type), {
+          headers: { Accept: 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) return [];
+        return Array.isArray(json.items) ? json.items : (Array.isArray(json.data) ? json.data : []);
+      }
+
+      async function preparePayrollCashBook() {
+        const books = await loadPayrollPayBooks('tien_mat');
+        if (!books.length) return '';
+        const defaults = books.filter(function(item) { return !!item.mac_dinh; });
+        if (defaults.length) return String(defaults[0]._id || '');
+        if (books.length === 1) return String(books[0]._id || '');
+        return String(books[0]._id || '');
+      }
+
+      function renderPayrollTransferBooks(books) {
+        const select = document.getElementById('ccPayTransferBook');
+        if (!select) return;
+        select.innerHTML = '<option value="">— Chọn tài khoản chuyển khoản —</option>' + (books || []).map(function(item) {
+          return '<option value="' + escapeHtml(item._id || '') + '">' + escapeHtml(item.ten_so_quy || item.ma_so_quy || 'Sổ quỹ') + '</option>';
+        }).join('');
+      }
+
+      function splitPayrollAmountEvenly(due) {
+        const amount = Math.max(0, Math.floor(Number(due || 0)));
+        if (!amount) return { tien_mat: 0, chuyen_khoan: 0 };
+        const tien_mat = Math.floor(amount / 2);
+        const chuyen_khoan = amount - tien_mat;
+        return { tien_mat: tien_mat, chuyen_khoan: chuyen_khoan };
+      }
+
+      async function openPayrollPayModal(payrollId) {
+        const preview = await fetchJson('/chamcongmoi/api/bang-luong/' + encodeURIComponent(payrollId) + '/thanh-toan', {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!preview.success) {
+          setStatus(preview.message || 'Không tải được thông tin thanh toán', 'error');
+          return;
+        }
+        if (preview.da_thanh_toan) {
+          setStatus('Bảng lương đã được thanh toán.', 'ok');
+          await loadPayrollTable();
+          return;
+        }
+        pendingPayrollPayId = payrollId;
+        pendingPayrollPayDue = Math.max(0, Number(preview.con_thanh_toan || 0));
+        payrollPayCashBookId = '';
+        const dueEl = document.getElementById('ccPayDue');
+        const cashEl = document.getElementById('ccPayCash');
+        const transferEl = document.getElementById('ccPayTransfer');
+        const splitAmount = splitPayrollAmountEvenly(pendingPayrollPayDue);
+        if (dueEl) dueEl.textContent = moneyTextVnd(pendingPayrollPayDue);
+        if (cashEl) {
+          cashEl.value = splitAmount.tien_mat > 0 ? formatMoneyInput(splitAmount.tien_mat) : '';
+          bindMoneyInput(cashEl);
+        }
+        if (transferEl) {
+          transferEl.value = splitAmount.chuyen_khoan > 0 ? formatMoneyInput(splitAmount.chuyen_khoan) : '';
+          bindMoneyInput(transferEl);
+        }
+        refreshPayrollPaymentSummary();
+        payrollPayModal.classList.add('is-open');
+        payrollPayCashBookId = await preparePayrollCashBook();
+        const transferBooks = await loadPayrollPayBooks('chuyen_khoan');
+        renderPayrollTransferBooks(transferBooks);
+        if (splitAmount.chuyen_khoan > 0) {
+          const transferSelect = document.getElementById('ccPayTransferBook');
+          if (transferSelect && transferBooks.length) {
+            const defaultBook = transferBooks.find(function(item) { return !!item.mac_dinh; }) || transferBooks[0];
+            if (defaultBook && defaultBook._id) transferSelect.value = String(defaultBook._id);
+          }
+        }
+        refreshPayrollPaymentSummary();
+      }
+
+      function closePayrollPayModal() {
+        pendingPayrollPayId = '';
+        pendingPayrollPayDue = 0;
+        payrollPayCashBookId = '';
+        payrollPayModal.classList.remove('is-open');
+      }
+
+      async function submitPayrollPayModal() {
+        const payment = readPayrollPaymentInput();
+        if (!pendingPayrollPayId) return;
+        if (payment.tong_chi <= 0) {
+          setStatus('Vui lòng nhập số tiền thanh toán.', 'error');
+          return;
+        }
+        if (payment.tong_chi !== pendingPayrollPayDue) {
+          setStatus('Số tiền thanh toán phải bằng ' + moneyText(pendingPayrollPayDue) + ' đ.', 'error');
+          return;
+        }
+        if (payment.tien_mat > 0 && !payrollPayCashBookId) {
+          payrollPayCashBookId = await preparePayrollCashBook();
+        }
+        if (payment.tien_mat > 0 && !payrollPayCashBookId) {
+          setStatus('Chưa có sổ tiền mặt active để chi lương.', 'error');
+          return;
+        }
+        const bankBookId = payment.chuyen_khoan > 0
+          ? String(document.getElementById('ccPayTransferBook')?.value || '').trim()
+          : '';
+        if (payment.chuyen_khoan > 0 && !bankBookId) {
+          setStatus('Vui lòng chọn sổ quỹ cho tiền chuyển khoản.', 'error');
+          return;
+        }
+        const submitBtn = document.getElementById('ccPaySubmit');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Đang tạo...';
+        }
+        try {
+          const json = await fetchJson('/chamcongmoi/api/bang-luong/' + encodeURIComponent(pendingPayrollPayId) + '/phieu-chi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              tien_mat: payment.tien_mat,
+              chuyen_khoan: payment.chuyen_khoan,
+              so_quy_tien_mat_id: payment.tien_mat > 0 ? payrollPayCashBookId : '',
+              so_quy_chuyen_khoan_id: bankBookId
+            })
+          });
+          if (!json.success) {
+            setStatus(json.message || 'Không tạo được phiếu chi', 'error');
+            return;
+          }
+          closePayrollPayModal();
+          setStatus((json.message || 'Đã tạo phiếu chi') + (json.receipt && json.receipt.ma_phieu ? (' (' + json.receipt.ma_phieu + ').') : '.'), 'ok');
+          await Promise.all([
+            loadPayrollTable(),
+            loadPaidPayrollTable({ silent: true })
+          ]);
+        } catch (error) {
+          setStatus('Không tạo được phiếu chi: ' + (error && error.message ? error.message : error), 'error');
+        } finally {
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Tạo phiếu chi';
+          }
+        }
+      }
+
+      function renderPayrollDayDetails(item) {
+        const days = Array.isArray(item.chi_tiet_ngay_cong) ? item.chi_tiet_ngay_cong : [];
+        if (!days.length) {
+          if (item.loai_luong === 'thang' && Number(item.so_thang_cong || 0) > 0) {
+            return '<div class="cc-payroll-day-lines"><div class="cc-payroll-day-line"><strong>Cả tháng</strong><span>Đồng ý chấm công</span></div></div>';
+          }
+          return '---';
+        }
+        return '<div class="cc-payroll-day-lines">' + days.map(function(day) {
+          const shifts = [];
+          if (day.ca_sang) shifts.push('Ca sáng');
+          if (day.ca_chieu) shifts.push('Ca chiều');
+          if (Number(day.tang_ca_cong || 0) > 0) shifts.push('Tăng ca ' + workUnitText(day.tang_ca_cong));
+          const soCong = day.so_cong != null ? workUnitText(day.so_cong) : workUnitText(dayWorkUnits(day));
+          const timeText = (shifts.length ? shifts.join(', ') : '---') + ' | ' + soCong + ' công';
+          const noteHtml = day.ghi_chu
+            ? ('<span class="cc-payroll-day-note">' + escapeHtml(day.ghi_chu) + '</span>')
+            : '';
+          return '<div class="cc-payroll-day-line"><div><strong>' + escapeHtml(day.ngay_hien_thi || day.ngay || '---') + '</strong>' + noteHtml + '</div><span>' + escapeHtml(timeText) + '</span></div>';
+        }).join('') + '</div>';
+      }
+
+      async function loadPayrollTable(highlightPayrollId, options) {
+        options = options || {};
+        const params = new URLSearchParams();
+        const payrollEmployeeId = document.getElementById('ccPayrollEmployee').value;
+        if (payrollEmployeeId) params.set('nhan_vien_id', payrollEmployeeId);
+        const json = await fetchJson('/chamcongmoi/api/bang-luong?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) {
+          if (!options.silent) setStatus(json.message || 'Không tải được bảng lương', 'error');
+          return false;
+        }
+        if (!json.items.length) {
+          const attendanceCount = Number(json.attendance_count || 0);
+          const emptyMessage = attendanceCount > 0
+            ? ('Đã có ' + attendanceCount + ' ngày công đã lưu nhưng chưa tạo được bảng lương. Bấm Tải lại hoặc lưu lại chấm công.')
+            : 'Chưa có bảng lương cần thanh toán. Hãy chấm công ở tab Chấm công trước.';
+          payrollRows.innerHTML = '<tr><td colspan="11" class="cc-empty">' + escapeHtml(emptyMessage) + '</td></tr>';
+          return true;
+        }
+        payrollRows.innerHTML = json.items.map(function(item) {
+          return renderPayrollTableRow(item, 'pending');
+        }).join('');
+        if (highlightPayrollId) {
+          const row = payrollRows.querySelector('[data-payroll-id="' + cssEscape(highlightPayrollId) + '"]');
+          if (row) {
+            row.classList.add('cc-row-highlight');
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }
+        return true;
+      }
+
+      function highlightPayrollRow(payrollId, tableBody) {
+        if (!payrollId || !tableBody) return;
+        const safeId = cssEscape(payrollId);
+        const row = tableBody.querySelector('[data-payroll-id="' + safeId + '"]')
+          || tableBody.querySelector('[data-payroll-code="' + safeId + '"]');
+        if (!row) return;
+        row.classList.add('cc-row-highlight');
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      async function loadPaidPayrollTable(options) {
+        options = options || {};
+        const params = new URLSearchParams({ trang_thai: 'da_thanh_toan' });
+        const payrollEmployeeId = document.getElementById('ccPayrollPaidEmployee').value;
+        if (payrollEmployeeId) params.set('nhan_vien_id', payrollEmployeeId);
+        const json = await fetchJson('/chamcongmoi/api/bang-luong?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) {
+          if (!options.silent) setStatus(json.message || 'Không tải được bảng lương đã thanh toán', 'error');
+          return false;
+        }
+        if (!json.items.length) {
+          payrollPaidRows.innerHTML = '<tr><td colspan="11" class="cc-empty">Chưa có bảng lương đã thanh toán.</td></tr>';
+          return true;
+        }
+        payrollPaidRows.innerHTML = json.items.map(function(item) {
+          return renderPayrollTableRow(item, 'paid');
+        }).join('');
+        if (options.highlightPayrollId) {
+          highlightPayrollRow(options.highlightPayrollId, payrollPaidRows);
+        }
+        return true;
+      }
+
+      async function loadEmployeeTable() {
+        const params = new URLSearchParams({ include_inactive: '1' });
+        const keyword = document.getElementById('ccEmployeeKeyword').value.trim();
+        if (keyword) params.set('keyword', keyword);
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien?' + params.toString(), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) {
+          setStatus(json.message || 'Không tải được danh sách nhân viên', 'error');
+          return;
+        }
+        if (!json.items.length) {
+          employeeRows.innerHTML = '<tr><td colspan="13" class="cc-empty">Chưa có nhân viên.</td></tr>';
+          return;
+        }
+        employeeRows.innerHTML = json.items.map(function(item) {
+          const statusClass = item.trang_thai === 'inactive' ? 'is-inactive' : 'is-active';
+          const statusText = item.trang_thai === 'inactive' ? 'Đã nghỉ' : 'Đang làm';
+          return `
+            <tr data-id="${escapeHtml(item._id)}">
+              <td>${escapeHtml(item.ma_nhan_vien || '')}</td>
+              <td>${escapeHtml(item.ten_nhan_vien || '')}</td>
+              <td>${escapeHtml(item.sdt || '')}</td>
+              <td>${escapeHtml(item.email || '')}</td>
+              <td>${escapeHtml(item.cccd || '')}</td>
+              <td>${escapeHtml(item.ngay_sinh_input || '')}</td>
+              <td>${escapeHtml(genderText(item.gioi_tinh))}</td>
+              <td>${escapeHtml(item.chuc_vu || '')}</td>
+              <td>${escapeHtml(item.ngay_bat_dau_lam_viec_input || '')}</td>
+              <td>${escapeHtml(moneyText(item.luong_theo_ngay))}</td>
+              <td>${escapeHtml(moneyText(item.luong_theo_thang))}</td>
+              <td><span class="cc-pill ${statusClass}">${statusText}</span></td>
+              <td>
+                <div class="cc-actions">
+                  <button type="button" class="cc-btn cc-btn-icon cc-edit-employee" title="Sửa" aria-label="Sửa">
+                    <i class="fa-solid fa-pen"></i>
+                  </button>
+                  <button type="button" class="cc-btn cc-btn-icon cc-btn-danger cc-delete-employee" title="Cho nghỉ" aria-label="Cho nghỉ">
+                    <i class="fa-solid fa-user-slash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      function fillEmployeeForm(item) {
+        item = item || {};
+        employeeEditId = item._id ? String(item._id) : '';
+        document.getElementById('ccEmployeeModalTitle').textContent = employeeEditId ? 'Sửa nhân viên' : 'Thêm nhân viên';
+        document.getElementById('ccFormName').value = item.ten_nhan_vien || '';
+        document.getElementById('ccFormPhone').value = item.sdt || '';
+        document.getElementById('ccFormEmail').value = item.email || '';
+        document.getElementById('ccFormCccd').value = item.cccd || '';
+        document.getElementById('ccFormBirth').value = item.ngay_sinh_input || '';
+        document.getElementById('ccFormGender').value = item.gioi_tinh || '';
+        document.getElementById('ccFormRole').value = item.chuc_vu || '';
+        document.getElementById('ccFormStart').value = item.ngay_bat_dau_lam_viec_input || '';
+        const salaryType = item.loai_luong || (item.co_luong_theo_thang === true || Number(item.luong_theo_thang || 0) > 0 ? 'thang' : 'ngay');
+        document.getElementById('ccFormHasDaySalary').checked = salaryType !== 'thang';
+        document.getElementById('ccFormDaySalary').value = formatMoneyInput(item.luong_theo_ngay || 0);
+        document.getElementById('ccFormHasMonthSalary').checked = salaryType === 'thang';
+        document.getElementById('ccFormMonthSalary').value = formatMoneyInput(item.luong_theo_thang || 0);
+        document.getElementById('ccFormStatus').value = item.trang_thai || 'active';
+        document.getElementById('ccFormNote').value = item.ghi_chu || '';
+        syncSalaryInputs();
+      }
+
+      function collectEmployeePayload() {
+        const hasDaySalary = document.getElementById('ccFormHasDaySalary').checked;
+        const hasMonthSalary = document.getElementById('ccFormHasMonthSalary').checked;
+        return {
+          ten_nhan_vien: document.getElementById('ccFormName').value.trim(),
+          sdt: document.getElementById('ccFormPhone').value.trim(),
+          email: document.getElementById('ccFormEmail').value.trim(),
+          cccd: document.getElementById('ccFormCccd').value.trim(),
+          ngay_sinh: document.getElementById('ccFormBirth').value,
+          gioi_tinh: document.getElementById('ccFormGender').value,
+          chuc_vu: document.getElementById('ccFormRole').value.trim(),
+          ngay_bat_dau_lam_viec: document.getElementById('ccFormStart').value,
+          loai_luong: hasMonthSalary ? 'thang' : 'ngay',
+          co_luong_theo_ngay: hasDaySalary,
+          luong_theo_ngay: hasDaySalary ? parseMoneyInput(document.getElementById('ccFormDaySalary').value) : 0,
+          co_luong_theo_thang: hasMonthSalary,
+          luong_theo_thang: hasMonthSalary ? parseMoneyInput(document.getElementById('ccFormMonthSalary').value) : 0,
+          trang_thai: document.getElementById('ccFormStatus').value,
+          ghi_chu: document.getElementById('ccFormNote').value.trim()
+        };
+      }
+
+      async function openEmployeeModal(id) {
+        setStatus('');
+        if (!id) {
+          fillEmployeeForm({});
+          modal.classList.add('is-open');
+          document.getElementById('ccFormName').focus();
+          return;
+        }
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id), {
+          headers: { 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        });
+        if (!json.success) {
+          setStatus(json.message || 'Không tải được nhân viên', 'error');
+          return;
+        }
+        fillEmployeeForm(json.item);
+        modal.classList.add('is-open');
+      }
+
+      async function saveEmployee() {
+        const payload = collectEmployeePayload();
+        if (!payload.ten_nhan_vien) {
+          setStatus('Tên nhân viên là bắt buộc.', 'error');
+          return;
+        }
+        const url = employeeEditId
+          ? '/chamcongmoi/api/nhan-vien/' + encodeURIComponent(employeeEditId)
+          : '/chamcongmoi/api/nhan-vien';
+        const json = await fetchJson(url, {
+          method: employeeEditId ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+        if (!json.success) {
+          setStatus(json.message || 'Lưu nhân viên thất bại', 'error');
+          return;
+        }
+        modal.classList.remove('is-open');
+        await refreshEmployees(json.item._id);
+        await loadEmployeeTable();
+        await loadPayrollTable();
+        if (employeeSelect.value === String(json.item._id)) loadWeek();
+        setStatus('Đã lưu nhân viên.', 'ok');
+      }
+
+      async function deleteEmployee(id) {
+        if (!confirm('Chuyển nhân viên sang trạng thái đã nghỉ?')) return;
+        const json = await fetchJson('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id) + '/trang-thai', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ trang_thai: 'inactive' })
+        });
+        if (!json.success) {
+          setStatus(json.message || 'Không cập nhật được nhân viên', 'error');
+          return;
+        }
+        await refreshEmployees();
+        await loadEmployeeTable();
+        await loadPayrollTable();
+        if (employeeSelect.value === String(id)) {
+          employeeSelect.value = '';
+          loadWeek();
+        }
+        setStatus('Đã chuyển nhân viên sang trạng thái đã nghỉ.', 'ok');
+      }
+
+      document.querySelectorAll('.detail-tab[data-tab]').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+      employeeSelect.addEventListener('change', loadWeek);
+      boardWrap.addEventListener('click', function(event) {
+        const warningBtn = event.target.closest('.cc-payroll-warning');
+        if (!warningBtn) return;
+        document.getElementById('ccPayrollEmployee').value = employeeSelect.value;
+        switchTab('payroll', true);
+        loadPayrollTable(warningBtn.dataset.payrollId || '');
+      });
+      function refreshDayWorkUnit(dayEl) {
+        if (!dayEl) return;
+        const caSang = !!(dayEl.querySelector('.cc-ca-sang') && dayEl.querySelector('.cc-ca-sang').checked);
+        const caChieu = !!(dayEl.querySelector('.cc-ca-chieu') && dayEl.querySelector('.cc-ca-chieu').checked);
+        const tangCaInput = dayEl.querySelector('.cc-tang-ca-cong');
+        const total = (caSang ? 0.5 : 0) + (caChieu ? 0.5 : 0) + parseWorkUnitInput(tangCaInput ? tangCaInput.value : '');
+        const totalEl = dayEl.querySelector('.cc-work-unit');
+        if (totalEl) totalEl.textContent = 'Tổng: ' + workUnitText(total) + ' công';
+      }
+      boardWrap.addEventListener('change', function(event) {
+        if (!event.target.closest('.cc-ca-sang,.cc-ca-chieu,.cc-tang-ca-cong')) return;
+        refreshDayWorkUnit(event.target.closest('.cc-day[data-date]'));
+      });
+      boardWrap.addEventListener('input', function(event) {
+        if (!event.target.closest('.cc-tang-ca-cong')) return;
+        refreshDayWorkUnit(event.target.closest('.cc-day[data-date]'));
+      });
+      boardWrap.addEventListener('focusin', function(event) {
+        if (!event.target.closest('.cc-tang-ca-cong')) return;
+        if (parseWorkUnitInput(event.target.value) === 0) event.target.value = '';
+      });
+      boardWrap.addEventListener('focusout', function(event) {
+        if (!event.target.closest('.cc-tang-ca-cong')) return;
+        event.target.value = workUnitText(event.target.value);
+        refreshDayWorkUnit(event.target.closest('.cc-day[data-date]'));
+      });
+      document.getElementById('ccSave').addEventListener('click', saveWeek);
+      if (viewWeekBtn) {
+        viewWeekBtn.addEventListener('click', function(event) {
+          event.preventDefault();
+          if (isDualAttendanceMode()) {
+            switchDualBoardView('ngay');
+            return;
+          }
+          monthStart = formatMonth(new Date());
+          weekStart = firstDayOfMonth(monthStart);
+          loadWeek();
+        });
+      }
+      if (viewMonthBtn) {
+        viewMonthBtn.addEventListener('click', function(event) {
+          event.preventDefault();
+          if (isDualAttendanceMode()) {
+            switchDualBoardView('thang');
+            return;
+          }
+          const today = new Date();
+          monthStart = formatMonth(new Date(Date.UTC(today.getFullYear(), today.getMonth() - 6, 1)));
+          dualBoardView = 'thang';
+          loadWeek();
+        });
+      }
+      document.getElementById('ccPrevWeek').addEventListener('click', function() {
+        if (isDualAttendanceMode() && dualBoardView !== 'ngay') switchDualBoardView('ngay');
+        monthStart = addMonths(monthStart || monthKeyFromDate(weekStart), -1);
+        weekStart = firstDayOfMonth(monthStart);
+        loadWeek();
+      });
+      document.getElementById('ccNextWeek').addEventListener('click', function() {
+        if (isDualAttendanceMode() && dualBoardView !== 'ngay') switchDualBoardView('ngay');
+        monthStart = addMonths(monthStart || monthKeyFromDate(weekStart), 1);
+        weekStart = firstDayOfMonth(monthStart);
+        loadWeek();
+      });
+      thisWeekBtn.addEventListener('click', function() {
+        if (isDualAttendanceMode() && dualBoardView !== 'ngay') switchDualBoardView('ngay');
+        monthStart = formatMonth(new Date());
+        weekStart = firstDayOfMonth(monthStart);
+        loadWeek();
+      });
+      document.getElementById('ccPrevMonth').addEventListener('click', function() {
+        if (isDualAttendanceMode() && dualBoardView !== 'thang') switchDualBoardView('thang');
+        monthStart = addMonths(monthStart, -7);
+        loadWeek();
+      });
+      document.getElementById('ccNextMonth').addEventListener('click', function() {
+        if (isDualAttendanceMode() && dualBoardView !== 'thang') switchDualBoardView('thang');
+        monthStart = addMonths(monthStart, 7);
+        loadWeek();
+      });
+      thisMonthBtn.addEventListener('click', function() {
+        if (isDualAttendanceMode() && dualBoardView !== 'thang') switchDualBoardView('thang');
+        const today = new Date();
+        monthStart = formatMonth(new Date(Date.UTC(today.getFullYear(), today.getMonth() - 6, 1)));
+        loadWeek();
+      });
+      document.getElementById('ccQuickAddEmployee').addEventListener('click', function() {
+        openEmployeeModal('');
+      });
+      document.getElementById('ccAddEmployee').addEventListener('click', function() {
+        openEmployeeModal('');
+      });
+      document.getElementById('ccEmployeeSearch').addEventListener('click', loadEmployeeTable);
+      document.getElementById('ccPayrollRefresh').addEventListener('click', loadPayrollTable);
+      document.getElementById('ccPayrollEmployee').addEventListener('change', loadPayrollTable);
+      document.getElementById('ccPayrollPaidRefresh').addEventListener('click', loadPaidPayrollTable);
+      document.getElementById('ccPayrollPaidEmployee').addEventListener('change', loadPaidPayrollTable);
+      payrollRows.addEventListener('click', function(event) {
+        const payBtn = event.target.closest('.cc-payroll-pay-btn');
+        if (!payBtn) return;
+        openPayrollPayModal(payBtn.dataset.payrollId || '');
+      });
+      document.getElementById('ccPaySubmit').addEventListener('click', submitPayrollPayModal);
+      document.getElementById('ccPayClose').addEventListener('click', closePayrollPayModal);
+      payrollPayModal.addEventListener('click', function(event) {
+        if (event.target === payrollPayModal) closePayrollPayModal();
+      });
+      ['ccPayCash', 'ccPayTransfer'].forEach(function(id) {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('input', refreshPayrollPaymentSummary);
+      });
+      document.getElementById('ccFormHasDaySalary').addEventListener('change', syncSalaryInputs);
+      document.getElementById('ccFormHasMonthSalary').addEventListener('change', syncSalaryInputs);
+      bindMoneyInput(document.getElementById('ccFormDaySalary'));
+      bindMoneyInput(document.getElementById('ccFormMonthSalary'));
+      syncSalaryInputs();
+      document.getElementById('ccEmployeeKeyword').addEventListener('keydown', function(event) {
+        if (event.key === 'Enter') loadEmployeeTable();
+      });
+      employeeRows.addEventListener('click', function(event) {
+        const row = event.target.closest('tr[data-id]');
+        if (!row) return;
+        if (event.target.closest('.cc-edit-employee')) openEmployeeModal(row.dataset.id);
+        if (event.target.closest('.cc-delete-employee')) deleteEmployee(row.dataset.id);
+      });
+      document.getElementById('ccCancelEmployee').addEventListener('click', function() {
+        modal.classList.remove('is-open');
+      });
+      document.getElementById('ccSaveEmployee').addEventListener('click', saveEmployee);
+      (async function initFromUrl() {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        const bangLuong = params.get('bang_luong');
+        if (tab === 'payroll-paid') {
+          switchTab('payroll-paid', true);
+          await loadPaidPayrollTable({ highlightPayrollId: bangLuong || '' });
+          return;
+        }
+        if (tab === 'payroll') {
+          switchTab('payroll', true);
+          await loadPayrollTable(bangLuong || '');
+          return;
+        }
+        if (tab === 'employees') {
+          switchTab('employees', true);
+          await loadEmployeeTable();
+          return;
+        }
+        if (tab === 'departments' || tab === 'positions' || tab === 'contributions') {
+          switchTab(tab, true);
+          return;
+        }
+        loadWeek();
+      })();
+    })();
+  </script>
+</body>
+</html>
+

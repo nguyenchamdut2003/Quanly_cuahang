@@ -1,0 +1,36 @@
+<section class="hr-table-panel">
+  <table class="hr-table">
+    <thead>
+      <tr>
+        <th>Ma phong ban</th>
+        <th>Ten phong ban</th>
+        <th>Mo ta</th>
+        <th>Trang thai</th>
+        <th style="width:100px">Hanh dong</th>
+      </tr>
+    </thead>
+    <tbody id="pbTableBody">
+      <% if (!(phongBans || []).length) { %>
+        <tr><td colspan="5" class="hr-empty">Chua co phong ban. <a id="pbEmptyAdd">Nhan vao day de them phong ban</a>.</td></tr>
+      <% } %>
+      <% (phongBans || []).forEach(function(pb) { %>
+        <tr data-id="<%= pb._id %>">
+          <td><%= pb.ma_phong_ban || '---' %></td>
+          <td><strong><%= pb.ten_phong_ban || '---' %></strong></td>
+          <td><%= pb.mo_ta || '---' %></td>
+          <td>
+            <span class="status-pill <%= pb.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+              <%= pb.trang_thai === 'active' ? 'Dang su dung' : 'Ngung su dung' %>
+            </span>
+          </td>
+          <td>
+            <div class="hr-actions">
+              <button type="button" class="hr-btn-icon pb-edit" title="Sua"><i class="fa-regular fa-pen-to-square"></i></button>
+              <button type="button" class="hr-btn-icon pb-inactive" title="Ngung su dung" <%= pb.trang_thai === 'inactive' ? 'disabled' : '' %>><i class="fa-solid fa-ban"></i></button>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>

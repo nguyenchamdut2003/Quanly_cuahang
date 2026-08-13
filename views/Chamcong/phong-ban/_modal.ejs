@@ -1,0 +1,21 @@
+<div class="modal-overlay" id="pbModal">
+  <div class="modal-card">
+    <div class="modal-head" id="pbModalTitle">Them phong ban</div>
+    <form id="pbForm" class="modal-body">
+      <input type="hidden" id="pbId">
+      <label>Ma phong ban<input id="pbMa" placeholder="De trong tu dong"></label>
+      <label>Ten phong ban *<input id="pbTen" required></label>
+      <label>Mo ta<textarea id="pbMoTa"></textarea></label>
+      <label>Trang thai
+        <select id="pbTrangThai">
+          <option value="active">Dang su dung</option>
+          <option value="inactive">Ngung su dung</option>
+        </select>
+      </label>
+    </form>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-light" id="pbCancelBtn">Bo qua</button>
+      <button type="submit" class="btn btn-primary" form="pbForm" id="pbSaveBtn">Luu</button>
+    </div>
+  </div>
+</div>

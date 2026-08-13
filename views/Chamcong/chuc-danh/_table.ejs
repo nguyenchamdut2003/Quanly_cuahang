@@ -1,0 +1,36 @@
+<section class="hr-table-panel">
+  <table class="hr-table">
+    <thead>
+      <tr>
+        <th>Ma chuc danh</th>
+        <th>Ten chuc danh</th>
+        <th>Mo ta</th>
+        <th>Trang thai</th>
+        <th style="width:100px">Hanh dong</th>
+      </tr>
+    </thead>
+    <tbody id="cdTableBody">
+      <% if (!(chucDanhs || []).length) { %>
+        <tr><td colspan="5" class="hr-empty">Chua co chuc danh. <a id="cdEmptyAdd">Nhan vao day de them chuc danh</a>.</td></tr>
+      <% } %>
+      <% (chucDanhs || []).forEach(function(cd) { %>
+        <tr data-id="<%= cd._id %>">
+          <td><%= cd.ma_chuc_danh || '---' %></td>
+          <td><strong><%= cd.ten_chuc_danh || '---' %></strong></td>
+          <td><%= cd.mo_ta || '---' %></td>
+          <td>
+            <span class="status-pill <%= cd.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+              <%= cd.trang_thai === 'active' ? 'Dang su dung' : 'Ngung su dung' %>
+            </span>
+          </td>
+          <td>
+            <div class="hr-actions">
+              <button type="button" class="hr-btn-icon cd-edit" title="Sua"><i class="fa-regular fa-pen-to-square"></i></button>
+              <button type="button" class="hr-btn-icon cd-inactive" title="Ngung su dung" <%= cd.trang_thai === 'inactive' ? 'disabled' : '' %>><i class="fa-solid fa-ban"></i></button>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
