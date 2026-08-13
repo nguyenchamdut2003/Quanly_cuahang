@@ -1,5 +1,4 @@
 var { calculateCashBookBalances } = require('../../services/cashBookBalance.service');
-var hrLog = require('../../utils/hrPayrollLogger');
 var catalog = require('../../services/soQuyCatalog.service');
 var { resolveStoreId } = require('../../utils/storeScope');
 var { uploadImageBuffer } = require('../../utils/cloudinaryUpload');
@@ -56,7 +55,6 @@ exports.index = async function(req, res, next) {
 
 exports.getActive = async function(req, res, next) {
   try {
-    hrLog.logPayrollInfo('cashbook.active.list.start', hrLog.buildRequestContext(req));
     var rows = await catalog.listCashBooks({
       query: Object.assign({}, req.query || {}, { activeOnly: 1 })
     });
@@ -71,18 +69,8 @@ exports.getActive = async function(req, res, next) {
         trang_thai: row.trang_thai || 'active'
       };
     });
-    hrLog.logPayrollInfo('cashbook.active.list.success', {
-      count: items.length,
-      items: items.map(function(row) {
-        return {
-          _id: hrLog.idStr(row._id),
-          ten_so_quy: row.ten_so_quy
-        };
-      })
-    });
     return res.json({ success: true, items: items });
   } catch (error) {
-    hrLog.logPayrollError('cashbook.active.list.error', error, hrLog.buildRequestContext(req));
     return jsonError(res, error);
   }
 };

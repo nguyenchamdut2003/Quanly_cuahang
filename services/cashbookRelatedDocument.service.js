@@ -8,7 +8,6 @@ const {
   PhieuTraHang,
   VanDon
 } = require('../models/kiot.model');
-const { BangLuong, ChiTietBangLuong } = require('../models/hr.model');
 const {
   computeNetPaidFromReceiptRows,
   receiptRowsForNetPaidFilter
@@ -255,54 +254,6 @@ async function listPhieuTraHangChi(storeId, customerId) {
   return result;
 }
 
-async function listBangLuongChi(storeId) {
-  const rows = await BangLuong.find({
-    cua_hang_id: storeId,
-    trang_thai: { $nin: ['cancelled'] },
-    con_can_tra: { $gt: 0 }
-  })
-    .select('ma_bang_luong ten_bang_luong con_can_tra tong_luong')
-    .sort({ created_at: -1 })
-    .limit(200)
-    .lean();
-
-  return rows.map(row => mapRow({
-    _id: row._id,
-    code: row.ma_bang_luong || row.ten_bang_luong,
-    total: Number(row.tong_luong || 0),
-    remaining: Number(row.con_can_tra || 0),
-    nhom: 'nhan_vien',
-    entity_id: '',
-    partner: row.ten_bang_luong || ''
-  }));
-}
-
-async function listCtBangLuongChi(storeId, employeeId) {
-  const filter = {
-    cua_hang_id: storeId,
-    trang_thai: { $nin: ['cancelled'] },
-    con_can_tra: { $gt: 0 }
-  };
-  if (employeeId) filter.nhan_vien_id = employeeId;
-
-  const rows = await ChiTietBangLuong.find(filter)
-    .select('bang_luong_id nhan_vien_id ma_nhan_vien ten_nhan_vien con_can_tra tong_luong')
-    .populate('nhan_vien_id', 'ten_nhan_vien')
-    .sort({ created_at: -1 })
-    .limit(200)
-    .lean();
-
-  return rows.map(row => mapRow({
-    _id: row._id,
-    code: `${row.ma_nhan_vien || ''} - ${row.ten_nhan_vien || row.nhan_vien_id?.ten_nhan_vien || ''}`.trim(),
-    total: Number(row.tong_luong || 0),
-    remaining: Number(row.con_can_tra || 0),
-    nhom: 'nhan_vien',
-    entity_id: row.nhan_vien_id?._id || row.nhan_vien_id,
-    partner: row.ten_nhan_vien || row.nhan_vien_id?.ten_nhan_vien || ''
-  }));
-}
-
 async function listVanDonChi(storeId, carrierId) {
   const filter = {
     cua_hang_id: storeId,
@@ -470,11 +421,6 @@ async function listRelatedDocuments({
     } else if (docType === 'phieu_tra_hang') {
       if (group !== 'khach_hang') return { items: [], message: 'Phieu tra hang ban chi ap dung nhom Khach hang' };
       items = await listPhieuTraHangChi(storeId, entityId);
-    } else if (docType === 'bang_luong') {
-      items = await listBangLuongChi(storeId);
-    } else if (docType === 'ct_bang_luong') {
-      if (group !== 'nhan_vien') return { items: [], message: 'Chi tiet luong nen chon nhom Nhan vien' };
-      items = await listCtBangLuongChi(storeId, entityId);
     } else if (docType === 'van_don') {
       if (group !== 'doi_tac_giao_hang') {
         return { items: [], message: 'Phi giao hang chi ap dung nhom Doi tac giao hang' };
@@ -499,8 +445,6 @@ const DOC_REF_FIELD = {
   phieu_tra_hang_nhap: 'phieu_tra_hang_nhap_id',
   phieu_tra_hang: 'phieu_tra_hang_id',
   van_don: 'van_don_id',
-  bang_luong: 'bang_luong_id',
-  ct_bang_luong: 'ct_bang_luong_id'
 };
 
 async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, document_id }) {
@@ -558,18 +502,6 @@ async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, do
       const paid = await sumReceiptAmount('chi', { phieu_tra_hang_id: docId });
       const remaining = Math.max(0, Number(row.can_tra_khach || 0) - paid);
       return { remaining, found: remaining > 0, code: row.ma_phieu_tra };
-    }
-    if (docType === 'bang_luong') {
-      const row = await BangLuong.findOne({ _id: docId, cua_hang_id: storeId }).lean();
-      if (!row || row.trang_thai === 'cancelled') return { remaining: 0, found: false };
-      const remaining = Number(row.con_can_tra || 0);
-      return { remaining, found: remaining > 0, code: row.ma_bang_luong || row.ten_bang_luong };
-    }
-    if (docType === 'ct_bang_luong') {
-      const row = await ChiTietBangLuong.findOne({ _id: docId, cua_hang_id: storeId }).lean();
-      if (!row || row.trang_thai === 'cancelled') return { remaining: 0, found: false };
-      const remaining = Number(row.con_can_tra || 0);
-      return { remaining, found: remaining > 0, code: row.ma_nhan_vien };
     }
     if (docType === 'van_don') {
       const row = await VanDon.findOne({ _id: docId, cua_hang_id: storeId }).lean();

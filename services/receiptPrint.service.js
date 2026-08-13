@@ -52,18 +52,6 @@ const RECEIPT_PRINT_POPULATES = [
         ]
     },
     {
-        path: 'bang_luong_id',
-        select: 'ma_bang_luong ten_bang_luong tu_ngay den_ngay tong_luong da_tra_nhan_vien con_can_tra trang_thai created_at'
-    },
-    {
-        path: 'ct_bang_luong_id',
-        select: 'ma_nhan_vien ten_nhan_vien tu_ngay den_ngay tong_luong da_tra con_can_tra trang_thai bang_luong_id nhan_vien_id',
-        populate: [
-            { path: 'nhan_vien_id', select: 'ma_nhan_vien ten_nhan_vien' },
-            { path: 'bang_luong_id', select: 'ma_bang_luong ten_bang_luong tu_ngay den_ngay trang_thai' }
-        ]
-    },
-    {
         path: 'allocations.phieu_nhap_id',
         select: 'ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id',
         populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
@@ -234,7 +222,6 @@ function hasReceiptDocRef(receipt) {
     if (!receipt) return false;
     if (receipt.hoa_don_id || receipt.don_hang_id || receipt.phieu_nhap_id) return true;
     if (receipt.phieu_tra_hang_id || receipt.phieu_tra_hang_nhap_id || receipt.van_don_id) return true;
-    if (receipt.bang_luong_id || receipt.ct_bang_luong_id) return true;
     return Array.isArray(receipt.allocations) && receipt.allocations.length > 0;
 }
 
@@ -409,40 +396,6 @@ function buildRelatedVoucherRows(receipt) {
         });
     }
 
-    const bl = relDocObject(receipt.bang_luong_id);
-    if (bl) {
-        pushRow({
-            typeLabel: 'Bảng lương',
-            code: bl.ma_bang_luong || bl.ten_bang_luong,
-            docDate: bl.tu_ngay || bl.created_at,
-            partner: '',
-            docValue: Number(bl.tong_luong || 0) || null,
-            paidBefore: Number(bl.da_tra_nhan_vien || 0) > 0 ? Number(bl.da_tra_nhan_vien) : null,
-            receiptValue: defaultReceiptValue,
-            remainAfter: bl.con_can_tra != null ? Number(bl.con_can_tra) : null,
-            status: getRelatedDocumentStatus('payroll', bl),
-            note: ''
-        });
-    }
-
-    const ct = relDocObject(receipt.ct_bang_luong_id);
-    if (ct) {
-        const blParent = relDocObject(ct.bang_luong_id);
-        const nv = relDocObject(ct.nhan_vien_id);
-        pushRow({
-            typeLabel: 'Chi tiết bảng lương',
-            code: ct.ma_nhan_vien || (blParent && blParent.ma_bang_luong),
-            docDate: ct.tu_ngay || ct.den_ngay,
-            partner: nv ? partnerLabel(nv) : String(ct.ten_nhan_vien || ''),
-            docValue: Number(ct.tong_luong || 0) || null,
-            paidBefore: Number(ct.da_tra || 0) > 0 ? Number(ct.da_tra) : null,
-            receiptValue: defaultReceiptValue,
-            remainAfter: ct.con_can_tra != null ? Number(ct.con_can_tra) : null,
-            status: getRelatedDocumentStatus('payroll', ct),
-            note: ''
-        });
-    }
-
     if (!rows.length && String(receipt.chung_tu_khac || receipt.ma_chung_tu_goc || '').trim()) {
         pushRow({
             typeLabel: 'Chứng từ khác',
@@ -518,7 +471,6 @@ function buildReceiptPrintData(receipt, store, options = {}) {
         'Chi khac': 'Chi khác',
         thanh_toan_nhap_hang: 'Thanh toán nhập hàng',
         thanh_toan_ncc: 'Thanh toán nhà cung cấp',
-        tra_luong_nhan_vien: 'Trả lương nhân viên',
         thu_cod: 'Thu COD'
     };
     const loaiThuChiLabel = receipt.loai_thu_chi

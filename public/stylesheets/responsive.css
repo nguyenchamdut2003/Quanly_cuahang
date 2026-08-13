@@ -474,7 +474,7 @@ svg {
   }
 }
 
-/* ── Chấm công mới ───────────────────────────────────────────────── */
+/* ── Chấm công ───────────────────────────────────────────────── */
 
 @media (max-width: 900px) {
   .cc-page {
@@ -529,28 +529,6 @@ svg {
 
   .cc-dialog-body .span-2 {
     grid-column: auto !important;
-  }
-}
-
-/* ── Chấm công (HR cũ) ───────────────────────────────────────────── */
-
-@media (max-width: 900px) {
-  .attendance-page .admin-shell {
-    padding: 12px !important;
-  }
-
-  .attendance-app {
-    height: auto !important;
-    min-height: calc(100vh - 98px);
-  }
-
-  .attendance-toolbar {
-    flex-wrap: wrap;
-  }
-
-  .attendance-title {
-    min-width: 0 !important;
-    width: 100%;
   }
 }
 

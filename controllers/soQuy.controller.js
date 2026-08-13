@@ -14,8 +14,6 @@ const {
     DonHang,
     NhapVatChua
 } = require('../models/kiot.model');
-const { NhanVien } = require('../models/hr.model');
-const { ChamCongMoiBangLuong } = require('../models/chamcongmoi.model');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const {
     buildReceiptPaymentInfo,
@@ -32,7 +30,6 @@ const {
     attachScopedAmounts
 } = require('../services/cashbookListScope.service');
 const { resolveStoreId } = require('../utils/storeScope');
-const hrLog = require('../utils/hrPayrollLogger');
 
 function isObjectId(value) {
     return /^[0-9a-fA-F]{24}$/.test(String(value || ''));
@@ -174,7 +171,6 @@ function getPeriodStart(query = {}) {
 async function loadPartnerLists(storeId) {
     const storeFilter = storeId ? { cua_hang_id: toObjectId(storeId) } : {};
     const [employees, carriers] = await Promise.all([
-        NhanVien.find({ ...storeFilter, trang_thai: 'dang_lam_viec' }).select('ma_nhan_vien ten_nhan_vien sdt').sort({ ten_nhan_vien: 1 }).lean(),
         DoiTacGiaoHang.find({ ...storeFilter, trang_thai: 'active' }).select('ma_doi_tac ten_doi_tac sdt').sort({ ten_doi_tac: 1 }).lean()
     ]);
     return { employees, carriers };
@@ -195,9 +191,6 @@ function relatedCode(item) {
         || item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap
         || item.phieu_tra_hang_id?.ma_phieu_tra
         || item.van_don_id?.ma_van_don
-        || item.chamcongmoi_bang_luong_id?.ma_bang_luong
-        || item.bang_luong_id?.ma_bang_luong
-        || item.ct_bang_luong_id?.ma_nhan_vien
         || item.nhap_vat_chua_id?.ma_nhap_vat_chua
         || item.chung_tu_khac
         || item.ma_chung_tu_goc
@@ -208,7 +201,6 @@ function hasReceiptDocRef(item) {
     if (!item) return false;
     if (item.hoa_don_id || item.don_hang_id || item.phieu_nhap_id) return true;
     if (item.phieu_tra_hang_id || item.phieu_tra_hang_nhap_id || item.van_don_id) return true;
-    if (item.chamcongmoi_bang_luong_id || item.bang_luong_id || item.ct_bang_luong_id) return true;
     if (item.nhap_vat_chua_id) return true;
     if (Array.isArray(item.allocations) && item.allocations.length) return true;
     return !!(item._docLinkType && item._docLinkId);
@@ -247,11 +239,6 @@ async function attachMissingDocRefs(receipt) {
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
             .lean();
         if (row) receipt.phieu_tra_hang_id = row;
-    } else if (/^BL/i.test(code) && !receipt.chamcongmoi_bang_luong_id) {
-        const row = await ChamCongMoiBangLuong.findOne({ ma_bang_luong: code })
-            .select('ma_bang_luong ma_nhan_vien ten_nhan_vien thang_bang_luong tong_tien trang_thai created_at nhan_vien_id')
-            .lean();
-        if (row) receipt.chamcongmoi_bang_luong_id = row;
     }
     return receipt;
 }
@@ -264,7 +251,6 @@ async function enrichReceiptListDocRefs(list) {
     const customerReturnCodes = [];
     const orderCodes = [];
     const nhapVatChuaCodes = [];
-    const chamcongPayrollCodes = [];
     list.forEach(item => {
         if (hasReceiptDocRef(item)) return;
         const code = String(item.ma_chung_tu_goc || '').trim();
@@ -275,10 +261,9 @@ async function enrichReceiptListDocRefs(list) {
         else if (isCustomerReturnDocCode(code)) customerReturnCodes.push(code);
         else if (/^DH/i.test(code)) orderCodes.push(code);
         else if (/^NVC/i.test(code)) nhapVatChuaCodes.push(code);
-        else if (/^BL/i.test(code)) chamcongPayrollCodes.push(code);
     });
     const unique = arr => [...new Set(arr.filter(Boolean))];
-    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas, chamcongPayrolls] = await Promise.all([
+    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas] = await Promise.all([
         unique(invoiceCodes).length
             ? HoaDonBanHang.find({ ma_hoa_don: { $in: unique(invoiceCodes) } }).select('_id ma_hoa_don').lean()
             : [],
@@ -296,9 +281,6 @@ async function enrichReceiptListDocRefs(list) {
             : [],
         unique(nhapVatChuaCodes).length
             ? NhapVatChua.find({ ma_nhap_vat_chua: { $in: unique(nhapVatChuaCodes) } }).select('_id ma_nhap_vat_chua').lean()
-            : [],
-        unique(chamcongPayrollCodes).length
-            ? ChamCongMoiBangLuong.find({ ma_bang_luong: { $in: unique(chamcongPayrollCodes) } }).select('_id ma_bang_luong').lean()
             : []
     ]);
     const invoiceByCode = new Map(invoices.map(row => [row.ma_hoa_don, row._id]));
@@ -307,7 +289,6 @@ async function enrichReceiptListDocRefs(list) {
     const customerReturnByCode = new Map(customerReturns.map(row => [row.ma_phieu_tra, row._id]));
     const orderByCode = new Map(orders.map(row => [row.ma_don_hang, row._id]));
     const nhapVatChuaByCode = new Map(nhapVatChuas.map(row => [row.ma_nhap_vat_chua, row._id]));
-    const chamcongPayrollByCode = new Map(chamcongPayrolls.map(row => [row.ma_bang_luong, row._id]));
     list.forEach(item => {
         if (hasReceiptDocRef(item)) return;
         const code = String(item.ma_chung_tu_goc || '').trim();
@@ -329,9 +310,6 @@ async function enrichReceiptListDocRefs(list) {
         } else if (nhapVatChuaByCode.has(code)) {
             item._docLinkType = 'nhap_vat_chua';
             item._docLinkId = nhapVatChuaByCode.get(code);
-        } else if (chamcongPayrollByCode.has(code)) {
-            item._docLinkType = 'chamcong_payroll';
-            item._docLinkId = chamcongPayrollByCode.get(code);
         }
     });
     return list;
@@ -364,19 +342,6 @@ exports.index = async (req, res, next) => {
                 { nha_cung_cap_id: { $in: phoneSuppliers.map(item => item._id) } }
             ];
         }
-        hrLog.logPayrollInfo('cashbook.page.list.start', {
-            method: req.method,
-            path: req.originalUrl || req.url,
-            cua_hang_id: String(storeId || ''),
-            so_quy_id: req.query.so_quy_id || 'all',
-            q: req.query.q || '',
-            nhom_doi_tuong: req.query.nhom_doi_tuong || '',
-            loai_phieu: req.query.loai_phieu || '',
-            loai_thu_chi: req.query.loai_thu_chi || '',
-            trang_thai: req.query.trang_thai || '',
-            date_from: req.query.date_from || '',
-            date_to: req.query.date_to || ''
-        });
 
         const [list, cashBooks, filterCashBooks, customers, suppliers, users, partnerLists] = await Promise.all([
             PhieuThuChi.find(filter)
@@ -394,7 +359,6 @@ exports.index = async (req, res, next) => {
                 .populate('phieu_tra_hang_nhap_id')
                 .populate('van_don_id')
                 .populate('nhap_vat_chua_id')
-                .populate('chamcongmoi_bang_luong_id', 'ma_bang_luong ma_nhan_vien ten_nhan_vien thang_bang_luong tong_tien trang_thai created_at')
                 .populate('allocations.phieu_nhap_id')
                 .sort({ ngay_lap: -1 }),
             SoQuy.find({ trang_thai: 'active',  }).sort({ ten_so_quy: 1 }),
@@ -427,14 +391,6 @@ exports.index = async (req, res, next) => {
             balance: opening + totalThu - totalChi
         };
 
-        hrLog.logPayrollInfo('cashbook.page.list.success', {
-            so_quy_id: req.query.so_quy_id || 'all',
-            result_count: list.length,
-            nhom_doi_tuong: req.query.nhom_doi_tuong || 'all',
-            loai_phieu: req.query.loai_phieu || 'all',
-            q: req.query.q || ''
-        });
-
         res.render('so-quy/index', {
             list,
             cashBooks,
@@ -451,10 +407,6 @@ exports.index = async (req, res, next) => {
             relatedCode
         });
     } catch (error) {
-        hrLog.logPayrollError('cashbook.page.list.error', error, {
-            path: req.originalUrl || req.url,
-            query: req.query || {}
-        });
         next(error);
     }
 };
@@ -567,23 +519,6 @@ const RECEIPT_DETAIL_POPULATES = [
         ]
     },
     {
-        path: 'chamcongmoi_bang_luong_id',
-        select: 'ma_bang_luong ma_nhan_vien ten_nhan_vien thang_bang_luong loai_luong tong_tien trang_thai created_at nhan_vien_id',
-        populate: { path: 'nhan_vien_id', select: 'ma_nhan_vien ten_nhan_vien' }
-    },
-    {
-        path: 'bang_luong_id',
-        select: 'ma_bang_luong ten_bang_luong tu_ngay den_ngay tong_luong da_tra_nhan_vien con_can_tra trang_thai created_at'
-    },
-    {
-        path: 'ct_bang_luong_id',
-        select: 'ma_nhan_vien ten_nhan_vien tu_ngay den_ngay tong_luong da_tra con_can_tra trang_thai bang_luong_id nhan_vien_id',
-        populate: [
-            { path: 'nhan_vien_id', select: 'ma_nhan_vien ten_nhan_vien' },
-            { path: 'bang_luong_id', select: 'ma_bang_luong ten_bang_luong tu_ngay den_ngay trang_thai' }
-        ]
-    },
-    {
         path: 'nhap_vat_chua_id',
         select: 'ma_nhap_vat_chua tong_tien created_at doi_tuong_ten trang_thai items'
     },
@@ -643,8 +578,6 @@ exports.postAdd = async (req, res, next) => {
             phieu_tra_hang_nhap_id: body.phieu_tra_hang_nhap_id,
             phieu_tra_hang_id: body.phieu_tra_hang_id,
             van_don_id: body.van_don_id,
-            bang_luong_id: body.bang_luong_id,
-            ct_bang_luong_id: body.ct_bang_luong_id
         });
         const receipt = await taoPhieuThuChi({
             cua_hang_id: storeId,
@@ -671,8 +604,6 @@ exports.postAdd = async (req, res, next) => {
             phieu_tra_hang_nhap_id: body.phieu_tra_hang_nhap_id,
             phieu_tra_hang_id: body.phieu_tra_hang_id,
             van_don_id: body.van_don_id,
-            bang_luong_id: body.bang_luong_id,
-            ct_bang_luong_id: body.ct_bang_luong_id,
             ma_chung_tu_goc: body.ma_chung_tu_goc,
             chung_tu_khac: body.chung_tu_khac,
             ma_phieu: body.ma_phieu,

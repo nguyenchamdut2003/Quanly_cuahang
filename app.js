@@ -41,13 +41,6 @@ var thuocTinhApiRouter = require('./routes/thuocTinhApi');
 var apiKhoRouter = require('./routes/apiKho');
 var apiAddressRouter = require('./routes/apiAddress');
 var traHangNhapRouter = require('./routes/traHangNhap');
-var phongBanRouter = require('./routes/phongBan');
-var apiPhongBanRouter = require('./routes/apiPhongBan');
-var chucDanhRouter = require('./routes/chucDanh');
-var apiChucDanhRouter = require('./routes/apiChucDanh');
-var nhanVienRouter = require('./routes/nhanVien');
-var apiNhanVienRouter = require('./routes/apiNhanVien');
-var chamcongMoiRouter = require('./routes/chamcongMoi');
 var apiSoQuyRouter = require('./routes/apiSoQuy');
 var shortcutRouter = require('./routes/shortcut');
 var systemRouter = require('./routes/system');
@@ -182,15 +175,13 @@ app.use(function(req, res, next) {
       kho: '/cua-hang?kho=' + encodeURIComponent(safeId),
       cashbook: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
-      chamcong_payroll: '/chamcongmoi?tab=payroll-paid&bang_luong=' + encodeURIComponent(safeId),
-      chamcongmoi_bang_luong: '/chamcongmoi?tab=payroll-paid&bang_luong=' + encodeURIComponent(safeId),
       nhap_vat_chua: '/vat-chua?nhap_vat_chua=' + encodeURIComponent(safeId)
     };
     return map[type] || '';
   };
   res.locals.refLink = function(type, doc, text, attrs) {
     var id = doc && doc._id ? doc._id : doc;
-    var label = String(text || (doc && (doc.ma_hang || doc.ma_ncc || doc.ma_khach_hang || doc.ma_phieu_nhap || doc.ma_nhap_vat_chua || doc.ma_don_hang || doc.ma_hoa_don || doc.ma_lo || doc.ma_van_don || doc.ma_phieu || doc.ma_bang_luong || doc.ma_kho || doc.ten_so_quy)) || '--');
+    var label = String(text || (doc && (doc.ma_hang || doc.ma_ncc || doc.ma_khach_hang || doc.ma_phieu_nhap || doc.ma_nhap_vat_chua || doc.ma_don_hang || doc.ma_hoa_don || doc.ma_lo || doc.ma_van_don || doc.ma_phieu || doc.ma_kho || doc.ten_so_quy)) || '--');
     var escape = function(value) {
       return String(value).replace(/[&<>"']/g, function(char) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
@@ -297,13 +288,6 @@ app.use('/doi-tac-giao-hang', doiTacGiaoHangExportRouter);
 app.use('/don-hang', donHangRouter);
 app.use('/so-quy', soQuyRouter);
 app.use('/bao-cao', baoCaoRouter);
-app.use('/api/phong-ban', apiPhongBanRouter);
-app.use('/api/chuc-danh', apiChucDanhRouter);
-app.use('/api/nhan-vien', apiNhanVienRouter);
-app.use('/phong-ban', phongBanRouter);
-app.use('/chuc-danh', chucDanhRouter);
-app.use('/chamcongmoi', chamcongMoiRouter);
-app.use('/nhan-vien', nhanVienRouter);
 app.use('/khach-hang', khachHangRouter);
 app.use('/chung-tu-kho', stockVoucherRouter);
 app.use('/xuat-dung-noi-bo', xuatDungNoiBoRouter);

@@ -3,21 +3,14 @@ const { CHANGE_RECEIPT_LOAI_THU_CHI } = require('../utils/customerPayment');
 const { buildReceiptPaymentInfo } = require('./paymentCashBook.service');
 
 const {
-
   PhieuThuChi,
-
   SoQuy,
-
   KhachHang,
-
   NhaCungCap,
   DoiTacGiaoHang,
   CongNoKhachHang,
   CongNoNhaCungCap
 } = require('../models/kiot.model');
-const { NhanVien } = require('../models/hr.model');
-
-
 
 const DOCUMENT_TYPE_TO_FIELD = {
 
@@ -35,17 +28,9 @@ const DOCUMENT_TYPE_TO_FIELD = {
 
   van_don: 'van_don_id',
 
-  bang_luong: 'bang_luong_id',
-
-  ct_bang_luong: 'ct_bang_luong_id'
-
 };
 
-
-
 const ALL_DOCUMENT_FIELDS = Object.values(DOCUMENT_TYPE_TO_FIELD);
-
-
 
 function parseMoney(value) {
 
@@ -53,15 +38,11 @@ function parseMoney(value) {
 
 }
 
-
-
 function isObjectId(value) {
 
   return mongoose.Types.ObjectId.isValid(String(value || '').trim());
 
 }
-
-
 
 function optionalId(value) {
 
@@ -69,15 +50,11 @@ function optionalId(value) {
 
 }
 
-
-
 function parseCheckbox(value) {
 
   return value === true || value === 'true' || value === 'on';
 
 }
-
-
 
 function normalizePaymentMethod(value) {
   return ['tien_mat', 'chuyen_khoan', 'vi_dien_tu', 'khac'].includes(value) ? value : 'tien_mat';
@@ -130,11 +107,9 @@ function normalizeSubjectGroup(value, customerId, supplierId, employeeId, carrie
 
   if (supplierId) return 'nha_cung_cap';
 
-  if (employeeId) return 'nhan_vien';
-
   if (carrierId) return 'doi_tac_giao_hang';
 
-  if (['khach_hang', 'nha_cung_cap', 'doi_tac_giao_hang', 'nhan_vien', 'khac'].includes(value)) return value;
+  if (['khach_hang', 'nha_cung_cap', 'doi_tac_giao_hang', 'khac'].includes(value)) return value;
 
   return 'khac';
 
@@ -600,12 +575,6 @@ async function taoPhieuThuChi(data = {}, options = {}) {
     phieu_tra_hang_id: docRefs.phieu_tra_hang_id,
 
     van_don_id: docRefs.van_don_id,
-
-    bang_luong_id: docRefs.bang_luong_id,
-
-    ct_bang_luong_id: docRefs.ct_bang_luong_id,
-
-    chamcongmoi_bang_luong_id: optionalId(data.chamcongmoi_bang_luong_id),
 
     ma_chung_tu_goc: docRefs.ma_chung_tu_goc,
 

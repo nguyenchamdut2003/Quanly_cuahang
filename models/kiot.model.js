@@ -1915,7 +1915,6 @@ const PhieuThuChiSchema = new Schema({
   nguoi_tao_id: { type: ObjectId, ref: 'NguoiDung' },
   khach_hang_id: { type: ObjectId, ref: 'KhachHang' },
   nha_cung_cap_id: { type: ObjectId, ref: 'NhaCungCap' },
-  nhan_vien_id: { type: ObjectId, ref: 'NhanVien' },
   doi_tac_giao_hang_id: { type: ObjectId, ref: 'DoiTacGiaoHang' },
   don_hang_id: { type: ObjectId, ref: 'DonHang' },
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
@@ -1924,9 +1923,6 @@ const PhieuThuChiSchema = new Schema({
   phieu_tra_hang_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap' },
   phieu_tra_hang_id: { type: ObjectId, ref: 'PhieuTraHang' },
   van_don_id: { type: ObjectId, ref: 'VanDon' },
-  bang_luong_id: { type: ObjectId, ref: 'BangLuong' },
-  ct_bang_luong_id: { type: ObjectId, ref: 'ChiTietBangLuong' },
-  chamcongmoi_bang_luong_id: { type: ObjectId, ref: 'ChamCongMoiBangLuong' },
   ma_chung_tu_goc: { type: String },
   chung_tu_khac: { type: String },
   allocation_type: { type: String },
@@ -1962,10 +1958,6 @@ const PhieuThuChiSchema = new Schema({
   ly_do_huy: { type: String },
 }, { collection: "phieu_thu_chi", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
-PhieuThuChiSchema.index({ cua_hang_id: 1, nhan_vien_id: 1, ngay_lap: -1 });
-PhieuThuChiSchema.index({ cua_hang_id: 1, bang_luong_id: 1 });
-PhieuThuChiSchema.index({ cua_hang_id: 1, ct_bang_luong_id: 1 });
-PhieuThuChiSchema.index({ cua_hang_id: 1, chamcongmoi_bang_luong_id: 1 });
 PhieuThuChiSchema.index(
   {
     cua_hang_id: 1,
@@ -2757,7 +2749,6 @@ XuatVatChuaSchema.index(
 const CuaHang = mongoose.models.CuaHang || mongoose.model("CuaHang", CuaHangSchema);
 const Kho = mongoose.models.Kho || mongoose.model("Kho", KhoSchema);
 const NguoiDung = mongoose.models.NguoiDung || mongoose.model("NguoiDung", NguoiDungSchema);
-const { PhongBan, ChucDanh, NhanVien } = require('./hr.model');
 const NhomKhachHang = mongoose.models.NhomKhachHang || mongoose.model("NhomKhachHang", NhomKhachHangSchema);
 const KhachHang = mongoose.models.KhachHang || mongoose.model("KhachHang", KhachHangSchema);
 const DiaChiKhachHang = mongoose.models.DiaChiKhachHang || mongoose.model("DiaChiKhachHang", DiaChiKhachHangSchema);
@@ -2820,7 +2811,7 @@ const VatChua = mongoose.models.VatChua || mongoose.model('VatChua', VatChuaSche
 const NhapVatChua = mongoose.models.NhapVatChua || mongoose.model('NhapVatChua', NhapVatChuaSchema);
 const XuatVatChua = mongoose.models.XuatVatChua || mongoose.model('XuatVatChua', XuatVatChuaSchema);
 module.exports = {
-  CuaHang, Kho, NguoiDung, PhongBan, ChucDanh, NhanVien,
+  CuaHang, Kho, NguoiDung,
   NhomKhachHang, KhachHang, DiaChiKhachHang, LoaiDiaChiKhachHang, 
   NhomNhaCungCap, DiaChiDoiTuong, DiaChiNcc, NhaCungCap,
   NhomHang, DonViTinh, HangHoa,
