@@ -1,21 +1,23 @@
 <div class="modal-overlay" id="cdModal">
   <div class="modal-card">
-    <div class="modal-head" id="cdModalTitle">Them chuc danh</div>
+    <div class="modal-head">
+      <span id="cdModalTitle">Thêm chức danh</span>
+      <button type="button" class="modal-close-btn" id="cdCloseBtn" aria-label="Đóng">&times;</button>
+    </div>
     <form id="cdForm" class="modal-body">
       <input type="hidden" id="cdId">
-      <label>Ma chuc danh<input id="cdMa" placeholder="De trong tu dong"></label>
-      <label>Ten chuc danh *<input id="cdTen" required></label>
-      <label>Mo ta<textarea id="cdMoTa"></textarea></label>
-      <label>Trang thai
+      <label>Tên chức danh *<input id="cdTen" required></label>
+      <label>Mô tả<textarea id="cdMoTa"></textarea></label>
+      <label>Trạng thái
         <select id="cdTrangThai">
-          <option value="active">Dang su dung</option>
-          <option value="inactive">Ngung su dung</option>
+          <option value="active">Đang sử dụng</option>
+          <option value="inactive">Ngừng sử dụng</option>
         </select>
       </label>
     </form>
     <div class="modal-foot">
-      <button type="button" class="btn btn-light" id="cdCancelBtn">Bo qua</button>
-      <button type="submit" class="btn btn-primary" form="cdForm" id="cdSaveBtn">Luu</button>
+      <button type="button" class="btn btn-light" id="cdCancelBtn">Bỏ qua</button>
+      <button type="submit" class="btn btn-primary" form="cdForm" id="cdSaveBtn">Lưu</button>
     </div>
   </div>
 </div>

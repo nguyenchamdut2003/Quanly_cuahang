@@ -1,74 +1,108 @@
 <%
-  var nhomKhoanLabels = {
-    thue: 'Thue',
-    bao_hiem: 'Bao hiem',
-    cong_doan: 'Cong doan',
-    khac: 'Khac'
-  };
-  var loaiKhoanLabels = {
-    thue_tncn: 'Thue TNCN',
-    bhxh: 'BHXH',
-    bhyt: 'BHYT',
-    bhtn: 'BHTN',
-    cong_doan: 'Cong doan',
-    khac: 'Khac'
-  };
-  var noiNopLabels = {
-    co_quan_thue: 'Co quan thue',
-    co_quan_bhxh: 'Co quan BHXH',
-    lien_doan_lao_dong: 'Lien doan lao dong',
-    khac: 'Khac'
-  };
+  var keywordValue = filter && filter.keyword ? filter.keyword : '';
 %>
-<section class="hr-table-panel">
-  <table class="hr-table">
-    <thead>
-      <tr>
-        <th>Ma khoan</th>
-        <th>Ten khoan</th>
-        <th>Nhom khoan</th>
-        <th>Loai khoan</th>
-        <th>Noi nop</th>
-        <th>Trang thai</th>
-        <th style="width:100px">Thao tac</th>
-      </tr>
-    </thead>
-    <tbody id="knTableBody">
-      <% if (!(danhMucKhoanNops || []).length) { %>
-        <tr><td colspan="7" class="hr-empty">Chua co khoan nop. <a id="knEmptyAdd">Nhan vao day de them khoan nop</a>.</td></tr>
-      <% } %>
-      <% (danhMucKhoanNops || []).forEach(function(item) { %>
-        <tr
-          data-id="<%= item._id %>"
-          data-ma-khoan="<%= item.ma_khoan || '' %>"
-          data-ten-khoan="<%= item.ten_khoan || '' %>"
-          data-nhom-khoan="<%= item.nhom_khoan || '' %>"
-          data-loai-khoan="<%= item.loai_khoan || '' %>"
-          data-noi-nop="<%= item.noi_nop || '' %>"
-          data-mo-ta="<%= item.mo_ta || '' %>"
-          data-thu-tu="<%= item.thu_tu_hien_thi || 0 %>"
-          data-trang-thai="<%= item.trang_thai || 'active' %>"
-        >
-          <td><%= item.ma_khoan || '---' %></td>
-          <td><strong><%= item.ten_khoan || '---' %></strong></td>
-          <td><%= nhomKhoanLabels[item.nhom_khoan] || item.nhom_khoan || '---' %></td>
-          <td><%= loaiKhoanLabels[item.loai_khoan] || item.loai_khoan || '---' %></td>
-          <td><%= noiNopLabels[item.noi_nop] || item.noi_nop || '---' %></td>
-          <td>
-            <span class="status-pill <%= item.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
-              <%= item.trang_thai === 'active' ? 'Dang su dung' : 'Ngung su dung' %>
-            </span>
-          </td>
-          <td>
-            <div class="hr-actions">
-              <button type="button" class="hr-btn-icon kn-edit" title="Sua"><i class="fa-regular fa-pen-to-square"></i></button>
-              <button type="button" class="hr-btn-icon kn-status" title="Doi trang thai">
-                <i class="fa-solid <%= item.trang_thai === 'active' ? 'fa-ban' : 'fa-rotate-left' %>"></i>
-              </button>
-            </div>
-          </td>
+<div class="kn-subtabs" role="tablist" aria-label="Khoản nộp">
+  <button type="button" class="kn-subtab is-active" data-kn-subtab="khoan-nop">Khoản nộp</button>
+  <button type="button" class="kn-subtab" data-kn-subtab="noi-nop">Nơi nộp</button>
+</div>
+
+<section class="kn-subpane is-active" data-kn-subpane="khoan-nop">
+  <div class="cc-toolbar kn-subtoolbar">
+    <h2 style="margin:0;font-size:18px;font-weight:800;color:#111827;flex:1">Danh mục khoản nộp</h2>
+    <button type="button" class="cc-btn cc-btn-primary" id="knAddBtn"><i class="fa-solid fa-plus"></i> Khoản nộp</button>
+    <div class="hr-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="search" id="knKeyword" placeholder="Tìm kiếm khoản nộp" value="<%= keywordValue %>">
+    </div>
+  </div>
+
+  <section class="hr-table-panel">
+    <table class="hr-table">
+      <thead>
+        <tr>
+          <th>Mã khoản</th>
+          <th>Tên khoản</th>
+          <th>Nơi nộp</th>
+          <th>Người lao động</th>
+          <th>Người sử dụng lao động</th>
+          <th>Trạng thái</th>
+          <th style="width:100px">Thao tác</th>
         </tr>
-      <% }) %>
-    </tbody>
-  </table>
+      </thead>
+      <tbody id="knTableBody">
+        <% if (!(danhMucKhoanNops || []).length) { %>
+          <tr><td colspan="7" class="hr-empty">Chưa có khoản nộp. <a id="knEmptyAdd">Nhấn vào đây để thêm khoản nộp</a>.</td></tr>
+        <% } %>
+        <% (danhMucKhoanNops || []).forEach(function(item) {
+          var noiNop = item.noi_nop_id && typeof item.noi_nop_id === 'object' ? item.noi_nop_id : null;
+        %>
+          <tr
+            data-id="<%= item._id %>"
+            data-ma-khoan="<%= item.ma_khoan || '' %>"
+            data-ten-khoan="<%= item.ten_khoan || '' %>"
+            data-noi-nop-id="<%= noiNop ? noiNop._id : (item.noi_nop_id || '') %>"
+            data-ti-le-nld="<%= item.ti_le_nld != null ? item.ti_le_nld : (item.ti_le || 0) %>"
+            data-ti-le-nsdld="<%= item.ti_le_nsdld || 0 %>"
+            data-trang-thai="<%= item.trang_thai || 'active' %>"
+          >
+            <td><%= item.ma_khoan || '---' %></td>
+            <td><strong><%= item.ten_khoan || '---' %></strong></td>
+            <td><%= noiNop ? ((noiNop.ma_noi_nop || '') + ' - ' + (noiNop.ten_noi_nop || '')) : '---' %></td>
+            <td><%= Number(item.ti_le_nld != null ? item.ti_le_nld : (item.ti_le || 0)).toLocaleString('vi-VN') %>%</td>
+            <td><%= Number(item.ti_le_nsdld || 0).toLocaleString('vi-VN') %>%</td>
+            <td>
+              <span class="status-pill <%= item.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+                <%= item.trang_thai === 'active' ? 'Đang sử dụng' : 'Ngừng sử dụng' %>
+              </span>
+            </td>
+            <td>
+              <div class="hr-actions">
+                <button type="button" class="hr-btn-icon kn-edit" title="Sửa"><i class="fa-regular fa-pen-to-square"></i></button>
+                <button type="button" class="hr-btn-icon kn-status" title="Đổi trạng thái">
+                  <i class="fa-solid <%= item.trang_thai === 'active' ? 'fa-ban' : 'fa-rotate-left' %>"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
+</section>
+
+<section class="kn-subpane" data-kn-subpane="noi-nop">
+  <section class="hr-table-panel kn-place-panel">
+    <div class="kn-place-head">
+      <strong>Nơi nộp</strong>
+      <div class="kn-place-form">
+        <input id="nnTenNoiNop" placeholder="Tên nơi nộp">
+        <button type="button" class="btn btn-primary" id="nnAddBtn">+ Nơi nộp</button>
+      </div>
+    </div>
+    <table class="hr-table">
+      <thead>
+        <tr>
+          <th>Mã nơi</th>
+          <th>Tên nơi nộp</th>
+          <th>Trạng thái</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!(noiNops || []).length) { %>
+          <tr><td colspan="3" class="hr-empty">Chưa có nơi nộp. Thêm nơi nộp trước khi tạo khoản nộp.</td></tr>
+        <% } %>
+        <% (noiNops || []).forEach(function(item) { %>
+          <tr>
+            <td><%= item.ma_noi_nop || '---' %></td>
+            <td><strong><%= item.ten_noi_nop || '---' %></strong></td>
+            <td>
+              <span class="status-pill <%= item.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+                <%= item.trang_thai === 'active' ? 'Đang sử dụng' : 'Ngừng sử dụng' %>
+              </span>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
 </section>

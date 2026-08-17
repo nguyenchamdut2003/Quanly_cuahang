@@ -60,6 +60,7 @@ function isDisabledDeleteOrTrashRequest(req) {
   var method = String(req.method || 'GET').toUpperCase();
   var requestPath = String(req.path || '').toLowerCase();
   if (requestPath === '/system/reset-data') return false;
+  if (method === 'DELETE' && /^\/chamcongmoi\/api\/bang-luong\/[^/]+$/.test(requestPath)) return false;
   if (requestPath === '/thung-rac' || requestPath.indexOf('/thung-rac/') === 0) return true;
   if (method === 'DELETE') return true;
   return /(^|\/)(delete|delete-selected|trash)(\/|$)/.test(requestPath);
@@ -298,6 +299,7 @@ app.use('/xuat-dung-noi-bo', xuatDungNoiBoRouter);
 app.use('/xuat-huy', xuatHuyRouter);
 app.use('/', chamCongDanhMucNhanSuRouter);
 app.use('/cham-cong', chamCongRouter);
+app.use('/chamcongmoi/api', chamCongRouter);
 app.use('/chamcongmoi/api/nhan-vien', chamCongNhanVienRouter);
 app.use('/chamcongmoi/khoan-nop', chamCongKhoanNopRouter);
 app.use('/system', systemRouter);

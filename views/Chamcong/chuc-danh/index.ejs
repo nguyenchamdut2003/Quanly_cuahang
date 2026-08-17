@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Chuc danh</title>
+  <title>Chức danh</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
@@ -15,11 +15,11 @@
     <%- include('../../partials/flash-message', { flash: flash }) %>
     <%- include('../partials/_tabs', { activeTab: 'positions', asLinks: true }) %>
     <div class="hr-toolbar">
-      <h1>Chuc danh</h1>
-      <button type="button" class="btn btn-primary" id="cdAddBtn">+ Chuc danh</button>
+      <h1>Chức danh</h1>
+      <button type="button" class="btn btn-primary" id="cdAddBtn">+ Chức danh</button>
       <div class="hr-search">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" id="cdKeyword" placeholder="Tim kiem chuc danh" value="<%= filter.keyword || '' %>">
+        <input type="search" id="cdKeyword" placeholder="Tìm kiếm chức danh" value="<%= filter.keyword || '' %>">
       </div>
     </div>
 

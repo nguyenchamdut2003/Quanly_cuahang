@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Danh muc khoan nop</title>
+  <title>Danh mục khoản nộp</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
@@ -14,19 +14,10 @@
   <main class="admin-shell store-page">
     <%- include('../../../partials/flash-message', { flash: flash }) %>
     <%- include('../../partials/_tabs', { activeTab: 'contributions', asLinks: true }) %>
-    <div class="hr-toolbar">
-      <h1>Danh muc khoan nop</h1>
-      <button type="button" class="btn btn-primary" id="knAddBtn">+ Khoan nop</button>
-      <div class="hr-search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input type="search" id="knKeyword" placeholder="Tim kiem khoan nop" value="<%= filter.keyword || '' %>">
-      </div>
-    </div>
-
-    <%- include('./_table', { danhMucKhoanNops: danhMucKhoanNops }) %>
+    <%- include('./_table', { danhMucKhoanNops: danhMucKhoanNops, noiNops: noiNops, filter: filter }) %>
   </main>
 
-  <%- include('./_modal') %>
+  <%- include('./_modal', { noiNops: noiNops }) %>
   <%- include('./_script') %>
 </body>
 </html>

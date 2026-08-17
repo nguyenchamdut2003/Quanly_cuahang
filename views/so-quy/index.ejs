@@ -50,7 +50,6 @@
   || item.nhap_vat_chua_id?.ma_nhap_vat_chua || item.chung_tu_khac || item.ma_chung_tu_goc || '';
   };
   const relatedDocLink = function(item) {
-  if (item.chung_tu_khac) return 'Khác';
   const code = codeOf(item);
   if (item.phieu_tra_hang_nhap_id) return refLink('supplier_return', item.phieu_tra_hang_nhap_id, code);
   if (item.phieu_tra_hang_id) return refLink('customer_return', item.phieu_tra_hang_id, code);
@@ -2126,7 +2125,7 @@
 
                 <script src="/javascripts/global-loading.js"></script>
                 <script>
-                  const receipts = <%- JSON.stringify(safeList.map(item => ({ _id: String(item._id), ma_phieu: item.ma_phieu, loai_phieu: item.loai_phieu, loai_thu_chi: item.loai_thu_chi || '', gia_tri: item.gia_tri || 0, chi_tiet_thanh_toan: item.chi_tiet_thanh_toan || {}, phuong_thuc_thanh_toan: item.phuong_thuc_thanh_toan || '', nhom_doi_tuong: item.nhom_doi_tuong || '', trang_thai: item.trang_thai || '', hach_toan: !!item.hach_toan, doi_tuong: item.doi_tuong || '', ghi_chu: item.ghi_chu || '', ngay_lap: item.ngay_lap, so_quy: item.so_quy_id?.ten_so_quy || 'Chưa phân sổ', chung_tu_khac: item.chung_tu_khac || '', chung_tu: item.chung_tu_khac ? 'Khác' : codeOf(item) }))) %>;
+                  const receipts = <%- JSON.stringify(safeList.map(item => ({ _id: String(item._id), ma_phieu: item.ma_phieu, loai_phieu: item.loai_phieu, loai_thu_chi: item.loai_thu_chi || '', gia_tri: item.gia_tri || 0, chi_tiet_thanh_toan: item.chi_tiet_thanh_toan || {}, phuong_thuc_thanh_toan: item.phuong_thuc_thanh_toan || '', nhom_doi_tuong: item.nhom_doi_tuong || '', trang_thai: item.trang_thai || '', hach_toan: !!item.hach_toan, doi_tuong: item.doi_tuong || '', ghi_chu: item.ghi_chu || '', ngay_lap: item.ngay_lap, so_quy: item.so_quy_id?.ten_so_quy || 'Chưa phân sổ', chung_tu_khac: item.chung_tu_khac || '', chung_tu: codeOf(item) }))) %>;
                   const customers = <%- JSON.stringify(safeCustomers.map(item => ({ _id: String(item._id), name: item.ten_khach_hang, code: item.ma_khach_hang, phone: item.sdt || '' }))) %>;
                   const suppliers = <%- JSON.stringify(safeSuppliers.map(item => ({ _id: String(item._id), name: item.ten_ncc, code: item.ma_ncc, phone: item.sdt || '' }))) %>;
                   const employees = <%- JSON.stringify(safeEmployees.map(item => ({ _id: String(item._id), name: item.ten_nhan_vien, code: item.ma_nhan_vien, phone: item.sdt || '' }))) %>;

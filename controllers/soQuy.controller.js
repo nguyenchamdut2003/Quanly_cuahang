@@ -50,6 +50,7 @@ function receiptErrorMessage(error) {
 function buildFilter(query = {}, storeId) {
     const filter = {};
     if (storeId) filter.cua_hang_id = toObjectId(storeId);
+    filter.trang_thai_du_lieu = { $ne: 'inactive' };
     if (query.q && query.q.trim() !== '') filter.ma_phieu = { $regex: query.q.trim(), $options: 'i' };
     if (query.loai_phieu && ['thu', 'chi'].includes(query.loai_phieu)) filter.loai_phieu = query.loai_phieu;
     if (query.doi_tuong_search && query.doi_tuong_search.trim() !== '') filter.doi_tuong = { $regex: query.doi_tuong_search.trim(), $options: 'i' };

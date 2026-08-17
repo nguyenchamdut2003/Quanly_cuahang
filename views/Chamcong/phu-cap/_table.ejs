@@ -1,0 +1,34 @@
+<section class="hr-table-panel">
+  <table class="hr-table">
+    <thead>
+      <tr>
+        <th>Tên phụ cấp</th>
+        <th>Mô tả</th>
+        <th>Trạng thái</th>
+        <th style="width:100px">Thao tác</th>
+      </tr>
+    </thead>
+    <tbody id="pcTableBody">
+      <% if (!(danhMucPhuCaps || []).length) { %>
+        <tr><td colspan="4" class="hr-empty">Chưa có phụ cấp. <a id="pcEmptyAdd">Nhấn vào đây để thêm phụ cấp</a>.</td></tr>
+      <% } %>
+      <% (danhMucPhuCaps || []).forEach(function(pc) { %>
+        <tr data-id="<%= pc._id %>">
+          <td><strong><%= pc.ten_phu_cap || '---' %></strong></td>
+          <td><%= pc.mo_ta || '---' %></td>
+          <td>
+            <span class="status-pill <%= pc.trang_thai === 'active' ? 'is-active' : 'is-inactive' %>">
+              <%= pc.trang_thai === 'active' ? 'Đang sử dụng' : 'Ngừng sử dụng' %>
+            </span>
+          </td>
+          <td>
+            <div class="hr-actions">
+              <button type="button" class="hr-btn-icon pc-edit" title="Sửa"><i class="fa-regular fa-pen-to-square"></i></button>
+              <button type="button" class="hr-btn-icon pc-inactive" title="Ngừng sử dụng" <%= pc.trang_thai === 'inactive' ? 'disabled' : '' %>><i class="fa-solid fa-ban"></i></button>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>

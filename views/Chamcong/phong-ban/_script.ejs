@@ -6,22 +6,27 @@
 
   function openPbModal(item) {
     pbEditId = item && item._id ? String(item._id) : '';
-    document.getElementById('pbModalTitle').textContent = pbEditId ? 'Sua phong ban' : 'Them phong ban';
+    if (!pbEditId && pbForm) pbForm.reset();
+    document.getElementById('pbModalTitle').textContent = pbEditId ? 'Sửa phòng ban' : 'Thêm phòng ban';
     document.getElementById('pbId').value = pbEditId;
-    document.getElementById('pbMa').value = item && item.ma_phong_ban ? item.ma_phong_ban : '';
     document.getElementById('pbTen').value = item && item.ten_phong_ban ? item.ten_phong_ban : '';
     document.getElementById('pbMoTa').value = item && item.mo_ta ? item.mo_ta : '';
     document.getElementById('pbTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
     pbModal.classList.add('is-open');
+    pbModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    setTimeout(() => document.getElementById('pbTen')?.focus(), 0);
   }
 
   function closePbModal() {
     pbModal.classList.remove('is-open');
+    pbModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
   }
 
   function reloadPbPage() {
     if (window.location.pathname === '/cham-cong') {
-      window.location.href = '/cham-cong?tab=departments';
+      window.location.href = '/cham-cong?tab=employees';
       return;
     }
     location.reload();
@@ -32,7 +37,7 @@
     const kw = pbKeyword.value.trim();
     if (kw) params.set('keyword', kw);
     if (window.location.pathname === '/cham-cong') {
-      params.set('tab', 'departments');
+      params.set('tab', 'employees');
       window.location.href = '/cham-cong?' + params.toString();
       return;
     }
@@ -45,8 +50,9 @@
     openPbModal(null);
   });
   document.getElementById('pbCancelBtn').addEventListener('click', closePbModal);
-  pbModal.addEventListener('click', (e) => {
-    if (e.target === pbModal) closePbModal();
+  document.getElementById('pbCloseBtn')?.addEventListener('click', closePbModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pbModal.classList.contains('is-open')) closePbModal();
   });
   pbKeyword.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') reloadPbWithKeyword();
@@ -57,9 +63,8 @@
       const row = this.closest('tr');
       openPbModal({
         _id: row.dataset.id,
-        ma_phong_ban: row.children[0].textContent.trim() === '---' ? '' : row.children[0].textContent.trim(),
         ten_phong_ban: row.querySelector('strong')?.textContent.trim() || '',
-        mo_ta: row.children[2].textContent.trim() === '---' ? '' : row.children[2].textContent.trim(),
+        mo_ta: row.children[1].textContent.trim() === '---' ? '' : row.children[1].textContent.trim(),
         trang_thai: row.querySelector('.status-pill')?.classList.contains('is-inactive') ? 'inactive' : 'active'
       });
     });
@@ -68,13 +73,13 @@
   document.querySelectorAll('.pb-inactive').forEach(btn => {
     btn.addEventListener('click', async function() {
       const id = this.closest('tr').dataset.id;
-      if (!confirm('Ngung su dung phong ban nay?')) return;
+      if (!confirm('Ngừng sử dụng phòng ban này?')) return;
       const res = await fetch('/api/phong-ban/' + id + '/inactive', {
         method: 'PATCH',
         headers: { 'Accept': 'application/json' }
       });
       const json = await res.json();
-      if (!json.success) return alert(json.message || 'Loi');
+      if (!json.success) return alert(json.message || 'Lỗi');
       reloadPbPage();
     });
   });
@@ -82,12 +87,11 @@
   pbForm.addEventListener('submit', async function(e) {
     e.preventDefault();
     const payload = {
-      ma_phong_ban: document.getElementById('pbMa').value.trim(),
       ten_phong_ban: document.getElementById('pbTen').value.trim(),
       mo_ta: document.getElementById('pbMoTa').value.trim(),
       trang_thai: document.getElementById('pbTrangThai').value
     };
-    if (!payload.ten_phong_ban) return alert('Vui long nhap ten phong ban');
+    if (!payload.ten_phong_ban) return alert('Vui lòng nhập tên phòng ban');
     const url = pbEditId ? ('/api/phong-ban/' + pbEditId) : '/api/phong-ban';
     const method = pbEditId ? 'PUT' : 'POST';
     const res = await fetch(url, {
@@ -96,7 +100,7 @@
       body: JSON.stringify(payload)
     });
     const json = await res.json();
-    if (!json.success) return alert(json.message || 'Loi luu phong ban');
+    if (!json.success) return alert(json.message || 'Lỗi lưu phòng ban');
     reloadPbPage();
   });
 </script>

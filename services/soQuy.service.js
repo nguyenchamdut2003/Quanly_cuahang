@@ -11,6 +11,7 @@ const {
   CongNoKhachHang,
   CongNoNhaCungCap
 } = require('../models/kiot.model');
+const { NhanVien } = require('../models/chamcong.model');
 
 const DOCUMENT_TYPE_TO_FIELD = {
 
@@ -206,9 +207,23 @@ function sanitizeDocumentRefs(data) {
 
 async function makeReceiptCode(loaiPhieu, session) {
 
-  const count = await PhieuThuChi.countDocuments({ loai_phieu: loaiPhieu }).session(session || null);
+  const prefix = loaiPhieu === 'thu' ? 'PT' : 'PC';
+  const regex = new RegExp('^' + prefix + '(\\d+)$');
+  const last = await PhieuThuChi.findOne({
+    loai_phieu: loaiPhieu,
+    ma_phieu: { $regex: regex }
+  }).sort({ ma_phieu: -1 }).select('ma_phieu').session(session || null).lean();
 
-  return (loaiPhieu === 'thu' ? 'PT' : 'PC') + String(count + 1).padStart(6, '0');
+  const match = last && String(last.ma_phieu || '').match(regex);
+  let next = match ? Number(match[1]) + 1 : 1;
+
+  for (let i = 0; i < 10000; i += 1) {
+    const code = prefix + String(next + i).padStart(6, '0');
+    const exists = await PhieuThuChi.exists({ ma_phieu: code }).session(session || null);
+    if (!exists) return code;
+  }
+
+  return prefix + String(Date.now()).slice(-10);
 
 }
 

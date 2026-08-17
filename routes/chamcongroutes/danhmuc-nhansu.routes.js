@@ -15,4 +15,9 @@ router.post('/api/chuc-danh', controller.createChucDanh);
 router.put('/api/chuc-danh/:id', controller.updateChucDanh);
 router.patch('/api/chuc-danh/:id/inactive', controller.inactiveChucDanh);
 
+router.get('/phu-cap', controller.phuCapIndex);
+router.post('/api/phu-cap', controller.createPhuCap);
+router.put('/api/phu-cap/:id', controller.updatePhuCap);
+router.patch('/api/phu-cap/:id/inactive', controller.inactivePhuCap);
+
 module.exports = router;

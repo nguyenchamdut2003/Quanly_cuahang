@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Danh mục phụ cấp</title>
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/hang-hoa.css">
+  <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <%- include('../partials/_catalog-styles') %>
+</head>
+<body class="admin-body">
+  <%- include('../../partials/header', { activeMenu: activeMenu, user: user }) %>
+  <main class="admin-shell store-page">
+    <%- include('../../partials/flash-message', { flash: flash }) %>
+    <%- include('../partials/_tabs', { activeTab: 'allowances', asLinks: true }) %>
+    <div class="hr-toolbar">
+      <h1>Danh mục phụ cấp</h1>
+      <button type="button" class="btn btn-primary" id="pcAddBtn">+ Phụ cấp</button>
+      <div class="hr-search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="search" id="pcKeyword" placeholder="Tìm kiếm phụ cấp" value="<%= filter.keyword || '' %>">
+      </div>
+    </div>
+
+    <%- include('./_table', { danhMucPhuCaps: danhMucPhuCaps }) %>
+  </main>
+
+  <%- include('./_modal') %>
+  <%- include('./_script') %>
+</body>
+</html>

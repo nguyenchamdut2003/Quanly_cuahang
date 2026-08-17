@@ -1,0 +1,106 @@
+<script>
+  const pcModal = document.getElementById('pcModal');
+  const pcForm = document.getElementById('pcForm');
+  const pcKeyword = document.getElementById('pcKeyword');
+  let pcEditId = '';
+
+  function openPcModal(item) {
+    pcEditId = item && item._id ? String(item._id) : '';
+    if (!pcEditId && pcForm) pcForm.reset();
+    document.getElementById('pcModalTitle').textContent = pcEditId ? 'Sửa phụ cấp' : 'Thêm phụ cấp';
+    document.getElementById('pcId').value = pcEditId;
+    document.getElementById('pcTen').value = item && item.ten_phu_cap ? item.ten_phu_cap : '';
+    document.getElementById('pcMoTa').value = item && item.mo_ta ? item.mo_ta : '';
+    document.getElementById('pcTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    pcModal.classList.add('is-open');
+    pcModal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('modal-open');
+    setTimeout(() => document.getElementById('pcTen')?.focus(), 0);
+  }
+
+  function closePcModal() {
+    pcModal.classList.remove('is-open');
+    pcModal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('modal-open');
+  }
+
+  function reloadPcPage() {
+    if (window.location.pathname === '/cham-cong') {
+      window.location.href = '/cham-cong?tab=allowances';
+      return;
+    }
+    location.reload();
+  }
+
+  function reloadPcWithKeyword() {
+    const params = new URLSearchParams();
+    const kw = pcKeyword.value.trim();
+    if (kw) params.set('keyword', kw);
+    if (window.location.pathname === '/cham-cong') {
+      params.set('tab', 'allowances');
+      window.location.href = '/cham-cong?' + params.toString();
+      return;
+    }
+    window.location.href = '/phu-cap' + (params.toString() ? '?' + params.toString() : '');
+  }
+
+  document.getElementById('pcAddBtn')?.addEventListener('click', () => openPcModal(null));
+  document.getElementById('pcEmptyAdd')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    openPcModal(null);
+  });
+  document.getElementById('pcCancelBtn')?.addEventListener('click', closePcModal);
+  document.getElementById('pcCloseBtn')?.addEventListener('click', closePcModal);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && pcModal.classList.contains('is-open')) closePcModal();
+  });
+  pcKeyword?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') reloadPcWithKeyword();
+  });
+
+  document.querySelectorAll('.pc-edit').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const row = this.closest('tr');
+      openPcModal({
+        _id: row.dataset.id,
+        ten_phu_cap: row.querySelector('strong')?.textContent.trim() || '',
+        mo_ta: row.children[1].textContent.trim() === '---' ? '' : row.children[1].textContent.trim(),
+        trang_thai: row.querySelector('.status-pill')?.classList.contains('is-inactive') ? 'inactive' : 'active'
+      });
+    });
+  });
+
+  document.querySelectorAll('.pc-inactive').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const id = this.closest('tr').dataset.id;
+      if (!confirm('Ngừng sử dụng phụ cấp này?')) return;
+      const res = await fetch('/api/phu-cap/' + id + '/inactive', {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json' }
+      });
+      const json = await res.json();
+      if (!json.success) return alert(json.message || 'Lỗi');
+      reloadPcPage();
+    });
+  });
+
+  pcForm.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const payload = {
+      ten_phu_cap: document.getElementById('pcTen').value.trim(),
+      mo_ta: document.getElementById('pcMoTa').value.trim(),
+      trang_thai: document.getElementById('pcTrangThai').value
+    };
+    if (!payload.ten_phu_cap) return alert('Vui lòng nhập tên phụ cấp');
+    const url = pcEditId ? ('/api/phu-cap/' + pcEditId) : '/api/phu-cap';
+    const method = pcEditId ? 'PUT' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!json.success) return alert(json.message || 'Lỗi lưu phụ cấp');
+    reloadPcPage();
+  });
+</script>

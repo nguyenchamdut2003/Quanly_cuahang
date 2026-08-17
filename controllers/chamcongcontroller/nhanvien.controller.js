@@ -1,22 +1,21 @@
 const {
   NhanVien,
+  PhongBan,
   ChucDanh,
-  CauHinhLuongNhanVien
+  DanhMucKhoanNop,
+  DanhMucPhuCap,
+  ChamCong,
+  CauHinhLuongNhanVien,
+  PhuCapNhanVien,
+  TamUngNhanVien,
+  BangLuong
 } = require('../../models/chamcong.model');
+const { taoPhieuThuChi } = require('../../services/soQuy.service');
 
 function getCurrentStoreId(req, res) {
-  if (res.locals.currentStore && res.locals.currentStore._id) {
-    return String(res.locals.currentStore._id);
-  }
-
-  if (req.session && req.session.cua_hang_id) {
-    return String(req.session.cua_hang_id);
-  }
-
-  if (req.user && req.user.cua_hang_id) {
-    return String(req.user.cua_hang_id._id || req.user.cua_hang_id);
-  }
-
+  if (res.locals.currentStore && res.locals.currentStore._id) return String(res.locals.currentStore._id);
+  if (req.session && req.session.cua_hang_id) return String(req.session.cua_hang_id);
+  if (req.user && req.user.cua_hang_id) return String(req.user.cua_hang_id._id || req.user.cua_hang_id);
   return '';
 }
 
@@ -51,19 +50,35 @@ function parseMoney(value) {
   return number;
 }
 
-function normalizeUiStatus(value) {
-  return value === 'inactive' || value === 'da_nghi' ? 'da_nghi' : 'dang_lam_viec';
-}
-
-function toUiStatus(value) {
-  return value === 'da_nghi' ? 'inactive' : 'active';
+function normalizeStatus(value) {
+  return value === 'inactive' || value === 'da_nghi' ? 'inactive' : 'active';
 }
 
 function buildEmployeeLabel(employee) {
   return (employee.ma_nhan_vien ? employee.ma_nhan_vien + ' - ' : '') + (employee.ten_nhan_vien || '');
 }
 
-function normalizePayload(body) {
+function formatDateText(value) {
+  if (!value) return '';
+  var date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return String(date.getDate()).padStart(2, '0') + '/'
+    + String(date.getMonth() + 1).padStart(2, '0') + '/'
+    + date.getFullYear();
+}
+
+function formatMonthText(month, year) {
+  if (!month || !year) return '';
+  return String(month).padStart(2, '0') + '/' + String(year);
+}
+
+function attendanceWorkUnits(row) {
+  return (row.ca_sang ? 0.5 : 0)
+    + (row.ca_chieu ? 0.5 : 0)
+    + Number(row.cong_tang_ca || 0);
+}
+
+function normalizeEmployeePayload(body) {
   return {
     ten_nhan_vien: String(body.ten_nhan_vien || '').trim(),
     sdt: String(body.sdt || '').trim(),
@@ -71,104 +86,266 @@ function normalizePayload(body) {
     cccd: String(body.cccd || '').trim(),
     ngay_sinh: parseDateInput(body.ngay_sinh),
     gioi_tinh: ['nam', 'nu', 'khac'].includes(body.gioi_tinh) ? body.gioi_tinh : undefined,
+    phong_ban_id: String(body.phong_ban_id || '').trim(),
+    chuc_danh_id: String(body.chuc_danh_id || '').trim(),
     chuc_vu: String(body.chuc_vu || '').trim(),
     ngay_bat_dau_lam_viec: parseDateInput(body.ngay_bat_dau_lam_viec),
     ghi_chu: String(body.ghi_chu || '').trim(),
-    trang_thai: normalizeUiStatus(body.trang_thai),
-    luong_theo_thang: parseMoney(body.luong_theo_thang),
-    luong_theo_ngay: parseMoney(body.luong_theo_ngay),
-    loai_luong: body.loai_luong === 'ngay' ? 'ngay' : 'thang'
+    trang_thai: normalizeStatus(body.trang_thai)
   };
 }
 
-async function makeEmployeeCode(storeId) {
+function normalizeSalaryPayload(body, employeePayload) {
+  var luong = body && typeof body.luong === 'object' ? body.luong : {};
+  var fromDate = parseDateInput(luong.tu_ngay) || employeePayload.ngay_bat_dau_lam_viec || new Date();
+  var contributionIds = Array.isArray(luong.khoan_nop_ids) ? luong.khoan_nop_ids : [];
+
+  return {
+    luong_thang: parseMoney(luong.luong_thang != null ? luong.luong_thang : body.luong_theo_thang),
+    so_ngay_cong_trong_thang: Number(luong.so_ngay_cong_trong_thang || 0),
+    khoan_nop_ids: contributionIds.map(function(id) { return String(id || '').trim(); }).filter(Boolean),
+    tu_ngay: fromDate,
+    ghi_chu: String(luong.ghi_chu || '').trim(),
+    trang_thai: 'active'
+  };
+}
+
+function normalizeAllowancePayload(body) {
+  var rows = Array.isArray(body.phu_caps) ? body.phu_caps : [];
+  return rows.map(function(row) {
+    return {
+      danh_muc_phu_cap_id: String(row.danh_muc_phu_cap_id || '').trim(),
+      kieu_tinh: ['co_dinh_thang', 'theo_ngay_di_lam', 'theo_cong'].includes(row.kieu_tinh) ? row.kieu_tinh : '',
+      muc_phu_cap: parseMoney(row.muc_phu_cap),
+      ghi_chu: String(row.ghi_chu || '').trim()
+    };
+  }).filter(function(row) {
+    return row.danh_muc_phu_cap_id;
+  });
+}
+
+async function makeEmployeeCode(storeId, session) {
   for (var index = 1; index < 10000; index += 1) {
     var code = 'NV' + String(index).padStart(3, '0');
-    var exists = await NhanVien.exists({ cua_hang_id: storeId, ma_nhan_vien: code });
+    var query = NhanVien.exists({ cua_hang_id: storeId, ma_nhan_vien: code });
+    if (session) query = query.session(session);
+    var exists = await query;
     if (!exists) return code;
   }
-
   return 'NV' + Date.now();
 }
 
-async function makePositionCode(storeId) {
-  for (var index = 1; index < 10000; index += 1) {
-    var code = 'CD' + String(index).padStart(3, '0');
-    var exists = await ChucDanh.exists({ cua_hang_id: storeId, ma_chuc_danh: code });
+async function makeAdvanceCode(storeId, session) {
+  var regex = /^TA(\d+)$/;
+  var query = TamUngNhanVien.findOne({
+    cua_hang_id: storeId,
+    ma_tam_ung: { $regex: /^TA\d+$/ }
+  }).sort({ ma_tam_ung: -1 }).select('ma_tam_ung');
+  if (session) query = query.session(session);
+  var last = await query.lean();
+  var match = last && String(last.ma_tam_ung || '').match(regex);
+  var next = match ? Number(match[1]) + 1 : 1;
+
+  for (var index = 0; index < 10000; index += 1) {
+    var code = 'TA' + String(next + index).padStart(4, '0');
+    var existsQuery = TamUngNhanVien.exists({ cua_hang_id: storeId, ma_tam_ung: code });
+    if (session) existsQuery = existsQuery.session(session);
+    var exists = await existsQuery;
     if (!exists) return code;
   }
 
-  return 'CD' + Date.now();
+  return 'TA' + Date.now();
 }
 
-async function findOrCreateChucDanh(storeId, name) {
-  var title = String(name || '').trim();
-  if (!title) return null;
-
-  var regex = new RegExp('^' + escapeRegex(title) + '$', 'i');
-  var existing = await ChucDanh.findOne({
-    cua_hang_id: storeId,
-    $or: [
-      { ten_chuc_danh: regex },
-      { ma_chuc_danh: title.toUpperCase() }
-    ]
-  });
-
-  if (existing) return existing;
-
-  return ChucDanh.create({
-    cua_hang_id: storeId,
-    ma_chuc_danh: await makePositionCode(storeId),
-    ten_chuc_danh: title,
-    trang_thai: 'active'
-  });
+async function validateReference(Model, storeId, id, label, session) {
+  if (!id) return null;
+  if (!isValidObjectId(id)) {
+    var error = new Error(label + ' không hợp lệ.');
+    error.status = 400;
+    throw error;
+  }
+  var query = Model.findOne({ _id: id, cua_hang_id: storeId });
+  if (session) query = query.session(session);
+  var doc = await query;
+  if (!doc) {
+    var notFound = new Error(label + ' không thuộc cửa hàng hiện tại.');
+    notFound.status = 400;
+    throw notFound;
+  }
+  return doc;
 }
 
-async function upsertSalaryConfig(storeId, employeeId, payload) {
-  var salary = payload.loai_luong === 'thang' ? payload.luong_theo_thang : 0;
-  var config = await CauHinhLuongNhanVien.findOne({
+function salaryChanged(current, nextSalary) {
+  if (!current) return true;
+  var currentContributionIds = (current.khoan_nop_ids || []).map(function(id) { return String(id); }).sort().join('|');
+  var nextContributionIds = (nextSalary.khoan_nop_ids || []).map(function(id) { return String(id); }).sort().join('|');
+  return Number(current.luong_thang || 0) !== Number(nextSalary.luong_thang || 0)
+    || Number(current.so_ngay_cong_trong_thang || 0) !== Number(nextSalary.so_ngay_cong_trong_thang || 0)
+    || currentContributionIds !== nextContributionIds;
+}
+
+async function saveSalaryConfig(storeId, employeeId, salary, session) {
+  var current = await CauHinhLuongNhanVien.findOne({
     cua_hang_id: storeId,
     nhan_vien_id: employeeId,
     trang_thai: 'active'
-  }).sort({ tu_ngay: -1, created_at: -1 });
+  }).sort({ tu_ngay: -1, created_at: -1 }).session(session || null);
 
-  if (!salary) {
-    if (config) {
-      config.trang_thai = 'inactive';
-      await config.save();
+  if (!current) {
+    return CauHinhLuongNhanVien.create([Object.assign({}, salary, {
+      cua_hang_id: storeId,
+      nhan_vien_id: employeeId
+    })], session ? { session: session, ordered: true } : undefined).then(function(rows) { return rows[0]; });
+  }
+
+  var sameStart = formatDateInput(current.tu_ngay) === formatDateInput(salary.tu_ngay);
+  if (!salaryChanged(current, salary)) return current;
+
+  if (sameStart) {
+    Object.assign(current, salary);
+    await current.save(session ? { session: session } : undefined);
+    return current;
+  }
+
+  current.den_ngay = salary.tu_ngay;
+  current.trang_thai = 'inactive';
+  await current.save(session ? { session: session } : undefined);
+  return CauHinhLuongNhanVien.create([Object.assign({}, salary, {
+    cua_hang_id: storeId,
+    nhan_vien_id: employeeId
+  })], session ? { session: session, ordered: true } : undefined).then(function(rows) { return rows[0]; });
+}
+
+async function validateSalaryContributionIds(storeId, salary, session) {
+  var ids = salary.khoan_nop_ids || [];
+  var uniqueIds = Array.from(new Set(ids));
+  if (uniqueIds.length !== ids.length) {
+    var duplicate = new Error('Không được chọn trùng một khoản nộp.');
+    duplicate.status = 400;
+    throw duplicate;
+  }
+
+  for (var i = 0; i < uniqueIds.length; i += 1) {
+    var id = uniqueIds[i];
+    if (!isValidObjectId(id)) {
+      var invalid = new Error('Khoản nộp không hợp lệ.');
+      invalid.status = 400;
+      throw invalid;
     }
-    return null;
+    var query = DanhMucKhoanNop.findOne({
+      _id: id,
+      cua_hang_id: storeId,
+      trang_thai: 'active'
+    });
+    if (session) query = query.session(session);
+    var exists = await query;
+    if (!exists) {
+      var notFound = new Error('Khoản nộp không thuộc cửa hàng hiện tại hoặc đã ngừng sử dụng.');
+      notFound.status = 400;
+      throw notFound;
+    }
+  }
+}
+
+async function saveEmployeeAllowances(storeId, employeeId, allowanceRows, startDate, session) {
+  var ids = allowanceRows.map(function(row) { return row.danh_muc_phu_cap_id; });
+  var uniqueIds = Array.from(new Set(ids));
+  if (uniqueIds.length !== ids.length) {
+    var duplicate = new Error('Không được chọn trùng một phụ cấp.');
+    duplicate.status = 400;
+    throw duplicate;
   }
 
-  var fromDate = payload.ngay_bat_dau_lam_viec || new Date();
-
-  if (config) {
-    config.luong_thang = salary;
-    config.tu_ngay = config.tu_ngay || fromDate;
-    await config.save();
-    return config;
+  for (var i = 0; i < allowanceRows.length; i += 1) {
+    var row = allowanceRows[i];
+    if (!row.kieu_tinh) {
+      var typeError = new Error('Vui lòng chọn cách tính phụ cấp.');
+      typeError.status = 400;
+      throw typeError;
+    }
+    var allowanceQuery = DanhMucPhuCap.findOne({
+      _id: row.danh_muc_phu_cap_id,
+      cua_hang_id: storeId,
+      trang_thai: 'active'
+    });
+    if (session) allowanceQuery = allowanceQuery.session(session);
+    var allowance = await allowanceQuery;
+    if (!allowance) {
+      var allowanceError = new Error('Phụ cấp không thuộc cửa hàng hiện tại hoặc đã ngừng sử dụng.');
+      allowanceError.status = 400;
+      throw allowanceError;
+    }
   }
 
-  return CauHinhLuongNhanVien.create({
+  var activeRows = await PhuCapNhanVien.find({
     cua_hang_id: storeId,
     nhan_vien_id: employeeId,
-    luong_thang: salary,
-    tu_ngay: fromDate,
     trang_thai: 'active'
+  }).session(session || null);
+  var incomingMap = {};
+  allowanceRows.forEach(function(row) {
+    incomingMap[row.danh_muc_phu_cap_id] = row;
   });
+
+  for (var a = 0; a < activeRows.length; a += 1) {
+    var active = activeRows[a];
+    var key = String(active.danh_muc_phu_cap_id);
+    var incoming = incomingMap[key];
+    if (!incoming) {
+      active.trang_thai = 'inactive';
+      active.den_ngay = startDate;
+      await active.save(session ? { session: session } : undefined);
+      continue;
+    }
+    active.kieu_tinh = incoming.kieu_tinh;
+    active.muc_phu_cap = incoming.muc_phu_cap;
+    active.ghi_chu = incoming.ghi_chu;
+    await active.save(session ? { session: session } : undefined);
+    delete incomingMap[key];
+  }
+
+  var creates = Object.keys(incomingMap).map(function(id) {
+    var row = incomingMap[id];
+    return {
+      cua_hang_id: storeId,
+      nhan_vien_id: employeeId,
+      danh_muc_phu_cap_id: row.danh_muc_phu_cap_id,
+      kieu_tinh: row.kieu_tinh,
+      muc_phu_cap: row.muc_phu_cap,
+      tu_ngay: startDate,
+      ghi_chu: row.ghi_chu,
+      trang_thai: 'active'
+    };
+  });
+  if (creates.length) await PhuCapNhanVien.create(creates, session ? { session: session, ordered: true } : undefined);
+}
+
+async function runInTransaction(work) {
+  var session = await NhanVien.db.startSession();
+  try {
+    var result;
+    try {
+      await session.withTransaction(async function() {
+        result = await work(session);
+      });
+    } catch (error) {
+      var message = String(error && error.message || '');
+      if (!/Transaction numbers are only allowed|replica set member|Transaction/.test(message)) throw error;
+      result = await work(null);
+    }
+    return result;
+  } finally {
+    await session.endSession();
+  }
 }
 
 async function getSalaryMap(storeId, employeeIds) {
   if (!employeeIds.length) return {};
-
   var rows = await CauHinhLuongNhanVien.find({
     cua_hang_id: storeId,
     nhan_vien_id: { $in: employeeIds },
     trang_thai: 'active'
-  })
-    .sort({ nhan_vien_id: 1, tu_ngay: -1, created_at: -1 })
-    .lean();
-
+  }).sort({ nhan_vien_id: 1, tu_ngay: -1, created_at: -1 }).lean();
   var map = {};
   rows.forEach(function(row) {
     var key = String(row.nhan_vien_id);
@@ -177,10 +354,50 @@ async function getSalaryMap(storeId, employeeIds) {
   return map;
 }
 
-function serializeEmployee(employee, salaryConfig) {
+async function getAllowanceMap(storeId, employeeIds) {
+  if (!employeeIds.length) return {};
+  var rows = await PhuCapNhanVien.find({
+    cua_hang_id: storeId,
+    nhan_vien_id: { $in: employeeIds },
+    trang_thai: 'active'
+  }).populate('danh_muc_phu_cap_id', 'ma_phu_cap ten_phu_cap trang_thai').lean();
+  var map = {};
+  rows.forEach(function(row) {
+    var key = String(row.nhan_vien_id);
+    if (!map[key]) map[key] = [];
+    map[key].push(row);
+  });
+  return map;
+}
+
+function serializeSalary(salaryConfig) {
+  var salary = salaryConfig || {};
+  return {
+    luong_thang: Number(salary.luong_thang || 0),
+    so_ngay_cong_trong_thang: Number(salary.so_ngay_cong_trong_thang || 0),
+    khoan_nop_ids: (salary.khoan_nop_ids || []).map(function(id) { return String(id); }),
+    tu_ngay: formatDateInput(salary.tu_ngay)
+  };
+}
+
+function serializeAllowance(row) {
+  var danhMuc = row.danh_muc_phu_cap_id && typeof row.danh_muc_phu_cap_id === 'object' ? row.danh_muc_phu_cap_id : null;
+  return {
+    _id: String(row._id),
+    danh_muc_phu_cap_id: danhMuc ? String(danhMuc._id) : String(row.danh_muc_phu_cap_id || ''),
+    ten_phu_cap: danhMuc ? (danhMuc.ten_phu_cap || '') : '',
+    kieu_tinh: row.kieu_tinh || '',
+    muc_phu_cap: Number(row.muc_phu_cap || 0),
+    tu_ngay: formatDateInput(row.tu_ngay),
+    ghi_chu: row.ghi_chu || ''
+  };
+}
+
+function serializeEmployee(employee, salaryConfig, allowanceRows) {
   var doc = employee.toObject ? employee.toObject() : employee;
+  var phongBan = doc.phong_ban_id && typeof doc.phong_ban_id === 'object' ? doc.phong_ban_id : null;
   var chucDanh = doc.chuc_danh_id && typeof doc.chuc_danh_id === 'object' ? doc.chuc_danh_id : null;
-  var monthlySalary = salaryConfig ? Number(salaryConfig.luong_thang || 0) : 0;
+  var salary = serializeSalary(salaryConfig);
 
   return {
     _id: String(doc._id),
@@ -192,29 +409,46 @@ function serializeEmployee(employee, salaryConfig) {
     cccd: doc.cccd || '',
     ngay_sinh_input: formatDateInput(doc.ngay_sinh),
     gioi_tinh: doc.gioi_tinh || '',
+    phong_ban_id: phongBan ? String(phongBan._id) : String(doc.phong_ban_id || ''),
+    phong_ban: phongBan ? (phongBan.ten_phong_ban || '') : '',
+    chuc_danh_id: chucDanh ? String(chucDanh._id) : String(doc.chuc_danh_id || ''),
     chuc_vu: chucDanh ? (chucDanh.ten_chuc_danh || '') : '',
     ngay_bat_dau_lam_viec_input: formatDateInput(doc.ngay_bat_dau_lam_viec),
     luong_theo_ngay: 0,
-    luong_theo_thang: monthlySalary,
-    loai_luong: monthlySalary > 0 ? 'thang' : 'ngay',
-    co_luong_theo_thang: monthlySalary > 0,
-    co_luong_theo_ngay: monthlySalary <= 0,
-    trang_thai: toUiStatus(doc.trang_thai),
+    luong_theo_thang: salary.luong_thang,
+    loai_luong: 'thang',
+    co_luong_theo_thang: true,
+    co_luong_theo_ngay: false,
+    luong: salary,
+    phu_caps: (allowanceRows || []).map(serializeAllowance),
+    trang_thai: doc.trang_thai || 'active',
     ghi_chu: doc.ghi_chu || ''
   };
+}
+
+function handleErrorResponse(res, error, next) {
+  if (error && error.status) {
+    return res.status(error.status).json({ success: false, message: error.message });
+  }
+  if (error && error.code === 11000) {
+    return res.status(409).json({ success: false, message: 'Mã nhân viên đã tồn tại.' });
+  }
+  return next(error);
 }
 
 exports.listNhanVien = async function(req, res, next) {
   try {
     var storeId = getCurrentStoreId(req, res);
-    if (!storeId) {
-      return res.status(400).json({ success: false, message: 'Chua chon cua hang.' });
-    }
+    if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng.' });
 
     var includeInactive = String(req.query.include_inactive || '') === '1';
     var keyword = String(req.query.keyword || '').trim();
+    var departmentId = String(req.query.phong_ban_id || '').trim();
+    var positionId = String(req.query.chuc_danh_id || '').trim();
     var query = { cua_hang_id: storeId };
-    if (!includeInactive) query.trang_thai = 'dang_lam_viec';
+    if (!includeInactive) query.trang_thai = 'active';
+    if (departmentId && isValidObjectId(departmentId)) query.phong_ban_id = departmentId;
+    if (positionId && isValidObjectId(positionId)) query.chuc_danh_id = positionId;
 
     if (keyword) {
       var regex = new RegExp(escapeRegex(keyword), 'i');
@@ -229,15 +463,18 @@ exports.listNhanVien = async function(req, res, next) {
     }
 
     var employees = await NhanVien.find(query)
+      .populate('phong_ban_id', 'ten_phong_ban ma_phong_ban')
       .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh')
       .sort({ trang_thai: 1, ma_nhan_vien: 1, ten_nhan_vien: 1 })
       .lean();
-    var salaryMap = await getSalaryMap(storeId, employees.map(function(item) { return item._id; }));
+    var employeeIds = employees.map(function(item) { return item._id; });
+    var salaryMap = await getSalaryMap(storeId, employeeIds);
+    var allowanceMap = await getAllowanceMap(storeId, employeeIds);
 
     res.json({
       success: true,
       items: employees.map(function(item) {
-        return serializeEmployee(item, salaryMap[String(item._id)]);
+        return serializeEmployee(item, salaryMap[String(item._id)], allowanceMap[String(item._id)]);
       })
     });
   } catch (error) {
@@ -250,70 +487,274 @@ exports.getNhanVien = async function(req, res, next) {
     var storeId = getCurrentStoreId(req, res);
     var id = String(req.params.id || '').trim();
     if (!storeId || !id || !isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: 'Du lieu khong hop le.' });
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
     }
 
     var employee = await NhanVien.findOne({ _id: id, cua_hang_id: storeId })
+      .populate('phong_ban_id', 'ten_phong_ban ma_phong_ban')
       .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh')
       .lean();
-
-    if (!employee) {
-      return res.status(404).json({ success: false, message: 'Khong tim thay nhan vien.' });
-    }
+    if (!employee) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên.' });
 
     var salaryMap = await getSalaryMap(storeId, [employee._id]);
+    var allowanceMap = await getAllowanceMap(storeId, [employee._id]);
     res.json({
       success: true,
-      item: serializeEmployee(employee, salaryMap[String(employee._id)])
+      item: serializeEmployee(employee, salaryMap[String(employee._id)], allowanceMap[String(employee._id)])
     });
   } catch (error) {
     next(error);
   }
 };
 
-exports.createNhanVien = async function(req, res, next) {
+exports.detailNhanVienPanel = async function(req, res, next) {
   try {
     var storeId = getCurrentStoreId(req, res);
-    if (!storeId) {
-      return res.status(400).json({ success: false, message: 'Chua chon cua hang.' });
+    var id = String(req.params.id || '').trim();
+    if (!storeId || !id || !isValidObjectId(id)) {
+      return res.status(400).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Dữ liệu không hợp lệ.</p></div>');
     }
 
-    var payload = normalizePayload(req.body || {});
-    if (!payload.ten_nhan_vien) {
-      return res.status(400).json({ success: false, message: 'Ten nhan vien la bat buoc.' });
-    }
-
-    var chucDanh = await findOrCreateChucDanh(storeId, payload.chuc_vu);
-    var employee = await NhanVien.create({
-      cua_hang_id: storeId,
-      ma_nhan_vien: await makeEmployeeCode(storeId),
-      ten_nhan_vien: payload.ten_nhan_vien,
-      sdt: payload.sdt,
-      email: payload.email,
-      cccd: payload.cccd,
-      ngay_sinh: payload.ngay_sinh,
-      gioi_tinh: payload.gioi_tinh,
-      chuc_danh_id: chucDanh ? chucDanh._id : undefined,
-      ngay_bat_dau_lam_viec: payload.ngay_bat_dau_lam_viec,
-      ghi_chu: payload.ghi_chu,
-      trang_thai: payload.trang_thai
-    });
-
-    var salaryConfig = await upsertSalaryConfig(storeId, employee._id, payload);
-    employee = await NhanVien.findById(employee._id)
+    var employee = await NhanVien.findOne({ _id: id, cua_hang_id: storeId })
+      .populate('phong_ban_id', 'ten_phong_ban ma_phong_ban')
       .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh')
       .lean();
+    if (!employee) {
+      return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tìm thấy nhân viên.</p></div>');
+    }
+
+    var salaryMap = await getSalaryMap(storeId, [employee._id]);
+    var allowanceMap = await getAllowanceMap(storeId, [employee._id]);
+    var attendanceRows = await ChamCong.find({
+      cua_hang_id: storeId,
+      nhan_vien_id: id
+    }).sort({ ngay_cham_cong: -1 }).limit(120).lean();
+    var payrollRows = await BangLuong.find({
+      cua_hang_id: storeId,
+      nhan_vien_id: id
+    }).sort({ nam: -1, thang: -1, created_at: -1 }).lean();
+
+    res.render('Chamcong/nhan-vien/_detail-panel', {
+      item: serializeEmployee(employee, salaryMap[String(employee._id)], allowanceMap[String(employee._id)]),
+      attendanceRows: attendanceRows.map(function(row) {
+        return {
+          ngay_cham_cong: formatDateInput(row.ngay_cham_cong),
+          ngay_hien_thi: formatDateText(row.ngay_cham_cong),
+          ca_sang: !!row.ca_sang,
+          ca_chieu: !!row.ca_chieu,
+          tang_ca_cong: Number(row.cong_tang_ca || 0),
+          so_cong: attendanceWorkUnits(row),
+          ghi_chu: row.ghi_chu || ''
+        };
+      }),
+      payrollRows: payrollRows.map(function(row) {
+        var paid = Number(row.da_thanh_toan || 0);
+        var due = Math.max(0, Number(row.con_phai_tra != null ? row.con_phai_tra : Number(row.thuc_nhan || 0) - paid));
+        var status = row.trang_thai_thanh_toan || (due <= 0 && paid > 0 ? 'da_thanh_toan' : 'chua_thanh_toan');
+        return {
+          _id: String(row._id),
+          ma_bang_luong: row.ma_bang_luong || '',
+          thang_hien_thi: formatMonthText(row.thang, row.nam),
+          ngay_cong_thuc_te: Number(row.ngay_cong_thuc_te || 0),
+          luong_thang: Number(row.luong_thang || 0),
+          thuc_nhan: Number(row.thuc_nhan || 0),
+          da_thanh_toan: paid,
+          con_phai_tra: due,
+          trang_thai_thanh_toan: status,
+          trang_thai_text: status === 'da_thanh_toan'
+            ? 'Đã thanh toán'
+            : (status === 'thanh_toan_mot_phan' ? 'Thanh toán một phần' : 'Chưa thanh toán')
+        };
+      })
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.listNgayCongNhanVien = async function(req, res, next) {
+  try {
+    var storeId = getCurrentStoreId(req, res);
+    var id = String(req.params.id || '').trim();
+    if (!storeId || !id || !isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
+    }
+
+    var employee = await NhanVien.findOne({ _id: id, cua_hang_id: storeId }).select('_id').lean();
+    if (!employee) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên.' });
+
+    var rows = await ChamCong.find({
+      cua_hang_id: storeId,
+      nhan_vien_id: id
+    }).sort({ ngay_cham_cong: -1 }).limit(120).lean();
 
     res.json({
       success: true,
-      message: 'Da them nhan vien.',
-      item: serializeEmployee(employee, salaryConfig)
+      items: rows.map(function(row) {
+        return {
+          _id: String(row._id),
+          ngay_cham_cong: formatDateInput(row.ngay_cham_cong),
+          ngay_hien_thi: formatDateText(row.ngay_cham_cong),
+          ca_sang: !!row.ca_sang,
+          ca_chieu: !!row.ca_chieu,
+          tang_ca_cong: Number(row.cong_tang_ca || 0),
+          so_cong: attendanceWorkUnits(row),
+          ghi_chu: row.ghi_chu || ''
+        };
+      })
     });
   } catch (error) {
-    if (error && error.code === 11000) {
-      return res.status(409).json({ success: false, message: 'Ma nhan vien da ton tai.' });
-    }
     next(error);
+  }
+};
+
+exports.createTamUngNhanVien = async function(req, res, next) {
+  try {
+    var storeId = getCurrentStoreId(req, res);
+    var id = String(req.params.id || '').trim();
+    if (!storeId || !id || !isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
+    }
+
+    var employee = await NhanVien.findOne({ _id: id, cua_hang_id: storeId }).lean();
+    if (!employee) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên.' });
+
+    var cashAmount = parseMoney(req.body && (req.body.tien_mat != null ? req.body.tien_mat : req.body.so_tien));
+    var transferAmount = parseMoney(req.body && req.body.chuyen_khoan);
+    var amount = cashAmount + transferAmount;
+    if (!(amount > 0)) return res.status(400).json({ success: false, message: 'Số tiền tạm ứng phải lớn hơn 0.' });
+
+    var advanceDate = parseDateInput(req.body && req.body.ngay_tam_ung) || new Date();
+    var note = String((req.body && req.body.ghi_chu) || '').trim();
+    var paymentMethod = transferAmount > 0 && cashAmount <= 0 ? 'chuyen_khoan' : 'tien_mat';
+    var cashBookId = String((req.body && (req.body.so_quy_tien_mat_id || req.body.so_quy_id)) || '').trim();
+    var transferBookId = String((req.body && req.body.so_quy_chuyen_khoan_id) || '').trim();
+
+    var result = await runInTransaction(async function(session) {
+      var advanceRows = await TamUngNhanVien.create([{
+        cua_hang_id: storeId,
+        nhan_vien_id: id,
+        ma_tam_ung: await makeAdvanceCode(storeId, session),
+        ngay_tam_ung: advanceDate,
+        so_tien: amount,
+        ghi_chu: note,
+        nguoi_tao_id: req.user && (req.user._id || req.user.id),
+        trang_thai: 'active'
+      }], session ? { session: session, ordered: true } : { ordered: true });
+      var advance = advanceRows[0];
+      var advanceCode = advance.ma_tam_ung || String(advance._id);
+
+      var paymentDetail = {
+        tien_mat: cashAmount,
+        chuyen_khoan: transferAmount,
+        tien_tra_khach: 0
+      };
+      if (cashBookId) paymentDetail.so_quy_tien_mat_id = cashBookId;
+      if (transferBookId) paymentDetail.so_quy_chuyen_khoan_id = transferBookId;
+
+      var receipt = await taoPhieuThuChi({
+        loai_phieu: 'chi',
+        loai_thu_chi: 'Tạm ứng nhân viên',
+        ngay_lap: advanceDate,
+        gia_tri: amount,
+        doi_tuong: buildEmployeeLabel(employee),
+        ghi_chu: note || ('Tạm ứng nhân viên ' + buildEmployeeLabel(employee)),
+        cua_hang_id: storeId,
+        chi_nhanh_id: req.session && req.session.chi_nhanh_id,
+        nguoi_tao_id: req.user && (req.user._id || req.user.id),
+        hach_toan: false,
+        nhom_doi_tuong: 'nhan_vien',
+        nhan_vien_id: id,
+        document_type: 'khac',
+        phuong_thuc_thanh_toan: paymentMethod,
+        payment_v2: true,
+        so_quy_id: cashBookId || transferBookId,
+        so_quy_tien_mat_id: cashBookId,
+        so_quy_chuyen_khoan_id: transferBookId,
+        chi_tiet_thanh_toan: paymentDetail,
+        ma_chung_tu_goc: advanceCode,
+        chung_tu_khac: advanceCode
+      }, { session: session });
+
+      return { advance: advance, receipt: receipt };
+    });
+
+    res.json({
+      success: true,
+      message: 'Đã tạo tạm ứng và phiếu chi.',
+      item: {
+        _id: String(result.advance._id),
+        ma_tam_ung: result.advance.ma_tam_ung || '',
+        ngay_tam_ung: formatDateInput(result.advance.ngay_tam_ung),
+        so_tien: Number(result.advance.so_tien || 0),
+        ghi_chu: result.advance.ghi_chu || '',
+        phieu_chi: result.receipt ? {
+          _id: String(result.receipt._id),
+          ma_phieu: result.receipt.ma_phieu || '',
+          gia_tri: Number(result.receipt.gia_tri || 0)
+        } : null
+      }
+    });
+  } catch (error) {
+    return handleErrorResponse(res, error, next);
+  }
+};
+
+exports.createNhanVien = async function(req, res, next) {
+  try {
+    var storeId = getCurrentStoreId(req, res);
+    if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng.' });
+
+    var employeePayload = normalizeEmployeePayload(req.body || {});
+    if (!employeePayload.ten_nhan_vien) {
+      return res.status(400).json({ success: false, message: 'Tên nhân viên là bắt buộc.' });
+    }
+    var salaryPayload = normalizeSalaryPayload(req.body || {}, employeePayload);
+    if (!(salaryPayload.so_ngay_cong_trong_thang > 0)) {
+      return res.status(400).json({ success: false, message: 'Số ngày công trong tháng phải lớn hơn 0.' });
+    }
+    var allowanceRows = normalizeAllowancePayload(req.body || {});
+
+    var result = await runInTransaction(async function(session) {
+      await validateReference(PhongBan, storeId, employeePayload.phong_ban_id, 'Phòng ban', session);
+      await validateReference(ChucDanh, storeId, employeePayload.chuc_danh_id, 'Chức danh', session);
+      await validateSalaryContributionIds(storeId, salaryPayload, session);
+
+      var rows = await NhanVien.create([{
+        cua_hang_id: storeId,
+        ma_nhan_vien: await makeEmployeeCode(storeId, session),
+        ten_nhan_vien: employeePayload.ten_nhan_vien,
+        sdt: employeePayload.sdt,
+        email: employeePayload.email,
+        cccd: employeePayload.cccd,
+        ngay_sinh: employeePayload.ngay_sinh,
+        gioi_tinh: employeePayload.gioi_tinh,
+        phong_ban_id: employeePayload.phong_ban_id || undefined,
+        chuc_danh_id: employeePayload.chuc_danh_id || undefined,
+        ngay_bat_dau_lam_viec: employeePayload.ngay_bat_dau_lam_viec,
+        ghi_chu: employeePayload.ghi_chu,
+        trang_thai: employeePayload.trang_thai
+      }], { session: session, ordered: true });
+
+      var employee = rows[0];
+      var salaryConfig = await saveSalaryConfig(storeId, employee._id, salaryPayload, session);
+      await saveEmployeeAllowances(storeId, employee._id, allowanceRows, salaryPayload.tu_ngay, session);
+      return { employeeId: employee._id, salaryConfig: salaryConfig };
+    });
+
+    var employee = await NhanVien.findById(result.employeeId)
+      .populate('phong_ban_id', 'ten_phong_ban ma_phong_ban')
+      .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh')
+      .lean();
+    var allowanceMap = await getAllowanceMap(storeId, [employee._id]);
+
+    res.json({
+      success: true,
+      message: 'Đã thêm nhân viên.',
+      item: serializeEmployee(employee, result.salaryConfig, allowanceMap[String(employee._id)])
+    });
+  } catch (error) {
+    return handleErrorResponse(res, error, next);
   }
 };
 
@@ -322,52 +763,68 @@ exports.updateNhanVien = async function(req, res, next) {
     var storeId = getCurrentStoreId(req, res);
     var id = String(req.params.id || '').trim();
     if (!storeId || !id || !isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: 'Du lieu khong hop le.' });
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
     }
 
-    var payload = normalizePayload(req.body || {});
-    if (!payload.ten_nhan_vien) {
-      return res.status(400).json({ success: false, message: 'Ten nhan vien la bat buoc.' });
+    var employeePayload = normalizeEmployeePayload(req.body || {});
+    if (!employeePayload.ten_nhan_vien) {
+      return res.status(400).json({ success: false, message: 'Tên nhân viên là bắt buộc.' });
     }
-
-    var chucDanh = await findOrCreateChucDanh(storeId, payload.chuc_vu);
-    var update = {
-      ten_nhan_vien: payload.ten_nhan_vien,
-      sdt: payload.sdt,
-      email: payload.email,
-      cccd: payload.cccd,
-      ngay_sinh: payload.ngay_sinh,
-      gioi_tinh: payload.gioi_tinh,
-      ngay_bat_dau_lam_viec: payload.ngay_bat_dau_lam_viec,
-      ghi_chu: payload.ghi_chu,
-      trang_thai: payload.trang_thai
-    };
-    var updateQuery = { $set: update };
-    if (chucDanh) update.chuc_danh_id = chucDanh._id;
-    else updateQuery.$unset = { chuc_danh_id: '' };
-
-    var employee = await NhanVien.findOneAndUpdate(
-      { _id: id, cua_hang_id: storeId },
-      updateQuery,
-      { new: true, runValidators: true }
-    )
-      .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh');
-
-    if (!employee) {
-      return res.status(404).json({ success: false, message: 'Khong tim thay nhan vien.' });
+    var salaryPayload = normalizeSalaryPayload(req.body || {}, employeePayload);
+    if (!(salaryPayload.so_ngay_cong_trong_thang > 0)) {
+      return res.status(400).json({ success: false, message: 'Số ngày công trong tháng phải lớn hơn 0.' });
     }
+    var allowanceRows = normalizeAllowancePayload(req.body || {});
 
-    var salaryConfig = await upsertSalaryConfig(storeId, employee._id, payload);
+    var result = await runInTransaction(async function(session) {
+      await validateReference(PhongBan, storeId, employeePayload.phong_ban_id, 'Phòng ban', session);
+      await validateReference(ChucDanh, storeId, employeePayload.chuc_danh_id, 'Chức danh', session);
+      await validateSalaryContributionIds(storeId, salaryPayload, session);
+
+      var employee = await NhanVien.findOneAndUpdate(
+        { _id: id, cua_hang_id: storeId },
+        {
+          $set: {
+            ten_nhan_vien: employeePayload.ten_nhan_vien,
+            sdt: employeePayload.sdt,
+            email: employeePayload.email,
+            cccd: employeePayload.cccd,
+            ngay_sinh: employeePayload.ngay_sinh,
+            gioi_tinh: employeePayload.gioi_tinh,
+            phong_ban_id: employeePayload.phong_ban_id || undefined,
+            chuc_danh_id: employeePayload.chuc_danh_id || undefined,
+            ngay_bat_dau_lam_viec: employeePayload.ngay_bat_dau_lam_viec,
+            ghi_chu: employeePayload.ghi_chu,
+            trang_thai: employeePayload.trang_thai
+          }
+        },
+        { new: true, runValidators: true, session: session }
+      );
+
+      if (!employee) {
+        var notFound = new Error('Không tìm thấy nhân viên.');
+        notFound.status = 404;
+        throw notFound;
+      }
+
+      var salaryConfig = await saveSalaryConfig(storeId, employee._id, salaryPayload, session);
+      await saveEmployeeAllowances(storeId, employee._id, allowanceRows, salaryPayload.tu_ngay, session);
+      return { employeeId: employee._id, salaryConfig: salaryConfig };
+    });
+
+    var employee = await NhanVien.findById(result.employeeId)
+      .populate('phong_ban_id', 'ten_phong_ban ma_phong_ban')
+      .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh')
+      .lean();
+    var allowanceMap = await getAllowanceMap(storeId, [employee._id]);
+
     res.json({
       success: true,
-      message: 'Da cap nhat nhan vien.',
-      item: serializeEmployee(employee, salaryConfig)
+      message: 'Đã cập nhật nhân viên.',
+      item: serializeEmployee(employee, result.salaryConfig, allowanceMap[String(employee._id)])
     });
   } catch (error) {
-    if (error && error.code === 11000) {
-      return res.status(409).json({ success: false, message: 'Ma nhan vien da ton tai.' });
-    }
-    next(error);
+    return handleErrorResponse(res, error, next);
   }
 };
 
@@ -376,29 +833,31 @@ exports.updateTrangThaiNhanVien = async function(req, res, next) {
     var storeId = getCurrentStoreId(req, res);
     var id = String(req.params.id || '').trim();
     if (!storeId || !id || !isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: 'Du lieu khong hop le.' });
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
     }
 
-    var nextStatus = normalizeUiStatus((req.body && req.body.trang_thai) || 'inactive');
+    var nextStatus = normalizeStatus((req.body && req.body.trang_thai) || 'inactive');
     var update = { trang_thai: nextStatus };
-    if (nextStatus === 'da_nghi') update.ngay_nghi_viec = new Date();
+    if (nextStatus === 'inactive') update.ngay_nghi_viec = new Date();
+    var updateQuery = nextStatus === 'inactive'
+      ? { $set: update }
+      : { $set: update, $unset: { ngay_nghi_viec: '' } };
 
     var employee = await NhanVien.findOneAndUpdate(
       { _id: id, cua_hang_id: storeId },
-      { $set: update },
+      updateQuery,
       { new: true, runValidators: true }
-    )
+    ).populate('phong_ban_id', 'ten_phong_ban ma_phong_ban')
       .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh');
 
-    if (!employee) {
-      return res.status(404).json({ success: false, message: 'Khong tim thay nhan vien.' });
-    }
+    if (!employee) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên.' });
 
     var salaryMap = await getSalaryMap(storeId, [employee._id]);
+    var allowanceMap = await getAllowanceMap(storeId, [employee._id]);
     res.json({
       success: true,
-      message: nextStatus === 'da_nghi' ? 'Da chuyen nhan vien sang da nghi.' : 'Da kich hoat nhan vien.',
-      item: serializeEmployee(employee, salaryMap[String(employee._id)])
+      message: nextStatus === 'inactive' ? 'Đã chuyển nhân viên sang ngừng làm việc.' : 'Đã kích hoạt nhân viên.',
+      item: serializeEmployee(employee, salaryMap[String(employee._id)], allowanceMap[String(employee._id)])
     });
   } catch (error) {
     next(error);

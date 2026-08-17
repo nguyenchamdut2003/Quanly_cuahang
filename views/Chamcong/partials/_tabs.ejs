@@ -6,9 +6,12 @@
     { key: 'departments', label: 'Phòng ban', href: '/cham-cong?tab=departments' },
     { key: 'positions', label: 'Chức danh', href: '/cham-cong?tab=positions' },
     { key: 'contributions', label: 'Danh mục khoản nộp', href: '/cham-cong?tab=contributions' },
-    { key: 'payroll', label: 'Bảng lương cần thanh toán', href: '/cham-cong?tab=payroll' },
-    { key: 'payroll-paid', label: 'Bảng lương đã thanh toán', href: '/cham-cong?tab=payroll-paid' }
+    { key: 'allowances', label: 'Danh mục phụ cấp', href: '/cham-cong?tab=allowances' },
+    { key: 'payroll', label: 'Bảng lương', href: '/cham-cong?tab=payroll' }
   ];
+  tabs = tabs.filter(function(tab) {
+    return tab.key !== 'departments' && tab.key !== 'positions';
+  });
   var useLinks = (typeof asLinks !== 'undefined') ? !!asLinks : false;
 %>
 <style>

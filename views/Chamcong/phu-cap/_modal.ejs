@@ -1,0 +1,23 @@
+<div class="modal-overlay" id="pcModal" aria-hidden="true">
+  <div class="modal-card">
+    <div class="modal-head">
+      <span id="pcModalTitle">Thêm phụ cấp</span>
+      <button type="button" class="modal-close-btn" id="pcCloseBtn" aria-label="Đóng">&times;</button>
+    </div>
+    <form id="pcForm" class="modal-body">
+      <input type="hidden" id="pcId">
+      <label>Tên phụ cấp *<input id="pcTen" required></label>
+      <label>Mô tả<textarea id="pcMoTa"></textarea></label>
+      <label>Trạng thái
+        <select id="pcTrangThai">
+          <option value="active">Đang sử dụng</option>
+          <option value="inactive">Ngừng sử dụng</option>
+        </select>
+      </label>
+    </form>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-light" id="pcCancelBtn">Bỏ qua</button>
+      <button type="submit" class="btn btn-primary" form="pcForm" id="pcSaveBtn">Lưu</button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,132 @@
+<div class="kv-detail-panel product-detail cc-employee-inline-detail" data-employee-id="<%= item._id %>">
+  <div class="detail-tabs">
+    <div class="detail-tab-list">
+      <button class="detail-tab is-active" type="button" data-tab-target="employee-info">Thông tin</button>
+      <button class="detail-tab" type="button" data-tab-target="employee-attendance">Ngày công</button>
+      <button class="detail-tab" type="button" data-tab-target="employee-payroll">Bảng lương</button>
+    </div>
+  </div>
+
+  <div class="product-detail-body">
+    <section class="detail-pane is-active" data-tab-panel="employee-info">
+      <div class="product-info-head">
+        <div class="product-thumb">NV</div>
+        <div>
+          <h2><%= (item.ma_nhan_vien ? item.ma_nhan_vien + ' - ' : '') + (item.ten_nhan_vien || 'Nhân viên') %></h2>
+          <p><%= item.chuc_vu || item.chuc_danh || '---' %></p>
+          <div class="tag-row">
+            <span class="tag tag-green"><%= item.trang_thai === 'inactive' ? 'Đã nghỉ' : 'Đang làm' %></span>
+            <span class="tag"><%= item.phong_ban || 'Chưa có phòng ban' %></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="product-info-grid">
+        <div><span>Mã nhân viên</span><strong><%= item.ma_nhan_vien || '---' %></strong></div>
+        <div><span>Tên nhân viên</span><strong><%= item.ten_nhan_vien || '---' %></strong></div>
+        <div><span>SĐT</span><strong><%= item.sdt || '---' %></strong></div>
+        <div><span>Email</span><strong><%= item.email || '---' %></strong></div>
+        <div><span>CCCD</span><strong><%= item.cccd || '---' %></strong></div>
+        <div><span>Ngày sinh</span><strong><%= item.ngay_sinh_input || '---' %></strong></div>
+        <div><span>Giới tính</span><strong><%= item.gioi_tinh === 'nam' ? 'Nam' : item.gioi_tinh === 'nu' ? 'Nữ' : item.gioi_tinh === 'khac' ? 'Khác' : '---' %></strong></div>
+        <div><span>Phòng ban</span><strong><%= item.phong_ban || '---' %></strong></div>
+        <div><span>Chức danh</span><strong><%= item.chuc_vu || '---' %></strong></div>
+        <div><span>Ngày bắt đầu</span><strong><%= item.ngay_bat_dau_lam_viec_input || '---' %></strong></div>
+        <div><span>Lương tháng</span><strong><%= Number((item.luong && item.luong.luong_thang) || item.luong_theo_thang || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Ngày công chuẩn</span><strong><%= (item.luong && item.luong.so_ngay_cong_trong_thang) || '---' %></strong></div>
+      </div>
+    </section>
+
+    <section class="detail-pane" data-tab-panel="employee-attendance">
+      <% if (!attendanceRows.length) { %>
+        <div class="empty-cell">Chưa có ngày công.</div>
+      <% } else { %>
+        <table class="admin-table product-inner-table">
+          <thead>
+            <tr>
+              <th>Ngày</th>
+              <th>Ca sáng</th>
+              <th>Ca chiều</th>
+              <th>Tăng ca</th>
+              <th>Tổng công</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% attendanceRows.forEach(function(row) { %>
+              <tr>
+                <td><%= row.ngay_hien_thi || row.ngay_cham_cong || '' %></td>
+                <td><%= row.ca_sang ? 'Có' : '' %></td>
+                <td><%= row.ca_chieu ? 'Có' : '' %></td>
+                <td><%= Number(row.tang_ca_cong || 0).toLocaleString('vi-VN') %></td>
+                <td><%= Number(row.so_cong || 0).toLocaleString('vi-VN') %></td>
+                <td><%= row.ghi_chu || '' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+    </section>
+
+    <section class="detail-pane" data-tab-panel="employee-payroll">
+      <div class="cc-detail-toolbar">
+        <div class="cc-field">
+          <label>Lọc bảng lương</label>
+          <select class="cc-select cc-inline-payroll-status">
+            <option value="all">Tất cả</option>
+            <option value="da_thanh_toan">Đã thanh toán</option>
+            <option value="chua_thanh_toan">Chưa thanh toán</option>
+          </select>
+        </div>
+      </div>
+
+      <% if (!(payrollRows || []).length) { %>
+        <div class="empty-cell">Chưa có bảng lương.</div>
+      <% } else { %>
+        <table class="admin-table product-inner-table">
+          <thead>
+            <tr>
+              <th>Mã bảng lương</th>
+              <th>Tháng</th>
+              <th>Ngày công</th>
+              <th>Lương/tháng</th>
+              <th>Cần thanh toán</th>
+              <th>Đã thanh toán</th>
+              <th>Còn phải trả</th>
+              <th>Trạng thái</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% payrollRows.forEach(function(row) {
+              var filterStatus = row.trang_thai_thanh_toan === 'da_thanh_toan' ? 'da_thanh_toan' : 'chua_thanh_toan';
+              var payrollHref = '/cham-cong?tab=' + (filterStatus === 'da_thanh_toan' ? 'payroll-paid' : 'payroll')
+                + '&bang_luong=' + encodeURIComponent(String(row._id || ''));
+            %>
+              <tr data-payroll-status="<%= filterStatus %>">
+                <td>
+                  <% if (row.ma_bang_luong) { %>
+                    <a class="cc-ref-link" href="<%= payrollHref %>"><%= row.ma_bang_luong %></a>
+                  <% } else { %>
+                    ---
+                  <% } %>
+                </td>
+                <td><%= row.thang_hien_thi || '---' %></td>
+                <td><%= Number(row.ngay_cong_thuc_te || 0).toLocaleString('vi-VN') %></td>
+                <td><%= Number(row.luong_thang || 0).toLocaleString('vi-VN') %></td>
+                <td><%= Number(row.thuc_nhan || 0).toLocaleString('vi-VN') %></td>
+                <td><%= Number(row.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
+                <td><%= Number(row.con_phai_tra || 0).toLocaleString('vi-VN') %></td>
+                <td>
+                  <span class="cc-pill <%= filterStatus === 'da_thanh_toan' ? 'cc-pill-pay-done' : 'cc-pill-pay-wait' %>">
+                    <%= row.trang_thai_text || 'Chưa thanh toán' %>
+                  </span>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <div class="empty-cell" data-inline-payroll-empty-filter hidden>Không có bảng lương theo bộ lọc.</div>
+      <% } %>
+    </section>
+  </div>
+</div>

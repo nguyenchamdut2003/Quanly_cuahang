@@ -1954,6 +1954,12 @@ const PhieuThuChiSchema = new Schema({
     so_quy_chuyen_khoan_id: { type: ObjectId, ref: 'SoQuy', default: null },
     tien_tra_khach: { type: Number, default: 0, min: 0 }
   },
+  trang_thai_du_lieu: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active',
+    index: true
+  },
   nguoi_huy_id: { type: ObjectId, ref: 'NguoiDung' },
   ngay_huy: { type: Date },
   ly_do_huy: { type: String },
@@ -1979,6 +1985,11 @@ PhieuThuChiSchema.index(
     name: 'idx_phieu_thu_chi_bank_book'
   }
 );
+PhieuThuChiSchema.index({
+  cua_hang_id: 1,
+  trang_thai_du_lieu: 1,
+  ngay_lap: -1
+});
 
 // CONG_NO_KHACH_HANG
 const CongNoKhachHangSchema = new Schema({
@@ -2788,6 +2799,25 @@ const PhieuKiemKho = mongoose.models.PhieuKiemKho || mongoose.model("PhieuKiemKh
 const CTPhieuKiemKho = mongoose.models.CTPhieuKiemKho || mongoose.model("CTPhieuKiemKho", CTPhieuKiemKhoSchema);
 const SoQuy = mongoose.models.SoQuy || mongoose.model("SoQuy", SoQuySchema);
 const PhieuThuChi = mongoose.models.PhieuThuChi || mongoose.model("PhieuThuChi", PhieuThuChiSchema);
+
+async function backfillPhieuThuChiDataStatus() {
+  try {
+    await PhieuThuChi.updateMany(
+      { trang_thai_du_lieu: { $exists: false } },
+      { $set: { trang_thai_du_lieu: 'active' } }
+    );
+  } catch (error) {
+    console.log('[SoQuy] Khong cap nhat duoc trang thai du lieu phieu thu chi cu');
+    console.log(error);
+  }
+}
+
+if (mongoose.connection.readyState === 1) {
+  backfillPhieuThuChiDataStatus();
+} else {
+  mongoose.connection.once('open', backfillPhieuThuChiDataStatus);
+}
+
 const CongNoKhachHang = mongoose.models.CongNoKhachHang || mongoose.model("CongNoKhachHang", CongNoKhachHangSchema);
 const CongNoNhaCungCap = mongoose.models.CongNoNhaCungCap || mongoose.model("CongNoNhaCungCap", CongNoNhaCungCapSchema);
 const LichSuKho = mongoose.models.LichSuKho || mongoose.model("LichSuKho", LichSuKhoSchema);
