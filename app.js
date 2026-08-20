@@ -94,6 +94,9 @@ app.use(dbWriteRequestContext);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.get('/favicon.ico', function(req, res) {
+  res.status(204).end();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(session({
@@ -180,7 +183,11 @@ app.use(function(req, res, next) {
       kho: '/cua-hang?kho=' + encodeURIComponent(safeId),
       cashbook: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
-      nhap_vat_chua: '/vat-chua?nhap_vat_chua=' + encodeURIComponent(safeId)
+      nhap_vat_chua: '/vat-chua?nhap_vat_chua=' + encodeURIComponent(safeId),
+      payroll: '/cham-cong?tab=payroll&bang_luong=' + encodeURIComponent(safeId),
+      bang_luong: '/cham-cong?tab=payroll&bang_luong=' + encodeURIComponent(safeId),
+      advance: '/cham-cong?tab=employees&tam_ung=' + encodeURIComponent(safeId),
+      tam_ung: '/cham-cong?tab=employees&tam_ung=' + encodeURIComponent(safeId)
     };
     return map[type] || '';
   };

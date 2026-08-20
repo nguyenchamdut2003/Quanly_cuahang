@@ -14,6 +14,7 @@ const {
     DonHang,
     NhapVatChua
 } = require('../models/kiot.model');
+const { BangLuong, TamUngNhanVien } = require('../models/chamcong.model');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const {
     buildReceiptPaymentInfo,
@@ -181,6 +182,20 @@ function isCustomerReturnDocCode(code) {
     return /^TH(?!N)/i.test(String(code || '').trim());
 }
 
+function isPayrollDocCode(code) {
+    return /^CC[\s-]?\d{6}/i.test(String(code || '').trim());
+}
+
+function isAdvanceDocCode(code) {
+    return /^TA\d+/i.test(String(code || '').trim());
+}
+
+function normalizePayrollDocCode(code) {
+    var raw = String(code || '').trim().toUpperCase();
+    if (!raw) return '';
+    return raw.replace(/\s+/g, '-').replace(/-+/g, '-');
+}
+
 function relatedCode(item) {
     const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
     const allocPn = firstAlloc?.phieu_nhap_id;
@@ -209,7 +224,7 @@ function hasReceiptDocRef(item) {
 
 async function attachMissingDocRefs(receipt) {
     if (!receipt || hasReceiptDocRef(receipt)) return receipt;
-    const code = String(receipt.ma_chung_tu_goc || '').trim();
+    const code = String(receipt.ma_chung_tu_goc || receipt.chung_tu_khac || '').trim();
     if (!code) return receipt;
     if (/^HD/i.test(code) && !receipt.hoa_don_id) {
         const row = await HoaDonBanHang.findOne({ ma_hoa_don: code })
@@ -240,11 +255,30 @@ async function attachMissingDocRefs(receipt) {
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
             .lean();
         if (row) receipt.phieu_tra_hang_id = row;
+    } else if (isPayrollDocCode(code)) {
+        const payrollCode = normalizePayrollDocCode(code);
+        const row = await BangLuong.findOne({
+            $or: [
+                { ma_bang_luong: code },
+                { ma_bang_luong: payrollCode }
+            ]
+        }).select('_id ma_bang_luong').lean();
+        if (row) {
+            receipt._docLinkType = 'payroll';
+            receipt._docLinkId = row._id;
+        }
+    } else if (isAdvanceDocCode(code)) {
+        const row = await TamUngNhanVien.findOne({ ma_tam_ung: code.toUpperCase() }).select('_id ma_tam_ung nhan_vien_id').lean();
+        if (row) {
+            receipt._docLinkType = 'advance';
+            receipt._docLinkId = row._id;
+            receipt._docLinkEmployeeId = row.nhan_vien_id;
+        }
     }
     return receipt;
 }
 
-async function enrichReceiptListDocRefs(list) {
+async function enrichReceiptListDocRefs(list, storeId) {
     if (!Array.isArray(list) || !list.length) return list;
     const invoiceCodes = [];
     const purchaseCodes = [];
@@ -252,9 +286,11 @@ async function enrichReceiptListDocRefs(list) {
     const customerReturnCodes = [];
     const orderCodes = [];
     const nhapVatChuaCodes = [];
+    const payrollCodes = [];
+    const advanceCodes = [];
     list.forEach(item => {
         if (hasReceiptDocRef(item)) return;
-        const code = String(item.ma_chung_tu_goc || '').trim();
+        const code = String(item.ma_chung_tu_goc || item.chung_tu_khac || '').trim();
         if (!code) return;
         if (/^HD/i.test(code)) invoiceCodes.push(code);
         else if (/^PN/i.test(code)) purchaseCodes.push(code);
@@ -262,9 +298,11 @@ async function enrichReceiptListDocRefs(list) {
         else if (isCustomerReturnDocCode(code)) customerReturnCodes.push(code);
         else if (/^DH/i.test(code)) orderCodes.push(code);
         else if (/^NVC/i.test(code)) nhapVatChuaCodes.push(code);
+        else if (isPayrollDocCode(code)) payrollCodes.push(normalizePayrollDocCode(code), code);
+        else if (isAdvanceDocCode(code)) advanceCodes.push(code.toUpperCase());
     });
     const unique = arr => [...new Set(arr.filter(Boolean))];
-    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas] = await Promise.all([
+    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas, payrolls, advances] = await Promise.all([
         unique(invoiceCodes).length
             ? HoaDonBanHang.find({ ma_hoa_don: { $in: unique(invoiceCodes) } }).select('_id ma_hoa_don').lean()
             : [],
@@ -282,6 +320,18 @@ async function enrichReceiptListDocRefs(list) {
             : [],
         unique(nhapVatChuaCodes).length
             ? NhapVatChua.find({ ma_nhap_vat_chua: { $in: unique(nhapVatChuaCodes) } }).select('_id ma_nhap_vat_chua').lean()
+            : [],
+        unique(payrollCodes).length
+            ? BangLuong.find(Object.assign(
+                { ma_bang_luong: { $in: unique(payrollCodes) } },
+                storeId ? { cua_hang_id: toObjectId(storeId) } : {}
+              )).select('_id ma_bang_luong').lean()
+            : [],
+        unique(advanceCodes).length
+            ? TamUngNhanVien.find(Object.assign(
+                { ma_tam_ung: { $in: unique(advanceCodes) } },
+                storeId ? { cua_hang_id: toObjectId(storeId) } : {}
+              )).select('_id ma_tam_ung nhan_vien_id').lean()
             : []
     ]);
     const invoiceByCode = new Map(invoices.map(row => [row.ma_hoa_don, row._id]));
@@ -290,9 +340,22 @@ async function enrichReceiptListDocRefs(list) {
     const customerReturnByCode = new Map(customerReturns.map(row => [row.ma_phieu_tra, row._id]));
     const orderByCode = new Map(orders.map(row => [row.ma_don_hang, row._id]));
     const nhapVatChuaByCode = new Map(nhapVatChuas.map(row => [row.ma_nhap_vat_chua, row._id]));
+    const payrollByCode = new Map();
+    payrolls.forEach(row => {
+        const code = String(row.ma_bang_luong || '').trim();
+        if (!code) return;
+        payrollByCode.set(code, row._id);
+        payrollByCode.set(normalizePayrollDocCode(code), row._id);
+    });
+    const advanceByCode = new Map();
+    advances.forEach(row => {
+        advanceByCode.set(String(row.ma_tam_ung || '').toUpperCase(), row);
+    });
     list.forEach(item => {
         if (hasReceiptDocRef(item)) return;
-        const code = String(item.ma_chung_tu_goc || '').trim();
+        const code = String(item.ma_chung_tu_goc || item.chung_tu_khac || '').trim();
+        const payrollCode = normalizePayrollDocCode(code);
+        const advanceCode = code.toUpperCase();
         if (invoiceByCode.has(code)) {
             item._docLinkType = 'invoice';
             item._docLinkId = invoiceByCode.get(code);
@@ -311,6 +374,14 @@ async function enrichReceiptListDocRefs(list) {
         } else if (nhapVatChuaByCode.has(code)) {
             item._docLinkType = 'nhap_vat_chua';
             item._docLinkId = nhapVatChuaByCode.get(code);
+        } else if (payrollByCode.has(code) || payrollByCode.has(payrollCode)) {
+            item._docLinkType = 'payroll';
+            item._docLinkId = payrollByCode.get(code) || payrollByCode.get(payrollCode);
+        } else if (advanceByCode.has(advanceCode)) {
+            const advance = advanceByCode.get(advanceCode);
+            item._docLinkType = 'advance';
+            item._docLinkId = advance._id;
+            item._docLinkEmployeeId = advance.nhan_vien_id;
         }
     });
     return list;
@@ -369,7 +440,7 @@ exports.index = async (req, res, next) => {
             NguoiDung.find().sort({ ho_ten: 1, username: 1 }),
             loadPartnerLists(storeId)
         ]);
-        await enrichReceiptListDocRefs(list);
+        await enrichReceiptListDocRefs(list, storeId);
         const cashBookScope = resolveCashBookFilterScope(req.query);
         const cashBookMeta = await buildCashBookMeta(cashBookScope);
         attachScopedAmounts(list, cashBookScope, cashBookMeta);

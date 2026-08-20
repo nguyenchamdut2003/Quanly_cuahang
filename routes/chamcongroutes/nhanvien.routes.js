@@ -10,6 +10,7 @@ router.post('/', controller.createNhanVien);
 router.get('/:id', controller.getNhanVien);
 router.get('/:id/detail', controller.detailNhanVienPanel);
 router.get('/:id/ngay-cong', controller.listNgayCongNhanVien);
+router.get('/:id/tam-ung', controller.listTamUngNhanVien);
 router.post('/:id/tam-ung', controller.createTamUngNhanVien);
 router.put('/:id', controller.updateNhanVien);
 router.patch('/:id/trang-thai', controller.updateTrangThaiNhanVien);

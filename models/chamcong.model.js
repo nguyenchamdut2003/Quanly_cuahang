@@ -1049,6 +1049,16 @@ const ThanhToanLuongSchema = new Schema({
     ref: 'NguoiDung'
   },
 
+  loai_thanh_toan: {
+    type: String,
+    enum: [
+      'nhan_vien',
+      'nsdld'
+    ],
+    default: 'nhan_vien',
+    index: true
+  },
+
   trang_thai: {
     type: String,
     enum: [

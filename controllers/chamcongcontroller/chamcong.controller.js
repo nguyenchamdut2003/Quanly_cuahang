@@ -304,6 +304,154 @@ function buildPayrollPayloadFromGroup(group, salaryMap, allowanceMap, advanceMap
   };
 }
 
+async function normalizeUnpaidPayrollAdvances(storeId, payroll, userId) {
+  if (!payroll || payroll.trang_thai_thanh_toan === 'da_thanh_toan') return payroll;
+  var advanceIds = (payroll.tam_ung_ids || []).map(function(id) { return String(id); }).filter(Boolean);
+  if (!advanceIds.length) return payroll;
+
+  var usedRows = await BangLuong.find({
+    _id: { $ne: payroll._id },
+    cua_hang_id: storeId,
+    nhan_vien_id: payroll.nhan_vien_id && payroll.nhan_vien_id._id ? payroll.nhan_vien_id._id : payroll.nhan_vien_id,
+    trang_thai_du_lieu: 'active',
+    tam_ung_ids: { $in: advanceIds },
+    $or: [
+      { trang_thai_thanh_toan: { $in: ['da_thanh_toan', 'thanh_toan_mot_phan'] } },
+      { da_thanh_toan: { $gt: 0 } }
+    ]
+  }).select('tam_ung_ids').lean();
+  if (!usedRows.length) return payroll;
+
+  var usedMap = {};
+  usedRows.forEach(function(row) {
+    (row.tam_ung_ids || []).forEach(function(id) {
+      usedMap[String(id)] = true;
+    });
+  });
+  var nextAdvanceIds = (payroll.tam_ung_ids || []).filter(function(id) {
+    return !usedMap[String(id)];
+  });
+  if (nextAdvanceIds.length === (payroll.tam_ung_ids || []).length) return payroll;
+
+  var advanceRows = nextAdvanceIds.length ? await TamUngNhanVien.find({
+    _id: { $in: nextAdvanceIds },
+    cua_hang_id: storeId,
+    trang_thai: 'active'
+  }).select('so_tien').lean() : [];
+  var nextAdvanceTotal = advanceRows.reduce(function(sum, row) {
+    return sum + Number(row.so_tien || 0);
+  }, 0);
+  var nextNet = Math.max(0, Number(payroll.tong_luong || 0) - Number(payroll.tong_khoan_tru || 0) - nextAdvanceTotal);
+  var paid = Number(payroll.da_thanh_toan || 0);
+  var nextDue = Math.max(0, nextNet - paid);
+  var nextStatus = nextDue <= 0 && paid > 0 ? 'da_thanh_toan' : (paid > 0 ? 'thanh_toan_mot_phan' : 'chua_thanh_toan');
+
+  await BangLuong.updateOne(
+    { _id: payroll._id, cua_hang_id: storeId },
+    {
+      $set: {
+        tam_ung_ids: nextAdvanceIds,
+        tong_tam_ung: nextAdvanceTotal,
+        thuc_nhan: nextNet,
+        con_phai_tra: nextDue,
+        trang_thai_thanh_toan: nextStatus,
+        nguoi_cap_nhat_id: userId
+      }
+    },
+    { runValidators: true }
+  );
+
+  return Object.assign({}, payroll, {
+    tam_ung_ids: nextAdvanceIds,
+    tong_tam_ung: nextAdvanceTotal,
+    thuc_nhan: nextNet,
+    con_phai_tra: nextDue,
+    trang_thai_thanh_toan: nextStatus
+  });
+}
+
+async function normalizeMissingPayrollSalary(storeId, payroll, userId) {
+  if (!payroll || Number(payroll.luong_thang || 0) > 0 || Number(payroll.da_thanh_toan || 0) > 0) return payroll;
+  var attendanceRows = (payroll.cham_cong_ids || []).filter(function(row) {
+    return row && row.ngay_cham_cong;
+  });
+  if (!attendanceRows.length && (payroll.cham_cong_ids || []).length) {
+    attendanceRows = await ChamCong.find({
+      _id: { $in: payroll.cham_cong_ids },
+      cua_hang_id: storeId
+    }).lean();
+  }
+  if (!attendanceRows.length) return payroll;
+
+  var employeeId = String(payroll.nhan_vien_id && payroll.nhan_vien_id._id ? payroll.nhan_vien_id._id : payroll.nhan_vien_id);
+  var maxDate = attendanceRows.reduce(function(max, row) {
+    var value = new Date(row.ngay_cham_cong);
+    return value > max ? value : max;
+  }, new Date(0));
+  var salaryMap = await getSalaryMap(storeId, [employeeId], maxDate);
+  var salary = salaryMap[employeeId] || {};
+  if (!(Number(salary.luong_thang || 0) > 0)) return payroll;
+
+  var allowanceRows = await PhuCapNhanVien.find({
+    cua_hang_id: storeId,
+    nhan_vien_id: employeeId,
+    trang_thai: 'active'
+  }).populate('danh_muc_phu_cap_id', 'ma_phu_cap ten_phu_cap').lean();
+  var allowanceMap = {};
+  allowanceMap[employeeId] = allowanceRows;
+
+  var advanceRows = (payroll.tam_ung_ids || []).length ? await TamUngNhanVien.find({
+    _id: { $in: payroll.tam_ung_ids },
+    cua_hang_id: storeId,
+    trang_thai: 'active'
+  }).lean() : [];
+  var month = payrollMonthKey(payroll) || formatMonthKey(maxDate);
+  var advanceMap = {};
+  advanceMap[employeeId + '_' + month] = advanceRows;
+
+  var payload = buildPayrollPayloadFromGroup({
+    employeeId: employeeId,
+    employee: {
+      ma_nhan_vien: payroll.ma_nhan_vien_snapshot || '',
+      ten_nhan_vien: payroll.ten_nhan_vien_snapshot || '',
+      phong_ban_id: payroll.phong_ban_id,
+      chuc_danh_id: payroll.chuc_danh_id
+    },
+    month: month,
+    rows: attendanceRows
+  }, salaryMap, allowanceMap, advanceMap, storeId, userId);
+
+  var paid = Number(payroll.da_thanh_toan || 0);
+  var nextDue = Math.max(0, Number(payload.thuc_nhan || 0) - paid);
+  var nextStatus = nextDue <= 0 && paid > 0 ? 'da_thanh_toan' : (paid > 0 ? 'thanh_toan_mot_phan' : 'chua_thanh_toan');
+  var setPayload = {
+    luong_thang: payload.luong_thang,
+    so_ngay_cong_trong_thang: payload.so_ngay_cong_trong_thang,
+    ngay_cong_thuc_te: payload.ngay_cong_thuc_te,
+    so_ngay_di_lam: payload.so_ngay_di_lam,
+    luong_thuc_te: payload.luong_thuc_te,
+    cong_tang_ca: payload.cong_tang_ca,
+    luong_tang_ca: payload.luong_tang_ca,
+    phu_caps: payload.phu_caps,
+    tong_phu_cap: payload.tong_phu_cap,
+    tong_luong: payload.tong_luong,
+    khoan_trus: payload.khoan_trus,
+    tong_khoan_tru: payload.tong_khoan_tru,
+    tong_tam_ung: payload.tong_tam_ung,
+    thuc_nhan: payload.thuc_nhan,
+    con_phai_tra: nextDue,
+    trang_thai_thanh_toan: nextStatus,
+    nguoi_cap_nhat_id: userId
+  };
+
+  await BangLuong.updateOne(
+    { _id: payroll._id, cua_hang_id: storeId },
+    { $set: setPayload },
+    { runValidators: true }
+  );
+  return Object.assign({}, payroll, setPayload);
+}
+
 async function nextPayrollCode(storeId, baseCode) {
   baseCode = String(baseCode || '').trim().toUpperCase();
   if (!baseCode) return '';
@@ -404,17 +552,123 @@ function buildPayrollFormulaLines(row) {
     amount: Number(row.thuc_nhan || 0),
     formula: 'Tổng lương - khoản trừ - tạm ứng'
   });
+  var employer = buildEmployerContributionSummary(row);
+  employer.lines.forEach(function(line) {
+    lines.push(line);
+  });
   return lines;
+}
+
+function employerContributionAmount(item) {
+  var rate = Number(item && item.ti_le_nsdld_snapshot || 0);
+  if (!(rate > 0)) return 0;
+  var base = Number(item && item.muc_tinh != null ? item.muc_tinh : 0);
+  return Math.round(base * rate / 100);
+}
+
+function buildEmployerContributionSummary(row) {
+  var grossSalary = Number(row && row.tong_luong || 0);
+  var lines = [];
+  var total = 0;
+  (row && row.khoan_trus || []).forEach(function(item) {
+    var rate = Number(item.ti_le_nsdld_snapshot || 0);
+    var amount = employerContributionAmount(item);
+    if (!(amount > 0)) return;
+    total += amount;
+    lines.push({
+      type: 'plus',
+      label: (item.ten_khoan_snapshot || item.ma_khoan_snapshot || 'Khoản nộp') + ' (NSDLĐ)',
+      amount: amount,
+      formula: formatFormulaMoney(amount) + ' = Tổng lương ' + formatFormulaMoney(item.muc_tinh || grossSalary) + ' x ' + formatFormulaNumber(rate, 2) + '%'
+    });
+  });
+  if (lines.length) {
+    lines.push({
+      type: 'total',
+      label: 'Tổng chi NSDLĐ',
+      amount: total,
+      formula: 'Tổng các khoản người sử dụng lao động'
+    });
+  }
+  return { lines: lines, tong: total };
+}
+
+async function enrichPayrollEmployerRates(storeId, payroll, userId) {
+  if (!payroll || !Array.isArray(payroll.khoan_trus) || !payroll.khoan_trus.length) return payroll;
+  var missingIds = payroll.khoan_trus.map(function(item) {
+    if (Number(item.ti_le_nsdld_snapshot || 0) > 0) return '';
+    return String(item.danh_muc_khoan_nop_id || '');
+  }).filter(Boolean);
+  if (!missingIds.length) return payroll;
+
+  var catalogRows = await DanhMucKhoanNop.find({
+    cua_hang_id: storeId,
+    _id: { $in: missingIds }
+  }).select('_id ti_le_nsdld').lean();
+  if (!catalogRows.length) return payroll;
+
+  var rateMap = {};
+  catalogRows.forEach(function(row) {
+    rateMap[String(row._id)] = Number(row.ti_le_nsdld || 0);
+  });
+
+  var changed = false;
+  var nextKhoanTrus = payroll.khoan_trus.map(function(item) {
+    if (Number(item.ti_le_nsdld_snapshot || 0) > 0) return item;
+    var rate = rateMap[String(item.danh_muc_khoan_nop_id || '')];
+    if (!(rate > 0)) return item;
+    changed = true;
+    return Object.assign({}, item, { ti_le_nsdld_snapshot: rate });
+  });
+  if (!changed) return payroll;
+
+  payroll = Object.assign({}, payroll, { khoan_trus: nextKhoanTrus });
+  if (Number(payroll.da_thanh_toan || 0) <= 0) {
+    await BangLuong.updateOne(
+      { _id: payroll._id, cua_hang_id: storeId },
+      {
+        $set: {
+          khoan_trus: nextKhoanTrus,
+          nguoi_cap_nhat_id: userId
+        }
+      },
+      { runValidators: true }
+    );
+  }
+  return payroll;
+}
+
+function calcEmployerPaymentShare(totalEmployer, paidEmployer, salaryDue, salaryPayAmount) {
+  var remainingEmployer = Math.max(0, Number(totalEmployer || 0) - Number(paidEmployer || 0));
+  var due = Math.max(0, Number(salaryDue || 0));
+  var pay = Math.max(0, Number(salaryPayAmount || 0));
+  if (!(remainingEmployer > 0) || !(due > 0) || !(pay > 0)) return 0;
+  if (pay >= due) return remainingEmployer;
+  return Math.round(remainingEmployer * pay / due);
+}
+
+function isEmployeeSalaryPayment(payment) {
+  return !payment || payment.loai_thanh_toan !== 'nsdld';
 }
 
 function serializeBangLuong(row, paymentMap) {
   var paid = Number(row.da_thanh_toan || 0);
   var due = Number(row.con_phai_tra != null ? row.con_phai_tra : (Number(row.thuc_nhan || 0) - paid));
   var payments = paymentMap[String(row._id)] || [];
-  var lastPayment = payments[0] || null;
+  var employeePayments = payments.filter(isEmployeeSalaryPayment);
+  var employerPayments = payments.filter(function(payment) { return !isEmployeeSalaryPayment(payment); });
+  var lastPayment = employeePayments[0] || null;
+  var lastEmployerPayment = employerPayments[0] || null;
   var receipt = lastPayment && lastPayment.phieu_chi_id && typeof lastPayment.phieu_chi_id === 'object'
     ? lastPayment.phieu_chi_id
     : null;
+  var employerReceipt = lastEmployerPayment && lastEmployerPayment.phieu_chi_id && typeof lastEmployerPayment.phieu_chi_id === 'object'
+    ? lastEmployerPayment.phieu_chi_id
+    : null;
+  var employerSummary = buildEmployerContributionSummary(row);
+  var paidEmployer = employerPayments.reduce(function(sum, payment) {
+    return sum + Number(payment.so_tien || 0);
+  }, 0);
   return {
     _id: String(row._id),
     ma_bang_luong: row.ma_bang_luong || '',
@@ -425,6 +679,7 @@ function serializeBangLuong(row, paymentMap) {
     thang_text: payrollMonthKey(row),
     loai_luong: 'ngay',
     so_ngay_cong: Number(row.ngay_cong_thuc_te || 0),
+    tong_cong_hien_thi: Number(row.ngay_cong_thuc_te || 0) + Number(row.cong_tang_ca || 0),
     so_thang_cong: 0,
     luong_theo_ngay: Number(row.so_ngay_cong_trong_thang || 0) > 0 ? Math.round(Number(row.luong_thang || 0) / Number(row.so_ngay_cong_trong_thang || 0)) : 0,
     luong_theo_thang: Number(row.luong_thang || 0),
@@ -441,14 +696,34 @@ function serializeBangLuong(row, paymentMap) {
     tong_phu_cap: Number(row.tong_phu_cap || 0),
     tong_khoan_tru: Number(row.tong_khoan_tru || 0),
     tong_tam_ung: Number(row.tong_tam_ung || 0),
+    tong_nsdld: employerSummary.tong,
+    da_tra_nsdld: paidEmployer,
+    con_nsdld: Math.max(0, employerSummary.tong - paidEmployer),
     payroll_lines: buildPayrollFormulaLines(row),
+    employer_lines: employerSummary.lines,
     phieu_chi: receipt ? {
       _id: String(receipt._id),
       ma_phieu: receipt.ma_phieu || '',
       gia_tri: Number(receipt.gia_tri || 0),
       ngay_lap_text: receipt.ngay_lap ? formatDateText(new Date(receipt.ngay_lap)) : ''
     } : null,
-    thanh_toans: payments.map(function(payment) {
+    phieu_chi_nsdld: employerReceipt ? {
+      _id: String(employerReceipt._id),
+      ma_phieu: employerReceipt.ma_phieu || '',
+      gia_tri: Number(employerReceipt.gia_tri || 0),
+      ngay_lap_text: employerReceipt.ngay_lap ? formatDateText(new Date(employerReceipt.ngay_lap)) : ''
+    } : null,
+    thanh_toans: employeePayments.map(function(payment) {
+      var payReceipt = payment.phieu_chi_id && typeof payment.phieu_chi_id === 'object' ? payment.phieu_chi_id : null;
+      return {
+        _id: String(payment._id),
+        so_tien: Number(payment.so_tien || 0),
+        ma_phieu: payReceipt ? (payReceipt.ma_phieu || '') : (payment.ma_tham_chieu || ''),
+        phieu_chi_id: payReceipt ? String(payReceipt._id) : '',
+        ngay_thanh_toan_text: payment.ngay_thanh_toan ? formatDateText(new Date(payment.ngay_thanh_toan)) : ''
+      };
+    }),
+    thanh_toans_nsdld: employerPayments.map(function(payment) {
       var payReceipt = payment.phieu_chi_id && typeof payment.phieu_chi_id === 'object' ? payment.phieu_chi_id : null;
       return {
         _id: String(payment._id),
@@ -684,14 +959,22 @@ function buildPayrollExportWorkbook(payroll, employee) {
   return workbook;
 }
 
+function pickBetterSalary(current, next) {
+  if (!next) return current;
+  if (!current) return next;
+  if (!(Number(current.luong_thang || 0) > 0) && Number(next.luong_thang || 0) > 0) return next;
+  return current;
+}
+
 async function getSalaryMap(storeId, employeeIds, beforeDate) {
   if (!employeeIds.length) return {};
-  var rows = await CauHinhLuongNhanVien.find({
+  var query = {
     cua_hang_id: storeId,
     nhan_vien_id: { $in: employeeIds },
-    trang_thai: 'active',
-    tu_ngay: { $lte: beforeDate || new Date() }
-  }).populate({
+    trang_thai: 'active'
+  };
+  if (beforeDate) query.tu_ngay = { $lte: beforeDate };
+  var rows = await CauHinhLuongNhanVien.find(query).populate({
     path: 'khoan_nop_ids',
     select: 'ma_khoan ten_khoan ti_le ti_le_nld ti_le_nsdld noi_nop_id',
     populate: { path: 'noi_nop_id', select: 'ma_noi_nop ten_noi_nop' }
@@ -699,8 +982,27 @@ async function getSalaryMap(storeId, employeeIds, beforeDate) {
   var map = {};
   rows.forEach(function(row) {
     var key = String(row.nhan_vien_id);
-    if (!map[key]) map[key] = row;
+    map[key] = pickBetterSalary(map[key], row);
   });
+  var missingIds = employeeIds.filter(function(id) {
+    var current = map[String(id)];
+    return !current || !(Number(current.luong_thang || 0) > 0);
+  });
+  if (missingIds.length) {
+    var fallbackRows = await CauHinhLuongNhanVien.find({
+      cua_hang_id: storeId,
+      nhan_vien_id: { $in: missingIds },
+      trang_thai: 'active'
+    }).populate({
+      path: 'khoan_nop_ids',
+      select: 'ma_khoan ten_khoan ti_le ti_le_nld ti_le_nsdld noi_nop_id',
+      populate: { path: 'noi_nop_id', select: 'ma_noi_nop ten_noi_nop' }
+    }).sort({ tu_ngay: -1 }).lean();
+    fallbackRows.forEach(function(row) {
+      var key = String(row.nhan_vien_id);
+      map[key] = pickBetterSalary(map[key], row);
+    });
+  }
   return map;
 }
 
@@ -911,6 +1213,28 @@ exports.saveTuan = async function(req, res, next) {
     existingRows.forEach(function(row) {
       attendanceById[String(row._id)] = row;
     });
+    var existingAttendanceIds = existingRows.map(function(row) { return row._id; });
+    var usedAttendanceMap = {};
+    if (existingAttendanceIds.length) {
+      var usedAttendancePayrolls = await BangLuong.find({
+        cua_hang_id: storeId,
+        nhan_vien_id: employeeId,
+        trang_thai_du_lieu: 'active',
+        cham_cong_ids: { $in: existingAttendanceIds }
+      }).select('_id ma_bang_luong cham_cong_ids trang_thai_thanh_toan').lean();
+      usedAttendancePayrolls.forEach(function(payroll) {
+        (payroll.cham_cong_ids || []).forEach(function(attendanceId) {
+          var key = String(attendanceId);
+          if (!usedAttendanceMap[key]) {
+            usedAttendanceMap[key] = {
+              _id: String(payroll._id),
+              ma_bang_luong: payroll.ma_bang_luong || '',
+              trang_thai_thanh_toan: payroll.trang_thai_thanh_toan || ''
+            };
+          }
+        });
+      });
+    }
 
     for (var i = 0; i < normalizedRows.length; i += 1) {
       var row = normalizedRows[i];
@@ -922,6 +1246,12 @@ exports.saveTuan = async function(req, res, next) {
         nhan_vien_id: employeeId,
         ngay_cham_cong: row.ngay_cham_cong
       };
+      var existingRow = existingRows.find(function(item) {
+        return formatDateKey(new Date(item.ngay_cham_cong)) === row.ngay_key;
+      });
+      if (existingRow && usedAttendanceMap[String(existingRow._id)]) {
+        continue;
+      }
 
       if (!row.should_save) {
         var deleteResult = await ChamCong.deleteOne(query);
@@ -967,6 +1297,7 @@ exports.saveTuan = async function(req, res, next) {
     });
     var payrollCreated = [];
     var payrollSourceRows = currentRows.filter(function(row) {
+      if (usedAttendanceMap[String(row._id)]) return false;
       return attendanceWorkUnits(row) > 0 || String(row.ghi_chu || '').trim();
     });
     if (payrollSourceRows.length) {
@@ -994,7 +1325,14 @@ exports.saveTuan = async function(req, res, next) {
         var value = new Date(row.ngay_cham_cong);
         return value > max ? value : max;
       }, new Date(0));
-      var salaryMap = await getSalaryMap(storeId, [employeeId], maxDate);
+      var salaryByMonth = {};
+      var groupMonths = Object.keys(groupedRows);
+      for (var sm = 0; sm < groupMonths.length; sm += 1) {
+        var groupMonth = groupedRows[groupMonths[sm]].month;
+        var monthRange = parseMonthKey(groupMonth);
+        var salaryAsOf = monthRange ? new Date(monthRange.end.getTime() - 1) : maxDate;
+        salaryByMonth[groupMonth] = await getSalaryMap(storeId, [employeeId], salaryAsOf);
+      }
       var allowanceRows = await PhuCapNhanVien.find({
         cua_hang_id: storeId,
         nhan_vien_id: employeeId,
@@ -1008,8 +1346,21 @@ exports.saveTuan = async function(req, res, next) {
         ngay_tam_ung: { $gte: new Date(Date.UTC(maxDate.getUTCFullYear(), 0, 1)), $lt: new Date(Date.UTC(maxDate.getUTCFullYear() + 1, 0, 1)) },
         trang_thai: 'active'
       }).lean();
+      var usedAdvanceRows = await BangLuong.find({
+        cua_hang_id: storeId,
+        nhan_vien_id: employeeId,
+        trang_thai_du_lieu: 'active',
+        tam_ung_ids: { $exists: true, $ne: [] }
+      }).select('tam_ung_ids').lean();
+      var usedAdvanceMap = {};
+      usedAdvanceRows.forEach(function(payroll) {
+        (payroll.tam_ung_ids || []).forEach(function(advanceId) {
+          usedAdvanceMap[String(advanceId)] = true;
+        });
+      });
       var advanceMap = {};
       advanceRows.forEach(function(row) {
+        if (usedAdvanceMap[String(row._id)]) return;
         var key = String(row.nhan_vien_id) + '_' + formatMonthKey(new Date(row.ngay_tam_ung));
         if (!advanceMap[key]) advanceMap[key] = [];
         advanceMap[key].push(row);
@@ -1020,6 +1371,7 @@ exports.saveTuan = async function(req, res, next) {
         groupedRows[groupKeys[g]].rows.sort(function(a, b) {
           return new Date(a.ngay_cham_cong) - new Date(b.ngay_cham_cong);
         });
+        var salaryMap = salaryByMonth[groupedRows[groupKeys[g]].month] || {};
         var payload = buildPayrollPayloadFromGroup(groupedRows[groupKeys[g]], salaryMap, allowanceMap, advanceMap, storeId, userId);
         payload.ma_bang_luong = await nextPayrollCode(storeId, payload.ma_bang_luong);
         payload.da_thanh_toan = 0;
@@ -1041,7 +1393,10 @@ exports.saveTuan = async function(req, res, next) {
         nhan_vien_id: employeeId,
         trang_thai_du_lieu: 'active',
         cham_cong_ids: { $in: affectedAttendanceIds }
-      }).sort({ nam: -1, thang: -1 }).lean();
+      }).populate('cham_cong_ids').sort({ nam: -1, thang: -1 }).lean();
+      for (var rp = 0; rp < relatedPayrollRows.length; rp += 1) {
+        relatedPayrollRows[rp] = await normalizeMissingPayrollSalary(storeId, relatedPayrollRows[rp], userId);
+      }
       var payrollIds = relatedPayrollRows.map(function(row) { return row._id; });
       var payments = payrollIds.length ? await ThanhToanLuong.find({
         cua_hang_id: storeId,
@@ -1100,6 +1455,10 @@ exports.listBangLuong = async function(req, res, next) {
       .populate('cham_cong_ids')
       .sort({ nam: -1, thang: -1, ma_nhan_vien_snapshot: 1 })
       .lean();
+    for (var p = 0; p < payrollRows.length; p += 1) {
+      payrollRows[p] = await normalizeUnpaidPayrollAdvances(storeId, payrollRows[p], req.user && (req.user._id || req.user.id));
+      payrollRows[p] = await normalizeMissingPayrollSalary(storeId, payrollRows[p], req.user && (req.user._id || req.user.id));
+    }
     var payrollIds = payrollRows.map(function(row) { return row._id; });
     var payments = payrollIds.length ? await ThanhToanLuong.find({
       cua_hang_id: storeId,
@@ -1130,9 +1489,24 @@ async function handleBangLuongThanhToanPreview(req, res, next) {
     if (!storeId || !isValidObjectId(id)) {
       return res.status(400).json({ success: false, message: 'Bảng lương không hợp lệ.' });
     }
-    var payroll = await BangLuong.findOne({ _id: id, cua_hang_id: storeId, trang_thai_du_lieu: 'active' }).lean();
+    var payroll = await BangLuong.findOne({ _id: id, cua_hang_id: storeId, trang_thai_du_lieu: 'active' }).populate('cham_cong_ids').lean();
     if (!payroll) return res.status(404).json({ success: false, message: 'Không tìm thấy bảng lương.' });
+    payroll = await normalizeUnpaidPayrollAdvances(storeId, payroll, req.user && (req.user._id || req.user.id));
+    payroll = await normalizeMissingPayrollSalary(storeId, payroll, req.user && (req.user._id || req.user.id));
+    payroll = await enrichPayrollEmployerRates(storeId, payroll, req.user && (req.user._id || req.user.id));
     var due = Math.max(0, Number(payroll.con_phai_tra != null ? payroll.con_phai_tra : Number(payroll.thuc_nhan || 0) - Number(payroll.da_thanh_toan || 0)));
+    var employerSummary = buildEmployerContributionSummary(payroll);
+    var employerPaidRows = await ThanhToanLuong.find({
+      cua_hang_id: storeId,
+      bang_luong_id: payroll._id,
+      loai_thanh_toan: 'nsdld',
+      trang_thai: 'completed',
+      trang_thai_du_lieu: { $ne: 'inactive' }
+    }).select('so_tien').lean();
+    var paidEmployer = employerPaidRows.reduce(function(sum, row) {
+      return sum + Number(row.so_tien || 0);
+    }, 0);
+    var remainingEmployer = Math.max(0, employerSummary.tong - paidEmployer);
     return res.json({
       success: true,
       bang_luong_id: String(payroll._id),
@@ -1141,7 +1515,11 @@ async function handleBangLuongThanhToanPreview(req, res, next) {
       da_thanh_toan: payroll.trang_thai_thanh_toan === 'da_thanh_toan',
       da_tra: Number(payroll.da_thanh_toan || 0),
       con_thanh_toan: due,
-      payroll_lines: buildPayrollFormulaLines(payroll)
+      tong_nsdld: employerSummary.tong,
+      da_tra_nsdld: paidEmployer,
+      con_nsdld: remainingEmployer,
+      payroll_lines: buildPayrollFormulaLines(payroll),
+      employer_lines: employerSummary.lines
     });
   } catch (error) {
     return next(error);
@@ -1155,8 +1533,14 @@ async function handleBangLuongCreatePayment(req, res, next) {
     if (!storeId || !isValidObjectId(id)) {
       return res.status(400).json({ success: false, message: 'Bảng lương không hợp lệ.' });
     }
-    var payroll = await BangLuong.findOne({ _id: id, cua_hang_id: storeId, trang_thai_du_lieu: 'active' }).populate('nhan_vien_id', 'ma_nhan_vien ten_nhan_vien').lean();
+    var payroll = await BangLuong.findOne({ _id: id, cua_hang_id: storeId, trang_thai_du_lieu: 'active' })
+      .populate('nhan_vien_id', 'ma_nhan_vien ten_nhan_vien')
+      .populate('cham_cong_ids')
+      .lean();
     if (!payroll) return res.status(404).json({ success: false, message: 'Không tìm thấy bảng lương.' });
+    payroll = await normalizeUnpaidPayrollAdvances(storeId, payroll, req.user && (req.user._id || req.user.id));
+    payroll = await normalizeMissingPayrollSalary(storeId, payroll, req.user && (req.user._id || req.user.id));
+    payroll = await enrichPayrollEmployerRates(storeId, payroll, req.user && (req.user._id || req.user.id));
 
     var cashAmount = parseMoney(req.body && req.body.tien_mat);
     var transferAmount = parseMoney(req.body && req.body.chuyen_khoan);
@@ -1170,8 +1554,43 @@ async function handleBangLuongCreatePayment(req, res, next) {
     if (cashAmount > 0 && !cashBookId) return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ tiền mặt.' });
     if (transferAmount > 0 && !transferBookId) return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ chuyển khoản.' });
 
+    var employerSummary = buildEmployerContributionSummary(payroll);
+    var employerPaidRows = await ThanhToanLuong.find({
+      cua_hang_id: storeId,
+      bang_luong_id: payroll._id,
+      loai_thanh_toan: 'nsdld',
+      trang_thai: 'completed',
+      trang_thai_du_lieu: { $ne: 'inactive' }
+    }).select('so_tien').lean();
+    var paidEmployer = employerPaidRows.reduce(function(sum, row) {
+      return sum + Number(row.so_tien || 0);
+    }, 0);
+    var expectedEmployer = calcEmployerPaymentShare(employerSummary.tong, paidEmployer, due, amount);
+    var employerCashAmount = parseMoney(req.body && req.body.nsdld_tien_mat);
+    var employerTransferAmount = parseMoney(req.body && req.body.nsdld_chuyen_khoan);
+    var employerAmount = employerCashAmount + employerTransferAmount;
+    var employerCashBookId = String(req.body && req.body.nsdld_so_quy_tien_mat_id || '').trim();
+    var employerTransferBookId = String(req.body && req.body.nsdld_so_quy_chuyen_khoan_id || '').trim();
+    if (expectedEmployer > 0) {
+      if (employerAmount !== expectedEmployer) {
+        return res.status(400).json({
+          success: false,
+          message: 'Số tiền chi NSDLĐ phải bằng ' + expectedEmployer.toLocaleString('vi-VN') + ' (theo tỷ lệ lần thanh toán lương).'
+        });
+      }
+      if (employerCashAmount > 0 && !employerCashBookId) {
+        return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ tiền mặt cho chi NSDLĐ.' });
+      }
+      if (employerTransferAmount > 0 && !employerTransferBookId) {
+        return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ quỹ chuyển khoản cho chi NSDLĐ.' });
+      }
+    } else if (employerAmount > 0) {
+      return res.status(400).json({ success: false, message: 'Lần thanh toán này không phát sinh chi NSDLĐ.' });
+    }
+
     var employee = payroll.nhan_vien_id && typeof payroll.nhan_vien_id === 'object' ? payroll.nhan_vien_id : null;
     var employeeLabel = (payroll.ma_nhan_vien_snapshot ? payroll.ma_nhan_vien_snapshot + ' - ' : '') + (payroll.ten_nhan_vien_snapshot || (employee && employee.ten_nhan_vien) || '');
+    var userId = req.user && (req.user._id || req.user.id);
     var receipt = await taoPhieuThuChi({
       loai_phieu: 'chi',
       loai_thu_chi: 'Thanh toán lương nhân viên',
@@ -1181,7 +1600,7 @@ async function handleBangLuongCreatePayment(req, res, next) {
       ghi_chu: 'Thanh toán lương ' + (payroll.ma_bang_luong || ''),
       cua_hang_id: storeId,
       chi_nhanh_id: req.session && req.session.chi_nhanh_id,
-      nguoi_tao_id: req.user && (req.user._id || req.user.id),
+      nguoi_tao_id: userId,
       hach_toan: true,
       nhom_doi_tuong: 'nhan_vien',
       nhan_vien_id: payroll.nhan_vien_id && payroll.nhan_vien_id._id ? payroll.nhan_vien_id._id : payroll.nhan_vien_id,
@@ -1214,10 +1633,63 @@ async function handleBangLuongCreatePayment(req, res, next) {
       so_quy_tien_mat_id: cashBookId || undefined,
       so_quy_chuyen_khoan_id: transferBookId || undefined,
       ghi_chu: 'Thanh toán lương ' + (payroll.ma_bang_luong || ''),
-      nguoi_thanh_toan_id: req.user && (req.user._id || req.user.id),
+      nguoi_thanh_toan_id: userId,
+      loai_thanh_toan: 'nhan_vien',
       trang_thai: 'completed',
       trang_thai_du_lieu: 'active'
     });
+
+    var employerReceipt = null;
+    var employerPayment = null;
+    if (expectedEmployer > 0) {
+      employerReceipt = await taoPhieuThuChi({
+        loai_phieu: 'chi',
+        loai_thu_chi: 'Chi khoản nộp NSDLĐ',
+        ngay_lap: new Date(),
+        gia_tri: expectedEmployer,
+        doi_tuong: 'Người sử dụng lao động - ' + employeeLabel,
+        ghi_chu: 'Chi NSDLĐ theo bảng lương ' + (payroll.ma_bang_luong || ''),
+        cua_hang_id: storeId,
+        chi_nhanh_id: req.session && req.session.chi_nhanh_id,
+        nguoi_tao_id: userId,
+        hach_toan: true,
+        nhom_doi_tuong: 'khac',
+        nhan_vien_id: payroll.nhan_vien_id && payroll.nhan_vien_id._id ? payroll.nhan_vien_id._id : payroll.nhan_vien_id,
+        document_type: 'khac',
+        phuong_thuc_thanh_toan: employerTransferAmount > 0 && employerCashAmount <= 0 ? 'chuyen_khoan' : 'tien_mat',
+        payment_v2: true,
+        so_quy_id: employerCashBookId || employerTransferBookId,
+        so_quy_tien_mat_id: employerCashBookId,
+        so_quy_chuyen_khoan_id: employerTransferBookId,
+        chi_tiet_thanh_toan: {
+          tien_mat: employerCashAmount,
+          chuyen_khoan: employerTransferAmount,
+          tien_tra_khach: 0,
+          so_quy_tien_mat_id: employerCashBookId || undefined,
+          so_quy_chuyen_khoan_id: employerTransferBookId || undefined
+        },
+        ma_chung_tu_goc: payroll.ma_bang_luong,
+        chung_tu_khac: payroll.ma_bang_luong
+      });
+
+      employerPayment = await ThanhToanLuong.create({
+        cua_hang_id: storeId,
+        bang_luong_id: payroll._id,
+        ngay_thanh_toan: new Date(),
+        so_tien: expectedEmployer,
+        ma_tham_chieu: employerReceipt.ma_phieu || '',
+        phieu_chi_id: employerReceipt._id,
+        tien_mat: employerCashAmount,
+        chuyen_khoan: employerTransferAmount,
+        so_quy_tien_mat_id: employerCashBookId || undefined,
+        so_quy_chuyen_khoan_id: employerTransferBookId || undefined,
+        ghi_chu: 'Chi NSDLĐ theo bảng lương ' + (payroll.ma_bang_luong || ''),
+        nguoi_thanh_toan_id: userId,
+        loai_thanh_toan: 'nsdld',
+        trang_thai: 'completed',
+        trang_thai_du_lieu: 'active'
+      });
+    }
 
     var nextPaid = Number(payroll.da_thanh_toan || 0) + amount;
     var nextDue = Math.max(0, Number(payroll.thuc_nhan || 0) - nextPaid);
@@ -1229,7 +1701,7 @@ async function handleBangLuongCreatePayment(req, res, next) {
           da_thanh_toan: nextPaid,
           con_phai_tra: nextDue,
           trang_thai_thanh_toan: nextStatus,
-          nguoi_cap_nhat_id: req.user && (req.user._id || req.user.id)
+          nguoi_cap_nhat_id: userId
         }
       },
       { runValidators: true }
@@ -1237,7 +1709,9 @@ async function handleBangLuongCreatePayment(req, res, next) {
 
     return res.json({
       success: true,
-      message: 'Đã thanh toán lương và tạo phiếu chi.',
+      message: expectedEmployer > 0
+        ? 'Đã thanh toán lương và tạo phiếu chi NSDLĐ.'
+        : 'Đã thanh toán lương và tạo phiếu chi.',
       payment: { _id: String(payment._id), so_tien: Number(payment.so_tien || 0) },
       receipt: {
         _id: String(receipt._id),
@@ -1245,6 +1719,16 @@ async function handleBangLuongCreatePayment(req, res, next) {
         gia_tri: Number(receipt.gia_tri || 0),
         ma_chung_tu_goc: payroll.ma_bang_luong || ''
       },
+      payment_nsdld: employerPayment ? {
+        _id: String(employerPayment._id),
+        so_tien: Number(employerPayment.so_tien || 0)
+      } : null,
+      receipt_nsdld: employerReceipt ? {
+        _id: String(employerReceipt._id),
+        ma_phieu: employerReceipt.ma_phieu || '',
+        gia_tri: Number(employerReceipt.gia_tri || 0),
+        ma_chung_tu_goc: payroll.ma_bang_luong || ''
+      } : null,
       bang_luong: {
         _id: String(payroll._id),
         da_thanh_toan: nextPaid,
@@ -1353,6 +1837,7 @@ exports.exportBangLuongExcel = async function(req, res, next) {
     if (!payroll) {
       return res.status(404).send('Không tìm thấy bảng lương.');
     }
+    payroll = await normalizeMissingPayrollSalary(storeId, payroll, req.user && (req.user._id || req.user.id));
 
     var employee = await NhanVien.findOne({ _id: payroll.nhan_vien_id, cua_hang_id: storeId })
       .populate('chuc_danh_id', 'ten_chuc_danh ma_chuc_danh')

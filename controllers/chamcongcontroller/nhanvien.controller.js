@@ -10,6 +10,7 @@ const {
   TamUngNhanVien,
   BangLuong
 } = require('../../models/chamcong.model');
+const { PhieuThuChi } = require('../../models/kiot.model');
 const { taoPhieuThuChi } = require('../../services/soQuy.service');
 
 function getCurrentStoreId(req, res) {
@@ -76,6 +77,90 @@ function attendanceWorkUnits(row) {
   return (row.ca_sang ? 0.5 : 0)
     + (row.ca_chieu ? 0.5 : 0)
     + Number(row.cong_tang_ca || 0);
+}
+
+function serializeAdvanceRow(row, receiptMap) {
+  var code = String(row.ma_tam_ung || '');
+  var receipt = receiptMap && code ? receiptMap[code] : null;
+  var payroll = row._payroll || null;
+  return {
+    _id: String(row._id),
+    ma_tam_ung: code,
+    ngay_tam_ung: formatDateInput(row.ngay_tam_ung),
+    ngay_tam_ung_text: formatDateText(row.ngay_tam_ung),
+    so_tien: Number(row.so_tien || 0),
+    ghi_chu: row.ghi_chu || '',
+    trang_thai: row.trang_thai || 'active',
+    phieu_chi: receipt ? {
+      _id: String(receipt._id),
+      ma_phieu: receipt.ma_phieu || '',
+      ngay_lap: formatDateInput(receipt.ngay_lap),
+      ngay_lap_text: formatDateText(receipt.ngay_lap),
+      gia_tri: Number(receipt.gia_tri || 0),
+      phuong_thuc_thanh_toan: receipt.phuong_thuc_thanh_toan || '',
+      trang_thai: receipt.trang_thai || '',
+      ghi_chu: receipt.ghi_chu || ''
+    } : null,
+    bang_luong: payroll ? {
+      _id: String(payroll._id),
+      ma_bang_luong: payroll.ma_bang_luong || '',
+      trang_thai_thanh_toan: payroll.trang_thai_thanh_toan || ''
+    } : null
+  };
+}
+
+async function listAdvanceRowsWithReceipts(storeId, employeeId, limit) {
+  var advances = await TamUngNhanVien.find({
+    cua_hang_id: storeId,
+    nhan_vien_id: employeeId,
+    trang_thai: 'active'
+  }).sort({ ngay_tam_ung: -1, created_at: -1 }).limit(limit || 120).lean();
+
+  var codes = advances.map(function(row) {
+    return String(row.ma_tam_ung || '').trim();
+  }).filter(Boolean);
+  var receiptMap = {};
+  var payrollMap = {};
+  if (codes.length) {
+    var receipts = await PhieuThuChi.find({
+      cua_hang_id: storeId,
+      loai_phieu: 'chi',
+      trang_thai_du_lieu: { $ne: 'inactive' },
+      $or: [
+        { ma_chung_tu_goc: { $in: codes } },
+        { chung_tu_khac: { $in: codes } }
+      ]
+    }).select('_id ma_phieu ngay_lap gia_tri phuong_thuc_thanh_toan trang_thai ghi_chu ma_chung_tu_goc chung_tu_khac')
+      .sort({ ngay_lap: -1, created_at: -1 })
+      .lean();
+    receipts.forEach(function(receipt) {
+      var key = String(receipt.ma_chung_tu_goc || receipt.chung_tu_khac || '').trim();
+      if (key && !receiptMap[key]) receiptMap[key] = receipt;
+    });
+  }
+
+  var advanceIds = advances.map(function(row) { return row._id; });
+  if (advanceIds.length) {
+    var payrollRows = await BangLuong.find({
+      cua_hang_id: storeId,
+      nhan_vien_id: employeeId,
+      tam_ung_ids: { $in: advanceIds },
+      trang_thai_du_lieu: { $ne: 'inactive' }
+    }).select('_id ma_bang_luong tam_ung_ids trang_thai_thanh_toan')
+      .sort({ nam: -1, thang: -1, created_at: -1 })
+      .lean();
+    payrollRows.forEach(function(payroll) {
+      (payroll.tam_ung_ids || []).forEach(function(advanceId) {
+        var key = String(advanceId);
+        if (!payrollMap[key]) payrollMap[key] = payroll;
+      });
+    });
+  }
+
+  return advances.map(function(row) {
+    row._payroll = payrollMap[String(row._id)] || null;
+    return serializeAdvanceRow(row, receiptMap);
+  });
 }
 
 function normalizeEmployeePayload(body) {
@@ -533,6 +618,7 @@ exports.detailNhanVienPanel = async function(req, res, next) {
       cua_hang_id: storeId,
       nhan_vien_id: id
     }).sort({ nam: -1, thang: -1, created_at: -1 }).lean();
+    var advanceRows = await listAdvanceRowsWithReceipts(storeId, id, 120);
 
     res.render('Chamcong/nhan-vien/_detail-panel', {
       item: serializeEmployee(employee, salaryMap[String(employee._id)], allowanceMap[String(employee._id)]),
@@ -565,7 +651,28 @@ exports.detailNhanVienPanel = async function(req, res, next) {
             ? 'Đã thanh toán'
             : (status === 'thanh_toan_mot_phan' ? 'Thanh toán một phần' : 'Chưa thanh toán')
         };
-      })
+      }),
+      advanceRows: advanceRows
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.listTamUngNhanVien = async function(req, res, next) {
+  try {
+    var storeId = getCurrentStoreId(req, res);
+    var id = String(req.params.id || '').trim();
+    if (!storeId || !id || !isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: 'Dá»¯ liá»‡u khÃ´ng há»£p lá»‡.' });
+    }
+
+    var employee = await NhanVien.findOne({ _id: id, cua_hang_id: storeId }).select('_id').lean();
+    if (!employee) return res.status(404).json({ success: false, message: 'KhÃ´ng tÃ¬m tháº¥y nhÃ¢n viÃªn.' });
+
+    res.json({
+      success: true,
+      items: await listAdvanceRowsWithReceipts(storeId, id, 120)
     });
   } catch (error) {
     next(error);

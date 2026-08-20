@@ -4,6 +4,7 @@
       <button class="detail-tab is-active" type="button" data-tab-target="employee-info">Thông tin</button>
       <button class="detail-tab" type="button" data-tab-target="employee-attendance">Ngày công</button>
       <button class="detail-tab" type="button" data-tab-target="employee-payroll">Bảng lương</button>
+      <button class="detail-tab" type="button" data-tab-target="employee-advance">Tạm ứng</button>
     </div>
   </div>
 
@@ -126,6 +127,61 @@
           </tbody>
         </table>
         <div class="empty-cell" data-inline-payroll-empty-filter hidden>Không có bảng lương theo bộ lọc.</div>
+      <% } %>
+    </section>
+
+    <section class="detail-pane" data-tab-panel="employee-advance">
+      <% if (!((advanceRows || []).length)) { %>
+        <div class="empty-cell">Chưa có phiếu chi tạm ứng.</div>
+      <% } else { %>
+        <table class="admin-table product-inner-table">
+          <thead>
+            <tr>
+              <th>Mã tạm ứng</th>
+              <th>Ngày tạm ứng</th>
+              <th>Số tiền</th>
+              <th>Mã bảng lương</th>
+              <th>Mã phiếu chi</th>
+              <th>Ngày phiếu chi</th>
+              <th>Phương thức</th>
+              <th>Ghi chú</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% advanceRows.forEach(function(row) {
+              var receipt = row.phieu_chi || null;
+              var payroll = row.bang_luong || null;
+              var receiptHref = receipt && receipt._id ? '/so-quy?receipt=' + encodeURIComponent(String(receipt._id)) : '';
+              var payrollTab = payroll && payroll.trang_thai_thanh_toan === 'da_thanh_toan' ? 'payroll-paid' : 'payroll';
+              var payrollHref = payroll && payroll._id ? '/cham-cong?tab=' + payrollTab + '&bang_luong=' + encodeURIComponent(String(payroll._id)) : '';
+              var methodText = 'Tiền mặt';
+              if (receipt && receipt.phuong_thuc_thanh_toan === 'chuyen_khoan') methodText = 'Chuyển khoản';
+              if (receipt && receipt.phuong_thuc_thanh_toan === 'vi_dien_tu') methodText = 'Ví điện tử';
+              if (receipt && receipt.phuong_thuc_thanh_toan === 'khac') methodText = 'Khác';
+            %>
+              <tr>
+                <td><%= row.ma_tam_ung || '---' %></td>
+                <td><%= row.ngay_tam_ung_text || row.ngay_tam_ung || '---' %></td>
+                <td><%= Number(row.so_tien || 0).toLocaleString('vi-VN') %></td>
+                <td>
+                  <% if (payroll && payroll.ma_bang_luong) { %>
+                    <a class="cc-ref-link" href="<%= payrollHref %>"><%= payroll.ma_bang_luong %></a>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (receipt && receipt.ma_phieu) { %>
+                    <a class="cc-ref-link" href="<%= receiptHref %>"><%= receipt.ma_phieu %></a>
+                  <% } else { %>
+                    ---
+                  <% } %>
+                </td>
+                <td><%= receipt ? (receipt.ngay_lap_text || receipt.ngay_lap || '---') : '---' %></td>
+                <td><%= receipt ? methodText : '---' %></td>
+                <td><%= row.ghi_chu || (receipt && receipt.ghi_chu) || '' %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
       <% } %>
     </section>
   </div>

@@ -63,16 +63,31 @@
   const first = allocs[0];
   if (first.phieu_nhap_id) return refLink('purchase', first.phieu_nhap_id, code || first.ma_phieu_nhap);
   }
-  if (item._docLinkType && item._docLinkId) return refLink(item._docLinkType, item._docLinkId, code);
   const label = String(code || '').trim();
-  if (/^THN/i.test(label)) return '<a href="/tra-hang-nhap?q=' + encodeURIComponent(label) + '" class="ref-link">' +
-    label.replace(/[&<>"']/g, function(char) {
-      return ({ '&': '&amp;', '<': '&lt;' , '>' : '&gt;' , '"' : '&quot;' , "'" : '&#39;' })[char]; }) + '</a>' ; if
-        (/^TH(?!N)/i.test(label)) return '<a href="/don-hang/tra-hang?q=' + encodeURIComponent(label)
-        + '" class="ref-link">' + label.replace(/[&<>"']/g, function(char) {
-        return ({ '&': '&amp;', '<': '&lt;' , '>' : '&gt;' , '"' : '&quot;' , "'" : '&#39;' })[char]; }) + '</a>' ;
-          return label ? String(label).replace(/[&<>"']/g, function(char) {
-          return ({ '&': '&amp;', '<': '&lt;' , '>' : '&gt;' , '"' : '&quot;' , "'" : '&#39;' })[char]; }) : '' ; };
+  const escapeLabel = function(value) {
+    return String(value || '').replace(/[&<>"']/g, function(char) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
+    });
+  };
+  if (item._docLinkType === 'payroll' && item._docLinkId) {
+    return refLink('payroll', item._docLinkId, code);
+  }
+  if (item._docLinkType === 'advance' && item._docLinkId) {
+    const advanceHref = '/cham-cong?tab=employees&tam_ung=' + encodeURIComponent(String(item._docLinkId))
+      + (item._docLinkEmployeeId ? ('&nhan_vien_id=' + encodeURIComponent(String(item._docLinkEmployeeId))) : '');
+    return '<a class="ref-link" href="' + advanceHref + '">' + escapeLabel(code || 'Tạm ứng') + '</a>';
+  }
+  if (item._docLinkType && item._docLinkId) return refLink(item._docLinkType, item._docLinkId, code);
+  if (/^THN/i.test(label)) return '<a href="/tra-hang-nhap?q=' + encodeURIComponent(label) + '" class="ref-link">' + escapeLabel(label) + '</a>';
+  if (/^TH(?!N)/i.test(label)) return '<a href="/don-hang/tra-hang?q=' + encodeURIComponent(label) + '" class="ref-link">' + escapeLabel(label) + '</a>';
+  if (/^CC[\s-]?\d{6}/i.test(label)) {
+    return '<a href="/cham-cong?tab=payroll&ma_bang_luong=' + encodeURIComponent(label.replace(/\s+/g, '-')) + '" class="ref-link">' + escapeLabel(label) + '</a>';
+  }
+  if (/^TA\d+/i.test(label)) {
+    return '<a href="/cham-cong?tab=employees&ma_tam_ung=' + encodeURIComponent(label.toUpperCase()) + '" class="ref-link">' + escapeLabel(label) + '</a>';
+  }
+  return label ? escapeLabel(label) : '';
+};
             const safeEmployees=Array.isArray(locals.employees) ? locals.employees : []; const
             safeCarriers=Array.isArray(locals.carriers) ? locals.carriers : []; const payLabel=value=> ({ tien_mat:
             'Tiền mặt', chuyen_khoan: 'Chuyển khoản', vi_dien_tu: 'Ví điện tử', khac: 'Khác' }[value] || 'Tiền mặt');
@@ -2791,7 +2806,7 @@
                   function closeInlineReceiptDetail() { document.querySelectorAll('.receipt-inline-row').forEach(row => row.remove()); document.querySelectorAll('.receipt-inline-main-row').forEach(row => row.classList.remove('is-open')) }
                   function openReceiptPrint(id) { if (!id) return; window.open('/so-quy/' + encodeURIComponent(String(id)) + '/in-tong-hop', '_blank') }
                   function receiptDocId(doc) { if (!doc) return ''; if (typeof doc === 'string') return String(doc); return doc._id ? String(doc._id) : '' }
-                  function receiptDocHref(type, id) { const safeId = String(id || '').trim(); if (!safeId) return ''; const map = { order: '/don-hang?order=', invoice: '/don-hang/hoa-don?invoice=', purchase: '/nhap-hang?purchase=', nhap_vat_chua: '/vat-chua?nhap_vat_chua=', supplier_return: '/tra-hang-nhap/', phieu_tra_hang_nhap: '/tra-hang-nhap/', customer_return: '/don-hang/tra-hang/', phieu_tra_hang: '/don-hang/tra-hang/', shipment: '/don-hang/van-don/', van_don: '/don-hang/van-don/' }; const base = map[type]; return base ? base + encodeURIComponent(safeId) : '' }
+                  function receiptDocHref(type, id) { const safeId = String(id || '').trim(); if (!safeId) return ''; const map = { order: '/don-hang?order=', invoice: '/don-hang/hoa-don?invoice=', purchase: '/nhap-hang?purchase=', nhap_vat_chua: '/vat-chua?nhap_vat_chua=', supplier_return: '/tra-hang-nhap/', phieu_tra_hang_nhap: '/tra-hang-nhap/', customer_return: '/don-hang/tra-hang/', phieu_tra_hang: '/don-hang/tra-hang/', shipment: '/don-hang/van-don/', van_don: '/don-hang/van-don/', payroll: '/cham-cong?tab=payroll&bang_luong=', bang_luong: '/cham-cong?tab=payroll&bang_luong=', advance: '/cham-cong?tab=employees&tam_ung=', tam_ung: '/cham-cong?tab=employees&tam_ung=' }; const base = map[type]; return base ? base + encodeURIComponent(safeId) : '' }
                   function receiptDocLink(type, id, code) { const label = escapeHtml(code || '—'); const href = receiptDocHref(type, id); return href ? `<a class="receipt-inline-link ref-link" href="${href}">${label}</a>` : label }
                   function relDocObject(doc) { return doc && typeof doc === 'object' ? doc : null }
                   function relMoneyCell(value) { if (value == null || value === '' || Number.isNaN(Number(value))) return '—'; return fmtMoney(Math.abs(Number(value) || 0)) }
@@ -2857,10 +2872,22 @@
                       pushRow({ type: 'shipment', typeLabel: 'Vận đơn/COD', code: vd.ma_van_don, docId: receiptDocId(vd), docDate: vd.created_at, partner, docValue: Number(vd.cod_amount || 0) || null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: getRelatedDocumentStatus('shipment', vd) });
                     }
                     const otherDoc = String(receipt.chung_tu_khac || '').trim();
-                    if (!rows.length && otherDoc) {
-                      pushRow({ type: '', typeLabel: 'Chứng từ khác', code: otherDoc, docId: '', docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: 'Chứng từ nhập tay' });
-                    } else if (!rows.length && String(receipt.ma_chung_tu_goc || '').trim()) {
-                      pushRow({ type: '', typeLabel: 'Chứng từ gốc', code: receipt.ma_chung_tu_goc, docId: '', docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: 'Mã chứng từ gốc' });
+                    if (!rows.length && (otherDoc || String(receipt.ma_chung_tu_goc || '').trim() || (receipt._docLinkType && receipt._docLinkId))) {
+                      const originCode = otherDoc || String(receipt.ma_chung_tu_goc || '').trim();
+                      if (receipt._docLinkType && receipt._docLinkId) {
+                        const typeLabel = receipt._docLinkType === 'advance'
+                          ? 'Tạm ứng nhân viên'
+                          : (receipt._docLinkType === 'payroll' ? 'Bảng lương' : (otherDoc ? 'Chứng từ khác' : 'Chứng từ gốc'));
+                        pushRow({ type: receipt._docLinkType, typeLabel: typeLabel, code: originCode, docId: receipt._docLinkId, docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: typeLabel });
+                      } else if (/^CC[\s-]?\d{6}/i.test(originCode)) {
+                        pushRow({ type: 'payroll', typeLabel: 'Bảng lương', code: originCode, docId: '', docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: 'Bảng lương' });
+                      } else if (/^TA\d+/i.test(originCode)) {
+                        pushRow({ type: 'advance', typeLabel: 'Tạm ứng nhân viên', code: originCode, docId: '', docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: 'Tạm ứng' });
+                      } else if (otherDoc) {
+                        pushRow({ type: '', typeLabel: 'Chứng từ khác', code: otherDoc, docId: '', docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: 'Chứng từ nhập tay' });
+                      } else {
+                        pushRow({ type: '', typeLabel: 'Chứng từ gốc', code: originCode, docId: '', docDate: receipt.ngay_lap, partner: relTextCell(receipt.doi_tuong), docValue: null, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: 'Mã chứng từ gốc' });
+                      }
                     }
                     return rows;
                   }
@@ -2869,15 +2896,42 @@
                     if (!rows.length) return '<div class="receipt-related-docs-empty">Phiếu này chưa gắn chứng từ liên quan.</div>';
                     const head = '<thead><tr><th>Loại chứng từ</th><th>Mã chứng từ</th><th>Ngày chứng từ</th><th>Đối tượng</th><th class="num">Giá trị phiếu này</th><th class="num">Còn lại sau phiếu</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>';
                     const body = rows.map(row => {
-                      const codeCell = row.docId ? receiptDocLink(row.type, row.docId, row.code || '—') : relTextCell(row.code || '—');
-                      const href = getRelatedDocumentLink(row.type, row.docId);
+                      let codeCell = row.docId ? receiptDocLink(row.type, row.docId, row.code || '—') : '';
+                      if (!codeCell) {
+                        const code = String(row.code || '').trim();
+                        if (/^CC[\s-]?\d{6}/i.test(code)) {
+                          codeCell = `<a class="receipt-inline-link ref-link" href="/cham-cong?tab=payroll&ma_bang_luong=${encodeURIComponent(code.replace(/\s+/g, '-'))}">${escapeHtml(code)}</a>`;
+                        } else if (/^TA\d+/i.test(code)) {
+                          codeCell = `<a class="receipt-inline-link ref-link" href="/cham-cong?tab=employees&ma_tam_ung=${encodeURIComponent(code.toUpperCase())}">${escapeHtml(code)}</a>`;
+                        } else {
+                          codeCell = relTextCell(code || '—');
+                        }
+                      }
+                      const href = row.docId
+                        ? getRelatedDocumentLink(row.type, row.docId)
+                        : (/^CC[\s-]?\d{6}/i.test(String(row.code || ''))
+                          ? ('/cham-cong?tab=payroll&ma_bang_luong=' + encodeURIComponent(String(row.code).replace(/\s+/g, '-')))
+                          : (/^TA\d+/i.test(String(row.code || ''))
+                            ? ('/cham-cong?tab=employees&ma_tam_ung=' + encodeURIComponent(String(row.code).toUpperCase()))
+                            : ''));
                       const action = href ? `<a class="receipt-inline-link ref-link" href="${href}">Xem</a>` : '—';
                       return `<tr><td>${relTextCell(row.typeLabel)}</td><td>${codeCell}</td><td>${row.docDate ? relTextCell(formatReceiptDate(row.docDate)) : '—'}</td><td>${relTextCell(row.partner)}</td><td class="num">${relMoneyCell(row.receiptValue)}</td><td class="num">${relMoneyCell(row.remainAfter)}</td><td>${relTextCell(row.status)}</td><td>${action}</td></tr>`;
                     }).join('');
                     return `<div class="receipt-inline-allocation"><div class="receipt-inline-allocation-title">Chứng từ liên quan</div><div class="receipt-related-docs-scroll"><table class="receipt-related-docs-table">${head}<tbody>${body}</tbody></table></div></div>`;
                   }
-                  function buildReceiptRelatedDocumentsSection(receipt) { if (String(receipt.chung_tu_khac || '').trim()) return ''; return buildRelatedDocumentTable(receipt) }
-                  function buildReceiptOtherDocumentField(receipt) { const otherDoc = String(receipt.chung_tu_khac || '').trim(); return otherDoc ? `<div class="receipt-other-doc"><span>Mã chứng từ</span><b>${escapeHtml(otherDoc)}</b></div>` : '' }
+                  function buildReceiptRelatedDocumentsSection(receipt) {
+                    const code = String(receipt.chung_tu_khac || receipt.ma_chung_tu_goc || '').trim();
+                    if (String(receipt.chung_tu_khac || '').trim() && !receipt._docLinkType && !/^CC[\s-]?\d{6}/i.test(code) && !/^TA\d+/i.test(code)) {
+                      return '';
+                    }
+                    return buildRelatedDocumentTable(receipt);
+                  }
+                  function buildReceiptOtherDocumentField(receipt) {
+                    const otherDoc = String(receipt.chung_tu_khac || '').trim();
+                    if (!otherDoc) return '';
+                    if (receipt._docLinkType || /^CC[\s-]?\d{6}/i.test(otherDoc) || /^TA\d+/i.test(otherDoc)) return '';
+                    return `<div class="receipt-other-doc"><span>Mã chứng từ</span><b>${escapeHtml(otherDoc)}</b></div>`;
+                  }
                   function buildReceiptOverpayment(receipt) { const amount = Number(receipt.overpayment_amount || 0); if (amount <= 0) return ''; return `<div class="receipt-inline-note"><strong>Trả dư / ứng trước NCC:</strong> ${fmt(amount)}</div>` }
                   function toNumber(value) { return Math.max(0, Number(value) || 0) }
                   function receiptPaymentBookName(book) { if (!book || typeof book !== 'object') return ''; const bank = book.thong_tin_ngan_hang || {}; return [bank.ten_ngan_hang, bank.so_tai_khoan].filter(Boolean).join(' - ') || book.ten_so_quy || '' }

@@ -26,6 +26,7 @@
     .cc-btn-primary{border-color:#0070f4;background:#0070f4;color:#fff}
     .cc-btn-danger{border-color:#fca5a5;background:#fff;color:#b42318}
     .cc-btn-icon{width:34px;padding:0}
+    .cc-attendance-total{font-size:13px;font-weight:800;color:#dc2626;white-space:nowrap}
     .cc-week-label{font-size:13px;color:#475467;font-weight:700;margin-left:auto}
     .cc-toolbar-status{min-width:120px;max-width:320px;font-size:12px;color:#475467;text-align:right;line-height:1.35}
     .cc-toolbar-status.is-error{color:#b42318}
@@ -95,6 +96,11 @@
     .cc-salary-label{display:flex!important;grid-template-columns:none!important;align-items:center;gap:8px}
     .cc-salary-label input{width:16px;height:16px;accent-color:#0070f4}
     .cc-money-input{text-align:right;font-variant-numeric:tabular-nums}
+    .cc-money-combo{display:flex;align-items:center;gap:8px}
+    .cc-money-combo .cc-input{flex:1;min-width:0}
+    .cc-btn-pay-all{flex:0 0 auto;height:34px;white-space:nowrap;padding:0 10px}
+    .cc-pay-employer-block{border:1px solid #dbeafe;border-radius:8px;background:#f8fbff;padding:12px}
+    .cc-pay-employer-title{font-size:13px;font-weight:800;color:#1d4ed8;margin-bottom:10px}
     .cc-form-section{grid-column:span 2;border-top:1px solid #e5e9ee;padding-top:14px;margin-top:2px;display:grid;gap:12px}
     .cc-form-section h3{margin:0;font-size:14px;font-weight:800;color:#111827;text-transform:uppercase}
     .cc-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -281,6 +287,7 @@
           <button type="button" id="ccBulkAttendanceOpen" class="cc-btn">
             <i class="fa-solid fa-list-check"></i> Thao tác nhanh
           </button>
+          <div id="ccAttendanceTotal" class="cc-attendance-total">Tổng công: 0 công</div>
           <div id="ccWeekLabel" class="cc-week-label"></div>
           <div id="ccToolbarStatus" class="cc-toolbar-status" aria-live="polite"></div>
           <button type="button" id="ccSave" class="cc-btn cc-btn-primary">Lưu chấm công</button>
@@ -546,7 +553,10 @@
         <div class="span-2" id="ccPayLines"></div>
         <label class="cc-field">
           <span>Tiền mặt</span>
-          <input id="ccPayCash" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+          <div class="cc-money-combo">
+            <input id="ccPayCash" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+            <button type="button" class="cc-btn cc-btn-pay-all" id="ccPayCashAll" data-pay-all="cash">Tất cả</button>
+          </div>
         </label>
         <label class="cc-field">
           <span>Sổ quỹ tiền mặt</span>
@@ -554,20 +564,58 @@
         </label>
         <label class="cc-field">
           <span>Chuyển khoản</span>
-          <input id="ccPayTransfer" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+          <div class="cc-money-combo">
+            <input id="ccPayTransfer" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+            <button type="button" class="cc-btn cc-btn-pay-all" id="ccPayTransferAll" data-pay-all="transfer">Tất cả</button>
+          </div>
         </label>
         <label class="cc-field">
           <span>Sổ quỹ chuyển khoản</span>
           <select id="ccPayTransferBook" class="cc-select"></select>
         </label>
         <label class="cc-field span-2">
-          <span>Tổng chi</span>
+          <span>Tổng chi lương NV</span>
           <div class="cc-pay-summary" id="ccPayTotal">0</div>
         </label>
         <label class="cc-field span-2">
-          <span>Thực chi</span>
+          <span>Thực chi lương NV</span>
           <div class="cc-pay-total" id="ccPayActual">0</div>
         </label>
+        <div class="span-2 cc-pay-employer-block" id="ccPayEmployerBlock" hidden>
+          <div class="cc-pay-employer-title">Chi người sử dụng lao động (NSDLĐ)</div>
+          <label class="cc-field span-2" style="display:grid;gap:5px;margin-bottom:10px">
+            <span>Cần chi NSDLĐ lần này</span>
+            <div class="cc-pay-total" id="ccPayEmployerDue">0</div>
+          </label>
+          <div class="cc-pay-grid" style="padding:0;gap:12px">
+            <label class="cc-field">
+              <span>Tiền mặt NSDLĐ</span>
+              <div class="cc-money-combo">
+                <input id="ccPayEmployerCash" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+                <button type="button" class="cc-btn cc-btn-pay-all" id="ccPayEmployerCashAll">Tất cả</button>
+              </div>
+            </label>
+            <label class="cc-field">
+              <span>Sổ quỹ tiền mặt NSDLĐ</span>
+              <select id="ccPayEmployerCashBook" class="cc-select"></select>
+            </label>
+            <label class="cc-field">
+              <span>Chuyển khoản NSDLĐ</span>
+              <div class="cc-money-combo">
+                <input id="ccPayEmployerTransfer" class="cc-input cc-money-input" type="text" inputmode="numeric" placeholder="0">
+                <button type="button" class="cc-btn cc-btn-pay-all" id="ccPayEmployerTransferAll">Tất cả</button>
+              </div>
+            </label>
+            <label class="cc-field">
+              <span>Sổ quỹ chuyển khoản NSDLĐ</span>
+              <select id="ccPayEmployerTransferBook" class="cc-select"></select>
+            </label>
+            <label class="cc-field span-2">
+              <span>Tổng chi NSDLĐ</span>
+              <div class="cc-pay-summary" id="ccPayEmployerTotal">0</div>
+            </label>
+          </div>
+        </div>
         <div class="span-2" id="ccPayErrorWrap" hidden>
           <div class="cc-pay-error" id="ccPayErrors"></div>
         </div>
@@ -903,6 +951,7 @@
       const saveBtn = document.getElementById('ccSave');
       const statusEl = document.getElementById('ccStatus');
       const toolbarStatusEl = document.getElementById('ccToolbarStatus');
+      const attendanceTotalEl = document.getElementById('ccAttendanceTotal');
       const modal = document.getElementById('ccEmployeeModal');
       const employeeRows = document.getElementById('ccEmployeeRows');
       const payrollRows = document.getElementById('ccPayrollRows');
@@ -925,6 +974,9 @@
       let employeeDetailId = '';
       let pendingPayrollPayId = '';
       let pendingPayrollPayDue = 0;
+      let pendingPayrollEmployerTotal = 0;
+      let pendingPayrollEmployerPaid = 0;
+      let pendingPayrollEmployerDue = 0;
       let payrollPayCashBookId = '';
       const payrollPayModal = document.getElementById('ccPayrollPayModal');
       const payrollDetailModal = document.getElementById('ccPayrollDetailModal');
@@ -1041,6 +1093,28 @@
         const morning = day && day.ca_sang ? 0.5 : 0;
         const afternoon = day && day.ca_chieu ? 0.5 : 0;
         return morning + afternoon + parseWorkUnitInput(day ? day.tang_ca_cong : 0);
+      }
+
+      function updateAttendanceTotal() {
+        if (!attendanceTotalEl) return;
+        let rows = [];
+        if (!employeeSelect.value) {
+          rows = [];
+        } else if (boardWrap && boardWrap.querySelector('.cc-day[data-date]')) {
+          rows = collectDayRows();
+        } else if (Array.isArray(currentDays)) {
+          rows = currentDays.map(function(day) {
+            return {
+              ca_sang: !!day.ca_sang,
+              ca_chieu: !!day.ca_chieu,
+              tang_ca_cong: parseWorkUnitInput(day.tang_ca_cong || day.cong_tang_ca || 0)
+            };
+          });
+        }
+        const total = rows.reduce(function(sum, row) {
+          return sum + dayWorkUnits(row);
+        }, 0);
+        attendanceTotalEl.textContent = 'Tổng công: ' + workUnitText(total) + ' công';
       }
 
       function firstDayOfMonth(value) {
@@ -1697,9 +1771,11 @@
         currentMonths = [];
         if (!employeeSelect.value) {
           boardWrap.innerHTML = '<div class="cc-empty">Chọn nhân viên để chấm công tháng hiện tại.</div>';
+          updateAttendanceTotal();
           return;
         }
         boardWrap.innerHTML = buildDayBoardHtml(currentDays);
+        updateAttendanceTotal();
       }
 
       function renderMonthBoard(months) {
@@ -1707,9 +1783,11 @@
         currentDays = [];
         if (!employeeSelect.value) {
           boardWrap.innerHTML = '<div class="cc-empty">Chọn nhân viên để chấm công.</div>';
+          updateAttendanceTotal();
           return;
         }
         boardWrap.innerHTML = buildMonthBoardHtml(currentMonths);
+        updateAttendanceTotal();
       }
 
       function renderDualBoard(days, months) {
@@ -1749,6 +1827,8 @@
           boardWrap.innerHTML = '<div class="cc-empty">Chọn nhân viên để chấm công tháng hiện tại.</div>';
           dualBoardView = 'thang';
           hasDualSalary = false;
+          currentDays = [];
+          updateAttendanceTotal();
           return false;
         }
         renderAttendanceMonth();
@@ -2242,17 +2322,89 @@
         };
       }
 
+      function fillPayrollPayAll(method) {
+        const cashEl = document.getElementById('ccPayCash');
+        const transferEl = document.getElementById('ccPayTransfer');
+        const due = Math.max(0, Number(pendingPayrollPayDue || 0));
+        const useCash = method === 'cash';
+        if (cashEl) cashEl.value = useCash && due > 0 ? formatMoneyInput(due) : formatMoneyInput(0);
+        if (transferEl) transferEl.value = !useCash && due > 0 ? formatMoneyInput(due) : formatMoneyInput(0);
+        syncPayrollEmployerShareInputs();
+        refreshPayrollPaymentSummary();
+      }
+
+      function fillPayrollEmployerPayAll(method) {
+        const cashEl = document.getElementById('ccPayEmployerCash');
+        const transferEl = document.getElementById('ccPayEmployerTransfer');
+        const due = Math.max(0, Number(pendingPayrollEmployerDue || 0));
+        const useCash = method === 'cash';
+        if (cashEl) cashEl.value = useCash && due > 0 ? formatMoneyInput(due) : formatMoneyInput(0);
+        if (transferEl) transferEl.value = !useCash && due > 0 ? formatMoneyInput(due) : formatMoneyInput(0);
+        refreshPayrollPaymentSummary();
+      }
+
+      function calcPendingEmployerShare(salaryPayAmount) {
+        const remainingEmployer = Math.max(0, Number(pendingPayrollEmployerTotal || 0) - Number(pendingPayrollEmployerPaid || 0));
+        const due = Math.max(0, Number(pendingPayrollPayDue || 0));
+        const pay = Math.max(0, Number(salaryPayAmount || 0));
+        if (!(remainingEmployer > 0) || !(due > 0) || !(pay > 0)) return 0;
+        if (pay >= due) return remainingEmployer;
+        return Math.round(remainingEmployer * pay / due);
+      }
+
+      function syncPayrollEmployerShareInputs(forceSplit) {
+        const payment = readPayrollPaymentInput();
+        pendingPayrollEmployerDue = calcPendingEmployerShare(payment.tong_chi);
+        const dueEl = document.getElementById('ccPayEmployerDue');
+        if (dueEl) dueEl.textContent = moneyTextVnd(pendingPayrollEmployerDue);
+        const block = document.getElementById('ccPayEmployerBlock');
+        if (block) block.hidden = !(Number(pendingPayrollEmployerTotal || 0) > 0);
+        if (forceSplit || document.activeElement?.id === 'ccPayCash' || document.activeElement?.id === 'ccPayTransfer'
+          || document.activeElement?.id === 'ccPayCashAll' || document.activeElement?.id === 'ccPayTransferAll'
+          || !document.activeElement
+          || ['ccPayEmployerCash', 'ccPayEmployerTransfer'].indexOf(document.activeElement.id) < 0) {
+          const split = splitPayrollAmountEvenly(pendingPayrollEmployerDue);
+          const cashEl = document.getElementById('ccPayEmployerCash');
+          const transferEl = document.getElementById('ccPayEmployerTransfer');
+          if (cashEl) cashEl.value = split.tien_mat > 0 ? formatMoneyInput(split.tien_mat) : formatMoneyInput(0);
+          if (transferEl) transferEl.value = split.chuyen_khoan > 0 ? formatMoneyInput(split.chuyen_khoan) : formatMoneyInput(0);
+        }
+      }
+
+      function readPayrollEmployerPaymentInput() {
+        const tien_mat = parseMoneyInput(document.getElementById('ccPayEmployerCash')?.value);
+        const chuyen_khoan = parseMoneyInput(document.getElementById('ccPayEmployerTransfer')?.value);
+        return {
+          tien_mat: tien_mat,
+          chuyen_khoan: chuyen_khoan,
+          tong_chi: tien_mat + chuyen_khoan
+        };
+      }
+
       function refreshPayrollPaymentSummary() {
         const payment = readPayrollPaymentInput();
+        pendingPayrollEmployerDue = calcPendingEmployerShare(payment.tong_chi);
+        const employerPayment = readPayrollEmployerPaymentInput();
         const errors = [];
-        if (payment.tong_chi <= 0) errors.push('Vui lòng nhập số tiền thanh toán');
-        if (payment.tong_chi > pendingPayrollPayDue) errors.push('Tổng chi không được vượt số cần thanh toán');
+        if (payment.tong_chi <= 0) errors.push('Vui lòng nhập số tiền thanh toán lương');
+        if (payment.tong_chi > pendingPayrollPayDue) errors.push('Tổng chi lương không được vượt số cần thanh toán');
+        const dueEl = document.getElementById('ccPayEmployerDue');
+        if (dueEl) dueEl.textContent = moneyTextVnd(pendingPayrollEmployerDue);
+        if (Number(pendingPayrollEmployerTotal || 0) > 0 && pendingPayrollEmployerDue > 0) {
+          if (employerPayment.tong_chi !== pendingPayrollEmployerDue) {
+            errors.push('Tổng chi NSDLĐ phải bằng ' + moneyText(pendingPayrollEmployerDue) + ' đ');
+          }
+        } else if (employerPayment.tong_chi > 0) {
+          errors.push('Lần thanh toán này không phát sinh chi NSDLĐ');
+        }
         const totalEl = document.getElementById('ccPayTotal');
         const actualEl = document.getElementById('ccPayActual');
+        const employerTotalEl = document.getElementById('ccPayEmployerTotal');
         const errWrap = document.getElementById('ccPayErrorWrap');
         const errEl = document.getElementById('ccPayErrors');
         if (totalEl) totalEl.textContent = moneyTextVnd(payment.tong_chi);
         if (actualEl) actualEl.textContent = moneyTextVnd(payment.tong_chi);
+        if (employerTotalEl) employerTotalEl.textContent = moneyTextVnd(employerPayment.tong_chi);
         if (errWrap && errEl) {
           if (errors.length) {
             errWrap.hidden = false;
@@ -2282,8 +2434,8 @@
         return String(books[0]._id || '');
       }
 
-      function renderPayrollCashBooks(books) {
-        const select = document.getElementById('ccPayCashBook');
+      function renderPayrollCashBooks(books, selectId) {
+        const select = document.getElementById(selectId || 'ccPayCashBook');
         if (!select) return '';
         select.innerHTML = '<option value="">— Chọn sổ tiền mặt —</option>' + (books || []).map(function(item) {
           return '<option value="' + escapeHtml(item._id || '') + '">' + escapeHtml(item.ten_so_quy || item.ma_so_quy || 'Sổ quỹ') + '</option>';
@@ -2307,20 +2459,6 @@
           const note = formula ? '<small>' + escapeHtml(formula) + '</small>' : '';
           return '<div class="cc-payroll-line ' + cls + '"><span>' + escapeHtml(line.label || '') + note + '</span><b>' + sign + escapeHtml(moneyText(line.amount)) + '</b></div>';
         }).join('') + '</div>';
-      }
-
-      function renderPayrollReceiptDetail(item) {
-        const receipt = item && item.phieu_chi ? item.phieu_chi : {};
-        if (!receipt.ma_phieu) return '<div class="cc-payroll-pay-note">Chưa có phiếu chi.</div>';
-        const receiptHref = receipt._id ? receiptDocHref(receipt._id) : '';
-        const code = receiptHref
-          ? '<a class="cc-ref-link" href="' + receiptHref + '">' + escapeHtml(receipt.ma_phieu) + '</a>'
-          : escapeHtml(receipt.ma_phieu);
-        return '<div class="cc-payroll-lines">'
-          + '<div class="cc-payroll-line"><span>Mã phiếu chi</span><b>' + code + '</b></div>'
-          + '<div class="cc-payroll-line"><span>Ngày lập</span><b>' + escapeHtml(receipt.ngay_lap_text || '---') + '</b></div>'
-          + '<div class="cc-payroll-line is-minus"><span>Giá trị</span><b>- ' + escapeHtml(moneyText(receipt.gia_tri || 0)) + '</b></div>'
-          + '</div>';
       }
 
       function renderPayrollDetailModal(item, preview) {
@@ -2385,13 +2523,44 @@
         wrap.innerHTML = renderPayrollLines({ payroll_lines: lines || [] });
       }
 
-      function renderPayrollTransferBooks(books) {
-        const select = document.getElementById('ccPayTransferBook');
+      function renderPayrollTransferBooks(books, selectId) {
+        const select = document.getElementById(selectId || 'ccPayTransferBook');
         if (!select) return;
         select.innerHTML = '<option value="">— Chọn tài khoản chuyển khoản —</option>' + (books || []).map(function(item) {
           return '<option value="' + escapeHtml(item._id || '') + '">' + escapeHtml(item.ten_so_quy || item.ma_so_quy || 'Sổ quỹ') + '</option>';
         }).join('');
         if (select.options[0]) select.options[0].textContent = '\u2014 Ch\u1ecdn s\u1ed5 chuy\u1ec3n kho\u1ea3n \u2014';
+        const defaultBook = (books || []).find(function(item) { return !!item.mac_dinh; }) || (books || [])[0];
+        if (defaultBook && defaultBook._id) select.value = String(defaultBook._id);
+      }
+
+      function renderPayrollReceiptDetail(item) {
+        const receipt = item && item.phieu_chi ? item.phieu_chi : {};
+        const employerReceipt = item && item.phieu_chi_nsdld ? item.phieu_chi_nsdld : {};
+        let html = '';
+        if (receipt.ma_phieu) {
+          const receiptHref = receipt._id ? receiptDocHref(receipt._id) : '';
+          const code = receiptHref
+            ? '<a class="cc-ref-link" href="' + receiptHref + '">' + escapeHtml(receipt.ma_phieu) + '</a>'
+            : escapeHtml(receipt.ma_phieu);
+          html += '<div class="cc-payroll-lines">'
+            + '<div class="cc-payroll-line"><span>Phiếu chi lương NV</span><b>' + code + '</b></div>'
+            + '<div class="cc-payroll-line"><span>Ngày lập</span><b>' + escapeHtml(receipt.ngay_lap_text || '---') + '</b></div>'
+            + '<div class="cc-payroll-line is-minus"><span>Giá trị</span><b>- ' + escapeHtml(moneyText(receipt.gia_tri || 0)) + '</b></div>'
+            + '</div>';
+        }
+        if (employerReceipt.ma_phieu) {
+          const receiptHref = employerReceipt._id ? receiptDocHref(employerReceipt._id) : '';
+          const code = receiptHref
+            ? '<a class="cc-ref-link" href="' + receiptHref + '">' + escapeHtml(employerReceipt.ma_phieu) + '</a>'
+            : escapeHtml(employerReceipt.ma_phieu);
+          html += '<div class="cc-payroll-lines" style="margin-top:8px">'
+            + '<div class="cc-payroll-line"><span>Phiếu chi NSDLĐ</span><b>' + code + '</b></div>'
+            + '<div class="cc-payroll-line"><span>Ngày lập</span><b>' + escapeHtml(employerReceipt.ngay_lap_text || '---') + '</b></div>'
+            + '<div class="cc-payroll-line is-minus"><span>Giá trị</span><b>- ' + escapeHtml(moneyText(employerReceipt.gia_tri || 0)) + '</b></div>'
+            + '</div>';
+        }
+        return html || '<div class="cc-payroll-pay-note">Chưa có phiếu chi.</div>';
       }
 
       function splitPayrollAmountEvenly(due) {
@@ -2418,13 +2587,20 @@
         }
         pendingPayrollPayId = payrollId;
         pendingPayrollPayDue = Math.max(0, Number(preview.con_thanh_toan || 0));
+        pendingPayrollEmployerTotal = Math.max(0, Number(preview.tong_nsdld || 0));
+        pendingPayrollEmployerPaid = Math.max(0, Number(preview.da_tra_nsdld || 0));
+        pendingPayrollEmployerDue = 0;
         payrollPayCashBookId = '';
         const dueEl = document.getElementById('ccPayDue');
         const cashEl = document.getElementById('ccPayCash');
         const transferEl = document.getElementById('ccPayTransfer');
+        const employerCashEl = document.getElementById('ccPayEmployerCash');
+        const employerTransferEl = document.getElementById('ccPayEmployerTransfer');
+        const employerBlock = document.getElementById('ccPayEmployerBlock');
         const splitAmount = splitPayrollAmountEvenly(pendingPayrollPayDue);
         if (dueEl) dueEl.textContent = moneyTextVnd(pendingPayrollPayDue);
         renderPayrollPaymentLines(preview.payroll_lines || []);
+        if (employerBlock) employerBlock.hidden = !(pendingPayrollEmployerTotal > 0);
         if (cashEl) {
           cashEl.value = splitAmount.tien_mat > 0 ? formatMoneyInput(splitAmount.tien_mat) : '';
           bindMoneyInput(cashEl);
@@ -2433,12 +2609,17 @@
           transferEl.value = splitAmount.chuyen_khoan > 0 ? formatMoneyInput(splitAmount.chuyen_khoan) : '';
           bindMoneyInput(transferEl);
         }
+        if (employerCashEl) bindMoneyInput(employerCashEl);
+        if (employerTransferEl) bindMoneyInput(employerTransferEl);
+        syncPayrollEmployerShareInputs(true);
         refreshPayrollPaymentSummary();
         payrollPayModal.classList.add('is-open');
         const cashBooks = await loadPayrollPayBooks('tien_mat');
-        payrollPayCashBookId = renderPayrollCashBooks(cashBooks);
+        payrollPayCashBookId = renderPayrollCashBooks(cashBooks, 'ccPayCashBook');
+        renderPayrollCashBooks(cashBooks, 'ccPayEmployerCashBook');
         const transferBooks = await loadPayrollPayBooks('chuyen_khoan');
-        renderPayrollTransferBooks(transferBooks);
+        renderPayrollTransferBooks(transferBooks, 'ccPayTransferBook');
+        renderPayrollTransferBooks(transferBooks, 'ccPayEmployerTransferBook');
         if (splitAmount.chuyen_khoan > 0) {
           const transferSelect = document.getElementById('ccPayTransferBook');
           if (transferSelect && transferBooks.length) {
@@ -2452,13 +2633,19 @@
       function closePayrollPayModal() {
         pendingPayrollPayId = '';
         pendingPayrollPayDue = 0;
+        pendingPayrollEmployerTotal = 0;
+        pendingPayrollEmployerPaid = 0;
+        pendingPayrollEmployerDue = 0;
         payrollPayCashBookId = '';
         renderPayrollPaymentLines([]);
+        const employerBlock = document.getElementById('ccPayEmployerBlock');
+        if (employerBlock) employerBlock.hidden = true;
         payrollPayModal.classList.remove('is-open');
       }
 
       async function submitPayrollPayModal() {
         const payment = readPayrollPaymentInput();
+        const employerPayment = readPayrollEmployerPaymentInput();
         if (!pendingPayrollPayId) return;
         if (payment.tong_chi <= 0) {
           setStatus('Vui lòng nhập số tiền thanh toán.', 'error');
@@ -2466,6 +2653,11 @@
         }
         if (payment.tong_chi > pendingPayrollPayDue) {
           setStatus('Số tiền thanh toán không được vượt ' + moneyText(pendingPayrollPayDue) + ' đ.', 'error');
+          return;
+        }
+        pendingPayrollEmployerDue = calcPendingEmployerShare(payment.tong_chi);
+        if (pendingPayrollEmployerDue > 0 && employerPayment.tong_chi !== pendingPayrollEmployerDue) {
+          setStatus('Số tiền chi NSDLĐ phải bằng ' + moneyText(pendingPayrollEmployerDue) + ' đ.', 'error');
           return;
         }
         const cashBookId = payment.tien_mat > 0
@@ -2482,6 +2674,20 @@
           setStatus('Vui lòng chọn sổ quỹ cho tiền chuyển khoản.', 'error');
           return;
         }
+        const employerCashBookId = employerPayment.tien_mat > 0
+          ? String(document.getElementById('ccPayEmployerCashBook')?.value || '').trim()
+          : '';
+        if (employerPayment.tien_mat > 0 && !employerCashBookId) {
+          setStatus('Vui lòng chọn sổ quỹ tiền mặt cho chi NSDLĐ.', 'error');
+          return;
+        }
+        const employerBankBookId = employerPayment.chuyen_khoan > 0
+          ? String(document.getElementById('ccPayEmployerTransferBook')?.value || '').trim()
+          : '';
+        if (employerPayment.chuyen_khoan > 0 && !employerBankBookId) {
+          setStatus('Vui lòng chọn sổ quỹ chuyển khoản cho chi NSDLĐ.', 'error');
+          return;
+        }
         const submitBtn = document.getElementById('ccPaySubmit');
         if (submitBtn) {
           submitBtn.disabled = true;
@@ -2496,7 +2702,11 @@
               tien_mat: payment.tien_mat,
               chuyen_khoan: payment.chuyen_khoan,
               so_quy_tien_mat_id: cashBookId,
-              so_quy_chuyen_khoan_id: bankBookId
+              so_quy_chuyen_khoan_id: bankBookId,
+              nsdld_tien_mat: employerPayment.tien_mat,
+              nsdld_chuyen_khoan: employerPayment.chuyen_khoan,
+              nsdld_so_quy_tien_mat_id: employerCashBookId,
+              nsdld_so_quy_chuyen_khoan_id: employerBankBookId
             })
           });
           if (!json.success) {
@@ -2504,7 +2714,10 @@
             return;
           }
           closePayrollPayModal();
-          setStatus((json.message || 'Đã thanh toán') + (json.receipt && json.receipt.ma_phieu ? (' (' + json.receipt.ma_phieu + ').') : '.'), 'ok');
+          const receiptCodes = [];
+          if (json.receipt && json.receipt.ma_phieu) receiptCodes.push(json.receipt.ma_phieu);
+          if (json.receipt_nsdld && json.receipt_nsdld.ma_phieu) receiptCodes.push(json.receipt_nsdld.ma_phieu);
+          setStatus((json.message || 'Đã thanh toán') + (receiptCodes.length ? (' (' + receiptCodes.join(', ') + ').') : '.'), 'ok');
           await Promise.all([
             loadPayrollTable(),
             loadPaidPayrollTable({ silent: true })
@@ -2557,6 +2770,7 @@
         }
         const firstDay = days[0] || {};
         const lastDay = days[days.length - 1] || {};
+        const totalWork = item.tong_cong_hien_thi != null ? item.tong_cong_hien_thi : (item.so_ngay_cong || 0);
         const rangeText = days.length === 1
           ? (firstDay.ngay_hien_thi || firstDay.ngay || '---')
           : ((firstDay.ngay_hien_thi || firstDay.ngay || '---') + ' - ' + (lastDay.ngay_hien_thi || lastDay.ngay || '---'));
@@ -2574,7 +2788,7 @@
           return '<div class="cc-payroll-day-line"><div><strong>' + escapeHtml(day.ngay_hien_thi || day.ngay || '---') + '</strong>' + noteHtml + '</div><span>' + escapeHtml(timeText) + '</span></div>';
         }).join('');
         return '<div class="cc-payroll-day-lines">'
-          + '<div class="cc-payroll-day-summary"><div><strong>Ngày công: ' + escapeHtml(workUnitText(item.so_ngay_cong || 0)) + '</strong><div class="cc-payroll-day-range">' + escapeHtml(rangeText) + '</div></div><button type="button" class="cc-payroll-toggle" aria-label="Xem chi tiết ngày công">v</button></div>'
+          + '<div class="cc-payroll-day-summary"><div><strong>Ngày công: ' + escapeHtml(workUnitText(totalWork || 0)) + '</strong><div class="cc-payroll-day-range">' + escapeHtml(rangeText) + '</div></div><button type="button" class="cc-payroll-toggle" aria-label="Xem chi tiết ngày công">v</button></div>'
           + '<div class="cc-payroll-day-details" hidden>' + detailHtml + '</div>'
           + '</div>';
       }
@@ -2583,7 +2797,13 @@
         options = options || {};
         const params = new URLSearchParams();
         const payrollEmployeeId = document.getElementById('ccPayrollEmployee').value;
-        const payrollStatus = document.getElementById('ccPayrollStatusHeader')?.value || 'all';
+        let payrollStatus = document.getElementById('ccPayrollStatusHeader')?.value || 'all';
+        if (highlightPayrollId && payrollStatus !== 'all') {
+          payrollStatus = 'all';
+          if (document.getElementById('ccPayrollStatusHeader')) {
+            document.getElementById('ccPayrollStatusHeader').value = 'all';
+          }
+        }
         if (payrollEmployeeId) params.set('nhan_vien_id', payrollEmployeeId);
         if (payrollStatus) params.set('trang_thai', payrollStatus);
         if (!options.silent) setTableLoading(payrollRows, 11, 'Đang tải bảng lương...');
@@ -2604,11 +2824,7 @@
           return renderPayrollTableRow(item, item.da_thanh_toan ? 'paid' : 'pending');
         }).join('');
         if (highlightPayrollId) {
-          const row = payrollRows.querySelector('[data-payroll-id="' + cssEscape(highlightPayrollId) + '"]');
-          if (row) {
-            row.classList.add('cc-row-highlight');
-            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
+          highlightPayrollRow(highlightPayrollId, payrollRows);
         }
         return true;
       }
@@ -2868,6 +3084,7 @@
         const tangCaInput = dayEl.querySelector('.cc-tang-ca-cong');
         const total = (caSang ? 0.5 : 0) + (caChieu ? 0.5 : 0) + parseWorkUnitInput(tangCaInput ? tangCaInput.value : '');
         const totalEl = dayEl.querySelector('.cc-work-unit');
+        updateAttendanceTotal();
         if (totalEl) totalEl.textContent = 'Tổng: ' + workUnitText(total) + ' công';
       }
       boardWrap.addEventListener('change', function(event) {
@@ -3062,7 +3279,27 @@
       ['ccPayCash', 'ccPayTransfer'].forEach(function(id) {
         const input = document.getElementById(id);
         if (!input) return;
+        input.addEventListener('input', function() {
+          syncPayrollEmployerShareInputs(true);
+          refreshPayrollPaymentSummary();
+        });
+      });
+      ['ccPayEmployerCash', 'ccPayEmployerTransfer'].forEach(function(id) {
+        const input = document.getElementById(id);
+        if (!input) return;
         input.addEventListener('input', refreshPayrollPaymentSummary);
+      });
+      document.getElementById('ccPayCashAll')?.addEventListener('click', function() {
+        fillPayrollPayAll('cash');
+      });
+      document.getElementById('ccPayTransferAll')?.addEventListener('click', function() {
+        fillPayrollPayAll('transfer');
+      });
+      document.getElementById('ccPayEmployerCashAll')?.addEventListener('click', function() {
+        fillPayrollEmployerPayAll('cash');
+      });
+      document.getElementById('ccPayEmployerTransferAll')?.addEventListener('click', function() {
+        fillPayrollEmployerPayAll('transfer');
       });
       document.getElementById('ccFormHasDaySalary').addEventListener('change', syncSalaryInputs);
       document.getElementById('ccFormHasMonthSalary').addEventListener('change', syncSalaryInputs);
@@ -3100,10 +3337,51 @@
         modal.classList.remove('is-open');
       });
       document.getElementById('ccSaveEmployee').addEventListener('click', saveEmployee);
+      async function openAdvanceFromUrl(token) {
+        const params = new URLSearchParams(location.search);
+        let employeeId = String(params.get('nhan_vien_id') || '').trim();
+        const codeOrId = String(token || '').trim();
+        if (!employeeId && /^[0-9a-fA-F]{24}$/.test(codeOrId)) {
+          // advance id without employee: open employees tab and highlight nothing special
+        }
+        if (!employeeId && employeeRows) {
+          const rows = Array.from(employeeRows.querySelectorAll('tr[data-id]'));
+          for (var i = 0; i < rows.length && !employeeId; i += 1) {
+            const id = rows[i].getAttribute('data-id');
+            if (!id) continue;
+            try {
+              const json = await fetchJson('/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id) + '/tam-ung', {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin'
+              });
+              const items = Array.isArray(json.items) ? json.items : [];
+              const found = items.find(function(item) {
+                return String(item._id) === codeOrId || String(item.ma_tam_ung || '').toUpperCase() === codeOrId.toUpperCase();
+              });
+              if (found) employeeId = id;
+            } catch (error) {
+              // ignore and continue
+            }
+          }
+        }
+        if (employeeId) {
+          const row = employeeRows.querySelector('[data-id="' + cssEscape(employeeId) + '"]');
+          if (row) {
+            row.classList.add('cc-row-highlight');
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          await openEmployeeDetail(employeeId);
+          setStatus('Đã mở nhân viên liên quan tạm ứng ' + (codeOrId || '') + '.', 'ok');
+          return;
+        }
+        if (codeOrId) setStatus('Không tìm thấy tạm ứng ' + codeOrId + '.', 'error');
+      }
+
       (async function initFromUrl() {
         const params = new URLSearchParams(location.search);
         const tab = params.get('tab');
-        const bangLuong = params.get('bang_luong');
+        const bangLuong = params.get('bang_luong') || params.get('ma_bang_luong') || '';
+        const tamUng = params.get('tam_ung') || params.get('ma_tam_ung') || '';
         const payrollStatus = params.get('trang_thai') || (tab === 'payroll-paid' ? 'da_thanh_toan' : '');
         if (payrollStatus && document.getElementById('ccPayrollStatusHeader')) {
           document.getElementById('ccPayrollStatusHeader').value = payrollStatus;
@@ -3113,14 +3391,20 @@
           await loadPayrollTable(bangLuong || '');
           return;
         }
-        if (tab === 'payroll') {
+        if (tab === 'payroll' || bangLuong) {
           switchTab('payroll', true);
           await loadPayrollTable(bangLuong || '');
+          if (bangLuong && /^[0-9a-fA-F]{24}$/.test(String(bangLuong))) {
+            openPayrollDetailModal(bangLuong);
+          }
           return;
         }
-        if (tab === 'employees' || tab === 'departments' || tab === 'positions') {
+        if (tab === 'employees' || tab === 'departments' || tab === 'positions' || tamUng) {
           switchTab('employees', true);
           await loadEmployeeTable();
+          if (tamUng) {
+            await openAdvanceFromUrl(tamUng);
+          }
           return;
         }
         if (tab === 'contributions' || tab === 'allowances') {

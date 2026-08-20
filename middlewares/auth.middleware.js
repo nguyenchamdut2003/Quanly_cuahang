@@ -8,7 +8,10 @@ function wantsJsonResponse(req) {
 
 function isSafeReturnUrl(value) {
     const url = String(value || '').trim();
-    return !!url && url[0] === '/' && url.indexOf('//') !== 0;
+    if (!url || url[0] !== '/' || url.indexOf('//') === 0) return false;
+    if (/^\/(?:login|register|logout|auth\/logout|auth\/google|auth\/google\/callback)(?:[/?#]|$)/i.test(url)) return false;
+    if (/\.(?:css|js|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|map)(?:[?#]|$)/i.test(url)) return false;
+    return true;
 }
 
 function redirectToLogin(req, res, error) {
