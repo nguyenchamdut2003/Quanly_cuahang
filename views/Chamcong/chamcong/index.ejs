@@ -82,6 +82,22 @@
     .cc-table th:nth-child(11),.cc-table td:nth-child(11){text-align:right}
     .cc-table th:nth-child(12),.cc-table td:nth-child(12){width:86px}
     .cc-table th:nth-child(13),.cc-table td:nth-child(13){width:92px}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(6),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(6){width:88px}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(7),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(7){width:56px;text-align:center}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(9),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(9),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(10),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(10),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(11),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(11),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(12),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(12){text-align:right}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(13),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(13){text-align:left}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(14),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(14){width:88px;text-align:left}
     .cc-pill{display:inline-flex;align-items:center;height:22px;border-radius:5px;padding:0 8px;font-size:11px;font-weight:800}
     .cc-pill.is-active{background:#dcfce7;color:#166534}
     .cc-pill.is-inactive{background:#fee2e2;color:#991b1b}
@@ -103,6 +119,9 @@
     .cc-pay-employer-title{font-size:13px;font-weight:800;color:#1d4ed8;margin-bottom:10px}
     .cc-form-section{grid-column:span 2;border-top:1px solid #e5e9ee;padding-top:14px;margin-top:2px;display:grid;gap:12px}
     .cc-form-section h3{margin:0;font-size:14px;font-weight:800;color:#111827;text-transform:uppercase}
+    .cc-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .cc-section-head button{border:0;background:transparent;color:#0070f4;font-size:12px;font-weight:800;padding:0;cursor:pointer}
+    .cc-section-head button:hover{text-decoration:underline}
     .cc-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .cc-radio-stack{display:grid;gap:8px}
     .cc-radio-line{display:flex;align-items:center;gap:8px;font-size:13px;color:#111827}
@@ -127,6 +146,10 @@
     .cc-filter-picker-head label{font-size:12px;color:#344054;font-weight:800}
     .cc-filter-picker-head button{border:0;background:transparent;color:#0070f4;font-size:12px;font-weight:800;padding:0;cursor:pointer}
     .cc-filter-picker-head button:hover{text-decoration:underline}
+    .cc-field-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .cc-field-head label{font-size:12px;color:#344054;font-weight:800}
+    .cc-field-head button{border:0;background:transparent;color:#0070f4;font-size:12px;font-weight:800;padding:0;cursor:pointer}
+    .cc-field-head button:hover{text-decoration:underline}
     .cc-filter-picker .cc-select{min-width:0;width:100%}
     .cc-employee-inline-filters{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin-left:auto}
     .cc-contribution-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -349,8 +372,10 @@
                 <th>Ngày sinh</th>
                 <th>Giới tính</th>
                 <th>Chức vụ</th>
-                <th>Ngày bắt đầu</th>
                 <th>Lương/tháng</th>
+                <th>Tạm ứng</th>
+                <th>Cần thanh toán</th>
+                <th>Tổng thanh toán</th>
                 <th>Trạng thái</th>
                 <th>Thao tác</th>
               </tr>
@@ -831,7 +856,10 @@
           <input id="ccFormMonthSalary" class="cc-input cc-money-input" type="text" inputmode="numeric" autocomplete="off" value="0">
         </div>
         <div class="cc-field">
-          <label for="ccFormDepartment">Phòng ban</label>
+          <div class="cc-field-head">
+            <label for="ccFormDepartment">Phòng ban</label>
+            <button type="button" id="ccFormDepartmentAdd">Tạo mới</button>
+          </div>
           <select id="ccFormDepartment" class="cc-select">
             <option value="">Chọn phòng ban</option>
             <% (phongBans || []).filter(function(item) { return item.trang_thai !== 'inactive'; }).forEach(function(item) { %>
@@ -840,7 +868,10 @@
           </select>
         </div>
         <div class="cc-field">
-          <label for="ccFormPosition">Chức danh</label>
+          <div class="cc-field-head">
+            <label for="ccFormPosition">Chức danh</label>
+            <button type="button" id="ccFormPositionAdd">Tạo mới</button>
+          </div>
           <select id="ccFormPosition" class="cc-select">
             <option value="">Chọn chức danh</option>
             <% (chucDanhs || []).filter(function(item) { return item.trang_thai !== 'inactive'; }).forEach(function(item) { %>
@@ -860,7 +891,10 @@
               <input id="ccWorkDaysInMonth" class="cc-input" type="number" min="0" step="0.5" value="26">
             </div>
             <div class="cc-field span-2">
-              <label>Khoản nộp áp dụng</label>
+              <div class="cc-field-head">
+                <label>Khoản nộp áp dụng</label>
+                <button type="button" id="ccFormContributionAdd">Tạo mới</button>
+              </div>
               <div class="cc-contribution-list" id="ccContributionList">
                 <% var activeKhoanNops = (danhMucKhoanNops || []).filter(function(item) { return item.trang_thai !== 'inactive'; }); %>
                 <% if (!activeKhoanNops.length) { %>
@@ -877,7 +911,10 @@
           </div>
         </section>
         <section class="cc-form-section">
-          <h3>Phụ cấp</h3>
+          <div class="cc-section-head">
+            <h3>Phụ cấp</h3>
+            <button type="button" id="ccFormAllowanceAdd">Tạo mới</button>
+          </div>
           <div class="cc-allowance-list" id="ccAllowanceList">
             <% var activePhuCaps = (danhMucPhuCaps || []).filter(function(item) { return item.trang_thai !== 'inactive'; }); %>
             <% if (!activePhuCaps.length) { %>
@@ -2874,7 +2911,7 @@
         if (keyword) params.set('keyword', keyword);
         if (departmentId) params.set('phong_ban_id', departmentId);
         if (positionId) params.set('chuc_danh_id', positionId);
-        setTableLoading(employeeRows, 12, 'Đang tải danh sách nhân viên...');
+        setTableLoading(employeeRows, 14, 'Đang tải danh sách nhân viên...');
         const json = await fetchJson('/chamcongmoi/api/nhan-vien?' + params.toString(), {
           headers: { 'Accept': 'application/json' },
           credentials: 'same-origin'
@@ -2884,7 +2921,7 @@
           return;
         }
         if (!json.items.length) {
-          employeeRows.innerHTML = '<tr><td colspan="12" class="cc-empty">Chưa có nhân viên.</td></tr>';
+          employeeRows.innerHTML = '<tr><td colspan="14" class="cc-empty">Chưa có nhân viên.</td></tr>';
           return;
         }
         employeeRows.innerHTML = json.items.map(function(item) {
@@ -2900,8 +2937,10 @@
               <td>${escapeHtml(item.ngay_sinh_input || '')}</td>
               <td>${escapeHtml(genderText(item.gioi_tinh))}</td>
               <td>${escapeHtml(item.chuc_vu || '')}</td>
-              <td>${escapeHtml(item.ngay_bat_dau_lam_viec_input || '')}</td>
               <td>${escapeHtml(moneyText(item.luong_theo_thang))}</td>
+              <td>${escapeHtml(moneyText(item.tam_ung || 0))}</td>
+              <td>${escapeHtml(moneyText(item.can_thanh_toan || 0))}</td>
+              <td>${escapeHtml(moneyText(item.tong_thanh_toan || 0))}</td>
               <td><span class="cc-pill ${statusClass}">${statusText}</span></td>
               <td>
                 <div class="cc-actions">

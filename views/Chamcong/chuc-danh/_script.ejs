@@ -44,7 +44,8 @@
     window.location.href = '/chuc-danh' + (params.toString() ? '?' + params.toString() : '');
   }
 
-  document.getElementById('cdAddBtn').addEventListener('click', () => openCdModal(null));
+  document.getElementById('cdAddBtn')?.addEventListener('click', () => openCdModal(null));
+  document.getElementById('ccFormPositionAdd')?.addEventListener('click', () => openCdModal(null));
   document.getElementById('cdEmptyAdd')?.addEventListener('click', (e) => {
     e.preventDefault();
     openCdModal(null);

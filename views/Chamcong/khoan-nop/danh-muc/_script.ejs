@@ -73,6 +73,7 @@
   }
 
   document.getElementById('knAddBtn')?.addEventListener('click', () => openKnModal(null));
+  document.getElementById('ccFormContributionAdd')?.addEventListener('click', () => openKnModal(null));
   document.getElementById('knEmptyAdd')?.addEventListener('click', (e) => {
     e.preventDefault();
     openKnModal(null);
@@ -92,8 +93,8 @@
 
   document.getElementById('nnAddBtn')?.addEventListener('click', async function() {
     const payload = {
-      ma_noi_nop: document.getElementById('nnMaNoiNop').value.trim(),
-      ten_noi_nop: document.getElementById('nnTenNoiNop').value.trim()
+      ma_noi_nop: (document.getElementById('nnMaNoiNop')?.value || '').trim(),
+      ten_noi_nop: (document.getElementById('nnTenNoiNop')?.value || '').trim()
     };
     if (!payload.ten_noi_nop) return alert('Vui lòng nhập tên nơi nộp');
 

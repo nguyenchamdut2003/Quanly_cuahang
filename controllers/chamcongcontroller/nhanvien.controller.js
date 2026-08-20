@@ -478,7 +478,41 @@ function serializeAllowance(row) {
   };
 }
 
-function serializeEmployee(employee, salaryConfig, allowanceRows) {
+async function getEmployeePayrollSummaryMap(storeId, employeeIds) {
+  if (!employeeIds.length) return {};
+  var rows = await BangLuong.find({
+    cua_hang_id: storeId,
+    nhan_vien_id: { $in: employeeIds },
+    trang_thai_du_lieu: 'active'
+  }).select('nhan_vien_id da_thanh_toan con_phai_tra thuc_nhan').lean();
+  var map = {};
+  rows.forEach(function(row) {
+    var key = String(row.nhan_vien_id);
+    if (!map[key]) map[key] = { tong_thanh_toan: 0, can_thanh_toan: 0 };
+    var paid = Number(row.da_thanh_toan || 0);
+    var due = Math.max(0, Number(row.con_phai_tra != null ? row.con_phai_tra : Number(row.thuc_nhan || 0) - paid));
+    map[key].tong_thanh_toan += paid;
+    map[key].can_thanh_toan += due;
+  });
+  return map;
+}
+
+async function getAdvanceTotalMap(storeId, employeeIds) {
+  if (!employeeIds.length) return {};
+  var rows = await TamUngNhanVien.find({
+    cua_hang_id: storeId,
+    nhan_vien_id: { $in: employeeIds },
+    trang_thai: 'active'
+  }).select('nhan_vien_id so_tien').lean();
+  var map = {};
+  rows.forEach(function(row) {
+    var key = String(row.nhan_vien_id);
+    map[key] = (map[key] || 0) + Number(row.so_tien || 0);
+  });
+  return map;
+}
+
+function serializeEmployee(employee, salaryConfig, allowanceRows, payrollSummary, advanceTotal) {
   var doc = employee.toObject ? employee.toObject() : employee;
   var phongBan = doc.phong_ban_id && typeof doc.phong_ban_id === 'object' ? doc.phong_ban_id : null;
   var chucDanh = doc.chuc_danh_id && typeof doc.chuc_danh_id === 'object' ? doc.chuc_danh_id : null;
@@ -507,7 +541,10 @@ function serializeEmployee(employee, salaryConfig, allowanceRows) {
     luong: salary,
     phu_caps: (allowanceRows || []).map(serializeAllowance),
     trang_thai: doc.trang_thai || 'active',
-    ghi_chu: doc.ghi_chu || ''
+    ghi_chu: doc.ghi_chu || '',
+    tam_ung: Number(advanceTotal || 0),
+    can_thanh_toan: Number((payrollSummary && payrollSummary.can_thanh_toan) || 0),
+    tong_thanh_toan: Number((payrollSummary && payrollSummary.tong_thanh_toan) || 0)
   };
 }
 
@@ -555,11 +592,20 @@ exports.listNhanVien = async function(req, res, next) {
     var employeeIds = employees.map(function(item) { return item._id; });
     var salaryMap = await getSalaryMap(storeId, employeeIds);
     var allowanceMap = await getAllowanceMap(storeId, employeeIds);
+    var payrollSummaryMap = await getEmployeePayrollSummaryMap(storeId, employeeIds);
+    var advanceTotalMap = await getAdvanceTotalMap(storeId, employeeIds);
 
     res.json({
       success: true,
       items: employees.map(function(item) {
-        return serializeEmployee(item, salaryMap[String(item._id)], allowanceMap[String(item._id)]);
+        var key = String(item._id);
+        return serializeEmployee(
+          item,
+          salaryMap[key],
+          allowanceMap[key],
+          payrollSummaryMap[key],
+          advanceTotalMap[key]
+        );
       })
     });
   } catch (error) {
@@ -610,10 +656,8 @@ exports.detailNhanVienPanel = async function(req, res, next) {
 
     var salaryMap = await getSalaryMap(storeId, [employee._id]);
     var allowanceMap = await getAllowanceMap(storeId, [employee._id]);
-    var attendanceRows = await ChamCong.find({
-      cua_hang_id: storeId,
-      nhan_vien_id: id
-    }).sort({ ngay_cham_cong: -1 }).limit(120).lean();
+    var payrollSummaryMap = await getEmployeePayrollSummaryMap(storeId, [employee._id]);
+    var advanceTotalMap = await getAdvanceTotalMap(storeId, [employee._id]);
     var payrollRows = await BangLuong.find({
       cua_hang_id: storeId,
       nhan_vien_id: id
@@ -621,18 +665,13 @@ exports.detailNhanVienPanel = async function(req, res, next) {
     var advanceRows = await listAdvanceRowsWithReceipts(storeId, id, 120);
 
     res.render('Chamcong/nhan-vien/_detail-panel', {
-      item: serializeEmployee(employee, salaryMap[String(employee._id)], allowanceMap[String(employee._id)]),
-      attendanceRows: attendanceRows.map(function(row) {
-        return {
-          ngay_cham_cong: formatDateInput(row.ngay_cham_cong),
-          ngay_hien_thi: formatDateText(row.ngay_cham_cong),
-          ca_sang: !!row.ca_sang,
-          ca_chieu: !!row.ca_chieu,
-          tang_ca_cong: Number(row.cong_tang_ca || 0),
-          so_cong: attendanceWorkUnits(row),
-          ghi_chu: row.ghi_chu || ''
-        };
-      }),
+      item: serializeEmployee(
+        employee,
+        salaryMap[String(employee._id)],
+        allowanceMap[String(employee._id)],
+        payrollSummaryMap[String(employee._id)],
+        advanceTotalMap[String(employee._id)]
+      ),
       payrollRows: payrollRows.map(function(row) {
         var paid = Number(row.da_thanh_toan || 0);
         var due = Math.max(0, Number(row.con_phai_tra != null ? row.con_phai_tra : Number(row.thuc_nhan || 0) - paid));

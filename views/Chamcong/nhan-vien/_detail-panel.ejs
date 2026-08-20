@@ -2,7 +2,6 @@
   <div class="detail-tabs">
     <div class="detail-tab-list">
       <button class="detail-tab is-active" type="button" data-tab-target="employee-info">Thông tin</button>
-      <button class="detail-tab" type="button" data-tab-target="employee-attendance">Ngày công</button>
       <button class="detail-tab" type="button" data-tab-target="employee-payroll">Bảng lương</button>
       <button class="detail-tab" type="button" data-tab-target="employee-advance">Tạm ứng</button>
     </div>
@@ -36,37 +35,6 @@
         <div><span>Lương tháng</span><strong><%= Number((item.luong && item.luong.luong_thang) || item.luong_theo_thang || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>Ngày công chuẩn</span><strong><%= (item.luong && item.luong.so_ngay_cong_trong_thang) || '---' %></strong></div>
       </div>
-    </section>
-
-    <section class="detail-pane" data-tab-panel="employee-attendance">
-      <% if (!attendanceRows.length) { %>
-        <div class="empty-cell">Chưa có ngày công.</div>
-      <% } else { %>
-        <table class="admin-table product-inner-table">
-          <thead>
-            <tr>
-              <th>Ngày</th>
-              <th>Ca sáng</th>
-              <th>Ca chiều</th>
-              <th>Tăng ca</th>
-              <th>Tổng công</th>
-              <th>Ghi chú</th>
-            </tr>
-          </thead>
-          <tbody>
-            <% attendanceRows.forEach(function(row) { %>
-              <tr>
-                <td><%= row.ngay_hien_thi || row.ngay_cham_cong || '' %></td>
-                <td><%= row.ca_sang ? 'Có' : '' %></td>
-                <td><%= row.ca_chieu ? 'Có' : '' %></td>
-                <td><%= Number(row.tang_ca_cong || 0).toLocaleString('vi-VN') %></td>
-                <td><%= Number(row.so_cong || 0).toLocaleString('vi-VN') %></td>
-                <td><%= row.ghi_chu || '' %></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
-      <% } %>
     </section>
 
     <section class="detail-pane" data-tab-panel="employee-payroll">

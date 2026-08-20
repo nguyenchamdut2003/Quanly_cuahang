@@ -44,7 +44,8 @@
     window.location.href = '/phong-ban' + (params.toString() ? '?' + params.toString() : '');
   }
 
-  document.getElementById('pbAddBtn').addEventListener('click', () => openPbModal(null));
+  document.getElementById('pbAddBtn')?.addEventListener('click', () => openPbModal(null));
+  document.getElementById('ccFormDepartmentAdd')?.addEventListener('click', () => openPbModal(null));
   document.getElementById('pbEmptyAdd')?.addEventListener('click', (e) => {
     e.preventDefault();
     openPbModal(null);
