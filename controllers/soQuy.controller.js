@@ -200,8 +200,11 @@ function normalizePayrollDocCode(code) {
 function relatedCode(item) {
     const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
     const allocPn = firstAlloc?.phieu_nhap_id;
+    const allocHd = firstAlloc?.hoa_don_id;
     return item.don_hang_id?.ma_don_hang
         || item.hoa_don_id?.ma_hoa_don
+        || (allocHd && typeof allocHd === 'object' ? allocHd.ma_hoa_don : '')
+        || firstAlloc?.ma_hoa_don
         || item.phieu_nhap_id?.ma_phieu_nhap
         || firstAlloc?.ma_phieu_nhap
         || (allocPn && typeof allocPn === 'object' ? allocPn.ma_phieu_nhap : '')
@@ -449,6 +452,8 @@ exports.index = async (req, res, next) => {
                 .populate('nhap_vat_chua_id')
                 .populate('xuat_vat_chua_id')
                 .populate('allocations.phieu_nhap_id')
+                .populate('allocations.nhap_vat_chua_id')
+                .populate('allocations.hoa_don_id')
                 .sort({ ngay_lap: -1 }),
             SoQuy.find({ trang_thai: 'active',  }).sort({ ten_so_quy: 1 }),
             SoQuy.find({}).sort({ trang_thai: 1, ten_so_quy: 1 }),
@@ -619,6 +624,15 @@ const RECEIPT_DETAIL_POPULATES = [
         path: 'allocations.phieu_nhap_id',
         select: 'ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id',
         populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+    },
+    {
+        path: 'allocations.nhap_vat_chua_id',
+        select: 'ma_nhap_vat_chua tong_tien created_at doi_tuong_ten trang_thai'
+    },
+    {
+        path: 'allocations.hoa_don_id',
+        select: 'ma_hoa_don ngay_ban tong_tien thanh_toan trang_thai khach_hang_id',
+        populate: { path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' }
     }
 ];
 

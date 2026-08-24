@@ -128,10 +128,11 @@ function normalizeAllocations(value) {
 
     const phieuNhapId = optionalId(item && item.phieu_nhap_id);
     const nhapVatChuaId = optionalId(item && item.nhap_vat_chua_id);
+    const hoaDonId = optionalId(item && item.hoa_don_id);
 
     const amount = parseMoney(item && item.so_tien);
 
-    if ((!phieuNhapId && !nhapVatChuaId) || amount <= 0) return null;
+    if ((!phieuNhapId && !nhapVatChuaId && !hoaDonId) || amount <= 0) return null;
 
     return {
 
@@ -139,9 +140,13 @@ function normalizeAllocations(value) {
 
       nhap_vat_chua_id: nhapVatChuaId || undefined,
 
+      hoa_don_id: hoaDonId || undefined,
+
       ma_phieu_nhap: String(item.ma_phieu_nhap || '').trim(),
 
       ma_nhap_vat_chua: String(item.ma_nhap_vat_chua || '').trim(),
+
+      ma_hoa_don: String(item.ma_hoa_don || '').trim(),
 
       so_tien: amount,
 

@@ -290,6 +290,50 @@
         flex: 1 1 calc(50% - 4px);
       }
     }
+    .customer-debt-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+    .customer-debt-summary{display:flex;align-items:baseline;gap:8px}
+    .customer-debt-summary-label{font-size:12px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+    .customer-debt-summary-value{font-size:18px;color:#b42318}
+    .customer-debt-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .customer-pay-modal-overlay{position:fixed;inset:0;z-index:1700;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:18px}
+    .customer-pay-modal-overlay.is-open{display:flex}
+    .customer-pay-modal{width:min(920px,calc(100vw - 24px));max-height:calc(100vh - 36px);display:flex;flex-direction:column;background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(15,23,42,.28);overflow:hidden}
+    .customer-pay-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 24px 10px;border-bottom:1px solid #eef2f6}
+    .customer-pay-title{margin:0 0 4px;font-size:18px;color:#111827}
+    .customer-pay-subtitle{display:flex;gap:8px;align-items:center;color:#64748b;font-size:12px;flex-wrap:wrap}
+    .customer-pay-debt-badge{padding:2px 7px;border-radius:4px;background:#f1f5f9;color:#334155;font-weight:700}
+    .customer-pay-close{border:0;background:transparent;color:#4b5563;font-size:30px;line-height:1;cursor:pointer}
+    .customer-pay-body{padding:0 24px 12px;overflow:auto}
+    .customer-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 22px}
+    .customer-pay-field{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#374151}
+    .customer-pay-field-full{grid-column:1/-1}
+    .customer-pay-input-wrap{position:relative}
+    .customer-pay-field input,.customer-pay-field select,.customer-pay-field textarea{width:100%;height:36px;border:1px solid #d0d5dd;border-radius:6px;padding:0 12px;font-size:13px;color:#111827;background:#fff;outline:none}
+    .customer-pay-field textarea{min-height:48px;resize:vertical;padding-top:8px}
+    .customer-pay-field input:focus,.customer-pay-field select:focus,.customer-pay-field textarea:focus{border-color:#0070f4;box-shadow:0 0 0 1px #0070f4}
+    .customer-pay-readonly{background:#f1f5f9!important;text-align:right;color:#111827}
+    .customer-pay-icons{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;gap:10px;color:#4b5563}
+    .customer-pay-check{display:inline-flex;align-items:center;gap:8px;margin:14px 0 6px;font-weight:500;color:#1f2937;font-size:13px}
+    .customer-pay-check input{width:14px;height:14px;accent-color:#0070f4}
+    .customer-pay-reconcile-note{margin:0 0 8px;color:#64748b;font-size:12px}
+    .customer-pay-reconcile-note strong{color:#111827}
+    .customer-pay-table-wrap{border-top:0;min-height:150px;background:#fff}
+    .customer-pay-table-wrap table{min-width:820px}
+    .customer-pay-table-wrap th{background:#f1f3f5!important;height:38px;color:#374151;font-size:12px}
+    .customer-pay-table-wrap td{height:40px;font-size:13px}
+    .customer-pay-row-input{width:88px;height:22px;border:1px solid #cfd8e3;border-radius:6px;text-align:right;padding:2px 8px;font-size:13px;outline:none}
+    .customer-pay-row-input:focus{border-color:#0070f4;box-shadow:0 0 0 1px #0070f4}
+    .customer-pay-total-row td{font-weight:800;border-top:1px solid #e5e7eb}
+    .customer-pay-unallocated-row td{border-bottom:0;font-size:13px}
+    .customer-pay-empty{display:grid;place-items:center;gap:14px;min-height:180px;color:#1f2937;font-weight:700}
+    .customer-pay-empty-icon{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:#eff6ff;color:#1d7ff5;font-size:42px}
+    .customer-pay-footer{display:flex;justify-content:flex-end;gap:8px;padding:12px 24px;border-top:1px solid #eef2f6;background:#f8fafc}
+    .customer-pay-footer button:disabled{opacity:.5;cursor:not-allowed}
+    .customer-muted-cell{font-size:11px;color:#64748b;margin-top:2px}
+    .customer-pay-remaining-hint{display:block;margin-top:4px;color:#64748b;font-size:12px}
+    @media (max-width:720px){
+      .customer-pay-grid{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body class="admin-body">
@@ -2323,6 +2367,326 @@
         if (customerImportMenu.contains(event.target)) return;
         if (customerImportToggle.contains(event.target)) return;
         closeCustomerImportMenu();
+      });
+
+      function parseCustomerMoney(value) {
+        var raw = String(value == null ? '' : value).replace(/[^\d]/g, '');
+        if (!raw) return '';
+        return Number(raw);
+      }
+      function parseCustomerMoneyAmount(value) {
+        var parsed = parseCustomerMoney(value);
+        return parsed === '' ? 0 : parsed;
+      }
+      function formatCustomerMoney(value) {
+        var amount = Number(value || 0);
+        if (!Number.isFinite(amount)) amount = 0;
+        return amount.toLocaleString('vi-VN');
+      }
+      function setCustomerPayInputValue(input, value) {
+        if (input) input.value = formatCustomerMoney(value);
+      }
+      function formatCustomerMoneyInput(input) {
+        if (!input) return;
+        var value = parseCustomerMoney(input.value);
+        input.value = value === '' ? '' : formatCustomerMoney(value);
+      }
+      function syncCustomerPayV2Total(form) {
+        if (!form) return 0;
+        var cash = parseCustomerMoneyAmount((form.querySelector('.js-customer-pay-cash') || {}).value);
+        var transfer = parseCustomerMoneyAmount((form.querySelector('.js-customer-pay-transfer') || {}).value);
+        var total = cash + transfer;
+        var amountInput = form.querySelector('.js-customer-pay-amount');
+        if (amountInput) amountInput.value = total ? formatCustomerMoney(total) : '';
+        var cashBook = form.querySelector('.js-customer-pay-cash-book');
+        var bankBook = form.querySelector('.js-customer-pay-bank-book');
+        if (cashBook) cashBook.disabled = cash <= 0;
+        if (bankBook) bankBook.disabled = transfer <= 0;
+        return total;
+      }
+      function getCustomerPayRowAllocations(form) {
+        var rows = [];
+        Array.prototype.slice.call(form.querySelectorAll('.js-customer-pay-row-paid-input')).forEach(function(input) {
+          var paid = parseCustomerMoneyAmount(input.value);
+          if (paid <= 0) return;
+          rows.push({
+            so_tien: paid,
+            hoa_don_id: input.getAttribute('data-invoice-id') || input.getAttribute('data-doc-id') || '',
+            ma_hoa_don: input.getAttribute('data-invoice-code') || ''
+          });
+        });
+        return rows;
+      }
+      function syncCustomerPayAllocationJson(form) {
+        var hidden = form ? form.querySelector('.js-customer-pay-allocations-json') : null;
+        if (hidden) hidden.value = JSON.stringify(getCustomerPayRowAllocations(form));
+        var amountInput = form ? form.querySelector('.js-customer-pay-amount') : null;
+        var overpaymentInput = form ? form.querySelector('.js-customer-pay-overpayment') : null;
+        if (overpaymentInput) {
+          var amount = syncCustomerPayV2Total(form) || parseCustomerMoneyAmount(amountInput ? amountInput.value : 0);
+          var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
+          overpaymentInput.value = String(Math.max(0, amount - payableDebt));
+        }
+      }
+      function updateCustomerPayAllocation(form, source) {
+        if (!form) return;
+        var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
+        var allowOverpayment = !!form.querySelector('.js-customer-pay-allow-overpayment:checked');
+        var amountInput = form.querySelector('.js-customer-pay-amount');
+        var amount = syncCustomerPayV2Total(form) || parseCustomerMoneyAmount(amountInput ? amountInput.value : 0);
+        if (!allowOverpayment) amount = Math.min(amount, payableDebt);
+        if (source === 'amount') {
+          if (amountInput) amountInput.value = amount ? formatCustomerMoney(amount) : '';
+          var rest = Math.min(amount, payableDebt);
+          Array.prototype.slice.call(form.querySelectorAll('.js-customer-pay-row')).forEach(function(row) {
+            var rowDebt = Number(row.getAttribute('data-debt') || 0);
+            var paid = Math.min(rest, rowDebt);
+            rest -= paid;
+            setCustomerPayInputValue(row.querySelector('.js-customer-pay-row-paid-input'), paid);
+          });
+        } else {
+          amount = 0;
+          var rowBudget = payableDebt;
+          Array.prototype.slice.call(form.querySelectorAll('.js-customer-pay-row-paid-input')).forEach(function(input) {
+            var rowDebt = Number(input.getAttribute('data-debt') || 0);
+            var paid = Math.min(rowBudget, Math.max(0, parseCustomerMoneyAmount(input.value)));
+            rowBudget -= paid;
+            setCustomerPayInputValue(input, paid);
+            amount += paid;
+          });
+          if (amountInput) amountInput.value = amount ? formatCustomerMoney(amount) : '';
+          syncCustomerPayV2Total(form);
+        }
+        var totalPaid = 0;
+        Array.prototype.slice.call(form.querySelectorAll('.js-customer-pay-row')).forEach(function(row) {
+          var rowDebt = Number(row.getAttribute('data-debt') || 0);
+          var input = row.querySelector('.js-customer-pay-row-paid-input');
+          var paid = parseCustomerMoneyAmount(input ? input.value : 0);
+          totalPaid += paid;
+          var leftCell = row.querySelector('.js-customer-pay-row-left');
+          if (leftCell) leftCell.textContent = formatCustomerMoney(Math.max(0, rowDebt - paid));
+        });
+        var remainingInput = form.querySelector('.js-customer-pay-remaining');
+        if (remainingInput) remainingInput.value = formatCustomerMoney(Math.max(0, payableDebt - Math.min(amount, payableDebt)));
+        var totalPaidCell = form.querySelector('.js-customer-pay-total-paid');
+        var totalDebtCell = form.querySelector('.js-customer-pay-total-debt');
+        var totalLeftCell = form.querySelector('.js-customer-pay-total-left');
+        var unallocatedCell = form.querySelector('.js-customer-pay-unallocated');
+        var invoiceDebtTotal = Number((totalDebtCell && totalDebtCell.textContent || '0').replace(/[^\d]/g, '') || 0);
+        if (totalPaidCell) totalPaidCell.textContent = formatCustomerMoney(totalPaid);
+        if (totalLeftCell) totalLeftCell.textContent = formatCustomerMoney(Math.max(0, invoiceDebtTotal - totalPaid));
+        if (unallocatedCell) unallocatedCell.textContent = formatCustomerMoney(Math.max(0, Math.min(amount, payableDebt) - totalPaid));
+        syncCustomerPayAllocationJson(form);
+      }
+      function openCustomerPayModal(modal) {
+        if (!modal) return;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        var form = modal.querySelector('.customer-pay-form');
+        if (!form) return;
+        Array.prototype.slice.call(form.querySelectorAll('.js-customer-pay-row-paid-input')).forEach(function(input) {
+          setCustomerPayInputValue(input, 0);
+        });
+        var cash = form.querySelector('.js-customer-pay-cash');
+        var transfer = form.querySelector('.js-customer-pay-transfer');
+        if (cash) cash.value = '';
+        if (transfer) transfer.value = '';
+        updateCustomerPayAllocation(form, 'amount');
+      }
+      function closeCustomerPayModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+      function syncCustomerDiscountTotal(form) {
+        if (!form) return 0;
+        var cash = parseCustomerMoneyAmount((form.querySelector('.js-customer-discount-cash') || {}).value);
+        var transfer = parseCustomerMoneyAmount((form.querySelector('.js-customer-discount-transfer') || {}).value);
+        var total = cash + transfer;
+        var amountInput = form.querySelector('.js-customer-discount-amount');
+        if (amountInput) amountInput.value = total ? formatCustomerMoney(total) : '';
+        var cashBook = form.querySelector('.js-customer-discount-cash-book');
+        var bankBook = form.querySelector('.js-customer-discount-bank-book');
+        if (cashBook) cashBook.disabled = cash <= 0;
+        if (bankBook) bankBook.disabled = transfer <= 0;
+        return total;
+      }
+      function updateCustomerDiscountRemaining(form) {
+        if (!form) return;
+        var debt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
+        var amount = syncCustomerDiscountTotal(form);
+        amount = Math.min(amount, debt);
+        var amountInput = form.querySelector('.js-customer-discount-amount');
+        if (amountInput) amountInput.value = amount ? formatCustomerMoney(amount) : '';
+        var remain = form.querySelector('.js-customer-discount-remaining');
+        if (remain) remain.textContent = formatCustomerMoney(Math.max(0, debt - amount));
+      }
+      function openCustomerDiscountModal(modal) {
+        if (!modal) return;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        var form = modal.querySelector('.customer-discount-form');
+        if (!form) return;
+        var cash = form.querySelector('.js-customer-discount-cash');
+        var transfer = form.querySelector('.js-customer-discount-transfer');
+        if (cash) cash.value = '';
+        if (transfer) transfer.value = '';
+        updateCustomerDiscountRemaining(form);
+      }
+      function closeCustomerDiscountModal(modal) {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+
+      document.addEventListener('click', function(event) {
+        var openPayBtn = event.target.closest('.js-open-customer-pay-modal');
+        if (openPayBtn) {
+          event.preventDefault();
+          openCustomerPayModal(document.getElementById(openPayBtn.getAttribute('data-modal-id')));
+          return;
+        }
+        var openDiscountBtn = event.target.closest('.js-open-customer-discount-modal');
+        if (openDiscountBtn) {
+          event.preventDefault();
+          openCustomerDiscountModal(document.getElementById(openDiscountBtn.getAttribute('data-modal-id')));
+          return;
+        }
+        var closePayBtn = event.target.closest('.js-close-customer-pay-modal');
+        if (closePayBtn) {
+          event.preventDefault();
+          closeCustomerPayModal(closePayBtn.closest('.js-customer-pay-overlay'));
+          return;
+        }
+        var closeDiscountBtn = event.target.closest('.js-close-customer-discount-modal');
+        if (closeDiscountBtn) {
+          event.preventDefault();
+          closeCustomerDiscountModal(closeDiscountBtn.closest('.js-customer-discount-overlay'));
+          return;
+        }
+        var discountSubmitBtn = event.target.closest('.js-submit-customer-discount-modal');
+        if (discountSubmitBtn) {
+          event.preventDefault();
+          event.stopPropagation();
+          var discountForm = document.getElementById(discountSubmitBtn.getAttribute('data-form-id'));
+          if (!discountForm || discountSubmitBtn.disabled) return;
+          var discountAmount = syncCustomerDiscountTotal(discountForm);
+          var discountDebt = Math.max(0, Number(discountForm.getAttribute('data-current-debt') || 0));
+          if (discountAmount <= 0) return alert('Vui lòng nhập số tiền chiết khấu.');
+          if (discountAmount > discountDebt) return alert('Số tiền chiết khấu không được vượt quá nợ hiện tại.');
+          var dCash = parseCustomerMoneyAmount((discountForm.querySelector('.js-customer-discount-cash') || {}).value);
+          var dTransfer = parseCustomerMoneyAmount((discountForm.querySelector('.js-customer-discount-transfer') || {}).value);
+          var dCashBook = discountForm.querySelector('.js-customer-discount-cash-book');
+          var dBankBook = discountForm.querySelector('.js-customer-discount-bank-book');
+          if (dCash > 0 && (!dCashBook || !dCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+          if (dTransfer > 0 && (!dBankBook || !dBankBook.value)) return alert('Vui lòng chọn tài khoản chuyển khoản.');
+          discountSubmitBtn.disabled = true;
+          fetch(discountForm.getAttribute('data-action'), {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              'X-Requested-With': 'XMLHttpRequest',
+              'Accept': 'application/json'
+            },
+            body: new URLSearchParams(new FormData(discountForm)).toString()
+          })
+            .then(function(response) {
+              return response.json().catch(function() {
+                return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+              });
+            })
+            .then(function(data) {
+              if (!data || !data.success) {
+                alert((data && data.message) || 'Không tạo được chiết khấu thanh toán.');
+                return;
+              }
+              window.location.reload();
+            })
+            .catch(function(error) {
+              alert((error && error.message) || 'Có lỗi khi tạo chiết khấu thanh toán.');
+            })
+            .finally(function() {
+              discountSubmitBtn.disabled = false;
+            });
+          return;
+        }
+        var submitBtn = event.target.closest('.js-submit-customer-pay-modal');
+        if (!submitBtn) return;
+        event.preventDefault();
+        event.stopPropagation();
+        var form = document.getElementById(submitBtn.getAttribute('data-form-id'));
+        if (!form || submitBtn.disabled) return;
+        var amount = syncCustomerPayV2Total(form) || parseCustomerMoneyAmount((form.querySelector('[name="gia_tri"]') || {}).value);
+        var payableDebt = Math.max(0, Number(form.getAttribute('data-current-debt') || 0));
+        var allowOverpayment = !!form.querySelector('.js-customer-pay-allow-overpayment:checked');
+        if (amount <= 0) return alert('Vui lòng nhập số tiền thanh toán.');
+        if (!allowOverpayment && amount > payableDebt) return alert('Số tiền thu không được vượt quá nợ hiện tại. Bật thu dư / ứng trước nếu muốn thu vượt.');
+        var cash = parseCustomerMoneyAmount((form.querySelector('.js-customer-pay-cash') || {}).value);
+        var transfer = parseCustomerMoneyAmount((form.querySelector('.js-customer-pay-transfer') || {}).value);
+        var v2CashBook = form.querySelector('.js-customer-pay-cash-book');
+        var v2BankBook = form.querySelector('.js-customer-pay-bank-book');
+        if (cash > 0 && (!v2CashBook || !v2CashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+        if (transfer > 0 && (!v2BankBook || !v2BankBook.value)) return alert('Vui lòng chọn tài khoản chuyển khoản.');
+        syncCustomerPayAllocationJson(form);
+        var allocations = getCustomerPayRowAllocations(form);
+        var allocatedTotal = allocations.reduce(function(sum, row) { return sum + Number(row.so_tien || 0); }, 0);
+        if (allocatedTotal > Math.min(amount, payableDebt)) return alert('Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ.');
+        submitBtn.disabled = true;
+        fetch(form.getAttribute('data-action'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+          },
+          body: new URLSearchParams(new FormData(form)).toString()
+        })
+          .then(function(response) {
+            return response.json().catch(function() {
+              return { success: false, message: 'Server không trả về JSON hợp lệ.' };
+            });
+          })
+          .then(function(data) {
+            if (!data || !data.success) {
+              alert((data && data.message) || 'Không tạo được phiếu thu.');
+              return;
+            }
+            if (submitBtn.getAttribute('data-print') === '1' && data.data && data.data.receipt && data.data.receipt._id) {
+              window.open('/so-quy/phieu-thu-chi/' + data.data.receipt._id, '_blank');
+            }
+            window.location.reload();
+          })
+          .catch(function(error) {
+            alert((error && error.message) || 'Có lỗi khi tạo phiếu thu.');
+          })
+          .finally(function() {
+            submitBtn.disabled = false;
+          });
+      });
+
+      document.addEventListener('input', function(event) {
+        var discountPayInput = event.target.closest('.js-customer-discount-cash,.js-customer-discount-transfer');
+        if (discountPayInput) {
+          formatCustomerMoneyInput(discountPayInput);
+          updateCustomerDiscountRemaining(discountPayInput.closest('.customer-discount-form'));
+          return;
+        }
+        var v2PayInput = event.target.closest('.js-customer-pay-cash,.js-customer-pay-transfer');
+        if (v2PayInput) {
+          formatCustomerMoneyInput(v2PayInput);
+          updateCustomerPayAllocation(v2PayInput.closest('.customer-pay-form'), 'amount');
+          return;
+        }
+        var rowInput = event.target.closest('.js-customer-pay-row-paid-input');
+        if (rowInput) {
+          formatCustomerMoneyInput(rowInput);
+          updateCustomerPayAllocation(rowInput.closest('.customer-pay-form'), 'row');
+        }
+      });
+      document.addEventListener('change', function(event) {
+        var overpaymentToggle = event.target.closest('.js-customer-pay-allow-overpayment');
+        if (!overpaymentToggle) return;
+        updateCustomerPayAllocation(overpaymentToggle.closest('.customer-pay-form'), 'amount');
       });
     });
   </script>

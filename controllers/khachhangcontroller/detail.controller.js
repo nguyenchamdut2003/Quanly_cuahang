@@ -19,7 +19,8 @@ async function renderCustomerTab(req, res, next, loader, viewName) {
     try {
         var ctx = await loader({
             customerId: req.params.id,
-            query: req.query || {}
+            query: req.query || {},
+            req: req
         });
         if (!ctx) {
             return res.status(404).type('html').send('<div class="empty-cell">Không tìm thấy khách hàng.</div>');

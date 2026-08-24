@@ -55,6 +55,15 @@ const RECEIPT_PRINT_POPULATES = [
         path: 'allocations.phieu_nhap_id',
         select: 'ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id',
         populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+    },
+    {
+        path: 'allocations.nhap_vat_chua_id',
+        select: 'ma_nhap_vat_chua tong_tien created_at doi_tuong_ten trang_thai'
+    },
+    {
+        path: 'allocations.hoa_don_id',
+        select: 'ma_hoa_don ngay_ban tong_tien thanh_toan trang_thai khach_hang_id',
+        populate: { path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' }
     }
 ];
 
@@ -265,6 +274,48 @@ function buildRelatedVoucherRows(receipt) {
 
     if (allocations.length) {
         allocations.forEach(alloc => {
+            const hd = relDocObject(alloc.hoa_don_id);
+            if (hd || alloc.hoa_don_id || alloc.ma_hoa_don) {
+                const docVal = Number((hd && (hd.thanh_toan || hd.tong_tien)) || 0)
+                    || (Number(alloc.con_no_truoc || 0) + Number(alloc.so_tien || 0)) || null;
+                let paidBefore = null;
+                if (alloc.con_no_truoc != null && docVal > 0) {
+                    paidBefore = Math.max(0, docVal - Number(alloc.con_no_truoc || 0));
+                }
+                pushRow({
+                    typeLabel: 'Hóa đơn',
+                    code: String(alloc.ma_hoa_don || (hd && hd.ma_hoa_don) || '').trim(),
+                    docDate: hd && (hd.ngay_ban || hd.created_at),
+                    partner: partnerLabel(hd && hd.khach_hang_id),
+                    docValue: docVal,
+                    paidBefore,
+                    receiptValue: Number(alloc.so_tien || 0),
+                    remainAfter: alloc.con_no_sau != null ? Number(alloc.con_no_sau) : null,
+                    status: getRelatedDocumentStatus('invoice', hd, alloc.con_no_sau, docVal),
+                    note: ''
+                });
+                return;
+            }
+            const nvc = relDocObject(alloc.nhap_vat_chua_id);
+            if (nvc || alloc.nhap_vat_chua_id || alloc.ma_nhap_vat_chua) {
+                const docVal = Number((nvc && nvc.tong_tien) || 0)
+                    || (Number(alloc.con_no_truoc || 0) + Number(alloc.so_tien || 0)) || null;
+                pushRow({
+                    typeLabel: 'Nhập vật chứa',
+                    code: String(alloc.ma_nhap_vat_chua || (nvc && nvc.ma_nhap_vat_chua) || '').trim(),
+                    docDate: nvc && nvc.created_at,
+                    partner: partnerLabel(null) || '',
+                    docValue: docVal,
+                    paidBefore: alloc.con_no_truoc != null && docVal > 0
+                        ? Math.max(0, docVal - Number(alloc.con_no_truoc || 0))
+                        : null,
+                    receiptValue: Number(alloc.so_tien || 0),
+                    remainAfter: alloc.con_no_sau != null ? Number(alloc.con_no_sau) : null,
+                    status: getRelatedDocumentStatus('nhap_vat_chua', nvc, alloc.con_no_sau, docVal),
+                    note: ''
+                });
+                return;
+            }
             const pn = relDocObject(alloc.phieu_nhap_id) || {};
             const docVal = Number(pn.can_tra_ncc || pn.tong_tien || 0)
                 || (Number(alloc.con_no_truoc || 0) + Number(alloc.so_tien || 0)) || null;

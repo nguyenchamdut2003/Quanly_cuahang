@@ -1937,8 +1937,10 @@ const PhieuThuChiSchema = new Schema({
   allocations: [{
     phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
     nhap_vat_chua_id: { type: ObjectId, ref: 'NhapVatChua' },
+    hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
     ma_phieu_nhap: { type: String },
     ma_nhap_vat_chua: { type: String },
+    ma_hoa_don: { type: String },
     so_tien: { type: Number, default: 0 },
     con_no_truoc: { type: Number, default: 0 },
     con_no_sau: { type: Number, default: 0 }
@@ -2408,6 +2410,7 @@ const GiaoDichCongNoKhachHangSchema = new Schema({
       'thanh_toan',
       'thu_cod',
       'tra_hang',
+      'chiet_khau_thanh_toan',
       'dieu_chinh_tang',
       'dieu_chinh_giam',
       'huy_hoa_don',

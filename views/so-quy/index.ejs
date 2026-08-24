@@ -44,7 +44,10 @@
   const codeOf = locals.relatedCode || function(item) {
   const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
   const allocPn = firstAlloc?.phieu_nhap_id;
-  return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don || item.phieu_nhap_id?.ma_phieu_nhap ||
+  const allocHd = firstAlloc?.hoa_don_id;
+  return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don ||
+  (allocHd && typeof allocHd === 'object' ? allocHd.ma_hoa_don : '') || firstAlloc?.ma_hoa_don ||
+  item.phieu_nhap_id?.ma_phieu_nhap ||
   firstAlloc?.ma_phieu_nhap || (allocPn && typeof allocPn === 'object' ? allocPn.ma_phieu_nhap : '') ||
   item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.phieu_tra_hang_id?.ma_phieu_tra || item.van_don_id?.ma_van_don
   || item.nhap_vat_chua_id?.ma_nhap_vat_chua || item.xuat_vat_chua_id?.ma_xuat_vat_chua || item.chung_tu_khac || item.ma_chung_tu_goc || '';
@@ -62,6 +65,8 @@
   const allocs = item.allocations || [];
   if (allocs.length) {
   const first = allocs[0];
+  if (first.hoa_don_id) return refLink('invoice', first.hoa_don_id, code || first.ma_hoa_don);
+  if (first.nhap_vat_chua_id) return refLink('nhap_vat_chua', first.nhap_vat_chua_id, code || first.ma_nhap_vat_chua);
   if (first.phieu_nhap_id) return refLink('purchase', first.phieu_nhap_id, code || first.ma_phieu_nhap);
   }
   const label = String(code || '').trim();
@@ -2825,6 +2830,24 @@
                     const pushRow = (row) => rows.push(row);
                     if (allocations.length) {
                       allocations.forEach(alloc => {
+                        const hd = relDocObject(alloc.hoa_don_id);
+                        if (hd || alloc.hoa_don_id || alloc.ma_hoa_don) {
+                          const hdId = receiptDocId(hd) || receiptDocId(alloc.hoa_don_id);
+                          const code = String(alloc.ma_hoa_don || (hd && hd.ma_hoa_don) || '').trim();
+                          const docVal = Number((hd && (hd.thanh_toan || hd.tong_tien)) || 0) || (Number(alloc.con_no_truoc || 0) + Number(alloc.so_tien || 0)) || null;
+                          let paidBefore = null;
+                          if (alloc.con_no_truoc != null && docVal > 0) paidBefore = Math.max(0, docVal - Number(alloc.con_no_truoc || 0));
+                          pushRow({ type: 'invoice', typeLabel: 'Hóa đơn', code, docId: hdId, docDate: hd && (hd.ngay_ban || hd.created_at), partner: relPartnerLabel(hd && hd.khach_hang_id), docValue: docVal, paidBefore, receiptValue: Number(alloc.so_tien || 0), remainAfter: alloc.con_no_sau != null ? Number(alloc.con_no_sau) : null, status: getRelatedDocumentStatus('invoice', hd, alloc.con_no_sau, docVal) });
+                          return;
+                        }
+                        const nvc = relDocObject(alloc.nhap_vat_chua_id);
+                        if (nvc || alloc.nhap_vat_chua_id || alloc.ma_nhap_vat_chua) {
+                          const nvcId = receiptDocId(nvc) || receiptDocId(alloc.nhap_vat_chua_id);
+                          const code = String(alloc.ma_nhap_vat_chua || (nvc && nvc.ma_nhap_vat_chua) || '').trim();
+                          const docVal = Number((nvc && nvc.tong_tien) || 0) || (Number(alloc.con_no_truoc || 0) + Number(alloc.so_tien || 0)) || null;
+                          pushRow({ type: 'nhap_vat_chua', typeLabel: 'Nhập vật chứa', code, docId: nvcId, docDate: nvc && nvc.created_at, partner: relTextCell((nvc && nvc.doi_tuong_ten) || receipt.doi_tuong), docValue: docVal, paidBefore: alloc.con_no_truoc != null && docVal > 0 ? Math.max(0, docVal - Number(alloc.con_no_truoc || 0)) : null, receiptValue: Number(alloc.so_tien || 0), remainAfter: alloc.con_no_sau != null ? Number(alloc.con_no_sau) : null, status: getRelatedDocumentStatus('nhap_vat_chua', nvc, alloc.con_no_sau, docVal) });
+                          return;
+                        }
                         const pn = relDocObject(alloc.phieu_nhap_id) || {};
                         const pnId = receiptDocId(pn) || receiptDocId(alloc.phieu_nhap_id);
                         const code = String(alloc.ma_phieu_nhap || pn.ma_phieu_nhap || '').trim();

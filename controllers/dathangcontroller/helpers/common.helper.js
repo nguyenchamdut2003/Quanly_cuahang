@@ -3320,7 +3320,8 @@ async function decorateInvoices(invoices) {
                 {
                     $or: [
                         { hoa_don_id: { $in: invoiceIds } },
-                        { don_hang_id: { $in: orderIds } }
+                        { don_hang_id: { $in: orderIds } },
+                        { 'allocations.hoa_don_id': { $in: invoiceIds } }
                     ]
                 },
                 {
@@ -3353,6 +3354,23 @@ async function decorateInvoices(invoices) {
     }, {});
     const paidByInvoice = {};
     receipts.forEach(row => {
+        const allocs = Array.isArray(row.allocations)
+            ? row.allocations.filter(item => item && item.hoa_don_id)
+            : [];
+        if (allocs.length) {
+            allocs.forEach(alloc => {
+                const key = String(alloc.hoa_don_id || '');
+                if (!key) return;
+                if (!paidByInvoice[key]) paidByInvoice[key] = [];
+                paidByInvoice[key].push({
+                    loai_phieu: row.loai_phieu,
+                    loai_thu_chi: row.loai_thu_chi,
+                    gia_tri: Number(alloc.so_tien || 0),
+                    trang_thai: row.trang_thai
+                });
+            });
+            return;
+        }
         const key = row.hoa_don_id
             ? String(row.hoa_don_id)
             : orderToInvoiceId[String(row.don_hang_id || '')];

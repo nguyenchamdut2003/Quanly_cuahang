@@ -299,13 +299,24 @@ async function loadCustomerDebtsTab(options) {
         .limit(TAB_PAGE_SIZE)
         .lean();
 
+    var debtHelper = require('../helpers/debt.helper');
+    var cashBooks = await debtHelper.loadActiveCashBooks();
+    var customerUnpaidInvoices = await debtHelper.loadCustomerUnpaidInvoices(selectedCustomer._id);
+    var currentUserName = '';
+    if (options.req && options.req.user) {
+        currentUserName = options.req.user.ho_ten || options.req.user.username || options.req.user.email || '';
+    }
+
     return Object.assign(makeTabContext({
         selectedCustomer: selectedCustomer,
         customerId: selectedCustomer._id,
         tab: 'debts'
     }), {
         historyDebts: historyDebts,
-        pagination: pagination
+        pagination: pagination,
+        cashBooks: cashBooks,
+        customerUnpaidInvoices: customerUnpaidInvoices,
+        currentUserName: currentUserName || '—'
     });
 }
 

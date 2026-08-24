@@ -23,6 +23,8 @@ router.get('/api/:id/invoices', khachHangController.apiCustomerInvoices);
 router.get('/api/:id/returns', khachHangController.apiCustomerReturns);
 router.get('/api/:id/vat-chua', khachHangController.apiCustomerVatChua);
 router.get('/api/:id/debts', khachHangController.apiCustomerDebts);
+router.post('/:id/pay-debt', khachHangController.payDebt);
+router.post('/:id/discount-debt', khachHangController.discountDebt);
 router.post('/add', khachHangController.add);
 router.post('/:id/update', khachHangController.update);
 router.post('/:id/delete', khachHangController.remove);

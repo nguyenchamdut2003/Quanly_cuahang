@@ -5,29 +5,44 @@
     giam_no: 'Giảm nợ',
     thanh_toan: 'Thanh toán'
   };
+  var unpaidInvoices = customerUnpaidInvoices || [];
+  var unpaidTotal = unpaidInvoices.reduce(function(sum, row) {
+    return sum + Number(row.con_no || 0);
+  }, 0);
+  var currentDebt = Number(selectedCustomer.tong_no || 0);
 %>
-<div class="customer-debt-toolbar" style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-  <button
-    type="button"
-    class="btn btn-primary btn-sm js-debt-export-trigger"
-    data-export-kind="both"
-    data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
-    data-extra-qs=""
-  >Xuất công nợ</button>
-  <button
-    type="button"
-    class="btn btn-light btn-sm js-debt-export-trigger"
-    data-export-kind="quan-tri"
-    data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
-    data-extra-qs=""
-  >Quản trị</button>
-  <button
-    type="button"
-    class="btn btn-light btn-sm js-debt-export-trigger"
-    data-export-kind="doi-tac"
-    data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
-    data-extra-qs=""
-  >Gửi đối tác</button>
+<div class="customer-debt-toolbar">
+  <div class="customer-debt-summary">
+    <span class="customer-debt-summary-label">Nợ hiện tại</span>
+    <strong class="customer-debt-summary-value"><%= money(currentDebt) %> VNĐ</strong>
+  </div>
+  <div class="customer-debt-actions">
+    <button class="btn btn-light btn-sm js-open-customer-pay-modal" type="button"
+      data-modal-id="customerPayModal_<%= selectedCustomer._id %>">Thanh toán</button>
+    <button class="btn btn-light btn-sm js-open-customer-discount-modal" type="button"
+      data-modal-id="customerDiscountModal_<%= selectedCustomer._id %>">Chiết khấu thanh toán</button>
+    <button
+      type="button"
+      class="btn btn-primary btn-sm js-debt-export-trigger"
+      data-export-kind="both"
+      data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+      data-extra-qs=""
+    >Xuất công nợ</button>
+    <button
+      type="button"
+      class="btn btn-light btn-sm js-debt-export-trigger"
+      data-export-kind="quan-tri"
+      data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+      data-extra-qs=""
+    >Quản trị</button>
+    <button
+      type="button"
+      class="btn btn-light btn-sm js-debt-export-trigger"
+      data-export-kind="doi-tac"
+      data-export-base="/khach-hang/<%= selectedCustomer._id %>/export/debt"
+      data-extra-qs=""
+    >Gửi đối tác</button>
+  </div>
 </div>
 <table class="admin-table warehouse-table">
   <thead><tr><th class="text-center">Ngày</th><th class="text-center">Loại</th><th class="text-center">Số tiền</th><th class="text-center">Hóa đơn</th><th class="text-center">Đơn hàng</th><th class="text-center">Phiếu thu chi</th><th class="text-center">Ghi chú</th></tr></thead>
@@ -49,3 +64,253 @@
   </tbody>
 </table>
 <%- include('_tab-pagination', { pagination: pagination, baseUrl: baseUrl }) %>
+
+<div class="customer-pay-modal-overlay js-customer-pay-overlay" id="customerPayModal_<%= selectedCustomer._id %>" aria-hidden="true">
+  <div class="customer-pay-modal" role="dialog" aria-modal="true" aria-labelledby="customerPayTitle_<%= selectedCustomer._id %>">
+    <div class="customer-pay-header">
+      <div>
+        <h3 class="customer-pay-title" id="customerPayTitle_<%= selectedCustomer._id %>">Thanh toán</h3>
+        <div class="customer-pay-subtitle">
+          <span><%= selectedCustomer.ten_khach_hang || selectedCustomer.ma_khach_hang || 'Khách hàng' %></span>
+          <span>·</span>
+          <span class="customer-pay-debt-badge">Nợ hiện tại: <%= money(currentDebt) %> VNĐ</span>
+        </div>
+      </div>
+      <button class="customer-pay-close js-close-customer-pay-modal" type="button" aria-label="Đóng">×</button>
+    </div>
+    <div class="customer-pay-body">
+      <form id="customerPayForm_<%= selectedCustomer._id %>" class="customer-pay-form"
+        data-action="/khach-hang/<%= selectedCustomer._id %>/pay-debt"
+        data-current-debt="<%= currentDebt %>">
+        <input type="hidden" name="allocations_json" class="js-customer-pay-allocations-json" value="[]">
+        <input type="hidden" name="overpayment_amount" class="js-customer-pay-overpayment" value="0">
+        <input type="hidden" name="payment_v2" value="1">
+        <input type="hidden" name="chi_tiet_thanh_toan[tien_tra_khach]" value="0">
+        <div class="customer-pay-grid">
+          <label class="customer-pay-field">
+            <span>Thời gian</span>
+            <span class="customer-pay-input-wrap">
+              <input name="ngay_lap_display" type="text"
+                value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }) %>"
+                readonly>
+              <span class="customer-pay-icons"><i class="fa-regular fa-calendar"></i><i class="fa-regular fa-clock"></i></span>
+            </span>
+          </label>
+          <label class="customer-pay-field">
+            <span>Người thu</span>
+            <select name="nguoi_thu_display" disabled>
+              <option selected><%= currentUserName || '—' %></option>
+            </select>
+          </label>
+          <label class="customer-pay-field">
+            <span>Tiền mặt</span>
+            <input class="js-customer-pay-cash" name="chi_tiet_thanh_toan[tien_mat]" inputmode="numeric" autocomplete="off" value="" placeholder="Tiền mặt">
+          </label>
+          <label class="customer-pay-field">
+            <span>Sổ tiền mặt</span>
+            <select class="js-customer-pay-cash-book" name="chi_tiet_thanh_toan[so_quy_tien_mat_id]">
+              <option value="">— Chọn sổ tiền mặt —</option>
+              <% (cashBooks || []).filter(function(cashBook) { return (cashBook.loai_so_quy || 'tien_mat') === 'tien_mat'; }).forEach(function(cashBook) { %>
+                <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= cashBook.ten_so_quy || 'Sổ tiền mặt' %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="customer-pay-field">
+            <span>Chuyển khoản</span>
+            <input class="js-customer-pay-transfer" name="chi_tiet_thanh_toan[chuyen_khoan]" inputmode="numeric" autocomplete="off" value="" placeholder="Chuyển khoản">
+          </label>
+          <label class="customer-pay-field">
+            <span>Tài khoản ngân hàng</span>
+            <select class="js-customer-pay-bank-book" name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]">
+              <option value="">— Chọn tài khoản chuyển khoản —</option>
+              <% (cashBooks || []).filter(function(cashBook) { return cashBook.loai_so_quy === 'chuyen_khoan'; }).forEach(function(cashBook) { %>
+                <% var bankInfo = cashBook.thong_tin_ngan_hang || {}; %>
+                <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= (bankInfo.ten_ngan_hang || cashBook.ten_so_quy || 'Tài khoản') + (bankInfo.so_tai_khoan ? (' - ' + bankInfo.so_tai_khoan) : '') %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="customer-pay-field">
+            <span>Tổng thanh toán</span>
+            <input class="js-customer-pay-amount" name="gia_tri" inputmode="numeric" autocomplete="off" value="" readonly>
+          </label>
+          <label class="customer-pay-field">
+            <span>Nợ còn</span>
+            <input class="customer-pay-readonly js-customer-pay-remaining" type="text" value="<%= money(currentDebt) %>" readonly>
+          </label>
+          <label class="customer-pay-field customer-pay-field-full">
+            <span>Ghi chú</span>
+            <textarea name="ghi_chu" placeholder="Nhập ghi chú"></textarea>
+          </label>
+        </div>
+        <label class="customer-pay-check">
+          <input type="checkbox" checked disabled>
+          <span>Phân bổ vào hóa đơn còn nợ</span>
+        </label>
+        <label class="customer-pay-check">
+          <input type="checkbox" name="enable_overpayment" class="js-customer-pay-allow-overpayment">
+          <span>Cho phép thu dư / ứng trước</span>
+        </label>
+        <% if (unpaidTotal !== currentDebt) { %>
+          <div class="customer-pay-reconcile-note">
+            Nợ theo hóa đơn: <strong><%= money(unpaidTotal) %></strong>.
+            Nợ hiện tại theo sổ công nợ: <strong><%= money(currentDebt) %> VNĐ</strong>.
+          </div>
+        <% } %>
+        <div class="customer-pay-table-wrap table-wrap">
+          <table class="admin-table warehouse-table">
+            <thead>
+              <tr>
+                <th>Mã chứng từ</th>
+                <th>Thời gian</th>
+                <th class="text-right">Giá trị</th>
+                <th class="text-right">Đã trả</th>
+                <th class="text-right">Còn cần thu</th>
+                <th class="text-right">Tiền thu</th>
+                <th class="text-right">Còn nợ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!unpaidInvoices.length) { %>
+                <tr>
+                  <td colspan="7">
+                    <div class="customer-pay-empty">
+                      <span class="customer-pay-empty-icon"><i class="fa-regular fa-inbox"></i></span>
+                      <span>Không có hóa đơn còn nợ</span>
+                    </div>
+                  </td>
+                </tr>
+              <% } %>
+              <% unpaidInvoices.forEach(function(invoice) { %>
+                <% var invoiceDebt = Number(invoice.con_no || 0); %>
+                <tr class="js-customer-pay-row" data-debt="<%= invoiceDebt %>">
+                  <td>
+                    <%= invoice.ma_hoa_don || invoice.ma_chung_tu || '--' %>
+                    <div class="customer-muted-cell">Hóa đơn</div>
+                  </td>
+                  <td><%= formatDate(invoice.ngay_chung_tu) %></td>
+                  <td class="text-right"><%= money(invoice.gia_tri_phai_tra || 0) %></td>
+                  <td class="text-right"><%= money(invoice.da_thanh_toan || 0) %></td>
+                  <td class="text-right"><%= money(invoiceDebt) %></td>
+                  <td class="text-right">
+                    <input class="customer-pay-row-input js-customer-pay-row-paid-input"
+                      inputmode="numeric" autocomplete="off" value="0"
+                      data-doc-type="hoa_don"
+                      data-doc-id="<%= invoice.doc_id || invoice._id %>"
+                      data-invoice-id="<%= invoice._id %>"
+                      data-invoice-code="<%= invoice.ma_hoa_don || '' %>"
+                      data-debt="<%= invoiceDebt %>">
+                  </td>
+                  <td class="text-right js-customer-pay-row-left"><%= money(invoiceDebt) %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+            <% if (unpaidInvoices.length) { %>
+              <tfoot>
+                <tr class="customer-pay-total-row">
+                  <td colspan="4"></td>
+                  <td class="text-right js-customer-pay-total-debt"><%= money(unpaidTotal) %></td>
+                  <td class="text-right js-customer-pay-total-paid">0</td>
+                  <td class="text-right js-customer-pay-total-left"><%= money(unpaidTotal) %></td>
+                </tr>
+                <tr class="customer-pay-unallocated-row">
+                  <td colspan="5"></td>
+                  <td class="js-customer-pay-unallocated-label">Tiền chưa gắn hóa đơn:</td>
+                  <td class="text-right js-customer-pay-unallocated">0</td>
+                </tr>
+              </tfoot>
+            <% } %>
+          </table>
+        </div>
+      </form>
+    </div>
+    <div class="customer-pay-footer">
+      <button class="btn btn-light js-close-customer-pay-modal" type="button">Bỏ qua</button>
+      <button class="btn btn-light js-submit-customer-pay-modal" type="button" data-print="1"
+        data-form-id="customerPayForm_<%= selectedCustomer._id %>">Tạo phiếu thu & In</button>
+      <button class="btn btn-primary js-submit-customer-pay-modal" type="button"
+        data-form-id="customerPayForm_<%= selectedCustomer._id %>">Tạo phiếu thu</button>
+    </div>
+  </div>
+</div>
+
+<div class="customer-pay-modal-overlay js-customer-discount-overlay" id="customerDiscountModal_<%= selectedCustomer._id %>" aria-hidden="true">
+  <div class="customer-pay-modal" role="dialog" aria-modal="true" aria-labelledby="customerDiscountTitle_<%= selectedCustomer._id %>">
+    <div class="customer-pay-header">
+      <div>
+        <h3 class="customer-pay-title" id="customerDiscountTitle_<%= selectedCustomer._id %>">Chiết khấu thanh toán</h3>
+        <div class="customer-pay-subtitle">
+          <span><%= selectedCustomer.ten_khach_hang || selectedCustomer.ma_khach_hang || 'Khách hàng' %></span>
+          <span>·</span>
+          <span class="customer-pay-debt-badge">Nợ hiện tại: <%= money(currentDebt) %> VNĐ</span>
+        </div>
+      </div>
+      <button class="customer-pay-close js-close-customer-discount-modal" type="button" aria-label="Đóng">×</button>
+    </div>
+    <div class="customer-pay-body">
+      <form id="customerDiscountForm_<%= selectedCustomer._id %>" class="customer-discount-form"
+        data-action="/khach-hang/<%= selectedCustomer._id %>/discount-debt"
+        data-current-debt="<%= currentDebt %>">
+        <input type="hidden" name="payment_v2" value="1">
+        <input type="hidden" name="chi_tiet_thanh_toan[tien_tra_khach]" value="0">
+        <div class="customer-pay-grid">
+          <label class="customer-pay-field">
+            <span>Thời gian</span>
+            <span class="customer-pay-input-wrap">
+              <input name="ngay_giao_dich_display" type="text"
+                value="<%= new Date().toLocaleString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }) %>"
+                readonly>
+              <span class="customer-pay-icons"><i class="fa-regular fa-calendar"></i><i class="fa-regular fa-clock"></i></span>
+            </span>
+          </label>
+          <label class="customer-pay-field">
+            <span>Người thực hiện</span>
+            <select name="nguoi_thuc_hien_display" disabled>
+              <option selected><%= currentUserName || '—' %></option>
+            </select>
+          </label>
+          <label class="customer-pay-field">
+            <span>Tiền mặt</span>
+            <input class="js-customer-discount-cash" name="chi_tiet_thanh_toan[tien_mat]" inputmode="numeric" autocomplete="off" value="" placeholder="Tiền mặt">
+          </label>
+          <label class="customer-pay-field">
+            <span>Sổ tiền mặt</span>
+            <select class="js-customer-discount-cash-book" name="chi_tiet_thanh_toan[so_quy_tien_mat_id]">
+              <option value="">— Chọn sổ tiền mặt —</option>
+              <% (cashBooks || []).filter(function(cashBook) { return (cashBook.loai_so_quy || 'tien_mat') === 'tien_mat'; }).forEach(function(cashBook) { %>
+                <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= cashBook.ten_so_quy || 'Sổ tiền mặt' %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="customer-pay-field">
+            <span>Chuyển khoản</span>
+            <input class="js-customer-discount-transfer" name="chi_tiet_thanh_toan[chuyen_khoan]" inputmode="numeric" autocomplete="off" value="" placeholder="Chuyển khoản">
+          </label>
+          <label class="customer-pay-field">
+            <span>Tài khoản ngân hàng</span>
+            <select class="js-customer-discount-bank-book" name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]">
+              <option value="">— Chọn tài khoản chuyển khoản —</option>
+              <% (cashBooks || []).filter(function(cashBook) { return cashBook.loai_so_quy === 'chuyen_khoan'; }).forEach(function(cashBook) { %>
+                <% var bankInfo = cashBook.thong_tin_ngan_hang || {}; %>
+                <option value="<%= cashBook._id %>" <%= cashBook.mac_dinh ? 'selected' : '' %>><%= (bankInfo.ten_ngan_hang || cashBook.ten_so_quy || 'Tài khoản') + (bankInfo.so_tai_khoan ? (' - ' + bankInfo.so_tai_khoan) : '') %></option>
+              <% }) %>
+            </select>
+          </label>
+          <label class="customer-pay-field customer-pay-field-full">
+            <span>Chiết khấu thanh toán</span>
+            <input class="js-customer-discount-amount" name="gia_tri" inputmode="numeric" autocomplete="off" value="" readonly>
+            <small class="customer-pay-remaining-hint">Còn nợ: <span class="js-customer-discount-remaining"><%= money(currentDebt) %></span></small>
+          </label>
+          <label class="customer-pay-field customer-pay-field-full">
+            <span>Ghi chú</span>
+            <textarea name="ghi_chu" placeholder="Nhập ghi chú"></textarea>
+          </label>
+        </div>
+      </form>
+    </div>
+    <div class="customer-pay-footer">
+      <button class="btn btn-light js-close-customer-discount-modal" type="button">Bỏ qua</button>
+      <button class="btn btn-primary js-submit-customer-discount-modal" type="button"
+        data-form-id="customerDiscountForm_<%= selectedCustomer._id %>">Tạo phiếu</button>
+    </div>
+  </div>
+</div>
