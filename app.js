@@ -165,8 +165,8 @@ app.use(function(req, res, next) {
       hoa_don: '/don-hang/hoa-don?invoice=' + encodeURIComponent(safeId),
       customer_return: '/don-hang/tra-hang?return=' + encodeURIComponent(safeId),
       phieu_tra_hang: '/don-hang/tra-hang?return=' + encodeURIComponent(safeId),
-      supplier_return: '/tra-hang-nhap/' + safeId,
-      phieu_tra_hang_nhap: '/tra-hang-nhap/' + safeId,
+      supplier_return: '/tra-hang-nhap?openReturn=' + encodeURIComponent(safeId),
+      phieu_tra_hang_nhap: '/tra-hang-nhap?openReturn=' + encodeURIComponent(safeId),
       stock_check: '/kiem-kho/' + safeId + '/export.csv',
       phieu_kiem_kho: '/kiem-kho/' + safeId + '/export.csv',
       stock_disposal: '/xuat-huy/' + safeId,
@@ -184,6 +184,7 @@ app.use(function(req, res, next) {
       cashbook: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       so_quy: '/so-quy?so_quy_id=' + encodeURIComponent(safeId),
       nhap_vat_chua: '/vat-chua?nhap_vat_chua=' + encodeURIComponent(safeId),
+      xuat_vat_chua: '/vat-chua?xuat_vat_chua=' + encodeURIComponent(safeId),
       payroll: '/cham-cong?tab=payroll&bang_luong=' + encodeURIComponent(safeId),
       bang_luong: '/cham-cong?tab=payroll&bang_luong=' + encodeURIComponent(safeId),
       advance: '/cham-cong?tab=employees&tam_ung=' + encodeURIComponent(safeId),
@@ -193,7 +194,7 @@ app.use(function(req, res, next) {
   };
   res.locals.refLink = function(type, doc, text, attrs) {
     var id = doc && doc._id ? doc._id : doc;
-    var label = String(text || (doc && (doc.ma_hang || doc.ma_ncc || doc.ma_khach_hang || doc.ma_phieu_nhap || doc.ma_nhap_vat_chua || doc.ma_don_hang || doc.ma_hoa_don || doc.ma_lo || doc.ma_van_don || doc.ma_phieu || doc.ma_kho || doc.ten_so_quy)) || '--');
+    var label = String(text || (doc && (doc.ma_hang || doc.ma_ncc || doc.ma_khach_hang || doc.ma_phieu_nhap || doc.ma_nhap_vat_chua || doc.ma_xuat_vat_chua || doc.ma_don_hang || doc.ma_hoa_don || doc.ma_lo || doc.ma_van_don || doc.ma_phieu || doc.ma_kho || doc.ten_so_quy)) || '--');
     var escape = function(value) {
       return String(value).replace(/[&<>"']/g, function(char) {
         return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];

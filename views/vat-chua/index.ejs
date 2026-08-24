@@ -766,7 +766,12 @@
                   <select id="exportVatChuaSelect" name="vat_chua_id" required>
                     <option value="">— Chọn vật chứa —</option>
                     <% (activeVatChuaList || []).forEach(function(vc) { %>
-                      <option value="<%= vc._id %>" data-stock="<%= Number(vc.so_luong_ton || 0) %>" <%= Number(vc.so_luong_ton || 0) <= 0 ? 'disabled' : '' %>>
+                      <option
+                        value="<%= vc._id %>"
+                        data-stock="<%= Number(vc.so_luong_ton || 0) %>"
+                        data-cost="<%= Number(vc.gia_von_trung_binh || 0) %>"
+                        <%= Number(vc.so_luong_ton || 0) <= 0 ? 'disabled' : '' %>
+                      >
                         <%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %> (tồn <%= Number(vc.so_luong_ton || 0).toLocaleString('vi-VN') %>)
                       </option>
                     <% }) %>
@@ -781,6 +786,37 @@
                   <span>Ghi chú</span>
                   <input id="exportGhiChuInput" name="ghi_chu" placeholder="Ghi chú xuất vật chứa (tùy chọn)">
                 </div>
+              </div>
+              <div class="vc-payment-block" id="vcExportPaymentBlock">
+                <div class="vc-payment-title">Thu tiền</div>
+                <div class="vc-summary-line"><span>Tổng giá trị xuất</span><span class="num" id="exportVatChuaTotal">0</span></div>
+                <div class="vc-summary-line">
+                  <span>Tiền mặt</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="exportVatChuaCash" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="exportVatChuaPayAllCash">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Sổ tiền mặt <span id="exportVatChuaCashBookRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="exportVatChuaCashBook" class="vc-side-input" disabled>
+                    <option value="">Chọn sổ tiền mặt</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Chuyển khoản</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="exportVatChuaTransfer" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="exportVatChuaPayAllTransfer">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Tài khoản ngân hàng <span id="exportVatChuaBankRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="exportVatChuaBankBook" class="vc-side-input" disabled>
+                    <option value="">Chọn tài khoản chuyển khoản</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line"><strong>Chưa thu</strong><span class="num" id="exportVatChuaDebt">0</span></div>
               </div>
               <div id="vcExportError" class="vc-form-error"></div>
             </section>
@@ -993,6 +1029,17 @@
       var exportSoLuongInput = document.getElementById('exportSoLuongInput');
       var exportGhiChuInput = document.getElementById('exportGhiChuInput');
       var exportStockHint = document.getElementById('exportVatChuaStockHint');
+      var exportPaymentBlock = document.getElementById('vcExportPaymentBlock');
+      var exportVatChuaTotal = document.getElementById('exportVatChuaTotal');
+      var exportVatChuaCash = document.getElementById('exportVatChuaCash');
+      var exportVatChuaTransfer = document.getElementById('exportVatChuaTransfer');
+      var exportVatChuaCashBook = document.getElementById('exportVatChuaCashBook');
+      var exportVatChuaBankBook = document.getElementById('exportVatChuaBankBook');
+      var exportVatChuaCashBookRequired = document.getElementById('exportVatChuaCashBookRequired');
+      var exportVatChuaBankRequired = document.getElementById('exportVatChuaBankRequired');
+      var exportVatChuaDebt = document.getElementById('exportVatChuaDebt');
+      var exportVatChuaPayAllCash = document.getElementById('exportVatChuaPayAllCash');
+      var exportVatChuaPayAllTransfer = document.getElementById('exportVatChuaPayAllTransfer');
       var exportError = document.getElementById('vcExportError');
       var exportSave = document.getElementById('vcExportModalSave');
       var exportClose = document.getElementById('vcExportModalClose');
@@ -1235,6 +1282,80 @@
           exportCustomerSelect.value = '';
         }
       }
+      function getExportEstimatedTotal() {
+        if (!exportVatChuaSelect || !exportVatChuaSelect.selectedOptions || !exportVatChuaSelect.selectedOptions[0]) return 0;
+        var cost = Math.max(0, Number(exportVatChuaSelect.selectedOptions[0].getAttribute('data-cost') || 0));
+        var qty = Math.max(0, Math.floor(Number(exportSoLuongInput && exportSoLuongInput.value || 0)));
+        return Math.round(cost * qty);
+      }
+      function renderExportPaymentSummary() {
+        var total = getExportEstimatedTotal();
+        if (exportVatChuaTotal) exportVatChuaTotal.textContent = fmtMoney(total);
+        var tienMat = numeric(exportVatChuaCash ? exportVatChuaCash.value : 0);
+        var chuyenKhoan = numeric(exportVatChuaTransfer ? exportVatChuaTransfer.value : 0);
+        if (tienMat + chuyenKhoan > total && total > 0) {
+          var overflow = tienMat + chuyenKhoan - total;
+          if (chuyenKhoan >= overflow) chuyenKhoan -= overflow;
+          else {
+            tienMat = Math.max(0, tienMat - (overflow - chuyenKhoan));
+            chuyenKhoan = 0;
+          }
+        }
+        if (exportVatChuaCash) exportVatChuaCash.value = fmt(tienMat);
+        if (exportVatChuaTransfer) exportVatChuaTransfer.value = fmt(chuyenKhoan);
+        var cashRequired = tienMat > 0;
+        var bankRequired = chuyenKhoan > 0;
+        if (exportVatChuaCashBook) {
+          exportVatChuaCashBook.disabled = !cashRequired;
+          if (!cashRequired) exportVatChuaCashBook.value = '';
+          if (cashRequired && !exportVatChuaCashBook.value) exportVatChuaCashBook.value = autoSelectCashBook(cashBookOptions);
+          exportVatChuaCashBook.classList.toggle('field-invalid', cashRequired && !String(exportVatChuaCashBook.value || '').trim());
+        }
+        if (exportVatChuaBankBook) {
+          exportVatChuaBankBook.disabled = !bankRequired;
+          if (!bankRequired) exportVatChuaBankBook.value = '';
+          if (bankRequired && !exportVatChuaBankBook.value) exportVatChuaBankBook.value = autoSelectCashBook(bankBookOptions);
+          exportVatChuaBankBook.classList.toggle('field-invalid', bankRequired && !String(exportVatChuaBankBook.value || '').trim());
+        }
+        if (exportVatChuaCashBookRequired) exportVatChuaCashBookRequired.style.display = cashRequired ? 'inline' : 'none';
+        if (exportVatChuaBankRequired) exportVatChuaBankRequired.style.display = bankRequired ? 'inline' : 'none';
+        if (exportVatChuaDebt) exportVatChuaDebt.textContent = fmtMoney(Math.max(total - tienMat - chuyenKhoan, 0));
+      }
+      function validateExportPayment() {
+        var total = getExportEstimatedTotal();
+        var tienMat = numeric(exportVatChuaCash ? exportVatChuaCash.value : 0);
+        var chuyenKhoan = numeric(exportVatChuaTransfer ? exportVatChuaTransfer.value : 0);
+        if (tienMat + chuyenKhoan > total && total > 0) {
+          setActionError(exportError, 'Số tiền thu không được vượt tổng giá trị xuất.');
+          return false;
+        }
+        if (tienMat > 0 && !String(exportVatChuaCashBook ? exportVatChuaCashBook.value : '').trim()) {
+          setActionError(exportError, 'Vui lòng chọn sổ tiền mặt.');
+          return false;
+        }
+        if (chuyenKhoan > 0 && !String(exportVatChuaBankBook ? exportVatChuaBankBook.value : '').trim()) {
+          setActionError(exportError, 'Vui lòng chọn tài khoản chuyển khoản.');
+          return false;
+        }
+        return true;
+      }
+      async function ensureExportCashBooks() {
+        if (!cashBookOptions.length || !bankBookOptions.length) {
+          try {
+            var lists = await Promise.all([
+              loadCashBooksByType('tien_mat'),
+              loadCashBooksByType('chuyen_khoan')
+            ]);
+            cashBookOptions = lists[0];
+            bankBookOptions = lists[1];
+          } catch (_) {
+            cashBookOptions = [];
+            bankBookOptions = [];
+          }
+        }
+        renderCashBookSelect(exportVatChuaCashBook, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
+        renderCashBookSelect(exportVatChuaBankBook, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+      }
       function resetExportModalFields() {
         if (exportEditId) exportEditId.value = '';
         exportEditOriginalVatChuaId = '';
@@ -1244,6 +1365,9 @@
         if (exportVatChuaSelect) exportVatChuaSelect.value = '';
         if (exportSoLuongInput) exportSoLuongInput.value = '';
         if (exportGhiChuInput) exportGhiChuInput.value = '';
+        if (exportVatChuaCash) exportVatChuaCash.value = '0';
+        if (exportVatChuaTransfer) exportVatChuaTransfer.value = '0';
+        if (exportPaymentBlock) exportPaymentBlock.style.display = '';
         setActionError(exportError, '');
         if (exportModalTitle) exportModalTitle.textContent = 'Xuất vật chứa';
         if (exportSave) {
@@ -1251,10 +1375,13 @@
           exportSave.textContent = 'Xuất';
         }
         refreshExportStockHint();
+        renderExportPaymentSummary();
       }
-      function openExportModal() {
+      async function openExportModal() {
         if (!exportOverlay) return false;
         resetExportModalFields();
+        await ensureExportCashBooks();
+        renderExportPaymentSummary();
         showVcActionModal(exportOverlay);
         return true;
       }
@@ -1285,12 +1412,16 @@
           if (exportVatChuaSelect) exportVatChuaSelect.value = row.vat_chua_id || '';
           if (exportSoLuongInput) exportSoLuongInput.value = row.so_luong || '';
           if (exportGhiChuInput) exportGhiChuInput.value = row.ghi_chu || '';
+          if (exportVatChuaCash) exportVatChuaCash.value = '0';
+          if (exportVatChuaTransfer) exportVatChuaTransfer.value = '0';
+          if (exportPaymentBlock) exportPaymentBlock.style.display = 'none';
           if (exportModalTitle) exportModalTitle.textContent = 'Chỉnh sửa xuất vật chứa' + (row.ma_xuat_vat_chua ? (' — ' + row.ma_xuat_vat_chua) : '');
           if (exportSave) {
             exportSave.disabled = false;
             exportSave.textContent = 'Lưu';
           }
           refreshExportStockHint();
+          renderExportPaymentSummary();
           showVcActionModal(exportOverlay);
         } catch (error) {
           alert(error && error.message ? error.message : 'Không tải được phiếu xuất vật chứa.');
@@ -1745,7 +1876,38 @@
         });
       }
       if (exportVatChuaSelect) {
-        exportVatChuaSelect.addEventListener('change', refreshExportStockHint);
+        exportVatChuaSelect.addEventListener('change', function() {
+          refreshExportStockHint();
+          renderExportPaymentSummary();
+        });
+      }
+      if (exportSoLuongInput) {
+        exportSoLuongInput.addEventListener('input', renderExportPaymentSummary);
+        exportSoLuongInput.addEventListener('change', renderExportPaymentSummary);
+      }
+      [exportVatChuaCash, exportVatChuaTransfer].forEach(function(el) {
+        if (!el) return;
+        el.addEventListener('input', function() {
+          applyLiveVNFormat(el);
+          renderExportPaymentSummary();
+        });
+        el.addEventListener('blur', renderExportPaymentSummary);
+      });
+      if (exportVatChuaPayAllCash) {
+        exportVatChuaPayAllCash.addEventListener('click', function() {
+          var total = getExportEstimatedTotal();
+          var transfer = numeric(exportVatChuaTransfer ? exportVatChuaTransfer.value : 0);
+          if (exportVatChuaCash) exportVatChuaCash.value = fmt(Math.max(0, total - transfer));
+          renderExportPaymentSummary();
+        });
+      }
+      if (exportVatChuaPayAllTransfer) {
+        exportVatChuaPayAllTransfer.addEventListener('click', function() {
+          var total = getExportEstimatedTotal();
+          var cash = numeric(exportVatChuaCash ? exportVatChuaCash.value : 0);
+          if (exportVatChuaTransfer) exportVatChuaTransfer.value = fmt(Math.max(0, total - cash));
+          renderExportPaymentSummary();
+        });
       }
 
       if (stocktakeBody) stocktakeBody.addEventListener('input', refreshStocktakeSummary);
@@ -1834,6 +1996,15 @@
               if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không cập nhật được phiếu xuất.');
               window.location.href = '/vat-chua?success=export_updated&xuat_vat_chua=' + encodeURIComponent(editId);
             } else {
+              if (!validateExportPayment()) return;
+              payload.payment_v2 = '1';
+              payload.chi_tiet_thanh_toan = {
+                tien_mat: numeric(exportVatChuaCash ? exportVatChuaCash.value : 0),
+                so_quy_tien_mat_id: exportVatChuaCashBook ? exportVatChuaCashBook.value : '',
+                chuyen_khoan: numeric(exportVatChuaTransfer ? exportVatChuaTransfer.value : 0),
+                so_quy_chuyen_khoan_id: exportVatChuaBankBook ? exportVatChuaBankBook.value : '',
+                tien_tra_khach: 0
+              };
               await postVatChuaAction('/vat-chua/xuat', payload, exportSave, 'Xuất', 'Đang xuất...');
             }
           } catch (error) {

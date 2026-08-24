@@ -23,6 +23,8 @@ const DOCUMENT_TYPE_TO_FIELD = {
 
   nhap_vat_chua: 'nhap_vat_chua_id',
 
+  xuat_vat_chua: 'xuat_vat_chua_id',
+
   phieu_tra_hang_nhap: 'phieu_tra_hang_nhap_id',
 
   phieu_tra_hang: 'phieu_tra_hang_id',
@@ -584,6 +586,8 @@ async function taoPhieuThuChi(data = {}, options = {}) {
     phieu_nhap_id: docRefs.phieu_nhap_id,
 
     nhap_vat_chua_id: docRefs.nhap_vat_chua_id,
+
+    xuat_vat_chua_id: docRefs.xuat_vat_chua_id,
 
     phieu_tra_hang_nhap_id: docRefs.phieu_tra_hang_nhap_id,
 

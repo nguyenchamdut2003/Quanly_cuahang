@@ -45,13 +45,19 @@ const SOURCE_TYPE_LABEL = {
   khac: 'Khác'
 };
 
-function buildSourceHref(sourceType, sourceId, loaiXuat) {
+function buildSourceHref(sourceType, sourceId, loaiXuat, sourceCode) {
   const id = cleanId(sourceId);
   if (!id) return '';
   if (sourceType === 'phieu_nhap') return '/nhap-hang?purchase=' + encodeURIComponent(id);
   if (sourceType === 'don_hang') return '/don-hang/' + id;
   if (sourceType === 'hoa_don') return '/don-hang/hoa-don/' + id;
-  if (sourceType === 'phieu_tra_hang_nhap') return '/tra-hang-nhap/' + id;
+  if (sourceType === 'phieu_tra_hang_nhap') {
+    const qs = new URLSearchParams();
+    const code = String(sourceCode || '').trim();
+    if (code) qs.set('q', code);
+    qs.set('openReturn', id);
+    return '/tra-hang-nhap?' + qs.toString();
+  }
   if (sourceType === 'tra_hang_ban') return '/don-hang/tra-hang?return=' + encodeURIComponent(id);
   if (sourceType === 'xuat_noi_bo' || loaiXuat === 'su_dung_noi_bo') {
     return '/xuat-dung-noi-bo?open=' + encodeURIComponent(id);
@@ -329,7 +335,8 @@ function flattenVatChuaDocLines(doc, kind) {
   const sourceHref = buildSourceHref(
     doc.source_type,
     doc.source_id,
-    kind === 'xuat' ? doc.loai_xuat : doc.loai_nhap
+    kind === 'xuat' ? doc.loai_xuat : doc.loai_nhap,
+    doc.source_code
   );
   const createdAt = doc.created_at || null;
 

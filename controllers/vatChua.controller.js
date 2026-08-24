@@ -4,6 +4,7 @@ var { resolveStoreId } = require('../utils/storeScope');
 var { importDirectVatChuaFromSupplier, loadAverageCostByVatChuaIds, createNhapVatChuaAndIncreaseStock } = require('../services/vatChuaImport.service');
 var {
   createXuatVatChuaAndDecreaseStock,
+  createReceiptForXuatVatChua,
   loadManualXuatVatChuaForEdit,
   updateManualXuatVatChua,
   cancelManualXuatVatChua,
@@ -204,10 +205,20 @@ async function loadCustomersForStore(storeId) {
 
 async function loadActiveVatChuaForStore(storeId) {
   if (!storeId) return [];
-  return VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
+  var rows = await VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
     .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
     .select('ma_vat_chua ten_vat_chua so_luong_ton')
     .lean();
+  if (!rows.length) return [];
+  var avgCostMap = await loadAverageCostByVatChuaIds(
+    storeId,
+    rows.map(function(row) { return row._id; })
+  );
+  return rows.map(function(row) {
+    return Object.assign({}, row, {
+      gia_von_trung_binh: avgCostMap[String(row._id)] || 0
+    });
+  });
 }
 
 async function resolveOpenDetailVatChuaId(storeId, docIdRaw, docKind) {
@@ -824,6 +835,11 @@ exports.exportStock = async function(req, res, next) {
     var customerId = normalizeObjectId(body.khach_hang_id);
     var supplierId = normalizeObjectId(body.nha_cung_cap_id);
     var ghiChu = String(body.ghi_chu || '').trim();
+    var usePaymentV2 = hasReturnPaymentV2Payload(body);
+    var paymentDetail = usePaymentV2 ? extractPaymentDetail(body) : null;
+    var soTienThu = usePaymentV2
+      ? Math.max(0, Number(paymentDetail.tien_mat || 0) + Number(paymentDetail.chuyen_khoan || 0))
+      : Math.max(0, Number(body.so_tien_thu || body.gia_tri || 0));
 
     if (!vatChuaId) return res.status(400).json({ success: false, message: 'Vui lòng chọn vật chứa.' });
     if (qty <= 0) return res.status(400).json({ success: false, message: 'Vui lòng nhập số lượng xuất hợp lệ.' });
@@ -832,6 +848,15 @@ exports.exportStock = async function(req, res, next) {
     }
     if (!customerId && !supplierId) {
       return res.status(400).json({ success: false, message: 'Vui lòng chọn khách hàng hoặc nhà cung cấp.' });
+    }
+    if (usePaymentV2 && paymentDetail && Number(paymentDetail.tien_tra_khach || 0) > 0) {
+      return res.status(400).json({ success: false, message: 'Tiền trả khách không áp dụng khi xuất vật chứa.' });
+    }
+    if (usePaymentV2 && paymentDetail && Number(paymentDetail.tien_mat || 0) > 0 && !normalizeObjectId(paymentDetail.so_quy_tien_mat_id)) {
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn sổ tiền mặt.' });
+    }
+    if (usePaymentV2 && paymentDetail && Number(paymentDetail.chuyen_khoan || 0) > 0 && !normalizeObjectId(paymentDetail.so_quy_chuyen_khoan_id)) {
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn tài khoản chuyển khoản.' });
     }
 
     var doiTuongType = 'none';
@@ -873,6 +898,7 @@ exports.exportStock = async function(req, res, next) {
 
     session = await mongoose.startSession();
     var xuatDoc = null;
+    var receipt = null;
     await session.withTransaction(async function() {
       xuatDoc = await createXuatVatChuaAndDecreaseStock({
         storeId: storeId,
@@ -891,6 +917,27 @@ exports.exportStock = async function(req, res, next) {
           amount: Number(xuatDoc.tong_tien || 0)
         }, session);
       }
+      if (soTienThu > 0) {
+        receipt = await createReceiptForXuatVatChua(xuatDoc, {
+          userId: req.user && req.user._id ? req.user._id : undefined,
+          doiTuongType: doiTuongType,
+          doiTuongId: doiTuongId,
+          doiTuongTen: doiTuongTen,
+          payment: usePaymentV2
+            ? {
+              isV2: true,
+              amount: soTienThu,
+              detail: {
+                tien_mat: Number(paymentDetail.tien_mat || 0),
+                so_quy_tien_mat_id: paymentDetail.so_quy_tien_mat_id || '',
+                chuyen_khoan: Number(paymentDetail.chuyen_khoan || 0),
+                so_quy_chuyen_khoan_id: paymentDetail.so_quy_chuyen_khoan_id || '',
+                tien_tra_khach: 0
+              }
+            }
+            : { isV2: false, amount: soTienThu, detail: {} }
+        }, session);
+      }
     });
 
     return res.json({
@@ -899,7 +946,9 @@ exports.exportStock = async function(req, res, next) {
       data: {
         id: xuatDoc && xuatDoc._id ? String(xuatDoc._id) : '',
         code: xuatDoc && xuatDoc.ma_xuat_vat_chua ? xuatDoc.ma_xuat_vat_chua : '',
-        qty: qty
+        qty: qty,
+        phieu_thu_id: receipt && receipt._id ? String(receipt._id) : '',
+        ma_phieu_thu: receipt && receipt.ma_phieu ? receipt.ma_phieu : ''
       }
     });
   } catch (error) {

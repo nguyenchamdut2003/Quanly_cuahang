@@ -1926,6 +1926,7 @@ const PhieuThuChiSchema = new Schema({
   hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
   phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap' },
   nhap_vat_chua_id: { type: ObjectId, ref: 'NhapVatChua' },
+  xuat_vat_chua_id: { type: ObjectId, ref: 'XuatVatChua' },
   phieu_tra_hang_nhap_id: { type: ObjectId, ref: 'PhieuTraHangNhap' },
   phieu_tra_hang_id: { type: ObjectId, ref: 'PhieuTraHang' },
   van_don_id: { type: ObjectId, ref: 'VanDon' },

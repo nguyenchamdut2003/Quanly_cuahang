@@ -47,7 +47,7 @@
   return item.don_hang_id?.ma_don_hang || item.hoa_don_id?.ma_hoa_don || item.phieu_nhap_id?.ma_phieu_nhap ||
   firstAlloc?.ma_phieu_nhap || (allocPn && typeof allocPn === 'object' ? allocPn.ma_phieu_nhap : '') ||
   item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.phieu_tra_hang_id?.ma_phieu_tra || item.van_don_id?.ma_van_don
-  || item.nhap_vat_chua_id?.ma_nhap_vat_chua || item.chung_tu_khac || item.ma_chung_tu_goc || '';
+  || item.nhap_vat_chua_id?.ma_nhap_vat_chua || item.xuat_vat_chua_id?.ma_xuat_vat_chua || item.chung_tu_khac || item.ma_chung_tu_goc || '';
   };
   const relatedDocLink = function(item) {
   const code = codeOf(item);
@@ -55,6 +55,7 @@
   if (item.phieu_tra_hang_id) return refLink('customer_return', item.phieu_tra_hang_id, code);
   if (item.phieu_nhap_id) return refLink('purchase', item.phieu_nhap_id, code);
   if (item.nhap_vat_chua_id) return refLink('nhap_vat_chua', item.nhap_vat_chua_id, code);
+  if (item.xuat_vat_chua_id) return refLink('xuat_vat_chua', item.xuat_vat_chua_id, code);
   if (item.don_hang_id) return refLink('order', item.don_hang_id, code);
   if (item.hoa_don_id) return refLink('invoice', item.hoa_don_id, code);
   if (item.van_don_id) return refLink('shipment', item.van_don_id, code);
@@ -2806,7 +2807,7 @@
                   function closeInlineReceiptDetail() { document.querySelectorAll('.receipt-inline-row').forEach(row => row.remove()); document.querySelectorAll('.receipt-inline-main-row').forEach(row => row.classList.remove('is-open')) }
                   function openReceiptPrint(id) { if (!id) return; window.open('/so-quy/' + encodeURIComponent(String(id)) + '/in-tong-hop', '_blank') }
                   function receiptDocId(doc) { if (!doc) return ''; if (typeof doc === 'string') return String(doc); return doc._id ? String(doc._id) : '' }
-                  function receiptDocHref(type, id) { const safeId = String(id || '').trim(); if (!safeId) return ''; const map = { order: '/don-hang?order=', invoice: '/don-hang/hoa-don?invoice=', purchase: '/nhap-hang?purchase=', nhap_vat_chua: '/vat-chua?nhap_vat_chua=', supplier_return: '/tra-hang-nhap/', phieu_tra_hang_nhap: '/tra-hang-nhap/', customer_return: '/don-hang/tra-hang/', phieu_tra_hang: '/don-hang/tra-hang/', shipment: '/don-hang/van-don/', van_don: '/don-hang/van-don/', payroll: '/cham-cong?tab=payroll&bang_luong=', bang_luong: '/cham-cong?tab=payroll&bang_luong=', advance: '/cham-cong?tab=employees&tam_ung=', tam_ung: '/cham-cong?tab=employees&tam_ung=' }; const base = map[type]; return base ? base + encodeURIComponent(safeId) : '' }
+                  function receiptDocHref(type, id) { const safeId = String(id || '').trim(); if (!safeId) return ''; const map = { order: '/don-hang?order=', invoice: '/don-hang/hoa-don?invoice=', purchase: '/nhap-hang?purchase=', nhap_vat_chua: '/vat-chua?nhap_vat_chua=', xuat_vat_chua: '/vat-chua?xuat_vat_chua=', supplier_return: '/tra-hang-nhap?openReturn=', phieu_tra_hang_nhap: '/tra-hang-nhap?openReturn=', customer_return: '/don-hang/tra-hang?return=', phieu_tra_hang: '/don-hang/tra-hang?return=', shipment: '/don-hang/van-don/', van_don: '/don-hang/van-don/', payroll: '/cham-cong?tab=payroll&bang_luong=', bang_luong: '/cham-cong?tab=payroll&bang_luong=', advance: '/cham-cong?tab=employees&tam_ung=', tam_ung: '/cham-cong?tab=employees&tam_ung=' }; const base = map[type]; return base ? base + encodeURIComponent(safeId) : '' }
                   function receiptDocLink(type, id, code) { const label = escapeHtml(code || '—'); const href = receiptDocHref(type, id); return href ? `<a class="receipt-inline-link ref-link" href="${href}">${label}</a>` : label }
                   function relDocObject(doc) { return doc && typeof doc === 'object' ? doc : null }
                   function relMoneyCell(value) { if (value == null || value === '' || Number.isNaN(Number(value))) return '—'; return fmtMoney(Math.abs(Number(value) || 0)) }
@@ -2855,6 +2856,11 @@
                     if (nvc) {
                       const docVal = Number(nvc.tong_tien || 0) || null;
                       pushRow({ type: 'nhap_vat_chua', typeLabel: 'Nhập vật chứa', code: nvc.ma_nhap_vat_chua, docId: receiptDocId(nvc), docDate: nvc.created_at, partner: relTextCell(nvc.doi_tuong_ten || receipt.doi_tuong), docValue: docVal, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: getRelatedDocumentStatus('nhap_vat_chua', nvc) });
+                    }
+                    const xvc = relDocObject(receipt.xuat_vat_chua_id);
+                    if (xvc) {
+                      const docVal = Number(xvc.tong_tien || 0) || null;
+                      pushRow({ type: 'xuat_vat_chua', typeLabel: 'Xuất vật chứa', code: xvc.ma_xuat_vat_chua, docId: receiptDocId(xvc), docDate: xvc.created_at, partner: relTextCell(xvc.doi_tuong_ten || receipt.doi_tuong), docValue: docVal, paidBefore: null, receiptValue: defaultReceiptValue, remainAfter: null, status: getRelatedDocumentStatus('xuat_vat_chua', xvc) });
                     }
                     const pth = relDocObject(receipt.phieu_tra_hang_id);
                     if (pth) {

@@ -5,6 +5,7 @@ const {
   assertVatChuaImportInput,
   loadAverageCostByVatChuaIds
 } = require('./vatChuaImport.service');
+const { taoPhieuThuChi } = require('./soQuy.service');
 
 function cleanId(value) {
   const id = String(value || '').trim();
@@ -94,6 +95,69 @@ async function makeXuatVatChuaCode(storeId, session) {
     ? Number(String(last.ma_xuat_vat_chua).replace(/\D/g, '')) + 1
     : 1;
   return 'XVC' + String(next).padStart(6, '0');
+}
+
+/**
+ * Tạo phiếu thu khi thu tiền lúc xuất vật chứa thủ công (KH/NCC).
+ * hach_toan=false: công nợ NCC đã giảm qua CongNo; KH chưa ghi nợ VC.
+ */
+async function createReceiptForXuatVatChua(xuatDoc, options = {}, session) {
+  if (!xuatDoc || !xuatDoc._id) return null;
+  const payment = options.payment || {};
+  const paidAmount = Math.max(0, Number(payment.amount || 0));
+  if (paidAmount <= 0) return null;
+
+  const doiTuongType = String(options.doiTuongType || xuatDoc.doi_tuong_type || '').trim();
+  const doiTuongId = cleanId(options.doiTuongId || xuatDoc.doi_tuong_id);
+  const doiTuongTen = String(options.doiTuongTen || xuatDoc.doi_tuong_ten || '').trim();
+  const limit = Math.max(0, Number(xuatDoc.tong_tien || 0));
+  if (limit > 0 && paidAmount > limit) {
+    throw new Error('Số tiền thu không được vượt tổng giá trị xuất vật chứa.');
+  }
+
+  if (!payment.isV2) {
+    throw new Error('Vui lòng chọn sổ quỹ để ghi nhận tiền thu xuất vật chứa.');
+  }
+  const detail = payment.detail || {};
+  if (Number(detail.tien_mat || 0) > 0 && !cleanId(detail.so_quy_tien_mat_id)) {
+    throw new Error('Vui lòng chọn sổ tiền mặt.');
+  }
+  if (Number(detail.chuyen_khoan || 0) > 0 && !cleanId(detail.so_quy_chuyen_khoan_id)) {
+    throw new Error('Vui lòng chọn tài khoản chuyển khoản.');
+  }
+
+  const payload = {
+    loai_phieu: 'thu',
+    loai_thu_chi: 'Thu xuất vật chứa',
+    gia_tri: paidAmount,
+    ngay_lap: new Date(),
+    cua_hang_id: xuatDoc.cua_hang_id,
+    nguoi_tao_id: options.userId,
+    xuat_vat_chua_id: xuatDoc._id,
+    document_type: 'xuat_vat_chua',
+    ma_chung_tu_goc: xuatDoc.ma_xuat_vat_chua || '',
+    doi_tuong: doiTuongTen,
+    ghi_chu: 'Thu tiền xuất vật chứa ' + (xuatDoc.ma_xuat_vat_chua || ''),
+    hach_toan: false,
+    payment_v2: true,
+    tien_mat: Number(detail.tien_mat || 0),
+    so_quy_tien_mat_id: detail.so_quy_tien_mat_id || '',
+    chuyen_khoan: Number(detail.chuyen_khoan || 0),
+    so_quy_chuyen_khoan_id: detail.so_quy_chuyen_khoan_id || '',
+    tien_tra_khach: 0
+  };
+
+  if (doiTuongType === 'nha_cung_cap') {
+    payload.nhom_doi_tuong = 'nha_cung_cap';
+    payload.nha_cung_cap_id = doiTuongId;
+  } else if (doiTuongType === 'khach_hang') {
+    payload.nhom_doi_tuong = 'khach_hang';
+    payload.khach_hang_id = doiTuongId;
+  } else {
+    payload.nhom_doi_tuong = 'khac';
+  }
+
+  return taoPhieuThuChi(payload, { session });
 }
 
 async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
@@ -580,6 +644,7 @@ module.exports = {
   exportVatChuaWithSalesReturn,
   cancelXuatVatChuaBySource,
   createXuatVatChuaAndDecreaseStock,
+  createReceiptForXuatVatChua,
   applySupplierDebtForXuatVatChua,
   reverseSupplierDebtForXuatVatChua,
   isManualPartnerExport,

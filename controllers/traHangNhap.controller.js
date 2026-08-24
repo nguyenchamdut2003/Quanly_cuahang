@@ -2183,7 +2183,24 @@ exports.detail = async function(req, res, next) {
       .populate('nguoi_tao_id')
       .populate('nguoi_tra_id')
       .lean();
-    if (!ret) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
+    if (!ret) {
+      const accept = String(req.headers.accept || '');
+      const wantsHtml = !req.xhr && accept.indexOf('text/html') >= 0;
+      if (wantsHtml) return res.redirect('/tra-hang-nhap');
+      return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
+    }
+
+    const accept = String(req.headers.accept || '');
+    const wantsHtml = !req.xhr
+      && accept.indexOf('text/html') >= 0
+      && (accept.indexOf('application/json') < 0 || accept.indexOf('text/html') < accept.indexOf('application/json'));
+    if (wantsHtml) {
+      const qs = new URLSearchParams();
+      if (ret.ma_phieu_tra_nhap) qs.set('q', String(ret.ma_phieu_tra_nhap));
+      qs.set('openReturn', String(ret._id));
+      return res.redirect('/tra-hang-nhap?' + qs.toString());
+    }
+
     const items = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: ret._id })
       .populate('hang_hoa_id')
       .populate('lo_hang_id')

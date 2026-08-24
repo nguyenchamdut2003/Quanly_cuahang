@@ -12,7 +12,8 @@ const {
     PhieuTraHangNhap,
     PhieuTraHang,
     DonHang,
-    NhapVatChua
+    NhapVatChua,
+    XuatVatChua
 } = require('../models/kiot.model');
 const { BangLuong, TamUngNhanVien } = require('../models/chamcong.model');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
@@ -208,6 +209,7 @@ function relatedCode(item) {
         || item.phieu_tra_hang_id?.ma_phieu_tra
         || item.van_don_id?.ma_van_don
         || item.nhap_vat_chua_id?.ma_nhap_vat_chua
+        || item.xuat_vat_chua_id?.ma_xuat_vat_chua
         || item.chung_tu_khac
         || item.ma_chung_tu_goc
         || '';
@@ -217,7 +219,7 @@ function hasReceiptDocRef(item) {
     if (!item) return false;
     if (item.hoa_don_id || item.don_hang_id || item.phieu_nhap_id) return true;
     if (item.phieu_tra_hang_id || item.phieu_tra_hang_nhap_id || item.van_don_id) return true;
-    if (item.nhap_vat_chua_id) return true;
+    if (item.nhap_vat_chua_id || item.xuat_vat_chua_id) return true;
     if (Array.isArray(item.allocations) && item.allocations.length) return true;
     return !!(item._docLinkType && item._docLinkId);
 }
@@ -249,6 +251,11 @@ async function attachMissingDocRefs(receipt) {
             .select('ma_nhap_vat_chua tong_tien created_at doi_tuong_ten trang_thai')
             .lean();
         if (row) receipt.nhap_vat_chua_id = row;
+    } else if (/^XVC/i.test(code) && !receipt.xuat_vat_chua_id) {
+        const row = await XuatVatChua.findOne({ ma_xuat_vat_chua: code })
+            .select('ma_xuat_vat_chua tong_tien created_at doi_tuong_ten trang_thai')
+            .lean();
+        if (row) receipt.xuat_vat_chua_id = row;
     } else if (isCustomerReturnDocCode(code) && !receipt.phieu_tra_hang_id) {
         const row = await PhieuTraHang.findOne({ ma_phieu_tra: code })
             .select('ma_phieu_tra ngay_tra tong_tien_tra can_tra_khach trang_thai khach_hang_id')
@@ -286,6 +293,7 @@ async function enrichReceiptListDocRefs(list, storeId) {
     const customerReturnCodes = [];
     const orderCodes = [];
     const nhapVatChuaCodes = [];
+    const xuatVatChuaCodes = [];
     const payrollCodes = [];
     const advanceCodes = [];
     list.forEach(item => {
@@ -298,11 +306,12 @@ async function enrichReceiptListDocRefs(list, storeId) {
         else if (isCustomerReturnDocCode(code)) customerReturnCodes.push(code);
         else if (/^DH/i.test(code)) orderCodes.push(code);
         else if (/^NVC/i.test(code)) nhapVatChuaCodes.push(code);
+        else if (/^XVC/i.test(code)) xuatVatChuaCodes.push(code);
         else if (isPayrollDocCode(code)) payrollCodes.push(normalizePayrollDocCode(code), code);
         else if (isAdvanceDocCode(code)) advanceCodes.push(code.toUpperCase());
     });
     const unique = arr => [...new Set(arr.filter(Boolean))];
-    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas, payrolls, advances] = await Promise.all([
+    const [invoices, purchases, supplierReturns, customerReturns, orders, nhapVatChuas, xuatVatChuas, payrolls, advances] = await Promise.all([
         unique(invoiceCodes).length
             ? HoaDonBanHang.find({ ma_hoa_don: { $in: unique(invoiceCodes) } }).select('_id ma_hoa_don').lean()
             : [],
@@ -320,6 +329,9 @@ async function enrichReceiptListDocRefs(list, storeId) {
             : [],
         unique(nhapVatChuaCodes).length
             ? NhapVatChua.find({ ma_nhap_vat_chua: { $in: unique(nhapVatChuaCodes) } }).select('_id ma_nhap_vat_chua').lean()
+            : [],
+        unique(xuatVatChuaCodes).length
+            ? XuatVatChua.find({ ma_xuat_vat_chua: { $in: unique(xuatVatChuaCodes) } }).select('_id ma_xuat_vat_chua').lean()
             : [],
         unique(payrollCodes).length
             ? BangLuong.find(Object.assign(
@@ -340,6 +352,7 @@ async function enrichReceiptListDocRefs(list, storeId) {
     const customerReturnByCode = new Map(customerReturns.map(row => [row.ma_phieu_tra, row._id]));
     const orderByCode = new Map(orders.map(row => [row.ma_don_hang, row._id]));
     const nhapVatChuaByCode = new Map(nhapVatChuas.map(row => [row.ma_nhap_vat_chua, row._id]));
+    const xuatVatChuaByCode = new Map(xuatVatChuas.map(row => [row.ma_xuat_vat_chua, row._id]));
     const payrollByCode = new Map();
     payrolls.forEach(row => {
         const code = String(row.ma_bang_luong || '').trim();
@@ -374,6 +387,9 @@ async function enrichReceiptListDocRefs(list, storeId) {
         } else if (nhapVatChuaByCode.has(code)) {
             item._docLinkType = 'nhap_vat_chua';
             item._docLinkId = nhapVatChuaByCode.get(code);
+        } else if (xuatVatChuaByCode.has(code)) {
+            item._docLinkType = 'xuat_vat_chua';
+            item._docLinkId = xuatVatChuaByCode.get(code);
         } else if (payrollByCode.has(code) || payrollByCode.has(payrollCode)) {
             item._docLinkType = 'payroll';
             item._docLinkId = payrollByCode.get(code) || payrollByCode.get(payrollCode);
@@ -431,6 +447,7 @@ exports.index = async (req, res, next) => {
                 .populate('phieu_tra_hang_nhap_id')
                 .populate('van_don_id')
                 .populate('nhap_vat_chua_id')
+                .populate('xuat_vat_chua_id')
                 .populate('allocations.phieu_nhap_id')
                 .sort({ ngay_lap: -1 }),
             SoQuy.find({ trang_thai: 'active',  }).sort({ ten_so_quy: 1 }),
@@ -593,6 +610,10 @@ const RECEIPT_DETAIL_POPULATES = [
     {
         path: 'nhap_vat_chua_id',
         select: 'ma_nhap_vat_chua tong_tien created_at doi_tuong_ten trang_thai items'
+    },
+    {
+        path: 'xuat_vat_chua_id',
+        select: 'ma_xuat_vat_chua tong_tien created_at doi_tuong_ten trang_thai items'
     },
     {
         path: 'allocations.phieu_nhap_id',
