@@ -7,7 +7,8 @@ var {
   loadManualXuatVatChuaForEdit,
   updateManualXuatVatChua,
   cancelManualXuatVatChua,
-  isManualPartnerExport
+  isManualPartnerExport,
+  applySupplierDebtForXuatVatChua
 } = require('../services/vatChuaExport.service');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo, extractPaymentDetail } = require('../services/paymentCashBook.service');
@@ -619,6 +620,20 @@ exports.apiImportReturn = async function(req, res, next) {
           ghiChu: 'Trả vật chứa theo phiếu nhập ' + (doc.ma_nhap_vat_chua || '')
         }, session);
 
+        if (
+          doc.doi_tuong_type === 'nha_cung_cap'
+          && String(doc.source_type || 'manual') === 'manual'
+          && xuatDoc
+          && returnTotal > 0
+        ) {
+          await applySupplierDebtForXuatVatChua(xuatDoc, {
+            supplierId: doc.doi_tuong_id,
+            nhapVatChuaId: doc._id,
+            amount: returnTotal,
+            note: 'Giảm nợ từ trả vật chứa ' + (xuatDoc.ma_xuat_vat_chua || '')
+          }, session);
+        }
+
         if (soTienThu > 0) {
           var receiptPayload = {
             loai_phieu: 'thu',
@@ -870,6 +885,12 @@ exports.exportStock = async function(req, res, next) {
         sourceType: 'manual',
         ghiChu: ghiChu || ('Xuất vật chứa cho ' + doiTuongTen)
       }, session);
+      if (doiTuongType === 'nha_cung_cap' && xuatDoc && Number(xuatDoc.tong_tien || 0) > 0) {
+        await applySupplierDebtForXuatVatChua(xuatDoc, {
+          supplierId: doiTuongId,
+          amount: Number(xuatDoc.tong_tien || 0)
+        }, session);
+      }
     });
 
     return res.json({

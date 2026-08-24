@@ -142,6 +142,34 @@ async function reassignPurchasePaymentDocs(sourceIds, receivingId, session) {
         { $set: { phieu_nhap_id: receivingId } },
         { session }
     );
+
+    // Sau remap: chỉ giữ 1 dòng tang_no / phiếu nhận (tránh lặp trên tab công nợ).
+    const tangNoRows = await CongNoNhaCungCap.find({
+        phieu_nhap_id: receivingId,
+        loai: 'tang_no'
+    }).sort({ created_at: 1, _id: 1 }).session(session).select('_id so_tien');
+
+    if (tangNoRows.length > 1) {
+        const keepId = tangNoRows[0]._id;
+        const removeIds = tangNoRows.slice(1).map(row => row._id);
+        const receivingPurchase = await PhieuNhap.findById(receivingId)
+            .select('can_tra_ncc tong_tien')
+            .session(session)
+            .lean();
+        const mergedAmount = Math.max(
+            0,
+            Number(receivingPurchase?.can_tra_ncc || receivingPurchase?.tong_tien || tangNoRows[0].so_tien || 0)
+        );
+        await CongNoNhaCungCap.updateOne(
+            { _id: keepId },
+            { $set: { so_tien: mergedAmount, phieu_nhap_id: receivingId } },
+            { session }
+        );
+        await CongNoNhaCungCap.deleteMany(
+            { _id: { $in: removeIds } },
+            { session }
+        );
+    }
 }
 
 async function mergePurchasesInSession(req, session) {

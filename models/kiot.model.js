@@ -898,6 +898,11 @@ const CongNoNhaCungCapSchema = new Schema({
     ref: 'NhapVatChua'
   },
 
+  xuat_vat_chua_id: {
+    type: ObjectId,
+    ref: 'XuatVatChua'
+  },
+
   phieu_tra_nhap_id: {
     type: ObjectId,
     ref: 'PhieuTraHangNhap'

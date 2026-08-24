@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { VatChua, XuatVatChua, KhachHang, NhaCungCap } = require('../models/kiot.model');
+const { VatChua, XuatVatChua, KhachHang, NhaCungCap, CongNoNhaCungCap } = require('../models/kiot.model');
 const {
   parseVatChuaImportInput,
   assertVatChuaImportInput,
@@ -19,6 +19,69 @@ async function createOne(model, doc, session) {
   if (!session) return model.create(doc);
   const rows = await model.create([doc], { session });
   return rows[0];
+}
+
+async function applySupplierDebtForXuatVatChua(xuatDoc, options = {}, session) {
+  const amount = Math.max(0, Number(options.amount != null ? options.amount : xuatDoc && xuatDoc.tong_tien || 0));
+  const supplierId = cleanId(options.supplierId || (xuatDoc && xuatDoc.doi_tuong_type === 'nha_cung_cap' ? xuatDoc.doi_tuong_id : null));
+  if (!amount || !supplierId || !xuatDoc || !xuatDoc._id) return null;
+
+  const existing = await withSessionQuery(
+    CongNoNhaCungCap.findOne({
+      xuat_vat_chua_id: xuatDoc._id,
+      loai: 'giam_no'
+    }),
+    session
+  ).lean();
+  if (existing) {
+    await withSessionQuery(
+      CongNoNhaCungCap.updateOne({ _id: existing._id }, { $set: { so_tien: amount } }),
+      session
+    );
+  } else {
+    await createOne(CongNoNhaCungCap, {
+      cua_hang_id: xuatDoc.cua_hang_id,
+      nha_cung_cap_id: supplierId,
+      xuat_vat_chua_id: xuatDoc._id,
+      nhap_vat_chua_id: options.nhapVatChuaId || xuatDoc.source_id || undefined,
+      so_tien: amount,
+      loai: 'giam_no',
+      ghi_chu: options.note || ('Giảm nợ từ xuất/trả vật chứa ' + (xuatDoc.ma_xuat_vat_chua || '')),
+      ngay: new Date()
+    }, session);
+  }
+
+  const debtDelta = options.debtDelta != null ? Number(options.debtDelta) : -amount;
+  if (debtDelta !== 0) {
+    await withSessionQuery(
+      NhaCungCap.updateOne({ _id: supplierId }, { $inc: { tong_no: debtDelta } }),
+      session
+    );
+  }
+  return true;
+}
+
+async function reverseSupplierDebtForXuatVatChua(xuatDoc, session) {
+  if (!xuatDoc || !xuatDoc._id) return;
+  const supplierId = cleanId(xuatDoc.doi_tuong_type === 'nha_cung_cap' ? xuatDoc.doi_tuong_id : null);
+  const rows = await withSessionQuery(
+    CongNoNhaCungCap.find({ xuat_vat_chua_id: xuatDoc._id, loai: 'giam_no' }),
+    session
+  ).lean();
+  if (!rows.length) return;
+  const amount = rows.reduce(function(sum, row) {
+    return sum + Math.max(0, Number(row.so_tien || 0));
+  }, 0);
+  await withSessionQuery(
+    CongNoNhaCungCap.deleteMany({ xuat_vat_chua_id: xuatDoc._id, loai: 'giam_no' }),
+    session
+  );
+  if (supplierId && amount > 0) {
+    await withSessionQuery(
+      NhaCungCap.updateOne({ _id: supplierId }, { $inc: { tong_no: amount } }),
+      session
+    );
+  }
 }
 
 async function makeXuatVatChuaCode(storeId, session) {
@@ -381,6 +444,9 @@ async function updateManualXuatVatChua(id, data = {}, storeId) {
       const oldLine = firstLine(doc);
       const oldVatChuaId = cleanId(oldLine.vat_chua_id);
       const oldQty = Math.max(0, Math.floor(Number(oldLine.so_luong || doc.tong_so_luong || 0)));
+      const oldPartnerType = doc.doi_tuong_type;
+      const oldPartnerId = doc.doi_tuong_id;
+      const oldTotal = Math.max(0, Number(doc.tong_tien || 0));
       const costMap = await loadAverageCostByVatChuaIds(store, [vatChuaId], session);
       const giaVon = Math.max(0, Number(costMap[String(vatChuaId)] || oldLine.gia_von || 0));
       const thanhTien = Math.round(giaVon * qty);
@@ -434,6 +500,19 @@ async function updateManualXuatVatChua(id, data = {}, storeId) {
       doc.ghi_chu = ghiChu || ('Xuất vật chứa cho ' + partner.doiTuongTen);
       await doc.save(withSessionOptions({}, session));
 
+      await reverseSupplierDebtForXuatVatChua({
+        _id: doc._id,
+        doi_tuong_type: oldPartnerType,
+        doi_tuong_id: oldPartnerId,
+        tong_tien: oldTotal
+      }, session);
+      if (partner.doiTuongType === 'nha_cung_cap' && thanhTien > 0) {
+        await applySupplierDebtForXuatVatChua(doc, {
+          supplierId: partner.doiTuongId,
+          amount: thanhTien
+        }, session);
+      }
+
       result = {
         edit_mode: 'manual_export',
         _id: String(doc._id),
@@ -480,6 +559,7 @@ async function cancelManualXuatVatChua(id, storeId) {
 
       doc.trang_thai = 'cancelled';
       await doc.save(withSessionOptions({}, session));
+      await reverseSupplierDebtForXuatVatChua(doc, session);
       result = {
         edit_mode: 'manual_export',
         _id: String(doc._id),
@@ -500,6 +580,8 @@ module.exports = {
   exportVatChuaWithSalesReturn,
   cancelXuatVatChuaBySource,
   createXuatVatChuaAndDecreaseStock,
+  applySupplierDebtForXuatVatChua,
+  reverseSupplierDebtForXuatVatChua,
   isManualPartnerExport,
   loadManualXuatVatChuaForEdit,
   updateManualXuatVatChua,

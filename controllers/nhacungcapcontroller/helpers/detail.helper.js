@@ -1,7 +1,7 @@
 const { mongoose, querystring, NhaCungCap, NhomNhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, GiaoDichCongNoNhaCungCap, DiaChiNhaCungCap, PhieuXuatNoiBo, CTXuatNoiBo, NhapVatChua, XuatVatChua, buildSupplierHangHoaExportPack, buildSupplierPurchaseInvoiceExportPack, handleSupplierDebtExport, formatDate, getUserName, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, resolveStoreId, normalizeIdParam, loadAddressTypes } = require('./common.helper');
 const { normalizeFilterQuery, buildFilterQueryString } = require('./filter.helper');
 const { aggregateSupplierPurchaseTotals, applySupplierTotalsFromMap, normalizeDebtWarnSettings } = require('./metrics.helper');
-const { isVisibleSupplierDebtRow, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierPayableDocuments, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks } = require('./debt.helper');
+const { isVisibleSupplierDebtRow, isIncludedInSupplierDebtHistory, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierPayableDocuments, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks, dedupeSupplierDebtSourceRows, applySupplierDebtHistoryDisplayTotals, attachManualNhapVatChuaPaidAmounts, loadManualNhapVatChuaDebtSourceRows, loadManualXuatVatChuaDebtSourceRows } = require('./debt.helper');
 const { buildProfitBySupplierAddressReport } = require('../../../services/profitReport.service');
 
 async function loadSelectedSupplierBase(req, supplierId) {
@@ -67,26 +67,6 @@ function isLinkedReceiptDebtRow(row) {
         || row.phieu_tra_nhap_id
         || row.phieu_tra_hang_nhap_id
     );
-}
-
-function applySupplierDebtHistoryDisplayTotals(rows) {
-    var runningDebt = 0;
-    var result = Array.isArray(rows) ? rows : [];
-    for (var i = result.length - 1; i >= 0; i--) {
-        var row = result[i] || {};
-        var type = String(row.loai || '').trim();
-        if (type === 'tang_no') {
-            runningDebt += Math.max(0, Number(row.con_lai || 0));
-        } else if (type === 'giam_no') {
-            var decrease = row.phieu_tra_nhap_id
-                ? Math.max(0, Number(row.da_thanh_toan || 0))
-                : Math.max(0, Number(row.gia_tri || 0));
-            runningDebt -= decrease;
-        }
-        row.tong_no = Math.max(0, runningDebt);
-        row.no_con_lai = row.tong_no;
-    }
-    return result;
 }
 
 async function loadSupplierDetailShellRenderLocals(req, supplierId) {
@@ -247,7 +227,8 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     }
     var debtRows = await CongNoNhaCungCap.find(debtQuery)
         .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai' })
-        .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua created_at tong_tien tong_so_luong trang_thai' })
+        .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua created_at tong_tien tong_so_luong trang_thai source_type' })
+        .populate({ path: 'xuat_vat_chua_id', select: 'ma_xuat_vat_chua created_at tong_tien tong_so_luong trang_thai source_type loai_xuat' })
         .populate({
             path: 'phieu_tra_nhap_id',
             select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai',
@@ -256,9 +237,27 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi trang_thai' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
-    debtRows = debtRows.filter(function(row) {
-        return isVisibleSupplierDebtRow(row) && !row.nhap_vat_chua_id;
+    debtRows = debtRows.filter(isIncludedInSupplierDebtHistory);
+    attachManualNhapVatChuaPaidAmounts(debtRows);
+    var nhapDebtRows = await loadManualNhapVatChuaDebtSourceRows(selectedSupplier._id, storeId);
+    var xuatDebtRows = await loadManualXuatVatChuaDebtSourceRows(selectedSupplier._id, storeId);
+    var existingNhapIds = Object.create(null);
+    var existingXuatIds = Object.create(null);
+    debtRows.forEach(function(row) {
+        var nid = row.nhap_vat_chua_id && (row.nhap_vat_chua_id._id || row.nhap_vat_chua_id);
+        if (nid) existingNhapIds[String(nid)] = true;
+        var xid = row.xuat_vat_chua_id && (row.xuat_vat_chua_id._id || row.xuat_vat_chua_id);
+        if (xid) existingXuatIds[String(xid)] = true;
     });
+    nhapDebtRows.forEach(function(row) {
+        var nid = row.nhap_vat_chua_id && (row.nhap_vat_chua_id._id || row.nhap_vat_chua_id);
+        if (nid && !existingNhapIds[String(nid)]) debtRows.push(row);
+    });
+    xuatDebtRows.forEach(function(row) {
+        var xid = row.xuat_vat_chua_id && (row.xuat_vat_chua_id._id || row.xuat_vat_chua_id);
+        if (xid && !existingXuatIds[String(xid)]) debtRows.push(row);
+    });
+    debtRows = dedupeSupplierDebtSourceRows(debtRows);
     var debtTransactionRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.find({
         nha_cung_cap_id: selectedSupplier._id,
         ...(storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId } : {}),
@@ -272,6 +271,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     debtTransactionRows = debtTransactionRows.filter(function(row) {
         return isVisibleSupplierDebtRow(row) && !row.nhap_vat_chua_id;
     });
+    debtTransactionRows = dedupeSupplierDebtSourceRows(debtTransactionRows);
     var runningDebt = 0;
     var debtAsc = debtRows.map(function(row) {
         return { source: 'legacy', row: row, date: getDebtEventTime(row) };
@@ -313,6 +313,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         return {
             phieu_nhap_id: sourceRow.phieu_nhap_id,
             nhap_vat_chua_id: sourceRow.nhap_vat_chua_id,
+            xuat_vat_chua_id: sourceRow.xuat_vat_chua_id,
             phieu_tra_nhap_id: sourceRow.phieu_tra_nhap_id,
             phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
             ma_phieu: docInfo.code,
@@ -541,7 +542,8 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
     }
     var debtRows = await CongNoNhaCungCap.find(debtQuery)
         .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai' })
-        .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua created_at tong_tien tong_so_luong trang_thai' })
+        .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua created_at tong_tien tong_so_luong trang_thai source_type' })
+        .populate({ path: 'xuat_vat_chua_id', select: 'ma_xuat_vat_chua created_at tong_tien tong_so_luong trang_thai source_type loai_xuat' })
         .populate({
             path: 'phieu_tra_nhap_id',
             select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai',
@@ -550,9 +552,27 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi trang_thai' })
         .sort({ ngay: -1, created_at: -1 })
         .lean();
-    debtRows = debtRows.filter(function(row) {
-        return isVisibleSupplierDebtRow(row) && !row.nhap_vat_chua_id;
+    debtRows = debtRows.filter(isIncludedInSupplierDebtHistory);
+    attachManualNhapVatChuaPaidAmounts(debtRows);
+    var nhapDebtRows = await loadManualNhapVatChuaDebtSourceRows(selectedSupplier._id, storeId);
+    var xuatDebtRows = await loadManualXuatVatChuaDebtSourceRows(selectedSupplier._id, storeId);
+    var existingNhapIds = Object.create(null);
+    var existingXuatIds = Object.create(null);
+    debtRows.forEach(function(row) {
+        var nid = row.nhap_vat_chua_id && (row.nhap_vat_chua_id._id || row.nhap_vat_chua_id);
+        if (nid) existingNhapIds[String(nid)] = true;
+        var xid = row.xuat_vat_chua_id && (row.xuat_vat_chua_id._id || row.xuat_vat_chua_id);
+        if (xid) existingXuatIds[String(xid)] = true;
     });
+    nhapDebtRows.forEach(function(row) {
+        var nid = row.nhap_vat_chua_id && (row.nhap_vat_chua_id._id || row.nhap_vat_chua_id);
+        if (nid && !existingNhapIds[String(nid)]) debtRows.push(row);
+    });
+    xuatDebtRows.forEach(function(row) {
+        var xid = row.xuat_vat_chua_id && (row.xuat_vat_chua_id._id || row.xuat_vat_chua_id);
+        if (xid && !existingXuatIds[String(xid)]) debtRows.push(row);
+    });
+    debtRows = dedupeSupplierDebtSourceRows(debtRows);
     var debtTransactionRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.find({
         nha_cung_cap_id: selectedSupplier._id,
         ...(storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId } : {}),
@@ -566,6 +586,7 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
     debtTransactionRows = debtTransactionRows.filter(function(row) {
         return isVisibleSupplierDebtRow(row) && !row.nhap_vat_chua_id;
     });
+    debtTransactionRows = dedupeSupplierDebtSourceRows(debtTransactionRows);
     var runningDebt = 0;
     var debtAsc = debtRows.map(function(row) {
         return { source: 'legacy', row: row, date: getDebtEventTime(row) };
@@ -607,6 +628,7 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
         return {
             phieu_nhap_id: sourceRow.phieu_nhap_id,
             nhap_vat_chua_id: sourceRow.nhap_vat_chua_id,
+            xuat_vat_chua_id: sourceRow.xuat_vat_chua_id,
             phieu_tra_nhap_id: sourceRow.phieu_tra_nhap_id,
             phieu_thu_chi_id: sourceRow.phieu_thu_chi_id,
             ma_phieu: docInfo.code,
