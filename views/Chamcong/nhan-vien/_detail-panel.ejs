@@ -52,16 +52,19 @@
       <% if (!(payrollRows || []).length) { %>
         <div class="empty-cell">Chưa có bảng lương.</div>
       <% } else { %>
-        <table class="admin-table product-inner-table">
+        <div class="employee-payroll-table-wrap">
+        <table class="admin-table product-inner-table employee-payroll-inner-table">
           <thead>
             <tr>
               <th>Mã bảng lương</th>
               <th>Tháng</th>
-              <th>Ngày công</th>
-              <th>Lương/tháng</th>
-              <th>Cần thanh toán</th>
-              <th>Đã thanh toán</th>
-              <th>Còn phải trả</th>
+              <th class="text-right">Ngày công</th>
+              <th class="text-right">Lương/tháng</th>
+              <th class="text-right">Cần thanh toán</th>
+              <th class="text-right">Khoản nộp NLD</th>
+              <th class="text-right">Khoản nộp NSDLD</th>
+              <th class="text-right">Đã thanh toán</th>
+              <th class="text-right">Còn phải trả</th>
               <th>Trạng thái</th>
             </tr>
           </thead>
@@ -80,11 +83,13 @@
                   <% } %>
                 </td>
                 <td><%= row.thang_hien_thi || '---' %></td>
-                <td><%= Number(row.ngay_cong_thuc_te || 0).toLocaleString('vi-VN') %></td>
-                <td><%= Number(row.luong_thang || 0).toLocaleString('vi-VN') %></td>
-                <td><%= Number(row.thuc_nhan || 0).toLocaleString('vi-VN') %></td>
-                <td><%= Number(row.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
-                <td><%= Number(row.con_phai_tra || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.ngay_cong_thuc_te || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.luong_thang || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.thuc_nhan || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.tong_khoan_nop || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.tong_khoan_nsdld || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.da_thanh_toan || 0).toLocaleString('vi-VN') %></td>
+                <td class="text-right"><%= Number(row.con_phai_tra || 0).toLocaleString('vi-VN') %></td>
                 <td>
                   <span class="cc-pill <%= filterStatus === 'da_thanh_toan' ? 'cc-pill-pay-done' : 'cc-pill-pay-wait' %>">
                     <%= row.trang_thai_text || 'Chưa thanh toán' %>
@@ -94,6 +99,7 @@
             <% }) %>
           </tbody>
         </table>
+        </div>
         <div class="empty-cell" data-inline-payroll-empty-filter hidden>Không có bảng lương theo bộ lọc.</div>
       <% } %>
     </section>

@@ -12,6 +12,7 @@ const {
 } = require('../../models/chamcong.model');
 const { PhieuThuChi } = require('../../models/kiot.model');
 const { taoPhieuThuChi } = require('../../services/soQuy.service');
+const { employerContributionAmount } = require('./chamcong.helpers');
 
 function getCurrentStoreId(req, res) {
   if (res.locals.currentStore && res.locals.currentStore._id) return String(res.locals.currentStore._id);
@@ -478,21 +479,37 @@ function serializeAllowance(row) {
   };
 }
 
+function sumPayrollContributionAmount(row) {
+  var total = Math.max(0, Number(row && row.tong_khoan_tru || 0));
+  if (total > 0) return total;
+  return (Array.isArray(row && row.khoan_trus) ? row.khoan_trus : []).reduce(function(sum, item) {
+    return sum + Math.max(0, Number(item && item.so_tien || 0));
+  }, 0);
+}
+
+function sumPayrollEmployerContributionAmount(row) {
+  return (Array.isArray(row && row.khoan_trus) ? row.khoan_trus : []).reduce(function(sum, item) {
+    return sum + employerContributionAmount(item);
+  }, 0);
+}
+
 async function getEmployeePayrollSummaryMap(storeId, employeeIds) {
   if (!employeeIds.length) return {};
   var rows = await BangLuong.find({
     cua_hang_id: storeId,
     nhan_vien_id: { $in: employeeIds },
     trang_thai_du_lieu: 'active'
-  }).select('nhan_vien_id da_thanh_toan con_phai_tra thuc_nhan').lean();
+  }).select('nhan_vien_id da_thanh_toan con_phai_tra thuc_nhan tong_khoan_tru khoan_trus').lean();
   var map = {};
   rows.forEach(function(row) {
     var key = String(row.nhan_vien_id);
-    if (!map[key]) map[key] = { tong_thanh_toan: 0, can_thanh_toan: 0 };
+    if (!map[key]) map[key] = { tong_thanh_toan: 0, can_thanh_toan: 0, tong_khoan_nop: 0, tong_khoan_nsdld: 0 };
     var paid = Number(row.da_thanh_toan || 0);
     var due = Math.max(0, Number(row.con_phai_tra != null ? row.con_phai_tra : Number(row.thuc_nhan || 0) - paid));
     map[key].tong_thanh_toan += paid;
     map[key].can_thanh_toan += due;
+    map[key].tong_khoan_nop += sumPayrollContributionAmount(row);
+    map[key].tong_khoan_nsdld += sumPayrollEmployerContributionAmount(row);
   });
   return map;
 }
@@ -544,6 +561,8 @@ function serializeEmployee(employee, salaryConfig, allowanceRows, payrollSummary
     ghi_chu: doc.ghi_chu || '',
     tam_ung: Number(advanceTotal || 0),
     can_thanh_toan: Number((payrollSummary && payrollSummary.can_thanh_toan) || 0),
+    tong_khoan_nop: Number((payrollSummary && payrollSummary.tong_khoan_nop) || 0),
+    tong_khoan_nsdld: Number((payrollSummary && payrollSummary.tong_khoan_nsdld) || 0),
     tong_thanh_toan: Number((payrollSummary && payrollSummary.tong_thanh_toan) || 0)
   };
 }
@@ -683,6 +702,8 @@ exports.detailNhanVienPanel = async function(req, res, next) {
           ngay_cong_thuc_te: Number(row.ngay_cong_thuc_te || 0),
           luong_thang: Number(row.luong_thang || 0),
           thuc_nhan: Number(row.thuc_nhan || 0),
+          tong_khoan_nop: sumPayrollContributionAmount(row),
+          tong_khoan_nsdld: sumPayrollEmployerContributionAmount(row),
           da_thanh_toan: paid,
           con_phai_tra: due,
           trang_thai_thanh_toan: status,

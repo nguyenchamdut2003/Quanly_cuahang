@@ -4,7 +4,44 @@
   const cdKeyword = document.getElementById('cdKeyword');
   let cdEditId = '';
 
-  function openCdModal(item) {
+  function isEmployeeFormHostOpen() {
+    const el = document.getElementById('ccEmployeeModal');
+    return !!(el && el.classList.contains('is-open'));
+  }
+
+  function syncBodyModalOpen() {
+    const hasCatalogModal = document.querySelector('.modal-overlay.is-open');
+    const hasEmployeeModal = isEmployeeFormHostOpen();
+    if (hasCatalogModal || hasEmployeeModal) {
+      document.body.classList.add('modal-open');
+      return;
+    }
+    document.body.classList.remove('modal-open');
+  }
+
+  function applyChucDanhToEmployeeSelect(data) {
+    if (!data || !data._id) return;
+    const id = String(data._id);
+    const name = data.ten_chuc_danh || '';
+    ['ccFormPosition', 'ccEmployeePositionFilter'].forEach(function(selectId) {
+      const el = document.getElementById(selectId);
+      if (!el) return;
+      let opt = Array.from(el.options).find(function(option) { return option.value === id; });
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = name;
+        el.appendChild(opt);
+      } else if (name) {
+        opt.textContent = name;
+      }
+    });
+    const formSelect = document.getElementById('ccFormPosition');
+    if (formSelect) formSelect.value = id;
+  }
+
+  function openCdModal(item, options) {
+    options = options || {};
     cdEditId = item && item._id ? String(item._id) : '';
     if (!cdEditId && cdForm) cdForm.reset();
     document.getElementById('cdModalTitle').textContent = cdEditId ? 'Sửa chức danh' : 'Thêm chức danh';
@@ -12,16 +49,18 @@
     document.getElementById('cdTen').value = item && item.ten_chuc_danh ? item.ten_chuc_danh : '';
     document.getElementById('cdMoTa').value = item && item.mo_ta ? item.mo_ta : '';
     document.getElementById('cdTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    const nested = options.nested === true;
+    cdModal.classList.toggle('is-nested', nested);
     cdModal.classList.add('is-open');
     cdModal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
-    setTimeout(() => document.getElementById('cdTen')?.focus(), 0);
+    syncBodyModalOpen();
+    setTimeout(function() { document.getElementById('cdTen')?.focus(); }, 0);
   }
 
   function closeCdModal() {
-    cdModal.classList.remove('is-open');
+    cdModal.classList.remove('is-open', 'is-nested');
     cdModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('modal-open');
+    syncBodyModalOpen();
   }
 
   function reloadCdPage() {
@@ -34,7 +73,7 @@
 
   function reloadCdWithKeyword() {
     const params = new URLSearchParams();
-    const kw = cdKeyword.value.trim();
+    const kw = cdKeyword ? cdKeyword.value.trim() : '';
     if (kw) params.set('keyword', kw);
     if (window.location.pathname === '/cham-cong') {
       params.set('tab', 'employees');
@@ -44,22 +83,25 @@
     window.location.href = '/chuc-danh' + (params.toString() ? '?' + params.toString() : '');
   }
 
-  document.getElementById('cdAddBtn')?.addEventListener('click', () => openCdModal(null));
-  document.getElementById('ccFormPositionAdd')?.addEventListener('click', () => openCdModal(null));
-  document.getElementById('cdEmptyAdd')?.addEventListener('click', (e) => {
+  document.getElementById('cdAddBtn')?.addEventListener('click', function() { openCdModal(null); });
+  document.getElementById('ccFormPositionAdd')?.addEventListener('click', function() { openCdModal(null, { nested: true }); });
+  document.getElementById('cdEmptyAdd')?.addEventListener('click', function(e) {
     e.preventDefault();
     openCdModal(null);
   });
   document.getElementById('cdCancelBtn').addEventListener('click', closeCdModal);
   document.getElementById('cdCloseBtn')?.addEventListener('click', closeCdModal);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && cdModal.classList.contains('is-open')) closeCdModal();
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && cdModal.classList.contains('is-open')) {
+      e.stopPropagation();
+      closeCdModal();
+    }
   });
-  cdKeyword.addEventListener('keydown', (e) => {
+  cdKeyword?.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') reloadCdWithKeyword();
   });
 
-  document.querySelectorAll('.cd-edit').forEach(btn => {
+  document.querySelectorAll('.cd-edit').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const row = this.closest('tr');
       openCdModal({
@@ -71,7 +113,7 @@
     });
   });
 
-  document.querySelectorAll('.cd-inactive').forEach(btn => {
+  document.querySelectorAll('.cd-inactive').forEach(function(btn) {
     btn.addEventListener('click', async function() {
       const id = this.closest('tr').dataset.id;
       if (!confirm('Ngừng sử dụng chức danh này?')) return;
@@ -102,6 +144,11 @@
     });
     const json = await res.json();
     if (!json.success) return alert(json.message || 'Lỗi lưu chức danh');
+    if (cdModal.classList.contains('is-nested') && !cdEditId) {
+      applyChucDanhToEmployeeSelect(json.data);
+      closeCdModal();
+      return;
+    }
     reloadCdPage();
   });
 </script>

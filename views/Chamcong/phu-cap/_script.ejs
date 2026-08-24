@@ -4,7 +4,75 @@
   const pcKeyword = document.getElementById('pcKeyword');
   let pcEditId = '';
 
-  function openPcModal(item) {
+  function isEmployeeFormHostOpen() {
+    const el = document.getElementById('ccEmployeeModal');
+    return !!(el && el.classList.contains('is-open'));
+  }
+
+  function syncBodyModalOpen() {
+    const hasCatalogModal = document.querySelector('.modal-overlay.is-open');
+    const hasEmployeeModal = isEmployeeFormHostOpen();
+    if (hasCatalogModal || hasEmployeeModal) {
+      document.body.classList.add('modal-open');
+      return;
+    }
+    document.body.classList.remove('modal-open');
+  }
+
+  function applyPhuCapToEmployeeForm(data) {
+    if (!data || !data._id) return;
+    if (data.trang_thai === 'inactive') return;
+    const list = document.getElementById('ccAllowanceList');
+    if (!list) return;
+    const id = String(data._id);
+    const existing = list.querySelector('.cc-allowance-item[data-allowance-id="' + id + '"]');
+    if (existing) {
+      const checkbox = existing.querySelector('.cc-allowance-enabled');
+      if (checkbox) checkbox.checked = true;
+      if (typeof window.ccRefreshAllowancePreviews === 'function') window.ccRefreshAllowancePreviews();
+      return;
+    }
+    const help = list.querySelector('.cc-help-text');
+    if (help) help.remove();
+
+    const row = document.createElement('div');
+    row.className = 'cc-allowance-item is-checked';
+    row.dataset.allowanceId = id;
+    row.innerHTML =
+      '<label class="cc-allowance-check">' +
+        '<input type="checkbox" class="cc-allowance-enabled" checked>' +
+        '<span></span>' +
+      '</label>' +
+      '<div class="cc-allowance-config">' +
+        '<div class="cc-field">' +
+          '<label>Cách tính</label>' +
+          '<select class="cc-select cc-allowance-type">' +
+            '<option value="co_dinh_thang">Cố định theo tháng</option>' +
+            '<option value="theo_ngay_di_lam">Theo ngày đi làm</option>' +
+            '<option value="theo_cong">Theo công</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="cc-field">' +
+          '<label>Mức phụ cấp</label>' +
+          '<input class="cc-input cc-money-input cc-allowance-amount" type="text" inputmode="numeric" value="0">' +
+        '</div>' +
+        '<div class="cc-allowance-preview">0 / tháng</div>' +
+      '</div>';
+    const nameSpan = row.querySelector('.cc-allowance-check span');
+    if (nameSpan) nameSpan.textContent = data.ten_phu_cap || '';
+    list.appendChild(row);
+
+    const amountInput = row.querySelector('.cc-allowance-amount');
+    if (typeof window.ccBindMoneyInput === 'function') {
+      window.ccBindMoneyInput(amountInput);
+    }
+    if (typeof window.ccRefreshAllowancePreviews === 'function') {
+      window.ccRefreshAllowancePreviews();
+    }
+  }
+
+  function openPcModal(item, options) {
+    options = options || {};
     pcEditId = item && item._id ? String(item._id) : '';
     if (!pcEditId && pcForm) pcForm.reset();
     document.getElementById('pcModalTitle').textContent = pcEditId ? 'Sửa phụ cấp' : 'Thêm phụ cấp';
@@ -12,16 +80,18 @@
     document.getElementById('pcTen').value = item && item.ten_phu_cap ? item.ten_phu_cap : '';
     document.getElementById('pcMoTa').value = item && item.mo_ta ? item.mo_ta : '';
     document.getElementById('pcTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    const nested = options.nested === true;
+    pcModal.classList.toggle('is-nested', nested);
     pcModal.classList.add('is-open');
     pcModal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
-    setTimeout(() => document.getElementById('pcTen')?.focus(), 0);
+    syncBodyModalOpen();
+    setTimeout(function() { document.getElementById('pcTen')?.focus(); }, 0);
   }
 
   function closePcModal() {
-    pcModal.classList.remove('is-open');
+    pcModal.classList.remove('is-open', 'is-nested');
     pcModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('modal-open');
+    syncBodyModalOpen();
   }
 
   function reloadPcPage() {
@@ -34,7 +104,7 @@
 
   function reloadPcWithKeyword() {
     const params = new URLSearchParams();
-    const kw = pcKeyword.value.trim();
+    const kw = pcKeyword ? pcKeyword.value.trim() : '';
     if (kw) params.set('keyword', kw);
     if (window.location.pathname === '/cham-cong') {
       params.set('tab', 'allowances');
@@ -44,22 +114,25 @@
     window.location.href = '/phu-cap' + (params.toString() ? '?' + params.toString() : '');
   }
 
-  document.getElementById('pcAddBtn')?.addEventListener('click', () => openPcModal(null));
-  document.getElementById('ccFormAllowanceAdd')?.addEventListener('click', () => openPcModal(null));
-  document.getElementById('pcEmptyAdd')?.addEventListener('click', (e) => {
+  document.getElementById('pcAddBtn')?.addEventListener('click', function() { openPcModal(null); });
+  document.getElementById('ccFormAllowanceAdd')?.addEventListener('click', function() { openPcModal(null, { nested: true }); });
+  document.getElementById('pcEmptyAdd')?.addEventListener('click', function(e) {
     e.preventDefault();
     openPcModal(null);
   });
   document.getElementById('pcCancelBtn')?.addEventListener('click', closePcModal);
   document.getElementById('pcCloseBtn')?.addEventListener('click', closePcModal);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && pcModal.classList.contains('is-open')) closePcModal();
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && pcModal.classList.contains('is-open')) {
+      e.stopPropagation();
+      closePcModal();
+    }
   });
-  pcKeyword?.addEventListener('keydown', (e) => {
+  pcKeyword?.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') reloadPcWithKeyword();
   });
 
-  document.querySelectorAll('.pc-edit').forEach(btn => {
+  document.querySelectorAll('.pc-edit').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const row = this.closest('tr');
       openPcModal({
@@ -71,7 +144,7 @@
     });
   });
 
-  document.querySelectorAll('.pc-inactive').forEach(btn => {
+  document.querySelectorAll('.pc-inactive').forEach(function(btn) {
     btn.addEventListener('click', async function() {
       const id = this.closest('tr').dataset.id;
       if (!confirm('Ngừng sử dụng phụ cấp này?')) return;
@@ -102,6 +175,11 @@
     });
     const json = await res.json();
     if (!json.success) return alert(json.message || 'Lỗi lưu phụ cấp');
+    if (pcModal.classList.contains('is-nested') && !pcEditId) {
+      applyPhuCapToEmployeeForm(json.data);
+      closePcModal();
+      return;
+    }
     reloadPcPage();
   });
 </script>

@@ -2,6 +2,7 @@ const {
   DanhMucKhoanNop,
   NoiNopKhoanNop
 } = require('../../models/chamcong.model');
+const { loadNoiNopsWithContributionTotals, enrichDanhMucKhoanNopsWithPayrollTotals } = require('./chamcong.helpers');
 
 const TRANG_THAI_VALUES = ['active', 'inactive'];
 
@@ -94,9 +95,7 @@ function normalizeNoiNopPayload(body) {
 }
 
 async function loadNoiNops(storeId) {
-  return NoiNopKhoanNop.find({ cua_hang_id: storeId })
-    .sort({ trang_thai: 1, ma_noi_nop: 1, ten_noi_nop: 1 })
-    .lean();
+  return loadNoiNopsWithContributionTotals(storeId);
 }
 
 exports.getDanhMucKhoanNop = async function(req, res, next) {
@@ -115,10 +114,13 @@ exports.getDanhMucKhoanNop = async function(req, res, next) {
       ];
     }
 
-    var danhMucKhoanNops = await DanhMucKhoanNop.find(query)
-      .populate('noi_nop_id', 'ma_noi_nop ten_noi_nop trang_thai')
-      .sort({ ma_khoan: 1, ten_khoan: 1 })
-      .lean();
+    var danhMucKhoanNops = await enrichDanhMucKhoanNopsWithPayrollTotals(
+      storeId,
+      await DanhMucKhoanNop.find(query)
+        .populate('noi_nop_id', 'ma_noi_nop ten_noi_nop trang_thai')
+        .sort({ ma_khoan: 1, ten_khoan: 1 })
+        .lean()
+    );
 
     res.render('Chamcong/khoan-nop/danh-muc/index', {
       pageTitle: 'Danh mục khoản nộp',

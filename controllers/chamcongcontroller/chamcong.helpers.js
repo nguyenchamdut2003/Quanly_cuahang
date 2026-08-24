@@ -567,6 +567,108 @@ function employerContributionAmount(item) {
   return Math.round(base * rate / 100);
 }
 
+function isActivePayrollRecord(row) {
+  var status = String(row && row.trang_thai_du_lieu || 'active').trim();
+  return !status || status === 'active';
+}
+
+async function aggregateNoiNopContributionTotals(storeId) {
+  if (!storeId || !isValidObjectId(storeId)) return {};
+
+  var payrollRows = await BangLuong.find({
+    cua_hang_id: storeId,
+    khoan_trus: { $exists: true, $ne: [] },
+    $or: [
+      { trang_thai_du_lieu: 'active' },
+      { trang_thai_du_lieu: { $exists: false } },
+      { trang_thai_du_lieu: null },
+      { trang_thai_du_lieu: '' }
+    ]
+  }).select('khoan_trus trang_thai_du_lieu').lean();
+
+  var totalsMap = {};
+  payrollRows.forEach(function(payroll) {
+    if (!isActivePayrollRecord(payroll)) return;
+    (payroll.khoan_trus || []).forEach(function(item) {
+      var placeId = String(item && item.noi_nop_id || '').trim();
+      if (!placeId) return;
+      if (!totalsMap[placeId]) {
+        totalsMap[placeId] = { tong_nop_nld: 0, tong_nop_nsdld: 0 };
+      }
+      totalsMap[placeId].tong_nop_nld += Math.max(0, Number(item.so_tien || 0));
+      totalsMap[placeId].tong_nop_nsdld += employerContributionAmount(item);
+    });
+  });
+  return totalsMap;
+}
+
+function enrichNoiNopsWithContributionTotals(noiNops, totalsMap) {
+  totalsMap = totalsMap || {};
+  return (Array.isArray(noiNops) ? noiNops : []).map(function(row) {
+    var key = String(row._id || '');
+    var totals = totalsMap[key] || { tong_nop_nld: 0, tong_nop_nsdld: 0 };
+    return Object.assign({}, row, {
+      tong_nop_nld: Math.max(0, Number(totals.tong_nop_nld || 0)),
+      tong_nop_nsdld: Math.max(0, Number(totals.tong_nop_nsdld || 0))
+    });
+  });
+}
+
+async function loadNoiNopsWithContributionTotals(storeId) {
+  var rows = await NoiNopKhoanNop.find({ cua_hang_id: storeId })
+    .sort({ trang_thai: 1, ma_noi_nop: 1, ten_noi_nop: 1 })
+    .lean();
+  var totalsMap = await aggregateNoiNopContributionTotals(storeId);
+  return enrichNoiNopsWithContributionTotals(rows, totalsMap);
+}
+
+async function aggregateDanhMucKhoanNopContributionTotals(storeId) {
+  if (!storeId || !isValidObjectId(storeId)) return {};
+
+  var payrollRows = await BangLuong.find({
+    cua_hang_id: storeId,
+    khoan_trus: { $exists: true, $ne: [] },
+    $or: [
+      { trang_thai_du_lieu: 'active' },
+      { trang_thai_du_lieu: { $exists: false } },
+      { trang_thai_du_lieu: null },
+      { trang_thai_du_lieu: '' }
+    ]
+  }).select('khoan_trus trang_thai_du_lieu').lean();
+
+  var totalsMap = {};
+  payrollRows.forEach(function(payroll) {
+    if (!isActivePayrollRecord(payroll)) return;
+    (payroll.khoan_trus || []).forEach(function(item) {
+      var catalogId = String(item && item.danh_muc_khoan_nop_id || '').trim();
+      if (!catalogId) return;
+      if (!totalsMap[catalogId]) {
+        totalsMap[catalogId] = { tong_nop_nld: 0, tong_nop_nsdld: 0 };
+      }
+      totalsMap[catalogId].tong_nop_nld += Math.max(0, Number(item.so_tien || 0));
+      totalsMap[catalogId].tong_nop_nsdld += employerContributionAmount(item);
+    });
+  });
+  return totalsMap;
+}
+
+function enrichDanhMucKhoanNopsWithContributionTotals(rows, totalsMap) {
+  totalsMap = totalsMap || {};
+  return (Array.isArray(rows) ? rows : []).map(function(row) {
+    var key = String(row._id || '');
+    var totals = totalsMap[key] || { tong_nop_nld: 0, tong_nop_nsdld: 0 };
+    return Object.assign({}, row, {
+      tong_nop_nld: Math.max(0, Number(totals.tong_nop_nld || 0)),
+      tong_nop_nsdld: Math.max(0, Number(totals.tong_nop_nsdld || 0))
+    });
+  });
+}
+
+async function enrichDanhMucKhoanNopsWithPayrollTotals(storeId, rows) {
+  var totalsMap = await aggregateDanhMucKhoanNopContributionTotals(storeId);
+  return enrichDanhMucKhoanNopsWithContributionTotals(rows, totalsMap);
+}
+
 function buildEmployerContributionSummary(row) {
   var grossSalary = Number(row && row.tong_luong || 0);
   var lines = [];
@@ -993,6 +1095,12 @@ module.exports = {
   formatFormulaMoney,
   buildPayrollFormulaLines,
   employerContributionAmount,
+  aggregateNoiNopContributionTotals,
+  enrichNoiNopsWithContributionTotals,
+  loadNoiNopsWithContributionTotals,
+  aggregateDanhMucKhoanNopContributionTotals,
+  enrichDanhMucKhoanNopsWithContributionTotals,
+  enrichDanhMucKhoanNopsWithPayrollTotals,
   buildEmployerContributionSummary,
   enrichPayrollEmployerRates,
   calcEmployerPaymentShare,

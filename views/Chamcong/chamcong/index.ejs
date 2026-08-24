@@ -93,11 +93,44 @@
     .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(11),
     .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(11),
     .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(12),
-    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(12){text-align:right}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(12),
     .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(13),
-    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(13){text-align:left}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(13),
     .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(14),
-    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(14){width:88px;text-align:left}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(14){text-align:right}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(15),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(15){text-align:left}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(16),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(16){width:88px;text-align:left}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] th:nth-child(4),
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] td:nth-child(4){min-width:150px}
+    .cc-table[data-kv-master="cham-cong-nhan-vien"] .product-detail-row > td{padding:0!important;background:#f8fbff!important;border:1px solid #0070f4!important}
+    .cc-employee-inline-detail .employee-payroll-table-wrap{overflow-x:auto;max-width:100%}
+    .cc-employee-inline-detail .employee-payroll-inner-table{table-layout:fixed;width:100%;min-width:1180px}
+    .cc-employee-inline-detail .employee-payroll-inner-table th,
+    .cc-employee-inline-detail .employee-payroll-inner-table td{padding:8px 10px;font-size:12px;line-height:1.35;vertical-align:middle}
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(1),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(1){width:150px;white-space:nowrap}
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(2),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(2){width:78px;white-space:nowrap}
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(3),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(3){width:82px}
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(4),
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(5),
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(6),
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(7),
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(8),
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(9),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(4),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(5),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(6),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(7),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(8),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(9){width:112px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+    .cc-employee-inline-detail .employee-payroll-inner-table th:nth-child(10),
+    .cc-employee-inline-detail .employee-payroll-inner-table td:nth-child(10){width:128px;min-width:128px;white-space:normal}
+    .cc-employee-inline-detail .employee-payroll-inner-table .cc-pill{white-space:nowrap}
+    .cc-employee-inline-detail [data-tab-panel="employee-advance"] .product-inner-table{table-layout:fixed;min-width:0}
     .cc-pill{display:inline-flex;align-items:center;height:22px;border-radius:5px;padding:0 8px;font-size:11px;font-weight:800}
     .cc-pill.is-active{background:#dcfce7;color:#166534}
     .cc-pill.is-inactive{background:#fee2e2;color:#991b1b}
@@ -375,6 +408,8 @@
                 <th>Lương/tháng</th>
                 <th>Tạm ứng</th>
                 <th>Cần thanh toán</th>
+                <th>Khoản nộp NLD</th>
+                <th>Khoản nộp NSDLD</th>
                 <th>Tổng thanh toán</th>
                 <th>Trạng thái</th>
                 <th>Thao tác</th>
@@ -1064,7 +1099,6 @@
       if (employeeMasterTable && typeof KvInlineDetail !== 'undefined') {
         new KvInlineDetail({
           table: employeeMasterTable,
-          colspan: 12,
           buildUrl: function(id) {
             return '/chamcongmoi/api/nhan-vien/' + encodeURIComponent(id) + '/detail';
           },
@@ -1113,6 +1147,7 @@
           input.value = formatMoneyInput(input.value);
         });
       }
+      window.ccBindMoneyInput = bindMoneyInput;
 
       function parseWorkUnitInput(value) {
         const normalized = String(value == null ? '' : value).replace(',', '.').replace(/[^0-9.]/g, '');
@@ -1195,6 +1230,7 @@
           if (preview) preview.textContent = amount.toLocaleString('vi-VN') + ' ' + allowanceUnitLabel(type);
         });
       }
+      window.ccRefreshAllowancePreviews = refreshAllowancePreviews;
 
       function setStatus(message, type) {
         const text = message || '';
@@ -2911,7 +2947,7 @@
         if (keyword) params.set('keyword', keyword);
         if (departmentId) params.set('phong_ban_id', departmentId);
         if (positionId) params.set('chuc_danh_id', positionId);
-        setTableLoading(employeeRows, 14, 'Đang tải danh sách nhân viên...');
+        setTableLoading(employeeRows, 16, 'Đang tải danh sách nhân viên...');
         const json = await fetchJson('/chamcongmoi/api/nhan-vien?' + params.toString(), {
           headers: { 'Accept': 'application/json' },
           credentials: 'same-origin'
@@ -2921,7 +2957,7 @@
           return;
         }
         if (!json.items.length) {
-          employeeRows.innerHTML = '<tr><td colspan="14" class="cc-empty">Chưa có nhân viên.</td></tr>';
+          employeeRows.innerHTML = '<tr><td colspan="16" class="cc-empty">Chưa có nhân viên.</td></tr>';
           return;
         }
         employeeRows.innerHTML = json.items.map(function(item) {
@@ -2940,6 +2976,8 @@
               <td>${escapeHtml(moneyText(item.luong_theo_thang))}</td>
               <td>${escapeHtml(moneyText(item.tam_ung || 0))}</td>
               <td>${escapeHtml(moneyText(item.can_thanh_toan || 0))}</td>
+              <td>${escapeHtml(moneyText(item.tong_khoan_nop || 0))}</td>
+              <td>${escapeHtml(moneyText(item.tong_khoan_nsdld || 0))}</td>
               <td>${escapeHtml(moneyText(item.tong_thanh_toan || 0))}</td>
               <td><span class="cc-pill ${statusClass}">${statusText}</span></td>
               <td>

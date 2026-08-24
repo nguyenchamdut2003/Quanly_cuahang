@@ -4,7 +4,44 @@
   const pbKeyword = document.getElementById('pbKeyword');
   let pbEditId = '';
 
-  function openPbModal(item) {
+  function isEmployeeFormHostOpen() {
+    const el = document.getElementById('ccEmployeeModal');
+    return !!(el && el.classList.contains('is-open'));
+  }
+
+  function syncBodyModalOpen() {
+    const hasCatalogModal = document.querySelector('.modal-overlay.is-open');
+    const hasEmployeeModal = isEmployeeFormHostOpen();
+    if (hasCatalogModal || hasEmployeeModal) {
+      document.body.classList.add('modal-open');
+      return;
+    }
+    document.body.classList.remove('modal-open');
+  }
+
+  function applyPhongBanToEmployeeSelect(data) {
+    if (!data || !data._id) return;
+    const id = String(data._id);
+    const name = data.ten_phong_ban || '';
+    ['ccFormDepartment', 'ccEmployeeDepartmentFilter'].forEach(function(selectId) {
+      const el = document.getElementById(selectId);
+      if (!el) return;
+      let opt = Array.from(el.options).find(function(option) { return option.value === id; });
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = id;
+        opt.textContent = name;
+        el.appendChild(opt);
+      } else if (name) {
+        opt.textContent = name;
+      }
+    });
+    const formSelect = document.getElementById('ccFormDepartment');
+    if (formSelect) formSelect.value = id;
+  }
+
+  function openPbModal(item, options) {
+    options = options || {};
     pbEditId = item && item._id ? String(item._id) : '';
     if (!pbEditId && pbForm) pbForm.reset();
     document.getElementById('pbModalTitle').textContent = pbEditId ? 'Sửa phòng ban' : 'Thêm phòng ban';
@@ -12,16 +49,18 @@
     document.getElementById('pbTen').value = item && item.ten_phong_ban ? item.ten_phong_ban : '';
     document.getElementById('pbMoTa').value = item && item.mo_ta ? item.mo_ta : '';
     document.getElementById('pbTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    const nested = options.nested === true;
+    pbModal.classList.toggle('is-nested', nested);
     pbModal.classList.add('is-open');
     pbModal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
-    setTimeout(() => document.getElementById('pbTen')?.focus(), 0);
+    syncBodyModalOpen();
+    setTimeout(function() { document.getElementById('pbTen')?.focus(); }, 0);
   }
 
   function closePbModal() {
-    pbModal.classList.remove('is-open');
+    pbModal.classList.remove('is-open', 'is-nested');
     pbModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('modal-open');
+    syncBodyModalOpen();
   }
 
   function reloadPbPage() {
@@ -34,7 +73,7 @@
 
   function reloadPbWithKeyword() {
     const params = new URLSearchParams();
-    const kw = pbKeyword.value.trim();
+    const kw = pbKeyword ? pbKeyword.value.trim() : '';
     if (kw) params.set('keyword', kw);
     if (window.location.pathname === '/cham-cong') {
       params.set('tab', 'employees');
@@ -44,22 +83,25 @@
     window.location.href = '/phong-ban' + (params.toString() ? '?' + params.toString() : '');
   }
 
-  document.getElementById('pbAddBtn')?.addEventListener('click', () => openPbModal(null));
-  document.getElementById('ccFormDepartmentAdd')?.addEventListener('click', () => openPbModal(null));
-  document.getElementById('pbEmptyAdd')?.addEventListener('click', (e) => {
+  document.getElementById('pbAddBtn')?.addEventListener('click', function() { openPbModal(null); });
+  document.getElementById('ccFormDepartmentAdd')?.addEventListener('click', function() { openPbModal(null, { nested: true }); });
+  document.getElementById('pbEmptyAdd')?.addEventListener('click', function(e) {
     e.preventDefault();
     openPbModal(null);
   });
   document.getElementById('pbCancelBtn').addEventListener('click', closePbModal);
   document.getElementById('pbCloseBtn')?.addEventListener('click', closePbModal);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && pbModal.classList.contains('is-open')) closePbModal();
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && pbModal.classList.contains('is-open')) {
+      e.stopPropagation();
+      closePbModal();
+    }
   });
-  pbKeyword.addEventListener('keydown', (e) => {
+  pbKeyword?.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') reloadPbWithKeyword();
   });
 
-  document.querySelectorAll('.pb-edit').forEach(btn => {
+  document.querySelectorAll('.pb-edit').forEach(function(btn) {
     btn.addEventListener('click', function() {
       const row = this.closest('tr');
       openPbModal({
@@ -71,7 +113,7 @@
     });
   });
 
-  document.querySelectorAll('.pb-inactive').forEach(btn => {
+  document.querySelectorAll('.pb-inactive').forEach(function(btn) {
     btn.addEventListener('click', async function() {
       const id = this.closest('tr').dataset.id;
       if (!confirm('Ngừng sử dụng phòng ban này?')) return;
@@ -102,6 +144,11 @@
     });
     const json = await res.json();
     if (!json.success) return alert(json.message || 'Lỗi lưu phòng ban');
+    if (pbModal.classList.contains('is-nested') && !pbEditId) {
+      applyPhongBanToEmployeeSelect(json.data);
+      closePbModal();
+      return;
+    }
     reloadPbPage();
   });
 </script>

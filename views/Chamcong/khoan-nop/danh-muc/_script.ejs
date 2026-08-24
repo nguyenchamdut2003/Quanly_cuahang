@@ -5,6 +5,57 @@
   let knEditId = '';
   let knCurrentSubtab = 'khoan-nop';
 
+  function isEmployeeFormHostOpen() {
+    const el = document.getElementById('ccEmployeeModal');
+    return !!(el && el.classList.contains('is-open'));
+  }
+
+  function syncBodyModalOpen() {
+    const hasCatalogModal = document.querySelector('.modal-overlay.is-open');
+    const hasEmployeeModal = isEmployeeFormHostOpen();
+    if (hasCatalogModal || hasEmployeeModal) {
+      document.body.classList.add('modal-open');
+      return;
+    }
+    document.body.classList.remove('modal-open');
+  }
+
+  function formatRateLabel(value) {
+    const num = Number(value != null ? value : 0);
+    return (Number.isFinite(num) ? num : 0).toLocaleString('vi-VN') + '% Người lao động';
+  }
+
+  function applyKhoanNopToEmployeeForm(data) {
+    if (!data || !data._id) return;
+    if (data.trang_thai === 'inactive') return;
+    const list = document.getElementById('ccContributionList');
+    if (!list) return;
+    const id = String(data._id);
+    const existing = list.querySelector('.cc-contribution-enabled[value="' + id + '"]');
+    if (existing) {
+      existing.checked = true;
+      return;
+    }
+    const help = list.querySelector('.cc-help-text');
+    if (help) help.remove();
+    const label = document.createElement('label');
+    label.className = 'cc-contribution-item';
+    const left = document.createElement('span');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'cc-contribution-enabled';
+    checkbox.value = id;
+    checkbox.checked = true;
+    left.appendChild(checkbox);
+    left.appendChild(document.createTextNode(' ' + (data.ten_khoan || '')));
+    const rate = document.createElement('span');
+    rate.className = 'cc-contribution-rate';
+    rate.textContent = formatRateLabel(data.ti_le_nld != null ? data.ti_le_nld : data.ti_le);
+    label.appendChild(left);
+    label.appendChild(rate);
+    list.appendChild(label);
+  }
+
   function getRowItem(row) {
     return {
       _id: row.dataset.id || '',
@@ -17,7 +68,8 @@
     };
   }
 
-  function openKnModal(item) {
+  function openKnModal(item, options) {
+    options = options || {};
     knEditId = item && item._id ? String(item._id) : '';
     if (!knEditId && knForm) knForm.reset();
     document.getElementById('knModalTitle').textContent = knEditId ? 'Sửa khoản nộp' : 'Thêm khoản nộp';
@@ -27,25 +79,27 @@
     document.getElementById('knTiLeNld').value = item && item.ti_le_nld ? item.ti_le_nld : '0';
     document.getElementById('knTiLeNsdld').value = item && item.ti_le_nsdld ? item.ti_le_nsdld : '0';
     document.getElementById('knTrangThai').value = item && item.trang_thai === 'inactive' ? 'inactive' : 'active';
+    const nested = options.nested === true;
+    knModal.classList.toggle('is-nested', nested);
     knModal.classList.add('is-open');
     knModal.setAttribute('aria-hidden', 'false');
-    document.body.classList.add('modal-open');
-    setTimeout(() => document.getElementById('knTenKhoan')?.focus(), 0);
+    syncBodyModalOpen();
+    setTimeout(function() { document.getElementById('knTenKhoan')?.focus(); }, 0);
   }
 
   function closeKnModal() {
-    knModal.classList.remove('is-open');
+    knModal.classList.remove('is-open', 'is-nested');
     knModal.setAttribute('aria-hidden', 'true');
-    document.body.classList.remove('modal-open');
+    syncBodyModalOpen();
   }
 
   function switchKnSubtab(tab) {
     knCurrentSubtab = tab === 'noi-nop' ? 'noi-nop' : 'khoan-nop';
-    document.querySelectorAll('[data-kn-subtab]').forEach(btn => {
+    document.querySelectorAll('[data-kn-subtab]').forEach(function(btn) {
       btn.classList.toggle('is-active', btn.dataset.knSubtab === knCurrentSubtab);
       btn.setAttribute('aria-selected', btn.dataset.knSubtab === knCurrentSubtab ? 'true' : 'false');
     });
-    document.querySelectorAll('[data-kn-subpane]').forEach(pane => {
+    document.querySelectorAll('[data-kn-subpane]').forEach(function(pane) {
       pane.classList.toggle('is-active', pane.dataset.knSubpane === knCurrentSubtab);
     });
   }
@@ -61,7 +115,7 @@
 
   function reloadKnWithKeyword() {
     const params = new URLSearchParams();
-    const kw = knKeyword.value.trim();
+    const kw = knKeyword ? knKeyword.value.trim() : '';
     if (kw) params.set('keyword', kw);
     params.set('subtab', 'khoan-nop');
     if (window.location.pathname === '/cham-cong') {
@@ -72,22 +126,25 @@
     window.location.href = '/chamcongmoi/khoan-nop/danh-muc' + (params.toString() ? '?' + params.toString() : '');
   }
 
-  document.getElementById('knAddBtn')?.addEventListener('click', () => openKnModal(null));
-  document.getElementById('ccFormContributionAdd')?.addEventListener('click', () => openKnModal(null));
-  document.getElementById('knEmptyAdd')?.addEventListener('click', (e) => {
+  document.getElementById('knAddBtn')?.addEventListener('click', function() { openKnModal(null); });
+  document.getElementById('ccFormContributionAdd')?.addEventListener('click', function() { openKnModal(null, { nested: true }); });
+  document.getElementById('knEmptyAdd')?.addEventListener('click', function(e) {
     e.preventDefault();
     openKnModal(null);
   });
   document.getElementById('knCancelBtn')?.addEventListener('click', closeKnModal);
   document.getElementById('knCloseBtn')?.addEventListener('click', closeKnModal);
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && knModal.classList.contains('is-open')) closeKnModal();
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && knModal.classList.contains('is-open')) {
+      e.stopPropagation();
+      closeKnModal();
+    }
   });
-  knKeyword?.addEventListener('keydown', (e) => {
+  knKeyword?.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') reloadKnWithKeyword();
   });
-  document.querySelectorAll('[data-kn-subtab]').forEach(btn => {
-    btn.addEventListener('click', () => switchKnSubtab(btn.dataset.knSubtab));
+  document.querySelectorAll('[data-kn-subtab]').forEach(function(btn) {
+    btn.addEventListener('click', function() { switchKnSubtab(btn.dataset.knSubtab); });
   });
   switchKnSubtab(new URLSearchParams(window.location.search).get('subtab'));
 
@@ -108,13 +165,13 @@
     reloadKnPage('noi-nop');
   });
 
-  document.querySelectorAll('.kn-edit').forEach(btn => {
+  document.querySelectorAll('.kn-edit').forEach(function(btn) {
     btn.addEventListener('click', function() {
       openKnModal(getRowItem(this.closest('tr')));
     });
   });
 
-  document.querySelectorAll('.kn-status').forEach(btn => {
+  document.querySelectorAll('.kn-status').forEach(function(btn) {
     btn.addEventListener('click', async function() {
       const item = getRowItem(this.closest('tr'));
       const nextStatus = item.trang_thai === 'active' ? 'inactive' : 'active';
@@ -159,6 +216,11 @@
     });
     const json = await res.json();
     if (!json.success) return alert(json.message || 'Lỗi lưu khoản nộp');
+    if (knModal.classList.contains('is-nested') && !knEditId) {
+      applyKhoanNopToEmployeeForm(json.data);
+      closeKnModal();
+      return;
+    }
     reloadKnPage('khoan-nop');
   });
 </script>

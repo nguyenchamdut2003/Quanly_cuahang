@@ -49,6 +49,8 @@ const {
   formatFormulaMoney,
   buildPayrollFormulaLines,
   employerContributionAmount,
+  loadNoiNopsWithContributionTotals,
+  enrichDanhMucKhoanNopsWithPayrollTotals,
   buildEmployerContributionSummary,
   enrichPayrollEmployerRates,
   calcEmployerPaymentShare,
@@ -132,14 +134,15 @@ exports.index = async function(req, res, next) {
       .sort({ trang_thai: 1, ma_chuc_danh: 1, ten_chuc_danh: 1 })
       .lean();
 
-    var danhMucKhoanNops = await DanhMucKhoanNop.find(khoanNopQuery)
-      .populate('noi_nop_id', 'ma_noi_nop ten_noi_nop trang_thai')
-      .sort({ ma_khoan: 1, ten_khoan: 1 })
-      .lean();
+    var danhMucKhoanNops = await enrichDanhMucKhoanNopsWithPayrollTotals(
+      storeId,
+      await DanhMucKhoanNop.find(khoanNopQuery)
+        .populate('noi_nop_id', 'ma_noi_nop ten_noi_nop trang_thai')
+        .sort({ ma_khoan: 1, ten_khoan: 1 })
+        .lean()
+    );
 
-    var noiNops = await NoiNopKhoanNop.find({ cua_hang_id: storeId })
-      .sort({ trang_thai: 1, ma_noi_nop: 1, ten_noi_nop: 1 })
-      .lean();
+    var noiNops = await loadNoiNopsWithContributionTotals(storeId);
 
     var danhMucPhuCaps = await DanhMucPhuCap.find(phuCapQuery)
       .sort({ trang_thai: 1, ma_phu_cap: 1, ten_phu_cap: 1 })
