@@ -46,7 +46,7 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         }
     ]);
     var debtRows = await CongNoNhaCungCap.find(debtMatch)
-        .populate({ path: 'phieu_nhap_id', select: '_id tong_tien can_tra_ncc con_no_ncc' })
+        .populate({ path: 'phieu_nhap_id', select: '_id tong_tien can_tra_ncc con_no_ncc trang_thai' })
         .populate({ path: 'nhap_vat_chua_id', select: '_id' })
         .populate({ path: 'phieu_tra_nhap_id', select: '_id ncc_da_tra' })
         .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })

@@ -1,8 +1,14 @@
 var mongoose = require('mongoose');
-var { VatChua, Counter, NhaCungCap, NhapVatChua, XuatVatChua } = require('../models/kiot.model');
+var { VatChua, Counter, NhaCungCap, KhachHang, NhapVatChua, XuatVatChua } = require('../models/kiot.model');
 var { resolveStoreId } = require('../utils/storeScope');
 var { importDirectVatChuaFromSupplier, loadAverageCostByVatChuaIds, createNhapVatChuaAndIncreaseStock } = require('../services/vatChuaImport.service');
-var { createXuatVatChuaAndDecreaseStock } = require('../services/vatChuaExport.service');
+var {
+  createXuatVatChuaAndDecreaseStock,
+  loadManualXuatVatChuaForEdit,
+  updateManualXuatVatChua,
+  cancelManualXuatVatChua,
+  isManualPartnerExport
+} = require('../services/vatChuaExport.service');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo, extractPaymentDetail } = require('../services/paymentCashBook.service');
 var { loadVatChuaDetailContext, loadVatChuaDocumentDetail } = require('../services/vatChuaDetail.service');
@@ -181,6 +187,20 @@ async function loadSuppliersForStore(storeId) {
   return NhaCungCap.find(query).sort({ ten_ncc: 1, ma_ncc: 1 }).select('ten_ncc ma_ncc').lean();
 }
 
+async function loadCustomersForStore(storeId) {
+  if (!storeId) return [];
+  var query = { trang_thai: 'active' };
+  query.$or = [
+    { cua_hang_id: storeId },
+    { cua_hang_id: { $exists: false } },
+    { cua_hang_id: null }
+  ];
+  return KhachHang.find(query)
+    .sort({ ten_khach_hang: 1, ma_khach_hang: 1 })
+    .select('ten_khach_hang ma_khach_hang sdt')
+    .lean();
+}
+
 async function loadActiveVatChuaForStore(storeId) {
   if (!storeId) return [];
   return VatChua.find({ cua_hang_id: storeId, trang_thai: 'active' })
@@ -221,6 +241,7 @@ exports.index = async function(req, res, next) {
         formMode: requestQuery.mode === 'create' ? 'create' : (requestQuery.mode === 'nhap' ? 'nhap' : ''),
         missingStore: true,
         suppliers: [],
+        customers: [],
         activeVatChuaList: [],
         openDetailVatChuaId: '',
         pagination: {
@@ -276,6 +297,7 @@ exports.index = async function(req, res, next) {
     var pageItems = items.slice(start, start + VAT_CHUA_PAGE_SIZE);
 
     var suppliers = await loadSuppliersForStore(storeId);
+    var customers = await loadCustomersForStore(storeId);
     var activeVatChuaList = await loadActiveVatChuaForStore(storeId);
     var openDetailVatChuaId = requestQuery.xuat_vat_chua
       ? await resolveOpenDetailVatChuaId(storeId, requestQuery.xuat_vat_chua, 'xuat')
@@ -293,6 +315,7 @@ exports.index = async function(req, res, next) {
       formMode: requestQuery.mode === 'create' ? 'create' : (requestQuery.mode === 'nhap' ? 'nhap' : ''),
       missingStore: false,
       suppliers: suppliers,
+      customers: customers,
       activeVatChuaList: activeVatChuaList,
       openDetailVatChuaId: openDetailVatChuaId,
       pagination: {
@@ -437,11 +460,21 @@ exports.apiReturnEditDetail = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
     if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc.' });
-    var data = await loadXuatVatChuaForEdit(req.params && req.params.id, storeId);
+    var docId = normalizeObjectId(req.params && req.params.id);
+    if (!docId) return res.status(400).json({ success: false, message: 'ID phiếu xuất không hợp lệ.' });
+
+    var doc = await XuatVatChua.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null })
+      .select('loai_xuat source_type trang_thai')
+      .lean();
+    if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất vật chứa.' });
+
+    var data = isManualPartnerExport(doc)
+      ? await loadManualXuatVatChuaForEdit(docId, storeId)
+      : await loadXuatVatChuaForEdit(docId, storeId);
     return res.json({ success: true, data: data });
   } catch (error) {
     var status = error && error.statusCode ? error.statusCode : 400;
-    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không tải được phiếu trả vật chứa.' });
+    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không tải được phiếu xuất vật chứa.' });
   }
 };
 
@@ -449,12 +482,22 @@ exports.apiReturnUpdate = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
     if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc.' });
+    var docId = normalizeObjectId(req.params && req.params.id);
+    if (!docId) return res.status(400).json({ success: false, message: 'ID phiếu xuất không hợp lệ.' });
+
+    var doc = await XuatVatChua.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null })
+      .select('loai_xuat source_type trang_thai deleted_at')
+      .lean();
+    if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất vật chứa.' });
+
     var userId = req.user && req.user._id ? req.user._id : undefined;
-    var data = await updateXuatVatChuaReturn(req.params && req.params.id, req.body || {}, storeId, userId);
+    var data = isManualPartnerExport(doc)
+      ? await updateManualXuatVatChua(docId, req.body || {}, storeId)
+      : await updateXuatVatChuaReturn(docId, req.body || {}, storeId, userId);
     return res.json({ success: true, data: data });
   } catch (error) {
     var status = error && error.statusCode ? error.statusCode : 400;
-    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không cập nhật được phiếu trả vật chứa.' });
+    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không cập nhật được phiếu xuất vật chứa.' });
   }
 };
 
@@ -462,12 +505,25 @@ exports.apiReturnDelete = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
     if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc.' });
+    var docId = normalizeObjectId(req.params && req.params.id);
+    if (!docId) return res.status(400).json({ success: false, message: 'ID phiếu xuất không hợp lệ.' });
+
+    var doc = await XuatVatChua.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null })
+      .select('loai_xuat source_type trang_thai deleted_at')
+      .lean();
+    if (!doc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất vật chứa.' });
+
+    if (isManualPartnerExport(doc)) {
+      var cancelled = await cancelManualXuatVatChua(docId, storeId);
+      return res.json({ success: true, data: cancelled });
+    }
+
     var userId = req.user && req.user._id ? req.user._id : undefined;
-    var data = await deleteXuatVatChuaReturn(req.params && req.params.id, storeId, userId);
+    var data = await deleteXuatVatChuaReturn(docId, storeId, userId);
     return res.json({ success: true, data: data });
   } catch (error) {
     var status = error && error.statusCode ? error.statusCode : 400;
-    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không xóa được phiếu trả vật chứa.' });
+    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không xóa được phiếu xuất vật chứa.' });
   }
 };
 
@@ -736,6 +792,101 @@ exports.destroyStock = async function(req, res, next) {
   } catch (error) {
     var status = error && error.statusCode ? error.statusCode : 400;
     return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không xuất hủy được vật chứa.' });
+  } finally {
+    if (session) await session.endSession();
+  }
+};
+
+exports.exportStock = async function(req, res, next) {
+  var session = null;
+  try {
+    var storeId = await resolveStoreId(req);
+    if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc.' });
+
+    var body = req && req.body ? req.body : {};
+    var vatChuaId = normalizeObjectId(body.vat_chua_id);
+    var qty = Math.max(0, Math.floor(Number(body.so_luong || body.qty || 0)));
+    var customerId = normalizeObjectId(body.khach_hang_id);
+    var supplierId = normalizeObjectId(body.nha_cung_cap_id);
+    var ghiChu = String(body.ghi_chu || '').trim();
+
+    if (!vatChuaId) return res.status(400).json({ success: false, message: 'Vui lòng chọn vật chứa.' });
+    if (qty <= 0) return res.status(400).json({ success: false, message: 'Vui lòng nhập số lượng xuất hợp lệ.' });
+    if (customerId && supplierId) {
+      return res.status(400).json({ success: false, message: 'Chỉ chọn một đối tượng: khách hàng hoặc nhà cung cấp.' });
+    }
+    if (!customerId && !supplierId) {
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn khách hàng hoặc nhà cung cấp.' });
+    }
+
+    var doiTuongType = 'none';
+    var doiTuongId = undefined;
+    var doiTuongTen = '';
+    var loaiXuat = 'khac';
+
+    if (customerId) {
+      var customer = await KhachHang.findOne({
+        _id: customerId,
+        trang_thai: 'active',
+        $or: [
+          { cua_hang_id: storeId },
+          { cua_hang_id: { $exists: false } },
+          { cua_hang_id: null }
+        ]
+      }).select('ten_khach_hang ma_khach_hang').lean();
+      if (!customer) return res.status(400).json({ success: false, message: 'Khách hàng không hợp lệ.' });
+      doiTuongType = 'khach_hang';
+      doiTuongId = customer._id;
+      doiTuongTen = customer.ten_khach_hang || customer.ma_khach_hang || '';
+      loaiXuat = 'ban_hang';
+    } else {
+      var supplier = await NhaCungCap.findOne({
+        _id: supplierId,
+        trang_thai: 'active',
+        $or: [
+          { cua_hang_id: storeId },
+          { cua_hang_id: { $exists: false } },
+          { cua_hang_id: null }
+        ]
+      }).select('ten_ncc ma_ncc').lean();
+      if (!supplier) return res.status(400).json({ success: false, message: 'Nhà cung cấp không hợp lệ.' });
+      doiTuongType = 'nha_cung_cap';
+      doiTuongId = supplier._id;
+      doiTuongTen = supplier.ten_ncc || supplier.ma_ncc || '';
+      loaiXuat = 'khac';
+    }
+
+    session = await mongoose.startSession();
+    var xuatDoc = null;
+    await session.withTransaction(async function() {
+      xuatDoc = await createXuatVatChuaAndDecreaseStock({
+        storeId: storeId,
+        vatChuaId: vatChuaId,
+        qty: qty,
+        loaiXuat: loaiXuat,
+        doiTuongType: doiTuongType,
+        doiTuongId: doiTuongId,
+        doiTuongTen: doiTuongTen,
+        sourceType: 'manual',
+        ghiChu: ghiChu || ('Xuất vật chứa cho ' + doiTuongTen)
+      }, session);
+    });
+
+    return res.json({
+      success: true,
+      message: 'Đã xuất vật chứa.',
+      data: {
+        id: xuatDoc && xuatDoc._id ? String(xuatDoc._id) : '',
+        code: xuatDoc && xuatDoc.ma_xuat_vat_chua ? xuatDoc.ma_xuat_vat_chua : '',
+        qty: qty
+      }
+    });
+  } catch (error) {
+    var status = error && error.statusCode ? error.statusCode : 400;
+    return res.status(status).json({
+      success: false,
+      message: error && error.message ? error.message : 'Không xuất được vật chứa.'
+    });
   } finally {
     if (session) await session.endSession();
   }

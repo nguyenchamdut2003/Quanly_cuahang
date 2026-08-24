@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { VatChua, XuatVatChua } = require('../models/kiot.model');
+const { VatChua, XuatVatChua, KhachHang, NhaCungCap } = require('../models/kiot.model');
 const {
   parseVatChuaImportInput,
   assertVatChuaImportInput,
@@ -245,11 +245,263 @@ function withSessionOptions(options, session) {
   return session ? Object.assign({}, options, { session }) : options;
 }
 
+function createHttpError(statusCode, message) {
+  const error = new Error(message || 'Yêu cầu không hợp lệ');
+  error.statusCode = statusCode || 400;
+  return error;
+}
+
+function firstLine(doc) {
+  return (Array.isArray(doc && doc.items) ? doc.items : [])[0] || {};
+}
+
+function isManualPartnerExport(doc) {
+  if (!doc || doc.trang_thai === 'cancelled' || doc.deleted_at) return false;
+  if (doc.source_type !== 'manual') return false;
+  return doc.loai_xuat === 'ban_hang' || doc.loai_xuat === 'khac';
+}
+
+async function loadManualXuatVatChuaForEdit(id, storeId) {
+  const docId = cleanId(id);
+  const store = cleanId(storeId);
+  if (!docId || !store) throw createHttpError(400, 'ID phiếu xuất vật chứa không hợp lệ.');
+
+  const doc = await XuatVatChua.findOne({
+    _id: docId,
+    cua_hang_id: store,
+    deleted_at: null
+  }).lean();
+  if (!doc) throw createHttpError(404, 'Không tìm thấy phiếu xuất vật chứa.');
+  if (!isManualPartnerExport(doc)) {
+    throw createHttpError(400, 'Chỉ chỉnh sửa phiếu xuất thủ công cho khách hàng hoặc nhà cung cấp.');
+  }
+
+  const line = firstLine(doc);
+  return {
+    edit_mode: 'manual_export',
+    _id: String(doc._id),
+    ma_xuat_vat_chua: doc.ma_xuat_vat_chua || '',
+    loai_xuat: doc.loai_xuat || '',
+    doi_tuong_type: doc.doi_tuong_type || 'none',
+    khach_hang_id: doc.doi_tuong_type === 'khach_hang' && doc.doi_tuong_id ? String(doc.doi_tuong_id) : '',
+    nha_cung_cap_id: doc.doi_tuong_type === 'nha_cung_cap' && doc.doi_tuong_id ? String(doc.doi_tuong_id) : '',
+    doi_tuong_ten: doc.doi_tuong_ten || '',
+    vat_chua_id: line.vat_chua_id ? String(line.vat_chua_id) : '',
+    so_luong: Number(line.so_luong || doc.tong_so_luong || 0),
+    ghi_chu: doc.ghi_chu || '',
+    tong_tien: Number(doc.tong_tien || 0)
+  };
+}
+
+async function resolvePartnerForManualExport(storeId, customerId, supplierId, session) {
+  if (customerId && supplierId) {
+    throw createHttpError(400, 'Chỉ chọn một đối tượng: khách hàng hoặc nhà cung cấp.');
+  }
+  if (!customerId && !supplierId) {
+    throw createHttpError(400, 'Vui lòng chọn khách hàng hoặc nhà cung cấp.');
+  }
+
+  if (customerId) {
+    const customer = await withSessionQuery(
+      KhachHang.findOne({
+        _id: customerId,
+        trang_thai: 'active',
+        $or: [
+          { cua_hang_id: storeId },
+          { cua_hang_id: { $exists: false } },
+          { cua_hang_id: null }
+        ]
+      }).select('ten_khach_hang ma_khach_hang'),
+      session
+    ).lean();
+    if (!customer) throw createHttpError(400, 'Khách hàng không hợp lệ.');
+    return {
+      doiTuongType: 'khach_hang',
+      doiTuongId: customer._id,
+      doiTuongTen: customer.ten_khach_hang || customer.ma_khach_hang || '',
+      loaiXuat: 'ban_hang'
+    };
+  }
+
+  const supplier = await withSessionQuery(
+    NhaCungCap.findOne({
+      _id: supplierId,
+      trang_thai: 'active',
+      $or: [
+        { cua_hang_id: storeId },
+        { cua_hang_id: { $exists: false } },
+        { cua_hang_id: null }
+      ]
+    }).select('ten_ncc ma_ncc'),
+    session
+  ).lean();
+  if (!supplier) throw createHttpError(400, 'Nhà cung cấp không hợp lệ.');
+  return {
+    doiTuongType: 'nha_cung_cap',
+    doiTuongId: supplier._id,
+    doiTuongTen: supplier.ten_ncc || supplier.ma_ncc || '',
+    loaiXuat: 'khac'
+  };
+}
+
+async function updateManualXuatVatChua(id, data = {}, storeId) {
+  const docId = cleanId(id);
+  const store = cleanId(storeId);
+  if (!docId || !store) throw createHttpError(400, 'ID phiếu xuất vật chứa không hợp lệ.');
+
+  const vatChuaId = cleanId(data.vat_chua_id);
+  const qty = Math.max(0, Math.floor(Number(data.so_luong || data.qty || 0)));
+  const customerId = cleanId(data.khach_hang_id);
+  const supplierId = cleanId(data.nha_cung_cap_id);
+  const ghiChu = String(data.ghi_chu || '').trim();
+
+  if (!vatChuaId) throw createHttpError(400, 'Vui lòng chọn vật chứa.');
+  if (qty <= 0) throw createHttpError(400, 'Vui lòng nhập số lượng xuất hợp lệ.');
+
+  const session = await mongoose.startSession();
+  let result = null;
+  try {
+    await session.withTransaction(async function() {
+      const doc = await withSessionQuery(
+        XuatVatChua.findOne({ _id: docId, cua_hang_id: store, deleted_at: null }),
+        session
+      );
+      if (!doc) throw createHttpError(404, 'Không tìm thấy phiếu xuất vật chứa.');
+      if (!isManualPartnerExport(doc)) {
+        throw createHttpError(400, 'Chỉ chỉnh sửa phiếu xuất thủ công cho khách hàng hoặc nhà cung cấp.');
+      }
+
+      const partner = await resolvePartnerForManualExport(store, customerId, supplierId, session);
+      const vatChua = await withSessionQuery(
+        VatChua.findOne({ _id: vatChuaId, cua_hang_id: store, trang_thai: 'active' }),
+        session
+      );
+      if (!vatChua) throw createHttpError(400, 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng.');
+
+      const oldLine = firstLine(doc);
+      const oldVatChuaId = cleanId(oldLine.vat_chua_id);
+      const oldQty = Math.max(0, Math.floor(Number(oldLine.so_luong || doc.tong_so_luong || 0)));
+      const costMap = await loadAverageCostByVatChuaIds(store, [vatChuaId], session);
+      const giaVon = Math.max(0, Number(costMap[String(vatChuaId)] || oldLine.gia_von || 0));
+      const thanhTien = Math.round(giaVon * qty);
+
+      if (oldVatChuaId && oldVatChuaId !== vatChuaId) {
+        if (oldQty > 0) {
+          await withSessionQuery(
+            VatChua.updateOne({ _id: oldVatChuaId, cua_hang_id: store }, { $inc: { so_luong_ton: oldQty } }),
+            session
+          );
+        }
+        const stockUpdate = await withSessionQuery(
+          VatChua.updateOne(
+            { _id: vatChuaId, cua_hang_id: store, so_luong_ton: { $gte: qty } },
+            { $inc: { so_luong_ton: -qty } }
+          ),
+          session
+        );
+        if (!stockUpdate || Number(stockUpdate.modifiedCount || 0) < 1) {
+          throw createHttpError(400, 'Tồn vật chứa không đủ để xuất.');
+        }
+      } else {
+        const deltaQty = qty - oldQty;
+        if (deltaQty !== 0) {
+          const stockFilter = { _id: vatChuaId, cua_hang_id: store };
+          if (deltaQty > 0) stockFilter.so_luong_ton = { $gte: deltaQty };
+          const stockUpdate = await withSessionQuery(
+            VatChua.updateOne(stockFilter, { $inc: { so_luong_ton: -deltaQty } }),
+            session
+          );
+          if (!stockUpdate || Number(stockUpdate.modifiedCount || 0) < 1) {
+            throw createHttpError(400, 'Tồn vật chứa không đủ để tăng số lượng xuất.');
+          }
+        }
+      }
+
+      doc.loai_xuat = partner.loaiXuat;
+      doc.doi_tuong_type = partner.doiTuongType;
+      doc.doi_tuong_id = partner.doiTuongId;
+      doc.doi_tuong_ten = partner.doiTuongTen;
+      doc.items = [{
+        vat_chua_id: vatChua._id,
+        ma_vat_chua: vatChua.ma_vat_chua || '',
+        ten_vat_chua: vatChua.ten_vat_chua || '',
+        so_luong: qty,
+        gia_von: giaVon,
+        thanh_tien: thanhTien
+      }];
+      doc.tong_so_luong = qty;
+      doc.tong_tien = thanhTien;
+      doc.ghi_chu = ghiChu || ('Xuất vật chứa cho ' + partner.doiTuongTen);
+      await doc.save(withSessionOptions({}, session));
+
+      result = {
+        edit_mode: 'manual_export',
+        _id: String(doc._id),
+        ma_xuat_vat_chua: doc.ma_xuat_vat_chua || '',
+        tong_so_luong: qty,
+        tong_tien: thanhTien
+      };
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return result;
+}
+
+async function cancelManualXuatVatChua(id, storeId) {
+  const docId = cleanId(id);
+  const store = cleanId(storeId);
+  if (!docId || !store) throw createHttpError(400, 'ID phiếu xuất vật chứa không hợp lệ.');
+
+  const session = await mongoose.startSession();
+  let result = null;
+  try {
+    await session.withTransaction(async function() {
+      const doc = await withSessionQuery(
+        XuatVatChua.findOne({ _id: docId, cua_hang_id: store, deleted_at: null }),
+        session
+      );
+      if (!doc) throw createHttpError(404, 'Không tìm thấy phiếu xuất vật chứa.');
+      if (!isManualPartnerExport(doc)) {
+        throw createHttpError(400, 'Chỉ xóa phiếu xuất thủ công cho khách hàng hoặc nhà cung cấp.');
+      }
+
+      const items = Array.isArray(doc.items) ? doc.items : [];
+      for (const item of items) {
+        const vatChuaId = cleanId(item.vat_chua_id);
+        const qty = Math.max(0, Math.floor(Number(item.so_luong || 0)));
+        if (!vatChuaId || qty <= 0) continue;
+        await withSessionQuery(
+          VatChua.updateOne({ _id: vatChuaId, cua_hang_id: store }, { $inc: { so_luong_ton: qty } }),
+          session
+        );
+      }
+
+      doc.trang_thai = 'cancelled';
+      await doc.save(withSessionOptions({}, session));
+      result = {
+        edit_mode: 'manual_export',
+        _id: String(doc._id),
+        ma_xuat_vat_chua: doc.ma_xuat_vat_chua || ''
+      };
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return result;
+}
+
 module.exports = {
   exportVatChuaWithOrderDelivery,
   exportVatChuaWithPurchaseReturn,
   exportVatChuaWithInvoice,
   exportVatChuaWithSalesReturn,
   cancelXuatVatChuaBySource,
-  createXuatVatChuaAndDecreaseStock
+  createXuatVatChuaAndDecreaseStock,
+  isManualPartnerExport,
+  loadManualXuatVatChuaForEdit,
+  updateManualXuatVatChua,
+  cancelManualXuatVatChua
 };

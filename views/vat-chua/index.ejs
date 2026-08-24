@@ -111,6 +111,12 @@
     #vcImportReturnModalOverlay { z-index: 4220 !important; }
     #vcImportReturnModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
     #vcImportReturnModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
+    #vcExportModalOverlay { z-index: 4230 !important; }
+    #vcExportModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
+    #vcExportModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
+    #vcExportModalOverlay .modal-content { width: min(640px, 96%); max-height: 90vh; }
+    .vc-export-partner-hint { margin: 0 0 8px; color: #667085; font-size: 12px; line-height: 1.4; }
+    .vc-export-stock-hint { margin-top: 4px; color: #667085; font-size: 12px; }
     #vcImportReturnModalOverlay .modal-content { width: min(620px, 96%); max-height: 88vh; }
     .vc-trash-desc { margin: 0 0 12px; color: #475467; font-size: 13px; line-height: 1.45; }
     .vc-trash-alert { border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.45; margin-bottom: 10px; }
@@ -122,7 +128,7 @@
     .vc-trash-groups { margin: 0; padding-left: 18px; color: #344054; font-size: 13px; }
     .vc-trash-loading { text-align: center; padding: 24px 8px; color: #667085; font-size: 13px; }
     .vc-documents-wrap { width: 100%; max-width: 100%; overflow-x: auto !important; overflow-y: hidden; padding-bottom: 8px; scrollbar-gutter: stable; }
-    .vc-documents-table { table-layout: fixed; width: 1250px; min-width: 1250px; }
+    .vc-documents-table { table-layout: fixed; width: 1340px; min-width: 1340px; }
     .vc-documents-table th,
     .vc-documents-table td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vc-documents-table td > a,
@@ -140,7 +146,8 @@
     .vc-documents-table th:nth-child(7) { width: 112px; }
     .vc-documents-table th:nth-child(8) { width: 130px; }
     .vc-documents-table th:nth-child(9) { width: 142px; }
-    .vc-documents-table th:nth-child(10) { width: 128px; }
+    .vc-documents-table th:nth-child(10) { width: 90px; }
+    .vc-documents-table th:nth-child(11) { width: 128px; }
     .vc-documents-table .vc-doc-actions-cell { overflow: visible; white-space: normal; }
     .vat-chua-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid #e5e7eb;background:#fff;color:#475467;font-size:14px}
     .vat-chua-pagination__actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -347,6 +354,7 @@
           </div>
           <div class="customer-toolbar-actions">
             <button class="btn btn-light" type="button" id="openVatChuaStocktakeModal" <%= missingStore ? 'disabled' : '' %>><i class="fa-solid fa-clipboard-check"></i> Kiểm kho</button>
+            <button class="btn btn-light" type="button" id="openVatChuaExportModal" <%= missingStore ? 'disabled' : '' %>><i class="fa-solid fa-box-open"></i> Xuất</button>
             <button class="btn btn-light" type="button" id="openVatChuaDestroyModal" <%= missingStore ? 'disabled' : '' %>><i class="fa-solid fa-trash-arrow-up"></i> Xuất hủy</button>
             <button class="btn btn-primary" type="button" id="openAddVatChuaModal" <%= missingStore ? 'disabled' : '' %>>+ Tạo mới</button>
             <button class="btn btn-light" type="button" id="openImportVatChuaModal" <%= missingStore ? 'disabled' : '' %>>Nhập vật chứa</button>
@@ -719,6 +727,71 @@
         </div>
       </div>
     </div>
+    <div id="vcExportModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3 id="vcExportModalTitle">Xuất vật chứa</h3>
+          <button type="button" class="modal-close" id="vcExportModalClose" aria-label="Đóng">×</button>
+        </div>
+        <form class="modal-body product-form-body" id="vcExportForm">
+          <input type="hidden" id="exportEditId" value="">
+          <div class="product-form-grid">
+            <section class="product-form-section">
+              <h4>Đối tượng nhận</h4>
+              <p class="vc-export-partner-hint">Chọn khách hàng hoặc nhà cung cấp (chỉ một bên).</p>
+              <div class="store-fields product-fields">
+                <div>
+                  <span>Khách hàng</span>
+                  <select id="exportCustomerSelect" name="khach_hang_id">
+                    <option value="">— Chọn khách hàng —</option>
+                    <% (customers || []).forEach(function(customer) { %>
+                      <option value="<%= customer._id %>"><%= customer.ten_khach_hang || customer.ma_khach_hang || '---' %><%= customer.sdt ? (' — ' + customer.sdt) : '' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div>
+                  <span>Nhà cung cấp</span>
+                  <select id="exportSupplierSelect" name="nha_cung_cap_id">
+                    <option value="">— Chọn nhà cung cấp —</option>
+                    <% (suppliers || []).forEach(function(supplier) { %>
+                      <option value="<%= supplier._id %>"><%= supplier.ten_ncc || supplier.ma_ncc || '---' %></option>
+                    <% }) %>
+                  </select>
+                </div>
+              </div>
+              <h4 style="margin-top:14px">Thông tin xuất</h4>
+              <div class="store-fields product-fields">
+                <div>
+                  <span>Vật chứa *</span>
+                  <select id="exportVatChuaSelect" name="vat_chua_id" required>
+                    <option value="">— Chọn vật chứa —</option>
+                    <% (activeVatChuaList || []).forEach(function(vc) { %>
+                      <option value="<%= vc._id %>" data-stock="<%= Number(vc.so_luong_ton || 0) %>" <%= Number(vc.so_luong_ton || 0) <= 0 ? 'disabled' : '' %>>
+                        <%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %> (tồn <%= Number(vc.so_luong_ton || 0).toLocaleString('vi-VN') %>)
+                      </option>
+                    <% }) %>
+                  </select>
+                  <div class="vc-export-stock-hint" id="exportVatChuaStockHint">Tồn khả dụng: —</div>
+                </div>
+                <div>
+                  <span>Số lượng *</span>
+                  <input type="number" min="1" step="1" id="exportSoLuongInput" name="so_luong" required placeholder="Nhập số lượng xuất">
+                </div>
+                <div class="span-2">
+                  <span>Ghi chú</span>
+                  <input id="exportGhiChuInput" name="ghi_chu" placeholder="Ghi chú xuất vật chứa (tùy chọn)">
+                </div>
+              </div>
+              <div id="vcExportError" class="vc-form-error"></div>
+            </section>
+          </div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcExportModalCancel">Hủy</button>
+          <button class="btn btn-primary" type="submit" form="vcExportForm" id="vcExportModalSave">Xuất</button>
+        </div>
+      </div>
+    </div>
     <div id="vcStocktakeModalOverlay" class="modal-overlay">
       <div class="modal-content product-create-modal" style="width:min(820px,96vw)">
         <div class="modal-header">
@@ -900,6 +973,7 @@
       var returnImportMode = 'create';
       var returnEditSourceId = '';
       var openStocktakeBtn = document.getElementById('openVatChuaStocktakeModal');
+      var openExportBtn = document.getElementById('openVatChuaExportModal');
       var openDestroyBtn = document.getElementById('openVatChuaDestroyModal');
       var stocktakeOverlay = document.getElementById('vcStocktakeModalOverlay');
       var stocktakeForm = document.getElementById('vcStocktakeForm');
@@ -909,6 +983,22 @@
       var stocktakeSave = document.getElementById('vcStocktakeModalSave');
       var stocktakeClose = document.getElementById('vcStocktakeModalClose');
       var stocktakeCancel = document.getElementById('vcStocktakeModalCancel');
+      var exportOverlay = document.getElementById('vcExportModalOverlay');
+      var exportForm = document.getElementById('vcExportForm');
+      var exportModalTitle = document.getElementById('vcExportModalTitle');
+      var exportEditId = document.getElementById('exportEditId');
+      var exportCustomerSelect = document.getElementById('exportCustomerSelect');
+      var exportSupplierSelect = document.getElementById('exportSupplierSelect');
+      var exportVatChuaSelect = document.getElementById('exportVatChuaSelect');
+      var exportSoLuongInput = document.getElementById('exportSoLuongInput');
+      var exportGhiChuInput = document.getElementById('exportGhiChuInput');
+      var exportStockHint = document.getElementById('exportVatChuaStockHint');
+      var exportError = document.getElementById('vcExportError');
+      var exportSave = document.getElementById('vcExportModalSave');
+      var exportClose = document.getElementById('vcExportModalClose');
+      var exportCancel = document.getElementById('vcExportModalCancel');
+      var exportEditOriginalVatChuaId = '';
+      var exportEditOriginalQty = 0;
       var destroyOverlay = document.getElementById('vcDestroyModalOverlay');
       var destroyForm = document.getElementById('vcDestroyForm');
       var destroyBody = document.getElementById('vcDestroyBody');
@@ -1103,13 +1193,131 @@
           });
           var data = await res.json();
           if (!data.success) throw new Error(data.message || 'Không thực hiện được thao tác.');
-          window.location.href = '/vat-chua?success=' + encodeURIComponent(url.indexOf('kiem-kho') >= 0 ? 'stocktake' : 'destroyed');
+          var successKey = 'ok';
+          if (url.indexOf('kiem-kho') >= 0) successKey = 'stocktake';
+          else if (url.indexOf('xuat-huy') >= 0) successKey = 'destroyed';
+          else if (url.indexOf('/xuat') >= 0) successKey = 'exported';
+          window.location.href = '/vat-chua?success=' + encodeURIComponent(successKey);
         } catch (error) {
           if (saveBtn) {
             saveBtn.disabled = false;
             saveBtn.textContent = defaultText;
           }
           throw error;
+        }
+      }
+      function getExportSelectedStock() {
+        if (!exportVatChuaSelect || !exportVatChuaSelect.selectedOptions || !exportVatChuaSelect.selectedOptions[0]) return 0;
+        var base = Math.max(0, Number(exportVatChuaSelect.selectedOptions[0].getAttribute('data-stock') || 0));
+        var selectedId = String(exportVatChuaSelect.value || '');
+        if (exportEditId && exportEditId.value && selectedId && selectedId === String(exportEditOriginalVatChuaId || '')) {
+          base += Math.max(0, Number(exportEditOriginalQty || 0));
+        }
+        return base;
+      }
+      function refreshExportStockHint() {
+        var stock = getExportSelectedStock();
+        if (exportStockHint) {
+          exportStockHint.textContent = exportVatChuaSelect && exportVatChuaSelect.value
+            ? ('Tồn khả dụng: ' + fmt(stock))
+            : 'Tồn khả dụng: —';
+        }
+        if (exportSoLuongInput) {
+          exportSoLuongInput.max = stock > 0 ? String(stock) : '';
+        }
+      }
+      function syncExportPartnerSelects(changed) {
+        if (!exportCustomerSelect || !exportSupplierSelect) return;
+        if (changed === 'customer' && exportCustomerSelect.value) {
+          exportSupplierSelect.value = '';
+        }
+        if (changed === 'supplier' && exportSupplierSelect.value) {
+          exportCustomerSelect.value = '';
+        }
+      }
+      function resetExportModalFields() {
+        if (exportEditId) exportEditId.value = '';
+        exportEditOriginalVatChuaId = '';
+        exportEditOriginalQty = 0;
+        if (exportCustomerSelect) exportCustomerSelect.value = '';
+        if (exportSupplierSelect) exportSupplierSelect.value = '';
+        if (exportVatChuaSelect) exportVatChuaSelect.value = '';
+        if (exportSoLuongInput) exportSoLuongInput.value = '';
+        if (exportGhiChuInput) exportGhiChuInput.value = '';
+        setActionError(exportError, '');
+        if (exportModalTitle) exportModalTitle.textContent = 'Xuất vật chứa';
+        if (exportSave) {
+          exportSave.disabled = false;
+          exportSave.textContent = 'Xuất';
+        }
+        refreshExportStockHint();
+      }
+      function openExportModal() {
+        if (!exportOverlay) return false;
+        resetExportModalFields();
+        showVcActionModal(exportOverlay);
+        return true;
+      }
+      function closeExportModal() {
+        hideVcActionModal(exportOverlay);
+        resetExportModalFields();
+      }
+      async function openExportEditModal(id) {
+        if (!exportOverlay || !id) return;
+        setActionError(exportError, '');
+        if (exportSave) exportSave.disabled = true;
+        try {
+          var res = await fetch('/vat-chua/xuat/' + encodeURIComponent(id) + '/edit', {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không tải được phiếu xuất vật chứa.');
+          var row = json.data || {};
+          if (row.edit_mode && row.edit_mode !== 'manual_export') {
+            throw new Error('Phiếu này không phải xuất thủ công. Vui lòng dùng chức năng trả vật chứa.');
+          }
+          if (exportEditId) exportEditId.value = row._id || id;
+          exportEditOriginalVatChuaId = row.vat_chua_id || '';
+          exportEditOriginalQty = Math.max(0, Number(row.so_luong || 0));
+          if (exportCustomerSelect) exportCustomerSelect.value = row.khach_hang_id || '';
+          if (exportSupplierSelect) exportSupplierSelect.value = row.nha_cung_cap_id || '';
+          if (exportVatChuaSelect) exportVatChuaSelect.value = row.vat_chua_id || '';
+          if (exportSoLuongInput) exportSoLuongInput.value = row.so_luong || '';
+          if (exportGhiChuInput) exportGhiChuInput.value = row.ghi_chu || '';
+          if (exportModalTitle) exportModalTitle.textContent = 'Chỉnh sửa xuất vật chứa' + (row.ma_xuat_vat_chua ? (' — ' + row.ma_xuat_vat_chua) : '');
+          if (exportSave) {
+            exportSave.disabled = false;
+            exportSave.textContent = 'Lưu';
+          }
+          refreshExportStockHint();
+          showVcActionModal(exportOverlay);
+        } catch (error) {
+          alert(error && error.message ? error.message : 'Không tải được phiếu xuất vật chứa.');
+          if (exportSave) {
+            exportSave.disabled = false;
+            exportSave.textContent = 'Xuất';
+          }
+        }
+      }
+      async function deleteManualExport(btn) {
+        if (!btn) return;
+        var id = String(btn.getAttribute('data-vc-export-id') || '').trim();
+        var code = String(btn.getAttribute('data-vc-export-code') || '').trim();
+        if (!id) return;
+        if (!window.confirm('Xóa phiếu xuất ' + (code || '') + '? Tồn kho sẽ được hoàn lại.')) return;
+        try {
+          var res = await fetch('/vat-chua/xuat/' + encodeURIComponent(id) + '/delete', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({})
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không xóa được phiếu xuất vật chứa.');
+          window.location.href = '/vat-chua?success=export_deleted&xuat_vat_chua=' + encodeURIComponent(id);
+        } catch (error) {
+          alert(error && error.message ? error.message : 'Không xóa được phiếu xuất vật chứa.');
         }
       }
       function cashBookLabel(book) {
@@ -1486,6 +1694,7 @@
       if (openStocktakeBtn) openStocktakeBtn.addEventListener('click', function() {
         if (renderStocktakeRows()) showVcActionModal(stocktakeOverlay);
       });
+      if (openExportBtn) openExportBtn.addEventListener('click', openExportModal);
       if (openDestroyBtn) openDestroyBtn.addEventListener('click', function() {
         if (renderDestroyRows()) showVcActionModal(destroyOverlay);
       });
@@ -1493,6 +1702,8 @@
       if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
       if (stocktakeClose) stocktakeClose.addEventListener('click', closeStocktakeModal);
       if (stocktakeCancel) stocktakeCancel.addEventListener('click', closeStocktakeModal);
+      if (exportClose) exportClose.addEventListener('click', closeExportModal);
+      if (exportCancel) exportCancel.addEventListener('click', closeExportModal);
       if (destroyClose) destroyClose.addEventListener('click', closeDestroyModal);
       if (destroyCancel) destroyCancel.addEventListener('click', closeDestroyModal);
       if (importCloseBtn) importCloseBtn.addEventListener('click', closeImportModal);
@@ -1514,11 +1725,28 @@
           closeImportModal();
           closeEditImportModal();
           closeReturnImportModal();
+          closeExportModal();
+          closeStocktakeModal();
+          closeDestroyModal();
           var vcDocOverlay = document.getElementById('vcDocumentModalOverlay');
           if (vcDocOverlay) vcDocOverlay.classList.remove('is-visible');
           closeVcImportTrashModal();
         }
       });
+
+      if (exportCustomerSelect) {
+        exportCustomerSelect.addEventListener('change', function() {
+          syncExportPartnerSelects('customer');
+        });
+      }
+      if (exportSupplierSelect) {
+        exportSupplierSelect.addEventListener('change', function() {
+          syncExportPartnerSelects('supplier');
+        });
+      }
+      if (exportVatChuaSelect) {
+        exportVatChuaSelect.addEventListener('change', refreshExportStockHint);
+      }
 
       if (stocktakeBody) stocktakeBody.addEventListener('input', refreshStocktakeSummary);
       if (destroyBody) destroyBody.addEventListener('input', refreshDestroySummary);
@@ -1547,6 +1775,73 @@
             }, stocktakeSave, 'Cân bằng kho', 'Đang cân bằng...');
           } catch (error) {
             setActionError(stocktakeError, error.message || 'Không kiểm kho được vật chứa.');
+          }
+        });
+      }
+      if (exportForm) {
+        exportForm.addEventListener('submit', async function(e) {
+          e.preventDefault();
+          setActionError(exportError, '');
+          var editId = exportEditId ? String(exportEditId.value || '').trim() : '';
+          var customerId = exportCustomerSelect ? String(exportCustomerSelect.value || '').trim() : '';
+          var supplierId = exportSupplierSelect ? String(exportSupplierSelect.value || '').trim() : '';
+          var vatChuaId = exportVatChuaSelect ? String(exportVatChuaSelect.value || '').trim() : '';
+          var qty = Math.max(0, Math.floor(Number(exportSoLuongInput && exportSoLuongInput.value || 0)));
+          var stock = getExportSelectedStock();
+
+          if (customerId && supplierId) {
+            setActionError(exportError, 'Chỉ chọn một đối tượng: khách hàng hoặc nhà cung cấp.');
+            return;
+          }
+          if (!customerId && !supplierId) {
+            setActionError(exportError, 'Vui lòng chọn khách hàng hoặc nhà cung cấp.');
+            return;
+          }
+          if (!vatChuaId) {
+            setActionError(exportError, 'Vui lòng chọn vật chứa.');
+            return;
+          }
+          if (qty <= 0) {
+            setActionError(exportError, 'Vui lòng nhập số lượng xuất hợp lệ.');
+            return;
+          }
+          if (qty > stock) {
+            setActionError(exportError, 'Số lượng xuất không được vượt tồn kho (' + fmt(stock) + ').');
+            return;
+          }
+
+          var payload = {
+            khach_hang_id: customerId,
+            nha_cung_cap_id: supplierId,
+            vat_chua_id: vatChuaId,
+            so_luong: qty,
+            ghi_chu: exportGhiChuInput ? String(exportGhiChuInput.value || '').trim() : ''
+          };
+
+          try {
+            if (editId) {
+              if (exportSave) {
+                exportSave.disabled = true;
+                exportSave.textContent = 'Đang lưu...';
+              }
+              var res = await fetch('/vat-chua/xuat/' + encodeURIComponent(editId) + '/edit', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify(payload)
+              });
+              var json = await res.json();
+              if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không cập nhật được phiếu xuất.');
+              window.location.href = '/vat-chua?success=export_updated&xuat_vat_chua=' + encodeURIComponent(editId);
+            } else {
+              await postVatChuaAction('/vat-chua/xuat', payload, exportSave, 'Xuất', 'Đang xuất...');
+            }
+          } catch (error) {
+            setActionError(exportError, error.message || 'Không xuất được vật chứa.');
+            if (exportSave) {
+              exportSave.disabled = false;
+              exportSave.textContent = editId ? 'Lưu' : 'Xuất';
+            }
           }
         });
       }
@@ -1634,8 +1929,6 @@
         if (!editImportOverlay || !id) return;
         showEditImportError('');
         if (editImportSave) editImportSave.disabled = true;
-        if (editImportId) editImportId.value = id;
-        editImportOverlay.classList.add('is-visible');
         try {
           await ensureEditPaymentCashBooks();
           var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/edit', {
@@ -1645,6 +1938,7 @@
           var json = await res.json();
           if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không tải được phiếu nhập vật chứa.');
           var row = json.data || {};
+          if (editImportId) editImportId.value = id;
           if (editImportSupplier) editImportSupplier.value = row.nha_cung_cap_id || '';
           if (editImportVatChua) editImportVatChua.value = row.vat_chua_id || '';
           if (editImportQty) editImportQty.value = row.so_luong || '';
@@ -1656,9 +1950,10 @@
           if (editImportCashBook) editImportCashBook.value = payment.so_quy_tien_mat_id || '';
           if (editImportBankBook) editImportBankBook.value = payment.so_quy_chuyen_khoan_id || '';
           renderEditImportPaymentSummary();
+          editImportOverlay.classList.add('is-visible');
           if (editImportSave) editImportSave.disabled = false;
         } catch (error) {
-          showEditImportError(error && error.message ? error.message : 'Không tải được phiếu nhập vật chứa.');
+          alert(error && error.message ? error.message : 'Không tải được phiếu nhập vật chứa.');
         }
       }
 
@@ -2135,6 +2430,20 @@
           e.preventDefault();
           closeVcDocActionMenus();
           openReturnImportModal(returnBtn);
+          return;
+        }
+        var exportEditBtn = e.target.closest('[data-vc-export-edit]');
+        if (exportEditBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          openExportEditModal(exportEditBtn.getAttribute('data-vc-export-id'));
+          return;
+        }
+        var exportDeleteBtn = e.target.closest('[data-vc-export-delete]');
+        if (exportDeleteBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          deleteManualExport(exportDeleteBtn);
           return;
         }
         var returnEditBtn = e.target.closest('[data-vc-return-edit]');

@@ -12,7 +12,10 @@ function isVisibleSupplierDebtRow(row) {
 }
 
 function isDeletedDebtLinkedDoc(doc) {
-    return !!(doc && typeof doc === 'object' && (doc.trang_thai === 'cancelled'));
+    if (!doc || typeof doc !== 'object') return false;
+    var status = String(doc.trang_thai || '').trim();
+    // Ẩn chứng từ đã hủy hoặc đã gộp vào phiếu nhận (chỉ hiện phiếu nhận).
+    return status === 'cancelled' || status === 'merged';
 }
 
 function getDebtDocumentInfo(row) {

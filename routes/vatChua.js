@@ -16,6 +16,7 @@ router.post('/xuat/:id/delete', vatChuaController.apiReturnDelete);
 router.get('/api/:id/detail', vatChuaController.apiDetail);
 router.post('/add', vatChuaController.add);
 router.post('/nhap', vatChuaController.importStock);
+router.post('/xuat', vatChuaController.exportStock);
 router.post('/kiem-kho', vatChuaController.stocktake);
 router.post('/xuat-huy', vatChuaController.destroyStock);
 router.post('/nhap/trash/preview', vatChuaController.previewImportTrash);
