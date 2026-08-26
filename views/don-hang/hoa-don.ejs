@@ -116,6 +116,20 @@
     .invoice-page-link{min-width:46px;height:28px;padding:0 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#111827;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;font-weight:700}
     .invoice-page-link.is-disabled{color:#94a3b8;background:#f8fafc;pointer-events:none}
     .invoice-page-current{font-weight:800;color:#111827}
+    .invoice-trip-tabs{display:flex;align-items:center;gap:18px;height:40px;border-bottom:1px solid #e5e9ee;margin:0 0 14px}
+    .invoice-trip-tab{height:100%;border:0;background:transparent;color:#475569;font-size:13px;font-weight:800;padding:0;cursor:pointer}
+    .invoice-trip-tab.is-active{color:#0070f4;box-shadow:inset 0 -2px 0 #0070f4}
+    .invoice-trip-pane{display:none}
+    .invoice-trip-pane.is-active{display:block}
+    .invoice-trip-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}
+    .invoice-trip-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .invoice-trip-form-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
+    .invoice-trip-form-grid label.full{grid-column:1/-1}
+    .invoice-trip-form-grid input,.invoice-trip-form-grid select,.invoice-trip-form-grid textarea{height:34px;border:1px solid #cfd8e3;border-radius:6px;padding:0 10px;font-size:13px}
+    .invoice-trip-form-grid textarea{height:72px;padding:8px 10px;resize:vertical}
+    .invoice-trip-nested-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1500;align-items:flex-start;justify-content:center;padding:7px 12px}
+    .invoice-trip-nested-overlay.is-open{display:flex}
+    .invoice-trip-status-select{height:30px;min-width:118px;max-width:100%;border:1px solid #cfd8e3;border-radius:6px;padding:0 8px;font-size:12px;background:#fff;color:#111827}
   </style>
 </head>
 <body>
@@ -168,8 +182,19 @@
         <div class="toolbar">
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã hóa đơn"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
-            <div class="dropdown" id="createDropdown"><button class="btn primary" type="button" onclick="toggleCreateMenu(event)"><i class="fa-solid fa-plus"></i> Tạo mới <i class="fa-solid fa-chevron-down"></i></button><div class="dropdown-menu"><span class="dropdown-item disabled">Vận đơn KShip</span><a class="dropdown-item" href="/don-hang/hoa-don/create">Hóa đơn</a></div></div>
+            <div class="dropdown" id="createDropdown">
+              <button class="btn primary" type="button" onclick="toggleCreateMenu(event)">
+                <i class="fa-solid fa-plus">
+                </i> 
+                Tạo mới 
+                <i class="fa-solid fa-chevron-down">
+                </i>
+              </button>
+              <div class="dropdown-menu">
+                <span class="dropdown-item disabled">Vận đơn KShip</span>
+                <a class="dropdown-item" href="/don-hang/hoa-don/create">Hóa đơn</a></div></div>
             <button type="button" class="btn" id="openInvoiceMergeModal"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
+            <button type="button" class="btn" id="openInvoiceTripModal"><i class="fa-solid fa-truck"></i> Thêm chuyến xe</button>
             <a href="/don-hang/hoa-don/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
             <button type="button" class="btn order-delete-btn" id="openInvoiceTrashModal"><i class="fa-regular fa-trash-can"></i> Xóa</button>
           </div>
@@ -281,6 +306,193 @@
       </div>
     </div>
   </div>
+
+  <div id="invoiceTripModalOverlay" class="invoice-merge-overlay">
+    <div class="invoice-merge-modal" role="dialog" aria-labelledby="invoiceTripModalTitle" aria-modal="true">
+      <div class="invoice-merge-head">
+        <h3 id="invoiceTripModalTitle">Thêm chuyến xe</h3>
+        <button type="button" class="invoice-merge-close" id="invoiceTripModalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-merge-body">
+        <div class="invoice-trip-tabs" role="tablist">
+          <button type="button" class="invoice-trip-tab is-active" data-trip-tab="with">Hóa đơn đã có chuyến xe</button>
+          <button type="button" class="invoice-trip-tab" data-trip-tab="without">Hóa đơn chưa có chuyến xe</button>
+        </div>
+        <div class="invoice-trip-pane is-active" data-trip-pane="with">
+          <div style="overflow:auto">
+            <table class="invoice-merge-table">
+              <thead>
+                <tr>
+                  <th>Mã hóa đơn</th>
+                  <th>Thời gian</th>
+                  <th>Mã KH</th>
+                  <th>Khách hàng</th>
+                  <th>Mã chuyến</th>
+                  <th>Nhà xe</th>
+                  <th>Xuất phát</th>
+                  <th>Trạng thái chuyến</th>
+                  <th class="num">Tổng tiền</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="invoiceTripWithRows"></tbody>
+            </table>
+          </div>
+          <div id="invoiceTripWithEmpty" class="invoice-merge-empty" style="display:none">
+            <div class="empty-icon"><i class="fa-regular fa-inbox"></i></div>
+            <strong>Chưa có hóa đơn thuộc chuyến xe</strong>
+            <span>Các hóa đơn đã gắn chuyến sẽ hiện ở đây.</span>
+          </div>
+        </div>
+        <div class="invoice-trip-pane" data-trip-pane="without">
+          <div style="overflow:auto">
+            <table class="invoice-merge-table">
+              <thead>
+                <tr>
+                  <th class="invoice-merge-check"><input id="invoiceTripCheckAll" type="checkbox"></th>
+                  <th>Mã hóa đơn</th>
+                  <th>Thời gian</th>
+                  <th>Mã KH</th>
+                  <th>Khách hàng</th>
+                  <th class="num">Tổng tiền</th>
+                  <th class="num">Còn nợ</th>
+                </tr>
+              </thead>
+              <tbody id="invoiceTripWithoutRows"></tbody>
+            </table>
+          </div>
+          <div id="invoiceTripWithoutEmpty" class="invoice-merge-empty" style="display:none">
+            <div class="empty-icon"><i class="fa-regular fa-inbox"></i></div>
+            <strong>Không còn hóa đơn chưa có chuyến</strong>
+            <span>Tất cả hóa đơn hiện tại đã được gắn chuyến xe.</span>
+          </div>
+          <div id="invoiceTripWithoutFoot" class="invoice-trip-actions" style="display:none">
+            <button type="button" class="btn" id="invoiceTripPickExistingBtn">Thêm chuyến xe có sẵn</button>
+            <button type="button" class="btn primary" id="invoiceTripCreateBtn">Thêm chuyến xe</button>
+          </div>
+        </div>
+      </div>
+      <div class="invoice-merge-foot" style="display:flex">
+        <button type="button" class="btn" id="invoiceTripCancel">Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="invoiceTripCreateOverlay" class="invoice-trip-nested-overlay">
+    <div class="invoice-merge-modal" style="width:min(720px,calc(100vw - 24px))" role="dialog" aria-labelledby="invoiceTripCreateTitle" aria-modal="true">
+      <div class="invoice-merge-head">
+        <h3 id="invoiceTripCreateTitle">Tạo chuyến xe mới</h3>
+        <button type="button" class="invoice-merge-close" id="invoiceTripCreateClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-merge-body">
+        <form id="invoiceTripCreateForm" class="invoice-trip-form-grid">
+          <label class="full">
+            <span>Nhà xe / Đối tác giao hàng <span style="color:#d92d20">*</span></span>
+            <select id="tripCreatePartner" required>
+              <option value="">— Chọn nhà xe —</option>
+            </select>
+          </label>
+          <label>
+            <span>Ngày giờ xuất phát</span>
+            <input id="tripCreateDepart" type="datetime-local">
+          </label>
+          <label>
+            <span>Ngày giờ dự kiến về</span>
+            <input id="tripCreateEta" type="datetime-local">
+          </label>
+          <label>
+            <span>Tài xế</span>
+            <input id="tripCreateDriver" type="text" maxlength="120" placeholder="Tên tài xế">
+          </label>
+          <label>
+            <span>SĐT tài xế</span>
+            <input id="tripCreateDriverPhone" type="text" maxlength="30" placeholder="Số điện thoại">
+          </label>
+          <label>
+            <span>Biển số xe</span>
+            <input id="tripCreatePlate" type="text" maxlength="40" placeholder="Biển số">
+          </label>
+          <label>
+            <span>Tuyến</span>
+            <input id="tripCreateRoute" type="text" maxlength="120" placeholder="Tuyến giao">
+          </label>
+          <label>
+            <span>Trạng thái chuyến</span>
+            <select id="tripCreateStatus">
+              <option value="draft">Nháp</option>
+              <option value="dang_giao">Đang giao</option>
+            </select>
+          </label>
+          <label class="full">
+            <span>Ghi chú</span>
+            <textarea id="tripCreateNote" placeholder="Ghi chú chuyến xe"></textarea>
+          </label>
+        </form>
+      </div>
+      <div class="invoice-merge-foot" style="display:flex">
+        <button type="button" class="btn" id="invoiceTripCreateCancel">Bỏ qua</button>
+        <button type="button" class="btn primary" id="invoiceTripCreateSubmit">Lưu chuyến xe</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="invoiceTripPickOverlay" class="invoice-trip-nested-overlay">
+    <div class="invoice-merge-modal" role="dialog" aria-labelledby="invoiceTripPickTitle" aria-modal="true">
+      <div class="invoice-merge-head">
+        <h3 id="invoiceTripPickTitle">Chọn chuyến xe có sẵn</h3>
+        <button type="button" class="invoice-merge-close" id="invoiceTripPickClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-merge-body">
+        <div style="overflow:auto">
+          <table class="invoice-merge-table">
+            <thead>
+              <tr>
+                <th class="invoice-merge-check"></th>
+                <th>Mã chuyến</th>
+                <th>Nhà xe</th>
+                <th>Xuất phát</th>
+                <th>Tài xế</th>
+                <th>SĐT</th>
+                <th>Biển số</th>
+                <th>Tuyến</th>
+                <th>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTripPickRows"></tbody>
+          </table>
+        </div>
+        <div id="invoiceTripPickEmpty" class="invoice-merge-empty" style="display:none">
+          <div class="empty-icon"><i class="fa-regular fa-inbox"></i></div>
+          <strong>Chưa có chuyến xe</strong>
+          <span>Hãy tạo chuyến xe mới trước.</span>
+        </div>
+      </div>
+      <div class="invoice-merge-foot" style="display:flex">
+        <button type="button" class="btn" id="invoiceTripPickCancel">Bỏ qua</button>
+        <button type="button" class="btn primary" id="invoiceTripPickSubmit">Thêm vào chuyến</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="invoiceTripEditOverlay" class="invoice-trip-nested-overlay">
+    <div class="invoice-merge-modal" style="width:min(480px,calc(100vw - 24px))" role="dialog" aria-labelledby="invoiceTripEditTitle" aria-modal="true">
+      <div class="invoice-merge-head">
+        <h3 id="invoiceTripEditTitle">Đổi chuyến xe</h3>
+        <button type="button" class="invoice-merge-close" id="invoiceTripEditClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-merge-body">
+        <p class="invoice-merge-desc" id="invoiceTripEditDesc">Chọn cách đổi chuyến cho hóa đơn đã chọn.</p>
+        <div class="invoice-trip-actions" style="justify-content:stretch;margin-top:0">
+          <button type="button" class="btn" id="invoiceTripEditPickBtn" style="flex:1;justify-content:center">Đổi sang chuyến có sẵn</button>
+          <button type="button" class="btn primary" id="invoiceTripEditCreateBtn" style="flex:1;justify-content:center">Tạo chuyến xe mới</button>
+        </div>
+      </div>
+      <div class="invoice-merge-foot" style="display:flex">
+        <button type="button" class="btn" id="invoiceTripEditCancel">Bỏ qua</button>
+      </div>
+    </div>
+  </div>
+
   <div id="invoiceReceiptPayModal" class="po-modal" role="dialog" aria-labelledby="invoiceReceiptPayTitle">
     <div class="po-modal-card">
       <div class="po-modal-head">
@@ -1388,6 +1600,462 @@
           if (e.key === 'Escape' && overlay && overlay.classList.contains('is-open')) closeTrashModal();
         });
         updateDeleteButtonState();
+      })();
+
+      (function initInvoiceTripModal() {
+        const openBtn = document.getElementById('openInvoiceTripModal');
+        const overlay = document.getElementById('invoiceTripModalOverlay');
+        const closeBtn = document.getElementById('invoiceTripModalClose');
+        const cancelBtn = document.getElementById('invoiceTripCancel');
+        const withRows = document.getElementById('invoiceTripWithRows');
+        const withoutRows = document.getElementById('invoiceTripWithoutRows');
+        const withEmpty = document.getElementById('invoiceTripWithEmpty');
+        const withoutEmpty = document.getElementById('invoiceTripWithoutEmpty');
+        const withoutFoot = document.getElementById('invoiceTripWithoutFoot');
+        const checkAll = document.getElementById('invoiceTripCheckAll');
+        const createBtn = document.getElementById('invoiceTripCreateBtn');
+        const pickBtn = document.getElementById('invoiceTripPickExistingBtn');
+        const createOverlay = document.getElementById('invoiceTripCreateOverlay');
+        const pickOverlay = document.getElementById('invoiceTripPickOverlay');
+        const editOverlay = document.getElementById('invoiceTripEditOverlay');
+        const partnerSelect = document.getElementById('tripCreatePartner');
+        const pickRows = document.getElementById('invoiceTripPickRows');
+        const pickEmpty = document.getElementById('invoiceTripPickEmpty');
+        let tripState = { without: [], with: [], trips: [], partners: [] };
+        let selectedTripId = '';
+        let editInvoiceIds = null;
+        let editExcludeTripId = '';
+        const TRIP_STATUS_OPTIONS = [
+          { value: 'draft', label: 'Nháp' },
+          { value: 'dang_giao', label: 'Đang giao' },
+          { value: 'hoan_thanh', label: 'Hoàn thành' },
+          { value: 'huy', label: 'Hủy' }
+        ];
+
+        function tripStatusLabel(status) {
+          const found = TRIP_STATUS_OPTIONS.find(item => item.value === status);
+          return found ? found.label : 'Nháp';
+        }
+
+        function renderTripStatusSelect(tripId, currentStatus) {
+          if (!tripId) return '';
+          const status = currentStatus || 'draft';
+          return '<select class="invoice-trip-status-select" data-trip-id="' + escapeHtml(tripId) + '" data-prev-status="' + escapeHtml(status) + '">' +
+            TRIP_STATUS_OPTIONS.map(function(opt) {
+              return '<option value="' + opt.value + '"' + (opt.value === status ? ' selected' : '') + '>' + opt.label + '</option>';
+            }).join('') +
+            '</select>';
+        }
+
+        function escapeHtml(value) {
+          return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        function formatDateTime(value) {
+          if (!value) return '';
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return '';
+          return date.toLocaleString('vi-VN');
+        }
+
+        function isEditMode() {
+          return Array.isArray(editInvoiceIds) && editInvoiceIds.length > 0;
+        }
+
+        function clearEditMode() {
+          editInvoiceIds = null;
+          editExcludeTripId = '';
+        }
+
+        function workingInvoiceIds() {
+          if (isEditMode()) return editInvoiceIds.slice();
+          return Array.from(document.querySelectorAll('.invoice-trip-row-check:checked'))
+            .map(cb => cb.value)
+            .filter(Boolean);
+        }
+
+        function updateCheckAll() {
+          if (!checkAll) return;
+          const checks = Array.from(document.querySelectorAll('.invoice-trip-row-check'));
+          checkAll.checked = checks.length > 0 && checks.every(cb => cb.checked);
+          checkAll.indeterminate = checks.some(cb => cb.checked) && !checkAll.checked;
+        }
+
+        function switchTab(tab) {
+          document.querySelectorAll('[data-trip-tab]').forEach(btn => {
+            btn.classList.toggle('is-active', btn.dataset.tripTab === tab);
+          });
+          document.querySelectorAll('[data-trip-pane]').forEach(pane => {
+            pane.classList.toggle('is-active', pane.dataset.tripPane === tab);
+          });
+        }
+
+        function renderLists() {
+          const withList = tripState.with || [];
+          const withoutList = tripState.without || [];
+          if (withRows) {
+            withRows.innerHTML = withList.map(item => `
+              <tr>
+                <td>${escapeHtml(item.ma_hoa_don)}</td>
+                <td>${escapeHtml(formatDateTime(item.ngay_ban))}</td>
+                <td>${escapeHtml(item.ma_khach_hang)}</td>
+                <td>${escapeHtml(item.ten_khach_hang)}</td>
+                <td>${escapeHtml(item.ma_chuyen)}</td>
+                <td>${escapeHtml(item.ten_doi_tac)}</td>
+                <td>${escapeHtml(formatDateTime(item.ngay_gio_xuat_phat))}</td>
+                <td>${renderTripStatusSelect(item.chuyen_xe_id, item.trang_thai_chuyen || 'draft')}</td>
+                <td class="num">${moneyText(item.tong_tien)}</td>
+                <td>
+                  <button type="button" class="btn invoice-trip-edit-btn" data-invoice-id="${escapeHtml(item.id)}" data-trip-id="${escapeHtml(item.chuyen_xe_id || '')}" data-invoice-code="${escapeHtml(item.ma_hoa_don || '')}">
+                    <i class="fa-regular fa-pen-to-square"></i> Sửa
+                  </button>
+                </td>
+              </tr>
+            `).join('');
+            withRows.querySelectorAll('.invoice-trip-edit-btn').forEach(btn => {
+              btn.addEventListener('click', function() {
+                openEditChoice(this.dataset.invoiceId, this.dataset.tripId, this.dataset.invoiceCode);
+              });
+            });
+            withRows.querySelectorAll('.invoice-trip-status-select').forEach(function(selectEl) {
+              selectEl.addEventListener('change', function() {
+                updateTripStatus(this);
+              });
+            });
+          }
+          if (withEmpty) withEmpty.style.display = withList.length ? 'none' : 'flex';
+
+          if (withoutRows) {
+            withoutRows.innerHTML = withoutList.map(item => `
+              <tr>
+                <td class="invoice-merge-check"><input class="invoice-trip-row-check" type="checkbox" value="${escapeHtml(item.id)}"></td>
+                <td>${escapeHtml(item.ma_hoa_don)}</td>
+                <td>${escapeHtml(formatDateTime(item.ngay_ban))}</td>
+                <td>${escapeHtml(item.ma_khach_hang)}</td>
+                <td>${escapeHtml(item.ten_khach_hang)}</td>
+                <td class="num">${moneyText(item.tong_tien)}</td>
+                <td class="num">${moneyText(item.con_no)}</td>
+              </tr>
+            `).join('');
+          }
+          if (withoutEmpty) withoutEmpty.style.display = withoutList.length ? 'none' : 'flex';
+          if (withoutFoot) withoutFoot.style.display = withoutList.length ? 'flex' : 'none';
+          updateCheckAll();
+          document.querySelectorAll('.invoice-trip-row-check').forEach(cb => {
+            cb.addEventListener('change', updateCheckAll);
+          });
+        }
+
+        function fillPartners() {
+          if (!partnerSelect) return;
+          const current = partnerSelect.value;
+          partnerSelect.innerHTML = '<option value="">— Chọn nhà xe —</option>' +
+            (tripState.partners || []).map(item =>
+              `<option value="${escapeHtml(item.id)}">${escapeHtml(item.ten_doi_tac || item.ma_doi_tac || '')}</option>`
+            ).join('');
+          partnerSelect.value = current || '';
+        }
+
+        function renderTripPickRows() {
+          const trips = (tripState.trips || []).filter(item => {
+            if (item.trang_thai === 'hoan_thanh' || item.trang_thai === 'huy') return false;
+            if (editExcludeTripId && item.id === editExcludeTripId) return false;
+            return true;
+          });
+          selectedTripId = '';
+          if (pickRows) {
+            pickRows.innerHTML = trips.map(item => `
+              <tr>
+                <td class="invoice-merge-check"><input type="radio" name="invoiceTripPickRadio" value="${escapeHtml(item.id)}"></td>
+                <td>${escapeHtml(item.ma_chuyen)}</td>
+                <td>${escapeHtml(item.ten_doi_tac)}</td>
+                <td>${escapeHtml(formatDateTime(item.ngay_gio_xuat_phat))}</td>
+                <td>${escapeHtml(item.tai_xe_ten)}</td>
+                <td>${escapeHtml(item.tai_xe_sdt)}</td>
+                <td>${escapeHtml(item.bien_so_xe)}</td>
+                <td>${escapeHtml(item.tuyen)}</td>
+                <td>${escapeHtml(item.trang_thai_text)}</td>
+              </tr>
+            `).join('');
+          }
+          if (pickEmpty) pickEmpty.style.display = trips.length ? 'none' : 'flex';
+          document.querySelectorAll('input[name="invoiceTripPickRadio"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+              selectedTripId = this.value || '';
+            });
+          });
+        }
+
+        async function loadCandidates() {
+          const res = await fetch('/api/don-hang/chuyen-xe/hoa-don-candidates', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin'
+          });
+          const json = await res.json();
+          if (!json.success) throw new Error(json.message || 'Không tải được danh sách hóa đơn.');
+          tripState = {
+            without: json.data?.without_trip || [],
+            with: json.data?.with_trip || [],
+            trips: json.data?.trips || [],
+            partners: json.data?.partners || []
+          };
+          renderLists();
+          fillPartners();
+        }
+
+        async function updateTripStatus(selectEl) {
+          const tripId = selectEl.dataset.tripId || '';
+          const newStatus = selectEl.value || '';
+          const prevStatus = selectEl.dataset.prevStatus || newStatus;
+          if (!tripId || !newStatus || newStatus === prevStatus) return;
+          selectEl.disabled = true;
+          try {
+            const res = await fetch('/api/don-hang/chuyen-xe/' + encodeURIComponent(tripId) + '/trang-thai', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ trang_thai: newStatus })
+            });
+            const json = await res.json();
+            if (!json.success) {
+              selectEl.value = prevStatus;
+              return alert(json.message || 'Không cập nhật được trạng thái chuyến.');
+            }
+            const label = tripStatusLabel(newStatus);
+            document.querySelectorAll('.invoice-trip-status-select[data-trip-id="' + tripId + '"]').forEach(function(el) {
+              el.value = newStatus;
+              el.dataset.prevStatus = newStatus;
+            });
+            (tripState.with || []).forEach(function(item) {
+              if (item.chuyen_xe_id === tripId) {
+                item.trang_thai_chuyen = newStatus;
+                item.trang_thai_chuyen_text = label;
+              }
+            });
+            (tripState.trips || []).forEach(function(item) {
+              if (item.id === tripId) {
+                item.trang_thai = newStatus;
+                item.trang_thai_text = label;
+              }
+            });
+          } catch (error) {
+            selectEl.value = prevStatus;
+            alert('Không cập nhật được trạng thái chuyến.');
+          } finally {
+            selectEl.disabled = false;
+          }
+        }
+
+        function openEditChoice(invoiceId, tripId, invoiceCode) {
+          if (!invoiceId) return;
+          editInvoiceIds = [invoiceId];
+          editExcludeTripId = tripId || '';
+          const desc = document.getElementById('invoiceTripEditDesc');
+          if (desc) {
+            desc.innerHTML = 'Đổi chuyến cho hóa đơn <strong>' + escapeHtml(invoiceCode || '') + '</strong>.';
+          }
+          if (editOverlay) editOverlay.classList.add('is-open');
+        }
+
+        function closeEditChoice() {
+          if (editOverlay) editOverlay.classList.remove('is-open');
+        }
+
+        function openCreateModal() {
+          const ids = workingInvoiceIds();
+          if (!ids.length) return alert('Vui lòng chọn ít nhất 1 hóa đơn.');
+          fillPartners();
+          document.getElementById('invoiceTripCreateForm')?.reset();
+          document.getElementById('tripCreateStatus').value = 'draft';
+          const title = document.getElementById('invoiceTripCreateTitle');
+          if (title) title.textContent = isEditMode() ? 'Tạo chuyến xe mới (đổi chuyến)' : 'Tạo chuyến xe mới';
+          if (createOverlay) createOverlay.classList.add('is-open');
+        }
+
+        function closeCreateModal() {
+          if (createOverlay) createOverlay.classList.remove('is-open');
+          if (!pickOverlay?.classList.contains('is-open') && !editOverlay?.classList.contains('is-open')) {
+            // keep editInvoiceIds until flow finishes; cleared after success
+          }
+        }
+
+        function openPickModal() {
+          const ids = workingInvoiceIds();
+          if (!ids.length) return alert('Vui lòng chọn ít nhất 1 hóa đơn.');
+          renderTripPickRows();
+          const title = document.getElementById('invoiceTripPickTitle');
+          if (title) title.textContent = isEditMode() ? 'Đổi sang chuyến xe có sẵn' : 'Chọn chuyến xe có sẵn';
+          const submitLabel = document.getElementById('invoiceTripPickSubmit');
+          if (submitLabel) submitLabel.textContent = isEditMode() ? 'Đổi chuyến' : 'Thêm vào chuyến';
+          if (pickOverlay) pickOverlay.classList.add('is-open');
+        }
+
+        function closePickModal() {
+          if (pickOverlay) pickOverlay.classList.remove('is-open');
+          selectedTripId = '';
+        }
+
+        async function submitCreateTrip() {
+          const ids = workingInvoiceIds();
+          if (!ids.length) return alert('Vui lòng chọn ít nhất 1 hóa đơn.');
+          const partnerId = partnerSelect?.value || '';
+          if (!partnerId) return alert('Vui lòng chọn nhà xe.');
+          const submitBtn = document.getElementById('invoiceTripCreateSubmit');
+          if (submitBtn) submitBtn.disabled = true;
+          const editing = isEditMode();
+          try {
+            const res = await fetch('/api/don-hang/chuyen-xe', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                doi_tac_giao_hang_id: partnerId,
+                ngay_gio_xuat_phat: document.getElementById('tripCreateDepart')?.value || '',
+                ngay_gio_du_kien_ve: document.getElementById('tripCreateEta')?.value || '',
+                tai_xe_ten: document.getElementById('tripCreateDriver')?.value || '',
+                tai_xe_sdt: document.getElementById('tripCreateDriverPhone')?.value || '',
+                bien_so_xe: document.getElementById('tripCreatePlate')?.value || '',
+                tuyen: document.getElementById('tripCreateRoute')?.value || '',
+                trang_thai: document.getElementById('tripCreateStatus')?.value || 'draft',
+                ghi_chu: document.getElementById('tripCreateNote')?.value || '',
+                hoa_don_ids: ids,
+                allow_reassign: editing
+              })
+            });
+            const json = await res.json();
+            if (!json.success) return alert(json.message || 'Không tạo được chuyến xe.');
+            closeCreateModal();
+            closeEditChoice();
+            clearEditMode();
+            await loadCandidates();
+            switchTab('with');
+            alert(editing ? 'Đã đổi sang chuyến xe mới.' : 'Đã tạo chuyến xe và gắn hóa đơn.');
+          } catch (error) {
+            alert('Không tạo được chuyến xe.');
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        }
+
+        async function submitPickTrip() {
+          const ids = workingInvoiceIds();
+          if (!ids.length) return alert('Vui lòng chọn ít nhất 1 hóa đơn.');
+          if (!selectedTripId) return alert('Vui lòng chọn 1 chuyến xe.');
+          const submitBtn = document.getElementById('invoiceTripPickSubmit');
+          if (submitBtn) submitBtn.disabled = true;
+          const editing = isEditMode();
+          try {
+            const res = await fetch('/api/don-hang/chuyen-xe/' + encodeURIComponent(selectedTripId) + '/assign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ hoa_don_ids: ids, allow_reassign: editing })
+            });
+            const json = await res.json();
+            if (!json.success) return alert(json.message || 'Không thêm được vào chuyến xe.');
+            closePickModal();
+            closeEditChoice();
+            clearEditMode();
+            await loadCandidates();
+            switchTab('with');
+            alert(editing ? 'Đã đổi chuyến xe cho hóa đơn.' : 'Đã thêm hóa đơn vào chuyến xe.');
+          } catch (error) {
+            alert('Không thêm được vào chuyến xe.');
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        }
+
+        async function openModal() {
+          if (!overlay) return;
+          clearEditMode();
+          switchTab('with');
+          overlay.style.display = 'flex';
+          if (withRows) withRows.innerHTML = '<tr><td colspan="10">Đang tải...</td></tr>';
+          if (withoutRows) withoutRows.innerHTML = '<tr><td colspan="7">Đang tải...</td></tr>';
+          try {
+            await loadCandidates();
+          } catch (error) {
+            alert(error.message || 'Không tải được dữ liệu chuyến xe.');
+            overlay.style.display = 'none';
+          }
+        }
+
+        function closeModal() {
+          if (overlay) overlay.style.display = 'none';
+          closeCreateModal();
+          closePickModal();
+          closeEditChoice();
+          clearEditMode();
+        }
+
+        document.querySelectorAll('[data-trip-tab]').forEach(btn => {
+          btn.addEventListener('click', function() {
+            switchTab(this.dataset.tripTab);
+          });
+        });
+        if (openBtn) openBtn.addEventListener('click', openModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+        if (checkAll) {
+          checkAll.addEventListener('change', function() {
+            document.querySelectorAll('.invoice-trip-row-check').forEach(cb => {
+              cb.checked = checkAll.checked;
+            });
+            updateCheckAll();
+          });
+        }
+        if (createBtn) createBtn.addEventListener('click', function() {
+          clearEditMode();
+          openCreateModal();
+        });
+        if (pickBtn) pickBtn.addEventListener('click', function() {
+          clearEditMode();
+          openPickModal();
+        });
+        document.getElementById('invoiceTripCreateClose')?.addEventListener('click', closeCreateModal);
+        document.getElementById('invoiceTripCreateCancel')?.addEventListener('click', closeCreateModal);
+        document.getElementById('invoiceTripCreateSubmit')?.addEventListener('click', submitCreateTrip);
+        document.getElementById('invoiceTripPickClose')?.addEventListener('click', closePickModal);
+        document.getElementById('invoiceTripPickCancel')?.addEventListener('click', closePickModal);
+        document.getElementById('invoiceTripPickSubmit')?.addEventListener('click', submitPickTrip);
+        document.getElementById('invoiceTripEditClose')?.addEventListener('click', function() {
+          closeEditChoice();
+          clearEditMode();
+        });
+        document.getElementById('invoiceTripEditCancel')?.addEventListener('click', function() {
+          closeEditChoice();
+          clearEditMode();
+        });
+        document.getElementById('invoiceTripEditPickBtn')?.addEventListener('click', function() {
+          closeEditChoice();
+          openPickModal();
+        });
+        document.getElementById('invoiceTripEditCreateBtn')?.addEventListener('click', function() {
+          closeEditChoice();
+          openCreateModal();
+        });
+        document.addEventListener('keydown', function(e) {
+          if (e.key !== 'Escape') return;
+          if (createOverlay?.classList.contains('is-open')) {
+            closeCreateModal();
+            return;
+          }
+          if (pickOverlay?.classList.contains('is-open')) {
+            closePickModal();
+            return;
+          }
+          if (editOverlay?.classList.contains('is-open')) {
+            closeEditChoice();
+            clearEditMode();
+            return;
+          }
+          if (overlay?.style.display === 'flex') closeModal();
+        });
       })();
 
       const invoiceId = new URLSearchParams(window.location.search).get('invoice');

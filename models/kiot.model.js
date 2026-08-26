@@ -1394,6 +1394,15 @@ const VanDonSchema = new Schema({
   cod_enabled: { type: Boolean, default: false },
   cod_amount: { type: Number, default: 0 },
   trang_thai_cod: { type: String, enum: ['khong_cod', 'chua_thu', 'da_thu', 'da_doi_soat'], default: 'khong_cod' },
+  chuyen_xe_id: {
+    type: ObjectId,
+    ref: 'ChuyenXe',
+    default: null
+  },
+  thu_tu_giao: {
+    type: Number,
+    default: null
+  },
   trang_thai: { type: String, enum: ['draft', 'shipping', 'completed', 'cancelled'], default: 'draft' },
   ghi_chu: { type: String }
 }, { collection: "van_don", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
@@ -1402,6 +1411,86 @@ VanDonSchema.index(
 );
 VanDonSchema.index(
   { doi_tac_giao_hang_id: 1, trang_thai: 1 }
+);
+VanDonSchema.index(
+  { chuyen_xe_id: 1, thu_tu_giao: 1 }
+);
+
+// CHUYEN_XE — chuyến giao của nhà xe (gom nhiều vận đơn)
+const ChuyenXeSchema = new Schema({
+  ma_chuyen: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  cua_hang_id: {
+    type: ObjectId,
+    ref: 'CuaHang',
+    required: true,
+    index: true
+  },
+  doi_tac_giao_hang_id: {
+    type: ObjectId,
+    ref: 'DoiTacGiaoHang',
+    required: true,
+    index: true
+  },
+  ngay_gio_xuat_phat: {
+    type: Date,
+    default: null
+  },
+  ngay_gio_du_kien_ve: {
+    type: Date,
+    default: null
+  },
+  ngay_gio_ket_thuc: {
+    type: Date,
+    default: null
+  },
+  tai_xe_ten: {
+    type: String,
+    default: ''
+  },
+  tai_xe_sdt: {
+    type: String,
+    default: ''
+  },
+  bien_so_xe: {
+    type: String,
+    default: ''
+  },
+  tuyen: {
+    type: String,
+    default: ''
+  },
+  trang_thai: {
+    type: String,
+    enum: ['draft', 'dang_giao', 'hoan_thanh', 'huy'],
+    default: 'draft',
+    index: true
+  },
+  trang_thai_du_lieu: {
+    type: String,
+    enum: ['active', 'inactive'],
+    default: 'active',
+    index: true
+  },
+  ghi_chu: {
+    type: String,
+    default: ''
+  }
+}, {
+  collection: 'chuyen_xe',
+  timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
+});
+ChuyenXeSchema.index(
+  { doi_tac_giao_hang_id: 1, trang_thai: 1, ngay_gio_xuat_phat: -1 }
+);
+ChuyenXeSchema.index(
+  { cua_hang_id: 1, trang_thai: 1, ngay_gio_xuat_phat: -1 }
+);
+ChuyenXeSchema.index(
+  { cua_hang_id: 1, trang_thai_du_lieu: 1, ngay_gio_xuat_phat: -1 }
 );
 
 const GopDonHangSchema = new Schema({
@@ -2799,6 +2888,7 @@ const CTHoaDonBanHang = mongoose.models.CTHoaDonBanHang || mongoose.model("CTHoa
 const DoiTacGiaoHang = mongoose.models.DoiTacGiaoHang || mongoose.model("DoiTacGiaoHang", DoiTacGiaoHangSchema);
 const BangGiaVanChuyen = mongoose.models.BangGiaVanChuyen || mongoose.model("BangGiaVanChuyen", BangGiaVanChuyenSchema);
 const VanDon = mongoose.models.VanDon || mongoose.model("VanDon", VanDonSchema);
+const ChuyenXe = mongoose.models.ChuyenXe || mongoose.model("ChuyenXe", ChuyenXeSchema);
 const GopDonHang = mongoose.models.GopDonHang || mongoose.model("GopDonHang", GopDonHangSchema);
 const GopHoaDon = mongoose.models.GopHoaDon || mongoose.model("GopHoaDon", GopHoaDonSchema);
 const GopPhieuNhap = mongoose.models.GopPhieuNhap || mongoose.model("GopPhieuNhap", GopPhieuNhapSchema);
@@ -2858,7 +2948,7 @@ module.exports = {
   BangGia, CTBangGia, GiaBanHangHoa, TonKho, LoHang, TonKhoLo, TonKhoLoQuyCach,
   PhieuNhap, CTPhieuNhap, PhieuTraHangNhap, CTPhieuTraHangNhap,
   DonHang, CTDonHang,
-  HoaDonBanHang, CTHoaDonBanHang, DoiTacGiaoHang, BangGiaVanChuyen, VanDon, GopDonHang, GopHoaDon, GopPhieuNhap,
+  HoaDonBanHang, CTHoaDonBanHang, DoiTacGiaoHang, BangGiaVanChuyen, VanDon, ChuyenXe, GopDonHang, GopHoaDon, GopPhieuNhap,
   PhieuTraHang, CTPhieuTraHang,
   PhieuKiemKho, CTPhieuKiemKho,
   SoQuy, PhieuThuChi,
