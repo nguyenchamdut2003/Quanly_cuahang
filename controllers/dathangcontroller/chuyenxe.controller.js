@@ -288,7 +288,8 @@ exports.createChuyenXe = async function(req, res, next) {
             ma_chuyen: await generateChuyenXeCode(),
             cua_hang_id: storeId,
             doi_tac_giao_hang_id: partnerId,
-            ngay_gio_xuat_phat: parseDateInput(body.ngay_gio_xuat_phat),
+            ngay_gio_xuat_phat: parseDateInput(body.ngay_gio_xuat_phat)
+                || (trangThai === 'dang_giao' ? new Date() : null),
             ngay_gio_du_kien_ve: parseDateInput(body.ngay_gio_du_kien_ve),
             ngay_gio_ket_thuc: parseDateInput(body.ngay_gio_ket_thuc),
             tai_xe_ten: String(body.tai_xe_ten || '').trim(),
@@ -362,6 +363,99 @@ exports.assignHoaDonToChuyenXe = async function(req, res, next) {
         if (error.status === 400) {
             return res.status(400).json({ success: false, message: error.message });
         }
+        next(error);
+    }
+};
+
+exports.unassignHoaDonFromChuyenXe = async function(req, res, next) {
+    try {
+        const storeId = await resolveStoreId(req);
+        const hoaDonIds = Array.isArray((req.body || {}).hoa_don_ids)
+            ? (req.body || {}).hoa_don_ids.map(String).filter(isValidObjectId)
+            : [];
+        if (!hoaDonIds.length) {
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 hóa đơn.' });
+        }
+
+        const invoiceFilter = {
+            _id: { $in: hoaDonIds },
+            trang_thai_du_lieu: 'active'
+        };
+        if (storeId) invoiceFilter.cua_hang_id = storeId;
+
+        const invoices = await HoaDonBanHang.find(invoiceFilter).select('_id don_hang_id ma_hoa_don').lean();
+        if (!invoices.length) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn.' });
+        }
+
+        const removed = [];
+        for (const invoice of invoices) {
+            const shipment = await VanDon.findOne({
+                $or: [
+                    { hoa_don_id: invoice._id },
+                    ...(invoice.don_hang_id ? [{ don_hang_id: invoice.don_hang_id }] : [])
+                ],
+                chuyen_xe_id: { $ne: null }
+            });
+            if (!shipment) continue;
+
+            shipment.chuyen_xe_id = null;
+            shipment.thu_tu_giao = null;
+            await shipment.save();
+            removed.push({
+                hoa_don_id: String(invoice._id),
+                ma_hoa_don: invoice.ma_hoa_don || '',
+                van_don_id: String(shipment._id),
+                ma_van_don: shipment.ma_van_don || ''
+            });
+        }
+
+        res.json({
+            success: true,
+            message: removed.length
+                ? 'Đã bỏ hóa đơn khỏi chuyến xe.'
+                : 'Hóa đơn không thuộc chuyến xe nào.',
+            data: { removed }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateChuyenXe = async function(req, res, next) {
+    try {
+        const storeId = await resolveStoreId(req);
+        const tripId = String(req.params.id || '').trim();
+        if (!isValidObjectId(tripId)) {
+            return res.status(400).json({ success: false, message: 'Chuyến xe không hợp lệ.' });
+        }
+
+        const trip = await ChuyenXe.findOne({
+            _id: tripId,
+            ...(storeId ? { cua_hang_id: storeId } : {}),
+            trang_thai_du_lieu: 'active'
+        });
+        if (!trip) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy chuyến xe.' });
+        }
+
+        const body = req.body || {};
+        trip.ngay_gio_xuat_phat = parseDateInput(body.ngay_gio_xuat_phat);
+        trip.ngay_gio_du_kien_ve = parseDateInput(body.ngay_gio_du_kien_ve);
+        trip.ngay_gio_ket_thuc = parseDateInput(body.ngay_gio_ket_thuc);
+        trip.tai_xe_ten = String(body.tai_xe_ten || '').trim();
+        await trip.save();
+
+        const populated = await ChuyenXe.findById(trip._id)
+            .populate('doi_tac_giao_hang_id', 'ma_doi_tac ten_doi_tac')
+            .lean();
+
+        res.json({
+            success: true,
+            message: 'Đã cập nhật chuyến xe.',
+            data: formatTripRow(populated)
+        });
+    } catch (error) {
         next(error);
     }
 };

@@ -130,6 +130,33 @@
     .invoice-trip-nested-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1500;align-items:flex-start;justify-content:center;padding:7px 12px}
     .invoice-trip-nested-overlay.is-open{display:flex}
     .invoice-trip-status-select{height:30px;min-width:118px;max-width:100%;border:1px solid #cfd8e3;border-radius:6px;padding:0 8px;font-size:12px;background:#fff;color:#111827}
+    .invoice-trip-list{display:flex;flex-direction:column;gap:10px;width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+    .invoice-trip-cols{display:grid;grid-template-columns:28px 88px minmax(0,1.1fr) minmax(0,.95fr) minmax(0,.95fr) minmax(0,.95fr) minmax(0,.8fr) 118px 72px;gap:8px;align-items:center;width:100%;max-width:100%;box-sizing:border-box;min-width:0}
+    .invoice-trip-edit-trip-btn{height:30px;padding:0 10px;font-size:12px;white-space:nowrap}
+    .invoice-trip-list-head{padding:0 12px 4px;font-size:12px;font-weight:700;color:#64748b}
+    .invoice-trip-list-head span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .invoice-trip-card{border:1px solid #e5e9ee;border-radius:8px;background:#fff;overflow:hidden;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+    .invoice-trip-card.is-open{border-color:#93c5fd;box-shadow:0 0 0 1px #dbeafe}
+    .invoice-trip-card-head{padding:10px 12px;cursor:pointer;background:#f8fafc}
+    .invoice-trip-card-head:hover{background:#f1f5f9}
+    .invoice-trip-card-head .trip-toggle{width:22px;height:22px;border:0;background:transparent;color:#64748b;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .invoice-trip-card.is-open .trip-toggle i{transform:rotate(90deg)}
+    .invoice-trip-card-head .trip-code{font-weight:800;color:#0f172a;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .invoice-trip-card-head .trip-meta{font-size:12px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+    .invoice-trip-card-head .trip-count{font-size:12px;font-weight:700;color:#0369a1;white-space:nowrap}
+    .invoice-trip-card-body{display:none;padding:0 12px 12px;border-top:1px solid #e5e9ee;background:#fff;width:100%;max-width:100%;box-sizing:border-box;overflow-x:auto;min-width:0}
+    .invoice-trip-card.is-open .invoice-trip-card-body{display:block}
+    .invoice-trip-card-body .invoice-merge-table{margin-top:10px;width:100%;max-width:100%;table-layout:fixed}
+    .invoice-trip-main-modal{width:1100px!important;max-width:calc(100vw - 24px)!important;min-width:0!important;flex:0 1 1100px;height:auto!important;min-height:0!important;max-height:calc(100vh - 28px)!important;resize:none;overflow-x:hidden!important;box-sizing:border-box}
+    .invoice-trip-main-modal .invoice-merge-head,.invoice-trip-main-modal .invoice-merge-foot{flex:0 0 auto;width:100%;max-width:100%;box-sizing:border-box}
+    .invoice-trip-main-modal .invoice-merge-body{flex:1 1 auto;min-width:0;width:100%;max-width:100%;box-sizing:border-box;overflow-x:hidden;overflow-y:auto;display:block;padding-bottom:16px}
+    .invoice-trip-main-modal .invoice-merge-foot{display:flex!important}
+    .invoice-trip-main-modal .invoice-trip-tabs{flex:0 0 auto;width:100%;max-width:100%}
+    .invoice-trip-pane.is-active{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+    .invoice-trip-pane[data-trip-pane="without"] .invoice-trip-without-scroll{overflow:auto;max-height:min(420px,calc(100vh - 260px));width:100%;max-width:100%}
+    .invoice-trip-pane[data-trip-pane="without"] .invoice-merge-empty{min-height:180px}
+    .invoice-trip-pane[data-trip-pane="without"] .invoice-trip-actions{margin-top:12px}
+    .invoice-trip-detail-scroll{width:100%;max-width:100%;overflow-x:auto;min-width:0;box-sizing:border-box}
   </style>
 </head>
 <body>
@@ -182,17 +209,7 @@
         <div class="toolbar">
           <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input name="q" value="<%= safeFilters.q || '' %>" placeholder="Theo mã hóa đơn"><button type="submit"><i class="fa-solid fa-sliders"></i></button></div>
           <div class="actions">
-            <div class="dropdown" id="createDropdown">
-              <button class="btn primary" type="button" onclick="toggleCreateMenu(event)">
-                <i class="fa-solid fa-plus">
-                </i> 
-                Tạo mới 
-                <i class="fa-solid fa-chevron-down">
-                </i>
-              </button>
-              <div class="dropdown-menu">
-                <span class="dropdown-item disabled">Vận đơn KShip</span>
-                <a class="dropdown-item" href="/don-hang/hoa-don/create">Hóa đơn</a></div></div>
+            <a href="/don-hang/hoa-don/create" class="btn primary"><i class="fa-solid fa-plus"></i> Tạo mới</a>
             <button type="button" class="btn" id="openInvoiceMergeModal"><i class="fa-regular fa-copy"></i> Gộp đơn</button>
             <button type="button" class="btn" id="openInvoiceTripModal"><i class="fa-solid fa-truck"></i> Thêm chuyến xe</button>
             <a href="/don-hang/hoa-don/export.xlsx<%= exportQuery ? '?' + exportQuery : '' %>" class="btn"><i class="fa-solid fa-file-export"></i> Xuất file <i class="fa-solid fa-chevron-down"></i></a>
@@ -308,44 +325,26 @@
   </div>
 
   <div id="invoiceTripModalOverlay" class="invoice-merge-overlay">
-    <div class="invoice-merge-modal" role="dialog" aria-labelledby="invoiceTripModalTitle" aria-modal="true">
+    <div class="invoice-merge-modal invoice-trip-main-modal" role="dialog" aria-labelledby="invoiceTripModalTitle" aria-modal="true">
       <div class="invoice-merge-head">
         <h3 id="invoiceTripModalTitle">Thêm chuyến xe</h3>
         <button type="button" class="invoice-merge-close" id="invoiceTripModalClose" aria-label="Đóng">×</button>
       </div>
       <div class="invoice-merge-body">
         <div class="invoice-trip-tabs" role="tablist">
-          <button type="button" class="invoice-trip-tab is-active" data-trip-tab="with">Hóa đơn đã có chuyến xe</button>
+          <button type="button" class="invoice-trip-tab is-active" data-trip-tab="with">Các chuyến xe</button>
           <button type="button" class="invoice-trip-tab" data-trip-tab="without">Hóa đơn chưa có chuyến xe</button>
         </div>
         <div class="invoice-trip-pane is-active" data-trip-pane="with">
-          <div style="overflow:auto">
-            <table class="invoice-merge-table">
-              <thead>
-                <tr>
-                  <th>Mã hóa đơn</th>
-                  <th>Thời gian</th>
-                  <th>Mã KH</th>
-                  <th>Khách hàng</th>
-                  <th>Mã chuyến</th>
-                  <th>Nhà xe</th>
-                  <th>Xuất phát</th>
-                  <th>Trạng thái chuyến</th>
-                  <th class="num">Tổng tiền</th>
-                  <th>Thao tác</th>
-                </tr>
-              </thead>
-              <tbody id="invoiceTripWithRows"></tbody>
-            </table>
-          </div>
+          <div id="invoiceTripList" class="invoice-trip-list"></div>
           <div id="invoiceTripWithEmpty" class="invoice-merge-empty" style="display:none">
             <div class="empty-icon"><i class="fa-regular fa-inbox"></i></div>
-            <strong>Chưa có hóa đơn thuộc chuyến xe</strong>
-            <span>Các hóa đơn đã gắn chuyến sẽ hiện ở đây.</span>
+            <strong>Chưa có chuyến xe</strong>
+            <span>Tạo chuyến từ tab hóa đơn chưa có chuyến, hoặc thêm chuyến mới.</span>
           </div>
         </div>
         <div class="invoice-trip-pane" data-trip-pane="without">
-          <div style="overflow:auto">
+          <div class="invoice-trip-without-scroll">
             <table class="invoice-merge-table">
               <thead>
                 <tr>
@@ -482,13 +481,48 @@
       </div>
       <div class="invoice-merge-body">
         <p class="invoice-merge-desc" id="invoiceTripEditDesc">Chọn cách đổi chuyến cho hóa đơn đã chọn.</p>
-        <div class="invoice-trip-actions" style="justify-content:stretch;margin-top:0">
-          <button type="button" class="btn" id="invoiceTripEditPickBtn" style="flex:1;justify-content:center">Đổi sang chuyến có sẵn</button>
-          <button type="button" class="btn primary" id="invoiceTripEditCreateBtn" style="flex:1;justify-content:center">Tạo chuyến xe mới</button>
+        <div class="invoice-trip-actions" style="justify-content:stretch;margin-top:0;flex-direction:column">
+          <button type="button" class="btn" id="invoiceTripEditPickBtn" style="width:100%;justify-content:center">Đổi sang chuyến có sẵn</button>
+          <button type="button" class="btn primary" id="invoiceTripEditCreateBtn" style="width:100%;justify-content:center">Tạo chuyến xe mới</button>
+          <button type="button" class="btn danger" id="invoiceTripEditUnassignBtn" style="width:100%;justify-content:center">Bỏ khỏi chuyến</button>
         </div>
       </div>
       <div class="invoice-merge-foot" style="display:flex">
         <button type="button" class="btn" id="invoiceTripEditCancel">Bỏ qua</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="invoiceTripInfoEditOverlay" class="invoice-trip-nested-overlay">
+    <div class="invoice-merge-modal" style="width:min(520px,calc(100vw - 24px))" role="dialog" aria-labelledby="invoiceTripInfoEditTitle" aria-modal="true">
+      <div class="invoice-merge-head">
+        <h3 id="invoiceTripInfoEditTitle">Sửa chuyến xe</h3>
+        <button type="button" class="invoice-merge-close" id="invoiceTripInfoEditClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="invoice-merge-body">
+        <p class="invoice-merge-desc" id="invoiceTripInfoEditDesc">Cập nhật thông tin chuyến xe.</p>
+        <form id="invoiceTripInfoEditForm" class="invoice-trip-form-grid">
+          <label>
+            <span>Xuất phát</span>
+            <input id="tripInfoEditDepart" type="datetime-local">
+          </label>
+          <label>
+            <span>Dự kiến về</span>
+            <input id="tripInfoEditEta" type="datetime-local">
+          </label>
+          <label>
+            <span>Kết thúc</span>
+            <input id="tripInfoEditEnd" type="datetime-local">
+          </label>
+          <label>
+            <span>Tài xế</span>
+            <input id="tripInfoEditDriver" type="text" maxlength="120" placeholder="Tên tài xế">
+          </label>
+        </form>
+      </div>
+      <div class="invoice-merge-foot" style="display:flex">
+        <button type="button" class="btn" id="invoiceTripInfoEditCancel">Bỏ qua</button>
+        <button type="button" class="btn primary" id="invoiceTripInfoEditSubmit">Lưu</button>
       </div>
     </div>
   </div>
@@ -718,12 +752,6 @@
       if (product && product.quan_ly_theo_lo === false) return 'Không có';
       return 'Không có';
     }
-
-    function toggleCreateMenu(event) {
-      event.stopPropagation();
-      document.getElementById('createDropdown').classList.toggle('open');
-    }
-    document.addEventListener('click', () => document.getElementById('createDropdown')?.classList.remove('open'));
 
     async function toggleInvoiceDetail(id) {
       const row = document.querySelector('[data-invoice-row="' + id + '"]');
@@ -1607,7 +1635,7 @@
         const overlay = document.getElementById('invoiceTripModalOverlay');
         const closeBtn = document.getElementById('invoiceTripModalClose');
         const cancelBtn = document.getElementById('invoiceTripCancel');
-        const withRows = document.getElementById('invoiceTripWithRows');
+        const tripListEl = document.getElementById('invoiceTripList');
         const withoutRows = document.getElementById('invoiceTripWithoutRows');
         const withEmpty = document.getElementById('invoiceTripWithEmpty');
         const withoutEmpty = document.getElementById('invoiceTripWithoutEmpty');
@@ -1618,6 +1646,7 @@
         const createOverlay = document.getElementById('invoiceTripCreateOverlay');
         const pickOverlay = document.getElementById('invoiceTripPickOverlay');
         const editOverlay = document.getElementById('invoiceTripEditOverlay');
+        const tripInfoEditOverlay = document.getElementById('invoiceTripInfoEditOverlay');
         const partnerSelect = document.getElementById('tripCreatePartner');
         const pickRows = document.getElementById('invoiceTripPickRows');
         const pickEmpty = document.getElementById('invoiceTripPickEmpty');
@@ -1625,6 +1654,8 @@
         let selectedTripId = '';
         let editInvoiceIds = null;
         let editExcludeTripId = '';
+        let editingTripId = '';
+        let openTripIds = new Set();
         const TRIP_STATUS_OPTIONS = [
           { value: 'draft', label: 'Nháp' },
           { value: 'dang_giao', label: 'Đang giao' },
@@ -1640,7 +1671,7 @@
         function renderTripStatusSelect(tripId, currentStatus) {
           if (!tripId) return '';
           const status = currentStatus || 'draft';
-          return '<select class="invoice-trip-status-select" data-trip-id="' + escapeHtml(tripId) + '" data-prev-status="' + escapeHtml(status) + '">' +
+          return '<select class="invoice-trip-status-select" data-trip-id="' + escapeHtml(tripId) + '" data-prev-status="' + escapeHtml(status) + '" onclick="event.stopPropagation()">' +
             TRIP_STATUS_OPTIONS.map(function(opt) {
               return '<option value="' + opt.value + '"' + (opt.value === status ? ' selected' : '') + '>' + opt.label + '</option>';
             }).join('') +
@@ -1660,6 +1691,19 @@
           const date = new Date(value);
           if (Number.isNaN(date.getTime())) return '';
           return date.toLocaleString('vi-VN');
+        }
+
+        function dashText(value) {
+          const text = String(value == null ? '' : value).trim();
+          return text || '---';
+        }
+
+        function toTripDateTimeLocal(value) {
+          if (!value) return '';
+          const date = new Date(value);
+          if (Number.isNaN(date.getTime())) return '';
+          const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+          return local.toISOString().slice(0, 16);
         }
 
         function isEditMode() {
@@ -1694,40 +1738,135 @@
           });
         }
 
+        function buildTripGroups() {
+          const map = {};
+          (tripState.trips || []).forEach(function(trip) {
+            map[trip.id] = {
+              id: trip.id,
+              ma_chuyen: trip.ma_chuyen || '',
+              ten_doi_tac: trip.ten_doi_tac || '',
+              ngay_gio_xuat_phat: trip.ngay_gio_xuat_phat || null,
+              ngay_gio_du_kien_ve: trip.ngay_gio_du_kien_ve || null,
+              ngay_gio_ket_thuc: trip.ngay_gio_ket_thuc || null,
+              tai_xe_ten: trip.tai_xe_ten || '',
+              trang_thai: trip.trang_thai || 'draft',
+              trang_thai_text: trip.trang_thai_text || tripStatusLabel(trip.trang_thai),
+              invoices: []
+            };
+          });
+          (tripState.with || []).forEach(function(inv) {
+            const tripId = inv.chuyen_xe_id || '';
+            if (!tripId) return;
+            if (!map[tripId]) {
+              map[tripId] = {
+                id: tripId,
+                ma_chuyen: inv.ma_chuyen || '',
+                ten_doi_tac: inv.ten_doi_tac || '',
+                ngay_gio_xuat_phat: inv.ngay_gio_xuat_phat || null,
+                ngay_gio_du_kien_ve: inv.ngay_gio_du_kien_ve || null,
+                ngay_gio_ket_thuc: inv.ngay_gio_ket_thuc || null,
+                tai_xe_ten: inv.tai_xe_ten || '',
+                trang_thai: inv.trang_thai_chuyen || 'draft',
+                trang_thai_text: inv.trang_thai_chuyen_text || tripStatusLabel(inv.trang_thai_chuyen),
+                invoices: []
+              };
+            }
+            map[tripId].invoices.push(inv);
+          });
+          return Object.keys(map).map(function(key) { return map[key]; })
+            .sort(function(a, b) {
+              const da = a.ngay_gio_xuat_phat ? new Date(a.ngay_gio_xuat_phat).getTime() : 0;
+              const db = b.ngay_gio_xuat_phat ? new Date(b.ngay_gio_xuat_phat).getTime() : 0;
+              return db - da || String(b.ma_chuyen).localeCompare(String(a.ma_chuyen));
+            });
+        }
+
+        function renderTripInvoiceTable(invoices) {
+          if (!invoices.length) {
+            return '<div class="invoice-merge-empty" style="min-height:80px;padding:12px 0"><strong>Chuyến chưa có hóa đơn</strong></div>';
+          }
+          return '<div class="invoice-trip-detail-scroll"><table class="invoice-merge-table"><thead><tr>' +
+            '<th>Mã hóa đơn</th><th>Thời gian</th><th>Mã KH</th><th>Khách hàng</th><th class="num">Tổng tiền</th><th>Thao tác</th>' +
+            '</tr></thead><tbody>' +
+            invoices.map(function(item) {
+              return '<tr>' +
+                '<td>' + escapeHtml(item.ma_hoa_don) + '</td>' +
+                '<td>' + escapeHtml(formatDateTime(item.ngay_ban)) + '</td>' +
+                '<td>' + escapeHtml(item.ma_khach_hang) + '</td>' +
+                '<td>' + escapeHtml(item.ten_khach_hang) + '</td>' +
+                '<td class="num">' + moneyText(item.tong_tien) + '</td>' +
+                '<td><button type="button" class="btn invoice-trip-edit-btn" data-invoice-id="' + escapeHtml(item.id) + '" data-trip-id="' + escapeHtml(item.chuyen_xe_id || '') + '" data-invoice-code="' + escapeHtml(item.ma_hoa_don || '') + '"><i class="fa-regular fa-pen-to-square"></i> Sửa</button></td>' +
+                '</tr>';
+            }).join('') +
+            '</tbody></table></div>';
+        }
+
         function renderLists() {
-          const withList = tripState.with || [];
+          const groups = buildTripGroups();
           const withoutList = tripState.without || [];
-          if (withRows) {
-            withRows.innerHTML = withList.map(item => `
-              <tr>
-                <td>${escapeHtml(item.ma_hoa_don)}</td>
-                <td>${escapeHtml(formatDateTime(item.ngay_ban))}</td>
-                <td>${escapeHtml(item.ma_khach_hang)}</td>
-                <td>${escapeHtml(item.ten_khach_hang)}</td>
-                <td>${escapeHtml(item.ma_chuyen)}</td>
-                <td>${escapeHtml(item.ten_doi_tac)}</td>
-                <td>${escapeHtml(formatDateTime(item.ngay_gio_xuat_phat))}</td>
-                <td>${renderTripStatusSelect(item.chuyen_xe_id, item.trang_thai_chuyen || 'draft')}</td>
-                <td class="num">${moneyText(item.tong_tien)}</td>
-                <td>
-                  <button type="button" class="btn invoice-trip-edit-btn" data-invoice-id="${escapeHtml(item.id)}" data-trip-id="${escapeHtml(item.chuyen_xe_id || '')}" data-invoice-code="${escapeHtml(item.ma_hoa_don || '')}">
-                    <i class="fa-regular fa-pen-to-square"></i> Sửa
-                  </button>
-                </td>
-              </tr>
-            `).join('');
-            withRows.querySelectorAll('.invoice-trip-edit-btn').forEach(btn => {
-              btn.addEventListener('click', function() {
-                openEditChoice(this.dataset.invoiceId, this.dataset.tripId, this.dataset.invoiceCode);
+
+          if (tripListEl) {
+            const tripListHead = '<div class="invoice-trip-list-head invoice-trip-cols" aria-hidden="true">' +
+              '<span></span>' +
+              '<span>Mã chuyến</span>' +
+              '<span>Đối tác giao hàng</span>' +
+              '<span>Xuất phát</span>' +
+              '<span>Dự kiến về</span>' +
+              '<span>Kết thúc</span>' +
+              '<span>Tài xế</span>' +
+              '<span>Trạng thái</span>' +
+              '<span>Thao tác</span>' +
+              '</div>';
+            tripListEl.innerHTML = (groups.length ? tripListHead : '') + groups.map(function(trip) {
+              const isOpen = openTripIds.has(trip.id);
+              return '<div class="invoice-trip-card' + (isOpen ? ' is-open' : '') + '" data-trip-card="' + escapeHtml(trip.id) + '">' +
+                '<div class="invoice-trip-card-head invoice-trip-cols" data-trip-toggle="' + escapeHtml(trip.id) + '">' +
+                  '<button type="button" class="trip-toggle" aria-label="Mở chi tiết"><i class="fa-solid fa-chevron-right"></i></button>' +
+                  '<span class="trip-code">' + escapeHtml(dashText(trip.ma_chuyen)) + '</span>' +
+                  '<span class="trip-meta" title="' + escapeHtml(dashText(trip.ten_doi_tac)) + '">' + escapeHtml(dashText(trip.ten_doi_tac)) + '</span>' +
+                  '<span class="trip-meta">' + escapeHtml(dashText(formatDateTime(trip.ngay_gio_xuat_phat))) + '</span>' +
+                  '<span class="trip-meta">' + escapeHtml(dashText(formatDateTime(trip.ngay_gio_du_kien_ve))) + '</span>' +
+                  '<span class="trip-meta">' + escapeHtml(dashText(formatDateTime(trip.ngay_gio_ket_thuc))) + '</span>' +
+                  '<span class="trip-meta">' + escapeHtml(dashText(trip.tai_xe_ten)) + '</span>' +
+                  '<span onclick="event.stopPropagation()">' + renderTripStatusSelect(trip.id, trip.trang_thai) + '</span>' +
+                  '<span onclick="event.stopPropagation()"><button type="button" class="btn invoice-trip-edit-trip-btn" data-trip-edit="' + escapeHtml(trip.id) + '"><i class="fa-regular fa-pen-to-square"></i> Sửa</button></span>' +
+                '</div>' +
+                '<div class="invoice-trip-card-body">' + renderTripInvoiceTable(trip.invoices) + '</div>' +
+              '</div>';
+            }).join('');
+
+            tripListEl.querySelectorAll('[data-trip-toggle]').forEach(function(head) {
+              head.addEventListener('click', function(e) {
+                if (e.target.closest('.invoice-trip-status-select, .invoice-trip-edit-trip-btn')) return;
+                const tripId = this.dataset.tripToggle || '';
+                const card = tripListEl.querySelector('[data-trip-card="' + tripId + '"]');
+                if (!card) return;
+                const willOpen = !card.classList.contains('is-open');
+                card.classList.toggle('is-open', willOpen);
+                if (willOpen) openTripIds.add(tripId);
+                else openTripIds.delete(tripId);
               });
             });
-            withRows.querySelectorAll('.invoice-trip-status-select').forEach(function(selectEl) {
+            tripListEl.querySelectorAll('.invoice-trip-status-select').forEach(function(selectEl) {
               selectEl.addEventListener('change', function() {
                 updateTripStatus(this);
               });
             });
+            tripListEl.querySelectorAll('.invoice-trip-edit-trip-btn').forEach(function(btn) {
+              btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                openTripInfoEdit(this.dataset.tripEdit);
+              });
+            });
+            tripListEl.querySelectorAll('.invoice-trip-edit-btn').forEach(function(btn) {
+              btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                openEditChoice(this.dataset.invoiceId, this.dataset.tripId, this.dataset.invoiceCode);
+              });
+            });
           }
-          if (withEmpty) withEmpty.style.display = withList.length ? 'none' : 'flex';
+          if (withEmpty) withEmpty.style.display = groups.length ? 'none' : 'flex';
+          if (tripListEl) tripListEl.style.display = groups.length ? 'flex' : 'none';
 
           if (withoutRows) {
             withoutRows.innerHTML = withoutList.map(item => `
@@ -1826,22 +1965,24 @@
               return alert(json.message || 'Không cập nhật được trạng thái chuyến.');
             }
             const label = tripStatusLabel(newStatus);
-            document.querySelectorAll('.invoice-trip-status-select[data-trip-id="' + tripId + '"]').forEach(function(el) {
-              el.value = newStatus;
-              el.dataset.prevStatus = newStatus;
-            });
+            const tripData = json.data || {};
+            selectEl.dataset.prevStatus = newStatus;
             (tripState.with || []).forEach(function(item) {
               if (item.chuyen_xe_id === tripId) {
                 item.trang_thai_chuyen = newStatus;
                 item.trang_thai_chuyen_text = label;
+                if (tripData.ngay_gio_xuat_phat) item.ngay_gio_xuat_phat = tripData.ngay_gio_xuat_phat;
               }
             });
             (tripState.trips || []).forEach(function(item) {
               if (item.id === tripId) {
                 item.trang_thai = newStatus;
                 item.trang_thai_text = label;
+                if (tripData.ngay_gio_xuat_phat) item.ngay_gio_xuat_phat = tripData.ngay_gio_xuat_phat;
+                if (tripData.ngay_gio_ket_thuc) item.ngay_gio_ket_thuc = tripData.ngay_gio_ket_thuc;
               }
             });
+            renderLists();
           } catch (error) {
             selectEl.value = prevStatus;
             alert('Không cập nhật được trạng thái chuyến.');
@@ -1863,6 +2004,90 @@
 
         function closeEditChoice() {
           if (editOverlay) editOverlay.classList.remove('is-open');
+        }
+
+        function openTripInfoEdit(tripId) {
+          if (!tripId) return;
+          const trip = (tripState.trips || []).find(function(item) { return item.id === tripId; });
+          if (!trip) return alert('Không tìm thấy chuyến xe.');
+          editingTripId = tripId;
+          const title = document.getElementById('invoiceTripInfoEditTitle');
+          const desc = document.getElementById('invoiceTripInfoEditDesc');
+          if (title) title.textContent = 'Sửa chuyến xe ' + (trip.ma_chuyen || '');
+          if (desc) desc.textContent = 'Cập nhật xuất phát, dự kiến về, kết thúc và tài xế.';
+          const departEl = document.getElementById('tripInfoEditDepart');
+          const etaEl = document.getElementById('tripInfoEditEta');
+          const endEl = document.getElementById('tripInfoEditEnd');
+          const driverEl = document.getElementById('tripInfoEditDriver');
+          if (departEl) departEl.value = toTripDateTimeLocal(trip.ngay_gio_xuat_phat);
+          if (etaEl) etaEl.value = toTripDateTimeLocal(trip.ngay_gio_du_kien_ve);
+          if (endEl) endEl.value = toTripDateTimeLocal(trip.ngay_gio_ket_thuc);
+          if (driverEl) driverEl.value = trip.tai_xe_ten || '';
+          if (tripInfoEditOverlay) tripInfoEditOverlay.classList.add('is-open');
+        }
+
+        function closeTripInfoEdit() {
+          editingTripId = '';
+          if (tripInfoEditOverlay) tripInfoEditOverlay.classList.remove('is-open');
+        }
+
+        async function submitTripInfoEdit() {
+          if (!editingTripId) return;
+          const submitBtn = document.getElementById('invoiceTripInfoEditSubmit');
+          if (submitBtn) submitBtn.disabled = true;
+          try {
+            const res = await fetch('/api/don-hang/chuyen-xe/' + encodeURIComponent(editingTripId), {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                ngay_gio_xuat_phat: document.getElementById('tripInfoEditDepart')?.value || '',
+                ngay_gio_du_kien_ve: document.getElementById('tripInfoEditEta')?.value || '',
+                ngay_gio_ket_thuc: document.getElementById('tripInfoEditEnd')?.value || '',
+                tai_xe_ten: document.getElementById('tripInfoEditDriver')?.value || ''
+              })
+            });
+            const json = await res.json();
+            if (!json.success) return alert(json.message || 'Không cập nhật được chuyến xe.');
+            const updated = json.data || {};
+            tripState.trips = (tripState.trips || []).map(function(item) {
+              return item.id === updated.id ? Object.assign({}, item, updated) : item;
+            });
+            closeTripInfoEdit();
+            renderLists();
+            alert(json.message || 'Đã cập nhật chuyến xe.');
+          } catch (error) {
+            alert('Không cập nhật được chuyến xe.');
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        }
+
+        async function submitUnassignFromTrip() {
+          const ids = workingInvoiceIds();
+          if (!ids.length) return alert('Vui lòng chọn hóa đơn.');
+          if (!confirm('Bỏ hóa đơn khỏi chuyến xe? Vận đơn và đối tác giao hàng sẽ được giữ nguyên.')) return;
+          const btn = document.getElementById('invoiceTripEditUnassignBtn');
+          if (btn) btn.disabled = true;
+          try {
+            const res = await fetch('/api/don-hang/chuyen-xe/unassign', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              credentials: 'same-origin',
+              body: JSON.stringify({ hoa_don_ids: ids })
+            });
+            const json = await res.json();
+            if (!json.success) return alert(json.message || 'Không bỏ được khỏi chuyến.');
+            closeEditChoice();
+            clearEditMode();
+            await loadCandidates();
+            switchTab('with');
+            alert(json.message || 'Đã bỏ hóa đơn khỏi chuyến xe.');
+          } catch (error) {
+            alert('Không bỏ được khỏi chuyến.');
+          } finally {
+            if (btn) btn.disabled = false;
+          }
         }
 
         function openCreateModal() {
@@ -1973,9 +2198,10 @@
         async function openModal() {
           if (!overlay) return;
           clearEditMode();
+          openTripIds = new Set();
           switchTab('with');
           overlay.style.display = 'flex';
-          if (withRows) withRows.innerHTML = '<tr><td colspan="10">Đang tải...</td></tr>';
+          if (tripListEl) tripListEl.innerHTML = '<div style="padding:16px;color:#667085">Đang tải chuyến xe...</div>';
           if (withoutRows) withoutRows.innerHTML = '<tr><td colspan="7">Đang tải...</td></tr>';
           try {
             await loadCandidates();
@@ -2039,8 +2265,16 @@
           closeEditChoice();
           openCreateModal();
         });
+        document.getElementById('invoiceTripEditUnassignBtn')?.addEventListener('click', submitUnassignFromTrip);
+        document.getElementById('invoiceTripInfoEditClose')?.addEventListener('click', closeTripInfoEdit);
+        document.getElementById('invoiceTripInfoEditCancel')?.addEventListener('click', closeTripInfoEdit);
+        document.getElementById('invoiceTripInfoEditSubmit')?.addEventListener('click', submitTripInfoEdit);
         document.addEventListener('keydown', function(e) {
           if (e.key !== 'Escape') return;
+          if (tripInfoEditOverlay?.classList.contains('is-open')) {
+            closeTripInfoEdit();
+            return;
+          }
           if (createOverlay?.classList.contains('is-open')) {
             closeCreateModal();
             return;
