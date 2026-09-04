@@ -409,12 +409,63 @@ function normalizeSupplierObjectIds(supplierIds) {
     return ids;
 }
 
+async function aggregateSupplierAdvanceBalances(storeId, supplierIds) {
+    var map = {};
+    var PhieuTamUng;
+    try {
+        PhieuTamUng = require('../../../models/tamung.model').PhieuTamUng;
+    } catch (err) {
+        return map;
+    }
+    if (!PhieuTamUng) return map;
+
+    var match = {
+        loai_doi_tuong: 'nha_cung_cap',
+        trang_thai_du_lieu: 'active',
+        trang_thai: { $in: ['active', 'da_dung_het'] },
+        nha_cung_cap_id: { $exists: true, $ne: null },
+        con_lai: { $gt: 0 }
+    };
+    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
+        match.cua_hang_id = new mongoose.Types.ObjectId(String(storeId));
+    }
+    var supplierObjectIds = normalizeSupplierObjectIds(supplierIds);
+    if (supplierObjectIds.length) {
+        match.nha_cung_cap_id = { $in: supplierObjectIds };
+    }
+
+    var rows = await PhieuTamUng.aggregate([
+        { $match: match },
+        {
+            $group: {
+                _id: '$nha_cung_cap_id',
+                tam_ung: { $sum: { $ifNull: ['$con_lai', 0] } }
+            }
+        }
+    ]);
+
+    rows.forEach(function(row) {
+        if (!row || !row._id) return;
+        map[String(row._id)] = Math.max(0, Number(row.tam_ung || 0));
+    });
+    return map;
+}
+
+function applySupplierAdvanceFromMap(supplier, advanceMap) {
+    if (!supplier) return;
+    var tamUng = advanceMap ? Number(advanceMap[String(supplier._id)] || 0) : 0;
+    supplier.tam_ung = Math.max(0, tamUng);
+    supplier.tong_no_cuoi = Number(supplier.tong_no || 0) - supplier.tam_ung;
+}
+
 module.exports = {
   SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
   aggregateSupplierPurchaseTotals,
   aggregateSupplierDebtDayInfo,
+  aggregateSupplierAdvanceBalances,
   applySupplierTotalsFromMap,
   applySupplierDebtDayInfo,
+  applySupplierAdvanceFromMap,
   normalizeDebtWarnSettings,
   evaluateSupplierDebtWarning,
   applySupplierDebtWarning,

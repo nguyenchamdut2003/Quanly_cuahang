@@ -366,6 +366,345 @@
       padding: 16px;
     }
     .debt-period-modal-overlay.is-open { display: flex; }
+    .supplier-advance-link {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      color: #2563eb;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .supplier-advance-link:hover { color: #1d4ed8; }
+    .supplier-advance-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1300;
+      background: rgba(15, 23, 42, 0.45);
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow: auto;
+    }
+    .supplier-advance-modal-overlay.is-open { display: flex; }
+    .supplier-advance-modal {
+      width: min(1100px, 100%);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+      overflow: hidden;
+      margin-top: 24px;
+    }
+    .supplier-advance-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .supplier-advance-modal__header h3 { margin: 0; font-size: 16px; }
+    .supplier-advance-modal__close {
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .supplier-advance-modal__body { padding: 16px; }
+    .supplier-advance-modal__toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .supplier-advance-modal__desc {
+      margin: 0;
+      color: #64748b;
+      font-size: 13px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .supplier-advance-modal__actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+    .supplier-advance-modal__table-wrap {
+      overflow: auto;
+      max-height: min(520px, calc(100vh - 220px));
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+    }
+    .supplier-advance-modal__table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .supplier-advance-modal__table th,
+    .supplier-advance-modal__table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eef2f7;
+      text-align: left;
+      white-space: nowrap;
+    }
+    .supplier-advance-modal__table th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .supplier-advance-modal__table td.num,
+    .supplier-advance-modal__table th.num { text-align: right; }
+    .supplier-advance-modal__table th.note,
+    .supplier-advance-modal__table td.note {
+      width: 180px;
+      max-width: 180px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .supplier-advance-modal__table th.actions,
+    .supplier-advance-modal__table td.actions {
+      width: 64px;
+      text-align: center;
+      overflow: visible;
+      white-space: normal;
+    }
+    .supplier-advance-action-menu {
+      position: relative;
+      display: inline-flex;
+      justify-content: center;
+      width: 100%;
+    }
+    .supplier-advance-more-btn {
+      width: 32px;
+      height: 32px;
+      border: 1px solid #cfd8e3;
+      background: #fff;
+      color: #344054;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+    }
+    .supplier-advance-more-btn:hover,
+    .supplier-advance-action-menu.is-open .supplier-advance-more-btn {
+      border-color: #0070f4;
+      color: #006dff;
+      background: #eff6ff;
+    }
+    .supplier-advance-more-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+    .supplier-advance-action-dropdown {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1500;
+      display: none;
+      min-width: 168px;
+      padding: 6px;
+      border: 1px solid #d9e2ec;
+      border-radius: 7px;
+      background: #fff;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, .16);
+    }
+    .supplier-advance-action-menu.is-open .supplier-advance-action-dropdown { display: block; }
+    .supplier-advance-menu-item {
+      width: 100%;
+      min-height: 34px;
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      color: #1f2937;
+      padding: 0 9px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .supplier-advance-menu-item:hover { background: #f1f5f9; color: #006dff; }
+    .supplier-advance-modal__empty {
+      padding: 28px 16px;
+      text-align: center;
+      color: #94a3b8;
+    }
+    .supplier-advance-modal__footer {
+      display: flex;
+      justify-content: flex-end;
+      padding: 12px 16px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .supplier-advance-create-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1400;
+      background: rgba(15, 23, 42, 0.45);
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow: auto;
+    }
+    .supplier-advance-create-overlay.is-open { display: flex; }
+    .supplier-advance-create-modal {
+      width: min(560px, 100%);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+      overflow: hidden;
+      margin-top: 40px;
+    }
+    .supplier-advance-create-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .supplier-advance-create-modal__header h3 { margin: 0; font-size: 16px; }
+    .supplier-advance-create-modal__close {
+      border: none;
+      background: transparent;
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .supplier-advance-create-modal__body {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+    .supplier-advance-create-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .supplier-advance-create-grid label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 13px;
+      color: #475569;
+    }
+    .supplier-advance-create-grid label.full { grid-column: 1 / -1; }
+    .supplier-advance-create-grid input,
+    .supplier-advance-create-grid select,
+    .supplier-advance-create-grid textarea {
+      height: 36px;
+      border: 1px solid #cfd8e3;
+      border-radius: 6px;
+      padding: 0 10px;
+      font-size: 13px;
+    }
+    .supplier-advance-create-grid textarea {
+      height: 72px;
+      padding: 8px 10px;
+      resize: vertical;
+    }
+    .supplier-advance-create-modal__footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 12px 16px;
+      border-top: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+    .supplier-advance-action-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1450;
+      background: rgba(15, 23, 42, 0.45);
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow: auto;
+    }
+    .supplier-advance-action-overlay.is-open { display: flex; }
+    .supplier-advance-offset-modal {
+      width: min(980px, 100%);
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+      overflow: hidden;
+      margin-top: 24px;
+    }
+    .supplier-advance-offset-body { padding: 16px; }
+    .supplier-advance-offset-hint {
+      margin: 12px 0 8px;
+      color: #64748b;
+      font-size: 12px;
+    }
+    .supplier-advance-offset-table-wrap {
+      max-height: min(360px, 45vh);
+      overflow: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .supplier-advance-offset-table th,
+    .supplier-advance-offset-table td {
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .supplier-advance-offset-table td.text-right {
+      font-variant-numeric: tabular-nums;
+    }
+    .supplier-advance-offset-code-cell {
+      min-width: 118px;
+    }
+    .supplier-advance-offset-code {
+      display: block;
+      font-weight: 700;
+      color: #111827;
+      line-height: 1.25;
+      letter-spacing: 0.01em;
+    }
+    .supplier-advance-offset-type {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #94a3b8;
+      line-height: 1.2;
+    }
+    .supplier-advance-offset-form .supplier-advance-create-grid {
+      margin-bottom: 0;
+    }
+    #supplierAdvanceCreateAmount,
+    #supplierAdvanceOffsetAmount,
+    #supplierAdvanceOffsetRemain,
+    #supplierAdvanceRefundRemain,
+    #supplierAdvanceRefundAmount {
+      background: #f8fafc;
+      color: #0f172a;
+      font-weight: 700;
+      cursor: default;
+    }
+    @media (max-width: 640px) {
+      .supplier-advance-create-grid { grid-template-columns: 1fr; }
+    }
     .debt-period-modal {
       width: min(420px, 100%);
       background: #fff;
@@ -707,14 +1046,16 @@
               sum.totalPurchase += Number(s.tong_mua || 0);
               sum.totalPaid += Number(s.da_thanh_toan || 0);
               sum.totalDebt += Number(s.tong_no || 0);
+              sum.totalAdvance += Number(s.tam_ung || 0);
+              sum.totalFinalDebt += Number(s.tong_no_cuoi != null ? s.tong_no_cuoi : (Number(s.tong_no || 0) - Number(s.tam_ung || 0)));
               return sum;
-            }, { totalPurchase: 0, totalPaid: 0, totalDebt: 0 });
+            }, { totalPurchase: 0, totalPaid: 0, totalDebt: 0, totalAdvance: 0, totalFinalDebt: 0 });
           %>
           <table class="admin-table store-table" data-kv-master="nha-cung-cap">
             <thead>
               <tr>
                 <th class="check-cell"><input id="selectAllSuppliers" type="checkbox" aria-label="Chọn tất cả"></th>
-                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng mua</th><th>Đã thanh toán</th><th>Tổng nợ</th><th>Trạng thái</th>
+                <th>Mã NCC</th><th>Tên nhà cung cấp</th><th>Điện thoại</th><th>Email</th><th>Tổng mua</th><th>Đã thanh toán</th><th>Tổng nợ</th><th>Tạm ứng</th><th>Tổng nợ cuối</th><th>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
@@ -724,13 +1065,17 @@
                 <td data-summary-field="tong-mua"><strong><%= Number(supplierSummaryTotals.totalPurchase || 0).toLocaleString('vi-VN') %></strong></td>
                 <td data-summary-field="da-thanh-toan"><strong><%= Number(supplierSummaryTotals.totalPaid || 0).toLocaleString('vi-VN') %></strong></td>
                 <td data-summary-field="tong-no"><strong class="<%= Number(supplierSummaryTotals.totalDebt || 0) > 0 ? 'supplier-money-positive' : (Number(supplierSummaryTotals.totalDebt || 0) < 0 ? 'supplier-money-negative' : '') %>"><%= Number(supplierSummaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
+                <td data-summary-field="tam-ung"><strong><%= Number(supplierSummaryTotals.totalAdvance || 0).toLocaleString('vi-VN') %></strong></td>
+                <td data-summary-field="tong-no-cuoi"><strong class="<%= Number(supplierSummaryTotals.totalFinalDebt || 0) > 0 ? 'supplier-money-positive' : (Number(supplierSummaryTotals.totalFinalDebt || 0) < 0 ? 'supplier-money-negative' : '') %>"><%= Number(supplierSummaryTotals.totalFinalDebt || 0).toLocaleString('vi-VN') %></strong></td>
                 <td></td>
               </tr>
               <% if (suppliers.length === 0) { %>
-                <tr><td colspan="9" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr>
+                <tr><td colspan="11" class="empty-cell">Không có nhà cung cấp phù hợp với bộ lọc.</td></tr>
               <% } %>
               <% suppliers.forEach(function(supplier) { %>
                 <% var listBase = typeof buildSupplierPageUrl === 'function' ? buildSupplierPageUrl(pagination ? pagination.page : 1) : ('/nha-cung-cap' + (filterQueryString ? ('?' + filterQueryString) : '')); %>
+                <% var tamUng = Number(supplier.tam_ung || 0); %>
+                <% var tongNoCuoi = supplier.tong_no_cuoi != null ? Number(supplier.tong_no_cuoi) : (Number(supplier.tong_no || 0) - tamUng); %>
                 <tr
                   class="supplier-row"
                   data-kv-detail-id="<%= supplier._id %>"
@@ -739,6 +1084,8 @@
                   data-metric-tong-mua="<%= Number(supplier.tong_mua || 0) %>"
                   data-metric-da-thanh-toan="<%= Number(supplier.da_thanh_toan || 0) %>"
                   data-metric-tong-no="<%= Number(supplier.tong_no || 0) %>"
+                  data-metric-tam-ung="<%= tamUng %>"
+                  data-metric-tong-no-cuoi="<%= tongNoCuoi %>"
                 >
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="supplier-checkbox" type="checkbox" name="ids" value="<%= supplier._id %>" form="bulkDeleteSuppliersForm" aria-label="Chọn nhà cung cấp"></td>
                   <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= supplier.ma_ncc || '---' %></a></td>
@@ -768,7 +1115,19 @@
                       <% } %>
                     </div>
                   </td>
-                  <td><span class="status-pill <%= supplier.trang_thai === 'active' ? 'is-active' : '' %>"><%= supplier.trang_thai === 'active' ? 'Đang hoạt động' : 'Ngừng hoạt động' %></span></td>
+                  <td data-field="tam-ung" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>">
+                    <button
+                      type="button"
+                      class="supplier-advance-link js-supplier-advance-link"
+                      data-supplier-id="<%= supplier._id %>"
+                      data-supplier-code="<%= supplier.ma_ncc || '' %>"
+                      data-supplier-name="<%= supplier.ten_ncc || '' %>"
+                    ><%= tamUng.toLocaleString('vi-VN') %></button>
+                  </td>
+                  <td data-field="tong-no-cuoi" class="<%= supplier.metrics_pending ? 'supplier-metrics-loading' : '' %>">
+                    <span data-final-debt-value class="<%= tongNoCuoi > 0 ? 'supplier-money-positive' : (tongNoCuoi < 0 ? 'supplier-money-negative' : '') %>"><%= tongNoCuoi.toLocaleString('vi-VN') %></span>
+                  </td>
+                  <td><span class="status-pill <%= supplier.trang_thai === 'active' ? 'is-active' : '' %>"><%= supplier.trang_thai === 'active' ? 'Hoạt động' : 'Ngừng hoạt động' %></span></td>
                 </tr>
               <% }) %>
             </tbody>
@@ -814,6 +1173,258 @@
   </div>
     <%- include('../partials/address-type-modal', { addressTypeListId: 'addressTypeList' }) %>
     <%- include('../partials/debt-period-export-modal') %>
+
+    <div id="supplierAdvanceModalOverlay" class="supplier-advance-modal-overlay" aria-hidden="true">
+      <div class="supplier-advance-modal" role="dialog" aria-modal="true" aria-labelledby="supplierAdvanceModalTitle">
+        <div class="supplier-advance-modal__header">
+          <h3 id="supplierAdvanceModalTitle">Phiếu tạm ứng</h3>
+          <button type="button" class="supplier-advance-modal__close" id="supplierAdvanceModalClose" aria-label="Đóng">×</button>
+        </div>
+        <div class="supplier-advance-modal__body">
+          <div class="supplier-advance-modal__toolbar">
+            <p class="supplier-advance-modal__desc" id="supplierAdvanceModalDesc">Danh sách phiếu tạm ứng của nhà cung cấp.</p>
+            <div class="supplier-advance-modal__actions">
+              <button type="button" class="btn btn-primary" id="supplierAdvanceCreateBtn">+ Tạm ứng</button>
+            </div>
+          </div>
+          <div class="supplier-advance-modal__table-wrap">
+            <table class="supplier-advance-modal__table">
+              <thead>
+                <tr>
+                  <th>Mã phiếu</th>
+                  <th>Ngày lập</th>
+                  <th class="num">Số tiền</th>
+                  <th class="num">Đã cấn trừ</th>
+                  <th class="num">Đã hoàn</th>
+                  <th class="num">Còn lại</th>
+                  <th>Phương thức</th>
+                  <th>Trạng thái</th>
+                  <th class="note">Ghi chú</th>
+                  <th class="actions">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="supplierAdvanceModalRows">
+                <tr><td colspan="10" class="supplier-advance-modal__empty">Đang tải...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="supplier-advance-modal__footer">
+          <button type="button" class="btn" id="supplierAdvanceModalCancel">Đóng</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="supplierAdvanceCreateOverlay" class="supplier-advance-create-overlay" aria-hidden="true">
+      <div class="supplier-advance-create-modal" role="dialog" aria-modal="true" aria-labelledby="supplierAdvanceCreateTitle">
+        <div class="supplier-advance-create-modal__header">
+          <h3 id="supplierAdvanceCreateTitle">Tạo phiếu tạm ứng</h3>
+          <button type="button" class="supplier-advance-create-modal__close" id="supplierAdvanceCreateClose" aria-label="Đóng">×</button>
+        </div>
+        <form id="supplierAdvanceCreateForm" class="supplier-advance-create-modal__body">
+          <input type="hidden" name="payment_v2" value="true">
+          <p class="supplier-advance-modal__desc" id="supplierAdvanceCreateDesc">Tạm ứng cho nhà cung cấp.</p>
+          <div class="supplier-advance-create-grid">
+            <label>
+              <span>Ngày lập</span>
+              <input type="datetime-local" name="ngay_lap" id="supplierAdvanceCreateDate" required>
+            </label>
+            <label>
+              <span>Số tiền tạm ứng</span>
+              <input type="text" inputmode="numeric" name="gia_tri" id="supplierAdvanceCreateAmount" placeholder="0" autocomplete="off" readonly>
+            </label>
+            <label>
+              <span>Tiền mặt</span>
+              <input type="text" inputmode="numeric" name="chi_tiet_thanh_toan[tien_mat]" id="supplierAdvanceCreateCash" class="js-advance-money-input" placeholder="0" autocomplete="off">
+            </label>
+            <label>
+              <span>Sổ tiền mặt</span>
+              <select name="chi_tiet_thanh_toan[so_quy_tien_mat_id]" id="supplierAdvanceCreateCashBook">
+                <option value="">Chọn sổ tiền mặt</option>
+              </select>
+            </label>
+            <label>
+              <span>Chuyển khoản</span>
+              <input type="text" inputmode="numeric" name="chi_tiet_thanh_toan[chuyen_khoan]" id="supplierAdvanceCreateTransfer" class="js-advance-money-input" placeholder="0" autocomplete="off">
+            </label>
+            <label>
+              <span>Sổ chuyển khoản</span>
+              <select name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]" id="supplierAdvanceCreateBankBook">
+                <option value="">Chọn sổ chuyển khoản</option>
+              </select>
+            </label>
+            <label class="full">
+              <span>Ghi chú</span>
+              <textarea name="ghi_chu" id="supplierAdvanceCreateNote" placeholder="Ghi chú tạm ứng"></textarea>
+            </label>
+          </div>
+        </form>
+        <div class="supplier-advance-create-modal__footer">
+          <button type="button" class="btn" id="supplierAdvanceCreateCancel">Bỏ qua</button>
+          <button type="button" class="btn btn-primary" id="supplierAdvanceCreateSubmit">Lưu tạm ứng</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="supplierAdvanceOffsetOverlay" class="supplier-advance-action-overlay" aria-hidden="true">
+      <div class="supplier-advance-offset-modal" role="dialog" aria-modal="true" aria-labelledby="supplierAdvanceOffsetTitle">
+        <div class="supplier-advance-create-modal__header">
+          <div>
+            <h3 id="supplierAdvanceOffsetTitle">Cấn trừ tạm ứng</h3>
+            <p class="supplier-advance-modal__desc" id="supplierAdvanceOffsetDesc" style="margin-top:4px">Cấn trừ vào phiếu nhập.</p>
+          </div>
+          <button type="button" class="supplier-advance-create-modal__close" id="supplierAdvanceOffsetClose" aria-label="Đóng">×</button>
+        </div>
+        <form id="supplierAdvanceOffsetForm" class="supplier-advance-offset-form" data-advance-remain="0">
+          <input type="hidden" id="supplierAdvanceOffsetAllocationsJson" value="[]">
+          <div class="supplier-advance-offset-body">
+            <div class="supplier-advance-create-grid">
+              <label>
+                <span>Phiếu tạm ứng</span>
+                <input type="text" id="supplierAdvanceOffsetCode" readonly>
+              </label>
+              <label>
+                <span>Còn lại tạm ứng</span>
+                <input type="text" id="supplierAdvanceOffsetRemain" readonly>
+              </label>
+              <label>
+                <span>Ngày lập</span>
+                <input type="datetime-local" id="supplierAdvanceOffsetDate">
+              </label>
+              <label>
+                <span>Số tiền cấn trừ</span>
+                <input type="text" inputmode="numeric" id="supplierAdvanceOffsetAmount" placeholder="0" autocomplete="off" readonly>
+              </label>
+              <label>
+                <span>Tiền mặt</span>
+                <input type="text" inputmode="numeric" id="supplierAdvanceOffsetCash" class="js-advance-money-input" placeholder="0" autocomplete="off">
+              </label>
+              <label>
+                <span>Sổ tiền mặt</span>
+                <select id="supplierAdvanceOffsetCashBook">
+                  <option value="">Chọn sổ tiền mặt</option>
+                </select>
+              </label>
+              <label>
+                <span>Chuyển khoản</span>
+                <input type="text" inputmode="numeric" id="supplierAdvanceOffsetTransfer" class="js-advance-money-input" placeholder="0" autocomplete="off">
+              </label>
+              <label>
+                <span>Sổ chuyển khoản</span>
+                <select id="supplierAdvanceOffsetBankBook">
+                  <option value="">Chọn sổ chuyển khoản</option>
+                </select>
+              </label>
+              <label class="full">
+                <span>Ghi chú</span>
+                <textarea id="supplierAdvanceOffsetNote" placeholder="Ghi chú cấn trừ"></textarea>
+              </label>
+            </div>
+            <p class="supplier-advance-offset-hint">Số tiền sẽ tự phân bổ vào các phiếu nhập gần nhất. Có thể sửa số tiền từng phiếu.</p>
+            <div class="supplier-pay-table-wrap table-wrap supplier-advance-offset-table-wrap">
+              <table class="admin-table warehouse-table supplier-advance-offset-table">
+                <thead>
+                  <tr>
+                    <th>Mã chứng từ</th>
+                    <th>Thời gian</th>
+                    <th class="text-right">Giá trị</th>
+                    <th class="text-right">Đã trả trước</th>
+                    <th class="text-right">Còn cần trả</th>
+                    <th class="text-right">Tiền cấn trừ</th>
+                    <th class="text-right">Còn nợ</th>
+                  </tr>
+                </thead>
+                <tbody id="supplierAdvanceOffsetRows">
+                  <tr>
+                    <td colspan="7">
+                      <div class="supplier-pay-empty">
+                        <span>Đang tải phiếu nhập...</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot id="supplierAdvanceOffsetFoot" style="display:none">
+                  <tr class="supplier-pay-total-row">
+                    <td colspan="4"></td>
+                    <td class="text-right" id="supplierAdvanceOffsetTotalDebt">0</td>
+                    <td class="text-right" id="supplierAdvanceOffsetTotalPaid">0</td>
+                    <td class="text-right" id="supplierAdvanceOffsetTotalLeft">0</td>
+                  </tr>
+                  <tr class="supplier-pay-unallocated-row">
+                    <td colspan="5"></td>
+                    <td>Tiền chưa gắn phiếu nhập:</td>
+                    <td class="text-right" id="supplierAdvanceOffsetUnallocated">0</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </form>
+        <div class="supplier-advance-create-modal__footer">
+          <button type="button" class="btn" id="supplierAdvanceOffsetCancel">Bỏ qua</button>
+          <button type="button" class="btn btn-primary" id="supplierAdvanceOffsetSubmit">Lưu cấn trừ</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="supplierAdvanceRefundOverlay" class="supplier-advance-action-overlay" aria-hidden="true">
+      <div class="supplier-advance-create-modal" role="dialog" aria-modal="true" aria-labelledby="supplierAdvanceRefundTitle">
+        <div class="supplier-advance-create-modal__header">
+          <h3 id="supplierAdvanceRefundTitle">Hoàn tiền tạm ứng</h3>
+          <button type="button" class="supplier-advance-create-modal__close" id="supplierAdvanceRefundClose" aria-label="Đóng">×</button>
+        </div>
+        <form id="supplierAdvanceRefundForm" class="supplier-advance-create-modal__body">
+          <input type="hidden" name="payment_v2" value="true">
+          <p class="supplier-advance-modal__desc" id="supplierAdvanceRefundDesc">Tạo phiếu thu hoàn tạm ứng.</p>
+          <div class="supplier-advance-create-grid">
+            <label>
+              <span>Phiếu tạm ứng</span>
+              <input type="text" id="supplierAdvanceRefundCode" readonly>
+            </label>
+            <label>
+              <span>Còn lại</span>
+              <input type="text" id="supplierAdvanceRefundRemain" readonly>
+            </label>
+            <label>
+              <span>Ngày lập</span>
+              <input type="datetime-local" id="supplierAdvanceRefundDate" required>
+            </label>
+            <label>
+              <span>Số tiền hoàn</span>
+              <input type="text" inputmode="numeric" id="supplierAdvanceRefundAmount" placeholder="0" autocomplete="off" readonly>
+            </label>
+            <label>
+              <span>Tiền mặt</span>
+              <input type="text" inputmode="numeric" id="supplierAdvanceRefundCash" class="js-advance-money-input" placeholder="0" autocomplete="off">
+            </label>
+            <label>
+              <span>Sổ tiền mặt</span>
+              <select id="supplierAdvanceRefundCashBook">
+                <option value="">Chọn sổ tiền mặt</option>
+              </select>
+            </label>
+            <label>
+              <span>Chuyển khoản</span>
+              <input type="text" inputmode="numeric" id="supplierAdvanceRefundTransfer" class="js-advance-money-input" placeholder="0" autocomplete="off">
+            </label>
+            <label>
+              <span>Sổ chuyển khoản</span>
+              <select id="supplierAdvanceRefundBankBook">
+                <option value="">Chọn sổ chuyển khoản</option>
+              </select>
+            </label>
+            <label class="full">
+              <span>Ghi chú</span>
+              <textarea id="supplierAdvanceRefundNote" placeholder="Ghi chú hoàn tiền"></textarea>
+            </label>
+          </div>
+        </form>
+        <div class="supplier-advance-create-modal__footer">
+          <button type="button" class="btn" id="supplierAdvanceRefundCancel">Bỏ qua</button>
+          <button type="button" class="btn btn-primary" id="supplierAdvanceRefundSubmit">Lưu hoàn tiền</button>
+        </div>
+      </div>
+    </div>
   </div>
   <%- include('../partials/global-loading') %>
   <script id="supplierGroupsSeed" type="application/json"><%- JSON.stringify(supplierGroups || []) %></script>
@@ -862,7 +1473,10 @@
       }
 
       function parseSupplierMoney(value) {
-        var normalized = String(value || '').replace(/\./g, '').replace(/,/g, '').trim();
+        var normalized = String(value || '')
+          .replace(/[.\s\u00a0\u202f]/g, '')
+          .replace(/,/g, '')
+          .trim();
         if (normalized === '') return '';
         var number = Number(normalized);
         return Number.isFinite(number) && number >= 0 ? Math.floor(number) : '';
@@ -870,12 +1484,15 @@
       function formatSupplierMoney(value) {
         if (value === '' || value == null) return '';
         var number = Math.max(0, Math.floor(Number(value || 0)));
-        return number.toLocaleString('vi-VN');
+        if (!Number.isFinite(number)) return '';
+        return String(number).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
       }
       function formatSupplierSignedMoney(value) {
         if (value === '' || value == null) return '';
         var number = Math.floor(Number(value || 0));
-        return Number.isFinite(number) ? number.toLocaleString('vi-VN') : '';
+        if (!Number.isFinite(number)) return '';
+        var absText = String(Math.abs(number)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        return number < 0 ? ('-' + absText) : absText;
       }
       function setSupplierMoneyTone(element, value) {
         if (!element) return;
@@ -999,6 +1616,21 @@
             return;
           }
         }
+        if (field === 'tong-no-cuoi') {
+          var finalDebtValue = cell.querySelector('[data-final-debt-value]');
+          if (finalDebtValue) {
+            finalDebtValue.textContent = formatSupplierSignedMoney(value);
+            setSupplierMoneyTone(finalDebtValue, value);
+            return;
+          }
+        }
+        if (field === 'tam-ung') {
+          var advanceLink = cell.querySelector('.js-supplier-advance-link');
+          if (advanceLink) {
+            advanceLink.textContent = formatSupplierMoney(value);
+            return;
+          }
+        }
         cell.textContent = formatSupplierMoney(value);
       }
 
@@ -1033,16 +1665,26 @@
           sum.tongMua += Number(row.dataset.metricTongMua || 0);
           sum.daThanhToan += Number(row.dataset.metricDaThanhToan || 0);
           sum.tongNo += Number(row.dataset.metricTongNo || 0);
+          sum.tamUng += Number(row.dataset.metricTamUng || 0);
+          sum.tongNoCuoi += Number(row.dataset.metricTongNoCuoi || 0);
           return sum;
-        }, { tongMua: 0, daThanhToan: 0, tongNo: 0 });
-        var totalPurchaseCell = document.querySelector('[data-summary-field="tong-mua"] strong');
-        var totalPaidCell = document.querySelector('[data-summary-field="da-thanh-toan"] strong');
-        var totalDebtCell = document.querySelector('[data-summary-field="tong-no"] strong');
+        }, { tongMua: 0, daThanhToan: 0, tongNo: 0, tamUng: 0, tongNoCuoi: 0 });
+        var summaryRoot = document.querySelector('.store-table .customer-summary-row') || document;
+        var totalPurchaseCell = summaryRoot.querySelector('[data-summary-field="tong-mua"] strong');
+        var totalPaidCell = summaryRoot.querySelector('[data-summary-field="da-thanh-toan"] strong');
+        var totalDebtCell = summaryRoot.querySelector('[data-summary-field="tong-no"] strong');
+        var totalAdvanceCell = summaryRoot.querySelector('[data-summary-field="tam-ung"] strong');
+        var totalFinalDebtCell = summaryRoot.querySelector('[data-summary-field="tong-no-cuoi"] strong');
         if (totalPurchaseCell) totalPurchaseCell.textContent = formatSupplierMoney(totals.tongMua);
         if (totalPaidCell) totalPaidCell.textContent = formatSupplierMoney(totals.daThanhToan);
         if (totalDebtCell) {
           totalDebtCell.textContent = formatSupplierSignedMoney(totals.tongNo);
           setSupplierMoneyTone(totalDebtCell, totals.tongNo);
+        }
+        if (totalAdvanceCell) totalAdvanceCell.textContent = formatSupplierMoney(totals.tamUng);
+        if (totalFinalDebtCell) {
+          totalFinalDebtCell.textContent = formatSupplierSignedMoney(totals.tongNoCuoi);
+          setSupplierMoneyTone(totalFinalDebtCell, totals.tongNoCuoi);
         }
       }
 
@@ -1050,7 +1692,7 @@
         rows.forEach(function(row) {
           row.dataset.metricsLoading = 'false';
           row.dataset.metricsError = 'true';
-          ['tong-mua', 'da-thanh-toan', 'tong-no'].forEach(function(field) {
+          ['tong-mua', 'da-thanh-toan', 'tong-no', 'tam-ung', 'tong-no-cuoi'].forEach(function(field) {
             var cell = row.querySelector('[data-field="' + field + '"]');
             if (!cell) return;
             cell.classList.remove('supplier-metrics-loading');
@@ -1094,15 +1736,19 @@
                 row.dataset.metricTongMua = String(Number(metric.tong_mua || 0));
                 row.dataset.metricDaThanhToan = String(Number(metric.da_thanh_toan || 0));
                 row.dataset.metricTongNo = String(Number(metric.tong_no || 0));
+                row.dataset.metricTamUng = String(Number(metric.tam_ung || 0));
+                row.dataset.metricTongNoCuoi = String(Number(metric.tong_no_cuoi || 0));
                 setSupplierMetricsCell(row, 'tong-mua', metric.tong_mua);
                 setSupplierMetricsCell(row, 'da-thanh-toan', metric.da_thanh_toan);
                 setSupplierMetricsCell(row, 'tong-no', metric.tong_no);
+                setSupplierMetricsCell(row, 'tam-ung', metric.tam_ung);
+                setSupplierMetricsCell(row, 'tong-no-cuoi', metric.tong_no_cuoi);
                 renderSupplierDebtWarning(row, metric);
               });
               batchRows.forEach(function(row) {
                 if (row.dataset.metricsLoading === 'true') {
                   row.dataset.metricsLoading = 'false';
-                  ['tong-mua', 'da-thanh-toan', 'tong-no'].forEach(function(field) {
+                  ['tong-mua', 'da-thanh-toan', 'tong-no', 'tam-ung', 'tong-no-cuoi'].forEach(function(field) {
                     var cell = row.querySelector('[data-field="' + field + '"]');
                     if (cell) cell.classList.remove('supplier-metrics-loading');
                   });
@@ -1123,6 +1769,840 @@
         });
       }
       loadSupplierTableMetrics();
+
+      (function initSupplierAdvanceModal() {
+        var overlay = document.getElementById('supplierAdvanceModalOverlay');
+        var titleEl = document.getElementById('supplierAdvanceModalTitle');
+        var descEl = document.getElementById('supplierAdvanceModalDesc');
+        var rowsEl = document.getElementById('supplierAdvanceModalRows');
+        var closeBtn = document.getElementById('supplierAdvanceModalClose');
+        var cancelBtn = document.getElementById('supplierAdvanceModalCancel');
+        var createBtn = document.getElementById('supplierAdvanceCreateBtn');
+        var createOverlay = document.getElementById('supplierAdvanceCreateOverlay');
+        var createForm = document.getElementById('supplierAdvanceCreateForm');
+        var createDesc = document.getElementById('supplierAdvanceCreateDesc');
+        var createDate = document.getElementById('supplierAdvanceCreateDate');
+        var createAmount = document.getElementById('supplierAdvanceCreateAmount');
+        var createCash = document.getElementById('supplierAdvanceCreateCash');
+        var createTransfer = document.getElementById('supplierAdvanceCreateTransfer');
+        var createCashBook = document.getElementById('supplierAdvanceCreateCashBook');
+        var createBankBook = document.getElementById('supplierAdvanceCreateBankBook');
+        var createNote = document.getElementById('supplierAdvanceCreateNote');
+        var createClose = document.getElementById('supplierAdvanceCreateClose');
+        var createCancel = document.getElementById('supplierAdvanceCreateCancel');
+        var createSubmit = document.getElementById('supplierAdvanceCreateSubmit');
+        var offsetOverlay = document.getElementById('supplierAdvanceOffsetOverlay');
+        var offsetForm = document.getElementById('supplierAdvanceOffsetForm');
+        var offsetDesc = document.getElementById('supplierAdvanceOffsetDesc');
+        var offsetCode = document.getElementById('supplierAdvanceOffsetCode');
+        var offsetRemain = document.getElementById('supplierAdvanceOffsetRemain');
+        var offsetAmount = document.getElementById('supplierAdvanceOffsetAmount');
+        var offsetCash = document.getElementById('supplierAdvanceOffsetCash');
+        var offsetTransfer = document.getElementById('supplierAdvanceOffsetTransfer');
+        var offsetCashBook = document.getElementById('supplierAdvanceOffsetCashBook');
+        var offsetBankBook = document.getElementById('supplierAdvanceOffsetBankBook');
+        var offsetDate = document.getElementById('supplierAdvanceOffsetDate');
+        var offsetNote = document.getElementById('supplierAdvanceOffsetNote');
+        var offsetRowsEl = document.getElementById('supplierAdvanceOffsetRows');
+        var offsetFootEl = document.getElementById('supplierAdvanceOffsetFoot');
+        var offsetTotalDebt = document.getElementById('supplierAdvanceOffsetTotalDebt');
+        var offsetTotalPaid = document.getElementById('supplierAdvanceOffsetTotalPaid');
+        var offsetTotalLeft = document.getElementById('supplierAdvanceOffsetTotalLeft');
+        var offsetUnallocated = document.getElementById('supplierAdvanceOffsetUnallocated');
+        var offsetAllocationsJson = document.getElementById('supplierAdvanceOffsetAllocationsJson');
+        var offsetClose = document.getElementById('supplierAdvanceOffsetClose');
+        var offsetCancel = document.getElementById('supplierAdvanceOffsetCancel');
+        var offsetSubmit = document.getElementById('supplierAdvanceOffsetSubmit');
+        var refundOverlay = document.getElementById('supplierAdvanceRefundOverlay');
+        var refundDesc = document.getElementById('supplierAdvanceRefundDesc');
+        var refundCode = document.getElementById('supplierAdvanceRefundCode');
+        var refundRemain = document.getElementById('supplierAdvanceRefundRemain');
+        var refundDate = document.getElementById('supplierAdvanceRefundDate');
+        var refundAmount = document.getElementById('supplierAdvanceRefundAmount');
+        var refundCash = document.getElementById('supplierAdvanceRefundCash');
+        var refundTransfer = document.getElementById('supplierAdvanceRefundTransfer');
+        var refundCashBook = document.getElementById('supplierAdvanceRefundCashBook');
+        var refundBankBook = document.getElementById('supplierAdvanceRefundBankBook');
+        var refundNote = document.getElementById('supplierAdvanceRefundNote');
+        var refundClose = document.getElementById('supplierAdvanceRefundClose');
+        var refundCancel = document.getElementById('supplierAdvanceRefundCancel');
+        var refundSubmit = document.getElementById('supplierAdvanceRefundSubmit');
+        if (!overlay || !rowsEl) return;
+
+        var currentSupplier = { id: '', code: '', name: '' };
+        var cashBooksCache = [];
+        var currentAdvance = null;
+        var offsetPurchases = [];
+
+        function escapeAdvanceHtml(value) {
+          return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        }
+
+        function parseAdvanceJson(response) {
+          return response.text().then(function(text) {
+            var json = null;
+            try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
+            return { response: response, json: json };
+          });
+        }
+
+        function formatAdvanceDateTime(value) {
+          if (!value) return '---';
+          var date = new Date(value);
+          if (Number.isNaN(date.getTime())) return '---';
+          return date.toLocaleString('vi-VN');
+        }
+
+        function toAdvanceDateTimeLocal(value) {
+          var date = value ? new Date(value) : new Date();
+          if (Number.isNaN(date.getTime())) date = new Date();
+          var local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+          return local.toISOString().slice(0, 16);
+        }
+
+        function closeAdvanceActionMenus(exceptMenu) {
+          document.querySelectorAll('.supplier-advance-action-menu.is-open').forEach(function(menu) {
+            if (exceptMenu && menu === exceptMenu) return;
+            menu.classList.remove('is-open');
+            var toggle = menu.querySelector('[data-advance-menu-toggle]');
+            if (toggle) toggle.setAttribute('aria-expanded', 'false');
+          });
+        }
+
+        function positionAdvanceActionMenu(menu) {
+          if (!menu) return;
+          var toggle = menu.querySelector('[data-advance-menu-toggle]');
+          var dropdown = menu.querySelector('.supplier-advance-action-dropdown');
+          if (!toggle || !dropdown) return;
+          var rect = toggle.getBoundingClientRect();
+          var width = dropdown.offsetWidth || 168;
+          var height = dropdown.offsetHeight || 90;
+          var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
+          var top = rect.bottom + 4;
+          if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 4);
+          dropdown.style.left = left + 'px';
+          dropdown.style.top = top + 'px';
+        }
+
+        function renderAdvanceRows(rows) {
+          if (!rows || !rows.length) {
+            rowsEl.innerHTML = '<tr><td colspan="10" class="supplier-advance-modal__empty">Chưa có phiếu tạm ứng.</td></tr>';
+            return;
+          }
+          rowsEl.innerHTML = rows.map(function(row) {
+            var note = String(row.ghi_chu || '').trim() || '---';
+            var remain = Number(row.con_lai || 0);
+            var canAct = remain > 0 && row.trang_thai !== 'huy';
+            var actions = canAct
+              ? ('<div class="supplier-advance-action-menu">' +
+                  '<button type="button" class="supplier-advance-more-btn" data-advance-menu-toggle aria-label="Thao tác" aria-expanded="false">⋯</button>' +
+                  '<div class="supplier-advance-action-dropdown" role="menu">' +
+                    '<button type="button" class="supplier-advance-menu-item js-advance-offset" role="menuitem"' +
+                      ' data-advance-id="' + escapeAdvanceHtml(row.id) + '"' +
+                      ' data-advance-code="' + escapeAdvanceHtml(row.ma_phieu || '') + '"' +
+                      ' data-advance-remain="' + escapeAdvanceHtml(remain) + '">Cấn trừ</button>' +
+                    '<button type="button" class="supplier-advance-menu-item js-advance-refund" role="menuitem"' +
+                      ' data-advance-id="' + escapeAdvanceHtml(row.id) + '"' +
+                      ' data-advance-code="' + escapeAdvanceHtml(row.ma_phieu || '') + '"' +
+                      ' data-advance-remain="' + escapeAdvanceHtml(remain) + '">Hoàn tiền</button>' +
+                  '</div>' +
+                '</div>')
+              : '—';
+            return '<tr>' +
+              '<td>' + escapeAdvanceHtml(row.ma_phieu || '---') + '</td>' +
+              '<td>' + escapeAdvanceHtml(formatAdvanceDateTime(row.ngay_lap)) + '</td>' +
+              '<td class="num">' + formatSupplierMoney(row.so_tien) + '</td>' +
+              '<td class="num">' + formatSupplierMoney(row.da_can_tru) + '</td>' +
+              '<td class="num">' + formatSupplierMoney(row.da_hoan) + '</td>' +
+              '<td class="num">' + formatSupplierMoney(row.con_lai) + '</td>' +
+              '<td>' + escapeAdvanceHtml(row.phuong_thuc_text || '---') + '</td>' +
+              '<td>' + escapeAdvanceHtml(row.trang_thai_text || '---') + '</td>' +
+              '<td class="note" title="' + escapeAdvanceHtml(note) + '">' + escapeAdvanceHtml(note) + '</td>' +
+              '<td class="actions">' + actions + '</td>' +
+            '</tr>';
+          }).join('');
+        }
+
+        function refreshSupplierAdvanceCell(supplierId, delta, debtDelta) {
+          var row = document.querySelector('.supplier-row[data-supplier-id="' + supplierId + '"]');
+          if (!row) return;
+          var nextAdvance = Math.max(0, Number(row.dataset.metricTamUng || 0) + Number(delta || 0));
+          var nextTongNo = Math.max(0, Number(row.dataset.metricTongNo || 0) + Number(debtDelta || 0));
+          var tongNoCuoi = nextTongNo - nextAdvance;
+          row.dataset.metricTamUng = String(nextAdvance);
+          row.dataset.metricTongNo = String(nextTongNo);
+          row.dataset.metricTongNoCuoi = String(tongNoCuoi);
+          setSupplierMetricsCell(row, 'tam-ung', nextAdvance);
+          setSupplierMetricsCell(row, 'tong-no', nextTongNo);
+          setSupplierMetricsCell(row, 'tong-no-cuoi', tongNoCuoi);
+          updateSupplierSummaryTotals(Array.prototype.slice.call(document.querySelectorAll('.supplier-row[data-supplier-id]')));
+        }
+
+        function fillCashBookSelect(selectEl, options, emptyLabel) {
+          if (!selectEl) return;
+          selectEl.innerHTML = '<option value="">' + escapeAdvanceHtml(emptyLabel) + '</option>' + options.map(function(item) {
+            var label = item.loai_so_quy === 'chuyen_khoan'
+              ? ((item.ten_ngan_hang || item.ten_so_quy || 'Tài khoản') + (item.so_tai_khoan ? (' - ' + item.so_tai_khoan) : ''))
+              : (item.ten_so_quy || 'Sổ tiền mặt');
+            return '<option value="' + escapeAdvanceHtml(item.id) + '"' + (item.mac_dinh ? ' selected' : '') + '>' +
+              escapeAdvanceHtml(label) + '</option>';
+          }).join('');
+        }
+
+        function fillCashBookSelects(books) {
+          cashBooksCache = Array.isArray(books) ? books : [];
+          var cashOptions = cashBooksCache.filter(function(item) {
+            return (item.loai_so_quy || 'tien_mat') === 'tien_mat';
+          });
+          var bankOptions = cashBooksCache.filter(function(item) {
+            return item.loai_so_quy === 'chuyen_khoan';
+          });
+          fillCashBookSelect(createCashBook, cashOptions, 'Chọn sổ tiền mặt');
+          fillCashBookSelect(createBankBook, bankOptions, 'Chọn sổ chuyển khoản');
+          fillCashBookSelect(offsetCashBook, cashOptions, 'Chọn sổ tiền mặt');
+          fillCashBookSelect(offsetBankBook, bankOptions, 'Chọn sổ chuyển khoản');
+          fillCashBookSelect(refundCashBook, cashOptions, 'Chọn sổ tiền mặt');
+          fillCashBookSelect(refundBankBook, bankOptions, 'Chọn sổ chuyển khoản');
+        }
+
+        function closeOffsetModal() {
+          if (!offsetOverlay) return;
+          offsetOverlay.classList.remove('is-open');
+          offsetOverlay.setAttribute('aria-hidden', 'true');
+          currentAdvance = null;
+          offsetPurchases = [];
+        }
+
+        function closeRefundModal() {
+          if (!refundOverlay) return;
+          refundOverlay.classList.remove('is-open');
+          refundOverlay.setAttribute('aria-hidden', 'true');
+          currentAdvance = null;
+        }
+
+        function closeCreateAdvanceModal() {
+          if (!createOverlay) return;
+          createOverlay.classList.remove('is-open');
+          createOverlay.setAttribute('aria-hidden', 'true');
+        }
+
+        function closeAdvanceModal() {
+          closeCreateAdvanceModal();
+          closeOffsetModal();
+          closeRefundModal();
+          closeAdvanceActionMenus();
+          overlay.classList.remove('is-open');
+          overlay.setAttribute('aria-hidden', 'true');
+          currentSupplier = { id: '', code: '', name: '' };
+        }
+
+        function loadAdvanceList() {
+          if (!currentSupplier.id) return Promise.resolve();
+          rowsEl.innerHTML = '<tr><td colspan="10" class="supplier-advance-modal__empty">Đang tải...</td></tr>';
+          return fetch('/nha-cung-cap/api/' + encodeURIComponent(currentSupplier.id) + '/tam-ung', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin'
+          })
+            .then(parseAdvanceJson)
+            .then(function(result) {
+              if (!result.response.ok || !result.json || result.json.success === false) {
+                throw new Error((result.json && result.json.message) || 'Không tải được phiếu tạm ứng.');
+              }
+              return result.json;
+            })
+            .then(function(payload) {
+              fillCashBookSelects(payload.cash_books || []);
+              renderAdvanceRows(payload.rows || []);
+            })
+            .catch(function(error) {
+              rowsEl.innerHTML = '<tr><td colspan="10" class="supplier-advance-modal__empty">' +
+                escapeAdvanceHtml(error.message || 'Không tải được phiếu tạm ứng.') +
+                '</td></tr>';
+            });
+        }
+
+        function openAdvanceModal(supplierId, supplierCode, supplierName) {
+          if (!supplierId) return;
+          currentSupplier = {
+            id: supplierId,
+            code: supplierCode || '',
+            name: supplierName || ''
+          };
+          var label = [currentSupplier.code, currentSupplier.name].filter(Boolean).join(' - ') || 'nhà cung cấp';
+          if (titleEl) titleEl.textContent = 'Phiếu tạm ứng';
+          if (descEl) descEl.textContent = 'Danh sách phiếu tạm ứng của ' + label + '.';
+          overlay.classList.add('is-open');
+          overlay.setAttribute('aria-hidden', 'false');
+          loadAdvanceList();
+        }
+
+        function openCreateAdvanceModal() {
+          if (!currentSupplier.id) return alert('Vui lòng chọn nhà cung cấp.');
+          var label = [currentSupplier.code, currentSupplier.name].filter(Boolean).join(' - ') || 'nhà cung cấp';
+          if (createDesc) createDesc.textContent = 'Tạm ứng cho ' + label + '.';
+          if (createForm) createForm.reset();
+          if (createDate) createDate.value = toAdvanceDateTimeLocal(new Date());
+          if (createAmount) createAmount.value = '';
+          if (createCash) createCash.value = '';
+          if (createTransfer) createTransfer.value = '';
+          if (createNote) createNote.value = '';
+          fillCashBookSelects(cashBooksCache);
+          if (createOverlay) {
+            createOverlay.classList.add('is-open');
+            createOverlay.setAttribute('aria-hidden', 'false');
+          }
+          if (createCash) createCash.focus();
+        }
+
+        function setOffsetRowInputValue(input, value) {
+          if (!input) return;
+          var amount = Math.max(0, Number(value || 0));
+          input.value = amount ? formatSupplierMoney(amount) : '0';
+        }
+
+        function getOffsetRowAllocations() {
+          var rows = [];
+          if (!offsetRowsEl) return rows;
+          Array.prototype.slice.call(offsetRowsEl.querySelectorAll('.js-advance-offset-row-paid')).forEach(function(input) {
+            var paid = Number(parseSupplierMoney(input.value) || 0);
+            if (paid <= 0) return;
+            rows.push({
+              phieu_nhap_id: input.getAttribute('data-purchase-id') || '',
+              ma_phieu_nhap: input.getAttribute('data-purchase-code') || '',
+              so_tien: paid
+            });
+          });
+          return rows;
+        }
+
+        function syncOffsetAllocationJson() {
+          if (offsetAllocationsJson) {
+            offsetAllocationsJson.value = JSON.stringify(getOffsetRowAllocations());
+          }
+        }
+
+        function updateOffsetAllocation(source) {
+          if (!offsetForm) return;
+          var remainLimit = Math.max(0, Number((currentAdvance && currentAdvance.remain) || offsetForm.getAttribute('data-advance-remain') || 0));
+          var totalDebt = 0;
+          Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-advance-offset-row') : []).forEach(function(row) {
+            totalDebt += Math.max(0, Number(row.getAttribute('data-debt') || 0));
+          });
+          var cap = Math.min(remainLimit, totalDebt);
+          var amount = Number(parseSupplierMoney(offsetAmount && offsetAmount.value) || 0);
+          amount = Math.min(Math.max(0, amount), cap);
+
+          if (source === 'amount') {
+            if (offsetAmount) offsetAmount.value = amount ? formatSupplierMoney(amount) : '';
+            var rest = amount;
+            Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-advance-offset-row') : []).forEach(function(row) {
+              var rowDebt = Math.max(0, Number(row.getAttribute('data-debt') || 0));
+              var paid = Math.min(rest, rowDebt);
+              rest -= paid;
+              setOffsetRowInputValue(row.querySelector('.js-advance-offset-row-paid'), paid);
+            });
+          } else {
+            var used = 0;
+            Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-advance-offset-row-paid') : []).forEach(function(input) {
+              var rowDebt = Math.max(0, Number(input.getAttribute('data-debt') || 0));
+              var paid = Math.min(Number(parseSupplierMoney(input.value) || 0), rowDebt, Math.max(0, amount - used));
+              used += paid;
+              setOffsetRowInputValue(input, paid);
+            });
+          }
+
+          var totalPaid = 0;
+          var totalLeft = 0;
+          Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-advance-offset-row') : []).forEach(function(row) {
+            var rowDebt = Math.max(0, Number(row.getAttribute('data-debt') || 0));
+            var input = row.querySelector('.js-advance-offset-row-paid');
+            var paid = Math.min(Number(parseSupplierMoney(input && input.value) || 0), rowDebt);
+            totalPaid += paid;
+            totalLeft += Math.max(0, rowDebt - paid);
+            var leftCell = row.querySelector('.js-advance-offset-row-left');
+            if (leftCell) leftCell.textContent = formatSupplierMoney(rowDebt - paid);
+          });
+          if (offsetTotalDebt) offsetTotalDebt.textContent = formatSupplierMoney(totalDebt);
+          if (offsetTotalPaid) offsetTotalPaid.textContent = formatSupplierMoney(totalPaid);
+          if (offsetTotalLeft) offsetTotalLeft.textContent = formatSupplierMoney(totalLeft);
+          if (offsetUnallocated) offsetUnallocated.textContent = formatSupplierMoney(Math.max(0, amount - totalPaid));
+          syncOffsetAllocationJson();
+        }
+
+        function syncOffsetAmountFromParts() {
+          var cash = Number(parseSupplierMoney(offsetCash && offsetCash.value) || 0);
+          var transfer = Number(parseSupplierMoney(offsetTransfer && offsetTransfer.value) || 0);
+          var total = cash + transfer;
+          if (offsetAmount) offsetAmount.value = total ? formatSupplierMoney(total) : '';
+          if (offsetCashBook) offsetCashBook.disabled = cash <= 0;
+          if (offsetBankBook) offsetBankBook.disabled = transfer <= 0;
+          updateOffsetAllocation('amount');
+        }
+
+        function formatOffsetDateTime(value) {
+          if (!value) return '---';
+          var date = new Date(value);
+          if (Number.isNaN(date.getTime())) return '---';
+          var dd = String(date.getDate()).padStart(2, '0');
+          var mm = String(date.getMonth() + 1).padStart(2, '0');
+          var yyyy = date.getFullYear();
+          var hh = String(date.getHours()).padStart(2, '0');
+          var mi = String(date.getMinutes()).padStart(2, '0');
+          return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + mi;
+        }
+
+        function renderOffsetPurchaseRows(rows) {
+          if (!offsetRowsEl) return;
+          if (!rows || !rows.length) {
+            offsetRowsEl.innerHTML = '<tr><td colspan="7"><div class="supplier-pay-empty"><span>Không có phiếu nhập còn nợ</span></div></td></tr>';
+            if (offsetFootEl) offsetFootEl.style.display = 'none';
+            return;
+          }
+          offsetRowsEl.innerHTML = rows.map(function(item) {
+            var debt = Math.max(0, Number(item.con_no || 0));
+            return '<tr class="js-advance-offset-row" data-debt="' + escapeAdvanceHtml(debt) + '">' +
+              '<td class="supplier-advance-offset-code-cell">' +
+                '<span class="supplier-advance-offset-code">' + escapeAdvanceHtml(item.ma_phieu_nhap || '---') + '</span>' +
+                '<span class="supplier-advance-offset-type">Phiếu nhập</span>' +
+              '</td>' +
+              '<td>' + escapeAdvanceHtml(formatOffsetDateTime(item.ngay_nhap)) + '</td>' +
+              '<td class="text-right">' + formatSupplierMoney(item.can_tra_ncc) + '</td>' +
+              '<td class="text-right">' + formatSupplierMoney(item.da_tra_ncc) + '</td>' +
+              '<td class="text-right">' + formatSupplierMoney(debt) + '</td>' +
+              '<td class="text-right">' +
+                '<input class="supplier-pay-row-input js-advance-offset-row-paid" inputmode="numeric" autocomplete="off" value="0"' +
+                  ' data-purchase-id="' + escapeAdvanceHtml(item.id) + '"' +
+                  ' data-purchase-code="' + escapeAdvanceHtml(item.ma_phieu_nhap || '') + '"' +
+                  ' data-debt="' + escapeAdvanceHtml(debt) + '">' +
+              '</td>' +
+              '<td class="text-right js-advance-offset-row-left">' + formatSupplierMoney(debt) + '</td>' +
+            '</tr>';
+          }).join('');
+          if (offsetFootEl) offsetFootEl.style.display = '';
+        }
+
+        function openOffsetModal(advanceId, advanceCode, remain) {
+          if (!currentSupplier.id || !advanceId) return;
+          currentAdvance = {
+            id: advanceId,
+            code: advanceCode || '',
+            remain: Number(remain || 0)
+          };
+          if (offsetForm) offsetForm.setAttribute('data-advance-remain', String(currentAdvance.remain));
+          if (offsetDesc) {
+            offsetDesc.textContent = 'Cấn trừ ' + (currentAdvance.code || 'phiếu tạm ứng') +
+              ' vào phiếu nhập của ' + ([currentSupplier.code, currentSupplier.name].filter(Boolean).join(' - ') || 'NCC') + '.';
+          }
+          if (offsetCode) offsetCode.value = currentAdvance.code || '';
+          if (offsetRemain) offsetRemain.value = formatSupplierMoney(currentAdvance.remain);
+          if (offsetAmount) offsetAmount.value = '';
+          if (offsetCash) offsetCash.value = '';
+          if (offsetTransfer) offsetTransfer.value = '';
+          if (offsetDate) offsetDate.value = toAdvanceDateTimeLocal(new Date());
+          if (offsetNote) offsetNote.value = '';
+          fillCashBookSelects(cashBooksCache);
+          if (offsetCashBook) offsetCashBook.disabled = true;
+          if (offsetBankBook) offsetBankBook.disabled = true;
+          if (offsetRowsEl) {
+            offsetRowsEl.innerHTML = '<tr><td colspan="7"><div class="supplier-pay-empty"><span>Đang tải phiếu nhập...</span></div></td></tr>';
+          }
+          if (offsetFootEl) offsetFootEl.style.display = 'none';
+          if (offsetOverlay) {
+            offsetOverlay.classList.add('is-open');
+            offsetOverlay.setAttribute('aria-hidden', 'false');
+          }
+
+          fetch('/nha-cung-cap/api/' + encodeURIComponent(currentSupplier.id) +
+            '/tam-ung/' + encodeURIComponent(advanceId) + '/phieu-nhap', {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin'
+          })
+            .then(parseAdvanceJson)
+            .then(function(result) {
+              if (!result.response.ok || !result.json || result.json.success === false) {
+                throw new Error((result.json && result.json.message) || 'Không tải được phiếu nhập.');
+              }
+              return result.json;
+            })
+            .then(function(payload) {
+              if (payload.advance) {
+                currentAdvance.remain = Number(payload.advance.con_lai || currentAdvance.remain || 0);
+                currentAdvance.code = payload.advance.ma_phieu || currentAdvance.code || '';
+                if (offsetForm) offsetForm.setAttribute('data-advance-remain', String(currentAdvance.remain));
+                if (offsetRemain) offsetRemain.value = formatSupplierMoney(currentAdvance.remain);
+                if (offsetCode) offsetCode.value = currentAdvance.code || '';
+              }
+              offsetPurchases = payload.rows || [];
+              renderOffsetPurchaseRows(offsetPurchases);
+              var totalDebt = offsetPurchases.reduce(function(sum, item) {
+                return sum + Math.max(0, Number(item.con_no || 0));
+              }, 0);
+              var defaultAmount = Math.min(currentAdvance.remain, totalDebt);
+              if (offsetCash) offsetCash.value = defaultAmount ? formatSupplierMoney(defaultAmount) : '';
+              if (offsetTransfer) offsetTransfer.value = '';
+              syncOffsetAmountFromParts();
+              if (offsetCash) offsetCash.focus();
+            })
+            .catch(function(error) {
+              if (offsetRowsEl) {
+                offsetRowsEl.innerHTML = '<tr><td colspan="7"><div class="supplier-pay-empty"><span>' +
+                  escapeAdvanceHtml(error.message || 'Không tải được phiếu nhập') +
+                  '</span></div></td></tr>';
+              }
+            });
+        }
+
+        function openRefundModal(advanceId, advanceCode, remain) {
+          if (!currentSupplier.id || !advanceId) return;
+          currentAdvance = {
+            id: advanceId,
+            code: advanceCode || '',
+            remain: Number(remain || 0)
+          };
+          var label = [currentSupplier.code, currentSupplier.name].filter(Boolean).join(' - ') || 'nhà cung cấp';
+          if (refundDesc) refundDesc.textContent = 'Hoàn tiền tạm ứng ' + (currentAdvance.code || '') + ' của ' + label + '.';
+          if (refundCode) refundCode.value = currentAdvance.code || '';
+          if (refundRemain) refundRemain.value = formatSupplierMoney(currentAdvance.remain);
+          if (refundDate) refundDate.value = toAdvanceDateTimeLocal(new Date());
+          if (refundAmount) refundAmount.value = '';
+          if (refundCash) refundCash.value = '';
+          if (refundTransfer) refundTransfer.value = '';
+          if (refundNote) refundNote.value = '';
+          fillCashBookSelects(cashBooksCache);
+          if (refundOverlay) {
+            refundOverlay.classList.add('is-open');
+            refundOverlay.setAttribute('aria-hidden', 'false');
+          }
+          if (refundCash) refundCash.focus();
+        }
+
+        function formatAdvanceMoneyInput(input) {
+          if (!input) return;
+          var digits = String(input.value || '').replace(/\D/g, '');
+          input.value = digits === '' ? '' : formatSupplierMoney(digits);
+        }
+
+        function syncAdvanceAmountFromParts() {
+          if (!createAmount) return;
+          var cash = Number(parseSupplierMoney(createCash && createCash.value) || 0);
+          var transfer = Number(parseSupplierMoney(createTransfer && createTransfer.value) || 0);
+          var total = cash + transfer;
+          createAmount.value = total ? formatSupplierMoney(total) : '';
+        }
+
+        function syncRefundAmountFromParts() {
+          if (!refundAmount) return;
+          var cash = Number(parseSupplierMoney(refundCash && refundCash.value) || 0);
+          var transfer = Number(parseSupplierMoney(refundTransfer && refundTransfer.value) || 0);
+          var total = cash + transfer;
+          refundAmount.value = total ? formatSupplierMoney(total) : '';
+        }
+
+        function submitCreateAdvance() {
+          if (!currentSupplier.id) return;
+          var cash = Number(parseSupplierMoney(createCash && createCash.value) || 0);
+          var transfer = Number(parseSupplierMoney(createTransfer && createTransfer.value) || 0);
+          var amount = cash + transfer;
+          if (amount <= 0) return alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+          if (cash > 0 && !(createCashBook && createCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+          if (transfer > 0 && !(createBankBook && createBankBook.value)) return alert('Vui lòng chọn sổ chuyển khoản.');
+
+          if (createSubmit) createSubmit.disabled = true;
+          fetch('/nha-cung-cap/' + encodeURIComponent(currentSupplier.id) + '/tam-ung', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              payment_v2: true,
+              ngay_lap: createDate ? createDate.value : '',
+              gia_tri: amount,
+              ghi_chu: createNote ? createNote.value : '',
+              chi_tiet_thanh_toan: {
+                tien_mat: cash,
+                chuyen_khoan: transfer,
+                so_quy_tien_mat_id: createCashBook ? createCashBook.value : '',
+                so_quy_chuyen_khoan_id: createBankBook ? createBankBook.value : ''
+              }
+            })
+          })
+            .then(parseAdvanceJson)
+            .then(function(result) {
+              if (!result.response.ok || !result.json || result.json.success === false) {
+                throw new Error((result.json && result.json.message) || 'Không tạo được phiếu tạm ứng.');
+              }
+              return result.json;
+            })
+            .then(function(json) {
+              closeCreateAdvanceModal();
+              refreshSupplierAdvanceCell(currentSupplier.id, amount, 0);
+              return loadAdvanceList().then(function() {
+                alert(json.message || 'Đã tạo phiếu tạm ứng.');
+              });
+            })
+            .catch(function(error) {
+              alert(error.message || 'Không tạo được phiếu tạm ứng.');
+            })
+            .finally(function() {
+              if (createSubmit) createSubmit.disabled = false;
+            });
+        }
+
+        function submitOffsetAdvance() {
+          if (!currentSupplier.id || !currentAdvance || !currentAdvance.id) return;
+          var cash = Number(parseSupplierMoney(offsetCash && offsetCash.value) || 0);
+          var transfer = Number(parseSupplierMoney(offsetTransfer && offsetTransfer.value) || 0);
+          var paymentAmount = cash + transfer;
+          if (paymentAmount <= 0) return alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+          if (cash > 0 && !(offsetCashBook && offsetCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+          if (transfer > 0 && !(offsetBankBook && offsetBankBook.value)) return alert('Vui lòng chọn sổ chuyển khoản.');
+          if (paymentAmount > Number(currentAdvance.remain || 0)) return alert('Số tiền vượt quá còn lại của phiếu tạm ứng.');
+
+          syncOffsetAmountFromParts();
+          var allocations = getOffsetRowAllocations();
+          var amount = allocations.reduce(function(sum, row) { return sum + Number(row.so_tien || 0); }, 0);
+          if (amount <= 0) return alert('Vui lòng phân bổ số tiền cấn trừ vào phiếu nhập.');
+          if (Math.abs(amount - paymentAmount) > 0.0001) return alert('Tổng tiền mặt/chuyển khoản phải bằng số tiền đã phân bổ.');
+
+          if (offsetSubmit) offsetSubmit.disabled = true;
+          fetch('/nha-cung-cap/' + encodeURIComponent(currentSupplier.id) +
+            '/tam-ung/' + encodeURIComponent(currentAdvance.id) + '/can-tru', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              payment_v2: true,
+              so_tien: amount,
+              gia_tri: amount,
+              ngay_lap: offsetDate ? offsetDate.value : '',
+              ghi_chu: offsetNote ? offsetNote.value : '',
+              allocations_json: JSON.stringify(allocations),
+              chi_tiet_thanh_toan: {
+                tien_mat: cash,
+                chuyen_khoan: transfer,
+                so_quy_tien_mat_id: offsetCashBook ? offsetCashBook.value : '',
+                so_quy_chuyen_khoan_id: offsetBankBook ? offsetBankBook.value : ''
+              }
+            })
+          })
+            .then(parseAdvanceJson)
+            .then(function(result) {
+              if (!result.response.ok || !result.json || result.json.success === false) {
+                throw new Error((result.json && result.json.message) || 'Không cấn trừ được tạm ứng.');
+              }
+              return result.json;
+            })
+            .then(function(json) {
+              closeOffsetModal();
+              refreshSupplierAdvanceCell(currentSupplier.id, -amount, -amount);
+              return loadAdvanceList().then(function() {
+                alert(json.message || 'Đã cấn trừ tạm ứng.');
+              });
+            })
+            .catch(function(error) {
+              alert(error.message || 'Không cấn trừ được tạm ứng.');
+            })
+            .finally(function() {
+              if (offsetSubmit) offsetSubmit.disabled = false;
+            });
+        }
+
+        function submitRefundAdvance() {
+          if (!currentSupplier.id || !currentAdvance || !currentAdvance.id) return;
+          var cash = Number(parseSupplierMoney(refundCash && refundCash.value) || 0);
+          var transfer = Number(parseSupplierMoney(refundTransfer && refundTransfer.value) || 0);
+          var amount = cash + transfer;
+          if (amount <= 0) return alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+          if (amount > Number(currentAdvance.remain || 0)) return alert('Số tiền hoàn vượt quá còn lại của phiếu tạm ứng.');
+          if (cash > 0 && !(refundCashBook && refundCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+          if (transfer > 0 && !(refundBankBook && refundBankBook.value)) return alert('Vui lòng chọn sổ chuyển khoản.');
+
+          if (refundSubmit) refundSubmit.disabled = true;
+          fetch('/nha-cung-cap/' + encodeURIComponent(currentSupplier.id) +
+            '/tam-ung/' + encodeURIComponent(currentAdvance.id) + '/hoan-tien', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              payment_v2: true,
+              ngay_lap: refundDate ? refundDate.value : '',
+              gia_tri: amount,
+              ghi_chu: refundNote ? refundNote.value : '',
+              chi_tiet_thanh_toan: {
+                tien_mat: cash,
+                chuyen_khoan: transfer,
+                so_quy_tien_mat_id: refundCashBook ? refundCashBook.value : '',
+                so_quy_chuyen_khoan_id: refundBankBook ? refundBankBook.value : ''
+              }
+            })
+          })
+            .then(parseAdvanceJson)
+            .then(function(result) {
+              if (!result.response.ok || !result.json || result.json.success === false) {
+                throw new Error((result.json && result.json.message) || 'Không hoàn được tạm ứng.');
+              }
+              return result.json;
+            })
+            .then(function(json) {
+              closeRefundModal();
+              refreshSupplierAdvanceCell(currentSupplier.id, -amount, 0);
+              return loadAdvanceList().then(function() {
+                alert(json.message || 'Đã hoàn tiền tạm ứng.');
+              });
+            })
+            .catch(function(error) {
+              alert(error.message || 'Không hoàn được tạm ứng.');
+            })
+            .finally(function() {
+              if (refundSubmit) refundSubmit.disabled = false;
+            });
+        }
+
+        document.addEventListener('click', function(event) {
+          var advanceLink = event.target.closest('.js-supplier-advance-link');
+          if (advanceLink) {
+            event.preventDefault();
+            event.stopPropagation();
+            openAdvanceModal(
+              advanceLink.getAttribute('data-supplier-id') || '',
+              advanceLink.getAttribute('data-supplier-code') || '',
+              advanceLink.getAttribute('data-supplier-name') || ''
+            );
+            return;
+          }
+
+          var menuToggle = event.target.closest('[data-advance-menu-toggle]');
+          if (menuToggle) {
+            event.preventDefault();
+            event.stopPropagation();
+            var menu = menuToggle.closest('.supplier-advance-action-menu');
+            var willOpen = menu && !menu.classList.contains('is-open');
+            closeAdvanceActionMenus();
+            if (willOpen && menu) {
+              menu.classList.add('is-open');
+              menuToggle.setAttribute('aria-expanded', 'true');
+              positionAdvanceActionMenu(menu);
+            }
+            return;
+          }
+
+          var offsetBtn = event.target.closest('.js-advance-offset');
+          if (offsetBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeAdvanceActionMenus();
+            openOffsetModal(
+              offsetBtn.getAttribute('data-advance-id') || '',
+              offsetBtn.getAttribute('data-advance-code') || '',
+              offsetBtn.getAttribute('data-advance-remain') || 0
+            );
+            return;
+          }
+
+          var refundBtn = event.target.closest('.js-advance-refund');
+          if (refundBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            closeAdvanceActionMenus();
+            openRefundModal(
+              refundBtn.getAttribute('data-advance-id') || '',
+              refundBtn.getAttribute('data-advance-code') || '',
+              refundBtn.getAttribute('data-advance-remain') || 0
+            );
+            return;
+          }
+
+          if (!event.target.closest('.supplier-advance-action-menu')) {
+            closeAdvanceActionMenus();
+          }
+        });
+
+        if (createBtn) createBtn.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          openCreateAdvanceModal();
+        });
+        [createCash, createTransfer].forEach(function(input) {
+          if (!input) return;
+          input.addEventListener('input', function() {
+            formatAdvanceMoneyInput(input);
+            syncAdvanceAmountFromParts();
+          });
+          input.addEventListener('blur', function() {
+            formatAdvanceMoneyInput(input);
+            syncAdvanceAmountFromParts();
+          });
+        });
+        [refundCash, refundTransfer].forEach(function(input) {
+          if (!input) return;
+          input.addEventListener('input', function() {
+            formatAdvanceMoneyInput(input);
+            syncRefundAmountFromParts();
+          });
+          input.addEventListener('blur', function() {
+            formatAdvanceMoneyInput(input);
+            syncRefundAmountFromParts();
+          });
+        });
+        [offsetCash, offsetTransfer].forEach(function(input) {
+          if (!input) return;
+          input.addEventListener('input', function() {
+            formatAdvanceMoneyInput(input);
+            syncOffsetAmountFromParts();
+          });
+          input.addEventListener('blur', function() {
+            formatAdvanceMoneyInput(input);
+            syncOffsetAmountFromParts();
+          });
+        });
+        if (offsetRowsEl) {
+          offsetRowsEl.addEventListener('input', function(event) {
+            var input = event.target.closest('.js-advance-offset-row-paid');
+            if (!input) return;
+            formatAdvanceMoneyInput(input);
+            updateOffsetAllocation('row');
+          });
+          offsetRowsEl.addEventListener('blur', function(event) {
+            var input = event.target.closest('.js-advance-offset-row-paid');
+            if (!input) return;
+            formatAdvanceMoneyInput(input);
+            updateOffsetAllocation('row');
+          }, true);
+        }
+        if (createSubmit) createSubmit.addEventListener('click', submitCreateAdvance);
+        if (createClose) createClose.addEventListener('click', closeCreateAdvanceModal);
+        if (createCancel) createCancel.addEventListener('click', closeCreateAdvanceModal);
+        if (offsetSubmit) offsetSubmit.addEventListener('click', submitOffsetAdvance);
+        if (offsetClose) offsetClose.addEventListener('click', closeOffsetModal);
+        if (offsetCancel) offsetCancel.addEventListener('click', closeOffsetModal);
+        if (refundSubmit) refundSubmit.addEventListener('click', submitRefundAdvance);
+        if (refundClose) refundClose.addEventListener('click', closeRefundModal);
+        if (refundCancel) refundCancel.addEventListener('click', closeRefundModal);
+        if (closeBtn) closeBtn.addEventListener('click', closeAdvanceModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeAdvanceModal);
+        window.addEventListener('resize', function() {
+          document.querySelectorAll('.supplier-advance-action-menu.is-open').forEach(positionAdvanceActionMenu);
+        });
+        document.addEventListener('keydown', function(event) {
+          if (event.key !== 'Escape') return;
+          if (offsetOverlay && offsetOverlay.classList.contains('is-open')) {
+            closeOffsetModal();
+            return;
+          }
+          if (refundOverlay && refundOverlay.classList.contains('is-open')) {
+            closeRefundModal();
+            return;
+          }
+          if (createOverlay && createOverlay.classList.contains('is-open')) {
+            closeCreateAdvanceModal();
+            return;
+          }
+          if (overlay.classList.contains('is-open')) closeAdvanceModal();
+        });
+      })();
 
       var selectAll = document.getElementById('selectAllSuppliers');
       var checkboxes = Array.prototype.slice.call(document.querySelectorAll('.supplier-checkbox'));
@@ -1215,9 +2695,12 @@
         applySupplierDebtRowWarnings(wrap);
       }
       if (kvSupplierTable && typeof KvInlineDetail !== 'undefined') {
+        var supplierDetailColspan = (kvSupplierTable.tHead && kvSupplierTable.tHead.rows[0])
+          ? kvSupplierTable.tHead.rows[0].cells.length
+          : 11;
         kvSupplier = new KvInlineDetail({
           table: kvSupplierTable,
-          colspan: 9,
+          colspan: supplierDetailColspan,
           buildUrl: function(id) {
             return '/nha-cung-cap/api/' + encodeURIComponent(id) + '/detail';
           },

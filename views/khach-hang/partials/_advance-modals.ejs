@@ -1,0 +1,1483 @@
+<style>
+  .customer-advance-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(15, 23, 42, 0.45);
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+    overflow: auto;
+  }
+  .customer-advance-modal-overlay.is-open { display: flex; }
+  .customer-advance-modal {
+    width: min(1100px, 100%);
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+    overflow: hidden;
+    margin-top: 24px;
+  }
+  .customer-advance-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .customer-advance-modal__header h3 { margin: 0; font-size: 16px; }
+  .customer-advance-modal__close {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #64748b;
+  }
+  .customer-advance-modal__body { padding: 16px; }
+  .customer-advance-modal__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .customer-advance-modal__desc {
+    margin: 0;
+    color: #64748b;
+    font-size: 13px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .customer-advance-modal__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+  .customer-advance-modal__table-wrap {
+    overflow: auto;
+    max-height: min(520px, calc(100vh - 220px));
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+  }
+  .customer-advance-modal__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .customer-advance-modal__table th,
+  .customer-advance-modal__table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eef2f7;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .customer-advance-modal__table th {
+    background: #f8fafc;
+    color: #475569;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .customer-advance-modal__table td.num,
+  .customer-advance-modal__table th.num { text-align: right; }
+  .customer-advance-modal__table th.note,
+  .customer-advance-modal__table td.note {
+    width: 180px;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .customer-advance-modal__table th.actions,
+  .customer-advance-modal__table td.actions {
+    width: 64px;
+    text-align: center;
+    overflow: visible;
+    white-space: normal;
+  }
+  .customer-advance-action-menu {
+    position: relative;
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+  }
+  .customer-advance-more-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #cfd8e3;
+    background: #fff;
+    color: #344054;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 0;
+  }
+  .customer-advance-more-btn:hover,
+  .customer-advance-action-menu.is-open .customer-advance-more-btn {
+    border-color: #0070f4;
+    color: #006dff;
+    background: #eff6ff;
+  }
+  .customer-advance-more-btn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+  }
+  .customer-advance-action-dropdown {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1500;
+    display: none;
+    min-width: 168px;
+    padding: 6px;
+    border: 1px solid #d9e2ec;
+    border-radius: 7px;
+    background: #fff;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, .16);
+  }
+  .customer-advance-action-menu.is-open .customer-advance-action-dropdown { display: block; }
+  .customer-advance-menu-item {
+    width: 100%;
+    min-height: 34px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: #1f2937;
+    padding: 0 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .customer-advance-menu-item:hover { background: #f1f5f9; color: #006dff; }
+  .customer-advance-modal__empty {
+    padding: 28px 16px;
+    text-align: center;
+    color: #94a3b8;
+  }
+  .customer-advance-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 12px 16px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+  .customer-advance-create-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1400;
+    background: rgba(15, 23, 42, 0.45);
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+    overflow: auto;
+  }
+  .customer-advance-create-overlay.is-open { display: flex; }
+  .customer-advance-create-modal {
+    width: min(560px, 100%);
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+    overflow: hidden;
+    margin-top: 40px;
+  }
+  .customer-advance-create-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .customer-advance-create-modal__header h3 { margin: 0; font-size: 16px; }
+  .customer-advance-create-modal__close {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #64748b;
+  }
+  .customer-advance-create-modal__body {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+  .customer-advance-create-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .customer-advance-create-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+    color: #475569;
+  }
+  .customer-advance-create-grid label.full { grid-column: 1 / -1; }
+  .customer-advance-create-grid input,
+  .customer-advance-create-grid select,
+  .customer-advance-create-grid textarea {
+    height: 36px;
+    border: 1px solid #cfd8e3;
+    border-radius: 6px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+  .customer-advance-create-grid textarea {
+    height: 72px;
+    padding: 8px 10px;
+    resize: vertical;
+  }
+  .customer-advance-create-modal__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+  .customer-advance-action-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1450;
+    background: rgba(15, 23, 42, 0.45);
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px;
+    overflow: auto;
+  }
+  .customer-advance-action-overlay.is-open { display: flex; }
+  .customer-advance-offset-modal {
+    width: min(980px, 100%);
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+    overflow: hidden;
+    margin-top: 24px;
+  }
+  .customer-advance-offset-body { padding: 16px; }
+  .customer-advance-offset-hint {
+    margin: 12px 0 8px;
+    color: #64748b;
+    font-size: 12px;
+  }
+  .customer-advance-offset-table-wrap {
+    max-height: min(360px, 45vh);
+    overflow: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .customer-advance-offset-table th,
+  .customer-advance-offset-table td {
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .customer-advance-offset-table td.text-right {
+    font-variant-numeric: tabular-nums;
+  }
+  .customer-advance-offset-code-cell {
+    min-width: 118px;
+  }
+  .customer-advance-offset-code {
+    display: block;
+    font-weight: 700;
+    color: #111827;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+  }
+  .customer-advance-offset-type {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+    line-height: 1.2;
+  }
+  .customer-advance-offset-form .customer-advance-create-grid {
+    margin-bottom: 0;
+  }
+  #customerAdvanceCreateAmount,
+  #customerAdvanceOffsetAmount,
+  #customerAdvanceOffsetRemain,
+  #customerAdvanceRefundRemain,
+  #customerAdvanceRefundAmount {
+    background: #f8fafc;
+    color: #0f172a;
+    font-weight: 700;
+    cursor: default;
+  }
+  @media (max-width: 640px) {
+    .customer-advance-create-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div id="customerAdvanceModalOverlay" class="customer-advance-modal-overlay" aria-hidden="true">
+  <div class="customer-advance-modal" role="dialog" aria-modal="true" aria-labelledby="customerAdvanceModalTitle">
+    <div class="customer-advance-modal__header">
+      <h3 id="customerAdvanceModalTitle">Phiếu tạm ứng</h3>
+      <button type="button" class="customer-advance-modal__close" id="customerAdvanceModalClose" aria-label="Đóng">×</button>
+    </div>
+    <div class="customer-advance-modal__body">
+      <div class="customer-advance-modal__toolbar">
+        <p class="customer-advance-modal__desc" id="customerAdvanceModalDesc">Danh sách phiếu tạm ứng của khách hàng.</p>
+        <div class="customer-advance-modal__actions">
+          <button type="button" class="btn btn-primary" id="customerAdvanceCreateBtn">+ Tạm ứng</button>
+        </div>
+      </div>
+      <div class="customer-advance-modal__table-wrap">
+        <table class="customer-advance-modal__table">
+          <thead>
+            <tr>
+              <th>Mã phiếu</th>
+              <th>Ngày lập</th>
+              <th class="num">Số tiền</th>
+              <th class="num">Đã cấn trừ</th>
+              <th class="num">Đã hoàn</th>
+              <th class="num">Còn lại</th>
+              <th>Phương thức</th>
+              <th>Trạng thái</th>
+              <th class="note">Ghi chú</th>
+              <th class="actions">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="customerAdvanceModalRows">
+            <tr><td colspan="10" class="customer-advance-modal__empty">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="customer-advance-modal__footer">
+      <button type="button" class="btn" id="customerAdvanceModalCancel">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div id="customerAdvanceCreateOverlay" class="customer-advance-create-overlay" aria-hidden="true">
+  <div class="customer-advance-create-modal" role="dialog" aria-modal="true" aria-labelledby="customerAdvanceCreateTitle">
+    <div class="customer-advance-create-modal__header">
+      <h3 id="customerAdvanceCreateTitle">Tạo phiếu tạm ứng</h3>
+      <button type="button" class="customer-advance-create-modal__close" id="customerAdvanceCreateClose" aria-label="Đóng">×</button>
+    </div>
+    <form id="customerAdvanceCreateForm" class="customer-advance-create-modal__body">
+      <input type="hidden" name="payment_v2" value="true">
+      <p class="customer-advance-modal__desc" id="customerAdvanceCreateDesc">Tạm ứng từ khách hàng.</p>
+      <div class="customer-advance-create-grid">
+        <label>
+          <span>Ngày lập</span>
+          <input type="datetime-local" name="ngay_lap" id="customerAdvanceCreateDate" required>
+        </label>
+        <label>
+          <span>Số tiền tạm ứng</span>
+          <input type="text" inputmode="numeric" name="gia_tri" id="customerAdvanceCreateAmount" placeholder="0" autocomplete="off" readonly>
+        </label>
+        <label>
+          <span>Tiền mặt</span>
+          <input type="text" inputmode="numeric" name="chi_tiet_thanh_toan[tien_mat]" id="customerAdvanceCreateCash" class="js-customer-advance-money-input" placeholder="0" autocomplete="off">
+        </label>
+        <label>
+          <span>Sổ tiền mặt</span>
+          <select name="chi_tiet_thanh_toan[so_quy_tien_mat_id]" id="customerAdvanceCreateCashBook">
+            <option value="">Chọn sổ tiền mặt</option>
+          </select>
+        </label>
+        <label>
+          <span>Chuyển khoản</span>
+          <input type="text" inputmode="numeric" name="chi_tiet_thanh_toan[chuyen_khoan]" id="customerAdvanceCreateTransfer" class="js-customer-advance-money-input" placeholder="0" autocomplete="off">
+        </label>
+        <label>
+          <span>Sổ chuyển khoản</span>
+          <select name="chi_tiet_thanh_toan[so_quy_chuyen_khoan_id]" id="customerAdvanceCreateBankBook">
+            <option value="">Chọn sổ chuyển khoản</option>
+          </select>
+        </label>
+        <label class="full">
+          <span>Ghi chú</span>
+          <textarea name="ghi_chu" id="customerAdvanceCreateNote" placeholder="Ghi chú tạm ứng"></textarea>
+        </label>
+      </div>
+    </form>
+    <div class="customer-advance-create-modal__footer">
+      <button type="button" class="btn" id="customerAdvanceCreateCancel">Bỏ qua</button>
+      <button type="button" class="btn btn-primary" id="customerAdvanceCreateSubmit">Lưu tạm ứng</button>
+    </div>
+  </div>
+</div>
+
+<div id="customerAdvanceOffsetOverlay" class="customer-advance-action-overlay" aria-hidden="true">
+  <div class="customer-advance-offset-modal" role="dialog" aria-modal="true" aria-labelledby="customerAdvanceOffsetTitle">
+    <div class="customer-advance-create-modal__header">
+      <div>
+        <h3 id="customerAdvanceOffsetTitle">Cấn trừ tạm ứng</h3>
+        <p class="customer-advance-modal__desc" id="customerAdvanceOffsetDesc" style="margin-top:4px">Cấn trừ vào hóa đơn.</p>
+      </div>
+      <button type="button" class="customer-advance-create-modal__close" id="customerAdvanceOffsetClose" aria-label="Đóng">×</button>
+    </div>
+    <form id="customerAdvanceOffsetForm" class="customer-advance-offset-form" data-advance-remain="0">
+      <input type="hidden" id="customerAdvanceOffsetAllocationsJson" value="[]">
+      <div class="customer-advance-offset-body">
+        <div class="customer-advance-create-grid">
+          <label>
+            <span>Phiếu tạm ứng</span>
+            <input type="text" id="customerAdvanceOffsetCode" readonly>
+          </label>
+          <label>
+            <span>Còn lại tạm ứng</span>
+            <input type="text" id="customerAdvanceOffsetRemain" readonly>
+          </label>
+          <label>
+            <span>Ngày lập</span>
+            <input type="datetime-local" id="customerAdvanceOffsetDate">
+          </label>
+          <label>
+            <span>Số tiền cấn trừ</span>
+            <input type="text" inputmode="numeric" id="customerAdvanceOffsetAmount" placeholder="0" autocomplete="off" readonly>
+          </label>
+          <label>
+            <span>Tiền mặt</span>
+            <input type="text" inputmode="numeric" id="customerAdvanceOffsetCash" class="js-customer-advance-money-input" placeholder="0" autocomplete="off">
+          </label>
+          <label>
+            <span>Sổ tiền mặt</span>
+            <select id="customerAdvanceOffsetCashBook">
+              <option value="">Chọn sổ tiền mặt</option>
+            </select>
+          </label>
+          <label>
+            <span>Chuyển khoản</span>
+            <input type="text" inputmode="numeric" id="customerAdvanceOffsetTransfer" class="js-customer-advance-money-input" placeholder="0" autocomplete="off">
+          </label>
+          <label>
+            <span>Sổ chuyển khoản</span>
+            <select id="customerAdvanceOffsetBankBook">
+              <option value="">Chọn sổ chuyển khoản</option>
+            </select>
+          </label>
+          <label class="full">
+            <span>Ghi chú</span>
+            <textarea id="customerAdvanceOffsetNote" placeholder="Ghi chú cấn trừ"></textarea>
+          </label>
+        </div>
+        <p class="customer-advance-offset-hint">Số tiền sẽ tự phân bổ vào các hóa đơn gần nhất. Có thể sửa số tiền từng hóa đơn.</p>
+        <div class="customer-pay-table-wrap table-wrap customer-advance-offset-table-wrap">
+          <table class="admin-table warehouse-table customer-advance-offset-table">
+            <thead>
+              <tr>
+                <th>Mã hóa đơn</th>
+                <th>Thời gian</th>
+                <th class="text-right">Giá trị</th>
+                <th class="text-right">Đã trả</th>
+                <th class="text-right">Còn cần trả</th>
+                <th class="text-right">Tiền cấn trừ</th>
+                <th class="text-right">Còn nợ</th>
+              </tr>
+            </thead>
+            <tbody id="customerAdvanceOffsetRows">
+              <tr>
+                <td colspan="7">
+                  <div class="customer-pay-empty">
+                    <span>Đang tải hóa đơn...</span>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+            <tfoot id="customerAdvanceOffsetFoot" style="display:none">
+              <tr class="customer-pay-total-row">
+                <td colspan="4"></td>
+                <td class="text-right" id="customerAdvanceOffsetTotalDebt">0</td>
+                <td class="text-right" id="customerAdvanceOffsetTotalPaid">0</td>
+                <td class="text-right" id="customerAdvanceOffsetTotalLeft">0</td>
+              </tr>
+              <tr class="customer-pay-unallocated-row">
+                <td colspan="5"></td>
+                <td>Tiền chưa gắn hóa đơn:</td>
+                <td class="text-right" id="customerAdvanceOffsetUnallocated">0</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    </form>
+    <div class="customer-advance-create-modal__footer">
+      <button type="button" class="btn" id="customerAdvanceOffsetCancel">Bỏ qua</button>
+      <button type="button" class="btn btn-primary" id="customerAdvanceOffsetSubmit">Lưu cấn trừ</button>
+    </div>
+  </div>
+</div>
+
+<div id="customerAdvanceRefundOverlay" class="customer-advance-action-overlay" aria-hidden="true">
+  <div class="customer-advance-create-modal" role="dialog" aria-modal="true" aria-labelledby="customerAdvanceRefundTitle">
+    <div class="customer-advance-create-modal__header">
+      <h3 id="customerAdvanceRefundTitle">Hoàn tiền tạm ứng</h3>
+      <button type="button" class="customer-advance-create-modal__close" id="customerAdvanceRefundClose" aria-label="Đóng">×</button>
+    </div>
+    <form id="customerAdvanceRefundForm" class="customer-advance-create-modal__body">
+      <input type="hidden" name="payment_v2" value="true">
+      <p class="customer-advance-modal__desc" id="customerAdvanceRefundDesc">Tạo phiếu chi hoàn tạm ứng.</p>
+      <div class="customer-advance-create-grid">
+        <label>
+          <span>Phiếu tạm ứng</span>
+          <input type="text" id="customerAdvanceRefundCode" readonly>
+        </label>
+        <label>
+          <span>Còn lại</span>
+          <input type="text" id="customerAdvanceRefundRemain" readonly>
+        </label>
+        <label>
+          <span>Ngày lập</span>
+          <input type="datetime-local" id="customerAdvanceRefundDate" required>
+        </label>
+        <label>
+          <span>Số tiền hoàn</span>
+          <input type="text" inputmode="numeric" id="customerAdvanceRefundAmount" placeholder="0" autocomplete="off" readonly>
+        </label>
+        <label>
+          <span>Tiền mặt</span>
+          <input type="text" inputmode="numeric" id="customerAdvanceRefundCash" class="js-customer-advance-money-input" placeholder="0" autocomplete="off">
+        </label>
+        <label>
+          <span>Sổ tiền mặt</span>
+          <select id="customerAdvanceRefundCashBook">
+            <option value="">Chọn sổ tiền mặt</option>
+          </select>
+        </label>
+        <label>
+          <span>Chuyển khoản</span>
+          <input type="text" inputmode="numeric" id="customerAdvanceRefundTransfer" class="js-customer-advance-money-input" placeholder="0" autocomplete="off">
+        </label>
+        <label>
+          <span>Sổ chuyển khoản</span>
+          <select id="customerAdvanceRefundBankBook">
+            <option value="">Chọn sổ chuyển khoản</option>
+          </select>
+        </label>
+        <label class="full">
+          <span>Ghi chú</span>
+          <textarea id="customerAdvanceRefundNote" placeholder="Ghi chú hoàn tiền"></textarea>
+        </label>
+      </div>
+    </form>
+    <div class="customer-advance-create-modal__footer">
+      <button type="button" class="btn" id="customerAdvanceRefundCancel">Bỏ qua</button>
+      <button type="button" class="btn btn-primary" id="customerAdvanceRefundSubmit">Lưu hoàn tiền</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function initCustomerAdvanceModal() {
+    var overlay = document.getElementById('customerAdvanceModalOverlay');
+    var titleEl = document.getElementById('customerAdvanceModalTitle');
+    var descEl = document.getElementById('customerAdvanceModalDesc');
+    var rowsEl = document.getElementById('customerAdvanceModalRows');
+    var closeBtn = document.getElementById('customerAdvanceModalClose');
+    var cancelBtn = document.getElementById('customerAdvanceModalCancel');
+    var createBtn = document.getElementById('customerAdvanceCreateBtn');
+    var createOverlay = document.getElementById('customerAdvanceCreateOverlay');
+    var createForm = document.getElementById('customerAdvanceCreateForm');
+    var createDesc = document.getElementById('customerAdvanceCreateDesc');
+    var createDate = document.getElementById('customerAdvanceCreateDate');
+    var createAmount = document.getElementById('customerAdvanceCreateAmount');
+    var createCash = document.getElementById('customerAdvanceCreateCash');
+    var createTransfer = document.getElementById('customerAdvanceCreateTransfer');
+    var createCashBook = document.getElementById('customerAdvanceCreateCashBook');
+    var createBankBook = document.getElementById('customerAdvanceCreateBankBook');
+    var createNote = document.getElementById('customerAdvanceCreateNote');
+    var createClose = document.getElementById('customerAdvanceCreateClose');
+    var createCancel = document.getElementById('customerAdvanceCreateCancel');
+    var createSubmit = document.getElementById('customerAdvanceCreateSubmit');
+    var offsetOverlay = document.getElementById('customerAdvanceOffsetOverlay');
+    var offsetForm = document.getElementById('customerAdvanceOffsetForm');
+    var offsetDesc = document.getElementById('customerAdvanceOffsetDesc');
+    var offsetCode = document.getElementById('customerAdvanceOffsetCode');
+    var offsetRemain = document.getElementById('customerAdvanceOffsetRemain');
+    var offsetAmount = document.getElementById('customerAdvanceOffsetAmount');
+    var offsetCash = document.getElementById('customerAdvanceOffsetCash');
+    var offsetTransfer = document.getElementById('customerAdvanceOffsetTransfer');
+    var offsetCashBook = document.getElementById('customerAdvanceOffsetCashBook');
+    var offsetBankBook = document.getElementById('customerAdvanceOffsetBankBook');
+    var offsetDate = document.getElementById('customerAdvanceOffsetDate');
+    var offsetNote = document.getElementById('customerAdvanceOffsetNote');
+    var offsetRowsEl = document.getElementById('customerAdvanceOffsetRows');
+    var offsetFootEl = document.getElementById('customerAdvanceOffsetFoot');
+    var offsetTotalDebt = document.getElementById('customerAdvanceOffsetTotalDebt');
+    var offsetTotalPaid = document.getElementById('customerAdvanceOffsetTotalPaid');
+    var offsetTotalLeft = document.getElementById('customerAdvanceOffsetTotalLeft');
+    var offsetUnallocated = document.getElementById('customerAdvanceOffsetUnallocated');
+    var offsetAllocationsJson = document.getElementById('customerAdvanceOffsetAllocationsJson');
+    var offsetClose = document.getElementById('customerAdvanceOffsetClose');
+    var offsetCancel = document.getElementById('customerAdvanceOffsetCancel');
+    var offsetSubmit = document.getElementById('customerAdvanceOffsetSubmit');
+    var refundOverlay = document.getElementById('customerAdvanceRefundOverlay');
+    var refundDesc = document.getElementById('customerAdvanceRefundDesc');
+    var refundCode = document.getElementById('customerAdvanceRefundCode');
+    var refundRemain = document.getElementById('customerAdvanceRefundRemain');
+    var refundDate = document.getElementById('customerAdvanceRefundDate');
+    var refundAmount = document.getElementById('customerAdvanceRefundAmount');
+    var refundCash = document.getElementById('customerAdvanceRefundCash');
+    var refundTransfer = document.getElementById('customerAdvanceRefundTransfer');
+    var refundCashBook = document.getElementById('customerAdvanceRefundCashBook');
+    var refundBankBook = document.getElementById('customerAdvanceRefundBankBook');
+    var refundNote = document.getElementById('customerAdvanceRefundNote');
+    var refundClose = document.getElementById('customerAdvanceRefundClose');
+    var refundCancel = document.getElementById('customerAdvanceRefundCancel');
+    var refundSubmit = document.getElementById('customerAdvanceRefundSubmit');
+    if (!overlay || !rowsEl) return;
+
+    var currentCustomer = { id: '', code: '', name: '' };
+    var cashBooksCache = [];
+    var currentAdvance = null;
+    var offsetInvoices = [];
+
+    function localParseCustomerMoney(value) {
+      var raw = String(value == null ? '' : value).replace(/[^\d]/g, '');
+      if (!raw) return '';
+      return Number(raw);
+    }
+
+    function localFormatCustomerMoney(value) {
+      var amount = Number(value || 0);
+      if (!isFinite(amount)) amount = 0;
+      return Math.floor(amount).toLocaleString('vi-VN');
+    }
+
+    var parseMoney = (typeof window !== 'undefined' && typeof window.parseCustomerMoney === 'function')
+      ? window.parseCustomerMoney
+      : (typeof parseCustomerMoney === 'function' ? parseCustomerMoney : localParseCustomerMoney);
+    var formatMoney = (typeof window !== 'undefined' && typeof window.formatCustomerMoney === 'function')
+      ? window.formatCustomerMoney
+      : (typeof formatCustomerMoney === 'function' ? formatCustomerMoney : localFormatCustomerMoney);
+
+    function escapeAdvanceHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function parseAdvanceJson(response) {
+      return response.text().then(function(text) {
+        var json = null;
+        try { json = text ? JSON.parse(text) : null; } catch (err) { json = null; }
+        return { response: response, json: json };
+      });
+    }
+
+    function formatAdvanceDateTime(value) {
+      if (!value) return '---';
+      var date = new Date(value);
+      if (isNaN(date.getTime())) return '---';
+      return date.toLocaleString('vi-VN');
+    }
+
+    function toAdvanceDateTimeLocal(value) {
+      var date = value ? new Date(value) : new Date();
+      if (isNaN(date.getTime())) date = new Date();
+      var local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+      return local.toISOString().slice(0, 16);
+    }
+
+    function closeAdvanceActionMenus(exceptMenu) {
+      document.querySelectorAll('.customer-advance-action-menu.is-open').forEach(function(menu) {
+        if (exceptMenu && menu === exceptMenu) return;
+        menu.classList.remove('is-open');
+        var toggle = menu.querySelector('[data-customer-advance-menu-toggle]');
+        if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    function positionAdvanceActionMenu(menu) {
+      if (!menu) return;
+      var toggle = menu.querySelector('[data-customer-advance-menu-toggle]');
+      var dropdown = menu.querySelector('.customer-advance-action-dropdown');
+      if (!toggle || !dropdown) return;
+      var rect = toggle.getBoundingClientRect();
+      var width = dropdown.offsetWidth || 168;
+      var height = dropdown.offsetHeight || 90;
+      var left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
+      var top = rect.bottom + 4;
+      if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 4);
+      dropdown.style.left = left + 'px';
+      dropdown.style.top = top + 'px';
+    }
+
+    function setCustomerMoneyTone(element, value) {
+      if (!element) return;
+      var number = Number(value || 0);
+      element.classList.remove('customer-money-positive', 'customer-money-negative');
+      if (number > 0) element.classList.add('customer-money-positive');
+      if (number < 0) element.classList.add('customer-money-negative');
+    }
+
+    function updateCustomerAdvanceSummaryTotals() {
+      var rows = Array.prototype.slice.call(document.querySelectorAll('.customer-row[data-customer-id]'));
+      var totalDebt = 0;
+      var totalAdvance = 0;
+      var totalFinal = 0;
+      rows.forEach(function(row) {
+        totalDebt += Number(row.dataset.metricTongNo || 0);
+        totalAdvance += Number(row.dataset.metricTamUng || 0);
+        totalFinal += Number(row.dataset.metricTongNoCuoi || 0);
+      });
+      var debtStrong = document.querySelector('.customer-summary-row [data-summary-field="tong-no"] strong');
+      var advanceStrong = document.querySelector('.customer-summary-row [data-summary-field="tam-ung"] strong');
+      var finalStrong = document.querySelector('.customer-summary-row [data-summary-field="tong-no-cuoi"] strong');
+      if (debtStrong) debtStrong.textContent = formatMoney(totalDebt);
+      if (advanceStrong) advanceStrong.textContent = formatMoney(totalAdvance);
+      if (finalStrong) {
+        finalStrong.textContent = formatMoney(totalFinal);
+        setCustomerMoneyTone(finalStrong, totalFinal);
+      }
+    }
+
+    function refreshCustomerAdvanceCell(customerId, advanceDelta, debtDelta) {
+      var row = document.querySelector('.customer-row[data-customer-id="' + customerId + '"]');
+      if (!row) return;
+      var nextAdvance = Math.max(0, Number(row.dataset.metricTamUng || 0) + Number(advanceDelta || 0));
+      var nextTongNo = Math.max(0, Number(row.dataset.metricTongNo || 0) + Number(debtDelta || 0));
+      var tongNoCuoi = nextTongNo - nextAdvance;
+      row.dataset.metricTamUng = String(nextAdvance);
+      row.dataset.metricTongNo = String(nextTongNo);
+      row.dataset.metricTongNoCuoi = String(tongNoCuoi);
+
+      var advanceCell = row.querySelector('[data-field="tam-ung"]');
+      if (advanceCell) {
+        var advanceLink = advanceCell.querySelector('.js-customer-advance-link');
+        if (advanceLink) advanceLink.textContent = formatMoney(nextAdvance);
+        else advanceCell.textContent = formatMoney(nextAdvance);
+      }
+
+      var debtCell = row.querySelector('[data-field="tong-no"]');
+      if (debtCell) debtCell.textContent = formatMoney(nextTongNo);
+
+      var finalCell = row.querySelector('[data-field="tong-no-cuoi"]');
+      if (finalCell) {
+        finalCell.textContent = formatMoney(tongNoCuoi);
+        setCustomerMoneyTone(finalCell, tongNoCuoi);
+      }
+
+      updateCustomerAdvanceSummaryTotals();
+    }
+
+    function renderAdvanceRows(rows) {
+      if (!rows || !rows.length) {
+        rowsEl.innerHTML = '<tr><td colspan="10" class="customer-advance-modal__empty">Chưa có phiếu tạm ứng.</td></tr>';
+        return;
+      }
+      rowsEl.innerHTML = rows.map(function(row) {
+        var note = String(row.ghi_chu || '').trim() || '---';
+        var remain = Number(row.con_lai || 0);
+        var canAct = remain > 0 && row.trang_thai !== 'huy';
+        var actions = canAct
+          ? ('<div class="customer-advance-action-menu">' +
+              '<button type="button" class="customer-advance-more-btn" data-customer-advance-menu-toggle aria-label="Thao tác" aria-expanded="false">⋯</button>' +
+              '<div class="customer-advance-action-dropdown" role="menu">' +
+                '<button type="button" class="customer-advance-menu-item js-customer-advance-offset" role="menuitem"' +
+                  ' data-advance-id="' + escapeAdvanceHtml(row.id) + '"' +
+                  ' data-advance-code="' + escapeAdvanceHtml(row.ma_phieu || '') + '"' +
+                  ' data-advance-remain="' + escapeAdvanceHtml(remain) + '">Cấn trừ</button>' +
+                '<button type="button" class="customer-advance-menu-item js-customer-advance-refund" role="menuitem"' +
+                  ' data-advance-id="' + escapeAdvanceHtml(row.id) + '"' +
+                  ' data-advance-code="' + escapeAdvanceHtml(row.ma_phieu || '') + '"' +
+                  ' data-advance-remain="' + escapeAdvanceHtml(remain) + '">Hoàn tiền</button>' +
+              '</div>' +
+            '</div>')
+          : '—';
+        return '<tr>' +
+          '<td>' + escapeAdvanceHtml(row.ma_phieu || '---') + '</td>' +
+          '<td>' + escapeAdvanceHtml(formatAdvanceDateTime(row.ngay_lap)) + '</td>' +
+          '<td class="num">' + formatMoney(row.so_tien) + '</td>' +
+          '<td class="num">' + formatMoney(row.da_can_tru) + '</td>' +
+          '<td class="num">' + formatMoney(row.da_hoan) + '</td>' +
+          '<td class="num">' + formatMoney(row.con_lai) + '</td>' +
+          '<td>' + escapeAdvanceHtml(row.phuong_thuc_text || '---') + '</td>' +
+          '<td>' + escapeAdvanceHtml(row.trang_thai_text || '---') + '</td>' +
+          '<td class="note" title="' + escapeAdvanceHtml(note) + '">' + escapeAdvanceHtml(note) + '</td>' +
+          '<td class="actions">' + actions + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function fillCashBookSelect(selectEl, options, emptyLabel) {
+      if (!selectEl) return;
+      selectEl.innerHTML = '<option value="">' + escapeAdvanceHtml(emptyLabel) + '</option>' + options.map(function(item) {
+        var label = item.loai_so_quy === 'chuyen_khoan'
+          ? ((item.ten_ngan_hang || item.ten_so_quy || 'Tài khoản') + (item.so_tai_khoan ? (' - ' + item.so_tai_khoan) : ''))
+          : (item.ten_so_quy || 'Sổ tiền mặt');
+        return '<option value="' + escapeAdvanceHtml(item.id) + '"' + (item.mac_dinh ? ' selected' : '') + '>' +
+          escapeAdvanceHtml(label) + '</option>';
+      }).join('');
+    }
+
+    function fillCashBookSelects(books) {
+      cashBooksCache = Array.isArray(books) ? books : [];
+      var cashOptions = cashBooksCache.filter(function(item) {
+        return (item.loai_so_quy || 'tien_mat') === 'tien_mat';
+      });
+      var bankOptions = cashBooksCache.filter(function(item) {
+        return item.loai_so_quy === 'chuyen_khoan';
+      });
+      fillCashBookSelect(createCashBook, cashOptions, 'Chọn sổ tiền mặt');
+      fillCashBookSelect(createBankBook, bankOptions, 'Chọn sổ chuyển khoản');
+      fillCashBookSelect(offsetCashBook, cashOptions, 'Chọn sổ tiền mặt');
+      fillCashBookSelect(offsetBankBook, bankOptions, 'Chọn sổ chuyển khoản');
+      fillCashBookSelect(refundCashBook, cashOptions, 'Chọn sổ tiền mặt');
+      fillCashBookSelect(refundBankBook, bankOptions, 'Chọn sổ chuyển khoản');
+    }
+
+    function closeOffsetModal() {
+      if (!offsetOverlay) return;
+      offsetOverlay.classList.remove('is-open');
+      offsetOverlay.setAttribute('aria-hidden', 'true');
+      currentAdvance = null;
+      offsetInvoices = [];
+    }
+
+    function closeRefundModal() {
+      if (!refundOverlay) return;
+      refundOverlay.classList.remove('is-open');
+      refundOverlay.setAttribute('aria-hidden', 'true');
+      currentAdvance = null;
+    }
+
+    function closeCreateAdvanceModal() {
+      if (!createOverlay) return;
+      createOverlay.classList.remove('is-open');
+      createOverlay.setAttribute('aria-hidden', 'true');
+    }
+
+    function closeAdvanceModal() {
+      closeCreateAdvanceModal();
+      closeOffsetModal();
+      closeRefundModal();
+      closeAdvanceActionMenus();
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      currentCustomer = { id: '', code: '', name: '' };
+    }
+
+    function loadAdvanceList() {
+      if (!currentCustomer.id) return Promise.resolve();
+      rowsEl.innerHTML = '<tr><td colspan="10" class="customer-advance-modal__empty">Đang tải...</td></tr>';
+      return fetch('/khach-hang/api/' + encodeURIComponent(currentCustomer.id) + '/tam-ung', {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin'
+      })
+        .then(parseAdvanceJson)
+        .then(function(result) {
+          if (!result.response.ok || !result.json || result.json.success === false) {
+            throw new Error((result.json && result.json.message) || 'Không tải được phiếu tạm ứng.');
+          }
+          return result.json;
+        })
+        .then(function(payload) {
+          fillCashBookSelects(payload.cash_books || []);
+          renderAdvanceRows(payload.rows || []);
+        })
+        .catch(function(error) {
+          rowsEl.innerHTML = '<tr><td colspan="10" class="customer-advance-modal__empty">' +
+            escapeAdvanceHtml(error.message || 'Không tải được phiếu tạm ứng.') +
+            '</td></tr>';
+        });
+    }
+
+    function openAdvanceModal(customerId, customerCode, customerName) {
+      if (!customerId) return;
+      currentCustomer = {
+        id: customerId,
+        code: customerCode || '',
+        name: customerName || ''
+      };
+      var label = [currentCustomer.code, currentCustomer.name].filter(Boolean).join(' - ') || 'khách hàng';
+      if (titleEl) titleEl.textContent = 'Phiếu tạm ứng';
+      if (descEl) descEl.textContent = 'Danh sách phiếu tạm ứng của ' + label + '.';
+      overlay.classList.add('is-open');
+      overlay.setAttribute('aria-hidden', 'false');
+      loadAdvanceList();
+    }
+
+    function openCreateAdvanceModal() {
+      if (!currentCustomer.id) return alert('Vui lòng chọn khách hàng.');
+      var label = [currentCustomer.code, currentCustomer.name].filter(Boolean).join(' - ') || 'khách hàng';
+      if (createDesc) createDesc.textContent = 'Tạm ứng từ ' + label + '.';
+      if (createForm) createForm.reset();
+      if (createDate) createDate.value = toAdvanceDateTimeLocal(new Date());
+      if (createAmount) createAmount.value = '';
+      if (createCash) createCash.value = '';
+      if (createTransfer) createTransfer.value = '';
+      if (createNote) createNote.value = '';
+      fillCashBookSelects(cashBooksCache);
+      if (createOverlay) {
+        createOverlay.classList.add('is-open');
+        createOverlay.setAttribute('aria-hidden', 'false');
+      }
+      if (createCash) createCash.focus();
+    }
+
+    function setOffsetRowInputValue(input, value) {
+      if (!input) return;
+      var amount = Math.max(0, Number(value || 0));
+      input.value = amount ? formatMoney(amount) : '0';
+    }
+
+    function getOffsetRowAllocations() {
+      var rows = [];
+      if (!offsetRowsEl) return rows;
+      Array.prototype.slice.call(offsetRowsEl.querySelectorAll('.js-customer-advance-offset-row-paid')).forEach(function(input) {
+        var paid = Number(parseMoney(input.value) || 0);
+        if (paid <= 0) return;
+        rows.push({
+          hoa_don_id: input.getAttribute('data-invoice-id') || '',
+          ma_hoa_don: input.getAttribute('data-invoice-code') || '',
+          so_tien: paid
+        });
+      });
+      return rows;
+    }
+
+    function syncOffsetAllocationJson() {
+      if (offsetAllocationsJson) {
+        offsetAllocationsJson.value = JSON.stringify(getOffsetRowAllocations());
+      }
+    }
+
+    function updateOffsetAllocation(source) {
+      if (!offsetForm) return;
+      var remainLimit = Math.max(0, Number((currentAdvance && currentAdvance.remain) || offsetForm.getAttribute('data-advance-remain') || 0));
+      var totalDebt = 0;
+      Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-customer-advance-offset-row') : []).forEach(function(row) {
+        totalDebt += Math.max(0, Number(row.getAttribute('data-debt') || 0));
+      });
+      var cap = Math.min(remainLimit, totalDebt);
+      var amount = Number(parseMoney(offsetAmount && offsetAmount.value) || 0);
+      amount = Math.min(Math.max(0, amount), cap);
+
+      if (source === 'amount') {
+        if (offsetAmount) offsetAmount.value = amount ? formatMoney(amount) : '';
+        var rest = amount;
+        Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-customer-advance-offset-row') : []).forEach(function(row) {
+          var rowDebt = Math.max(0, Number(row.getAttribute('data-debt') || 0));
+          var paid = Math.min(rest, rowDebt);
+          rest -= paid;
+          setOffsetRowInputValue(row.querySelector('.js-customer-advance-offset-row-paid'), paid);
+        });
+      } else {
+        var used = 0;
+        Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-customer-advance-offset-row-paid') : []).forEach(function(input) {
+          var rowDebt = Math.max(0, Number(input.getAttribute('data-debt') || 0));
+          var paid = Math.min(Number(parseMoney(input.value) || 0), rowDebt, Math.max(0, amount - used));
+          used += paid;
+          setOffsetRowInputValue(input, paid);
+        });
+      }
+
+      var totalPaid = 0;
+      var totalLeft = 0;
+      Array.prototype.slice.call(offsetRowsEl ? offsetRowsEl.querySelectorAll('.js-customer-advance-offset-row') : []).forEach(function(row) {
+        var rowDebt = Math.max(0, Number(row.getAttribute('data-debt') || 0));
+        var input = row.querySelector('.js-customer-advance-offset-row-paid');
+        var paid = Math.min(Number(parseMoney(input && input.value) || 0), rowDebt);
+        totalPaid += paid;
+        totalLeft += Math.max(0, rowDebt - paid);
+        var leftCell = row.querySelector('.js-customer-advance-offset-row-left');
+        if (leftCell) leftCell.textContent = formatMoney(rowDebt - paid);
+      });
+      if (offsetTotalDebt) offsetTotalDebt.textContent = formatMoney(totalDebt);
+      if (offsetTotalPaid) offsetTotalPaid.textContent = formatMoney(totalPaid);
+      if (offsetTotalLeft) offsetTotalLeft.textContent = formatMoney(totalLeft);
+      if (offsetUnallocated) offsetUnallocated.textContent = formatMoney(Math.max(0, amount - totalPaid));
+      syncOffsetAllocationJson();
+    }
+
+    function syncOffsetAmountFromParts() {
+      var cash = Number(parseMoney(offsetCash && offsetCash.value) || 0);
+      var transfer = Number(parseMoney(offsetTransfer && offsetTransfer.value) || 0);
+      var total = cash + transfer;
+      if (offsetAmount) offsetAmount.value = total ? formatMoney(total) : '';
+      if (offsetCashBook) offsetCashBook.disabled = cash <= 0;
+      if (offsetBankBook) offsetBankBook.disabled = transfer <= 0;
+      updateOffsetAllocation('amount');
+    }
+
+    function formatOffsetDateTime(value) {
+      if (!value) return '---';
+      var date = new Date(value);
+      if (isNaN(date.getTime())) return '---';
+      var dd = String(date.getDate());
+      var mm = String(date.getMonth() + 1);
+      if (dd.length < 2) dd = '0' + dd;
+      if (mm.length < 2) mm = '0' + mm;
+      var yyyy = date.getFullYear();
+      var hh = String(date.getHours());
+      var mi = String(date.getMinutes());
+      if (hh.length < 2) hh = '0' + hh;
+      if (mi.length < 2) mi = '0' + mi;
+      return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + mi;
+    }
+
+    function renderOffsetInvoiceRows(rows) {
+      if (!offsetRowsEl) return;
+      if (!rows || !rows.length) {
+        offsetRowsEl.innerHTML = '<tr><td colspan="7"><div class="customer-pay-empty"><span>Không có hóa đơn còn nợ</span></div></td></tr>';
+        if (offsetFootEl) offsetFootEl.style.display = 'none';
+        return;
+      }
+      offsetRowsEl.innerHTML = rows.map(function(item) {
+        var debt = Math.max(0, Number(item.con_no || 0));
+        return '<tr class="js-customer-advance-offset-row" data-debt="' + escapeAdvanceHtml(debt) + '">' +
+          '<td class="customer-advance-offset-code-cell">' +
+            '<span class="customer-advance-offset-code">' + escapeAdvanceHtml(item.ma_hoa_don || '---') + '</span>' +
+            '<span class="customer-advance-offset-type">Hóa đơn</span>' +
+          '</td>' +
+          '<td>' + escapeAdvanceHtml(formatOffsetDateTime(item.ngay_ban)) + '</td>' +
+          '<td class="text-right">' + formatMoney(item.can_tra) + '</td>' +
+          '<td class="text-right">' + formatMoney(item.da_tra) + '</td>' +
+          '<td class="text-right">' + formatMoney(debt) + '</td>' +
+          '<td class="text-right">' +
+            '<input class="customer-pay-row-input js-customer-advance-offset-row-paid" inputmode="numeric" autocomplete="off" value="0"' +
+              ' data-invoice-id="' + escapeAdvanceHtml(item.id) + '"' +
+              ' data-invoice-code="' + escapeAdvanceHtml(item.ma_hoa_don || '') + '"' +
+              ' data-debt="' + escapeAdvanceHtml(debt) + '">' +
+          '</td>' +
+          '<td class="text-right js-customer-advance-offset-row-left">' + formatMoney(debt) + '</td>' +
+        '</tr>';
+      }).join('');
+      if (offsetFootEl) offsetFootEl.style.display = '';
+    }
+
+    function openOffsetModal(advanceId, advanceCode, remain) {
+      if (!currentCustomer.id || !advanceId) return;
+      currentAdvance = {
+        id: advanceId,
+        code: advanceCode || '',
+        remain: Number(remain || 0)
+      };
+      if (offsetForm) offsetForm.setAttribute('data-advance-remain', String(currentAdvance.remain));
+      if (offsetDesc) {
+        offsetDesc.textContent = 'Cấn trừ ' + (currentAdvance.code || 'phiếu tạm ứng') +
+          ' vào hóa đơn của ' + ([currentCustomer.code, currentCustomer.name].filter(Boolean).join(' - ') || 'KH') + '.';
+      }
+      if (offsetCode) offsetCode.value = currentAdvance.code || '';
+      if (offsetRemain) offsetRemain.value = formatMoney(currentAdvance.remain);
+      if (offsetAmount) offsetAmount.value = '';
+      if (offsetCash) offsetCash.value = '';
+      if (offsetTransfer) offsetTransfer.value = '';
+      if (offsetDate) offsetDate.value = toAdvanceDateTimeLocal(new Date());
+      if (offsetNote) offsetNote.value = '';
+      fillCashBookSelects(cashBooksCache);
+      if (offsetCashBook) offsetCashBook.disabled = true;
+      if (offsetBankBook) offsetBankBook.disabled = true;
+      if (offsetRowsEl) {
+        offsetRowsEl.innerHTML = '<tr><td colspan="7"><div class="customer-pay-empty"><span>Đang tải hóa đơn...</span></div></td></tr>';
+      }
+      if (offsetFootEl) offsetFootEl.style.display = 'none';
+      if (offsetOverlay) {
+        offsetOverlay.classList.add('is-open');
+        offsetOverlay.setAttribute('aria-hidden', 'false');
+      }
+
+      fetch('/khach-hang/api/' + encodeURIComponent(currentCustomer.id) +
+        '/tam-ung/' + encodeURIComponent(advanceId) + '/hoa-don', {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin'
+      })
+        .then(parseAdvanceJson)
+        .then(function(result) {
+          if (!result.response.ok || !result.json || result.json.success === false) {
+            throw new Error((result.json && result.json.message) || 'Không tải được hóa đơn.');
+          }
+          return result.json;
+        })
+        .then(function(payload) {
+          if (payload.advance) {
+            currentAdvance.remain = Number(payload.advance.con_lai || currentAdvance.remain || 0);
+            currentAdvance.code = payload.advance.ma_phieu || currentAdvance.code || '';
+            if (offsetForm) offsetForm.setAttribute('data-advance-remain', String(currentAdvance.remain));
+            if (offsetRemain) offsetRemain.value = formatMoney(currentAdvance.remain);
+            if (offsetCode) offsetCode.value = currentAdvance.code || '';
+          }
+          offsetInvoices = payload.rows || [];
+          renderOffsetInvoiceRows(offsetInvoices);
+          var totalDebt = offsetInvoices.reduce(function(sum, item) {
+            return sum + Math.max(0, Number(item.con_no || 0));
+          }, 0);
+          var defaultAmount = Math.min(currentAdvance.remain, totalDebt);
+          if (offsetCash) offsetCash.value = defaultAmount ? formatMoney(defaultAmount) : '';
+          if (offsetTransfer) offsetTransfer.value = '';
+          syncOffsetAmountFromParts();
+          if (offsetCash) offsetCash.focus();
+        })
+        .catch(function(error) {
+          if (offsetRowsEl) {
+            offsetRowsEl.innerHTML = '<tr><td colspan="7"><div class="customer-pay-empty"><span>' +
+              escapeAdvanceHtml(error.message || 'Không tải được hóa đơn') +
+              '</span></div></td></tr>';
+          }
+        });
+    }
+
+    function openRefundModal(advanceId, advanceCode, remain) {
+      if (!currentCustomer.id || !advanceId) return;
+      currentAdvance = {
+        id: advanceId,
+        code: advanceCode || '',
+        remain: Number(remain || 0)
+      };
+      var label = [currentCustomer.code, currentCustomer.name].filter(Boolean).join(' - ') || 'khách hàng';
+      if (refundDesc) refundDesc.textContent = 'Hoàn tiền tạm ứng ' + (currentAdvance.code || '') + ' của ' + label + '.';
+      if (refundCode) refundCode.value = currentAdvance.code || '';
+      if (refundRemain) refundRemain.value = formatMoney(currentAdvance.remain);
+      if (refundDate) refundDate.value = toAdvanceDateTimeLocal(new Date());
+      if (refundAmount) refundAmount.value = '';
+      if (refundCash) refundCash.value = '';
+      if (refundTransfer) refundTransfer.value = '';
+      if (refundNote) refundNote.value = '';
+      fillCashBookSelects(cashBooksCache);
+      if (refundOverlay) {
+        refundOverlay.classList.add('is-open');
+        refundOverlay.setAttribute('aria-hidden', 'false');
+      }
+      if (refundCash) refundCash.focus();
+    }
+
+    function formatAdvanceMoneyInput(input) {
+      if (!input) return;
+      var digits = String(input.value || '').replace(/\D/g, '');
+      input.value = digits === '' ? '' : formatMoney(digits);
+    }
+
+    function syncAdvanceAmountFromParts() {
+      if (!createAmount) return;
+      var cash = Number(parseMoney(createCash && createCash.value) || 0);
+      var transfer = Number(parseMoney(createTransfer && createTransfer.value) || 0);
+      var total = cash + transfer;
+      createAmount.value = total ? formatMoney(total) : '';
+    }
+
+    function syncRefundAmountFromParts() {
+      if (!refundAmount) return;
+      var cash = Number(parseMoney(refundCash && refundCash.value) || 0);
+      var transfer = Number(parseMoney(refundTransfer && refundTransfer.value) || 0);
+      var total = cash + transfer;
+      refundAmount.value = total ? formatMoney(total) : '';
+    }
+
+    function submitCreateAdvance() {
+      if (!currentCustomer.id) return;
+      var cash = Number(parseMoney(createCash && createCash.value) || 0);
+      var transfer = Number(parseMoney(createTransfer && createTransfer.value) || 0);
+      var amount = cash + transfer;
+      if (amount <= 0) return alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+      if (cash > 0 && !(createCashBook && createCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+      if (transfer > 0 && !(createBankBook && createBankBook.value)) return alert('Vui lòng chọn sổ chuyển khoản.');
+
+      if (createSubmit) createSubmit.disabled = true;
+      fetch('/khach-hang/' + encodeURIComponent(currentCustomer.id) + '/tam-ung', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          payment_v2: true,
+          ngay_lap: createDate ? createDate.value : '',
+          gia_tri: amount,
+          ghi_chu: createNote ? createNote.value : '',
+          chi_tiet_thanh_toan: {
+            tien_mat: cash,
+            chuyen_khoan: transfer,
+            so_quy_tien_mat_id: createCashBook ? createCashBook.value : '',
+            so_quy_chuyen_khoan_id: createBankBook ? createBankBook.value : ''
+          }
+        })
+      })
+        .then(parseAdvanceJson)
+        .then(function(result) {
+          if (!result.response.ok || !result.json || result.json.success === false) {
+            throw new Error((result.json && result.json.message) || 'Không tạo được phiếu tạm ứng.');
+          }
+          return result.json;
+        })
+        .then(function(json) {
+          closeCreateAdvanceModal();
+          refreshCustomerAdvanceCell(currentCustomer.id, amount, 0);
+          return loadAdvanceList().then(function() {
+            alert(json.message || 'Đã tạo phiếu tạm ứng.');
+          });
+        })
+        .catch(function(error) {
+          alert(error.message || 'Không tạo được phiếu tạm ứng.');
+        })
+        .finally(function() {
+          if (createSubmit) createSubmit.disabled = false;
+        });
+    }
+
+    function submitOffsetAdvance() {
+      if (!currentCustomer.id || !currentAdvance || !currentAdvance.id) return;
+      var cash = Number(parseMoney(offsetCash && offsetCash.value) || 0);
+      var transfer = Number(parseMoney(offsetTransfer && offsetTransfer.value) || 0);
+      var paymentAmount = cash + transfer;
+      if (paymentAmount <= 0) return alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+      if (cash > 0 && !(offsetCashBook && offsetCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+      if (transfer > 0 && !(offsetBankBook && offsetBankBook.value)) return alert('Vui lòng chọn sổ chuyển khoản.');
+      if (paymentAmount > Number(currentAdvance.remain || 0)) return alert('Số tiền vượt quá còn lại của phiếu tạm ứng.');
+
+      syncOffsetAmountFromParts();
+      var allocations = getOffsetRowAllocations();
+      var amount = allocations.reduce(function(sum, row) { return sum + Number(row.so_tien || 0); }, 0);
+      if (amount <= 0) return alert('Vui lòng phân bổ số tiền cấn trừ vào hóa đơn.');
+      if (Math.abs(amount - paymentAmount) > 0.0001) return alert('Tổng tiền mặt/chuyển khoản phải bằng số tiền đã phân bổ.');
+
+      if (offsetSubmit) offsetSubmit.disabled = true;
+      fetch('/khach-hang/' + encodeURIComponent(currentCustomer.id) +
+        '/tam-ung/' + encodeURIComponent(currentAdvance.id) + '/can-tru', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          payment_v2: true,
+          so_tien: amount,
+          gia_tri: amount,
+          ngay_lap: offsetDate ? offsetDate.value : '',
+          ghi_chu: offsetNote ? offsetNote.value : '',
+          allocations_json: JSON.stringify(allocations),
+          chi_tiet_thanh_toan: {
+            tien_mat: cash,
+            chuyen_khoan: transfer,
+            so_quy_tien_mat_id: offsetCashBook ? offsetCashBook.value : '',
+            so_quy_chuyen_khoan_id: offsetBankBook ? offsetBankBook.value : ''
+          }
+        })
+      })
+        .then(parseAdvanceJson)
+        .then(function(result) {
+          if (!result.response.ok || !result.json || result.json.success === false) {
+            throw new Error((result.json && result.json.message) || 'Không cấn trừ được tạm ứng.');
+          }
+          return result.json;
+        })
+        .then(function(json) {
+          closeOffsetModal();
+          refreshCustomerAdvanceCell(currentCustomer.id, -amount, -amount);
+          return loadAdvanceList().then(function() {
+            alert(json.message || 'Đã cấn trừ tạm ứng.');
+          });
+        })
+        .catch(function(error) {
+          alert(error.message || 'Không cấn trừ được tạm ứng.');
+        })
+        .finally(function() {
+          if (offsetSubmit) offsetSubmit.disabled = false;
+        });
+    }
+
+    function submitRefundAdvance() {
+      if (!currentCustomer.id || !currentAdvance || !currentAdvance.id) return;
+      var cash = Number(parseMoney(refundCash && refundCash.value) || 0);
+      var transfer = Number(parseMoney(refundTransfer && refundTransfer.value) || 0);
+      var amount = cash + transfer;
+      if (amount <= 0) return alert('Vui lòng nhập tiền mặt hoặc chuyển khoản.');
+      if (amount > Number(currentAdvance.remain || 0)) return alert('Số tiền hoàn vượt quá còn lại của phiếu tạm ứng.');
+      if (cash > 0 && !(refundCashBook && refundCashBook.value)) return alert('Vui lòng chọn sổ tiền mặt.');
+      if (transfer > 0 && !(refundBankBook && refundBankBook.value)) return alert('Vui lòng chọn sổ chuyển khoản.');
+
+      if (refundSubmit) refundSubmit.disabled = true;
+      fetch('/khach-hang/' + encodeURIComponent(currentCustomer.id) +
+        '/tam-ung/' + encodeURIComponent(currentAdvance.id) + '/hoan-tien', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          payment_v2: true,
+          ngay_lap: refundDate ? refundDate.value : '',
+          gia_tri: amount,
+          ghi_chu: refundNote ? refundNote.value : '',
+          chi_tiet_thanh_toan: {
+            tien_mat: cash,
+            chuyen_khoan: transfer,
+            so_quy_tien_mat_id: refundCashBook ? refundCashBook.value : '',
+            so_quy_chuyen_khoan_id: refundBankBook ? refundBankBook.value : ''
+          }
+        })
+      })
+        .then(parseAdvanceJson)
+        .then(function(result) {
+          if (!result.response.ok || !result.json || result.json.success === false) {
+            throw new Error((result.json && result.json.message) || 'Không hoàn được tạm ứng.');
+          }
+          return result.json;
+        })
+        .then(function(json) {
+          closeRefundModal();
+          refreshCustomerAdvanceCell(currentCustomer.id, -amount, 0);
+          return loadAdvanceList().then(function() {
+            alert(json.message || 'Đã hoàn tiền tạm ứng.');
+          });
+        })
+        .catch(function(error) {
+          alert(error.message || 'Không hoàn được tạm ứng.');
+        })
+        .finally(function() {
+          if (refundSubmit) refundSubmit.disabled = false;
+        });
+    }
+
+    document.addEventListener('click', function(event) {
+      var advanceLink = event.target.closest('.js-customer-advance-link');
+      if (advanceLink) {
+        event.preventDefault();
+        event.stopPropagation();
+        openAdvanceModal(
+          advanceLink.getAttribute('data-customer-id') || '',
+          advanceLink.getAttribute('data-customer-code') || '',
+          advanceLink.getAttribute('data-customer-name') || ''
+        );
+        return;
+      }
+
+      var menuToggle = event.target.closest('[data-customer-advance-menu-toggle]');
+      if (menuToggle) {
+        event.preventDefault();
+        event.stopPropagation();
+        var menu = menuToggle.closest('.customer-advance-action-menu');
+        var willOpen = menu && !menu.classList.contains('is-open');
+        closeAdvanceActionMenus();
+        if (willOpen && menu) {
+          menu.classList.add('is-open');
+          menuToggle.setAttribute('aria-expanded', 'true');
+          positionAdvanceActionMenu(menu);
+        }
+        return;
+      }
+
+      var offsetBtn = event.target.closest('.js-customer-advance-offset');
+      if (offsetBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeAdvanceActionMenus();
+        openOffsetModal(
+          offsetBtn.getAttribute('data-advance-id') || '',
+          offsetBtn.getAttribute('data-advance-code') || '',
+          offsetBtn.getAttribute('data-advance-remain') || 0
+        );
+        return;
+      }
+
+      var refundBtn = event.target.closest('.js-customer-advance-refund');
+      if (refundBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeAdvanceActionMenus();
+        openRefundModal(
+          refundBtn.getAttribute('data-advance-id') || '',
+          refundBtn.getAttribute('data-advance-code') || '',
+          refundBtn.getAttribute('data-advance-remain') || 0
+        );
+        return;
+      }
+
+      if (!event.target.closest('.customer-advance-action-menu')) {
+        closeAdvanceActionMenus();
+      }
+    });
+
+    if (createBtn) createBtn.addEventListener('click', function(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openCreateAdvanceModal();
+    });
+    [createCash, createTransfer].forEach(function(input) {
+      if (!input) return;
+      input.addEventListener('input', function() {
+        formatAdvanceMoneyInput(input);
+        syncAdvanceAmountFromParts();
+      });
+      input.addEventListener('blur', function() {
+        formatAdvanceMoneyInput(input);
+        syncAdvanceAmountFromParts();
+      });
+    });
+    [refundCash, refundTransfer].forEach(function(input) {
+      if (!input) return;
+      input.addEventListener('input', function() {
+        formatAdvanceMoneyInput(input);
+        syncRefundAmountFromParts();
+      });
+      input.addEventListener('blur', function() {
+        formatAdvanceMoneyInput(input);
+        syncRefundAmountFromParts();
+      });
+    });
+    [offsetCash, offsetTransfer].forEach(function(input) {
+      if (!input) return;
+      input.addEventListener('input', function() {
+        formatAdvanceMoneyInput(input);
+        syncOffsetAmountFromParts();
+      });
+      input.addEventListener('blur', function() {
+        formatAdvanceMoneyInput(input);
+        syncOffsetAmountFromParts();
+      });
+    });
+    if (offsetRowsEl) {
+      offsetRowsEl.addEventListener('input', function(event) {
+        var input = event.target.closest('.js-customer-advance-offset-row-paid');
+        if (!input) return;
+        formatAdvanceMoneyInput(input);
+        updateOffsetAllocation('row');
+      });
+      offsetRowsEl.addEventListener('blur', function(event) {
+        var input = event.target.closest('.js-customer-advance-offset-row-paid');
+        if (!input) return;
+        formatAdvanceMoneyInput(input);
+        updateOffsetAllocation('row');
+      }, true);
+    }
+    if (createSubmit) createSubmit.addEventListener('click', submitCreateAdvance);
+    if (createClose) createClose.addEventListener('click', closeCreateAdvanceModal);
+    if (createCancel) createCancel.addEventListener('click', closeCreateAdvanceModal);
+    if (offsetSubmit) offsetSubmit.addEventListener('click', submitOffsetAdvance);
+    if (offsetClose) offsetClose.addEventListener('click', closeOffsetModal);
+    if (offsetCancel) offsetCancel.addEventListener('click', closeOffsetModal);
+    if (refundSubmit) refundSubmit.addEventListener('click', submitRefundAdvance);
+    if (refundClose) refundClose.addEventListener('click', closeRefundModal);
+    if (refundCancel) refundCancel.addEventListener('click', closeRefundModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeAdvanceModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeAdvanceModal);
+    window.addEventListener('resize', function() {
+      document.querySelectorAll('.customer-advance-action-menu.is-open').forEach(positionAdvanceActionMenu);
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key !== 'Escape') return;
+      if (offsetOverlay && offsetOverlay.classList.contains('is-open')) {
+        closeOffsetModal();
+        return;
+      }
+      if (refundOverlay && refundOverlay.classList.contains('is-open')) {
+        closeRefundModal();
+        return;
+      }
+      if (createOverlay && createOverlay.classList.contains('is-open')) {
+        closeCreateAdvanceModal();
+        return;
+      }
+      if (overlay.classList.contains('is-open')) closeAdvanceModal();
+    });
+  })();
+</script>

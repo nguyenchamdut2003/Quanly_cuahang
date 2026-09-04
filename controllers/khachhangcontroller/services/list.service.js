@@ -16,7 +16,8 @@ var {
     formatDetailText,
     getCreatorName
 } = require('../helpers/customer.helper');
-var { loadCustomerFinancialMetrics } = require('./metrics.service');
+var { loadCustomerFinancialMetrics, aggregateCustomerAdvanceBalances, applyCustomerAdvanceFromMap } = require('./metrics.service');
+var { resolveStoreId } = require('../../../utils/storeScope');
 var { loadCustomerGroups } = require('./group.service');
 var { loadAddressTypes } = require('./addressType.service');
 
@@ -38,16 +39,20 @@ async function loadCustomerListPage(options) {
         return map;
     }, {});
 
+    var storeId = options.storeId || (options.req ? await resolveStoreId(options.req) : null);
     var customers = await KhachHang.find(customerQuery)
         .populate({ path: 'nguoi_tao_id', select: 'ho_ten email username' })
         .sort({ created_at: -1, ma_khach_hang: 1 })
         .lean();
-    var financialMap = await loadCustomerFinancialMetrics(customers.map(function(customer) { return customer._id; }));
+    var customerIds = customers.map(function(customer) { return customer._id; });
+    var financialMap = await loadCustomerFinancialMetrics(customerIds);
+    var advanceMap = await aggregateCustomerAdvanceBalances(customerIds, storeId);
     customers = customers.map(function(customer) {
         var metric = financialMap[String(customer._id)] || {};
         customer.tong_ban = Number(metric.tong_ban || 0);
         customer.tong_no = Number(metric.tong_no || 0);
         customer.tong_ban_tru_tra_hang = Number(metric.tong_ban_tru_tra_hang || 0);
+        applyCustomerAdvanceFromMap(customer, advanceMap);
         customer.nhom_khach_hang_ten = groupMap[String(customer.nhom_khach_hang_id || '')] || '---';
         customer.nguoi_tao_ten = getCreatorName(customer);
         return customer;
@@ -70,10 +75,14 @@ async function loadCustomerListPage(options) {
     }
     var summaryTotals = customers.reduce(function(sum, customer) {
         sum.totalDebt += Number(customer.tong_no || 0);
+        sum.totalAdvance += Number(customer.tam_ung || 0);
+        sum.totalFinalDebt += Number(customer.tong_no_cuoi != null
+            ? customer.tong_no_cuoi
+            : (Number(customer.tong_no || 0) - Number(customer.tam_ung || 0)));
         sum.totalSales += Number(customer.tong_ban || 0);
         sum.totalNetSales += Number(customer.tong_ban_tru_tra_hang || 0);
         return sum;
-    }, { totalDebt: 0, totalSales: 0, totalNetSales: 0 });
+    }, { totalDebt: 0, totalAdvance: 0, totalFinalDebt: 0, totalSales: 0, totalNetSales: 0 });
     var totalCustomers = customers.length;
     var totalPages = Math.max(1, Math.ceil(totalCustomers / CUSTOMER_PAGE_SIZE));
     var page = parseInt(requestQuery.page, 10);

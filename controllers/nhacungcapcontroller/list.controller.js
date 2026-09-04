@@ -21,8 +21,10 @@ const {
   SUPPLIER_DEBT_WARN_DEFAULT_DAYS,
   aggregateSupplierPurchaseTotals,
   aggregateSupplierDebtDayInfo,
+  aggregateSupplierAdvanceBalances,
   applySupplierTotalsFromMap,
   applySupplierDebtDayInfo,
+  applySupplierAdvanceFromMap,
   normalizeDebtWarnSettings,
   applySupplierDebtWarning,
   normalizeSupplierMetricIds,
@@ -113,10 +115,19 @@ exports.index = async function(req, res, next) {
               .limit(pageSize)
               .lean();
 
+          var storeId = await resolveStoreId(req);
+          var advanceMap = suppliers.length
+              ? await aggregateSupplierAdvanceBalances(
+                  storeId,
+                  suppliers.map(function(supplier) { return supplier._id; })
+              )
+              : {};
+
           suppliers.forEach(function(supplier) {
               supplier.da_thanh_toan =
                   resolveSupplierDaThanhToan(supplier);
               supplier.tong_no_theo_so = null;
+              applySupplierAdvanceFromMap(supplier, advanceMap);
               supplier.debt_warning = false;
               supplier.metrics_pending = true;
           });
@@ -248,10 +259,14 @@ exports.index = async function(req, res, next) {
                   }),
                   measureAsync('nhaCungCap.apiTableMetrics.aggregateDebtDays', function() {
                       return aggregateSupplierDebtDayInfo(storeId, allowedIds);
+                  }),
+                  measureAsync('nhaCungCap.apiTableMetrics.aggregateAdvances', function() {
+                      return aggregateSupplierAdvanceBalances(storeId, allowedIds);
                   })
               ]);
               var totalsMap = aggregateResult[0];
               var debtDayMap = aggregateResult[1];
+              var advanceMap = aggregateResult[2];
               var debtWarnSettings = normalizeDebtWarnSettings(normalizeFilterQuery(req?.query || {}));
   
               var rows = ids.map(function(id) {
@@ -259,12 +274,15 @@ exports.index = async function(req, res, next) {
                   if (!supplier) return null;
                   applySupplierTotalsFromMap(supplier, totalsMap);
                   applySupplierDebtDayInfo(supplier, debtDayMap);
+                  applySupplierAdvanceFromMap(supplier, advanceMap);
                   applySupplierDebtWarning(supplier, debtWarnSettings);
                   return {
                       id: id,
                       tong_mua: Number(supplier.tong_mua || 0),
                       da_thanh_toan: Number(supplier.da_thanh_toan || 0),
                       tong_no: Number(supplier.tong_no || 0),
+                      tam_ung: Number(supplier.tam_ung || 0),
+                      tong_no_cuoi: Number(supplier.tong_no_cuoi || 0),
                       tong_no_theo_so: Number(supplier.tong_no_theo_so || 0),
                       so_ngay_no_xa: supplier.so_ngay_no_xa != null ? Number(supplier.so_ngay_no_xa) : null,
                       so_ngay_no_gan: supplier.so_ngay_no_gan != null ? Number(supplier.so_ngay_no_gan) : null,

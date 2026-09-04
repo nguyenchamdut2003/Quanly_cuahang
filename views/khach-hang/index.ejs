@@ -20,6 +20,10 @@
     .customer-page-link{min-width:34px;height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:700}
     .customer-page-link.is-active{background:#0070f4;border-color:#0070f4;color:#fff}
     .customer-page-link.is-disabled{pointer-events:none;opacity:.45}
+    .customer-advance-link{border:0;background:transparent;color:#2563eb;font:inherit;font-weight:700;cursor:pointer;padding:0;text-align:right;width:100%}
+    .customer-advance-link:hover{color:#1d4ed8;text-decoration:underline}
+    .customer-money-positive{color:#b42318;font-weight:700}
+    .customer-money-negative{color:#027a48;font-weight:700}
     .store-delete-modal-overlay{position:fixed;inset:0;z-index:1600;display:none;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:24px}
     .store-delete-modal-overlay.is-visible{display:flex}
     .store-delete-modal{width:min(760px,calc(100vw - 24px));max-height:calc(100vh - 48px);display:flex;flex-direction:column;background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(15,23,42,.28);overflow:hidden}
@@ -750,6 +754,8 @@
                   <th>Nợ hiện tại</th>
                   <th>Tổng bán</th>
                   <th>Tổng bán trừ trả hàng</th>
+                  <th class="text-right">Tạm ứng</th>
+                  <th class="text-right">Tổng nợ cuối</th>
 
                 </tr>
               </thead>
@@ -757,26 +763,49 @@
                 <tr class="customer-summary-row" style="background-color: #f1f5f9;">
                   <td class="check-cell"></td>
                   <td colspan="3" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
-                  <td><strong><%= Number(summaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
-                  <td><strong><%= Number(summaryTotals.totalSales || 0).toLocaleString('vi-VN') %></strong></td>
-                  <td><strong><%= Number(summaryTotals.totalNetSales || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td data-summary-field="tong-no"><strong><%= Number(summaryTotals.totalDebt || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td data-summary-field="tong-ban"><strong><%= Number(summaryTotals.totalSales || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td data-summary-field="tong-ban-tru-tra-hang"><strong><%= Number(summaryTotals.totalNetSales || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td class="text-right" data-summary-field="tam-ung"><strong><%= Number(summaryTotals.totalAdvance || 0).toLocaleString('vi-VN') %></strong></td>
+                  <td class="text-right" data-summary-field="tong-no-cuoi"><strong class="<%= Number(summaryTotals.totalFinalDebt || 0) > 0 ? 'customer-money-positive' : (Number(summaryTotals.totalFinalDebt || 0) < 0 ? 'customer-money-negative' : '') %>"><%= Number(summaryTotals.totalFinalDebt || 0).toLocaleString('vi-VN') %></strong></td>
                 </tr>
                 <% if (customers.length === 0) { %>
                   <tr>
-                    <td colspan="7" class="empty-cell">Không có khách hàng phù hợp với bộ lọc.</td>
+                    <td colspan="9" class="empty-cell">Không có khách hàng phù hợp với bộ lọc.</td>
                   </tr>
 
                 <% } %>
                 <% customers.forEach(function(customer) { %>
                   <% var listBase = buildCustomerPageUrl(pagination ? pagination.page : 1); %>
-                  <tr data-kv-detail-id="<%= customer._id %>" data-customer-code="<%= customer.ma_khach_hang || '' %>" data-customer-name="<%= customer.ten_khach_hang || '' %>">
+                  <% var tamUng = Number(customer.tam_ung || 0); %>
+                  <% var tongNoCuoi = customer.tong_no_cuoi != null ? Number(customer.tong_no_cuoi) : (Number(customer.tong_no || 0) - tamUng); %>
+                  <tr
+                    class="customer-row"
+                    data-kv-detail-id="<%= customer._id %>"
+                    data-customer-id="<%= customer._id %>"
+                    data-customer-code="<%= customer.ma_khach_hang || '' %>"
+                    data-customer-name="<%= customer.ten_khach_hang || '' %>"
+                    data-metric-tong-no="<%= Number(customer.tong_no || 0) %>"
+                    data-metric-tam-ung="<%= tamUng %>"
+                    data-metric-tong-no-cuoi="<%= tongNoCuoi %>"
+                  >
                     <td class="check-cell" onclick="event.stopPropagation()"><input class="customer-checkbox" type="checkbox" name="ids" value="<%= customer._id %>" form="bulkDeleteCustomersForm" aria-label="Chọn khách hàng"></td>
                     <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= customer.ma_khach_hang || '---' %></a></td>
                     <td><strong><%= customer.ten_khach_hang || '---' %></strong></td>
                     <td><%= customer.sdt || '---' %></td>
-                    <td><%= Number(customer.tong_no || 0).toLocaleString('vi-VN') %></td>
-                    <td><%= Number(customer.tong_ban || 0).toLocaleString('vi-VN') %></td>
-                    <td><%= Number(customer.tong_ban_tru_tra_hang || 0).toLocaleString('vi-VN') %></td>
+                    <td data-field="tong-no"><%= Number(customer.tong_no || 0).toLocaleString('vi-VN') %></td>
+                    <td data-field="tong-ban"><%= Number(customer.tong_ban || 0).toLocaleString('vi-VN') %></td>
+                    <td data-field="tong-ban-tru-tra-hang"><%= Number(customer.tong_ban_tru_tra_hang || 0).toLocaleString('vi-VN') %></td>
+                    <td class="text-right" data-field="tam-ung">
+                      <button
+                        type="button"
+                        class="customer-advance-link js-customer-advance-link"
+                        data-customer-id="<%= customer._id %>"
+                        data-customer-code="<%= customer.ma_khach_hang || '' %>"
+                        data-customer-name="<%= customer.ten_khach_hang || '' %>"
+                      ><%= tamUng.toLocaleString('vi-VN') %></button>
+                    </td>
+                    <td class="text-right <%= tongNoCuoi > 0 ? 'customer-money-positive' : (tongNoCuoi < 0 ? 'customer-money-negative' : '') %>" data-field="tong-no-cuoi"><%= tongNoCuoi.toLocaleString('vi-VN') %></td>
                   </tr>
                 <% }) %>
               </tbody>
@@ -856,6 +885,7 @@
     <%- include('../partials/debt-period-export-modal') %>
   </div>
   <%- include('../partials/global-loading') %>
+  <%- include('partials/_advance-modals') %>
   <script id="customerGroupsSeed" type="application/json"><%- JSON.stringify(customerGroups || []) %></script>
   <script id="addressTypesSeed" type="application/json"><%- JSON.stringify(addressTypes || []) %></script>
   <script src="/javascripts/global-loading.js"></script>
@@ -1187,7 +1217,7 @@
       if (kvCustomerTable && typeof KvInlineDetail !== 'undefined') {
         kvCustomer = new KvInlineDetail({
           table: kvCustomerTable,
-          colspan: 7,
+          colspan: 9,
           buildUrl: function(id) {
             return '/khach-hang/api/' + encodeURIComponent(id) + '/detail';
           },

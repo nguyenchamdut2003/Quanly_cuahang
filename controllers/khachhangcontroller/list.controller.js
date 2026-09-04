@@ -13,7 +13,8 @@ exports.index = async function(req, res, next) {
 
         var locals = await listService.loadCustomerListPage({
             query: requestQuery,
-            user: req.user
+            user: req.user,
+            req: req
         });
         res.render('khach-hang/index', locals);
     } catch (error) {
