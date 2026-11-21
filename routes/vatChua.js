@@ -9,6 +9,7 @@ router.get('/', vatChuaController.index);
 router.get('/api/document/:kind/:id', vatChuaController.apiDocumentDetail);
 router.get('/nhap/:id/edit', vatChuaController.apiImportEditDetail);
 router.post('/nhap/:id/edit', vatChuaController.apiImportUpdate);
+router.post('/nhap/:id/pay', vatChuaController.apiImportPay);
 router.post('/nhap/:id/return', vatChuaController.apiImportReturn);
 router.get('/xuat/:id/edit', vatChuaController.apiReturnEditDetail);
 router.post('/xuat/:id/edit', vatChuaController.apiReturnUpdate);

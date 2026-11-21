@@ -2055,7 +2055,7 @@
         if (!getStoreId()) return alert('Chưa chọn cửa hàng. Vui lòng chọn cửa hàng ở menu góc trên phải.');
         if (!document.getElementById('khoId').value) return alert('Vui lòng chọn kho.');
         const invoiceDateInput = document.getElementById('invoiceDate');
-        if (invoiceDateInput && invoiceDateInput.value && Number.isNaN(new Date(invoiceDateInput.value).getTime())) return alert('Ngay hoa don khong hop le.');
+        if (invoiceDateInput && invoiceDateInput.value && Number.isNaN(new Date(invoiceDateInput.value).getTime())) return alert('Ngày hóa đơn không hợp lệ.');
         if (!customerId.value) return alert('Vui lòng chọn khách hàng.');
         const wantsShipping = Boolean(partnerId.value) || num(shippingFee.value) > 0;
         if (wantsShipping && !partnerId.value) return alert('Vui lòng chọn đối tác giao hàng');

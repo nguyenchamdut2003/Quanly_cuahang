@@ -242,7 +242,7 @@ async function index(req, res, next) {
         });
 
         var locals = {
-            pageTitle: 'HÃ ng hÃ³a',
+            pageTitle: 'Hàng hóa',
             activeMenu: 'hang-hoa',
             user: req.user,
             flash: requestQuery,

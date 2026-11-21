@@ -252,14 +252,14 @@
                               <table class="admin-table warehouse-table">
                                 <thead>
                                   <tr>
-                                    <th>Ma chung tu</th>
-                                    <th>Thoi gian</th>
-                                    <th class="text-right">Gia tri chung tu</th>
-                                    <th class="text-right">Da tra truoc</th>
-                                    <th class="text-right">Con can tra <i class="fa-regular fa-circle-question"></i>
+                                    <th>Mã chứng từ</th>
+                                    <th>Thời gian</th>
+                                    <th class="text-right">Giá trị chứng từ</th>
+                                    <th class="text-right">Đã trả trước</th>
+                                    <th class="text-right">Còn cần trả <i class="fa-regular fa-circle-question"></i>
                                     </th>
-                                    <th class="text-right">Tien tra</th>
-                                    <th class="text-right">Con no</th>
+                                    <th class="text-right">Tiền trả</th>
+                                    <th class="text-right">Còn nợ</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -269,7 +269,7 @@
                                         <div class="supplier-pay-empty">
                                           <span class="supplier-pay-empty-icon"><i
                                               class="fa-regular fa-inbox"></i></span>
-                                          <span>Khong co ket qua phu hop</span>
+                                          <span>Không có kết quả phù hợp</span>
                                         </div>
                                       </td>
                                     </tr>
@@ -281,7 +281,7 @@
                                           data-debt="<%= purchaseDebt %>">
                                           <td>
                                             <%= purchase.ma_chung_tu || purchase.ma_phieu_nhap || purchase.ma_nhap_vat_chua || '--' %>
-                                            <div class="supplier-muted-cell"><%= purchaseType === 'nhap_vat_chua' ? 'Nhap vat chua' : 'Phieu nhap' %></div>
+                                            <div class="supplier-muted-cell"><%= purchaseType === 'nhap_vat_chua' ? 'Nhập vật chứa' : 'Phiếu nhập' %></div>
                                           </td>
                                           <td>
                                             <%= formatDate(purchase.ngay_chung_tu || purchase.ngay_nhap || purchase.created_at) %>

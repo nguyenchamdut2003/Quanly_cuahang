@@ -121,6 +121,12 @@
                           <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
                           Sửa
                         </button>
+                        <% if (doc.supplier_href) { %>
+                          <button type="button" class="vc-doc-menu-item" data-vc-import-pay data-vc-import-id="<%= doc._id %>" role="menuitem">
+                            <i class="fa-solid fa-money-bill-transfer" aria-hidden="true"></i>
+                            Thanh toán
+                          </button>
+                        <% } %>
                         <button type="button" class="vc-doc-menu-item danger" data-vc-import-trash data-vc-import-id="<%= doc._id %>" data-vc-import-code="<%= doc.ma_chung_tu || '' %>" role="menuitem">
                           <i class="fa-regular fa-trash-can" aria-hidden="true"></i>
                           Xóa

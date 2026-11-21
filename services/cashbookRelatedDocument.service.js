@@ -375,34 +375,34 @@ async function listRelatedDocuments({
   doi_tuong_entity_id
 }) {
   const storeId = toObjectId(cua_hang_id);
-  if (!storeId) throw new Error('Thieu cua_hang_id');
-  if (!['thu', 'chi'].includes(loai_phieu)) throw new Error('Loai phieu khong hop le');
+  if (!storeId) throw new Error('Thiếu cua_hang_id');
+  if (!['thu', 'chi'].includes(loai_phieu)) throw new Error('Loại phiếu không hợp lệ');
 
   const docType = String(document_type || '').trim();
   if (!docType || docType === 'khac') {
-    return { items: [], message: docType === 'khac' ? 'Loai Khac khong can chon chung tu' : '' };
+    return { items: [], message: docType === 'khac' ? 'Loại Khác không cần chọn chứng từ' : '' };
   }
 
   const entityId = toObjectId(doi_tuong_entity_id);
   const group = String(nhom_doi_tuong || '').trim();
 
   if (group === 'khac') {
-    return { items: [], message: 'Nhom Khac khong gan chung tu he thong' };
+    return { items: [], message: 'Nhóm Khác không gắn chứng từ hệ thống' };
   }
 
   const needsEntity = ['khach_hang', 'nha_cung_cap', 'nhan_vien', 'doi_tac_giao_hang'].includes(group);
   if (needsEntity && !entityId) {
-    return { items: [], message: 'Vui long chon nguoi nop/nhan tu danh sach' };
+    return { items: [], message: 'Vui lòng chọn người nộp/nhận từ danh sách' };
   }
 
   let items = [];
 
   if (loai_phieu === 'thu') {
     if (docType === 'don_hang') {
-      if (group !== 'khach_hang') return { items: [], message: 'Don hang chi ap dung nhom Khach hang' };
+      if (group !== 'khach_hang') return { items: [], message: 'Đơn hàng chỉ áp dụng nhóm Khách hàng' };
       items = await listDonHangThu(storeId, entityId);
     } else if (docType === 'hoa_don') {
-      if (group !== 'khach_hang') return { items: [], message: 'Hoa don chi ap dung nhom Khach hang' };
+      if (group !== 'khach_hang') return { items: [], message: 'Hóa đơn chỉ áp dụng nhóm Khách hàng' };
       items = await listHoaDonThu(storeId, entityId);
     } else if (docType === 'van_don') {
       items = await listVanDonThu(
@@ -411,26 +411,26 @@ async function listRelatedDocuments({
         group === 'doi_tac_giao_hang' ? entityId : null
       );
     } else if (docType === 'phieu_tra_hang_nhap') {
-      if (group !== 'nha_cung_cap') return { items: [], message: 'Phieu tra hang nhap chi ap dung nhom Nha cung cap' };
+      if (group !== 'nha_cung_cap') return { items: [], message: 'Phiếu trả hàng nhập chỉ áp dụng nhóm Nhà cung cấp' };
       items = await listPhieuTraHangNhapThu(storeId, entityId);
     }
   } else if (loai_phieu === 'chi') {
     if (docType === 'phieu_nhap') {
-      if (group !== 'nha_cung_cap') return { items: [], message: 'Phieu nhap chi ap dung nhom Nha cung cap' };
+      if (group !== 'nha_cung_cap') return { items: [], message: 'Phiếu nhập chỉ áp dụng nhóm Nhà cung cấp' };
       items = await listPhieuNhapChi(storeId, entityId);
     } else if (docType === 'phieu_tra_hang') {
-      if (group !== 'khach_hang') return { items: [], message: 'Phieu tra hang ban chi ap dung nhom Khach hang' };
+      if (group !== 'khach_hang') return { items: [], message: 'Phiếu trả hàng bán chỉ áp dụng nhóm Khách hàng' };
       items = await listPhieuTraHangChi(storeId, entityId);
     } else if (docType === 'van_don') {
       if (group !== 'doi_tac_giao_hang') {
-        return { items: [], message: 'Phi giao hang chi ap dung nhom Doi tac giao hang' };
+        return { items: [], message: 'Phí giao hàng chỉ áp dụng nhóm Đối tác giao hàng' };
       }
       items = await listVanDonChi(storeId, entityId);
     } else if (docType === 'don_hang') {
-      if (group !== 'khach_hang') return { items: [], message: 'Hoan tien don hang chi ap dung nhom Khach hang' };
+      if (group !== 'khach_hang') return { items: [], message: 'Hoàn tiền đơn hàng chỉ áp dụng nhóm Khách hàng' };
       items = await listDonHangChiRefund(storeId, entityId);
     } else if (docType === 'hoa_don') {
-      if (group !== 'khach_hang') return { items: [], message: 'Hoan tien hoa don chi ap dung nhom Khach hang' };
+      if (group !== 'khach_hang') return { items: [], message: 'Hoàn tiền hóa đơn chỉ áp dụng nhóm Khách hàng' };
       items = await listHoaDonChiRefund(storeId, entityId);
     }
   }
@@ -551,7 +551,7 @@ async function validateReceiptDocumentAmount(data) {
 
   const docId = data[field];
   if (!isObjectId(docId)) {
-    throw new Error('Chung tu lien quan khong hop le');
+    throw new Error('Chứng từ liên quan không hợp lệ');
   }
 
   const remainingInfo = await getDocumentRemaining({
@@ -562,13 +562,13 @@ async function validateReceiptDocumentAmount(data) {
   });
 
   if (!remainingInfo.found || remainingInfo.remaining <= 0) {
-    throw new Error('Chung tu da het so tien can thu/chi hoac da huy');
+    throw new Error('Chứng từ đã hết số tiền cần thu/chi hoặc đã hủy');
   }
 
   const amount = parseMoney(data.gia_tri);
   if (amount > remainingInfo.remaining) {
     throw new Error(
-      `So tien vuot so con lai ${remainingInfo.remaining.toLocaleString('vi-VN')} VND (${remainingInfo.code || ''})`
+      `Số tiền vượt số còn lại ${remainingInfo.remaining.toLocaleString('vi-VN')} VNĐ (${remainingInfo.code || ''})`
     );
   }
 }

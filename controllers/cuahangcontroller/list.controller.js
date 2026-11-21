@@ -14,7 +14,7 @@ const index = async function(req, res, next) {
         var skip = (page - 1) * STORE_PAGE_SIZE;
 
         var stores = await CuaHang.find(storeQuery)
-            .select('ma_cua_hang ten_cua_hang ma_so_thue dia_chi dia_chi_chi_tiet dia_chi_day_du tinh_thanh tinh_thanh_id phuong_xa phuong_xa_code sdt email trang_thai created_at updated_at')
+            .select('ma_cua_hang ten_cua_hang ma_so_thue dia_chi dia_chi_chi_tiet dia_chi_day_du tinh_thanh tinh_thanh_id phuong_xa phuong_xa_code sdt email ghi_chu trang_thai created_at updated_at')
             .sort({ created_at: 1, ma_cua_hang: 1 })
             .skip(skip)
             .limit(STORE_PAGE_SIZE)

@@ -31,7 +31,7 @@ const { taoPhieuThuChi } = require('../services/soQuy.service');
 const { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
 
 function disabledTrashOperation() {
-  const error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+  const error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
   error.statusCode = 410;
   throw error;
 }
@@ -1543,7 +1543,7 @@ exports.deactivateSelected = async function(req, res) {
     ids = Array.isArray(ids) ? ids : [];
     ids = ids.map(id => String(id || '').trim()).filter(isObjectId);
     if (!ids.length) {
-      return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot phieu tra hang nhap.' });
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một phiếu trả hàng nhập.' });
     }
     const filter = { _id: { $in: ids } };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
@@ -1553,12 +1553,12 @@ exports.deactivateSelected = async function(req, res) {
     );
     return res.json({
       success: true,
-      message: 'Da xoa phieu tra hang nhap da chon.',
+      message: 'Đã xóa phiếu trả hàng nhập đã chọn.',
       data: { modified_count: result.modifiedCount || result.nModified || 0 }
     });
   } catch (error) {
     const status = Number(error && error.statusCode) || 400;
-    return res.status(status).json({ success: false, message: error.message || 'Khong xoa duoc phieu tra hang nhap.' });
+    return res.status(status).json({ success: false, message: error.message || 'Không xóa được phiếu trả hàng nhập.' });
   }
 };
 
@@ -2168,7 +2168,7 @@ exports.createSubmit = async function(req, res, next) {
       print_url: '/tra-hang-nhap/' + returnDoc._id + '/in'
     });
   } catch (error) {
-    const message = error && error.message ? error.message : 'Khong the luu phieu tra hang nhap';
+    const message = error && error.message ? error.message : 'Không thể lưu phiếu trả hàng nhập';
     console.error('[TRA_HANG_NHAP][CREATE_FAIL]', message, error && error.stack ? error.stack : error);
     return res.status(400).json({ success: false, message: message });
   }

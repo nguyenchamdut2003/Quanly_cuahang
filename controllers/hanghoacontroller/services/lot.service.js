@@ -123,13 +123,13 @@ async function apiLotProfitReport(req, res, next) {
         query.cua_hang_id = storeId;
         var result = await buildLotProfitReport(query);
         if (!result.product) {
-            return res.status(404).json({ success: false, message: 'KhÃ´ng tÃ¬m tháº¥y hÃ ng hÃ³a' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa' });
         }
         res.json({ success: true, data: result });
     } catch (err) {
         res.status(err.status || err.statusCode || 500).json({
             success: false,
-            message: err.message || 'KhÃ´ng táº£i Ä‘Æ°á»£c bÃ¡o cÃ¡o lá»i lá»— theo lÃ´'
+            message: err.message || 'Không tải được báo cáo lời lỗ theo lô'
         });
     }
 };

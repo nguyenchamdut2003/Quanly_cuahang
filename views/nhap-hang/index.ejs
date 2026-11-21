@@ -349,6 +349,7 @@
         <h1 class="po-title">Nhập hàng</h1>
         <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
+          <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="submitPoFilters()"> Phiếu tạm</label>
           <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitPoFilters()"> Đã nhập hàng</label>
           <label class="check-line"><input type="checkbox" name="trang_thai" value="cancelled" <%= selectedStatuses.includes('cancelled') ? 'checked' : '' %> onchange="submitPoFilters()"> Đã hủy</label>
         </div>

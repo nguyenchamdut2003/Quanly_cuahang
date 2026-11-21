@@ -30,11 +30,11 @@
     <%- include('../partials/header') %>
     <main class="permission-page">
       <% if (success) { %>
-        <div class="permission-alert success">Da cap nhat phan quyen tai khoan.</div>
+        <div class="permission-alert success">Đã cập nhật phân quyền tài khoản.</div>
       <% } %>
       <% if (error) { %>
         <div class="permission-alert error">
-          <%= error === 'super_admin_locked' ? 'Khong duoc thay doi vai tro super admin.' : 'Khong cap nhat duoc phan quyen.' %>
+          <%= error === 'super_admin_locked' ? 'Không được thay đổi vai trò super admin.' : 'Không cập nhật được phân quyền.' %>
         </div>
       <% } %>
       <section class="permission-panel">
@@ -68,7 +68,7 @@
                           <option value="<%= role.value %>" <%= item.vai_tro === role.value ? 'selected' : '' %>><%= role.label %></option>
                         <% }) %>
                       </select>
-                      <button type="submit" class="permission-save">Luu</button>
+                      <button type="submit" class="permission-save">Lưu</button>
                     </form>
                   <% } %>
                 </td>

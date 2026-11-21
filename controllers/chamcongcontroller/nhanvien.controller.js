@@ -724,11 +724,11 @@ exports.listTamUngNhanVien = async function(req, res, next) {
     var storeId = getCurrentStoreId(req, res);
     var id = String(req.params.id || '').trim();
     if (!storeId || !id || !isValidObjectId(id)) {
-      return res.status(400).json({ success: false, message: 'Dá»¯ liá»‡u khÃ´ng há»£p lá»‡.' });
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ.' });
     }
 
     var employee = await NhanVien.findOne({ _id: id, cua_hang_id: storeId }).select('_id').lean();
-    if (!employee) return res.status(404).json({ success: false, message: 'KhÃ´ng tÃ¬m tháº¥y nhÃ¢n viÃªn.' });
+    if (!employee) return res.status(404).json({ success: false, message: 'Không tìm thấy nhân viên.' });
 
     res.json({
       success: true,

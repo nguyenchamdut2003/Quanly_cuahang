@@ -16,6 +16,7 @@ const CuaHangSchema = new Schema({
   phuong_xa_code: { type: String },
   sdt: { type: String },
   email: { type: String },
+  ghi_chu: { type: String, default: '' },
   trang_thai: {
     type: String,
     enum: ['active', 'inactive'],

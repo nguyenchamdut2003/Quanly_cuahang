@@ -164,16 +164,14 @@
         <button type="button" class="nav-item nav-dropdown-trigger">Hàng hóa</button>
         <div class="nav-mega-menu">
           <div class="nav-mega-col">
-            <a href="/hang-hoa" class="nav-mega-item">Danh sách hàng hóa</a>
             <a href="/vat-chua" class="nav-mega-item">Vật chứa hàng hóa</a>
-            <a href="/hang-hoa/thiet-lap-gia" class="nav-mega-item">Thiết lập giá</a>
           </div>
           <div class="nav-mega-col">
+            <a href="/hang-hoa" class="nav-mega-item">Danh sách hàng hóa</a>
             <a href="/kiem-kho" class="nav-mega-item">Kiểm kho</a>
-            <a href="/xuat-dung-noi-bo" class="nav-mega-item">
-              <span>Xuất dùng nội bộ</span>
-            </a>
+            <a href="/xuat-dung-noi-bo" class="nav-mega-item">Xuất dùng nội bộ</a>
             <a href="/xuat-huy" class="nav-mega-item">Xuất hủy</a>
+            <a href="/hang-hoa/thiet-lap-gia" class="nav-mega-item">Thiết lập giá</a>
           </div>
         </div>
       </div>
@@ -363,11 +361,11 @@
           headers: { Accept: 'application/json' }
         });
         const data = await res.json().catch(function() { return {}; });
-        if (!res.ok || !data.success) throw new Error(data.message || 'Khong bo qua duoc doi mat khau');
+        if (!res.ok || !data.success) throw new Error(data.message || 'Không bỏ qua được đổi mật khẩu');
         changePasswordModal.setAttribute('data-force', '0');
         setChangePasswordModalOpen(false, { allowForcedClose: true });
       } catch (error) {
-        alert(error.message || 'Khong bo qua duoc doi mat khau');
+        alert(error.message || 'Không bỏ qua được đổi mật khẩu');
       } finally {
         if (changePasswordClose) changePasswordClose.disabled = false;
       }

@@ -202,7 +202,7 @@ async function apiProductDetail(req, res, next) {
     try {
         var ctx = await loadProductBasicDetailById(req.params.id, req);
         if (!ctx) {
-            return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>KhÃ´ng tÃ¬m tháº¥y hÃ ng hÃ³a.</p></div>');
+            return res.status(404).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tìm thấy hàng hóa.</p></div>');
         }
         res.render('hang-hoa/_detail-panel', ctx);
     } catch (err) {
@@ -214,7 +214,7 @@ async function apiUpdateProductNotes(req, res, next) {
     try {
         var productId = normalizeIdParam(req && req.params && req.params.id);
         if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
-            return res.status(400).json({ success: false, message: 'HÃ ng hÃ³a khÃ´ng há»£p lá»‡.' });
+            return res.status(400).json({ success: false, message: 'Hàng hóa không hợp lệ.' });
         }
 
         var storeId = await resolveStoreId(req);
@@ -229,7 +229,7 @@ async function apiUpdateProductNotes(req, res, next) {
 
         var existing = await HangHoa.findOne(productQuery).select('_id').lean();
         if (!existing) {
-            return res.status(404).json({ success: false, message: 'KhÃ´ng tÃ¬m tháº¥y hÃ ng hÃ³a.' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hàng hóa.' });
         }
 
         var payload = normalizeProductNotePayload(req && req.body);
@@ -241,7 +241,7 @@ async function apiUpdateProductNotes(req, res, next) {
 
         res.json({
             success: true,
-            message: 'ÄÃ£ lÆ°u mÃ´ táº£ vÃ  ghi chÃº Ä‘áº·t hÃ ng.',
+            message: 'Đã lưu mô tả và ghi chú đặt hàng.',
             data: {
                 mo_ta: decodeLegacyEntities(updated.mo_ta || ''),
                 ghi_chu_dat_hang: decodeLegacyEntities(updated.ghi_chu_dat_hang || '')
@@ -250,7 +250,7 @@ async function apiUpdateProductNotes(req, res, next) {
     } catch (err) {
         res.status(err.status || err.statusCode || 500).json({
             success: false,
-            message: err.message || 'KhÃ´ng cáº­p nháº­t Ä‘Æ°á»£c mÃ´ táº£/ghi chÃº.'
+            message: err.message || 'Không cập nhật được mô tả/ghi chú.'
         });
     }
 };

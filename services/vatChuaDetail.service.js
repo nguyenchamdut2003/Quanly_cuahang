@@ -6,6 +6,7 @@ const {
   PhieuThuChi
 } = require('../models/kiot.model');
 const { loadAverageCostByVatChuaIds } = require('./vatChuaImport.service');
+const { buildNhapVatChuaReceiptFilter, getNhapVatChuaReceiptAmount, loadNhapVatChuaReturnTotals } = require('./vatChuaPaymentTotals.service');
 
 function cleanId(value) {
   const id = String(value || '').trim();
@@ -81,7 +82,7 @@ function resolveXuatLoaiLabel(row) {
   return LOAI_XUAT_LABEL[row.loai_xuat] || row.loai_xuat || '---';
 }
 
-function mapNhapRows(rows, vatChuaId, paidMap) {
+function mapNhapRows(rows, vatChuaId, paidMap, returnedMap) {
   const targetId = String(vatChuaId);
   return (Array.isArray(rows) ? rows : []).map(function(row) {
     const line = (Array.isArray(row.items) ? row.items : []).find(function(item) {
@@ -89,6 +90,7 @@ function mapNhapRows(rows, vatChuaId, paidMap) {
     }) || (row.items && row.items[0]) || {};
     const rowId = String(row._id || '');
     const paidAmount = Number((paidMap && paidMap[rowId]) || 0);
+    const returnedAmount = Number((returnedMap && returnedMap.get(rowId)) || 0);
     const thanhTien = Number(line.thanh_tien || row.tong_tien || 0);
     return {
       _id: row._id,
@@ -98,6 +100,7 @@ function mapNhapRows(rows, vatChuaId, paidMap) {
       loai: row.loai_nhap || '',
       loai_label: resolveNhapLoaiLabel(row),
       doi_tuong_ten: row.doi_tuong_ten || '---',
+      doi_tuong_type: row.doi_tuong_type || '',
       doi_tuong_id: row.doi_tuong_id ? String(row.doi_tuong_id) : '',
       supplier_href: row.doi_tuong_type === 'nha_cung_cap' && row.doi_tuong_id
         ? '/nha-cung-cap?supplier=' + encodeURIComponent(String(row.doi_tuong_id))
@@ -110,7 +113,8 @@ function mapNhapRows(rows, vatChuaId, paidMap) {
       gia_von: Number(line.gia_von || 0),
       thanh_tien: thanhTien,
       da_tra_ncc: paidAmount,
-      can_tra_ncc: Math.max(0, thanhTien - paidAmount),
+      returned_amount: returnedAmount,
+      can_tra_ncc: Math.max(0, thanhTien - paidAmount - returnedAmount),
       trang_thai: row.trang_thai || 'active',
       trang_thai_label: row.trang_thai === 'cancelled' ? 'Đã hủy' : 'Hợp lệ',
       created_at: row.created_at,
@@ -224,33 +228,22 @@ async function loadVatChuaDetailContext(vatChuaId, storeId) {
     XuatVatChua.find(activeXuatMatch).sort({ created_at: -1 }).lean()
   ]);
 
-  const nhapIds = nhapRows.map(function(row) { return row._id; }).filter(Boolean);
-  const nhapCodes = nhapRows.map(function(r) { return r.ma_nhap_vat_chua; }).filter(Boolean);
   let chiDocuments = [];
   const paidMap = {};
-  if (nhapIds.length) {
-    const chiRows = await PhieuThuChi.find({
-      cua_hang_id: store,
-      loai_phieu: 'chi',
-      deleted_at: null,
-      $or: [
-        { nhap_vat_chua_id: { $in: nhapIds } },
-        { ma_chung_tu_goc: { $in: nhapCodes } }
-      ]
-    }).sort({ ngay_lap: -1, created_at: -1 }).lean();
-    const idByCode = nhapRows.reduce(function(map, row) {
-      if (row.ma_nhap_vat_chua) map[row.ma_nhap_vat_chua] = String(row._id);
-      return map;
-    }, {});
-    chiRows.forEach(function(row) {
-      const linkedId = cleanId(row.nhap_vat_chua_id) || idByCode[String(row.ma_chung_tu_goc || '').trim()] || '';
-      if (!linkedId) return;
-      paidMap[linkedId] = Number(paidMap[linkedId] || 0) + Number(row.gia_tri || 0);
+  if (nhapRows.length) {
+    const chiRows = await PhieuThuChi.find(buildNhapVatChuaReceiptFilter(nhapRows, store, { includeCancelled: true }))
+      .setOptions({ strictQuery: false })
+      .sort({ ngay_lap: -1, created_at: -1 }).lean();
+    nhapRows.forEach(function(doc) {
+      paidMap[String(doc._id)] = chiRows.reduce(function(total, receipt) {
+        return total + getNhapVatChuaReceiptAmount(receipt, doc);
+      }, 0);
     });
     chiDocuments = mapChiReceiptRows(chiRows);
   }
 
-  const documents = mapNhapRows(nhapRows, id, paidMap)
+  const returnedMap = await loadNhapVatChuaReturnTotals(nhapRows, { storeId: store });
+  const documents = mapNhapRows(nhapRows, id, paidMap, returnedMap)
     .concat(mapXuatRows(xuatRows, id))
     .sort(function(a, b) {
       const ta = new Date(a.created_at || 0).getTime();

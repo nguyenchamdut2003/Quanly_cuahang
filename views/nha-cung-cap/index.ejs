@@ -255,6 +255,15 @@
       margin: 0;
     }
     .supplier-detail-field-full { grid-column: 1 / -1; }
+    .supplier-inline-edit-error {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border: 1px solid #fecdca;
+      border-radius: 6px;
+      background: #fff1f0;
+      color: #b42318;
+      font-size: 13px;
+    }
 
     .supplier-pane-toolbar {
       display: flex;
@@ -1472,6 +1481,45 @@
         });
       }
 
+      function showSupplierEditError(form, field) {
+        var error = form.querySelector('[data-supplier-edit-error]');
+        if (!error) return;
+        if (!field) {
+          error.hidden = true;
+          error.textContent = '';
+          return;
+        }
+        if (field.name === 'ten_ncc' && field.validity.valueMissing) {
+          error.textContent = 'Vui lòng nhập tên nhà cung cấp trước khi lưu.';
+        } else if (field.name === 'email' && field.validity.typeMismatch) {
+          error.textContent = 'Email chưa đúng định dạng. Vui lòng kiểm tra lại trước khi lưu.';
+        } else {
+          error.textContent = field.validationMessage || 'Vui lòng kiểm tra lại thông tin nhà cung cấp trước khi lưu.';
+        }
+        error.hidden = false;
+      }
+
+      document.addEventListener('invalid', function(event) {
+        var form = event.target.form;
+        if (!form || !form.classList.contains('supplier-inline-edit-form')) return;
+        showSupplierEditError(form, form.querySelector(':invalid') || event.target);
+      }, true);
+
+      document.addEventListener('input', function(event) {
+        var form = event.target.form;
+        if (form && form.classList.contains('supplier-inline-edit-form') && !form.querySelector(':invalid')) {
+          showSupplierEditError(form, null);
+        }
+      });
+
+      document.addEventListener('submit', function(event) {
+        if (!event.target.classList.contains('supplier-inline-edit-form')) return;
+        showSupplierEditError(event.target, null);
+        if (window.showGlobalLoading && window.showGlobalLoading('Đang lưu thông tin nhà cung cấp...') === false) {
+          event.preventDefault();
+        }
+      });
+
       function parseSupplierMoney(value) {
         var normalized = String(value || '')
           .replace(/[.\s\u00a0\u202f]/g, '')
@@ -1720,10 +1768,10 @@
                 try {
                   json = text ? JSON.parse(text) : null;
                 } catch (err) {
-                  throw new Error('Response metrics khong phai JSON hop le.');
+                  throw new Error('Phản hồi số liệu không phải JSON hợp lệ.');
                 }
                 if (!response.ok || !json || json.success === false) {
-                  throw new Error((json && json.message) || 'Khong the tai so lieu tong hop NCC.');
+                  throw new Error((json && json.message) || 'Không thể tải số liệu tổng hợp NCC.');
                 }
                 return json;
               });

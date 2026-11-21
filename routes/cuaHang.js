@@ -22,6 +22,7 @@ router.post('/import', upload.single('file'), cuaHangController.importExcel);
 router.post('/add', cuaHangController.add);
 router.get('/:id/export/:section.xlsx', cuaHangController.exportSectionExcel);
 router.post('/:id/update', cuaHangController.update);
+router.post('/:id/notes', cuaHangController.updateNotes);
 router.post('/:id/warehouse/add', cuaHangController.addWarehouse);
 router.post('/:id/warehouse/:warehouseId/update', cuaHangController.updateWarehouse);
 router.post('/:id/warehouse/:warehouseId/delete', cuaHangController.removeWarehouse);

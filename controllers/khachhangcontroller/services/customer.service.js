@@ -69,13 +69,18 @@ async function updateCustomer(options) {
 
     applyCustomerTypeFields(payload);
     delete payload.ma_khach_hang;
-    if (!payload.nhom_khach_hang_id) delete payload.nhom_khach_hang_id;
 
     var existingCustomer = await KhachHang.findOne({ _id: customerId }).lean();
     if (!existingCustomer) {
         var notFound = new Error('invalid_customer');
         notFound.code = 'invalid_customer';
         throw notFound;
+    }
+    if (!Object.prototype.hasOwnProperty.call(options.body || {}, 'trang_thai')) {
+        payload.trang_thai = existingCustomer.trang_thai || 'active';
+    }
+    if (!Object.prototype.hasOwnProperty.call(options.body || {}, 'nhom_khach_hang_id')) {
+        payload.nhom_khach_hang_id = existingCustomer.nhom_khach_hang_id || null;
     }
     finalizeCustomerPayload(payload, existingCustomer);
     await KhachHang.findByIdAndUpdate(customerId, { $set: payload }, { runValidators: true });
@@ -108,11 +113,11 @@ async function updateCustomer(options) {
 }
 
 async function removeCustomer(customerId) {
-    throw Object.assign(new Error('Chuc nang xoa/dua vao thung rac da duoc tat.'), { statusCode: 410 });
+    throw Object.assign(new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.'), { statusCode: 410 });
 }
 
 async function removeCustomerWithContext(customerId, context) {
-    throw Object.assign(new Error('Chuc nang xoa/dua vao thung rac da duoc tat.'), { statusCode: 410 });
+    throw Object.assign(new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.'), { statusCode: 410 });
 }
 
 async function removeCustomers(ids, context) {

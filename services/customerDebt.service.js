@@ -29,14 +29,14 @@ async function generateCustomerDebtTransactionCode(session) {
 function normalizeAmount(value) {
   const amount = Number(value || 0);
   if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error('Gia tri giao dich cong no khach hang phai lon hon 0');
+    throw new Error('Giá trị giao dịch công nợ khách hàng phải lớn hơn 0');
   }
   return amount;
 }
 
 function validateDirection(value) {
   if (value !== 'tang_no' && value !== 'giam_no') {
-    throw new Error('Huong cong no khach hang khong hop le');
+    throw new Error('Hướng công nợ khách hàng không hợp lệ');
   }
   return value;
 }
@@ -59,8 +59,8 @@ async function createCustomerDebtTransaction({
   nguoi_tao_id,
   session
 } = {}) {
-  if (!isObjectId(cua_hang_id)) throw new Error('Thieu cua_hang_id khi ghi cong no khach hang');
-  if (!isObjectId(khach_hang_id)) throw new Error('Thieu khach_hang_id khi ghi cong no khach hang');
+  if (!isObjectId(cua_hang_id)) throw new Error('Thiếu cua_hang_id khi ghi công nợ khách hàng');
+  if (!isObjectId(khach_hang_id)) throw new Error('Thiếu khach_hang_id khi ghi công nợ khách hàng');
 
   const amount = normalizeAmount(gia_tri);
   const direction = validateDirection(huong_cong_no);
@@ -68,7 +68,7 @@ async function createCustomerDebtTransaction({
     .select('tong_no')
     .session(session || null)
     .lean();
-  if (!customer) throw new Error('Khong tim thay khach hang de ghi cong no');
+  if (!customer) throw new Error('Không tìm thấy khách hàng để ghi công nợ');
 
   const previousDebt = Math.max(0, Number(customer.tong_no || 0));
   let nextDebt = previousDebt;
@@ -76,7 +76,7 @@ async function createCustomerDebtTransaction({
     nextDebt = previousDebt + amount;
   } else {
     if (amount > previousDebt) {
-      throw new Error('So tien giam no lon hon no hien tai cua khach hang');
+      throw new Error('Số tiền giảm nợ lớn hơn nợ hiện tại của khách hàng');
     }
     nextDebt = previousDebt - amount;
   }
@@ -121,19 +121,19 @@ async function cancelCustomerDebtTransaction({
   nguoi_huy_id,
   session
 } = {}) {
-  if (!isObjectId(giao_dich_id)) throw new Error('giao_dich_id khong hop le');
+  if (!isObjectId(giao_dich_id)) throw new Error('giao_dich_id không hợp lệ');
 
   const transaction = await GiaoDichCongNoKhachHang.findOne({
     _id: giao_dich_id,
     trang_thai: 'active'
   }).session(session || null);
-  if (!transaction) throw new Error('Khong tim thay giao dich cong no khach hang dang hieu luc');
+  if (!transaction) throw new Error('Không tìm thấy giao dịch công nợ khách hàng đang hiệu lực');
 
   const customer = await KhachHang.findById(transaction.khach_hang_id)
     .select('tong_no')
     .session(session || null)
     .lean();
-  if (!customer) throw new Error('Khong tim thay khach hang de huy giao dich cong no');
+  if (!customer) throw new Error('Không tìm thấy khách hàng để hủy giao dịch công nợ');
 
   const currentDebt = Math.max(0, Number(customer.tong_no || 0));
   const amount = Math.max(0, Number(transaction.gia_tri || 0));

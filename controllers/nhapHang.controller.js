@@ -16,7 +16,7 @@ var pdfService = require('../services/pdf.service');
 var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require('../services/vatChuaDetail.service');
 
 function disabledTrashOperation() {
-  var error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+  var error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
   error.statusCode = 410;
   throw error;
 }
@@ -142,8 +142,8 @@ function normalizeNhapHangFilter(query) {
   query = query || {};
   var statuses = Array.isArray(query.trang_thai) ? query.trang_thai : (query.trang_thai ? [query.trang_thai] : []);
   statuses = statuses.map(function(x) { return String(x || '').trim(); }).filter(Boolean);
-  statuses = statuses.filter(function(x) { return ['completed', 'cancelled'].indexOf(x) >= 0; });
-  if (!statuses.length) statuses = ['completed'];
+  statuses = statuses.filter(function(x) { return ['draft', 'completed', 'cancelled'].indexOf(x) >= 0; });
+  if (!statuses.length) statuses = ['completed', 'draft'];
   var sort = String(query.sort || query.sort_cong_no || 'newest').trim();
   if (['newest', 'oldest', 'debt_high', 'debt_low', 'oldest_debt'].indexOf(sort) < 0) sort = 'newest';
   var supplierId = String(query.nha_cung_cap_id || '').trim();
@@ -958,7 +958,7 @@ exports.apiSupplierAddresses = async function(req, res, next) {
   try {
     var supplierId = String(req.params.id || '').trim();
     if (!mongoose.Types.ObjectId.isValid(supplierId)) {
-      return res.status(400).json({ success: false, message: 'nha_cung_cap_id khong hop le' });
+      return res.status(400).json({ success: false, message: 'nha_cung_cap_id không hợp lệ' });
     }
     var items = await DiaChiNcc.find({
         nha_cung_cap_id: supplierId,
@@ -1994,7 +1994,7 @@ exports.deactivateSelected = async function(req, res, next) {
       return mongoose.Types.ObjectId.isValid(id);
     });
     if (!ids.length) {
-      return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot phieu nhap.' });
+      return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một phiếu nhập.' });
     }
     var modifiedCount = 0;
     for (var i = 0; i < ids.length; i++) {
@@ -2003,11 +2003,11 @@ exports.deactivateSelected = async function(req, res, next) {
     }
     return res.json({
       success: true,
-      message: 'Da xoa phieu nhap da chon.',
+      message: 'Đã xóa phiếu nhập đã chọn.',
       data: { modified_count: modifiedCount }
     });
   } catch (error) {
-    return res.status(400).json({ success: false, message: error.message || 'Khong xoa duoc phieu nhap.' });
+    return res.status(400).json({ success: false, message: error.message || 'Không xóa được phiếu nhập.' });
   }
 };
 
@@ -2296,7 +2296,7 @@ async function renderPurchasePdf(req, res, next, viewName, title, filenamePrefix
 }
 
 exports.printPurchase = async function(req, res, next) {
-  return renderPurchasePrint(req, res, next, 'nhap-hang/print-phieu-nhap', 'In phieu nhap hang');
+  return renderPurchasePrint(req, res, next, 'nhap-hang/print-phieu-nhap', 'In phiếu nhập hàng');
 };
 
 exports.printBangKe02Tndn = async function(req, res, next) {
@@ -2318,7 +2318,7 @@ exports.printContract = async function(req, res, next) {
 };
 
 exports.printPhieuNhapPdf = async function(req, res, next) {
-  return renderPurchasePdf(req, res, next, 'nhap-hang/print-phieu-nhap', 'In phieu nhap hang', 'phieu-nhap');
+  return renderPurchasePdf(req, res, next, 'nhap-hang/print-phieu-nhap', 'In phiếu nhập hàng', 'phieu-nhap');
 };
 
 exports.printBangKe02TndnPdf = async function(req, res, next) {

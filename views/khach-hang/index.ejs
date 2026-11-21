@@ -2153,6 +2153,22 @@
 
       var customerCreateForm = document.getElementById('customerCreateForm');
 
+      function resetCustomerForm() {
+        if (!customerCreateForm) return;
+        customerCreateForm.reset();
+        refreshGroupWidgets(undefined, '');
+        renderAddressTypeList(window.__addressTypes || []);
+        customerCreateForm.querySelectorAll('.js-ghn-province, .js-ghn-ward').forEach(function(select) {
+          select.value = '';
+          select.setAttribute('data-selected-id', '');
+          select.setAttribute('data-selected-name', '');
+          if (select.classList.contains('js-ghn-ward')) {
+            select.innerHTML = '<option value="">Chọn Phường/Xã</option>';
+          }
+          refreshAddressSelect(select);
+        });
+      }
+
       document.addEventListener('click', function(ev) {
         var editBtn = ev.target.closest('.btn-edit-customer');
         if (!editBtn) return;
@@ -2165,6 +2181,7 @@
         }
         if (!customerCreateForm) return;
 
+        resetCustomerForm();
         customerCreateForm.action = '/khach-hang/' + customerData._id + '/update';
         var title = document.getElementById('addCustomerModalTitle');
         if (title) title.textContent = 'Cập nhật khách hàng';
@@ -2184,6 +2201,7 @@
             }
           }
         });
+        refreshGroupWidgets(undefined, customerData.nhom_khach_hang_id || '');
 
         var selectedType = customerData.loai_khach_hang || 'ca_nhan';
         var typeRadios = customerCreateForm.querySelectorAll('input[name="loai_khach_hang"]');
@@ -2274,7 +2292,7 @@
       if (openAddCustomerModalBtn) {
         openAddCustomerModalBtn.addEventListener('click', function() {
           if (customerCreateForm) {
-            customerCreateForm.reset();
+            resetCustomerForm();
             customerCreateForm.action = '/khach-hang/add';
             var title = document.getElementById('addCustomerModalTitle');
             if (title) title.textContent = 'Thêm khách hàng';

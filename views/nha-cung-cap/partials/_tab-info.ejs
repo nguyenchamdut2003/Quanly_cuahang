@@ -62,6 +62,7 @@
             <div class="supplier-detail-field-full"><span>Ghi chú</span><input name="ghi_chu"
                 value="<%= selectedSupplier.ghi_chu || '' %>"></div>
           </div>
+          <div class="supplier-inline-edit-error" data-supplier-edit-error role="alert" hidden></div>
         </form>
         <div class="supplier-detail-footer">
           <a class="btn btn-primary btn-sm" href="/nha-cung-cap/<%= selectedSupplier._id %>/export/hoa-don-gop"
@@ -72,6 +73,5 @@
             rel="noopener">Xuất thông tin</a>
           <button class="btn btn-danger btn-sm" type="submit" form="supplierInlineDel_<%= selectedSupplier._id %>"
             onclick="return confirm('Bạn có chắc muốn xóa nhà cung cấp này không?')">Xóa</button>
-          <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>"
-            onclick="return confirm('Bạn có muốn lưu thay đổi nhà cung cấp này không?')">Chỉnh sửa</button>
+          <button class="btn btn-success btn-sm" type="submit" form="supplierInlineEdit_<%= selectedSupplier._id %>">Lưu thay đổi</button>
         </div>

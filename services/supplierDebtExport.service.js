@@ -73,13 +73,13 @@ function getDebtDocumentInfo(row) {
     }
     if (row.nhap_vat_chua_id) {
         return {
-            label: 'Nhap vat chua',
+            label: 'Nhập vật chứa',
             code: row.nhap_vat_chua_id.ma_nhap_vat_chua || '--'
         };
     }
     if (row.xuat_vat_chua_id) {
         return {
-            label: 'Tra vat chua',
+            label: 'Trả vật chứa',
             code: row.xuat_vat_chua_id.ma_xuat_vat_chua || '--'
         };
     }

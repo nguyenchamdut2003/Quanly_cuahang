@@ -36,14 +36,14 @@ function signParams(params, apiSecret) {
 async function uploadImageBuffer(file, options) {
   if (!file || !file.buffer || !file.buffer.length) return null;
   if (!/^image\//i.test(String(file.mimetype || ''))) {
-    var typeError = new Error('File tai len phai la anh.');
+    var typeError = new Error('File tải lên phải là ảnh.');
     typeError.statusCode = 400;
     throw typeError;
   }
 
   var config = cloudinaryConfig();
   if (!config.cloudName || !config.apiKey || !config.apiSecret) {
-    var configError = new Error('Chua cau hinh Cloudinary trong .env.');
+    var configError = new Error('Chưa cấu hình Cloudinary trong .env.');
     configError.statusCode = 500;
     throw configError;
   }
@@ -66,7 +66,7 @@ async function uploadImageBuffer(file, options) {
   });
   var data = await response.json().catch(function() { return {}; });
   if (!response.ok) {
-    var uploadError = new Error(data.error && data.error.message ? data.error.message : 'Khong upload duoc anh len Cloudinary.');
+    var uploadError = new Error(data.error && data.error.message ? data.error.message : 'Không tải được ảnh lên Cloudinary.');
     uploadError.statusCode = response.status >= 400 && response.status < 500 ? 400 : 502;
     throw uploadError;
   }

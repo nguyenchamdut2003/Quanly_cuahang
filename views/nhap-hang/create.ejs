@@ -1451,7 +1451,7 @@
         lotExistingId.innerHTML += lots.map(lot => {
           const name = String(lot.ten_lo || '').trim();
           const code = String(lot.ma_lo || '').trim();
-          const label = name || code || 'Lo khong ten';
+          const label = name || code || 'Lô không tên';
           const codeSuffix = name && code && code !== name ? ` (Ma: ${code})` : '';
           return `<option value="${lot._id}" data-ma="${escapeHtml(code)}" data-ten="${escapeHtml(name)}" data-hsd="${escapeHtml(toISODate(lot.han_su_dung))}" ${String(lot._id) === String(selectedLotId || '') ? 'selected' : ''}>${escapeHtml(label + codeSuffix)} - Ton ${fmt(lot.so_luong_con_lai || 0)} - HSD ${escapeHtml(formatDateVi(lot.han_su_dung))}</option>`;
         }).join('');

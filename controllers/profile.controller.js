@@ -64,7 +64,7 @@ exports.postChangePassword = async function(req, res, next) {
         const password = String(req.body && req.body.password || '');
         const confirmPassword = String(req.body && req.body.confirm_password || '');
 
-        if (!userId) return res.status(400).send('Khong tim thay thong tin nguoi dung');
+        if (!userId) return res.status(400).send('Không tìm thấy thông tin người dùng');
         if (!password || password !== confirmPassword) {
             return res.redirect('/profile?password_error=confirm');
         }
@@ -73,7 +73,7 @@ exports.postChangePassword = async function(req, res, next) {
         }
 
         const user = await NguoiDung.findById(userId).select('+password_hash');
-        if (!user) return res.status(404).send('Nguoi dung khong ton tai');
+        if (!user) return res.status(404).send('Người dùng không tồn tại');
 
         if (user.password_hash) {
             const matched = await bcrypt.compare(currentPassword, user.password_hash);
@@ -94,7 +94,7 @@ exports.postChangePassword = async function(req, res, next) {
 exports.postSkipPasswordChange = async function(req, res, next) {
     try {
         const userId = req.user && req.user._id;
-        if (!userId) return res.status(400).json({ success: false, message: 'Khong tim thay thong tin nguoi dung' });
+        if (!userId) return res.status(400).json({ success: false, message: 'Không tìm thấy thông tin người dùng' });
 
         await NguoiDung.updateOne({ _id: userId }, { $set: { must_change_password: false } });
         if (req.user) req.user.must_change_password = false;

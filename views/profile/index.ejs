@@ -140,10 +140,10 @@
             messageDiv.style.borderColor = '#fecaca';
             const code = urlParams.get('password_error');
             messageDiv.innerText = code === 'current'
-              ? 'Mat khau hien tai khong dung.'
-              : (code === 'weak' ? 'Mat khau moi phai co it nhat 8 ky tu, gom chu va so.' : 'Xac nhan mat khau moi khong khop.');
+              ? 'Mật khẩu hiện tại không đúng.'
+              : (code === 'weak' ? 'Mật khẩu mới phải có ít nhất 8 ký tự, gồm chữ và số.' : 'Xác nhận mật khẩu mới không khớp.');
           } else {
-            messageDiv.innerText = 'Doi mat khau thanh cong!';
+            messageDiv.innerText = 'Đổi mật khẩu thành công!';
           }
           const container = document.querySelector('.profile-container');
           container.insertBefore(messageDiv, container.childNodes[2]);

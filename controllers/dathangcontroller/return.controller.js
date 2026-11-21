@@ -492,7 +492,7 @@ exports.getTraHangInvoicesSearch = async (req, res, next) => {
                 tong_tien: i.tong_tien || 0,
                 thanh_toan: i.thanh_toan || 0,
                 nguoi_ban: i.nguoi_ban_id?.ho_ten || i.nguoi_ban_id?.username || 'Admin',
-                khach_hang: i.khach_hang_id?.ten_khach_hang || 'Kh�ch l?',
+                khach_hang: i.khach_hang_id?.ten_khach_hang || 'Khách lẻ',
                 khach_hang_id: i.khach_hang_id ? String(i.khach_hang_id._id) : ''
             })),
             pagination: {
@@ -655,7 +655,7 @@ exports.postTraHangAdd = async (req, res, next) => {
                 if (item.ct_hoa_don_id) {
                     const invoiceLine = invoiceLineById[item.ct_hoa_don_id];
                     if (!invoiceLine) {
-                        return res.status(400).json({ success: false, message: 'Dong hoa don tra khong hop le' });
+                        return res.status(400).json({ success: false, message: 'Dòng hóa đơn trả không hợp lệ' });
                     }
                     item.invoiceLine = invoiceLine;
                     item.hang_hoa_id = item.hang_hoa_id || invoiceLine.hang_hoa_id;

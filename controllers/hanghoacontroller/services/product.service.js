@@ -142,7 +142,7 @@ async function add(req, res, next) {
                     ma_lo: String(req?.body?.initial_lot_ma || '').trim() || undefined,
                     ten_lo: String(req?.body?.initial_lot_ten || '').trim() || undefined,
                     han_su_dung: req?.body?.initial_lot_han_su_dung ? new Date(req.body.initial_lot_han_su_dung) : undefined,
-                    ghi_chu: 'Táº¡o tá»« tá»“n ban Ä‘áº§u'
+                    ghi_chu: 'Tạo từ tồn ban đầu'
                 };
                 var createdLots = [];
                 if (created.quan_ly_theo_lo) {
@@ -162,7 +162,7 @@ async function add(req, res, next) {
                         so_luong_thay_doi: initialQty,
                         ton_kho_sau: Number(inventory.so_luong || 0),
                         gia_tri_thay_doi: initialQty * Number(created.gia_von || 0),
-                        ghi_chu: 'Tá»“n ban Ä‘áº§u'
+                        ghi_chu: 'Tồn ban đầu'
                     });
                 }
             }

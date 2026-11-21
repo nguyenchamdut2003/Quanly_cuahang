@@ -36,7 +36,7 @@ function redirectToPending(req, res) {
     if (wantsJsonResponse(req)) {
         return res.status(403).json({
             success: false,
-            message: 'Vui long lien he admin de phan quyen vao web.'
+            message: 'Vui lòng liên hệ admin để phân quyền vào web.'
         });
     }
     return res.redirect('/cho-phan-quyen');
@@ -53,12 +53,12 @@ exports.isLoggedInActive = (req, res, next) => {
         if (loggedIn) {
             return res.status(403).json({
                 success: false,
-                message: 'TÃ i khoáº£n Ä‘Ã£ bá»‹ khÃ³a hoáº·c ngá»«ng hoáº¡t Ä‘á»™ng.'
+                message: 'Tài khoản đã bị khóa hoặc ngừng hoạt động.'
             });
         }
         return res.status(401).json({
             success: false,
-            message: 'PhiÃªn Ä‘Äƒng nháº­p Ä‘Ã£ háº¿t háº¡n. Vui lÃ²ng Ä‘Äƒng nháº­p láº¡i.'
+            message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
         });
     }
 

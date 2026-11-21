@@ -110,7 +110,7 @@ async function addUnit(req, res, next) {
     try {
         var tenDonVi = String(req?.body?.ten_don_vi || '').trim();
         var maDonVi = String(req?.body?.ma_don_vi || '').trim().toUpperCase();
-        if (!tenDonVi) return respondUnitError(req, res, 400, 'Vui lÃ²ng nháº­p tÃªn Ä‘Æ¡n vá»‹ tÃ­nh.');
+        if (!tenDonVi) return respondUnitError(req, res, 400, 'Vui lòng nhập tên đơn vị tính.');
         if (!maDonVi) maDonVi = await makeUnitCode();
 
         var doc = {
@@ -126,7 +126,7 @@ async function addUnit(req, res, next) {
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'ÄÃ£ thÃªm Ä‘Æ¡n vá»‹ tÃ­nh.',
+                message: 'Đã thêm đơn vị tính.',
                 data: created,
                 selectedId: String(created._id),
                 units: await loadUnitOptions()
@@ -135,10 +135,10 @@ async function addUnit(req, res, next) {
         res.redirect('/hang-hoa?success=created');
     } catch (error) {
         if (error && error.code === 11000) {
-            return respondUnitError(req, res, 409, 'MÃ£ Ä‘Æ¡n vá»‹ tÃ­nh Ä‘Ã£ tá»“n táº¡i.');
+            return respondUnitError(req, res, 409, 'Mã đơn vị tính đã tồn tại.');
         }
         if (error && error.name === 'ValidationError') {
-            return respondUnitError(req, res, 400, error.message || 'Dá»¯ liá»‡u Ä‘Æ¡n vá»‹ tÃ­nh khÃ´ng há»£p lá»‡.');
+            return respondUnitError(req, res, 400, error.message || 'Dữ liệu đơn vị tính không hợp lệ.');
         }
         next(error);
     }
@@ -148,23 +148,23 @@ async function updateUnit(req, res, next) {
     try {
         var unitId = normalizeIdParam(req?.params?.unitId);
         if (!unitId || !mongoose.Types.ObjectId.isValid(unitId)) {
-            return respondUnitError(req, res, 400, 'ÄÆ¡n vá»‹ tÃ­nh khÃ´ng há»£p lá»‡.');
+            return respondUnitError(req, res, 400, 'Đơn vị tính không hợp lệ.');
         }
 
         var tenDonVi = String(req?.body?.ten_don_vi || '').trim();
-        if (!tenDonVi) return respondUnitError(req, res, 400, 'Vui lÃ²ng nháº­p tÃªn Ä‘Æ¡n vá»‹ tÃ­nh.');
+        if (!tenDonVi) return respondUnitError(req, res, 400, 'Vui lòng nhập tên đơn vị tính.');
 
         var updated = await DonViTinh.findByIdAndUpdate(
             unitId,
             { ten_don_vi: tenDonVi },
             { runValidators: true, new: true }
         );
-        if (!updated) return respondUnitError(req, res, 404, 'KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n vá»‹ tÃ­nh.');
+        if (!updated) return respondUnitError(req, res, 404, 'Không tìm thấy đơn vị tính.');
 
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'ÄÃ£ cáº­p nháº­t Ä‘Æ¡n vá»‹ tÃ­nh.',
+                message: 'Đã cập nhật đơn vị tính.',
                 data: updated,
                 selectedId: unitId,
                 units: await loadUnitOptions()
@@ -173,7 +173,7 @@ async function updateUnit(req, res, next) {
         res.redirect('/hang-hoa?success=updated');
     } catch (error) {
         if (error && error.name === 'ValidationError') {
-            return respondUnitError(req, res, 400, error.message || 'Dá»¯ liá»‡u Ä‘Æ¡n vá»‹ tÃ­nh khÃ´ng há»£p lá»‡.');
+            return respondUnitError(req, res, 400, error.message || 'Dữ liệu đơn vị tính không hợp lệ.');
         }
         next(error);
     }
@@ -183,7 +183,7 @@ async function removeUnit(req, res, next) {
     try {
         var unitId = normalizeIdParam(req?.params?.unitId);
         if (!unitId || !mongoose.Types.ObjectId.isValid(unitId)) {
-            return respondUnitError(req, res, 400, 'ÄÆ¡n vá»‹ tÃ­nh khÃ´ng há»£p lá»‡.');
+            return respondUnitError(req, res, 400, 'Đơn vị tính không hợp lệ.');
         }
 
         await HangHoa.updateMany(
@@ -191,12 +191,12 @@ async function removeUnit(req, res, next) {
             { $unset: { don_vi_tinh_id: 1 } }
         );
         var deleted = await DonViTinh.findByIdAndDelete(unitId);
-        if (!deleted) return respondUnitError(req, res, 404, 'KhÃ´ng tÃ¬m tháº¥y Ä‘Æ¡n vá»‹ tÃ­nh.');
+        if (!deleted) return respondUnitError(req, res, 404, 'Không tìm thấy đơn vị tính.');
 
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'ÄÃ£ xÃ³a Ä‘Æ¡n vá»‹ tÃ­nh.',
+                message: 'Đã xóa đơn vị tính.',
                 units: await loadUnitOptions()
             });
         }

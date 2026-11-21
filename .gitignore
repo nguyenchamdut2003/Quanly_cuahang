@@ -13,10 +13,6 @@ scripts/local-tests/
 # Tài liệu test case / ghi chú dev (không ảnh hưởng logic app)
 docs/
 
-Biểu mẫu Thông tư 58/
-
 .env.example
 
 .cursorrules
-
-.playwright-mcp

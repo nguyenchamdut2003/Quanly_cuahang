@@ -259,7 +259,7 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
     try {
         const khoId = req.params.id;
         if (!khoId) {
-            return res.status(400).json({ success: false, message: 'Thieu kho_id' });
+            return res.status(400).json({ success: false, message: 'Thiếu kho_id' });
         }
 
         const today = new Date();
@@ -451,7 +451,7 @@ exports.getKhoIdHangKiemKho = async (req, res, next) => {
     try {
         const khoId = req.params.id;
         if (!khoId) {
-            return res.status(400).json({ success: false, message: 'Thieu kho_id' });
+            return res.status(400).json({ success: false, message: 'Thiếu kho_id' });
         }
 
         const today = new Date();
@@ -592,7 +592,7 @@ exports.getTonKhoLo = async (req, res, next) => {
     try {
         const { kho_id, hang_hoa_id } = req.query;
         if (!kho_id || !hang_hoa_id) {
-            return res.status(400).json({ success: false, message: 'Thieu kho_id hoac hang_hoa_id' });
+            return res.status(400).json({ success: false, message: 'Thiếu kho_id hoặc hang_hoa_id' });
         }
 
         const docs = await layTonKhoTheoLo(kho_id, hang_hoa_id);
@@ -896,7 +896,7 @@ exports.putPhanBoHangIdXacNhan = async (req, res, next) => {
         allocation.trang_thai = 'confirmed';
         allocation.ngay_xac_nhan = new Date();
         await allocation.save();
-        res.json({ success: true, message: 'Da xac nhan phan bo hang. Ton kho se tru o buoc giao hang.', data: allocation, print_url: '/chung-tu-kho/phan-bo/' + allocation._id });
+        res.json({ success: true, message: 'Đã xác nhận phân bổ hàng. Tồn kho sẽ trừ ở bước giao hàng.', data: allocation, print_url: '/chung-tu-kho/phan-bo/' + allocation._id });
     } catch (error) {
         next(error);
     }

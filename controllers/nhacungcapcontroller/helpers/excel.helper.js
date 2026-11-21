@@ -1,7 +1,7 @@
 const { mongoose, ExcelJS, NhaCungCap, PhieuNhap, PhieuTraHangNhap, CongNoNhaCungCap, DiaChiNhaCungCap, LoaiDiaChiKhachHang, Counter, nhaCungCapImportService, normalizeAddress, formatDate, getUserName, normalizeAddressTypeCode } = require('./common.helper');
 const { getDateRange } = require('./filter.helper');
 const { isVisibleSupplierDebtRow, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtDisplayDate, sortDebtLedgerAsc, resolveSupplierDaThanhToan } = require('./debt.helper');
-const { mapTraHangStatus, mapSupplierPurchaseHistoryType } = require('./detail.helper');
+const { mapNhapHangStatus, mapTraHangStatus, mapSupplierPurchaseHistoryType } = require('./detail.helper');
 
 var SUPPLIER_EXPORT_COLUMNS = [
     { header: 'Mã NCC', key: 'ma_ncc' },
@@ -194,7 +194,11 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             { header: 'Còn nợ', key: 'con_no', style: { numFmt: '#,##0' } },
             { header: 'Trạng thái', key: 'trang_thai', width: 16 }
         ];
-        var pnMatch = { nha_cung_cap_id: supplier._id, trang_thai: { $in: ['completed', 'draft', 'cancelled'] } };
+        var pnMatch = {
+            nha_cung_cap_id: supplier._id,
+            trang_thai_du_lieu: { $ne: 'inactive' },
+            trang_thai: { $in: ['completed', 'draft', 'cancelled'] }
+        };
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) pnMatch.cua_hang_id = storeId;
         var nhapRows = await PhieuNhap.find(pnMatch).sort({ ngay_nhap: -1, created_at: -1 }).lean();
         nhapRows.forEach(function(row) {
@@ -209,7 +213,11 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             });
         });
         if (PhieuTraHangNhap) {
-            var ptMatch = { nha_cung_cap_id: supplier._id, trang_thai: { $ne: 'cancelled' } };
+            var ptMatch = {
+                nha_cung_cap_id: supplier._id,
+                trang_thai_du_lieu: { $ne: 'inactive' },
+                trang_thai: { $ne: 'cancelled' }
+            };
             if (storeId && mongoose.Types.ObjectId.isValid(storeId)) ptMatch.cua_hang_id = storeId;
             var traRows = await PhieuTraHangNhap.find(ptMatch).sort({ ngay_tra: -1, created_at: -1 }).lean();
             traRows.forEach(function(row) {

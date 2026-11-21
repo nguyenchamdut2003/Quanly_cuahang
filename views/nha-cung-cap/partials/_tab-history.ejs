@@ -61,7 +61,8 @@
                             </span>
                           </td>
                           <td class="text-center">
-                            <% var statusClass='status-pill' ; var statusLabelText=historyTypeLabel; if
+                            <% var statusClass='status-pill' ; var statusLabelText=row.trang_thai==='draft' ? 'Phiếu tạm' :
+                              (row.trang_thai==='cancelled' ? 'Đã hủy' : historyTypeLabel); if
                               (row.trang_thai==='completed' ) statusClass +=' is-active' ; else if
                               (row.trang_thai==='active' ) statusClass +=' is-active' ; else if
                               (row.trang_thai==='draft' ) statusClass +=' is-draft' ; else if

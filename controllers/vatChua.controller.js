@@ -15,10 +15,11 @@ var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo, extractPaymentDetail } = require('../services/paymentCashBook.service');
 var { loadVatChuaDetailContext, loadVatChuaDocumentDetail } = require('../services/vatChuaDetail.service');
 var { loadNhapVatChuaForEdit, updateNhapVatChuaImport } = require('../services/vatChuaImportEdit.service');
+var { payNhapVatChuaImport } = require('../services/vatChuaPayment.service');
 var { loadXuatVatChuaForEdit, updateXuatVatChuaReturn } = require('../services/vatChuaReturnEdit.service');
 
 function disabledTrashOperation() {
-  var error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+  var error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
   error.statusCode = 410;
   throw error;
 }
@@ -465,6 +466,19 @@ exports.apiImportUpdate = async function(req, res, next) {
   } catch (error) {
     var status = error && error.statusCode ? error.statusCode : 400;
     return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không cập nhật được phiếu nhập vật chứa.' });
+  }
+};
+
+exports.apiImportPay = async function(req, res) {
+  try {
+    var storeId = await resolveStoreId(req);
+    if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc.' });
+    var userId = req.user && req.user._id ? req.user._id : null;
+    var data = await payNhapVatChuaImport(req.params && req.params.id, req.body || {}, storeId, userId);
+    return res.json({ success: true, data: data });
+  } catch (error) {
+    var status = error && error.statusCode ? error.statusCode : 400;
+    return res.status(status).json({ success: false, message: error && error.message ? error.message : 'Không thanh toán được phiếu nhập vật chứa.' });
   }
 };
 

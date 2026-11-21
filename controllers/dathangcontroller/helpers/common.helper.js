@@ -62,7 +62,7 @@ const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaW
 const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines } = require('../../../services/vatChuaDetail.service');
 
 function disabledTrashOperation() {
-    const error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+    const error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
     error.statusCode = 410;
     throw error;
 }
@@ -697,7 +697,7 @@ async function recordSalesReturnRefundReceipt({
     userId
 }) {
     if (!refund || refund <= 0) return null;
-    if (!storeId) throw new Error('Thi?u c?a h�ng d? ghi phi?u chi ho�n ti?n tr? h�ng.');
+    if (!storeId) throw new Error('Thiếu cửa hàng để ghi phiếu chi hoàn tiền trả hàng.');
 
     const refundBase = {
         loai_phieu: 'chi',
@@ -709,7 +709,7 @@ async function recordSalesReturnRefundReceipt({
         hoa_don_id: hoa_don_id || undefined,
         phieu_tra_hang_id: returnSlip._id,
         ma_chung_tu_goc: ma_phieu_tra,
-        doi_tuong: customerId ? undefined : 'Kh�ch l?',
+        doi_tuong: customerId ? undefined : 'Khách lẻ',
         nhom_doi_tuong: 'khach_hang',
         hach_toan: false,
         ghi_chu: `Hoan tien tra hang ${ma_phieu_tra}`

@@ -1,6 +1,7 @@
 ﻿const { CuaHang } = require('../../models/kiot.model');
 const { normalizeIdParam, normalizeStorePayload } = require('./helpers/common.helper');
 const { makeStoreCode } = require('./helpers/code.helper');
+const mongoose = require('mongoose');
 
 const add = async function(req, res, next) {
     try {
@@ -51,8 +52,40 @@ const update = async function(req, res, next) {
     }
 };
 
+const updateNotes = async function(req, res) {
+    try {
+        var storeId = normalizeIdParam(req?.params?.id);
+        if (!mongoose.Types.ObjectId.isValid(storeId)) {
+            return res.status(400).json({ success: false, message: 'Cửa hàng không hợp lệ.' });
+        }
+        if (typeof req?.body?.ghi_chu !== 'string') {
+            return res.status(400).json({ success: false, message: 'Nội dung ghi chú không hợp lệ.' });
+        }
+
+        var notes = req.body.ghi_chu.trim();
+        var store = await CuaHang.findByIdAndUpdate(
+            storeId,
+            { $set: { ghi_chu: notes } },
+            { new: true, runValidators: true }
+        ).select('_id ghi_chu').lean();
+        if (!store) {
+            return res.status(404).json({ success: false, message: 'Không tìm thấy cửa hàng.' });
+        }
+
+        return res.json({
+            success: true,
+            message: notes ? 'Đã lưu ghi chú cửa hàng.' : 'Đã xóa ghi chú cửa hàng.',
+            ghi_chu: store.ghi_chu || ''
+        });
+    } catch (error) {
+        console.error('[StoreNotes]', error);
+        return res.status(500).json({ success: false, message: 'Không thể lưu ghi chú cửa hàng. Vui lòng thử lại.' });
+    }
+};
+
 module.exports = {
     add,
-    update
+    update,
+    updateNotes
 };
 

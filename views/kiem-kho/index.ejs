@@ -648,7 +648,7 @@
           } catch (error) {
             throw new Error('ENDPOINT_NOT_JSON');
           }
-          if (!res.ok) throw new Error(data.message || 'Khong xoa duoc phieu kiem kho');
+          if (!res.ok) throw new Error(data.message || 'Không xóa được phiếu kiểm kho');
           return data;
         });
       }
@@ -662,7 +662,7 @@
             }).then(parseJsonResponse);
           });
         }, Promise.resolve()).then(function() {
-          return { success: true, message: 'Da xoa phieu kiem kho' };
+          return { success: true, message: 'Đã xóa phiếu kiểm kho' };
         });
       }
 
@@ -680,12 +680,12 @@
             throw err;
           })
           .then(function(data) {
-            if (!data.success) throw new Error(data.message || 'Khong xoa duoc phieu kiem kho');
-            alert(data.message || 'Da xoa phieu kiem kho');
+            if (!data.success) throw new Error(data.message || 'Không xóa được phiếu kiểm kho');
+            alert(data.message || 'Đã xóa phiếu kiểm kho');
             window.location.reload();
           })
           .catch(function(err) {
-            alert(err.message || 'Khong xoa duoc phieu kiem kho');
+            alert(err.message || 'Không xóa được phiếu kiểm kho');
             if (confirmBtn) confirmBtn.disabled = false;
           });
       }

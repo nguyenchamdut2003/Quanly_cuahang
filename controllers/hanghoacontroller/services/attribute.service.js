@@ -130,7 +130,7 @@ async function attributesPage(req, res, next) {
         countsAgg.forEach(function(row) { valueCounts[String(row._id)] = row.count; });
 
         res.render('hang-hoa/thuoc-tinh', {
-            pageTitle: 'Thuá»™c tÃ­nh hÃ ng hÃ³a',
+            pageTitle: 'Thuộc tính hàng hóa',
             activeMenu: 'hang-hoa',
             user: req.user,
             flash: req.query || {},
@@ -253,7 +253,7 @@ async function apiCreateAttribute(req, res, next) {
     try {
         var storeId = await resolveStoreId(req);
         var payload = normalizeAttributePayload(req.body);
-        if (!payload.ten_thuoc_tinh) return res.status(400).json({ success: false, message: 'TÃªn thuá»™c tÃ­nh lÃ  báº¯t buá»™c' });
+        if (!payload.ten_thuoc_tinh) return res.status(400).json({ success: false, message: 'Tên thuộc tính là bắt buộc' });
         if (!payload.ma_thuoc_tinh) payload.ma_thuoc_tinh = await nextAttributeCode(storeId);
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) payload.cua_hang_id = storeId;
         var created = await ThuocTinhHang.create(payload);
@@ -266,7 +266,7 @@ async function apiCreateAttribute(req, res, next) {
 async function apiUpdateAttribute(req, res, next) {
     try {
         var id = String(req.params.id || '');
-        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID khÃ´ng há»£p lá»‡' });
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
         var payload = normalizeAttributePayload(req.body);
         await ThuocTinhHang.updateOne({ _id: id }, { $set: payload }, { runValidators: true });
         return res.json({ success: true });
@@ -278,7 +278,7 @@ async function apiUpdateAttribute(req, res, next) {
 async function apiDeleteAttribute(req, res, next) {
     try {
         var id = String(req.params.id || '');
-        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID khÃ´ng há»£p lá»‡' });
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
         var used = await HangHoaThuocTinh.exists({ thuoc_tinh_id: id });
         var hasValues = await GiaTriThuocTinh.exists({ thuoc_tinh_id: id });
         if (used || hasValues) await ThuocTinhHang.updateOne({ _id: id }, { $set: { trang_thai: 'inactive' } });
@@ -304,11 +304,11 @@ async function apiAttributeValues(req, res, next) {
 async function apiCreateAttributeValue(req, res, next) {
     try {
         var attrId = String(req.body.thuoc_tinh_id || '').trim();
-        if (!mongoose.Types.ObjectId.isValid(attrId)) return res.status(400).json({ success: false, message: 'Thuá»™c tÃ­nh khÃ´ng há»£p lá»‡' });
+        if (!mongoose.Types.ObjectId.isValid(attrId)) return res.status(400).json({ success: false, message: 'Thuộc tính không hợp lệ' });
         var attr = await ThuocTinhHang.findById(attrId).lean();
-        if (!attr) return res.status(404).json({ success: false, message: 'KhÃ´ng tÃ¬m tháº¥y thuá»™c tÃ­nh' });
+        if (!attr) return res.status(404).json({ success: false, message: 'Không tìm thấy thuộc tính' });
         var payload = normalizeAttributeValuePayload(req.body);
-        if (!payload.ten_gia_tri) return res.status(400).json({ success: false, message: 'TÃªn giÃ¡ trá»‹ lÃ  báº¯t buá»™c' });
+        if (!payload.ten_gia_tri) return res.status(400).json({ success: false, message: 'Tên giá trị là bắt buộc' });
         if (!payload.ma_gia_tri) payload.ma_gia_tri = await nextAttributeValueCode(attrId);
         payload.thuoc_tinh_id = attrId;
         payload.cua_hang_id = attr.cua_hang_id || undefined;
@@ -322,7 +322,7 @@ async function apiCreateAttributeValue(req, res, next) {
 async function apiUpdateAttributeValue(req, res, next) {
     try {
         var id = String(req.params.id || '');
-        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID khÃ´ng há»£p lá»‡' });
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
         var payload = normalizeAttributeValuePayload(req.body);
         await GiaTriThuocTinh.updateOne({ _id: id }, { $set: payload }, { runValidators: true });
         return res.json({ success: true });
@@ -334,7 +334,7 @@ async function apiUpdateAttributeValue(req, res, next) {
 async function apiDeleteAttributeValue(req, res, next) {
     try {
         var id = String(req.params.id || '');
-        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID khÃ´ng há»£p lá»‡' });
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ success: false, message: 'ID không hợp lệ' });
         var used = await HangHoaThuocTinh.exists({ gia_tri_id: id });
         if (used) await GiaTriThuocTinh.updateOne({ _id: id }, { $set: { trang_thai: 'inactive' } });
         else await GiaTriThuocTinh.deleteOne({ _id: id });
@@ -347,7 +347,7 @@ async function apiDeleteAttributeValue(req, res, next) {
 async function apiProductAttributes(req, res, next) {
     try {
         var productId = String(req.params.id || '').trim();
-        if (!mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'HÃ ng hÃ³a khÃ´ng há»£p lá»‡' });
+        if (!mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'Hàng hóa không hợp lệ' });
         var rows = await HangHoaThuocTinh.find({ hang_hoa_id: productId })
             .populate({ path: 'thuoc_tinh_id', select: 'ten_thuoc_tinh trang_thai' })
             .populate({ path: 'gia_tri_id', select: 'ten_gia_tri thu_tu trang_thai' })

@@ -2201,11 +2201,6 @@ button.dropdown-item {
   margin-bottom: 18px;
 }
 
-.store-fields div {
-  min-height: 48px;
-  border-bottom: 1px solid var(--admin-border);
-}
-
 .store-fields span {
   display: block;
   margin-bottom: 7px;

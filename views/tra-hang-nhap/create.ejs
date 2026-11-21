@@ -155,13 +155,13 @@
       <div class="field">
         <label>Sổ quỹ tiền mặt<span id="cashBookRequiredMarkV2" style="display:none;color:#d92d20">*</span></label>
         <select id="cashBookCashId" class="control" disabled>
-          <option value="">-- Chon so tien mat --</option>
+          <option value="">-- Chọn sổ tiền mặt --</option>
         </select>
       </div>
       <div class="field">
-        <label>Tai khoan ngan hang <span id="bankBookRequiredMark" style="display:none;color:#d92d20">*</span></label>
+        <label>Tài khoản ngân hàng <span id="bankBookRequiredMark" style="display:none;color:#d92d20">*</span></label>
         <select id="cashBookBankId" class="control" disabled>
-          <option value="">-- Chon tai khoan ngan hang --</option>
+          <option value="">-- Chọn tài khoản ngân hàng --</option>
         </select>
       </div>
       <input type="hidden" id="nccDaTra" value="0">
@@ -276,9 +276,9 @@
     function autoSelectBook(select, rows) {
       if (!select) return;
       rows = Array.isArray(rows) ? rows : [];
-      select.innerHTML = '<option value="">-- Chon so --</option>' + rows.map(row => {
+      select.innerHTML = '<option value="">-- Chọn sổ --</option>' + rows.map(row => {
         const bank = row.thong_tin_ngan_hang || {};
-        const label = [row.ten_so_quy || 'So quy', bank.so_tai_khoan || ''].filter(Boolean).join(' - ');
+        const label = [row.ten_so_quy || 'Sổ quỹ', bank.so_tai_khoan || ''].filter(Boolean).join(' - ');
         return `<option value="${row._id}">${label}</option>`;
       }).join('');
       const defaults = rows.filter(row => row.mac_dinh);
@@ -296,7 +296,7 @@
         autoSelectBook(document.getElementById('cashBookCashId'), cashData.items || []);
         autoSelectBook(document.getElementById('cashBookBankId'), bankData.items || []);
       } catch (error) {
-        showError('Khong tai duoc danh sach so quy dang hoat dong');
+        showError('Không tải được danh sách sổ quỹ đang hoạt động');
       }
     }
 
@@ -447,8 +447,8 @@
       const p = products.find(x => x._id === item.hang_hoa_id);
       if (!p || !p.quan_ly_theo_lo) return '<option value="">Không quản lý lô</option>';
       const lots = (p.lots || []).filter(l => !l.kho_id || l.kho_id === currentKho());
-      return '<option value="">Tu chon FEFO</option>' + lots.map(l => {
-        const label = String(l.ten_lo || l.ma_lo || 'Lo khong ten').trim();
+      return '<option value="">Tự chọn FEFO</option>' + lots.map(l => {
+        const label = String(l.ten_lo || l.ma_lo || 'Lô không tên').trim();
         const code = String(l.ma_lo || '').trim();
         const codeSuffix = l.ten_lo && code && code !== l.ten_lo ? ` (Ma: ${code})` : '';
         return `<option value="${l._id}" ${item.lo_hang_id === l._id ? 'selected' : ''}>${label}${codeSuffix} - SL ${fmt(l.so_luong)}</option>`;
@@ -638,12 +638,12 @@
       if (cashAmount > 0 && v2CashBook && !String(v2CashBook.value || '').trim()) {
         v2CashBook.classList.add('field-invalid');
         v2CashBook.focus();
-        return showError('Vui long chon so tien mat.');
+        return showError('Vui lòng chọn sổ tiền mặt.');
       }
       if (transferAmount > 0 && v2BankBook && !String(v2BankBook.value || '').trim()) {
         v2BankBook.classList.add('field-invalid');
         v2BankBook.focus();
-        return showError('Vui long chon tai khoan ngan hang.');
+        return showError('Vui lòng chọn tài khoản ngân hàng.');
       }
       if (document.getElementById('cashBookId')) document.getElementById('cashBookId').value = paidAmount > 0 ? 'v2' : '';
       const cashBook = document.getElementById('cashBookId');

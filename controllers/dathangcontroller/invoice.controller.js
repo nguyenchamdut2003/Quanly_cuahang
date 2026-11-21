@@ -528,7 +528,7 @@ exports.createInvoice = async function(req, res, next) {
         for (const item of expandedInvoiceItems) {
             const productId = String(item.hang_hoa_id || '').trim();
             const quantity = Number(item.so_luong_dat ?? item.so_luong ?? 0);
-            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'Dong hang khong hop le' });
+            if (!productId || quantity <= 0) return res.status(400).json({ success: false, message: 'Dòng hàng không hợp lệ' });
             const unitPrice = Number(item.don_gia_ban ?? item.don_gia ?? 0);
             const lineBase = quantity * unitPrice;
             const lineDiscount = normalizeDiscount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
@@ -656,7 +656,7 @@ exports.createInvoice = async function(req, res, next) {
             tong_tien: tong_tien_hang,
             giam_gia: discount,
             thanh_toan: payable,
-            phuong_thuc_tt: codEnabled ? 'COD' : (phuong_thuc_thanh_toan || 'Ti?n m?t'),
+            phuong_thuc_tt: codEnabled ? 'COD' : (phuong_thuc_thanh_toan || 'Tiền mặt'),
             trang_thai: invoiceStatus,
             ghi_chu,
             cua_hang_id: finalStoreId,
@@ -706,7 +706,7 @@ exports.createInvoice = async function(req, res, next) {
                 stockLines: stockAppliedLines,
                 restoreStock: stockAppliedLines.length > 0
             });
-            if (/t?n kho|ton kho|Ton kho/i.test(stockError.message || '')) {
+            if (/tồn kho|ton kho|Ton kho/i.test(stockError.message || '')) {
                 return res.status(400).json({ success: false, message: stockError.message });
             }
             throw stockError;
@@ -817,14 +817,14 @@ exports.createInvoice = async function(req, res, next) {
         if (!sourceOrder && !codEnabled && paymentAtCreate.tong_khach_dua > 0) {
             const customerName = finalCustomerId
                 ? (await KhachHang.findById(finalCustomerId).select('ten_khach_hang').lean())?.ten_khach_hang
-                : 'Kh�ch l?';
+                : 'Khách lẻ';
             await recordCustomerPaymentReceipts(buildCustomerPaymentReceiptPayload(req.body, paymentAtCreate, {
                 loai_thu_chi: 'Thu tien hoa don',
                 ngay_lap: invoice.ngay_ban || new Date(),
                 cua_hang_id: invoice.cua_hang_id,
                 nguoi_tao_id: req.user?._id,
                 khach_hang_id: finalCustomerId,
-                doi_tuong: customerName || 'Kh�ch l?',
+                doi_tuong: customerName || 'Khách lẻ',
                 hoa_don_id: invoice._id,
                 van_don_id: shipment?._id,
                 ma_chung_tu_goc: ma_hoa_don,
@@ -1142,7 +1142,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
         try {
             assertVatChuaImportInput(parsedVatChua);
         } catch (vcErr) {
-            return res.status(400).json({ success: false, message: vcErr.message || 'Dữ liệu vât ch?a không hợp lệ' });
+            return res.status(400).json({ success: false, message: vcErr.message || 'Dữ liệu vật chứa không hợp lệ' });
         }
 
         const storeId = invoice.cua_hang_id;
@@ -1166,7 +1166,7 @@ exports.postHoaDonIdSave = async (req, res, next) => {
             } catch (vatChuaError) {
                 return res.status(400).json({
                     success: false,
-                    message: vatChuaError.message || 'Không ghi nhận xuất vât ch?a được'
+                    message: vatChuaError.message || 'Không ghi nhận xuất vật chứa được'
                 });
             }
         }
@@ -1312,7 +1312,7 @@ exports.postHoaDonDeactivateSelected = async (req, res, next) => {
     try {
         const ids = normalizeInvoiceIds(req.body?.hoa_don_ids || req.body?.ids || []);
         if (!ids.length) {
-            return res.status(400).json({ success: false, message: 'Vui long chon it nhat mot hoa don de xoa' });
+            return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất một hóa đơn để xóa' });
         }
 
         const invoices = await HoaDonBanHang.find({
@@ -1321,7 +1321,7 @@ exports.postHoaDonDeactivateSelected = async (req, res, next) => {
         });
 
         if (!invoices.length) {
-            return res.status(404).json({ success: false, message: 'Khong tim thay hoa don active de xoa' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy hóa đơn đang hoạt động để xóa' });
         }
 
         let restoredLineCount = 0;
@@ -1345,7 +1345,7 @@ exports.postHoaDonDeactivateSelected = async (req, res, next) => {
 
         res.json({
             success: true,
-            message: `Da xoa ${invoices.length} hoa don va hoan ton ${restoredLineCount} dong hang`,
+            message: `Đã xóa ${invoices.length} hóa đơn và hoàn tồn ${restoredLineCount} dòng hàng`,
             data: {
                 affected: invoices.length,
                 restored_lines: restoredLineCount

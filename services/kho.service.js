@@ -528,7 +528,7 @@ async function congTonKho(params) {
   const cost = Number(params.gia_von) || 0;
   const warehouse = await withSessionQuery(Kho.findById(khoId), session);
   if (!warehouse) {
-    throw new Error('KhÃ´ng tÃ¬m tháº¥y kho');
+    throw new Error('Không tìm thấy kho');
   }
   const product = await withSessionQuery(HangHoa.findById(hangHoaId).select('quan_ly_theo_lo'), session);
   const manageLots = Boolean(product && product.quan_ly_theo_lo);

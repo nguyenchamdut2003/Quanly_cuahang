@@ -262,7 +262,7 @@ app.use(function(req, res, next) {
 
 app.use(function(req, res, next) {
   if (!isDisabledDeleteOrTrashRequest(req)) return next();
-  var message = 'Chuc nang xoa du lieu va thung rac da duoc tat. Chi giu chuc nang reset du lieu.';
+  var message = 'Chức năng xóa dữ liệu và thùng rác đã được tắt. Chỉ giữ chức năng reset dữ liệu.';
   if (req.xhr || (req.headers.accept || '').indexOf('application/json') !== -1) {
     return res.status(410).json({ success: false, message: message });
   }

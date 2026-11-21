@@ -362,7 +362,7 @@ async function ghiCongNoKhachHang(receipt, amount, data, session) {
 
       loai: 'thanh_toan',
 
-      ghi_chu: data.ghi_chu || `Thanh toan ${receipt.ma_phieu}`,
+      ghi_chu: data.ghi_chu || `Thanh toán ${receipt.ma_phieu}`,
 
       ngay: receipt.ngay_lap
 
@@ -392,7 +392,7 @@ async function ghiCongNoKhachHang(receipt, amount, data, session) {
 
       loai: 'tang_no',
 
-      ghi_chu: data.ghi_chu || `Phieu chi ${receipt.ma_phieu}`,
+      ghi_chu: data.ghi_chu || `Phiếu chi ${receipt.ma_phieu}`,
 
       ngay: receipt.ngay_lap
 
@@ -410,7 +410,7 @@ async function ghiCongNoNhaCungCap(receipt, amount, data, session) {
 
   const storeId = receipt.cua_hang_id || data.cua_hang_id;
 
-  if (!storeId) throw new Error('Thieu cua_hang_id khi ghi cong no nha cung cap');
+  if (!storeId) throw new Error('Thiếu cua_hang_id khi ghi công nợ nhà cung cấp');
 
 
 
@@ -442,7 +442,7 @@ async function ghiCongNoNhaCungCap(receipt, amount, data, session) {
 
       loai: 'thanh_toan',
 
-      ghi_chu: data.ghi_chu || `Thanh toan NCC ${receipt.ma_phieu}`,
+      ghi_chu: data.ghi_chu || `Thanh toán NCC ${receipt.ma_phieu}`,
 
       ngay: receipt.ngay_lap
 
@@ -476,7 +476,7 @@ async function ghiCongNoNhaCungCap(receipt, amount, data, session) {
 
       loai: 'tang_no',
 
-      ghi_chu: data.ghi_chu || `NCC hoan tien ${receipt.ma_phieu}`,
+      ghi_chu: data.ghi_chu || `NCC hoàn tiền ${receipt.ma_phieu}`,
 
       ngay: receipt.ngay_lap
 
@@ -492,7 +492,7 @@ async function taoPhieuThuChi(data = {}, options = {}) {
 
   const loaiPhieu = data.loai_phieu;
 
-  if (!['thu', 'chi'].includes(loaiPhieu)) throw new Error('Loai phieu khong hop le');
+  if (!['thu', 'chi'].includes(loaiPhieu)) throw new Error('Loại phiếu không hợp lệ');
 
 
 
@@ -500,7 +500,7 @@ async function taoPhieuThuChi(data = {}, options = {}) {
 
   const storeIdFromData = optionalId(data.cua_hang_id);
 
-  if (!storeIdFromData) throw new Error('Thieu cua_hang_id khi tao phieu thu chi');
+  if (!storeIdFromData) throw new Error('Thiếu cua_hang_id khi tạo phiếu thu chi');
 
   const paymentInfo = data._paymentInfo || await buildReceiptPaymentInfo(data, {
     cuaHangId: storeIdFromData,

@@ -107,7 +107,12 @@
     #vcImportEditModalOverlay { z-index: 4210 !important; }
     #vcImportEditModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
     #vcImportEditModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
-    #vcImportEditModalOverlay .modal-content { width: min(720px, 96%); max-height: 90vh; }
+    #vcImportEditModalOverlay .modal-content { width: min(720px, calc(100vw - 24px)) !important; max-height: 90vh; }
+    #vcImportPaymentModalOverlay { z-index: 4220 !important; }
+    #vcImportPaymentModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
+    #vcImportPaymentModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
+    #vcImportPaymentModalOverlay .modal-content { width: min(720px, calc(100vw - 24px)) !important; max-height: 90vh; }
+    #vcImportPaymentModalOverlay .product-fields { grid-template-columns: 1fr; }
     #vcImportReturnModalOverlay { z-index: 4220 !important; }
     #vcImportReturnModalOverlay:not(.is-visible) { display: none !important; pointer-events: none !important; visibility: hidden !important; }
     #vcImportReturnModalOverlay.is-visible { display: flex !important; pointer-events: auto !important; visibility: visible !important; }
@@ -266,7 +271,7 @@
     %>
     <% const vcFlash = typeof flash !== 'undefined' ? flash : {}; %>
     <% const vcFlashForGeneric = Object.assign({}, vcFlash); %>
-    <% if (['created', 'imported', 'deleted', 'import_deleted', 'import_updated', 'returned', 'stocktake', 'destroyed'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
+    <% if (['created', 'imported', 'deleted', 'import_deleted', 'import_updated', 'import_paid', 'returned', 'stocktake', 'destroyed'].indexOf(String(vcFlash.success || '')) >= 0) { delete vcFlashForGeneric.success; } %>
     <% if (['missing_store', 'missing_name', 'duplicate_code', 'no_selection', 'import_failed'].indexOf(String(vcFlash.error || '')) >= 0) { delete vcFlashForGeneric.error; } %>
     <%- include('../partials/flash-message', { flash: vcFlashForGeneric }) %>
     <% if (vcFlash.error === 'missing_store') { %>
@@ -290,6 +295,8 @@
       <div class="flash-message flash-success">Đã đưa phiếu nhập vật chứa vào thùng rác.</div>
     <% } else if (vcFlash.success === 'import_updated') { %>
       <div class="flash-message flash-success">Đã cập nhật phiếu nhập vật chứa.</div>
+    <% } else if (vcFlash.success === 'import_paid') { %>
+      <div class="flash-message flash-success">Đã thanh toán và tạo phiếu chi mới cho phiếu nhập vật chứa.</div>
     <% } else if (vcFlash.success === 'returned') { %>
       <div class="flash-message flash-success">Đã trả vật chứa thành công.</div>
     <% } else if (vcFlash.success === 'stocktake') { %>
@@ -584,6 +591,7 @@
                       <option value="<%= supplier._id %>"><%= supplier.ten_ncc || supplier.ma_ncc || '---' %></option>
                     <% }) %>
                   </select>
+                  <small id="editNhapVatChuaSupplierHint" style="display:none;color:#667085">Không thể đổi nhà cung cấp khi phiếu đã thanh toán hoặc có phiếu trả hàng còn hiệu lực.</small>
                 </div>
                 <div>
                   <span>Vật chứa *</span>
@@ -608,43 +616,79 @@
                 </div>
               </div>
               <div class="vc-payment-block">
-                <div class="vc-payment-title">Thanh toán</div>
+                <div class="vc-payment-title">Thông tin thanh toán</div>
                 <div class="vc-summary-line"><span>Tổng tiền</span><span class="num" id="editNhapVatChuaGrandTotal">0</span></div>
-                <div class="vc-summary-line">
-                  <span>Tiền mặt</span>
-                  <div class="vc-paid-combo">
-                    <input type="text" id="editNhapVatChuaCash" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
-                    <button type="button" class="vc-btn-pay-all" id="editNhapVatChuaPayAllCash">Tất cả</button>
-                  </div>
-                </div>
-                <div class="vc-summary-line">
-                  <span>Sổ tiền mặt <span id="editNhapVatChuaCashRequired" style="display:none;color:#d92d20">*</span></span>
-                  <select id="editNhapVatChuaCashBook" class="vc-side-input" disabled>
-                    <option value="">Chọn sổ tiền mặt</option>
-                  </select>
-                </div>
-                <div class="vc-summary-line">
-                  <span>Chuyển khoản</span>
-                  <div class="vc-paid-combo">
-                    <input type="text" id="editNhapVatChuaTransfer" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
-                    <button type="button" class="vc-btn-pay-all" id="editNhapVatChuaPayAllTransfer">Tất cả</button>
-                  </div>
-                </div>
-                <div class="vc-summary-line">
-                  <span>Tài khoản ngân hàng <span id="editNhapVatChuaBankRequired" style="display:none;color:#d92d20">*</span></span>
-                  <select id="editNhapVatChuaBankBook" class="vc-side-input" disabled>
-                    <option value="">Chọn tài khoản chuyển khoản</option>
-                  </select>
-                </div>
-                <div class="vc-summary-line"><strong>Nợ nhà cung cấp</strong><span class="num" id="editNhapVatChuaDebt">0</span></div>
+                <div class="vc-summary-line"><span>Đã trả</span><span class="num" id="editNhapVatChuaPaid">0</span></div>
+                <div class="vc-summary-line" id="editNhapVatChuaReturnedLine" style="display:none"><span>Giá trị đã trả hàng</span><span class="num" id="editNhapVatChuaReturned">0</span></div>
+                <div class="vc-summary-line"><strong>Cần trả nhà cung cấp</strong><span class="num" id="editNhapVatChuaDebt">0</span></div>
+                <div class="vc-summary-line"><span></span><button type="button" class="btn btn-primary" id="editNhapVatChuaPay">Thanh toán</button></div>
                 <div id="editNhapVatChuaError" class="vc-form-error"></div>
               </div>
             </section>
           </div>
         </form>
         <div class="page-actions modal-footer">
-          <button class="btn btn-light" type="button" id="vcImportEditModalCancel">Hủy</button>
+          <button class="btn btn-light" type="button" id="vcImportEditModalCancel">Bỏ qua</button>
           <button class="btn btn-primary" type="submit" form="vcImportEditForm" id="vcImportEditModalSave">Lưu</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="vcImportPaymentModalOverlay" class="modal-overlay">
+      <div class="modal-content product-create-modal">
+        <div class="modal-header">
+          <h3>Thanh toán phiếu nhập vật chứa <span id="payNhapVatChuaCode"></span></h3>
+          <button type="button" class="modal-close" id="vcImportPaymentModalClose" aria-label="Đóng">×</button>
+        </div>
+        <form class="modal-body product-form-body" id="vcImportPaymentForm">
+          <input type="hidden" id="payNhapVatChuaId">
+          <div class="product-form-grid">
+            <section class="product-form-section">
+              <h4 id="payNhapVatChuaSupplier"></h4>
+              <div class="vc-payment-block">
+                <div class="vc-payment-title">Thanh toán mới</div>
+                <div class="vc-summary-line"><span>Tổng tiền</span><span class="num" id="payNhapVatChuaGrandTotal">0</span></div>
+                <div class="vc-summary-line"><span>Đã trả</span><span class="num" id="payNhapVatChuaPaid">0</span></div>
+                <div class="vc-summary-line" id="payNhapVatChuaReturnedLine" style="display:none"><span>Giá trị đã trả hàng</span><span class="num" id="payNhapVatChuaReturned">0</span></div>
+                <div class="vc-summary-line"><strong>Cần trả nhà cung cấp</strong><span class="num" id="payNhapVatChuaOutstanding">0</span></div>
+                <div class="vc-summary-line">
+                  <span>Tiền mặt</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="payNhapVatChuaCash" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="payNhapVatChuaPayAllCash">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Sổ tiền mặt <span id="payNhapVatChuaCashRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="payNhapVatChuaCashBook" class="vc-side-input" disabled>
+                    <option value="">Chọn sổ tiền mặt</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Chuyển khoản</span>
+                  <div class="vc-paid-combo">
+                    <input type="text" id="payNhapVatChuaTransfer" class="vc-discount-input vn-number-input" inputmode="numeric" value="0" autocomplete="off">
+                    <button type="button" class="vc-btn-pay-all" id="payNhapVatChuaPayAllTransfer">Tất cả</button>
+                  </div>
+                </div>
+                <div class="vc-summary-line">
+                  <span>Tài khoản ngân hàng <span id="payNhapVatChuaBankRequired" style="display:none;color:#d92d20">*</span></span>
+                  <select id="payNhapVatChuaBankBook" class="vc-side-input" disabled>
+                    <option value="">Chọn tài khoản chuyển khoản</option>
+                  </select>
+                </div>
+                <div class="vc-summary-line"><strong>Còn lại sau thanh toán</strong><span class="num" id="payNhapVatChuaDebt">0</span></div>
+              </div>
+              <div class="store-fields product-fields" style="margin-top:16px">
+                <div class="span-2"><span>Ghi chú thanh toán</span><input id="payNhapVatChuaNote" placeholder="Ghi chú phiếu chi"></div>
+              </div>
+              <div id="payNhapVatChuaError" class="vc-form-error"></div>
+            </section>
+          </div>
+        </form>
+        <div class="page-actions modal-footer">
+          <button class="btn btn-light" type="button" id="vcImportPaymentModalCancel">Bỏ qua</button>
+          <button class="btn btn-primary" type="submit" form="vcImportPaymentForm" id="vcImportPaymentModalSave">Thanh toán</button>
         </div>
       </div>
     </div>
@@ -969,21 +1013,45 @@
       var editImportSave = document.getElementById('vcImportEditModalSave');
       var editImportId = document.getElementById('editNhapVatChuaId');
       var editImportSupplier = document.getElementById('editNhapVatChuaSupplier');
+      var editImportSupplierHint = document.getElementById('editNhapVatChuaSupplierHint');
       var editImportVatChua = document.getElementById('editNhapVatChuaVatChua');
       var editImportQty = document.getElementById('editNhapVatChuaQty');
       var editImportGiaVon = document.getElementById('editNhapVatChuaGiaVon');
       var editImportNote = document.getElementById('editNhapVatChuaNote');
       var editImportGrandTotal = document.getElementById('editNhapVatChuaGrandTotal');
-      var editImportCash = document.getElementById('editNhapVatChuaCash');
-      var editImportTransfer = document.getElementById('editNhapVatChuaTransfer');
-      var editImportCashBook = document.getElementById('editNhapVatChuaCashBook');
-      var editImportBankBook = document.getElementById('editNhapVatChuaBankBook');
-      var editImportCashRequired = document.getElementById('editNhapVatChuaCashRequired');
-      var editImportBankRequired = document.getElementById('editNhapVatChuaBankRequired');
-      var editImportPayAllCash = document.getElementById('editNhapVatChuaPayAllCash');
-      var editImportPayAllTransfer = document.getElementById('editNhapVatChuaPayAllTransfer');
+      var editImportPaid = document.getElementById('editNhapVatChuaPaid');
+      var editImportReturned = document.getElementById('editNhapVatChuaReturned');
+      var editImportReturnedLine = document.getElementById('editNhapVatChuaReturnedLine');
+      var editImportPay = document.getElementById('editNhapVatChuaPay');
       var editImportDebt = document.getElementById('editNhapVatChuaDebt');
       var editImportError = document.getElementById('editNhapVatChuaError');
+      var editImportSavedRow = null;
+      var payImportOverlay = document.getElementById('vcImportPaymentModalOverlay');
+      var payImportForm = document.getElementById('vcImportPaymentForm');
+      var payImportClose = document.getElementById('vcImportPaymentModalClose');
+      var payImportCancel = document.getElementById('vcImportPaymentModalCancel');
+      var payImportSave = document.getElementById('vcImportPaymentModalSave');
+      var payImportId = document.getElementById('payNhapVatChuaId');
+      var payImportCode = document.getElementById('payNhapVatChuaCode');
+      var payImportSupplier = document.getElementById('payNhapVatChuaSupplier');
+      var payImportGrandTotal = document.getElementById('payNhapVatChuaGrandTotal');
+      var payImportPaid = document.getElementById('payNhapVatChuaPaid');
+      var payImportReturned = document.getElementById('payNhapVatChuaReturned');
+      var payImportReturnedLine = document.getElementById('payNhapVatChuaReturnedLine');
+      var payImportOutstanding = document.getElementById('payNhapVatChuaOutstanding');
+      var payImportCash = document.getElementById('payNhapVatChuaCash');
+      var payImportTransfer = document.getElementById('payNhapVatChuaTransfer');
+      var payImportCashBook = document.getElementById('payNhapVatChuaCashBook');
+      var payImportBankBook = document.getElementById('payNhapVatChuaBankBook');
+      var payImportCashRequired = document.getElementById('payNhapVatChuaCashRequired');
+      var payImportBankRequired = document.getElementById('payNhapVatChuaBankRequired');
+      var payImportPayAllCash = document.getElementById('payNhapVatChuaPayAllCash');
+      var payImportPayAllTransfer = document.getElementById('payNhapVatChuaPayAllTransfer');
+      var payImportDebt = document.getElementById('payNhapVatChuaDebt');
+      var payImportNote = document.getElementById('payNhapVatChuaNote');
+      var payImportError = document.getElementById('payNhapVatChuaError');
+      var payImportSavedRow = null;
+      var payImportSubmitting = false;
       var returnImportOverlay = document.getElementById('vcImportReturnModalOverlay');
       var returnImportForm = document.getElementById('vcImportReturnForm');
       var vcImportReturnModalTitle = document.getElementById('vcImportReturnModalTitle');
@@ -1523,8 +1591,8 @@
             bankBookOptions = [];
           }
         }
-        renderCashBookSelect(editImportCashBook, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt active');
-        renderCashBookSelect(editImportBankBook, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản active');
+        renderCashBookSelect(payImportCashBook, cashBookOptions, cashBookOptions.length ? 'Chọn sổ tiền mặt' : 'Chưa có sổ tiền mặt đang hoạt động');
+        renderCashBookSelect(payImportBankBook, bankBookOptions, bankBookOptions.length ? 'Chọn tài khoản chuyển khoản' : 'Chưa có tài khoản đang hoạt động');
       }
       async function ensureReturnCashBooks() {
         if (!cashBookOptions.length || !bankBookOptions.length) {
@@ -1623,35 +1691,42 @@
       function renderEditImportPaymentSummary() {
         var grandTotal = getEditImportGrandTotal();
         if (editImportGrandTotal) editImportGrandTotal.textContent = fmtMoney(grandTotal);
-        var tienMat = numeric(editImportCash ? editImportCash.value : 0);
-        var chuyenKhoan = numeric(editImportTransfer ? editImportTransfer.value : 0);
-        if (tienMat + chuyenKhoan > grandTotal && grandTotal > 0) {
-          var overflow = tienMat + chuyenKhoan - grandTotal;
-          if (chuyenKhoan >= overflow) chuyenKhoan -= overflow;
-          else {
-            tienMat = Math.max(0, tienMat - (overflow - chuyenKhoan));
-            chuyenKhoan = 0;
-          }
-        }
-        if (editImportCash) editImportCash.value = fmt(tienMat);
-        if (editImportTransfer) editImportTransfer.value = fmt(chuyenKhoan);
+        var paidAmount = Number(editImportSavedRow && editImportSavedRow.paid_amount || 0);
+        var returnedAmount = Number(editImportSavedRow && editImportSavedRow.returned_amount || 0);
+        if (editImportPaid) editImportPaid.textContent = fmtMoney(paidAmount);
+        if (editImportReturned) editImportReturned.textContent = fmtMoney(returnedAmount);
+        if (editImportReturnedLine) editImportReturnedLine.style.display = returnedAmount > 0 ? 'grid' : 'none';
+        if (editImportDebt) editImportDebt.textContent = fmtMoney(Math.max(grandTotal - paidAmount - returnedAmount, 0));
+        if (editImportPay) editImportPay.disabled = !editImportSavedRow || Number(editImportSavedRow.remaining_amount || 0) <= 0;
+      }
+      function renderPayImportSummary() {
+        var row = payImportSavedRow || {};
+        var outstanding = Number(row.remaining_amount || 0);
+        if (payImportGrandTotal) payImportGrandTotal.textContent = fmtMoney(row.tong_tien || 0);
+        if (payImportPaid) payImportPaid.textContent = fmtMoney(row.paid_amount || 0);
+        if (payImportReturned) payImportReturned.textContent = fmtMoney(row.returned_amount || 0);
+        if (payImportReturnedLine) payImportReturnedLine.style.display = Number(row.returned_amount || 0) > 0 ? 'grid' : 'none';
+        if (payImportOutstanding) payImportOutstanding.textContent = fmtMoney(outstanding);
+        var tienMat = numeric(payImportCash ? payImportCash.value : 0);
+        var chuyenKhoan = numeric(payImportTransfer ? payImportTransfer.value : 0);
         var cashRequired = tienMat > 0;
         var bankRequired = chuyenKhoan > 0;
-        if (editImportCashBook) {
-          editImportCashBook.disabled = !cashRequired;
-          if (!cashRequired) editImportCashBook.value = '';
-          if (cashRequired && !editImportCashBook.value) editImportCashBook.value = autoSelectCashBook(cashBookOptions);
-          editImportCashBook.classList.toggle('field-invalid', cashRequired && !String(editImportCashBook.value || '').trim());
+        if (payImportCashBook) {
+          payImportCashBook.disabled = !cashRequired;
+          if (!cashRequired) payImportCashBook.value = '';
+          if (cashRequired && !payImportCashBook.value) payImportCashBook.value = autoSelectCashBook(cashBookOptions);
+          payImportCashBook.classList.toggle('field-invalid', cashRequired && !String(payImportCashBook.value || '').trim());
         }
-        if (editImportBankBook) {
-          editImportBankBook.disabled = !bankRequired;
-          if (!bankRequired) editImportBankBook.value = '';
-          if (bankRequired && !editImportBankBook.value) editImportBankBook.value = autoSelectCashBook(bankBookOptions);
-          editImportBankBook.classList.toggle('field-invalid', bankRequired && !String(editImportBankBook.value || '').trim());
+        if (payImportBankBook) {
+          payImportBankBook.disabled = !bankRequired;
+          if (!bankRequired) payImportBankBook.value = '';
+          if (bankRequired && !payImportBankBook.value) payImportBankBook.value = autoSelectCashBook(bankBookOptions);
+          payImportBankBook.classList.toggle('field-invalid', bankRequired && !String(payImportBankBook.value || '').trim());
         }
-        if (editImportCashRequired) editImportCashRequired.style.display = cashRequired ? 'inline' : 'none';
-        if (editImportBankRequired) editImportBankRequired.style.display = bankRequired ? 'inline' : 'none';
-        if (editImportDebt) editImportDebt.textContent = fmtMoney(Math.max(grandTotal - tienMat - chuyenKhoan, 0));
+        if (payImportCashRequired) payImportCashRequired.style.display = cashRequired ? 'inline' : 'none';
+        if (payImportBankRequired) payImportBankRequired.style.display = bankRequired ? 'inline' : 'none';
+        if (payImportDebt) payImportDebt.textContent = fmtMoney(Math.max(outstanding - tienMat - chuyenKhoan, 0));
+        if (payImportSave) payImportSave.disabled = payImportSubmitting || outstanding <= 0;
       }
       function getReturnImportTotal() {
         var qty = Math.max(0, Math.floor(Number(returnImportQty ? returnImportQty.value : 0) || 0));
@@ -1734,20 +1809,9 @@
           showEditImportError('Vui lòng nhập số lượng và giá vốn hợp lệ.');
           return false;
         }
-        var tienMat = numeric(editImportCash ? editImportCash.value : 0);
-        var chuyenKhoan = numeric(editImportTransfer ? editImportTransfer.value : 0);
-        if (tienMat + chuyenKhoan > grandTotal) {
-          showEditImportError('Số tiền thanh toán không được vượt tổng tiền.');
-          return false;
-        }
-        if (tienMat > 0 && !String(editImportCashBook ? editImportCashBook.value : '').trim()) {
-          showEditImportError('Vui lòng chọn sổ tiền mặt.');
-          if (editImportCashBook) editImportCashBook.focus();
-          return false;
-        }
-        if (chuyenKhoan > 0 && !String(editImportBankBook ? editImportBankBook.value : '').trim()) {
-          showEditImportError('Vui lòng chọn tài khoản chuyển khoản.');
-          if (editImportBankBook) editImportBankBook.focus();
+        if (grandTotal < Number(editImportSavedRow && editImportSavedRow.tong_tien || 0)
+          && grandTotal < Number(editImportSavedRow && editImportSavedRow.paid_amount || 0) + Number(editImportSavedRow && editImportSavedRow.returned_amount || 0)) {
+          showEditImportError('Tổng tiền không được nhỏ hơn tổng số tiền đã trả và giá trị đã trả hàng.');
           return false;
         }
         return true;
@@ -1790,6 +1854,11 @@
           editImportError.style.display = 'none';
           editImportError.textContent = '';
         }
+      }
+      function closePayImportModal() {
+        if (payImportSubmitting) return;
+        if (payImportOverlay) payImportOverlay.classList.remove('is-visible');
+        setActionError(payImportError, '');
       }
       function closeReturnImportModal() {
         if (!returnImportOverlay) return;
@@ -1853,8 +1922,11 @@
       }
       document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') {
+          if ((payImportOverlay && payImportOverlay.classList.contains('is-visible'))
+            || (editImportOverlay && editImportOverlay.classList.contains('is-visible'))) {
+            return;
+          }
           closeImportModal();
-          closeEditImportModal();
           closeReturnImportModal();
           closeExportModal();
           closeStocktakeModal();
@@ -2101,7 +2173,6 @@
         showEditImportError('');
         if (editImportSave) editImportSave.disabled = true;
         try {
-          await ensureEditPaymentCashBooks();
           var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/edit', {
             credentials: 'same-origin',
             headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
@@ -2109,17 +2180,15 @@
           var json = await res.json();
           if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không tải được phiếu nhập vật chứa.');
           var row = json.data || {};
+          editImportSavedRow = row;
           if (editImportId) editImportId.value = id;
           if (editImportSupplier) editImportSupplier.value = row.nha_cung_cap_id || '';
+          if (editImportSupplier) editImportSupplier.disabled = row.can_change_supplier === false;
+          if (editImportSupplierHint) editImportSupplierHint.style.display = row.can_change_supplier === false ? 'block' : 'none';
           if (editImportVatChua) editImportVatChua.value = row.vat_chua_id || '';
           if (editImportQty) editImportQty.value = row.so_luong || '';
           if (editImportGiaVon) editImportGiaVon.value = row.gia_von ? fmt(row.gia_von) : '';
           if (editImportNote) editImportNote.value = row.ghi_chu || '';
-          var payment = row.payment || {};
-          if (editImportCash) editImportCash.value = fmt(payment.tien_mat || 0);
-          if (editImportTransfer) editImportTransfer.value = fmt(payment.chuyen_khoan || 0);
-          if (editImportCashBook) editImportCashBook.value = payment.so_quy_tien_mat_id || '';
-          if (editImportBankBook) editImportBankBook.value = payment.so_quy_chuyen_khoan_id || '';
           renderEditImportPaymentSummary();
           editImportOverlay.classList.add('is-visible');
           if (editImportSave) editImportSave.disabled = false;
@@ -2139,15 +2208,7 @@
           vat_chua_id: editImportVatChua ? editImportVatChua.value : '',
           so_luong: editImportQty ? editImportQty.value : '',
           gia_von: String(numeric(editImportGiaVon ? editImportGiaVon.value : 0)),
-          ghi_chu: editImportNote ? editImportNote.value : '',
-          payment_v2: '1',
-          chi_tiet_thanh_toan: {
-            tien_mat: numeric(editImportCash ? editImportCash.value : 0),
-            so_quy_tien_mat_id: editImportCashBook ? editImportCashBook.value : '',
-            chuyen_khoan: numeric(editImportTransfer ? editImportTransfer.value : 0),
-            so_quy_chuyen_khoan_id: editImportBankBook ? editImportBankBook.value : '',
-            tien_tra_khach: 0
-          }
+          ghi_chu: editImportNote ? editImportNote.value : ''
         };
         try {
           var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/edit', {
@@ -2165,25 +2226,157 @@
         }
       }
 
-      [editImportGiaVon, editImportCash, editImportTransfer].forEach(bindVNNumberInput);
-      [editImportQty, editImportGiaVon, editImportCash, editImportTransfer, editImportCashBook, editImportBankBook].forEach(function(el) {
+      function hasUnsavedImportChanges() {
+        var row = editImportSavedRow;
+        if (!row) return false;
+        return String(editImportSupplier ? editImportSupplier.value : '') !== String(row.nha_cung_cap_id || '')
+          || String(editImportVatChua ? editImportVatChua.value : '') !== String(row.vat_chua_id || '')
+          || Number(editImportQty ? editImportQty.value : 0) !== Number(row.so_luong || 0)
+          || numeric(editImportGiaVon ? editImportGiaVon.value : 0) !== Number(row.gia_von || 0)
+          || String(editImportNote ? editImportNote.value : '').trim() !== String(row.ghi_chu || '').trim();
+      }
+
+      async function openPayImportModal(id, fromEdit) {
+        if (!payImportOverlay || !id || payImportSubmitting) return;
+        if (fromEdit && hasUnsavedImportChanges()) {
+          showEditImportError('Vui lòng lưu thay đổi phiếu nhập trước khi thanh toán.');
+          return;
+        }
+        if (fromEdit && editImportPay) editImportPay.disabled = true;
+        try {
+          var results = await Promise.all([
+            fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/edit', {
+              credentials: 'same-origin',
+              headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            }),
+            ensureEditPaymentCashBooks()
+          ]);
+          var res = results[0];
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không tải được thông tin thanh toán.');
+          payImportSavedRow = json.data || {};
+          if (fromEdit) {
+            editImportSavedRow.paid_amount = payImportSavedRow.paid_amount;
+            editImportSavedRow.returned_amount = payImportSavedRow.returned_amount;
+            editImportSavedRow.remaining_amount = payImportSavedRow.remaining_amount;
+            renderEditImportPaymentSummary();
+          }
+          if (payImportId) payImportId.value = id;
+          if (payImportCode) payImportCode.textContent = payImportSavedRow.ma_nhap_vat_chua || '';
+          if (payImportSupplier) payImportSupplier.textContent = payImportSavedRow.doi_tuong_ten || 'Nhà cung cấp';
+          if (payImportCash) payImportCash.value = '0';
+          if (payImportTransfer) payImportTransfer.value = '0';
+          if (payImportCashBook) payImportCashBook.value = '';
+          if (payImportBankBook) payImportBankBook.value = '';
+          if (payImportNote) payImportNote.value = '';
+          setActionError(payImportError, Number(payImportSavedRow.remaining_amount || 0) > 0 ? '' : 'Phiếu nhập đã được thanh toán đủ.');
+          renderPayImportSummary();
+          payImportOverlay.classList.add('is-visible');
+        } catch (error) {
+          var message = error && error.message ? error.message : 'Không tải được thông tin thanh toán.';
+          if (fromEdit) showEditImportError(message);
+          else alert(message);
+        } finally {
+          if (fromEdit) renderEditImportPaymentSummary();
+        }
+      }
+
+      async function submitPayImport() {
+        if (payImportSubmitting) return;
+        setActionError(payImportError, '');
+        var id = String(payImportId ? payImportId.value : '').trim();
+        var tienMat = numeric(payImportCash ? payImportCash.value : 0);
+        var chuyenKhoan = numeric(payImportTransfer ? payImportTransfer.value : 0);
+        var amount = tienMat + chuyenKhoan;
+        var outstanding = Number(payImportSavedRow && payImportSavedRow.remaining_amount || 0);
+        if (!id || !payImportSavedRow) return;
+        if (amount <= 0) {
+          setActionError(payImportError, 'Vui lòng nhập số tiền thanh toán lớn hơn 0.');
+          return;
+        }
+        if (amount > outstanding) {
+          setActionError(payImportError, 'Số tiền thanh toán không được vượt số tiền cần trả.');
+          return;
+        }
+        if (tienMat > 0 && !String(payImportCashBook ? payImportCashBook.value : '').trim()) {
+          setActionError(payImportError, 'Vui lòng chọn sổ tiền mặt.');
+          if (payImportCashBook) payImportCashBook.focus();
+          return;
+        }
+        if (chuyenKhoan > 0 && !String(payImportBankBook ? payImportBankBook.value : '').trim()) {
+          setActionError(payImportError, 'Vui lòng chọn tài khoản chuyển khoản.');
+          if (payImportBankBook) payImportBankBook.focus();
+          return;
+        }
+        payImportSubmitting = true;
+        if (payImportSave) payImportSave.textContent = 'Đang thanh toán...';
+        if (payImportClose) payImportClose.disabled = true;
+        if (payImportCancel) payImportCancel.disabled = true;
+        renderPayImportSummary();
+        try {
+          var res = await fetch('/vat-chua/nhap/' + encodeURIComponent(id) + '/pay', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+              payment_v2: true,
+              ghi_chu: payImportNote ? payImportNote.value : '',
+              chi_tiet_thanh_toan: {
+                tien_mat: tienMat,
+                so_quy_tien_mat_id: payImportCashBook ? payImportCashBook.value : '',
+                chuyen_khoan: chuyenKhoan,
+                so_quy_chuyen_khoan_id: payImportBankBook ? payImportBankBook.value : '',
+                tien_tra_khach: 0
+              }
+            })
+          });
+          var json = await res.json();
+          if (!res.ok || !json || !json.success) throw new Error((json && json.message) || 'Không thanh toán được phiếu nhập vật chứa.');
+          window.location.href = '/vat-chua?success=import_paid&nhap_vat_chua=' + encodeURIComponent(id);
+        } catch (error) {
+          setActionError(payImportError, error && error.message ? error.message : 'Không thanh toán được phiếu nhập vật chứa.');
+          payImportSubmitting = false;
+          if (payImportSave) payImportSave.textContent = 'Thanh toán';
+          if (payImportClose) payImportClose.disabled = false;
+          if (payImportCancel) payImportCancel.disabled = false;
+          renderPayImportSummary();
+        }
+      }
+
+      [payImportCash, payImportTransfer].forEach(bindVNNumberInput);
+      [payImportCash, payImportTransfer, payImportCashBook, payImportBankBook].forEach(function(el) {
+        function updatePayment() {
+          setActionError(payImportError, '');
+          renderPayImportSummary();
+        }
+        if (el) el.addEventListener('input', updatePayment);
+        if (el) el.addEventListener('change', updatePayment);
+      });
+      if (payImportPayAllCash) payImportPayAllCash.addEventListener('click', function() {
+        if (payImportCash) payImportCash.value = fmt(payImportSavedRow && payImportSavedRow.remaining_amount || 0);
+        if (payImportTransfer) payImportTransfer.value = '0';
+        renderPayImportSummary();
+      });
+      if (payImportPayAllTransfer) payImportPayAllTransfer.addEventListener('click', function() {
+        if (payImportTransfer) payImportTransfer.value = fmt(payImportSavedRow && payImportSavedRow.remaining_amount || 0);
+        if (payImportCash) payImportCash.value = '0';
+        renderPayImportSummary();
+      });
+      if (editImportPay) editImportPay.addEventListener('click', function() {
+        openPayImportModal(editImportId ? editImportId.value : '', true);
+      });
+      if (payImportForm) payImportForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitPayImport();
+      });
+      if (payImportClose) payImportClose.addEventListener('click', closePayImportModal);
+      if (payImportCancel) payImportCancel.addEventListener('click', closePayImportModal);
+
+      [editImportGiaVon].forEach(bindVNNumberInput);
+      [editImportQty, editImportGiaVon].forEach(function(el) {
         if (el) el.addEventListener('input', renderEditImportPaymentSummary);
         if (el) el.addEventListener('change', renderEditImportPaymentSummary);
       });
-      if (editImportPayAllCash) {
-        editImportPayAllCash.addEventListener('click', function() {
-          if (editImportCash) editImportCash.value = fmt(getEditImportGrandTotal());
-          if (editImportTransfer) editImportTransfer.value = '0';
-          renderEditImportPaymentSummary();
-        });
-      }
-      if (editImportPayAllTransfer) {
-        editImportPayAllTransfer.addEventListener('click', function() {
-          if (editImportTransfer) editImportTransfer.value = fmt(getEditImportGrandTotal());
-          if (editImportCash) editImportCash.value = '0';
-          renderEditImportPaymentSummary();
-        });
-      }
       if (editImportForm) {
         editImportForm.addEventListener('submit', function(e) {
           e.preventDefault();
@@ -2589,6 +2782,13 @@
           openEditImportModal(editBtn.getAttribute('data-vc-import-id'));
           return;
         }
+        var payBtn = e.target.closest('[data-vc-import-pay]');
+        if (payBtn) {
+          e.preventDefault();
+          closeVcDocActionMenus();
+          openPayImportModal(payBtn.getAttribute('data-vc-import-id'), false);
+          return;
+        }
         var trashBtn = e.target.closest('[data-vc-import-trash]');
         if (trashBtn) {
           e.preventDefault();
@@ -2640,7 +2840,6 @@
         }
         closeVcDocActionMenus();
         if (vcDocumentOverlay && e.target === vcDocumentOverlay) closeVcDocumentModal();
-        if (editImportOverlay && e.target === editImportOverlay) closeEditImportModal();
         if (returnImportOverlay && e.target === returnImportOverlay) closeReturnImportModal();
         if (vcImportTrashOverlay && e.target === vcImportTrashOverlay) closeVcImportTrashModal();
       });

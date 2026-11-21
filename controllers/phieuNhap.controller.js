@@ -368,7 +368,7 @@ exports.postAdd = async (req, res, next) => {
         const normalizedItems = [];
         for (const item of items) {
             if (!item.hang_hoa_id) {
-                return res.status(400).json({ success: false, message: 'Dong hang thieu hang_hoa_id' });
+                return res.status(400).json({ success: false, message: 'Dòng hàng thiếu hang_hoa_id' });
             }
 
             const so_luong = Number(item.so_luong);
@@ -493,7 +493,7 @@ exports.postAdd = async (req, res, next) => {
 
             if (phieu.trang_thai === 'completed') {
                 throw new Error(
-                    'Route nhap hang cu (phieuNhap.js) da ngung. Vui long dung module Nhap hang (purchase.service).'
+                    'Route nhập hàng cũ (phieuNhap.js) đã ngừng. Vui lòng dùng module Nhập hàng (purchase.service).'
                 );
             }
         }

@@ -322,7 +322,7 @@ async function buildLotProfitReport(options = {}) {
       product,
       filters: { applied: options },
       filterOptions: { lots: [] },
-      meta: { message: 'Hang hoa khong quan ly theo lo', tong_dong: 0 }
+      meta: { message: 'Hàng hóa không quản lý theo lô', tong_dong: 0 }
     };
   }
 

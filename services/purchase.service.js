@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const {
   PhieuNhap,
   CTPhieuNhap,
+  PhieuTraHangNhap,
   NhaCungCap,
   DiaChiNcc,
   HangHoa,
@@ -121,12 +122,12 @@ function normalizePaymentDetail(data = {}, maxAmount) {
   if (isPurchasePaymentV2(data)) {
     const detail = extractPaymentDetail(data);
     if (detail.tien_tra_khach > 0) {
-      throw new Error('Tiá»n tráº£ khÃ¡ch khÃ´ng Ã¡p dá»¥ng cho thanh toÃ¡n nhÃ  cung cáº¥p.');
+      throw new Error('Tiền trả khách không áp dụng cho thanh toán nhà cung cấp.');
     }
     const amount = detail.tien_mat + detail.chuyen_khoan;
     const limit = Math.max(0, parseMoney(maxAmount));
     if (amount > limit) {
-      throw new Error('Sá»‘ tiá»n thanh toÃ¡n khÃ´ng Ä‘Æ°á»£c vÆ°á»£t sá»‘ cáº§n tráº£ nhÃ  cung cáº¥p.');
+      throw new Error('Số tiền thanh toán không được vượt số cần trả nhà cung cấp.');
     }
     return {
       isV2: true,
@@ -239,23 +240,23 @@ function normalizeLotInfo(raw) {
 function validateLotInfoForProduct(item, product) {
   if (!product || !product.quan_ly_theo_lo) return;
   const lotInfo = item.lot_info;
-  if (!lotInfo) throw new Error('Hang quan ly theo lo can thong tin lo');
+  if (!lotInfo) throw new Error('Hàng quản lý theo lô cần thông tin lô');
   const quyCachItems = normalizeQuyCachItems(lotInfo.quy_cach_items);
   for (const row of quyCachItems) {
     if (!row.ten_quy_cach) {
-      throw new Error('Ten quy cach khong duoc de trong khi co so luong');
+      throw new Error('Tên quy cách không được để trống khi có số lượng');
     }
     if (Number(row.so_luong || 0) <= 0) {
-      throw new Error('So luong quy cach phai lon hon 0');
+      throw new Error('Số lượng quy cách phải lớn hơn 0');
     }
     if (Number(row.don_gia_nhap || 0) < 0) {
-      throw new Error('Don gia quy cach khong hop le');
+      throw new Error('Đơn giá quy cách không hợp lệ');
     }
   }
   if (quyCachItems.length) {
     const total = sumQuyCachItems(quyCachItems);
     if (Number(item.so_luong || 0) > 0 && Number(item.so_luong || 0) !== total) {
-      throw new Error('Tong so luong quy cach phai bang so luong dong hang');
+      throw new Error('Tổng số lượng quy cách phải bằng số lượng dòng hàng');
     }
     item.so_luong = total;
     item.don_gia_nhap = total > 0 ? Math.round(sumQuyCachAmount(quyCachItems) / total) : item.don_gia_nhap;
@@ -263,7 +264,7 @@ function validateLotInfoForProduct(item, product) {
     item.lot_info.tong_tien_quy_cach = sumQuyCachAmount(quyCachItems);
     item.lot_info.quy_cach_items = quyCachItems;
   }
-  if (Number(item.so_luong || 0) <= 0) throw new Error('Tong so luong lo phai lon hon 0');
+  if (Number(item.so_luong || 0) <= 0) throw new Error('Tổng số lượng lô phải lớn hơn 0');
 }
 
 function formatLotName(dateValue) {
@@ -307,7 +308,7 @@ function lineTotal(item) {
   const discount = item.kieu_giam_gia_dong === 'percent'
     ? Math.floor(base * Math.min(Number(item.giam_gia_dong || 0), 100) / 100)
     : Number(item.giam_gia_dong || 0);
-  if (discount > base) throw new Error('Giam gia dong khong duoc vuot qua thanh tien');
+  if (discount > base) throw new Error('Giảm giá dòng không được vượt quá thành tiền');
   return Math.max(0, Math.floor(base - discount));
 }
 
@@ -319,7 +320,7 @@ function calculateTotals(items, discountValue, discountType) {
   const discountAmount = kieuGiamGia === 'percent'
     ? Math.floor(tongTienHang * giamGia / 100)
     : giamGia;
-  if (discountAmount > tongTienHang) throw new Error('Giam gia phieu khong duoc vuot qua tong tien hang');
+  if (discountAmount > tongTienHang) throw new Error('Giảm giá phiếu không được vượt quá tổng tiền hàng');
   const tongTien = Math.max(0, tongTienHang - discountAmount);
   return { tongTienHang, giamGia, kieuGiamGia, tongTien };
 }
@@ -367,17 +368,17 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
       kho_id: khoId,
       trang_thai: { $ne: 'huy' }
     }), session);
-    if (!existing) throw new Error('Lo hang khong hop le');
+    if (!existing) throw new Error('Lô hàng không hợp lệ');
     return existing._id;
   }
 
   const lotInfo = item.lot_info;
-  if (!lotInfo) throw new Error('Hang quan ly theo lo can thong tin lo');
+  if (!lotInfo) throw new Error('Hàng quản lý theo lô cần thông tin lô');
   const lotQty = Math.floor(Number(item.so_luong || 0));
-  if (lotQty <= 0) throw new Error('So luong dong hang khong hop le');
+  if (lotQty <= 0) throw new Error('Số lượng dòng hàng không hợp lệ');
 
   const maLo = lotInfo.ma_lo || makePurchaseLotCode(purchase.ma_phieu_nhap, product && product.ma_hang);
-  if (!maLo) throw new Error('Khong the sinh ma lo tu phieu nhap va hang hoa');
+  if (!maLo) throw new Error('Không thể sinh mã lô từ phiếu nhập và hàng hóa');
   if (lotCache && lotCache.has(maLo)) {
     const lotId = lotCache.get(maLo);
     await withNhapHangLog('LoHang', `cap nhat lo co san ${maLo}`, () => LoHang.updateOne(
@@ -443,11 +444,11 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
 
 async function applyCompletedEffects(purchase, rows, options = {}) {
   const session = options.session;
-  if (purchase.__effectsApplied) throw new Error('Phieu nhap da duoc hoan tat truoc do');
+  if (purchase.__effectsApplied) throw new Error('Phiếu nhập đã được hoàn tất trước đó');
   purchase.__effectsApplied = true;
 
   const warehouse = await withSessionQuery(Kho.findById(purchase.kho_id), session).lean();
-  if (!warehouse) throw new Error('Khong tim thay kho nhap');
+  if (!warehouse) throw new Error('Không tìm thấy kho nhập');
 
   for (const row of rows) {
     const qty = Number(row.so_luong || 0);
@@ -458,7 +459,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
     if (row.lo_hang_id && quyCachItems.length) {
       const totalQc = sumQuyCachItems(quyCachItems);
       if (qty > 0 && totalQc !== qty) {
-        throw new Error('Tong so luong quy cach phai bang so luong dong hang');
+        throw new Error('Tổng số lượng quy cách phải bằng số lượng dòng hàng');
       }
       for (const qc of quyCachItems) {
         await withNhapHangLog('TonKhoLoQuyCach', `dong bo ten cu qc=${qc.ten_quy_cach}`, () => TonKhoLoQuyCach.updateMany(
@@ -566,7 +567,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
       so_luong_thay_doi: qty,
       ton_kho_sau: Number(updatedStock?.so_luong || 0),
       gia_tri_thay_doi: Number(row.thanh_tien || 0),
-      ghi_chu: 'Nhap hang',
+      ghi_chu: 'Nhập hàng',
       ngay: purchase.ngay_nhap || new Date()
     }, session));
 
@@ -589,7 +590,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
         phieu_nhap_id: purchase._id,
         so_tien: canTra,
         loai: 'tang_no',
-        ghi_chu: 'Cong no phat sinh tu phieu nhap ' + purchase.ma_phieu_nhap,
+        ghi_chu: 'Công nợ phát sinh từ phiếu nhập ' + purchase.ma_phieu_nhap,
         ngay: purchase.ngay_nhap || new Date()
       }, session));
     }
@@ -654,7 +655,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
         phieu_nhap_id: purchase._id,
         so_tien: daTra,
         loai: 'thanh_toan',
-        ghi_chu: 'Thanh toan NCC tu phieu nhap ' + purchase.ma_phieu_nhap,
+        ghi_chu: 'Thanh toán NCC từ phiếu nhập ' + purchase.ma_phieu_nhap,
         ngay: purchase.ngay_nhap || new Date()
       }, session));
     }
@@ -666,7 +667,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
   const userId = cleanId(options.userId);
   const isRollback = direction < 0;
   const warehouse = await withSessionQuery(Kho.findById(purchase.kho_id), session).lean();
-  if (!warehouse) throw new Error('Khong tim thay kho nhap');
+  if (!warehouse) throw new Error('Không tìm thấy kho nhập');
 
   for (const row of rows) {
     const qty = Number(row.so_luong || 0);
@@ -679,7 +680,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
         kho_id: purchase.kho_id,
         hang_hoa_id: row.hang_hoa_id
       }), session).lean();
-      if (!stock || Number(stock.so_luong || 0) < qty) throw new Error('Ton kho khong du de hoan tac phieu nhap');
+      if (!stock || Number(stock.so_luong || 0) < qty) throw new Error('Tồn kho không đủ để hoàn tác phiếu nhập');
     }
 
     if (row.lo_hang_id && quyCachItems.length) {
@@ -696,7 +697,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
         if (isRollback) {
           const qcStock = await withSessionQuery(TonKhoLoQuyCach.findOne(qcFilter), session).lean();
           if (!qcStock || Number(qcStock.so_luong || 0) < Number(qc.so_luong || 0)) {
-            throw new Error('Ton kho quy cach trong lo khong du de hoan tac phieu nhap');
+            throw new Error('Tồn kho quy cách trong lô không đủ để hoàn tác phiếu nhập');
           }
         }
         await TonKhoLoQuyCach.findOneAndUpdate(
@@ -737,7 +738,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
         { $inc: { so_luong: direction * qty }, $setOnInsert: { cua_hang_id: purchase.cua_hang_id } },
         withSessionOptions({ upsert: !isRollback, new: true }, session)
       ).lean();
-      if (!updated || Number(updated.so_luong || 0) < 0) throw new Error('Ton kho khong du de hoan tac phieu nhap');
+      if (!updated || Number(updated.so_luong || 0) < 0) throw new Error('Tồn kho không đủ để hoàn tác phiếu nhập');
 
       if (row.lo_hang_id) {
         const lotStock = await TonKhoLo.findOneAndUpdate(
@@ -751,7 +752,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
           { $inc: { so_luong: direction * qty }, $set: { gia_von: row.don_gia_nhap } },
           withSessionOptions({ upsert: !isRollback, new: true }, session)
         );
-        if (!lotStock || Number(lotStock.so_luong || 0) < 0) throw new Error('Ton kho lo khong du de hoan tac phieu nhap');
+        if (!lotStock || Number(lotStock.so_luong || 0) < 0) throw new Error('Tồn kho lô không đủ để hoàn tác phiếu nhập');
         const lotQtyAfter = Number(lotStock.so_luong || 0);
         await LoHang.updateOne(
           { _id: row.lo_hang_id },
@@ -775,7 +776,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
       so_luong_thay_doi: direction * qty,
       ton_kho_sau: Number(updated?.so_luong || 0),
       gia_tri_thay_doi: direction * Number(row.thanh_tien || 0),
-      ghi_chu: (isRollback ? 'Hoan tac phieu nhap ' : 'Khoi phuc phieu nhap ') + purchase.ma_phieu_nhap,
+      ghi_chu: (isRollback ? 'Hoàn tác phiếu nhập ' : 'Khôi phục phiếu nhập ') + purchase.ma_phieu_nhap,
       ngay: new Date()
     }, session);
   }
@@ -803,11 +804,11 @@ async function createPurchase(data = {}, options = {}) {
   const session = options.session || data.session;
   const storeId = cleanId(data.cua_hang_id);
   const khoId = cleanId(data.kho_id);
-  if (!storeId) throw new Error('Cua hang khong hop le');
+  if (!storeId) throw new Error('Cửa hàng không hợp lệ');
   if (!khoId) throw new Error('Vui lòng chọn kho nhập');
 
   const items = normalizeItems(data.items_json ?? data.items);
-  if (!items.length) throw new Error('Vui long chon hang hoa');
+  if (!items.length) throw new Error('Vui lòng chọn hàng hóa');
 
   const supplierId = cleanId(data.nha_cung_cap_id);
   const supplierAddressId = supplierId ? cleanId(data.dia_chi_ncc_id) : undefined;
@@ -820,14 +821,14 @@ async function createPurchase(data = {}, options = {}) {
       }).select('_id'),
       session
     ).lean();
-    if (!address) throw new Error('Dia chi nha cung cap khong hop le');
+    if (!address) throw new Error('Địa chỉ nhà cung cấp không hợp lệ');
   }
   const mode = data.submitMode === 'completed' ? 'completed' : 'draft';
   const vatChuaImport = parseVatChuaImportInput(data);
   if (mode === 'completed') assertVatChuaImportInput(vatChuaImport);
   const totals = calculateTotals(items, data.giam_gia, data.kieu_giam_gia);
   const canTra = parseMoney(data.can_tra_ncc || totals.tongTien);
-  if (canTra > totals.tongTien) throw new Error('Can tra nha cung cap khong duoc lon hon tong tien');
+  if (canTra > totals.tongTien) throw new Error('Cần trả nhà cung cấp không được lớn hơn tổng tiền');
   const payment = normalizePaymentDetail(data, canTra);
   const daTra = payment.amount;
   const phuongThuc = purchasePaymentMethodFromDetail(payment.detail);
@@ -847,7 +848,7 @@ async function createPurchase(data = {}, options = {}) {
   ).lean();
   const productMap = new Map(productDocs.map(p => [String(p._id), p]));
   if (productMap.size !== new Set(items.map(x => String(x.hang_hoa_id))).size) {
-    throw new Error('Co hang hoa khong hop le hoac da ngung kinh doanh');
+    throw new Error('Có hàng hóa không hợp lệ hoặc đã ngừng kinh doanh');
   }
   for (const item of items) {
     const product = productMap.get(String(item.hang_hoa_id));
@@ -857,11 +858,11 @@ async function createPurchase(data = {}, options = {}) {
     }
     validateLotInfoForProduct(item, product);
     if (!product.quan_ly_theo_lo && Number(item.so_luong || 0) <= 0) {
-      throw new Error('So luong dong hang phai lon hon 0');
+      throw new Error('Số lượng dòng hàng phải lớn hơn 0');
     }
     lineTotal(item);
     if (product.quan_ly_theo_lo && mode === 'completed') {
-      if (!item.lo_hang_id && !item.lot_info) throw new Error('Hang quan ly theo lo can chon hoac tao lo');
+      if (!item.lo_hang_id && !item.lot_info) throw new Error('Hàng quản lý theo lô cần chọn hoặc tạo lô');
     }
   }
 
@@ -890,7 +891,7 @@ async function createPurchase(data = {}, options = {}) {
   for (const item of items) {
     const product = productMap.get(String(item.hang_hoa_id));
     if (product.quan_ly_theo_lo && mode === 'completed' && !item.lo_hang_id && !item.lot_info) {
-      throw new Error('Hang quan ly theo lo can chon hoac tao lo');
+      throw new Error('Hàng quản lý theo lô cần chọn hoặc tạo lô');
     }
     const total = lineTotal(item);
     const ctDoc = await withNhapHangLog('CTPhieuNhap', `tao dong hang=${item.hang_hoa_id} sl=${item.so_luong}`, () => createOne(CTPhieuNhap, {
@@ -960,8 +961,20 @@ async function cancelPurchase(id, storeId, userId) {
       const filter = { _id: id, deleted_at: null };
       if (cleanId(storeId)) filter.cua_hang_id = storeId;
       const purchase = await withSessionQuery(PhieuNhap.findOne(filter), session);
-      if (!purchase) throw new Error('Khong tim thay phieu nhap hoac phieu dang trong thung rac');
-      if (purchase.trang_thai === 'cancelled') throw new Error('Phieu nhap da bi huy');
+      if (!purchase) throw new Error('Không tìm thấy phiếu nhập hoặc phiếu đang trong thùng rác');
+      if (purchase.trang_thai === 'cancelled') throw new Error('Phiếu nhập đã bị hủy');
+
+      const activeReturn = await withSessionQuery(PhieuTraHangNhap.findOne({
+        phieu_nhap_id: purchase._id,
+        trang_thai: { $ne: 'cancelled' },
+        trang_thai_du_lieu: { $ne: 'inactive' },
+        deleted_at: null
+      }).setOptions({ strictQuery: false }).select('ma_phieu_tra_nhap'), session).lean();
+      if (activeReturn) {
+        const returnCode = activeReturn.ma_phieu_tra_nhap ? ' ' + activeReturn.ma_phieu_tra_nhap : '';
+        throw new Error('Không thể hủy phiếu nhập ' + purchase.ma_phieu_nhap
+          + ' vì còn phiếu trả hàng' + returnCode + ' đang có hiệu lực.');
+      }
 
       const rows = await withSessionQuery(CTPhieuNhap.find({ phieu_nhap_id: purchase._id }), session).lean();
       if (purchase.trang_thai === 'completed') {
@@ -979,7 +992,7 @@ async function cancelPurchase(id, storeId, userId) {
           {
             $set: {
               trang_thai: 'cancelled',
-              ghi_chu: 'Huy theo phieu nhap ' + purchase.ma_phieu_nhap
+              ghi_chu: 'Hủy theo phiếu nhập ' + purchase.ma_phieu_nhap
             }
           },
           withSessionOptions({}, session)

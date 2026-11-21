@@ -84,7 +84,7 @@ async function buildCustomerReport(query = {}) {
 
     return {
         generatedAt: new Date(),
-        branchName: 'C?a h‡ng trung t‚m',
+        branchName: 'C·ª≠a h√†ng trung t√¢m',
         range,
         rows,
         topCustomers: rows.slice(0, 10),

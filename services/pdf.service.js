@@ -9,7 +9,7 @@ async function generatePdfFromHtml(html, options = {}) {
   try {
     puppeteer = require('puppeteer');
   } catch (error) {
-    error.message = 'Chua cai puppeteer. Chay: npm install puppeteer. Chi tiet: ' + error.message;
+    error.message = 'Chưa cài puppeteer. Chạy: npm install puppeteer. Chi tiết: ' + error.message;
     throw error;
   }
 

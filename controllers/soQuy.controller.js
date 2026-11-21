@@ -42,11 +42,11 @@ function toObjectId(value) {
 }
 
 function receiptErrorMessage(error) {
-    if (!error) return 'Khong tao duoc phieu';
-    if (error.code === 11000) return 'Ma phieu da ton tai';
+    if (!error) return 'Không tạo được phiếu';
+    if (error.code === 11000) return 'Mã phiếu đã tồn tại';
     if (error.name === 'CastError') return 'Dữ liệu phiếu thu chi không hợp lệ.';
     if (error.name === 'ValidationError') return 'Dữ liệu phiếu thu chi không hợp lệ.';
-    return error.message || 'Khong tao duoc phieu';
+    return error.message || 'Không tạo được phiếu';
 }
 
 function buildFilter(query = {}, storeId) {
@@ -552,7 +552,7 @@ exports.getRelatedDocuments = async (req, res, next) => {
     try {
         const storeId = await resolveStoreId(req);
         if (!storeId) {
-            return res.status(400).json({ success: false, message: 'Chua chon cua hang' });
+            return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng' });
         }
         const result = await listRelatedDocuments({
             cua_hang_id: storeId,
@@ -567,7 +567,7 @@ exports.getRelatedDocuments = async (req, res, next) => {
             message: result.message || ''
         });
     } catch (error) {
-        return res.status(400).json({ success: false, message: error.message || 'Khong tai duoc chung tu' });
+        return res.status(400).json({ success: false, message: error.message || 'Không tải được chứng từ' });
     }
 };
 
@@ -638,7 +638,7 @@ const RECEIPT_DETAIL_POPULATES = [
 
 exports.getIdDetail = async (req, res, next) => {
     try {
-        if (!isObjectId(req.params.id)) return res.status(400).json({ success: false, message: 'id khong hop le' });
+        if (!isObjectId(req.params.id)) return res.status(400).json({ success: false, message: 'id không hợp lệ' });
         let query = PhieuThuChi.findById(req.params.id);
         RECEIPT_DETAIL_POPULATES.forEach(spec => {
             query = query.populate(spec);
@@ -718,7 +718,7 @@ exports.postAdd = async (req, res, next) => {
             nguoi_tao_id: req.user?._id,
             hach_toan: body.hach_toan
         });
-        res.json({ success: true, message: `Da tao phieu ${receipt.loai_phieu}`, data: receipt });
+        res.json({ success: true, message: `Đã tạo phiếu ${receipt.loai_phieu}`, data: receipt });
     } catch (error) {
         return res.status(400).json({ success: false, message: receiptErrorMessage(error) });
     }

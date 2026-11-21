@@ -331,7 +331,7 @@ async function loadAllocationPageData(req) {
                 ten_hang: product.ten_hang || '---',
                 don_vi_tinh_ten: donVi,
                 ma_lo: '---',
-                ten_lo: 'KhÃ´ng theo lÃ´',
+                ten_lo: 'Không theo lô',
                 ten_quy_cach: '---',
                 kho_ten: '---',
                 ngay_nhap: null,
@@ -354,7 +354,7 @@ async function loadAllocationPageData(req) {
                 ten_hang: product.ten_hang || '---',
                 don_vi_tinh_ten: donVi,
                 ma_lo: '---',
-                ten_lo: 'KhÃ´ng theo lÃ´',
+                ten_lo: 'Không theo lô',
                 ten_quy_cach: '---',
                 kho_ten: warehouseMap[String(row.kho_id || '')] || '---',
                 ngay_nhap: null,
@@ -448,7 +448,7 @@ async function allocationPage(req, res, next) {
             .select('ma_vat_chua ten_vat_chua so_luong_ton')
             .lean();
         res.render('hang-hoa/phan-bo', {
-            pageTitle: 'PhÃ¢n bá»• hÃ ng tá»“n kho',
+            pageTitle: 'Phân bổ hàng tồn kho',
             activeMenu: 'hang-hoa',
             user: req.user,
             flash: req.query || {},

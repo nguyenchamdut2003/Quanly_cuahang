@@ -20,6 +20,14 @@
     .store-page-link{min-width:34px;height:34px;border:1px solid #d0d5dd;border-radius:6px;background:#fff;color:#344054;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:0 10px;font-weight:700}
     .store-page-link.is-active{background:#0070f4;border-color:#0070f4;color:#fff}
     .store-page-link.is-disabled{pointer-events:none;opacity:.45}
+    .store-notes-form label{display:block;margin-bottom:8px;font-size:14px;font-weight:600;color:#344054}
+    .store-notes-form textarea{display:block;width:100%;min-height:130px;box-sizing:border-box;resize:vertical;padding:12px;border:1px solid #d0d5dd;border-radius:6px;font:inherit;line-height:1.5;color:#101828;background:#fff}
+    .store-notes-form textarea:focus{outline:2px solid #b2ddff;outline-offset:1px;border-color:#1570ef}
+    .store-note-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:12px}
+    .store-note-confirm{display:flex;align-items:center;flex-wrap:wrap;gap:8px;color:#344054;font-size:14px}
+    .store-note-status{margin:12px 0 0;color:#027a48;font-size:14px}
+    .store-note-status.is-error{color:#b42318}
+    .store-note-confirm[hidden],.store-note-status[hidden],[data-store-note-empty][hidden],[data-store-save-action][hidden]{display:none!important}
   </style>
 </head>
 <body class="admin-body">
@@ -527,7 +535,7 @@
         return fetch(url, { headers: { Accept: 'application/json' } })
           .then(function(response) { return response.json(); })
           .then(function(data) {
-            if (!data || !data.success) throw new Error((data && data.message) || 'Khong tai duoc du lieu cua hang.');
+            if (!data || !data.success) throw new Error((data && data.message) || 'Không tải được dữ liệu cửa hàng.');
             return data;
           });
       }
@@ -855,6 +863,19 @@
         var tabs = Array.prototype.slice.call(detailBlock.querySelectorAll('.detail-tab'));
         var panes = Array.prototype.slice.call(detailBlock.querySelectorAll('.store-detail-pane'));
         var exportAction = detailBlock.querySelector('[data-store-export-action]');
+        var saveAction = detailBlock.querySelector('[data-store-save-action]');
+        var notesForm = detailBlock.querySelector('[data-store-notes-form]');
+        var noteInput = detailBlock.querySelector('[data-store-note-input]');
+        var noteClear = detailBlock.querySelector('[data-store-note-clear]');
+        var noteConfirmPanel = detailBlock.querySelector('[data-store-note-confirm-panel]');
+        var noteConfirm = detailBlock.querySelector('[data-store-note-confirm]');
+        var noteCancel = detailBlock.querySelector('[data-store-note-cancel]');
+        var noteStatus = detailBlock.querySelector('[data-store-note-status]');
+        var noteEmpty = detailBlock.querySelector('[data-store-note-empty]');
+        var savedNote = noteInput ? noteInput.value.trim() : '';
+        var notesPending = false;
+        var activeTarget = 'store-info';
+        var infoFormId = saveAction ? saveAction.getAttribute('form') : '';
         if (!collapseBtn || !detailBody) return;
 
         function syncStoreExportAction(target) {
@@ -869,12 +890,94 @@
           exportAction.setAttribute('aria-disabled', disabled ? 'true' : 'false');
         }
 
+        function syncStoreSaveAction() {
+          if (!saveAction) return;
+          saveAction.hidden = activeTarget === 'store-warehouses';
+          saveAction.setAttribute('form', activeTarget === 'store-notes' && notesForm ? notesForm.id : infoFormId);
+          saveAction.disabled = activeTarget === 'store-notes' && notesPending;
+        }
+
+        function syncNoteControls() {
+          if (noteInput) noteInput.disabled = notesPending;
+          if (noteClear) noteClear.disabled = notesPending || !(savedNote || (noteInput && noteInput.value.trim()));
+          if (noteConfirm) noteConfirm.disabled = notesPending;
+          if (noteCancel) noteCancel.disabled = notesPending;
+          if (noteEmpty) noteEmpty.hidden = Boolean(savedNote || (noteInput && noteInput.value.trim()));
+          syncStoreSaveAction();
+        }
+
+        function showNoteStatus(message, isError) {
+          if (!noteStatus) return;
+          noteStatus.textContent = message;
+          noteStatus.hidden = !message;
+          noteStatus.classList.toggle('is-error', Boolean(isError));
+          noteStatus.setAttribute('role', isError ? 'alert' : 'status');
+          noteStatus.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+        }
+
+        function submitStoreNote(value) {
+          if (!notesForm || !noteInput || notesPending) return;
+          notesPending = true;
+          if (noteConfirmPanel) noteConfirmPanel.hidden = true;
+          showNoteStatus(value.trim() ? 'Đang lưu ghi chú...' : 'Đang xóa ghi chú...', false);
+          syncNoteControls();
+          fetch(notesForm.action, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ ghi_chu: value })
+          }).then(function(response) {
+            return response.json().then(function(data) {
+              if (!response.ok || !data || !data.success || typeof data.ghi_chu !== 'string') {
+                var noteError = new Error((data && data.message) || 'Không lưu được ghi chú. Vui lòng thử lại.');
+                noteError.isStoreNoteError = true;
+                throw noteError;
+              }
+              return data;
+            });
+          }).then(function(data) {
+            savedNote = data.ghi_chu;
+            noteInput.value = savedNote;
+            if (exportAction) exportAction.setAttribute('data-store-notes-disabled', savedNote.trim() ? '0' : '1');
+            syncStoreExportAction(activeTarget);
+            showNoteStatus(data.message || (savedNote ? 'Đã lưu ghi chú.' : 'Đã xóa ghi chú.'), false);
+          }).catch(function(error) {
+            showNoteStatus(error.isStoreNoteError ? error.message : 'Không lưu được ghi chú. Vui lòng thử lại.', true);
+          }).finally(function() {
+            notesPending = false;
+            syncNoteControls();
+          });
+        }
+
+        if (notesForm) {
+          notesForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            submitStoreNote(noteInput ? noteInput.value : '');
+          });
+        }
+        if (noteInput) {
+          noteInput.addEventListener('input', function() {
+            if (noteConfirmPanel) noteConfirmPanel.hidden = true;
+            showNoteStatus('', false);
+            syncNoteControls();
+          });
+        }
+        if (noteClear) {
+          noteClear.addEventListener('click', function() {
+            if (!noteClear.disabled && noteConfirmPanel) noteConfirmPanel.hidden = false;
+          });
+        }
+        if (noteConfirm) noteConfirm.addEventListener('click', function() { submitStoreNote(''); });
+        if (noteCancel) noteCancel.addEventListener('click', function() { if (noteConfirmPanel) noteConfirmPanel.hidden = true; });
+
         syncStoreExportAction('store-info');
+        syncNoteControls();
 
         tabs.forEach(function(tab) {
           tab.addEventListener('click', function(event) {
             event.stopPropagation();
             var target = tab.getAttribute('data-tab-target');
+            activeTarget = target;
             tabs.forEach(function(node) {
               node.classList.toggle('is-active', node === tab);
             });
@@ -882,6 +985,7 @@
               pane.classList.toggle('is-active', pane.getAttribute('data-tab-pane') === target);
             });
             syncStoreExportAction(target);
+            syncStoreSaveAction();
           });
         });
 
@@ -985,13 +1089,13 @@
         }).then(function(response) {
           return response.json().then(function(data) {
             if (!response.ok || !data || !data.success) {
-              throw new Error((data && data.message) || 'Khong tai duoc thong tin cua hang.');
+              throw new Error((data && data.message) || 'Không tải được thông tin cửa hàng.');
             }
             return data;
           });
         }).then(function(data) {
           if (self.activeId !== id || self.detailRow !== detailRow) return;
-          detailCell.innerHTML = data.html || '<div class="store-detail-content">Khong co du lieu.</div>';
+          detailCell.innerHTML = data.html || '<div class="store-detail-content">Không có dữ liệu.</div>';
           var formsMount = document.getElementById('storeDynamicFormsMount');
           if (formsMount) formsMount.innerHTML = data.forms_html || '';
           bindStoreDetailPanel(detailCell.querySelector('.store-detail'));
@@ -1008,7 +1112,7 @@
         }).catch(function(error) {
           if (error && error.name === 'AbortError') return;
           if (self.detailRow !== detailRow) return;
-          detailCell.innerHTML = '<div class="kv-detail-panel product-detail kv-detail-error"><p>Khong tai duoc thong tin cua hang.</p></div>';
+          detailCell.innerHTML = '<div class="kv-detail-panel product-detail kv-detail-error"><p>Không tải được thông tin cửa hàng.</p></div>';
         });
       };
 

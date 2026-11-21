@@ -9,7 +9,7 @@ var upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: function(req, file, cb) {
     if (!file || /^image\//i.test(String(file.mimetype || ''))) return cb(null, true);
-    return cb(new Error('File tai len phai la anh.'));
+    return cb(new Error('File tải lên phải là ảnh.'));
   }
 });
 

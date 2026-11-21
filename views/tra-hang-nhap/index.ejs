@@ -756,9 +756,9 @@
         var grid = transferEl && transferEl.closest('.quick-pay-grid');
         if (!grid || document.getElementById('returnReceiptPayCashBookV2')) return;
         var cashLabel = document.createElement('label');
-        cashLabel.innerHTML = '<span>So tien mat</span><select id="returnReceiptPayCashBookV2"><option value="">-- Chon so tien mat --</option></select>';
+        cashLabel.innerHTML = '<span>Sổ tiền mặt</span><select id="returnReceiptPayCashBookV2"><option value="">-- Chọn sổ tiền mặt --</option></select>';
         var bankLabel = document.createElement('label');
-        bankLabel.innerHTML = '<span>Tai khoan ngan hang</span><select id="returnReceiptPayBankBookV2"><option value="">-- Chon tai khoan ngan hang --</option></select>';
+        bankLabel.innerHTML = '<span>Tài khoản ngân hàng</span><select id="returnReceiptPayBankBookV2"><option value="">-- Chọn tài khoản ngân hàng --</option></select>';
         var transferLabel = transferEl.closest('label');
         transferLabel.insertAdjacentElement('afterend', bankLabel);
         transferLabel.insertAdjacentElement('afterend', cashLabel);
@@ -766,9 +766,9 @@
       function autoSelectReturnBook(select, rows) {
         if (!select) return;
         rows = Array.isArray(rows) ? rows : [];
-        select.innerHTML = '<option value="">-- Chon so --</option>' + rows.map(function(row) {
+        select.innerHTML = '<option value="">-- Chọn sổ --</option>' + rows.map(function(row) {
           var bank = row.thong_tin_ngan_hang || {};
-          var label = [row.ten_so_quy || 'So quy', bank.so_tai_khoan || ''].filter(Boolean).join(' - ');
+          var label = [row.ten_so_quy || 'Sổ quỹ', bank.so_tai_khoan || ''].filter(Boolean).join(' - ');
           return '<option value="' + row._id + '">' + label + '</option>';
         }).join('');
         var defaults = rows.filter(function(row) { return row.mac_dinh; });
@@ -875,8 +875,8 @@
         if (!pendingReturnReceiptId) return alert('Không xác định được phiếu trả hàng nhập.');
         if (payment.amount <= 0) return alert('Vui lòng nhập số tiền nhà cung cấp trả.');
         if (payment.amount > pendingReturnReceiptDue) return alert('Thực thu không được vượt số NCC còn phải trả.');
-        if (payment.tien_mat > 0 && !cashBookId) return alert('Vui long chon so tien mat.');
-        if (payment.chuyen_khoan > 0 && !bankBookId) return alert('Vui long chon tai khoan ngan hang.');
+        if (payment.tien_mat > 0 && !cashBookId) return alert('Vui lòng chọn sổ tiền mặt.');
+        if (payment.chuyen_khoan > 0 && !bankBookId) return alert('Vui lòng chọn tài khoản ngân hàng.');
         if (document.getElementById('returnReceiptPayCashBook')) document.getElementById('returnReceiptPayCashBook').value = payment.amount > 0 ? 'v2' : '';
         cashBookId = cashBookId || (payment.amount > 0 ? 'v2' : '');
         if (!cashBookId) return alert('Vui lòng chọn sổ quỹ.');

@@ -1,9 +1,11 @@
-const { mongoose, PhieuNhap, SoQuy, Counter, parseMoney, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, NhapVatChua, XuatVatChua, PhieuThuChi } = require('./common.helper');
+const { mongoose, PhieuNhap, SoQuy, Counter, parseMoney, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, NhapVatChua, XuatVatChua } = require('./common.helper');
+const { loadNhapVatChuaPaymentTotals, loadNhapVatChuaReturnTotals } = require('../../../services/vatChuaPaymentTotals.service');
 
 function isVisibleSupplierDebtRow(row) {
     if (!row) return false;
     if (row.trang_thai === 'cancelled') return false;
-    if (row.phieu_nhap_id && isDeletedDebtLinkedDoc(row.phieu_nhap_id)) return false;
+    var isPurchaseReturn = Boolean(row.phieu_tra_nhap_id || row.phieu_tra_hang_nhap_id);
+    if (row.phieu_nhap_id && isDeletedDebtLinkedDoc(row.phieu_nhap_id, !isPurchaseReturn)) return false;
     if (row.nhap_vat_chua_id && isDeletedDebtLinkedDoc(row.nhap_vat_chua_id)) return false;
     if (row.xuat_vat_chua_id && isDeletedDebtLinkedDoc(row.xuat_vat_chua_id)) return false;
     if (row.phieu_tra_nhap_id && isDeletedDebtLinkedDoc(row.phieu_tra_nhap_id)) return false;
@@ -32,8 +34,10 @@ function isIncludedInSupplierDebtHistory(row) {
     return true;
 }
 
-function isDeletedDebtLinkedDoc(doc) {
+function isDeletedDebtLinkedDoc(doc, checkDataStatus) {
     if (!doc || typeof doc !== 'object') return false;
+    // Phiếu trả có trạng thái dữ liệu riêng, không phụ thuộc trạng thái dữ liệu phiếu nhập gốc.
+    if (checkDataStatus !== false && doc.trang_thai_du_lieu === 'inactive') return true;
     var status = String(doc.trang_thai || '').trim();
     // Ẩn chứng từ đã hủy hoặc đã gộp vào phiếu nhận (chỉ hiện phiếu nhận).
     return status === 'cancelled' || status === 'merged';
@@ -333,6 +337,7 @@ async function loadSupplierUnpaidPurchases(supplierId, storeId) {
     var query = {
         nha_cung_cap_id: supplierId,
         trang_thai: 'completed',
+        trang_thai_du_lieu: { $ne: 'inactive' },
         con_no_ncc: { $gt: 0 }
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
@@ -393,28 +398,18 @@ async function loadManualNhapVatChuaDebtSourceRows(supplierId, storeId) {
     var rows = await NhapVatChua.find(query).sort({ created_at: 1 }).lean();
     if (!rows.length) return [];
 
-    var ids = rows.map(function(row) { return row._id; });
-    var paidMap = Object.create(null);
-    if (PhieuThuChi) {
-        var receipts = await PhieuThuChi.find({
-            nhap_vat_chua_id: { $in: ids },
-            loai_phieu: 'chi',
-            trang_thai: { $ne: 'cancelled' }
-        }).select('nhap_vat_chua_id gia_tri').lean();
-        receipts.forEach(function(receipt) {
-            var key = String(receipt.nhap_vat_chua_id || '');
-            if (!key) return;
-            paidMap[key] = Number(paidMap[key] || 0) + Math.max(0, Number(receipt.gia_tri || 0));
-        });
-    }
+    var paidMap = await loadNhapVatChuaPaymentTotals(rows, { storeId: storeId });
+    var returnedMap = await loadNhapVatChuaReturnTotals(rows, { storeId: storeId });
 
     return rows.map(function(row) {
         var total = Math.max(0, Number(row.tong_tien || 0));
-        var paid = Math.max(0, Number(paidMap[String(row._id)] || 0));
+        var paid = Math.max(0, Number(paidMap.get(String(row._id)) || 0));
+        var returned = Math.max(0, Number(returnedMap.get(String(row._id)) || 0));
         var doc = Object.assign({}, row, {
             source_type: row.source_type || 'manual',
             da_tra: paid,
-            con_no: Math.max(0, total - paid)
+            returned_amount: returned,
+            con_no: Math.max(0, total - paid - returned)
         });
         return {
             _id: row._id,
@@ -482,29 +477,18 @@ async function loadSupplierUnpaidManualVatChua(supplierId, storeId) {
     var query = buildManualNhapVatChuaMatch(supplierId, storeId);
     var rows = await NhapVatChua.find(query)
         .sort({ created_at: 1 })
-        .select('ma_nhap_vat_chua created_at tong_tien')
+        .select('ma_nhap_vat_chua created_at tong_tien cua_hang_id')
         .lean();
     if (!rows.length) return [];
 
-    var ids = rows.map(function(row) { return row._id; });
-    var paidMap = Object.create(null);
-    if (PhieuThuChi) {
-        var receipts = await PhieuThuChi.find({
-            nhap_vat_chua_id: { $in: ids },
-            loai_phieu: 'chi',
-            trang_thai: { $ne: 'cancelled' }
-        }).select('nhap_vat_chua_id gia_tri').lean();
-        receipts.forEach(function(receipt) {
-            var key = String(receipt.nhap_vat_chua_id || '');
-            if (!key) return;
-            paidMap[key] = Number(paidMap[key] || 0) + Math.max(0, Number(receipt.gia_tri || 0));
-        });
-    }
+    var paidMap = await loadNhapVatChuaPaymentTotals(rows, { storeId: storeId });
+    var returnedMap = await loadNhapVatChuaReturnTotals(rows, { storeId: storeId });
 
     return rows.map(function(row) {
         var total = Math.max(0, Number(row.tong_tien || 0));
-        var paid = Math.max(0, Number(paidMap[String(row._id)] || 0));
-        var conNo = Math.max(0, total - paid);
+        var paid = Math.max(0, Number(paidMap.get(String(row._id)) || 0));
+        var returned = Math.max(0, Number(returnedMap.get(String(row._id)) || 0));
+        var conNo = Math.max(0, total - paid - returned);
         return Object.assign({}, row, {
             doc_type: 'nhap_vat_chua',
             doc_id: row._id,
@@ -514,6 +498,7 @@ async function loadSupplierUnpaidManualVatChua(supplierId, storeId) {
             gia_tri_phai_tra: total,
             da_thanh_toan: paid,
             da_tra_ncc: paid,
+            returned_amount: returned,
             con_no: conNo,
             con_no_ncc: conNo
         });

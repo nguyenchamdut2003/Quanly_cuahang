@@ -71,11 +71,11 @@ exports.payDebt = async function(req, res, next) {
                       var manual = manualAllocations[m] || {};
                       var manualId = String(manual.phieu_nhap_id || manual.nhap_vat_chua_id || '').trim();
                       var manualPurchase = purchaseMap[manualId];
-                      if (!manualPurchase) throw new Error('Chung tu phan bo khong hop le');
+                      if (!manualPurchase) throw new Error('Chứng từ phân bổ không hợp lệ');
                       var manualDebt = Math.max(0, Number(manualPurchase.con_no_ncc != null ? manualPurchase.con_no_ncc : manualPurchase.con_no || 0));
                       var manualAmount = parseMoney(manual.so_tien);
                       if (manualAmount <= 0) continue;
-                      if (manualAmount > manualDebt) throw new Error('Khong duoc phan bo vuot no chung tu');
+                      if (manualAmount > manualDebt) throw new Error('Không được phân bổ vượt nợ chứng từ');
                       manualTotal += manualAmount;
                       allocations.push({
                           phieu_nhap_id: manualPurchase.doc_type === 'phieu_nhap' ? manualPurchase._id : undefined,
@@ -87,7 +87,7 @@ exports.payDebt = async function(req, res, next) {
                           con_no_sau: Math.max(0, manualDebt - manualAmount)
                       });
                   }
-                  if (manualTotal > allocationLimit) throw new Error('Tong tien phan bo khong duoc vuot qua no theo so cong no');
+                  if (manualTotal > allocationLimit) throw new Error('Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ');
               } else {
                   for (var i = 0; i < purchases.length && remaining > 0; i++) {
                       var purchase = purchases[i];

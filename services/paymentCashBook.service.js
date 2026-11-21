@@ -184,7 +184,7 @@ function legacySoQuyId(detail) {
 
 async function buildLegacyPaymentInfo(data, options) {
   const amount = normalizeNonNegativeMoney(data.gia_tri ?? data.so_tien, 'Giá trị phiếu không hợp lệ.');
-  if (amount <= 0) throw new Error('gia_tri phai lon hon 0');
+  if (amount <= 0) throw new Error('gia_tri phải lớn hơn 0');
   if (!data.so_quy_id || !isObjectId(data.so_quy_id)) throw new Error('Vui lòng chọn sổ quỹ.');
   const row = await withSession(SoQuy.findById(data.so_quy_id), options.session);
   if (!row) throw new Error('Sổ quỹ không tồn tại hoặc đã ngừng sử dụng.');
@@ -217,7 +217,7 @@ async function buildV2PaymentInfo(data, options) {
     giaTri = totalReceived;
     if (giaTri <= 0) throw new Error('Tổng tiền chi phải lớn hơn 0.');
   } else {
-    throw new Error('Loai phieu khong hop le');
+    throw new Error('Loại phiếu không hợp lệ');
   }
 
   const needCashBook = raw.tien_mat > 0 || raw.tien_tra_khach > 0;

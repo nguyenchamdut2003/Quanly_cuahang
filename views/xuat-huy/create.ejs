@@ -139,7 +139,7 @@
         const selected = String(lot._id) === String(it.lo_hang_id) ? 'selected' : '';
         const name = String(lot.ten_lo || '').trim();
         const code = String(lot.ma_lo || '').trim();
-        const label = name || code || 'Lo khong ten';
+        const label = name || code || 'Lô không tên';
         const codeSuffix = name && code && code !== name ? ` (Ma: ${code})` : '';
         return `<option value="${lot._id}" ${selected}>${label}${codeSuffix} (${fmt(lot.so_luong)})</option>`;
       }).join('');

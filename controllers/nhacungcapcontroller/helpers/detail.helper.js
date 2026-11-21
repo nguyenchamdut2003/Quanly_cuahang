@@ -121,6 +121,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
 
     var phieuNhapQuery = {
         nha_cung_cap_id: selectedSupplier._id,
+        trang_thai_du_lieu: { $ne: 'inactive' },
         trang_thai: { $in: ['completed', 'draft', 'cancelled'] }
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
@@ -144,7 +145,10 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
     });
 
     if (PhieuTraHangNhap) {
-        var phieuTraQuery = { nha_cung_cap_id: selectedSupplier._id };
+        var phieuTraQuery = {
+            nha_cung_cap_id: selectedSupplier._id,
+            trang_thai_du_lieu: { $ne: 'inactive' }
+        };
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
             phieuTraQuery.cua_hang_id = storeId;
         }
@@ -226,12 +230,12 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         debtQuery.cua_hang_id = storeId;
     }
     var debtRows = await CongNoNhaCungCap.find(debtQuery)
-        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai' })
+        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai trang_thai_du_lieu' })
         .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua created_at tong_tien tong_so_luong trang_thai source_type' })
         .populate({ path: 'xuat_vat_chua_id', select: 'ma_xuat_vat_chua created_at tong_tien tong_so_luong trang_thai source_type loai_xuat' })
         .populate({
             path: 'phieu_tra_nhap_id',
-            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai',
+            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai trang_thai_du_lieu',
             populate: { path: 'phieu_nhap_id', select: 'ngay_nhap created_at' }
         })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi trang_thai' })
@@ -263,8 +267,8 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         ...(storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId } : {}),
         trang_thai: 'active'
     })
-        .populate({ path: 'phieu_nhap_id', select: 'trang_thai' })
-        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'trang_thai' })
+        .populate({ path: 'phieu_nhap_id', select: 'trang_thai trang_thai_du_lieu' })
+        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'trang_thai trang_thai_du_lieu' })
         .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
         .sort({ ngay_giao_dich: -1, created_at: -1 })
         .lean() : [];
@@ -432,6 +436,7 @@ async function loadSupplierDetailTabRenderLocals(req, supplierId, tab) {
 async function loadSupplierPurchaseHistory(selectedSupplier, storeId) {
     var phieuNhapQuery = {
         nha_cung_cap_id: selectedSupplier._id,
+        trang_thai_du_lieu: { $ne: 'inactive' },
         trang_thai: { $in: ['completed', 'draft', 'cancelled'] }
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
@@ -455,7 +460,10 @@ async function loadSupplierPurchaseHistory(selectedSupplier, storeId) {
     });
 
     if (PhieuTraHangNhap) {
-        var phieuTraQuery = { nha_cung_cap_id: selectedSupplier._id };
+        var phieuTraQuery = {
+            nha_cung_cap_id: selectedSupplier._id,
+            trang_thai_du_lieu: { $ne: 'inactive' }
+        };
         if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
             phieuTraQuery.cua_hang_id = storeId;
         }
@@ -541,12 +549,12 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
         debtQuery.cua_hang_id = storeId;
     }
     var debtRows = await CongNoNhaCungCap.find(debtQuery)
-        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai' })
+        .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai trang_thai_du_lieu' })
         .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua created_at tong_tien tong_so_luong trang_thai source_type' })
         .populate({ path: 'xuat_vat_chua_id', select: 'ma_xuat_vat_chua created_at tong_tien tong_so_luong trang_thai source_type loai_xuat' })
         .populate({
             path: 'phieu_tra_nhap_id',
-            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai',
+            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai trang_thai_du_lieu',
             populate: { path: 'phieu_nhap_id', select: 'ngay_nhap created_at' }
         })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi trang_thai' })
@@ -578,8 +586,8 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
         ...(storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId } : {}),
         trang_thai: 'active'
     })
-        .populate({ path: 'phieu_nhap_id', select: 'trang_thai' })
-        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'trang_thai' })
+        .populate({ path: 'phieu_nhap_id', select: 'trang_thai trang_thai_du_lieu' })
+        .populate({ path: 'phieu_tra_hang_nhap_id', select: 'trang_thai trang_thai_du_lieu' })
         .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
         .sort({ ngay_giao_dich: -1, created_at: -1 })
         .lean() : [];

@@ -160,7 +160,7 @@
       const wrap = button.closest('.cod-action');
       const cashBookId = wrap.querySelector('.cod-cashbook')?.value || '';
       const method = wrap.querySelector('.cod-method')?.value || 'tien_mat';
-      if(!cashBookId) return alert('Vui long chon so quy de thu COD');
+      if(!cashBookId) return alert('Vui lòng chọn sổ quỹ để thu COD');
       button.disabled = true;
       const res = await fetch(`/don-hang/van-don/${id}/thu-cod`, {
         method:'POST',
@@ -170,7 +170,7 @@
       const result = await res.json();
       if(!result.success){
         button.disabled = false;
-        return alert(result.message || 'Khong thu duoc COD');
+        return alert(result.message || 'Không thu được COD');
       }
       location.reload();
     }

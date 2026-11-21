@@ -355,24 +355,24 @@ exports.postVanDonIdThuCod = async (req, res, next) => {
                 .populate('don_hang_id')
                 .session(session);
             if (!shipment) {
-                const error = new Error('Khong tim thay van don');
+                const error = new Error('Không tìm thấy vận đơn');
                 error.statusCode = 404;
                 throw error;
             }
             if (shipment.trang_thai_cod === 'da_thu') {
-                const error = new Error('Van don nay da thu COD, khong the thu lai lan nua.');
+                const error = new Error('Vận đơn này đã thu COD, không thể thu lại lần nữa.');
                 error.statusCode = 400;
                 throw error;
             }
             if (shipment.cod_enabled !== true) {
-                const error = new Error('Van don khong bat COD, khong the thu COD.');
+                const error = new Error('Vận đơn không bật COD, không thể thu COD.');
                 error.statusCode = 400;
                 throw error;
             }
 
             const codAmount = Number(shipment.cod_amount || 0);
             if (!Number.isFinite(codAmount) || codAmount <= 0) {
-                const error = new Error('So tien COD khong hop le');
+                const error = new Error('Số tiền COD không hợp lệ');
                 error.statusCode = 400;
                 throw error;
             }
@@ -381,12 +381,12 @@ exports.postVanDonIdThuCod = async (req, res, next) => {
             const invoiceId = shipment.hoa_don_id?._id || shipment.hoa_don_id;
             const orderId = shipment.don_hang_id?._id || shipment.don_hang_id;
             if (!customerId) {
-                const error = new Error('Van don COD chua gan khach hang.');
+                const error = new Error('Vận đơn COD chưa gắn khách hàng.');
                 error.statusCode = 400;
                 throw error;
             }
             if (!invoiceId) {
-                const error = new Error('Van don COD chua gan hoa don.');
+                const error = new Error('Vận đơn COD chưa gắn hóa đơn.');
                 error.statusCode = 400;
                 throw error;
             }
@@ -405,7 +405,7 @@ exports.postVanDonIdThuCod = async (req, res, next) => {
                 trang_thai: { $ne: 'cancelled' }
             }).session(session);
             if (exists) {
-                const error = new Error('Van don nay da thu COD, khong the thu lai lan nua.');
+                const error = new Error('Vận đơn này đã thu COD, không thể thu lại lần nữa.');
                 error.statusCode = 400;
                 throw error;
             }
@@ -474,7 +474,7 @@ exports.postVanDonIdThuCod = async (req, res, next) => {
         });
         res.json({ success: true, message: 'Đã thu COD va giảm công nợ khách hàng', data: responseData });
     } catch (error) {
-        return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Khong thu duoc COD' });
+        return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Không thu được COD' });
     } finally {
         session.endSession();
     }

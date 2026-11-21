@@ -50,7 +50,7 @@ var {
 } = require('../../../services/salePrice.service');
 
 function disabledTrashOperation() {
-    var error = new Error('Chuc nang xoa/dua vao thung rac da duoc tat.');
+    var error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
     error.statusCode = 410;
     throw error;
 }

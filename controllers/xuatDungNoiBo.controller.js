@@ -959,10 +959,10 @@ exports.postAdd = async (req, res, next) => {
                         sourceType: 'xuat_noi_bo',
                         sourceId: phieu._id,
                         sourceCode: ma_xuat_noi_bo,
-                        ghiChu: ghi_chu || 'Xuat vat chua dung noi bo'
+                        ghiChu: ghi_chu || 'Xuất vật chứa dùng nội bộ'
                     });
                 } catch (error) {
-                    return res.status(400).json({ success: false, message: error.message || 'Khong du ton vat chua de xuat' });
+                    return res.status(400).json({ success: false, message: error.message || 'Không đủ tồn vật chứa để xuất' });
                 }
             }
         }
@@ -1122,7 +1122,7 @@ exports.getDetails = async (req, res, next) => {
 exports.getIdDetails = async (req, res, next) => {
     try {
         if (!/^[0-9a-fA-F]{24}$/.test(req.params.id)) {
-            return res.status(404).json({ success: false, message: 'Khong tim thay phieu xuat noi bo' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất nội bộ' });
         }
 
         await ensureXnbDataStatusDefault();
@@ -1131,7 +1131,7 @@ exports.getIdDetails = async (req, res, next) => {
             .populate('kho_id')
             .lean();
         if (!ticket) {
-            return res.status(404).json({ success: false, message: 'Khong tim thay phieu xuat noi bo' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu xuất nội bộ' });
         }
 
         const details = await CTXuatNoiBo.find({ phieu_xuat_id: ticket._id })

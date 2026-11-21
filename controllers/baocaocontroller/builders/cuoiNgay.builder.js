@@ -75,7 +75,7 @@ async function buildEndOfDayReport(query = {}) {
     return {
         date: day,
         generatedAt: new Date(),
-        branchName: 'C?a h‡ng trung t‚m',
+        branchName: 'C·ª≠a h√†ng trung t√¢m',
         invoices,
         returns,
         receipts,

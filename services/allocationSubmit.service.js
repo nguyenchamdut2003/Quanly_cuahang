@@ -311,7 +311,7 @@ async function createInvoiceGroup({ storeId, khoId, khachHangId, items, userId, 
                 nguoi_tao_id: userId,
                 loai_phieu: 'ban_hang',
                 ma_phieu: maHoaDon,
-                ghi_chu: 'Xuat kho HD ' + maHoaDon,
+                ghi_chu: 'Xuất kho HĐ ' + maHoaDon,
                 allow_negative: true
             });
             const lotPatch = applyLotAllocationsToInvoiceLine(stockResult.allocations);

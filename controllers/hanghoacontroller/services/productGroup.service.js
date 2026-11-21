@@ -111,13 +111,13 @@ async function addGroup(req, res, next) {
         var tenNhom = String(req?.body?.ten_nhom_hang || '').trim();
         var moTa = String(req?.body?.mo_ta || '').trim();
         var maNhom = String(req?.body?.ma_nhom_hang || '').trim().toUpperCase();
-        if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lÃ²ng nháº­p tÃªn nhÃ³m hÃ ng.');
+        if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lòng nhập tên nhóm hàng.');
         if (!maNhom) maNhom = await makeProductGroupCode();
 
         var storeId = await resolveStoreId(req);
         var duplicate = await findDuplicateGroupName(storeId, tenNhom);
         if (duplicate) {
-            return respondProductGroupError(req, res, 409, 'TÃªn nhÃ³m hÃ ng Ä‘Ã£ tá»“n táº¡i trong cá»­a hÃ ng nÃ y.');
+            return respondProductGroupError(req, res, 409, 'Tên nhóm hàng đã tồn tại trong cửa hàng này.');
         }
 
         var doc = {
@@ -133,7 +133,7 @@ async function addGroup(req, res, next) {
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'ÄÃ£ thÃªm nhÃ³m hÃ ng.',
+                message: 'Đã thêm nhóm hàng.',
                 data: created,
                 selectedId: String(created._id),
                 groups: await loadProductGroups(storeId)
@@ -143,10 +143,10 @@ async function addGroup(req, res, next) {
         res.redirect('/hang-hoa?success=created');
     } catch (error) {
         if (error && error.code === 11000) {
-            return respondProductGroupError(req, res, 409, 'MÃ£ nhÃ³m hÃ ng Ä‘Ã£ tá»“n táº¡i.');
+            return respondProductGroupError(req, res, 409, 'Mã nhóm hàng đã tồn tại.');
         }
         if (error && error.name === 'ValidationError') {
-            return respondProductGroupError(req, res, 400, error.message || 'Dá»¯ liá»‡u nhÃ³m hÃ ng khÃ´ng há»£p lá»‡.');
+            return respondProductGroupError(req, res, 400, error.message || 'Dữ liệu nhóm hàng không hợp lệ.');
         }
         next(error);
     }
@@ -156,20 +156,20 @@ async function updateGroup(req, res, next) {
     try {
         var groupId = normalizeIdParam(req?.params?.groupId);
         if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-            return respondProductGroupError(req, res, 400, 'NhÃ³m hÃ ng khÃ´ng há»£p lá»‡.');
+            return respondProductGroupError(req, res, 400, 'Nhóm hàng không hợp lệ.');
         }
 
         var tenNhom = String(req?.body?.ten_nhom_hang || '').trim();
         var moTa = String(req?.body?.mo_ta || '').trim();
-        if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lÃ²ng nháº­p tÃªn nhÃ³m hÃ ng.');
+        if (!tenNhom) return respondProductGroupError(req, res, 400, 'Vui lòng nhập tên nhóm hàng.');
 
         var existing = await NhomHang.findById(groupId).lean();
-        if (!existing) return respondProductGroupError(req, res, 404, 'KhÃ´ng tÃ¬m tháº¥y nhÃ³m hÃ ng.');
+        if (!existing) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
 
         var storeId = existing.cua_hang_id ? String(existing.cua_hang_id) : await resolveStoreId(req);
         var duplicate = await findDuplicateGroupName(storeId, tenNhom, groupId);
         if (duplicate) {
-            return respondProductGroupError(req, res, 409, 'TÃªn nhÃ³m hÃ ng Ä‘Ã£ tá»“n táº¡i trong cá»­a hÃ ng nÃ y.');
+            return respondProductGroupError(req, res, 409, 'Tên nhóm hàng đã tồn tại trong cửa hàng này.');
         }
 
         var updated = await NhomHang.findByIdAndUpdate(
@@ -177,12 +177,12 @@ async function updateGroup(req, res, next) {
             { ten_nhom_hang: tenNhom, mo_ta: moTa },
             { runValidators: true, new: true }
         );
-        if (!updated) return respondProductGroupError(req, res, 404, 'KhÃ´ng tÃ¬m tháº¥y nhÃ³m hÃ ng.');
+        if (!updated) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
 
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,
-                message: 'ÄÃ£ cáº­p nháº­t nhÃ³m hÃ ng.',
+                message: 'Đã cập nhật nhóm hàng.',
                 data: updated,
                 selectedId: groupId,
                 groups: await loadProductGroups(storeId)
@@ -192,7 +192,7 @@ async function updateGroup(req, res, next) {
         res.redirect('/hang-hoa?success=updated');
     } catch (error) {
         if (error && error.name === 'ValidationError') {
-            return respondProductGroupError(req, res, 400, error.message || 'Dá»¯ liá»‡u nhÃ³m hÃ ng khÃ´ng há»£p lá»‡.');
+            return respondProductGroupError(req, res, 400, error.message || 'Dữ liệu nhóm hàng không hợp lệ.');
         }
         next(error);
     }
@@ -202,19 +202,19 @@ async function removeGroup(req, res, next) {
     try {
         var groupId = normalizeIdParam(req?.params?.groupId);
         if (!groupId || !mongoose.Types.ObjectId.isValid(groupId)) {
-            return respondProductGroupError(req, res, 400, 'NhÃ³m hÃ ng khÃ´ng há»£p lá»‡.');
+            return respondProductGroupError(req, res, 400, 'Nhóm hàng không hợp lệ.');
         }
 
         var usedCount = await HangHoa.countDocuments({ nhom_hang_id: groupId });
         var deleted = null;
-        var message = 'Da xoa nhom hang.';
+        var message = 'Đã xóa nhóm hàng.';
         if (usedCount > 0) {
             deleted = await NhomHang.findByIdAndUpdate(groupId, { trang_thai: 'inactive' }, { new: true });
-            message = 'Nhom hang dang duoc su dung nen da chuyen sang ngung hoat dong.';
+            message = 'Nhóm hàng đang được sử dụng nên đã chuyển sang ngừng hoạt động.';
         } else {
             deleted = await NhomHang.findByIdAndDelete(groupId);
         }
-        if (!deleted) return respondProductGroupError(req, res, 404, 'KhÃ´ng tÃ¬m tháº¥y nhÃ³m hÃ ng.');
+        if (!deleted) return respondProductGroupError(req, res, 404, 'Không tìm thấy nhóm hàng.');
         if (shouldRespondJson(req)) {
             return res.json({
                 success: true,

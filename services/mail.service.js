@@ -35,9 +35,9 @@ async function sendPasswordResetCode(options) {
   var name = String(options && options.name || '').trim();
   var code = String(options && options.code || '').trim();
   var expiresInMinutes = Number(options && options.expiresInMinutes || 10);
-  var fromName = process.env.MAIL_FROM_NAME || 'Quan ly cua hang';
+  var fromName = process.env.MAIL_FROM_NAME || 'Quản lý cửa hàng';
   var fromEmail = requiredEnv('MAIL_FROM_EMAIL');
-  var greeting = name ? 'Xin chao ' + name + ',' : 'Xin chao,';
+  var greeting = name ? 'Xin chào ' + name + ',' : 'Xin chào,';
   var safeCode = escapeHtml(code);
   var safeMinutes = Number.isFinite(expiresInMinutes) && expiresInMinutes > 0 ? Math.floor(expiresInMinutes) : 10;
 
@@ -47,26 +47,26 @@ async function sendPasswordResetCode(options) {
   var text = [
     greeting,
     '',
-    'Ma xac nhan dat lai mat khau cua ban la: ' + code,
-    'Ma nay se het han sau ' + safeMinutes + ' phut.',
+    'Mã xác nhận đặt lại mật khẩu của bạn là: ' + code,
+    'Mã này sẽ hết hạn sau ' + safeMinutes + ' phút.',
     '',
-    'Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.'
+    'Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.'
   ].join('\n');
 
   var html = [
     '<div style="font-family:Arial,sans-serif;line-height:1.5;color:#172033">',
     '<p>' + escapeHtml(greeting) + '</p>',
-    '<p>Ma xac nhan dat lai mat khau cua ban la:</p>',
+    '<p>Mã xác nhận đặt lại mật khẩu của bạn là:</p>',
     '<div style="font-size:28px;font-weight:700;letter-spacing:6px;padding:14px 18px;border:1px solid #d9e2ee;border-radius:8px;display:inline-block;color:#0b7af3">' + safeCode + '</div>',
-    '<p>Ma nay se het han sau <strong>' + safeMinutes + ' phut</strong>.</p>',
-    '<p style="color:#607088">Neu ban khong yeu cau dat lai mat khau, vui long bo qua email nay.</p>',
+    '<p>Mã này sẽ hết hạn sau <strong>' + safeMinutes + ' phút</strong>.</p>',
+    '<p style="color:#607088">Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>',
     '</div>'
   ].join('');
 
   return createTransporter().sendMail({
     from: '"' + String(fromName).replace(/"/g, '\\"') + '" <' + fromEmail + '>',
     to: to,
-    subject: 'Ma xac nhan dat lai mat khau',
+    subject: 'Mã xác nhận đặt lại mật khẩu',
     text: text,
     html: html
   });

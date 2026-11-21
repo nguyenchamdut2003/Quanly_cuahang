@@ -8,7 +8,7 @@ const {
 const { extractPaymentDetail } = require('./paymentCashBook.service');
 
 function createHttpError(statusCode, message) {
-  const error = new Error(message || 'Yeu cau khong hop le');
+  const error = new Error(message || 'Yêu cầu không hợp lệ');
   error.statusCode = statusCode || 400;
   return error;
 }
@@ -60,18 +60,18 @@ function pickPaymentDetail(receipt) {
 }
 
 function assertEditableReturn(doc) {
-  if (!doc) throw createHttpError(404, 'Khong tim thay phieu tra vat chua.');
-  if (doc.deleted_at) throw createHttpError(400, 'Phieu tra vat chua da nam trong thung rac.');
-  if (doc.trang_thai === 'cancelled') throw createHttpError(400, 'Phieu tra vat chua da huy, khong the chinh sua.');
+  if (!doc) throw createHttpError(404, 'Không tìm thấy phiếu trả vật chứa.');
+  if (doc.deleted_at) throw createHttpError(400, 'Phiếu trả vật chứa đã nằm trong thùng rác.');
+  if (doc.trang_thai === 'cancelled') throw createHttpError(400, 'Phiếu trả vật chứa đã hủy, không thể chỉnh sửa.');
   if (doc.loai_xuat !== 'tra_hang_nhap' || doc.source_type !== 'manual') {
-    throw createHttpError(400, 'Chi chinh sua truc tiep phieu tra vat chua tao thu cong tai man Vat chua.');
+    throw createHttpError(400, 'Chỉ chỉnh sửa trực tiếp phiếu trả vật chứa tạo thủ công tại màn Vật chứa.');
   }
 }
 
 async function loadXuatVatChuaForEdit(id, storeId) {
   const docId = cleanId(id);
   const store = cleanId(storeId);
-  if (!docId || !store) throw createHttpError(400, 'ID phieu tra vat chua khong hop le.');
+  if (!docId || !store) throw createHttpError(400, 'ID phiếu trả vật chứa không hợp lệ.');
 
   const doc = await XuatVatChua.findOne({
     _id: docId,
@@ -141,7 +141,7 @@ async function upsertReceipt(doc, detail, paidAmount, userId, session) {
     if (receipt) {
       receipt.trang_thai = 'cancelled';
       receipt.ngay_huy = new Date();
-      receipt.ly_do_huy = 'Chinh sua phieu tra vat chua ve chua thu tien';
+      receipt.ly_do_huy = 'Chỉnh sửa phiếu trả vật chứa về chưa thu tiền';
       await receipt.save({ session });
     }
     return null;
@@ -153,7 +153,7 @@ async function upsertReceipt(doc, detail, paidAmount, userId, session) {
     loai_thu_chi: 'Thu tien tra vat chua',
     gia_tri: paidAmount,
     doi_tuong: doc.doi_tuong_ten || '',
-    ghi_chu: 'Thu tien tra vat chua theo ' + (doc.ma_xuat_vat_chua || ''),
+    ghi_chu: 'Thu tiền trả vật chứa theo ' + (doc.ma_xuat_vat_chua || ''),
     trang_thai: 'paid',
     hach_toan: false,
     cua_hang_id: doc.cua_hang_id,
@@ -187,20 +187,20 @@ async function upsertReceipt(doc, detail, paidAmount, userId, session) {
 async function updateXuatVatChuaReturn(id, data = {}, storeId, userId) {
   const docId = cleanId(id);
   const store = cleanId(storeId);
-  if (!docId || !store) throw createHttpError(400, 'ID phieu tra vat chua khong hop le.');
+  if (!docId || !store) throw createHttpError(400, 'ID phiếu trả vật chứa không hợp lệ.');
 
   const qty = parseQty(data.so_luong);
   const giaTra = parseMoney(data.gia_tra || data.gia_von);
   const detail = extractPaymentDetail(Object.assign({}, data, { payment_v2: true }));
-  if (qty <= 0) throw createHttpError(400, 'So luong tra phai lon hon 0.');
-  if (giaTra <= 0) throw createHttpError(400, 'Gia tra phai lon hon 0.');
-  if (detail.tien_tra_khach > 0) throw createHttpError(400, 'Tien tra khach khong ap dung khi tra vat chua.');
+  if (qty <= 0) throw createHttpError(400, 'Số lượng trả phải lớn hơn 0.');
+  if (giaTra <= 0) throw createHttpError(400, 'Giá trả phải lớn hơn 0.');
+  if (detail.tien_tra_khach > 0) throw createHttpError(400, 'Tiền trả khách không áp dụng khi trả vật chứa.');
 
   const paidAmount = detail.tien_mat + detail.chuyen_khoan;
   const total = Math.round(qty * giaTra);
-  if (paidAmount > total) throw createHttpError(400, 'So tien thu khong duoc vuot tong gia tri tra.');
-  if (detail.tien_mat > 0 && !detail.so_quy_tien_mat_id) throw createHttpError(400, 'Vui long chon so tien mat.');
-  if (detail.chuyen_khoan > 0 && !detail.so_quy_chuyen_khoan_id) throw createHttpError(400, 'Vui long chon tai khoan chuyen khoan.');
+  if (paidAmount > total) throw createHttpError(400, 'Số tiền thu không được vượt tổng giá trị trả.');
+  if (detail.tien_mat > 0 && !detail.so_quy_tien_mat_id) throw createHttpError(400, 'Vui lòng chọn sổ tiền mặt.');
+  if (detail.chuyen_khoan > 0 && !detail.so_quy_chuyen_khoan_id) throw createHttpError(400, 'Vui lòng chọn tài khoản chuyển khoản.');
 
   const session = await mongoose.startSession();
   let result = null;
@@ -211,18 +211,18 @@ async function updateXuatVatChuaReturn(id, data = {}, storeId, userId) {
 
       const oldLine = firstLine(doc);
       const vatChuaId = cleanId(oldLine.vat_chua_id);
-      if (!vatChuaId) throw createHttpError(400, 'Phieu tra vat chua khong co dong vat chua hop le.');
+      if (!vatChuaId) throw createHttpError(400, 'Phiếu trả vật chứa không có dòng vật chứa hợp lệ.');
       const importId = cleanId(doc.source_id);
       const importDoc = importId
         ? await NhapVatChua.findOne({ _id: importId, cua_hang_id: store, deleted_at: null }).session(session)
         : null;
-      if (!importDoc) throw createHttpError(400, 'Khong tim thay phieu nhap vat chua goc.');
+      if (!importDoc) throw createHttpError(400, 'Không tìm thấy phiếu nhập vật chứa gốc.');
       const vatChua = await VatChua.findOne({ _id: vatChuaId, cua_hang_id: store, trang_thai: 'active' }).session(session);
-      if (!vatChua) throw createHttpError(400, 'Vat chua khong hop le hoac da ngung su dung.');
+      if (!vatChua) throw createHttpError(400, 'Vật chứa không hợp lệ hoặc đã ngừng sử dụng.');
 
       const maxReturnQty = await getMaxReturnQty(importDoc, vatChuaId, doc._id, session);
       if (qty > maxReturnQty) {
-        throw createHttpError(400, 'So luong tra vuot so luong con co the tra (' + maxReturnQty + ').');
+        throw createHttpError(400, 'Số lượng trả vượt số lượng còn có thể trả (' + maxReturnQty + ').');
       }
 
       const oldQty = Number(oldLine.so_luong || doc.tong_so_luong || 0);
@@ -232,7 +232,7 @@ async function updateXuatVatChuaReturn(id, data = {}, storeId, userId) {
         if (deltaQty > 0) stockFilter.so_luong_ton = { $gte: deltaQty };
         const stockUpdate = await VatChua.updateOne(stockFilter, { $inc: { so_luong_ton: -deltaQty } }, { session });
         if (!stockUpdate || Number(stockUpdate.modifiedCount || 0) < 1) {
-          throw createHttpError(400, 'Ton vat chua khong du de tang so luong tra.');
+          throw createHttpError(400, 'Tồn vật chứa không đủ để tăng số lượng trả.');
         }
       }
 

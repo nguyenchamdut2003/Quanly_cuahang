@@ -28,7 +28,8 @@
         </div>
       </div>
 
-      <div class="store-fields">
+      <form id="storeUpdateForm_<%= selectedStore._id %>" class="store-fields" method="post"
+        action="/cua-hang/<%= selectedStore._id %>/update">
         <div>
           <span>Mã cửa hàng</span>
           <input name="ma_cua_hang" value="<%= selectedStore.ma_cua_hang || '' %>">
@@ -102,7 +103,7 @@
             <%= warehouses.length %>
           </strong>
         </div>
-      </div>
+      </form>
     </div>
 
     <div class="store-detail-pane detail-pane" data-tab-pane="store-warehouses" data-tab-panel="store-warehouses">
@@ -222,21 +223,35 @@
     <div class="store-detail-pane detail-pane" data-tab-pane="store-notes" data-tab-panel="store-notes">
       <div class="warehouse-section">
         <h3>Ghi chú</h3>
-        <p class="muted-line">Chưa có ghi chú cho cửa hàng này.</p>
+        <form id="storeNotesForm_<%= selectedStore._id %>" class="store-notes-form" method="post"
+          action="/cua-hang/<%= selectedStore._id %>/notes" data-store-notes-form>
+          <label for="storeNoteInput_<%= selectedStore._id %>">Nội dung ghi chú</label>
+          <textarea id="storeNoteInput_<%= selectedStore._id %>" name="ghi_chu" rows="5"
+            placeholder="Nhập ghi chú cho cửa hàng" data-store-note-input><%= selectedStore.ghi_chu || '' %></textarea>
+          <p class="muted-line" data-store-note-empty <%= selectedStore.ghi_chu ? 'hidden' : '' %>>Chưa có ghi chú cho cửa hàng này.</p>
+          <div class="store-note-actions">
+            <button class="btn btn-light btn-sm" type="button" data-store-note-clear <%= selectedStore.ghi_chu ? '' : 'disabled' %>>Xóa ghi chú</button>
+            <div class="store-note-confirm" data-store-note-confirm-panel hidden>
+              <span>Bạn có chắc muốn xóa ghi chú của cửa hàng này?</span>
+              <button class="btn btn-danger btn-sm" type="button" data-store-note-confirm>Đồng ý xóa</button>
+              <button class="btn btn-light btn-sm" type="button" data-store-note-cancel>Bỏ qua</button>
+            </div>
+          </div>
+          <p class="store-note-status" data-store-note-status role="status" aria-live="polite" hidden></p>
+        </form>
       </div>
     </div>
   </div>
 
   <div class="page-actions detail-panel-footer page-actions--sm">
-    <button class="btn btn-success btn-sm" type="submit" formaction="/cua-hang/<%= selectedStore._id %>/update"
-      formmethod="post" onclick="return confirm('Bạn có muốn lưu thay đổi cửa hàng này không?')">Chỉnh sửa</button>
+    <button class="btn btn-success btn-sm" type="submit" form="storeUpdateForm_<%= selectedStore._id %>" data-store-save-action>Lưu thay đổi</button>
     <a class="btn btn-success btn-sm" href="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
       data-store-export-action data-store-info-url="/cua-hang/<%= selectedStore._id %>/export/info.xlsx"
       data-store-info-label="Xuất thông tin" data-store-info-disabled="0"
       data-store-warehouses-url="/cua-hang/<%= selectedStore._id %>/export/warehouses.xlsx"
       data-store-warehouses-label="Xuất kho" data-store-warehouses-disabled="<%= warehouses.length ? '0' : '1' %>"
       data-store-notes-url="/cua-hang/<%= selectedStore._id %>/export/notes.xlsx" data-store-notes-label="Xuất ghi chú"
-      data-store-notes-disabled="1">Xuất thông tin</a>
+      data-store-notes-disabled="<%= String(selectedStore.ghi_chu || '').trim() ? '0' : '1' %>">Xuất thông tin</a>
   </div>
 
 </div>

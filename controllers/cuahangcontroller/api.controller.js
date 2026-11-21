@@ -67,14 +67,14 @@ exports.detail = async function(req, res, next) {
     try {
         var storeId = String(req.params && req.params.id || '').trim();
         if (!mongoose.Types.ObjectId.isValid(storeId)) {
-            return res.status(400).json({ success: false, message: 'Cua hang khong hop le' });
+            return res.status(400).json({ success: false, message: 'Cửa hàng không hợp lệ' });
         }
 
         var store = await CuaHang.findOne({ _id: storeId })
-            .select('ma_cua_hang ten_cua_hang ma_so_thue dia_chi dia_chi_chi_tiet dia_chi_day_du tinh_thanh tinh_thanh_id phuong_xa phuong_xa_code sdt email trang_thai created_at updated_at')
+            .select('ma_cua_hang ten_cua_hang ma_so_thue dia_chi dia_chi_chi_tiet dia_chi_day_du tinh_thanh tinh_thanh_id phuong_xa phuong_xa_code sdt email ghi_chu trang_thai created_at updated_at')
             .lean();
         if (!store) {
-            return res.status(404).json({ success: false, message: 'Khong tim thay cua hang' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy cửa hàng' });
         }
 
         var warehouses = await Kho.find({ cua_hang_id: store._id })
@@ -115,12 +115,12 @@ exports.warehouses = async function(req, res, next) {
     try {
         var storeId = String(req.params && req.params.id || '').trim();
         if (!mongoose.Types.ObjectId.isValid(storeId)) {
-            return res.status(400).json({ success: false, message: 'Cua hang khong hop le' });
+            return res.status(400).json({ success: false, message: 'Cửa hàng không hợp lệ' });
         }
 
         var store = await CuaHang.findOne({ _id: storeId }).select('_id').lean();
         if (!store) {
-            return res.status(404).json({ success: false, message: 'Khong tim thay cua hang' });
+            return res.status(404).json({ success: false, message: 'Không tìm thấy cửa hàng' });
         }
 
         var warehouses = await Kho.find({ cua_hang_id: store._id })

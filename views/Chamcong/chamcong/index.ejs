@@ -371,11 +371,11 @@
           <div class="cc-employee-inline-filters">
             <div class="cc-filter-picker">
               <div class="cc-filter-picker-head">
-                <label for="ccEmployeeDepartmentFilter">PhÃ²ng ban</label>
-                <button type="button" id="pbAddBtn">Táº¡o má»›i</button>
+                <label for="ccEmployeeDepartmentFilter">Phòng ban</label>
+                <button type="button" id="pbAddBtn">Tạo mới</button>
               </div>
               <select id="ccEmployeeDepartmentFilter" class="cc-select">
-                <option value="">Chá»n phÃ²ng ban</option>
+                <option value="">Chọn phòng ban</option>
                 <% (phongBans || []).forEach(function(item) { %>
                   <option value="<%= item._id %>"><%= item.ten_phong_ban %></option>
                 <% }) %>
@@ -383,11 +383,11 @@
             </div>
             <div class="cc-filter-picker">
               <div class="cc-filter-picker-head">
-                <label for="ccEmployeePositionFilter">Chá»©c danh</label>
-                <button type="button" id="cdAddBtn">Táº¡o má»›i</button>
+                <label for="ccEmployeePositionFilter">Chức danh</label>
+                <button type="button" id="cdAddBtn">Tạo mới</button>
               </div>
               <select id="ccEmployeePositionFilter" class="cc-select">
-                <option value="">Chá»n chá»©c danh</option>
+                <option value="">Chọn chức danh</option>
                 <% (chucDanhs || []).forEach(function(item) { %>
                   <option value="<%= item._id %>"><%= item.ten_chuc_danh %></option>
                 <% }) %>
@@ -511,11 +511,11 @@
           <div class="cc-employee-filter-spacer"></div>
           <div class="cc-filter-picker">
             <div class="cc-filter-picker-head">
-              <label for="ccEmployeeDepartmentFilter">PhÃ²ng ban</label>
-              <button type="button" id="pbHiddenAddBtn">Táº¡o má»›i</button>
+              <label for="ccEmployeeDepartmentFilter">Phòng ban</label>
+              <button type="button" id="pbHiddenAddBtn">Tạo mới</button>
             </div>
             <select id="ccHiddenDepartmentFilter" class="cc-select">
-              <option value="">Chá»n phÃ²ng ban</option>
+              <option value="">Chọn phòng ban</option>
               <% (phongBans || []).forEach(function(item) { %>
                 <option value="<%= item._id %>"><%= item.ten_phong_ban %></option>
               <% }) %>
@@ -523,11 +523,11 @@
           </div>
           <div class="cc-filter-picker">
             <div class="cc-filter-picker-head">
-              <label for="ccEmployeePositionFilter">Chá»©c danh</label>
-              <button type="button" id="cdHiddenAddBtn">Táº¡o má»›i</button>
+              <label for="ccEmployeePositionFilter">Chức danh</label>
+              <button type="button" id="cdHiddenAddBtn">Tạo mới</button>
             </div>
             <select id="ccHiddenPositionFilter" class="cc-select">
-              <option value="">Chá»n chá»©c danh</option>
+              <option value="">Chọn chức danh</option>
               <% (chucDanhs || []).forEach(function(item) { %>
                 <option value="<%= item._id %>"><%= item.ten_chuc_danh %></option>
               <% }) %>
@@ -536,11 +536,11 @@
           <div class="cc-employee-filter-spacer"></div>
           <div class="cc-filter-picker">
             <div class="cc-filter-picker-head">
-              <label for="ccEmployeeDepartmentFilter">PhÃ²ng ban</label>
-              <button type="button" id="pbHiddenAddBtn2">Táº¡o má»›i</button>
+              <label for="ccEmployeeDepartmentFilter">Phòng ban</label>
+              <button type="button" id="pbHiddenAddBtn2">Tạo mới</button>
             </div>
             <select id="ccHiddenDepartmentFilter2" class="cc-select">
-              <option value="">Chá»n phÃ²ng ban</option>
+              <option value="">Chọn phòng ban</option>
               <% (phongBans || []).forEach(function(item) { %>
                 <option value="<%= item._id %>"><%= item.ten_phong_ban %></option>
               <% }) %>
@@ -548,11 +548,11 @@
           </div>
           <div class="cc-filter-picker">
             <div class="cc-filter-picker-head">
-              <label for="ccEmployeePositionFilter">Chá»©c danh</label>
-              <button type="button" id="cdHiddenAddBtn2">Táº¡o má»›i</button>
+              <label for="ccEmployeePositionFilter">Chức danh</label>
+              <button type="button" id="cdHiddenAddBtn2">Tạo mới</button>
             </div>
             <select id="ccHiddenPositionFilter2" class="cc-select">
-              <option value="">Chá»n chá»©c danh</option>
+              <option value="">Chọn chức danh</option>
               <% (chucDanhs || []).forEach(function(item) { %>
                 <option value="<%= item._id %>"><%= item.ten_chuc_danh %></option>
               <% }) %>
@@ -2851,7 +2851,7 @@
           const shifts = [];
           if (day.ca_sang) shifts.push('Ca sáng');
           if (day.ca_chieu) shifts.push('Ca chiều');
-          if (day.tick_tang_ca) shifts.push('Tinh tang ca');
+          if (day.tick_tang_ca) shifts.push('Tính tăng ca');
           if (Number(day.tang_ca_cong || 0) > 0) shifts.push('Tăng ca ' + workUnitText(day.tang_ca_cong));
           const soCong = day.so_cong != null ? workUnitText(day.so_cong) : workUnitText(dayWorkUnits(day));
           const timeText = (shifts.length ? shifts.join(', ') : '---') + ' | ' + soCong + ' công';
