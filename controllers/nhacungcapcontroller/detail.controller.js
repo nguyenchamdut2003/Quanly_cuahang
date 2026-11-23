@@ -2,6 +2,34 @@ const {
   loadSupplierDetailShellRenderLocals,
   loadSupplierDetailTabRenderLocals
 } = require('./helpers/detail.helper');
+const mongoose = require('mongoose');
+const { resolveStoreId } = require('../../utils/storeScope');
+const { getPurchaseSourceDetail } = require('../../services/purchaseGroupQuery.service');
+const { loadPurchaseLinkedVatChuaLines } = require('../../services/vatChuaDetail.service');
+const { createPurchaseDetailViewHelpers } = require('../../utils/purchaseDetailView');
+
+exports.apiSupplierPurchaseDetail = async function(req, res, next) {
+  try {
+    const supplierId = String(req.params.id || '').trim();
+    const purchaseId = String(req.params.purchaseId || '').trim();
+    res.set('Cache-Control', 'no-store');
+    const notFound = () => res.status(404).type('html').send('<div class="empty-cell">Không tìm thấy phiếu nhập của nhà cung cấp.</div>');
+    if (!mongoose.Types.ObjectId.isValid(supplierId) || !mongoose.Types.ObjectId.isValid(purchaseId)) return notFound();
+    const storeId = String(await resolveStoreId(req) || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(storeId)) return res.status(400).type('html').send('<div class="empty-cell">Chưa chọn cửa hàng làm việc hợp lệ.</div>');
+    const source = await getPurchaseSourceDetail(purchaseId, storeId, { supplierId });
+    const idOf = value => String(value && value._id || value || '');
+    if (!source || idOf(source.cua_hang_id) !== storeId || idOf(source.nha_cung_cap_id) !== supplierId) return notFound();
+    const vatChuaLines = await loadPurchaseLinkedVatChuaLines(purchaseId, storeId);
+    const helpers = createPurchaseDetailViewHelpers({ refLink: res.locals && res.locals.refLink });
+    return res.render('nhap-hang/_purchase-detail', Object.assign({}, helpers, {
+      t: Object.assign({}, source, { vat_chua_lines: vatChuaLines }),
+      showPurchaseActions: false
+    }));
+  } catch (err) {
+    next(err);
+  }
+};
 
 exports.apiSupplierDetail = async function(req, res, next) {
   try {

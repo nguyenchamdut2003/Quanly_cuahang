@@ -198,6 +198,7 @@ function normalizePayrollDocCode(code) {
 }
 
 function relatedCode(item) {
+    if (item.phieu_nhap_tong_hop_id) return item.phieu_nhap_tong_hop_id.ma_phieu_tong_hop || item.ma_chung_tu_goc || '';
     const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
     const allocPn = firstAlloc?.phieu_nhap_id;
     const allocHd = firstAlloc?.hoa_don_id;

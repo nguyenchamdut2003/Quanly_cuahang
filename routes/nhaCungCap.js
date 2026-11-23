@@ -22,6 +22,7 @@ router.post('/:id/tam-ung', nhaCungCapController.createSupplierAdvance);
 router.post('/:id/tam-ung/:advanceId/can-tru', nhaCungCapController.applyAdvanceOffset);
 router.post('/:id/tam-ung/:advanceId/hoan-tien', nhaCungCapController.refundSupplierAdvance);
 router.get('/api/:id/detail', nhaCungCapController.apiSupplierDetail);
+router.get('/api/:id/purchase/:purchaseId/detail', nhaCungCapController.apiSupplierPurchaseDetail);
 router.get('/api/:id/tab/:tab(address|history|vat-chua|debt|xnb)', nhaCungCapController.apiSupplierDetailTab);
 router.get('/:id/export/:section', nhaCungCapController.exportSupplierDetail);
 router.post('/add', nhaCungCapController.add);

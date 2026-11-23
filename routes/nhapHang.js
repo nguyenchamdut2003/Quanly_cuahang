@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
 var nhapHangController = require('../controllers/nhapHang.controller');
+var groupController = require('../controllers/phieuNhapTongHop.controller');
 
 router.use(isAuthenticated);
 
@@ -13,7 +14,17 @@ router.post('/create', nhapHangController.createSubmit);
 router.post('/deactivate', nhapHangController.deactivateSelected);
 router.post('/trash/preview', nhapHangController.previewTrash);
 router.post('/trash/move', nhapHangController.moveToTrash);
-router.post('/gop-phieu-nhap', nhapHangController.mergePurchases);
+router.get('/tong-hop/eligible', groupController.eligible);
+router.post('/tong-hop/preview', groupController.preview);
+router.get('/tong-hop', groupController.list);
+router.post('/tong-hop', groupController.create);
+router.get('/tong-hop/:id/return', groupController.returnToSource);
+router.post('/tong-hop/:id/pay', groupController.pay);
+router.post('/tong-hop/:id/cancel', groupController.cancel);
+router.get('/tong-hop/:id', groupController.detail);
+router.post('/gop-phieu-nhap', groupController.create);
+router.get('/tra-hang-nhap', nhapHangController.traHangNhapPage);
+router.post('/tra-hang-nhap/add', nhapHangController.traHangNhapSubmit);
 router.get('/:id/in-tong-hop', nhapHangController.printPurchaseBundle);
 router.get('/:id/in', nhapHangController.printPurchase);
 router.get('/:id/in/pdf', nhapHangController.printPhieuNhapPdf);
@@ -30,7 +41,5 @@ router.post('/:id/copy', nhapHangController.copy);
 router.post('/:id/pay-supplier', nhapHangController.paySupplier);
 router.post('/:id/save', nhapHangController.save);
 
-router.get('/tra-hang-nhap', nhapHangController.traHangNhapPage);
-router.post('/tra-hang-nhap/add', nhapHangController.traHangNhapSubmit);
 
 module.exports = router;

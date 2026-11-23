@@ -19,6 +19,7 @@ const {
   loadSupplierPayableDocuments,
   makeSupplierDebtTransactionCode
 } = require('./helpers/debt.helper');
+const { acquirePurchaseGroupMutationLock } = require('../../services/purchaseGroup.service');
 
 exports.payDebt = async function(req, res, next) {
       var session = null;
@@ -36,6 +37,7 @@ exports.payDebt = async function(req, res, next) {
           var result;
           session = await mongoose.startSession();
           await session.withTransaction(async function() {
+              await acquirePurchaseGroupMutationLock(storeId, session);
               var supplier = await NhaCungCap.findById(supplierId).session(session).lean();
               if (!supplier) throw new Error('Không tìm thấy nhà cung cấp');
               if (storeId && mongoose.Types.ObjectId.isValid(storeId) && supplier.cua_hang_id && String(supplier.cua_hang_id) !== String(storeId)) {
@@ -44,7 +46,7 @@ exports.payDebt = async function(req, res, next) {
   
               var totalsMap = await aggregateSupplierPurchaseTotals(storeId, [supplier._id]);
               applySupplierTotalsFromMap(supplier, totalsMap);
-              var purchases = await loadSupplierPayableDocuments(supplier._id, storeId);
+              var purchases = await loadSupplierPayableDocuments(supplier._id, storeId, { session: session });
               var invoiceDebt = sumInvoiceDebt(purchases);
               var payableDebt = Math.max(0, Number(supplier.tong_no || 0));
               if (!allowOverpayment && payment.amount > payableDebt) {
@@ -67,9 +69,12 @@ exports.payDebt = async function(req, res, next) {
                   var purchaseMap = {};
                   purchases.forEach(function(row) { purchaseMap[String(row.doc_id || row._id)] = row; });
                   var manualTotal = 0;
+                  var manualSourceIds = new Set();
                   for (var m = 0; m < manualAllocations.length; m++) {
                       var manual = manualAllocations[m] || {};
                       var manualId = String(manual.phieu_nhap_id || manual.nhap_vat_chua_id || '').trim();
+                      if (manualSourceIds.has(manualId)) throw new Error('Mỗi chứng từ chỉ được phân bổ một lần trong phiếu chi.');
+                      manualSourceIds.add(manualId);
                       var manualPurchase = purchaseMap[manualId];
                       if (!manualPurchase) throw new Error('Chứng từ phân bổ không hợp lệ');
                       var manualDebt = Math.max(0, Number(manualPurchase.con_no_ncc != null ? manualPurchase.con_no_ncc : manualPurchase.con_no || 0));
@@ -108,6 +113,13 @@ exports.payDebt = async function(req, res, next) {
               }
   
               var allocatedTotal = allocations.reduce(function(sum, row) { return sum + Number(row.so_tien || 0); }, 0);
+              allocations.forEach(function(allocation) {
+                  if (!allocation.phieu_nhap_id) return;
+                  var source = purchases.find(function(row) { return String(row._id) === String(allocation.phieu_nhap_id); });
+                  if (source && source.payment_current && source.payment_current.legacy_paid_fallback) {
+                      allocation.legacy_paid_baseline = Number(source.payment_current.paid || 0);
+                  }
+              });
               if (allocatedTotal > allocationLimit) throw new Error('Tổng tiền phân bổ không được vượt quá nợ theo sổ công nợ');
               var overpaymentAmount = Math.max(0, payment.amount - payableDebt);
               var note = String(req?.body?.ghi_chu || '').trim() || ('Thanh toán công nợ nhà cung cấp ' + (supplier.ten_ncc || supplier.ma_ncc || ''));
@@ -159,13 +171,12 @@ exports.payDebt = async function(req, res, next) {
                   if (!allocation.phieu_nhap_id) continue;
                   var matchingPurchase = purchases.find(function(item) { return String(item._id) === String(allocation.phieu_nhap_id); });
                   if (!matchingPurchase) continue;
-                  var payable = Number(matchingPurchase.can_tra_ncc || matchingPurchase.tong_tien || 0);
-                  if (!payable || payable < Number(matchingPurchase.da_tra_ncc || 0) + allocation.con_no_truoc) {
-                      payable = Number(matchingPurchase.da_tra_ncc || 0) + allocation.con_no_truoc;
-                  }
+                  var payable = Number(matchingPurchase.payment_current ? matchingPurchase.payment_current.payable
+                      : (matchingPurchase.can_tra_ncc == null ? matchingPurchase.tong_tien : matchingPurchase.can_tra_ncc)) || 0;
+                  var nextPaid = Math.min(Number(matchingPurchase.da_tra_ncc || 0) + allocation.so_tien, payable);
                   await PhieuNhap.updateOne(
                       { _id: allocation.phieu_nhap_id },
-                      { $set: { da_tra_ncc: Math.min(Number(matchingPurchase.da_tra_ncc || 0) + allocation.so_tien, payable), con_no_ncc: allocation.con_no_sau } },
+                      { $set: { da_tra_ncc: nextPaid, con_no_ncc: Math.max(0, payable - nextPaid) } },
                       { session: session }
                   );
               }

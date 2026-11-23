@@ -10,6 +10,14 @@ function toObjectId(value) {
 }
 
 function normalizeNonNegativeMoney(value, label) {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0) throw new Error(label || 'Số tiền không hợp lệ.');
+    return value;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0) throw new Error(label || 'Số tiền không hợp lệ.');
+    return value;
+  }
   if (value === undefined || value === null || value === '') return 0;
   const raw = String(value).trim();
   if (!raw) return 0;

@@ -37,6 +37,10 @@ const ALL_DOCUMENT_FIELDS = Object.values(DOCUMENT_TYPE_TO_FIELD);
 
 function parseMoney(value) {
 
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
   return Number(String(value || '').replace(/\./g, '').replace(/,/g, '')) || 0;
 
 }
@@ -152,7 +156,9 @@ function normalizeAllocations(value) {
 
       con_no_truoc: parseMoney(item.con_no_truoc),
 
-      con_no_sau: parseMoney(item.con_no_sau)
+      con_no_sau: parseMoney(item.con_no_sau),
+
+      legacy_paid_baseline: Math.max(0, parseMoney(item.legacy_paid_baseline))
 
     };
 
@@ -589,6 +595,9 @@ async function taoPhieuThuChi(data = {}, options = {}) {
     hoa_don_id: docRefs.hoa_don_id,
 
     phieu_nhap_id: docRefs.phieu_nhap_id,
+
+    // Group C is a navigation reference only; real obligations stay in allocations.
+    phieu_nhap_tong_hop_id: optionalId(data.phieu_nhap_tong_hop_id),
 
     nhap_vat_chua_id: docRefs.nhap_vat_chua_id,
 

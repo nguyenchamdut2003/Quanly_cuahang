@@ -19,6 +19,7 @@ const {
 const { taoPhieuThuChi } = require('./soQuy.service');
 const { extractPaymentDetail } = require('./paymentCashBook.service');
 const { syncTonKhoSauQuyCach } = require('./kho.service');
+const { acquirePurchaseGroupMutationLock, findActivePurchaseGroupForSource } = require('./purchaseGroup.service');
 const {
   assertVatChuaImportInput,
   parseVatChuaImportInput,
@@ -953,16 +954,86 @@ async function createPurchase(data = {}, options = {}) {
   return purchase;
 }
 
+function isLegacyMergedPurchase(purchase) {
+  return purchase.trang_thai === 'merged'
+    || Boolean(purchase.is_merged_purchase || purchase.merged_to_phieu_nhap_id || purchase.merged_to_ma_phieu_nhap || purchase.merged_at)
+    || (Array.isArray(purchase.merged_from_phieu_nhap_ids) && purchase.merged_from_phieu_nhap_ids.length > 0)
+    || (Array.isArray(purchase.merged_from_ma_phieu_nhaps) && purchase.merged_from_ma_phieu_nhaps.length > 0);
+}
+
+function paymentSpansOtherDocuments(row, purchaseId, allocationField, amountField) {
+  const targetId = String(purchaseId);
+  const directId = String(row.phieu_nhap_id || '');
+  if ((directId && directId !== targetId) || row.nhap_vat_chua_id || row.hoa_don_id || row.don_hang_id) return true;
+  if (Number(row.overpayment_amount || 0) > 0) return true;
+  const allocations = Array.isArray(row[allocationField]) ? row[allocationField] : [];
+  if (!allocations.length) return false;
+  let ownAmount = 0;
+  for (const allocation of allocations) {
+    const amount = Math.max(0, Number(allocation[amountField] || 0));
+    if (amount <= 0) continue;
+    if (String(allocation.phieu_nhap_id || '') !== targetId || allocation.nhap_vat_chua_id || allocation.hoa_don_id) return true;
+    ownAmount += amount;
+  }
+  return Number(row.gia_tri || 0) > ownAmount;
+}
+
+async function assertPurchasePaymentsCanBeCancelled(purchase, session) {
+  const linkedFilter = {
+    cua_hang_id: purchase.cua_hang_id,
+    deleted_at: null,
+    trang_thai_du_lieu: { $ne: 'inactive' },
+    trang_thai: { $nin: ['cancelled', 'inactive'] },
+    loai_phieu: 'chi',
+    $or: [{ phieu_nhap_id: purchase._id }, { 'allocations.phieu_nhap_id': purchase._id }]
+  };
+  const receipts = await withSessionQuery(PhieuThuChi.find(linkedFilter)
+    .setOptions({ strictQuery: false })
+    .select('ma_phieu phieu_nhap_id nhap_vat_chua_id hoa_don_id don_hang_id allocations gia_tri overpayment_amount'), session).lean();
+  for (const receipt of receipts) {
+    if (paymentSpansOtherDocuments(receipt, purchase._id, 'allocations', 'so_tien')) {
+      throw new Error('Không thể hủy phiếu nhập ' + purchase.ma_phieu_nhap + ' vì phiếu chi '
+        + (receipt.ma_phieu || '') + ' còn phân bổ cho chứng từ khác hoặc có tiền tạm ứng. Vui lòng xử lý phiếu chi trước.');
+    }
+  }
+  if (!GiaoDichCongNoNhaCungCap) return;
+  const transactions = await withSessionQuery(GiaoDichCongNoNhaCungCap.find({
+    cua_hang_id: purchase.cua_hang_id,
+    deleted_at: null,
+    trang_thai_du_lieu: { $ne: 'inactive' },
+    trang_thai: { $nin: ['cancelled', 'inactive'] },
+    $or: [{ phieu_nhap_id: purchase._id }, { 'phan_bo_phieu_nhap.phieu_nhap_id': purchase._id }]
+  }).setOptions({ strictQuery: false }).select('ma_giao_dich phieu_nhap_id phan_bo_phieu_nhap gia_tri'), session).lean();
+  for (const transaction of transactions) {
+    if (paymentSpansOtherDocuments(transaction, purchase._id, 'phan_bo_phieu_nhap', 'so_tien_phan_bo')) {
+      throw new Error('Không thể hủy phiếu nhập ' + purchase.ma_phieu_nhap + ' vì giao dịch công nợ '
+        + (transaction.ma_giao_dich || '') + ' còn phân bổ cho phiếu khác. Vui lòng xử lý phân bổ trước.');
+    }
+  }
+}
+
 async function cancelPurchase(id, storeId, userId) {
+  const purchaseId = cleanId(id);
+  const scopedStoreId = cleanId(storeId);
+  if (!purchaseId) throw new Error('ID phiếu nhập không hợp lệ.');
+  if (!scopedStoreId) throw new Error('Chưa chọn cửa hàng làm việc hợp lệ.');
   const session = await mongoose.startSession();
   try {
     let result;
     await session.withTransaction(async function() {
-      const filter = { _id: id, deleted_at: null };
-      if (cleanId(storeId)) filter.cua_hang_id = storeId;
-      const purchase = await withSessionQuery(PhieuNhap.findOne(filter), session);
+      await acquirePurchaseGroupMutationLock(scopedStoreId, session);
+      const filter = { _id: purchaseId, cua_hang_id: scopedStoreId, deleted_at: null, trang_thai_du_lieu: { $ne: 'inactive' } };
+      const purchase = await withSessionQuery(PhieuNhap.findOne(filter).setOptions({ strictQuery: false }), session);
       if (!purchase) throw new Error('Không tìm thấy phiếu nhập hoặc phiếu đang trong thùng rác');
       if (purchase.trang_thai === 'cancelled') throw new Error('Phiếu nhập đã bị hủy');
+      if (isLegacyMergedPurchase(purchase)) {
+        throw new Error('Phiếu nhập ' + purchase.ma_phieu_nhap + ' thuộc cơ chế gộp cũ, cần đối soát trước khi hủy.');
+      }
+      const group = await findActivePurchaseGroupForSource(purchase._id, scopedStoreId, { session });
+      if (group) {
+        throw new Error('Không thể hủy phiếu nhập ' + purchase.ma_phieu_nhap + ' đang thuộc phiếu tổng hợp '
+          + group.ma_phieu_tong_hop + '. Vui lòng tách nhóm trước.');
+      }
 
       const activeReturn = await withSessionQuery(PhieuTraHangNhap.findOne({
         phieu_nhap_id: purchase._id,
@@ -976,14 +1047,19 @@ async function cancelPurchase(id, storeId, userId) {
           + ' vì còn phiếu trả hàng' + returnCode + ' đang có hiệu lực.');
       }
 
+      await assertPurchasePaymentsCanBeCancelled(purchase, session);
+
       const rows = await withSessionQuery(CTPhieuNhap.find({ phieu_nhap_id: purchase._id }), session).lean();
       if (purchase.trang_thai === 'completed') {
         await rollbackCompletedPurchaseEffects(purchase, rows, { userId, session });
         await cancelNhapVatChuaBySource(purchase.cua_hang_id, 'phieu_nhap', purchase._id, session);
         await PhieuThuChi.updateMany(
           {
+            cua_hang_id: purchase.cua_hang_id,
+            deleted_at: null,
+            trang_thai_du_lieu: { $ne: 'inactive' },
             loai_phieu: 'chi',
-            trang_thai: { $ne: 'cancelled' },
+            trang_thai: { $nin: ['cancelled', 'inactive'] },
             $or: [
               { phieu_nhap_id: purchase._id },
               { 'allocations.phieu_nhap_id': purchase._id }
@@ -995,19 +1071,21 @@ async function cancelPurchase(id, storeId, userId) {
               ghi_chu: 'Hủy theo phiếu nhập ' + purchase.ma_phieu_nhap
             }
           },
-          withSessionOptions({}, session)
+          withSessionOptions({ strictQuery: false }, session)
         );
         const now = new Date();
         await CongNoNhaCungCap.updateMany(
-          { phieu_nhap_id: purchase._id, deleted_at: null },
+          { cua_hang_id: purchase.cua_hang_id, phieu_nhap_id: purchase._id, deleted_at: null },
           { $set: { deleted_at: now, deleted_by: cleanId(userId) || null } },
-          withSessionOptions({}, session)
+          withSessionOptions({ strictQuery: false }, session)
         );
         if (GiaoDichCongNoNhaCungCap) {
           await GiaoDichCongNoNhaCungCap.updateMany(
             {
+              cua_hang_id: purchase.cua_hang_id,
               deleted_at: null,
-              trang_thai: { $ne: 'cancelled' },
+              trang_thai_du_lieu: { $ne: 'inactive' },
+              trang_thai: { $nin: ['cancelled', 'inactive'] },
               $or: [
                 { phieu_nhap_id: purchase._id },
                 { 'phan_bo_phieu_nhap.phieu_nhap_id': purchase._id }
@@ -1023,7 +1101,7 @@ async function cancelPurchase(id, storeId, userId) {
                 ly_do_huy: 'Hủy phiếu nhập'
               }
             },
-            withSessionOptions({}, session)
+            withSessionOptions({ strictQuery: false }, session)
           );
         }
       }

@@ -16,3 +16,5 @@ docs/
 .env.example
 
 .cursorrules
+
+.playwright-mcp

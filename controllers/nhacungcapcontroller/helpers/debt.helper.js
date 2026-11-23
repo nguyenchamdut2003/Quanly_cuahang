@@ -1,5 +1,6 @@
 const { mongoose, PhieuNhap, SoQuy, Counter, parseMoney, SUPPLIER_DEBT_WARN_DEFAULT_DAYS, NhapVatChua, XuatVatChua } = require('./common.helper');
 const { loadNhapVatChuaPaymentTotals, loadNhapVatChuaReturnTotals } = require('../../../services/vatChuaPaymentTotals.service');
+const { loadPurchaseSourceBalances } = require('../../../services/purchaseGroupQuery.service');
 
 function isVisibleSupplierDebtRow(row) {
     if (!row) return false;
@@ -333,18 +334,29 @@ function normalizeSupplierPaymentInput(body) {
     };
 }
 
-async function loadSupplierUnpaidPurchases(supplierId, storeId) {
+async function loadSupplierUnpaidPurchases(supplierId, storeId, options = {}) {
+    if (!storeId || !mongoose.Types.ObjectId.isValid(String(storeId))) {
+        throw new Error('Chưa chọn cửa hàng làm việc hợp lệ.');
+    }
     var query = {
         nha_cung_cap_id: supplierId,
         trang_thai: 'completed',
         trang_thai_du_lieu: { $ne: 'inactive' },
-        con_no_ncc: { $gt: 0 }
+        deleted_at: null,
+        cua_hang_id: storeId
     };
-    if (storeId && mongoose.Types.ObjectId.isValid(storeId)) query.cua_hang_id = storeId;
-    return await PhieuNhap.find(query)
+    var sourceQuery = PhieuNhap.find(query).setOptions({ strictQuery: false })
         .sort({ ngay_nhap: 1, created_at: 1 })
-        .select('ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc')
-        .lean();
+        .select('_id');
+    if (options.session) sourceQuery = sourceQuery.session(options.session);
+    var sources = await sourceQuery.lean();
+    var balances = await loadPurchaseSourceBalances(sources.map(function(row) { return row._id; }), storeId, options);
+    var byId = new Map(balances.map(function(row) { return [String(row._id), row]; }));
+    return sources.map(function(row) { return byId.get(String(row._id)); }).filter(function(row) {
+        var supplier = row && row.nha_cung_cap_id;
+        return row && String(supplier && (supplier._id || supplier) || '') === String(supplierId)
+            && Number(row.con_no_ncc || 0) > 0;
+    });
 }
 
 function attachManualNhapVatChuaPaidAmounts(debtRows) {
@@ -507,8 +519,8 @@ async function loadSupplierUnpaidManualVatChua(supplierId, storeId) {
     });
 }
 
-async function loadSupplierPayableDocuments(supplierId, storeId) {
-    var purchases = await loadSupplierUnpaidPurchases(supplierId, storeId);
+async function loadSupplierPayableDocuments(supplierId, storeId, options) {
+    var purchases = await loadSupplierUnpaidPurchases(supplierId, storeId, options);
     var vatChuaDocs = await loadSupplierUnpaidManualVatChua(supplierId, storeId);
     var docs = purchases.map(function(row) {
         return Object.assign({}, row, {

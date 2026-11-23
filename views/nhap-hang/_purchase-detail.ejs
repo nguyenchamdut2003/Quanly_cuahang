@@ -1,0 +1,165 @@
+<div class="po-detail">
+  <div class="po-detail-tabs">
+    <button class="po-detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
+    <button class="po-detail-tab" type="button" data-tab-target="payment">Lịch sử thanh toán</button>
+  </div>
+  <div class="po-detail-pane is-active" data-tab-pane="info">
+    <div class="detail-head">
+      <div>
+        <div class="detail-title"><%- refLink('purchase', t, t.ma_phieu_nhap || '--') %></div>
+        <span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span>
+      </div>
+      <div><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></div>
+    </div>
+    <div class="detail-grid">
+      <div class="item">Người tạo<b><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || t.nguoi_tao_id.email || '--') : '--' %></b></div>
+      <div class="item">Người nhập<b><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || '--') : '--' %></b></div>
+      <div class="item">Ngày nhập<b><%= formatDate(t.ngay_nhap || t.created_at) %></b></div>
+      <div class="item">Kho nhập<b><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></b></div>
+      <div class="item">Tên NCC<b><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></b></div>
+      <div class="item">Mã NCC<b>
+        <% if (t.nha_cung_cap_id && t.nha_cung_cap_id._id) { %>
+          <%- refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '--') %>
+        <% } else { %>
+          --
+        <% } %>
+      </b></div>
+      <div class="item" style="grid-column: span 2;">Ghi chú<b><%= t.ghi_chu || '--' %></b></div>
+    </div>
+    <div class="detail-body">
+      <div>
+        <% if (t.trang_thai === 'completed' && (t.vat_chua_lines || []).length) { %>
+          <div class="purchase-vat-chua-box">
+            <div class="purchase-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa đã nhập</div>
+            <table class="mini-table purchase-vat-chua-table">
+              <thead>
+                <tr>
+                  <th>Mã chứng từ</th>
+                  <th>Loại</th>
+                  <th>Mã vật chứa</th>
+                  <th>Tên vật chứa</th>
+                  <th class="num">Số lượng</th>
+                  <th>Chứng từ liên kết</th>
+                  <th>Thời gian</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% (t.vat_chua_lines || []).forEach(function(line) { %>
+                  <tr>
+                    <td>
+                      <% if (line.doc_href && line.doc_id) { %>
+                        <%- refLink('nhap_vat_chua', { _id: line.doc_id }, line.ma_chung_tu || '--') %>
+                      <% } else { %>
+                        <%= line.ma_chung_tu || '--' %>
+                      <% } %>
+                    </td>
+                    <td><%= line.doc_kind_label || '--' %></td>
+                    <td><%= line.ma_vat_chua || '--' %></td>
+                    <td><%= line.ten_vat_chua || '--' %></td>
+                    <td class="num"><%= fmt(line.so_luong || 0) %></td>
+                    <td>
+                      <% if (line.source_href && line.source_code) { %>
+                        <a class="ref-link" href="<%= line.source_href %>"><%= line.source_code %></a>
+                      <% } else { %>
+                        <%= line.source_code || '--' %>
+                      <% } %>
+                    </td>
+                    <td><%= formatDate(line.created_at) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+        <% if (!(t.detail_rows || []).length) { %>
+          <table class="mini-table"><tbody><tr><td>Không có chi tiết hàng.</td></tr></tbody></table>
+        <% } %>
+        <% detailGroups(t.detail_rows || []).forEach(function(group) { %>
+          <div class="lot-group-title">
+            <%- group.product ? (refLink('product', group.product, group.product.ma_hang || '--') + ' - ' + (group.product.ten_hang || '--')) : '--' %>
+          </div>
+          <table class="mini-table grouped-lot-table">
+            <thead>
+              <tr>
+                <th>Ngày / Lô</th>
+                <th>Thuộc tính</th>
+                <th class="num">Số Kg</th>
+                <th class="num">Đơn giá</th>
+                <th class="num">Thành tiền</th>
+                <th class="num">Tổng theo lô</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% var displayRows = detailRowsForGroup(group); %>
+              <% displayRows.forEach(function(r, rowIndex) { %>
+                <tr>
+                  <% if (rowIndex === 0) { %>
+                    <td class="lot-cell" rowspan="<%= displayRows.length %>"><%- group.lot_label %></td>
+                  <% } %>
+                  <td class="attr-cell">
+                    <div><%= r.ten_thuoc_tinh || '--' %></div>
+                  </td>
+                  <td class="num"><%= fmt(r.so_luong || 0) %></td>
+                  <td class="num"><%= fmtMoney(r.don_gia_nhap || 0) %></td>
+                  <td class="num"><%= fmtMoney(r.thanh_tien || 0) %></td>
+                  <% if (rowIndex === 0) { %>
+                    <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmtMoney(group.total || 0) %></td>
+                  <% } %>
+                </tr>
+              <% }) %>
+              <tr class="group-total-row">
+                <td colspan="4" class="num">TỔNG CỘNG</td>
+                <td class="num"><%= fmtMoney(group.total || 0) %></td>
+                <td class="num"><%= fmtMoney(group.total || 0) %></td>
+              </tr>
+            </tbody>
+          </table>
+        <% }) %>
+      </div>
+      <div class="summary-card">
+        <div class="summary-line"><span>Số lượng mặt hàng</span><b><%= fmt(t?.detail_summary?.tong_mat_hang || 0) %></b></div>
+        <div class="summary-line"><span>Tổng tiền hàng</span><b><%= fmtMoney(t.tong_tien_hang || 0) %></b></div>
+        <div class="summary-line"><span>Giảm giá</span><b><%= (t.kieu_giam_gia === 'percent' ? ((t.giam_gia || 0) + '%') : fmtMoney(t.giam_gia || 0)) %></b></div>
+        <div class="summary-line"><span>Tổng cộng / Cần trả NCC</span><b><%= fmtMoney(t.can_tra_ncc || t.tong_tien || 0) %></b></div>
+        <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmtMoney(t.da_tra_ncc || 0) %></b></div>
+        <div class="summary-line"><span>Nợ NCC</span><b><%= fmtMoney(t.con_no_ncc || 0) %></b></div>
+        <% if (locals.showPurchaseActions !== false && Number(t.con_no_ncc || 0) > 0) { %>
+          <button type="button" class="kv-btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="openPaySupplierModal('<%= t._id %>')">Trả NCC</button>
+        <% } %>
+      </div>
+    </div>
+    <% if (locals.showPurchaseActions !== false) { %>
+    <div class="page-actions page-actions--bordered detail-actions">
+      <button type="button" class="kv-btn primary" onclick="openPurchase('<%= t._id %>')">Chỉnh sửa</button>
+      <button type="button" class="kv-btn" onclick="cancelPurchase('<%= t._id %>')" <%= t.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
+      <button type="button" class="kv-btn" onclick="copyPurchase('<%= t._id %>')">Sao chép</button>
+      <a class="kv-btn" href="/nhap-hang/<%= t._id %>/export.xlsx">Xuất file</a>
+      <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/in-tong-hop" target="_blank">In phiếu + 02/TNDN</a>
+      <button type="button" class="kv-btn" onclick="returnPurchase('<%= t._id %>')">Trả hàng nhập</button>
+      <button type="button" class="kv-btn" onclick="openLabelModal('<%= t._id %>')">In tem mã</button>
+    </div>
+    <% } %>
+  </div>
+  <div class="po-detail-pane" data-tab-pane="payment">
+    <table class="mini-table">
+      <thead>
+        <tr><th>Ngày</th><th>Mã phiếu chi</th><th>Số tiền</th><th>Sổ quỹ</th><th>Người tạo</th><th>Ghi chú</th></tr>
+      </thead>
+      <tbody>
+        <% if (!(t.payment_rows || []).length) { %>
+          <tr><td colspan="6">Chưa có lịch sử thanh toán.</td></tr>
+        <% } %>
+        <% (t.payment_rows || []).forEach(function(p) { %>
+          <tr>
+            <td><%= formatDate(p.thoi_gian) %></td>
+            <td><%- p._id ? refLink('receipt', p._id, p.ma_phieu || '--') : (p.ma_phieu || '--') %></td>
+            <td><%= fmtMoney(p.tien_chi || 0) %></td>
+            <td><%= p.so_quy || '--' %></td>
+            <td><%= p.nguoi_tao || '--' %></td>
+            <td><%= p.trang_thai === 'Đã hủy' || p.trang_thai === 'cancelled' ? 'Đã hủy · ' : '' %><%= p.ghi_chu || '--' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

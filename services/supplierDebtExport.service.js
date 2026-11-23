@@ -122,6 +122,7 @@ function buildPurchaseQuery(supplierId, storeId) {
     const query = {
         nha_cung_cap_id: new mongoose.Types.ObjectId(String(supplierId)),
         trang_thai: 'completed',
+        trang_thai_du_lieu: { $ne: 'inactive' },
         deleted_at: null,
         con_no_ncc: { $gt: 0 }
     };
@@ -133,6 +134,7 @@ function buildPurchaseQuery(supplierId, storeId) {
 
 async function loadUnpaidPurchases(supplierId, storeId) {
     return PhieuNhap.find(buildPurchaseQuery(supplierId, storeId))
+        .setOptions({ strictQuery: false })
         .sort({ ngay_nhap: 1, created_at: 1 })
         .select('ma_phieu_nhap ngay_nhap created_at tong_tien can_tra_ncc da_tra_ncc con_no_ncc ghi_chu')
         .lean();

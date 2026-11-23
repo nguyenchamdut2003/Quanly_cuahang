@@ -192,6 +192,7 @@ async function buildSupplierPurchaseInvoiceExportPack(supplier, storeId) {
     const pnMatch = {
         nha_cung_cap_id: supplierOid,
         trang_thai: 'completed',
+        trang_thai_du_lieu: { $ne: 'inactive' },
         deleted_at: null
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
@@ -199,6 +200,7 @@ async function buildSupplierPurchaseInvoiceExportPack(supplier, storeId) {
     }
 
     const phieuList = await PhieuNhap.find(pnMatch)
+        .setOptions({ strictQuery: false })
         .sort({ ngay_nhap: 1, created_at: 1 })
         .lean();
 

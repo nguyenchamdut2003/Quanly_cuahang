@@ -159,6 +159,7 @@ app.use(function(req, res, next) {
       khach_hang: '/khach-hang/' + safeId,
       purchase: '/nhap-hang?purchase=' + encodeURIComponent(safeId),
       phieu_nhap: '/nhap-hang?purchase=' + encodeURIComponent(safeId),
+      phieu_nhap_tong_hop: '/nhap-hang/tong-hop/' + encodeURIComponent(safeId),
       order: '/don-hang?order=' + encodeURIComponent(safeId),
       don_hang: '/don-hang?order=' + encodeURIComponent(safeId),
       invoice: '/don-hang/hoa-don?invoice=' + encodeURIComponent(safeId),

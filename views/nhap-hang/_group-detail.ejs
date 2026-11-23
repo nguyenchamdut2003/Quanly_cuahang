@@ -1,0 +1,183 @@
+<%
+  const ticket = group || {};
+  const totals = ticket.totals || ticket;
+  const sources = Array.isArray(ticket.sources) ? ticket.sources : [];
+  const lines = Array.isArray(ticket.lines) ? ticket.lines : [];
+  const payments = Array.isArray(ticket.payments) ? ticket.payments : [];
+  const idOf = value => String(value && value._id || value || '');
+  const sourceIds = new Set(sources.map(source => idOf(source._id)));
+  const supplier = ticket.nha_cung_cap_id || {};
+  const warehouse = ticket.kho_id || {};
+  const creator = ticket.nguoi_tao_id || {};
+  const active = ticket.trang_thai !== 'cancelled';
+  const status = value => ({ draft: 'Phiếu tạm', completed: 'Đã nhập hàng', cancelled: 'Đã hủy', merged: 'Đã gộp trước đây' })[value] || value || '--';
+  const stockLabel = ticket.source_status_label || ticket.trang_thai_label || 'Phiếu tổng hợp';
+  const sourceHref = source => '/nhap-hang?purchase=' + encodeURIComponent(idOf(source._id));
+  const legacyPaid = sources.reduce((sum, source) => {
+    const current = source.payment_current || {};
+    return sum + Number(current.legacy_paid_fallback ? current.paid || 0 : current.legacy_paid_baseline || 0);
+  }, 0);
+  const paymentAmount = row => row.group_amount != null ? Number(row.group_amount)
+    : (row.group_allocated_amount != null ? Number(row.group_allocated_amount)
+      : ((row.allocations || []).length
+        ? row.allocations.reduce((sum, allocation) => sum + (sourceIds.has(idOf(allocation.phieu_nhap_id)) ? Number(allocation.so_tien || 0) : 0), 0)
+        : (sourceIds.has(idOf(row.phieu_nhap_id)) ? Number(row.gia_tri || 0) : 0)));
+  const sourceGroups = [];
+  const groupsBySource = new Map();
+  sources.forEach(source => {
+    const sourceId = idOf(source._id);
+    const sourceGroup = { sourceId, sourceCode: source.ma_phieu_nhap || '--', goods: [], goodsByKey: new Map(), total: 0 };
+    groupsBySource.set(sourceId, sourceGroup);
+    sourceGroups.push(sourceGroup);
+  });
+  lines.forEach(line => {
+    const sourceId = idOf(line.phieu_nhap_id);
+    let sourceGroup = groupsBySource.get(sourceId);
+    if (!sourceGroup) {
+      sourceGroup = { sourceId, sourceCode: line.source_code || '--', goods: [], goodsByKey: new Map(), total: 0 };
+      groupsBySource.set(sourceId, sourceGroup);
+      sourceGroups.push(sourceGroup);
+    }
+    const product = line.hang_hoa_id || {};
+    const key = [idOf(product._id || product.ma_hang || line.hang_hoa_id), idOf(line.lo_hang_id)].join('::');
+    let bucket = sourceGroup.goodsByKey.get(key);
+    if (!bucket) {
+      bucket = { product, rows: [], total: 0, lotLabel: lotLabel(line) };
+      sourceGroup.goodsByKey.set(key, bucket);
+      sourceGroup.goods.push(bucket);
+    }
+    bucket.rows.push(line);
+    bucket.total += Number(line.thanh_tien || 0);
+    sourceGroup.total += Number(line.thanh_tien || 0);
+  });
+  const displayRows = line => {
+    const value = line.gia_tri_thuoc_tinh_id;
+    const items = Array.isArray((line.lot_info || {}).quy_cach_items)
+      ? line.lot_info.quy_cach_items.filter(item => item && (Number(item.so_luong || 0) > 0 || item.ten_quy_cach || item.ten_thuoc_tinh)) : [];
+    if (!items.length) return [{
+      attribute: value && (value.gia_tri || value.ten_gia_tri) || '--',
+      quantity: Number(line.so_luong || 0), price: Number(line.don_gia_nhap || 0), amount: Number(line.thanh_tien || 0), line
+    }];
+    return items.map(item => {
+      const quantity = Number(item.so_luong || 0);
+      const price = Number(item.don_gia_nhap ?? item.gia_von ?? line.don_gia_nhap ?? 0);
+      return { attribute: item.ten_quy_cach || item.ten_thuoc_tinh || '--', quantity, price,
+        amount: Number(item.thanh_tien ?? Math.floor(quantity * price)), line };
+    });
+  };
+  const totalQuantity = lines.reduce((sum, line) => sum + Number(line.so_luong || 0), 0);
+  const sourceDiscount = sources.reduce((sum, source) => sum + Math.max(0, Number(source.tong_tien_hang ?? source.tong_tien ?? 0) - Number(source.tong_tien || 0)), 0);
+%>
+<div class="po-detail" data-purchase-group-detail="<%= ticket._id %>" data-debt="<%= Number(totals.con_no_ncc || 0) %>">
+  <div class="po-detail-tabs">
+    <button class="po-detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
+    <button class="po-detail-tab" type="button" data-tab-target="payment">Lịch sử thanh toán</button>
+    <button class="po-detail-tab" type="button" data-tab-target="sources">Phiếu nguồn (<%= Number(ticket.source_count || sources.length) %>)</button>
+  </div>
+  <div class="po-detail-pane is-active" data-tab-pane="info">
+    <div class="detail-head">
+      <div><div class="detail-title"><%= ticket.ma_phieu_tong_hop || ticket.ma_phieu_nhap || '--' %></div><span class="status-badge <%= !active ? 'merged' : (stockLabel === 'Phiếu tạm' ? 'draft' : '') %>"><%= active ? stockLabel : 'Đã tách nhóm' %></span></div>
+      <div><%= warehouse.ten_kho || warehouse.ma_kho || '--' %></div>
+    </div>
+    <div class="detail-grid">
+      <div class="item">Người tạo<b><%= creator.ho_ten || creator.ten_dang_nhap || creator.email || '--' %></b></div>
+      <div class="item">Ngày tổng hợp<b><%= formatDate(ticket.ngay_gop || ticket.ngay_nhap || ticket.created_at) %></b></div>
+      <div class="item">Kho nhập<b><%= warehouse.ten_kho || warehouse.ma_kho || '--' %></b></div>
+      <div class="item">Số phiếu nguồn<b><%= Number(ticket.source_count || sources.length) %></b></div>
+      <div class="item">Tên NCC<b><%= supplier.ten_ncc || '--' %></b></div>
+      <div class="item">Mã NCC<b><%- supplier._id ? refLink('supplier', supplier, supplier.ma_ncc || '--') : (supplier.ma_ncc || '--') %></b></div>
+      <div class="item" style="grid-column:span 2">Ghi chú<b><%= ticket.ghi_chu || '--' %></b></div>
+    </div>
+    <div class="detail-body purchase-group-body">
+      <div class="purchase-group-goods">
+        <% if (!sourceGroups.length) { %><table class="mini-table"><tbody><tr><td>Không có chi tiết hàng.</td></tr></tbody></table><% } %>
+        <% sourceGroups.forEach(function(sourceGroup) { %>
+          <section class="purchase-source-group" data-source-id="<%= sourceGroup.sourceId %>">
+            <div class="purchase-source-title"><a class="ref-link" data-purchase-source-open="<%= sourceGroup.sourceId %>" href="/nhap-hang?purchase=<%= encodeURIComponent(sourceGroup.sourceId) %>"><%= sourceGroup.sourceCode %></a></div>
+            <div class="purchase-source-table-wrap">
+              <table class="mini-table grouped-lot-table purchase-source-table">
+                <thead><tr><th>Ngày / Lô</th><th>Thuộc tính</th><th class="num">Số lượng</th><th class="num">Đơn giá</th><th class="num">Chiết khấu</th><th class="num">Thành tiền</th><th class="num">Tổng theo lô</th></tr></thead>
+                <% if (!sourceGroup.goods.length) { %><tbody><tr><td colspan="7">Không có chi tiết hàng.</td></tr></tbody><% } %>
+                <% sourceGroup.goods.forEach(function(bucket) { const rows = bucket.rows.flatMap(displayRows); %>
+                  <tbody>
+                    <tr class="purchase-product-title"><td colspan="7"><% if (bucket.product && bucket.product._id) { %><%- refLink('product', bucket.product, bucket.product.ma_hang || '--') %><% } else { %><%= bucket.product.ma_hang || '--' %><% } %> - <%= bucket.product.ten_hang || '--' %></td></tr>
+                    <% bucket.rows.forEach(function(line, lineIndex) { const attributes = displayRows(line); %>
+                      <% attributes.forEach(function(row, index) { %>
+                        <tr class="purchase-attribute-row">
+                          <% if (!lineIndex && !index) { %><td class="lot-cell" rowspan="<%= rows.length %>"><%- bucket.lotLabel %></td><% } %>
+                          <td class="attr-cell"><%= row.attribute %></td>
+                          <td class="num"><%= fmt(row.quantity) %><% if (line.don_vi_tinh_id && line.don_vi_tinh_id.ten_don_vi) { %> <%= line.don_vi_tinh_id.ten_don_vi %><% } %></td>
+                          <td class="num"><%= fmtMoney(row.price) %></td>
+                          <% if (!index) { %><td class="num" rowspan="<%= attributes.length %>"><%= line.kieu_giam_gia_dong === 'percent' ? fmt(line.giam_gia_dong || 0) + '%' : fmtMoney(line.giam_gia_dong || 0) %></td><% } %>
+                          <td class="num"><%= fmtMoney(row.amount) %></td>
+                          <% if (!lineIndex && !index) { %><td class="lot-total-cell" rowspan="<%= rows.length %>"><%= fmtMoney(bucket.total) %></td><% } %>
+                        </tr>
+                      <% }) %>
+                    <% }) %>
+                  </tbody>
+                <% }) %>
+                <tfoot><tr class="group-total-row"><td colspan="5" class="num">TỔNG CỘNG</td><td class="num"><%= fmtMoney(sourceGroup.total) %></td><td class="num"><%= fmtMoney(sourceGroup.total) %></td></tr></tfoot>
+              </table>
+            </div>
+          </section>
+        <% }) %>
+      </div>
+      <div class="summary-card">
+        <div class="summary-line"><span>Số dòng hàng</span><b><%= fmt(lines.length) %></b></div>
+        <div class="summary-line"><span>Tổng số lượng</span><b><%= fmt(totalQuantity) %></b></div>
+        <div class="summary-line"><span>Tổng tiền hàng</span><b><%= fmtMoney(totals.tong_tien_hang || 0) %></b></div>
+        <div class="summary-line"><span>Giảm giá phiếu nguồn</span><b><%= fmtMoney(sourceDiscount) %></b></div>
+        <div class="summary-line"><span>Tổng cộng</span><b><%= fmtMoney(totals.tong_tien || 0) %></b></div>
+        <% if (Number(totals.tong_du_kien || 0) > 0) { %><div class="summary-line"><span>Phiếu tạm</span><b><%= fmtMoney(totals.tong_du_kien) %></b></div><div class="summary-line"><span>Đã nhập hàng</span><b><%= fmtMoney(totals.tong_da_nhap || 0) %></b></div><% } %>
+        <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmtMoney(totals.da_tra_ncc || 0) %></b></div>
+        <div class="summary-line"><span>Nợ NCC</span><b><%= fmtMoney(totals.con_no_ncc || 0) %></b></div>
+        <% if (active && Number(totals.con_no_ncc || 0) > 0) { %><button type="button" class="kv-btn primary" style="width:100%;justify-content:center;margin-top:10px" data-purchase-group-pay="<%= ticket._id %>">Trả NCC</button><% } %>
+      </div>
+    </div>
+    <div class="page-actions page-actions--bordered detail-actions">
+      <% if (active) { %><button type="button" class="kv-btn primary" data-purchase-group-pay="<%= ticket._id %>" <%= Number(totals.con_no_ncc || 0) <= 0 ? 'disabled' : '' %>>Thanh toán</button><% } %>
+      <% if (active) { %><button type="button" class="kv-btn" data-purchase-group-cancel="<%= ticket._id %>">Tách phiếu tổng hợp</button><% } %>
+    </div>
+  </div>
+  <div class="po-detail-pane" data-tab-pane="payment">
+    <% if (legacyPaid > 0) { %><p>Thanh toán ghi nhận trước đây: <strong><%= fmtMoney(legacyPaid) %></strong>. Danh sách bên dưới hiển thị các phiếu chi liên kết.</p><% } %>
+    <table class="mini-table">
+      <thead><tr><th>Ngày</th><th>Mã phiếu chi</th><th class="num">Số tiền phân bổ</th><th>Sổ quỹ / Phương thức</th><th>Người tạo</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <% if (!payments.length) { %><tr><td colspan="6">Chưa có phiếu chi liên kết.</td></tr><% } %>
+        <% payments.forEach(function(payment) { const detail = payment.chi_tiet_thanh_toan || {}; const methods = [Number(detail.tien_mat || 0) > 0 ? 'Tiền mặt' : '', Number(detail.chuyen_khoan || 0) > 0 ? 'Chuyển khoản' : ''].filter(Boolean); const author = payment.nguoi_tao_id || {}; %>
+          <tr><td><%= formatDate(payment.ngay_lap || payment.created_at) %></td><td><%- payment._id ? refLink('receipt', payment._id, payment.ma_phieu || '--') : (payment.ma_phieu || '--') %></td><td class="num"><%= fmtMoney(paymentAmount(payment)) %></td><td><%= payment.so_quy_id && payment.so_quy_id.ten_so_quy || methods.join(' / ') || '--' %></td><td><%= author.ho_ten || author.email || author.ten_dang_nhap || '--' %></td><td><%= payment.trang_thai === 'cancelled' ? 'Đã hủy · ' : '' %><%= payment.ghi_chu || '--' %></td></tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="po-detail-pane" data-tab-pane="sources">
+    <table class="mini-table purchase-group-sources-table">
+      <thead><tr><th>Mã phiếu nguồn</th><th>Ngày nhập</th><th>Trạng thái</th><th class="num">Giá trị</th><th class="num">Đã trả NCC</th><th class="num">Nợ NCC</th></tr></thead>
+      <tbody>
+        <% if (!sources.length) { %><tr><td colspan="6">Không tìm thấy phiếu nguồn.</td></tr><% } %>
+        <% sources.forEach(function(source) {
+          const current = source.payment_current || {};
+          const effective = source.trang_thai === 'completed' && source.trang_thai_du_lieu !== 'inactive' && !source.deleted_at;
+          const sourceId = idOf(source._id);
+          const detailId = 'group-source-detail-' + idOf(ticket._id) + '-' + sourceId;
+          const sourceLines = source.detail_rows || lines.filter(line => idOf(line.phieu_nhap_id) === sourceId);
+          const sourceDetail = Object.assign({}, source, { detail_rows: sourceLines,
+            detail_summary: source.detail_summary || { tong_mat_hang: sourceLines.length, tong_so_luong: sourceLines.reduce((sum, line) => sum + Number(line.so_luong || 0), 0) } });
+        %>
+          <tr class="purchase-source-row" data-purchase-source-id="<%= sourceId %>">
+            <td><a class="ref-link purchase-source-code" data-purchase-source-toggle href="<%= sourceHref(source) %>" aria-expanded="false" aria-controls="<%= detailId %>"><%= source.ma_phieu_nhap || '--' %></a></td>
+            <td><%= formatDate(source.ngay_nhap || source.created_at) %></td>
+            <td><%= status(source.trang_thai) %><%= source.trang_thai_du_lieu === 'inactive' ? ' (không còn hiệu lực)' : '' %></td>
+            <td class="num"><%= fmtMoney(source.can_tra_ncc ?? source.tong_tien ?? 0) %></td>
+            <td class="num"><%= fmtMoney(current.paid ?? source.da_tra_ncc ?? 0) %></td>
+            <td class="num"><%= fmtMoney(effective ? current.debt ?? source.con_no_ncc ?? 0 : 0) %></td>
+          </tr>
+          <tr class="purchase-source-detail-row" id="<%= detailId %>" data-purchase-source-detail="<%= sourceId %>" hidden>
+            <td colspan="6"><%- include('_purchase-detail', { t: sourceDetail, showPurchaseActions: false }) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

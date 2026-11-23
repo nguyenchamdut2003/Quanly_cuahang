@@ -16,6 +16,7 @@ const {
   loadActiveCashBooks,
   loadSupplierUnpaidPurchases
 } = require('./helpers/debt.helper');
+const { acquirePurchaseGroupMutationLock } = require('../../services/purchaseGroup.service');
 
 function formatAdvanceStatus(status) {
   if (status === 'da_dung_het') return 'Đã dùng hết';
@@ -379,6 +380,7 @@ exports.applyAdvanceOffset = async function(req, res) {
     let result = null;
     session = await mongoose.startSession();
     await session.withTransaction(async function() {
+      await acquirePurchaseGroupMutationLock(storeId, session);
       const supplierQuery = Object.assign(
         { _id: supplierId },
         buildSupplierStoreAccessQuery(storeId)
@@ -393,7 +395,7 @@ exports.applyAdvanceOffset = async function(req, res) {
       const conLai = Math.max(0, Number(advance.con_lai || 0));
       if (conLai <= 0) throw new Error('Phiếu tạm ứng đã hết số dư.');
 
-      const purchases = await loadSupplierUnpaidPurchases(supplier._id, storeId);
+      const purchases = await loadSupplierUnpaidPurchases(supplier._id, storeId, { session });
       const purchaseMap = {};
       purchases.forEach(function(row) {
         purchaseMap[String(row._id)] = row;
@@ -495,12 +497,15 @@ exports.applyAdvanceOffset = async function(req, res) {
         hach_toan: true,
         allocation_type: 'can_tru_tam_ung_ncc',
         allocations: allocations.map(function(row) {
+          const source = purchaseMap[String(row.phieu_nhap_id)];
           return {
             phieu_nhap_id: row.phieu_nhap_id,
             ma_phieu_nhap: row.ma_phieu_nhap,
             so_tien: row.so_tien,
             con_no_truoc: row.con_no_truoc,
-            con_no_sau: row.con_no_sau
+            con_no_sau: row.con_no_sau,
+            legacy_paid_baseline: source && source.payment_current && source.payment_current.legacy_paid_fallback
+              ? Number(source.payment_current.paid) || 0 : 0
           };
         }),
         payment_v2: true,
@@ -524,12 +529,13 @@ exports.applyAdvanceOffset = async function(req, res) {
           Number(allocation.can_tra_ncc || 0),
           Number(allocation.da_tra_ncc || 0) + Number(allocation.con_no_truoc || 0)
         );
+        const nextPaid = Math.min(Number(allocation.da_tra_ncc || 0) + allocation.so_tien, payable);
         await PhieuNhap.updateOne(
           { _id: allocation.phieu_nhap_id },
           {
             $set: {
-              da_tra_ncc: Math.min(Number(allocation.da_tra_ncc || 0) + allocation.so_tien, payable),
-              con_no_ncc: allocation.con_no_sau
+              da_tra_ncc: nextPaid,
+              con_no_ncc: Math.max(0, payable - nextPaid)
             }
           },
           { session: session }

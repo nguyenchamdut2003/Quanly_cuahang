@@ -116,7 +116,9 @@ async function fetchPeriodAggregates(range, store) {
         ...rangeFilter(range, 'ngay_tra')
     };
     const purchaseFilter = {
-        trang_thai: { $ne: 'cancelled' },
+        // Only real posted purchases are expenses; drafts and legacy merged sources are not booked again.
+        trang_thai: 'completed',
+        trang_thai_du_lieu: { $ne: 'inactive' },
         deleted_at: null,
         ...storeFilter(store),
         ...rangeFilter(range, 'ngay_nhap')
@@ -131,7 +133,7 @@ async function fetchPeriodAggregates(range, store) {
     const [invoices, returns, purchases, chiReceipts] = await Promise.all([
         HoaDonBanHang.find(invoiceFilter).select('tong_tien thanh_toan').lean(),
         PhieuTraHang.find(returnFilter).select('tong_tien_tra').lean(),
-        PhieuNhap.find(purchaseFilter).select('tong_tien').lean(),
+        PhieuNhap.find(purchaseFilter).setOptions({ strictQuery: false }).select('tong_tien').lean(),
         PhieuThuChi.find(chiFilter).select('gia_tri phieu_nhap_id nha_cung_cap_id loai_thu_chi').lean()
     ]);
 
@@ -251,7 +253,8 @@ async function fetchRevenueExpenseRows(range, store) {
             .select('ma_hoa_don ngay_ban tong_tien thanh_toan ghi_chu')
             .sort({ ngay_ban: 1 })
             .lean(),
-        PhieuNhap.find({ trang_thai: { $ne: 'cancelled' }, deleted_at: null, ...sf, ...rangeFilter(range, 'ngay_nhap') })
+        PhieuNhap.find({ trang_thai: 'completed', trang_thai_du_lieu: { $ne: 'inactive' }, deleted_at: null, ...sf, ...rangeFilter(range, 'ngay_nhap') })
+            .setOptions({ strictQuery: false })
             .select('ma_phieu_nhap ngay_nhap tong_tien ghi_chu')
             .sort({ ngay_nhap: 1 })
             .lean(),

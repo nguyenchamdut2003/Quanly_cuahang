@@ -42,6 +42,7 @@
   ? String(safeFilters.so_quy_id)
   : '';
   const codeOf = locals.relatedCode || function(item) {
+  if (item.phieu_nhap_tong_hop_id) return item.phieu_nhap_tong_hop_id.ma_phieu_tong_hop || item.ma_chung_tu_goc || '';
   const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
   const allocPn = firstAlloc?.phieu_nhap_id;
   const allocHd = firstAlloc?.hoa_don_id;
@@ -54,6 +55,7 @@
   };
   const relatedDocLink = function(item) {
   const code = codeOf(item);
+  if (item.phieu_nhap_tong_hop_id) return refLink('phieu_nhap_tong_hop', item.phieu_nhap_tong_hop_id, code);
   if (item.phieu_tra_hang_nhap_id) return refLink('supplier_return', item.phieu_tra_hang_nhap_id, code);
   if (item.phieu_tra_hang_id) return refLink('customer_return', item.phieu_tra_hang_id, code);
   if (item.phieu_nhap_id) return refLink('purchase', item.phieu_nhap_id, code);

@@ -29,6 +29,7 @@ const { loadReturnsLinkedVatChuaMap } = require('../services/vatChuaDetail.servi
 const { truTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
+const { acquirePurchaseGroupMutationLock } = require('../services/purchaseGroup.service');
 
 function disabledTrashOperation() {
   const error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
@@ -181,6 +182,11 @@ function returnPaymentIsV2(body = {}) {
 
 function withSessionOption(session) {
   return session ? { session } : {};
+}
+
+function isEffectiveReturnHeader(header) {
+  return Boolean(header && header.trang_thai !== 'cancelled'
+    && header.trang_thai_du_lieu !== 'inactive' && !header.deleted_at);
 }
 
 function normalizeSearchText(value) {
@@ -504,14 +510,14 @@ async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}
       .select('phieu_nhap_id so_luong hang_hoa_id lo_hang_id lot_info don_gia_nhap gia_tri_thuoc_tinh_id')
       .lean(),
     CTPhieuTraHangNhap.find({ phieu_nhap_id: { $in: ids } })
-      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
+      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai trang_thai_du_lieu deleted_at' })
       .select('phieu_nhap_id ct_phieu_nhap_id so_luong phieu_tra_nhap_id ten_quy_cach gia_tri_thuoc_tinh_id')
       .lean()
   ]);
 
   const returnedByPurchaseSlot = {};
   returnRows.forEach(row => {
-    if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
+    if (!isEffectiveReturnHeader(row.phieu_tra_nhap_id)) return;
     const pid = String(row.phieu_nhap_id);
     if (!row.ct_phieu_nhap_id) return;
     const ctId = String(row.ct_phieu_nhap_id);
@@ -836,12 +842,12 @@ async function loadCreateData(storeId) {
 /**
  * Khớp dòng trả với dòng nhập đã bung theo quy cách/lô (expandCtPhieuNhapReturnSlots).
  */
-async function matchPurchaseReturnSlot(detail, item, khoId) {
+async function matchPurchaseReturnSlot(detail, item, khoId, session) {
   const slots = expandCtPhieuNhapReturnSlots(detail);
   let resolvedTenQc = String(item.ten_quy_cach || '').trim();
   let tonKhoLoQcId = isObjectId(item.ton_kho_lo_quy_cach_id) ? item.ton_kho_lo_quy_cach_id : null;
   if (tonKhoLoQcId) {
-    const qc = await TonKhoLoQuyCach.findById(tonKhoLoQcId).lean();
+    const qc = await TonKhoLoQuyCach.findById(tonKhoLoQcId).session(session || null).lean();
     if (!qc) throw new Error('Không tìm thấy tồn quy cách trong lô');
     if (String(qc.kho_id) !== String(khoId)) throw new Error('Tồn quy cách không thuộc kho trả');
     if (String(qc.hang_hoa_id) !== String(item.hang_hoa_id)) throw new Error('Tồn quy cách không khớp hàng hóa');
@@ -881,7 +887,7 @@ async function matchPurchaseReturnSlot(detail, item, khoId) {
       hang_hoa_id: item.hang_hoa_id,
       lo_hang_id: lotId,
       $or: [{ ten_quy_cach: resolvedTenQc }, { ten_thuoc_tinh: resolvedTenQc }]
-    }).select('_id').lean();
+    }).select('_id').session(session || null).lean();
     if (qd) tonKhoLoQcId = qd._id;
   }
 
@@ -900,7 +906,7 @@ async function matchPurchaseReturnSlot(detail, item, khoId) {
 }
 
 async function validateReturnItems(params) {
-  const { items, storeId, khoId, phieuNhapId, returnId, ignorePhieuTraNhapIds } = params;
+  const { items, storeId, khoId, phieuNhapId, returnId, ignorePhieuTraNhapIds, session } = params;
   const ignoreSet = new Set((ignorePhieuTraNhapIds || []).filter(id => isObjectId(id)).map(id => String(id)));
   if (!items.length) throw new Error('Vui lòng chọn ít nhất một hàng hóa cần trả');
   if (!isObjectId(khoId)) throw new Error('Vui lòng chọn kho trả hàng');
@@ -908,7 +914,7 @@ async function validateReturnItems(params) {
   const purchase = isObjectId(phieuNhapId)
     ? await PhieuNhap.findOne(activePurchaseDataFilter({ _id: phieuNhapId })).select(
       '_id cua_hang_id nha_cung_cap_id kho_id trang_thai ngay_nhap created_at han_tra_hang_nhap so_ngay_duoc_tra_hang_nhap'
-    ).lean()
+    ).session(session || null).lean()
     : null;
   if (isObjectId(phieuNhapId) && !purchase) {
     throw new Error('Phiếu nhập gốc không hợp lệ');
@@ -928,6 +934,7 @@ async function validateReturnItems(params) {
     purchaseDetailsPopulated = await CTPhieuNhap.find({ phieu_nhap_id: phieuNhapId })
       .populate({ path: 'hang_hoa_id', select: 'quan_ly_theo_lo ma_hang ten_hang' })
       .populate({ path: 'gia_tri_thuoc_tinh_id', select: 'ten_gia_tri ma_gia_tri' })
+      .session(session || null)
       .lean();
 
     purchaseDetailsPopulated.forEach(ct => {
@@ -943,13 +950,14 @@ async function validateReturnItems(params) {
       currentReturnFilter.phieu_tra_nhap_id = { $ne: returnId };
     }
     const completedReturns = await CTPhieuTraHangNhap.find(currentReturnFilter)
-      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
+      .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai trang_thai_du_lieu deleted_at' })
+      .session(session || null)
       .lean();
 
     completedReturns.forEach(row => {
       const ptId0 = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
       if (ptId0 && ignoreSet.has(String(ptId0))) return;
-      if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
+      if (!isEffectiveReturnHeader(row.phieu_tra_nhap_id)) return;
       if (!row.ct_phieu_nhap_id) return;
       const ctId = String(row.ct_phieu_nhap_id);
       const key = parseReturnLineSlotKey(ctId, row);
@@ -965,6 +973,7 @@ async function validateReturnItems(params) {
   const productIds = items.map(item => item.hang_hoa_id);
   const products = await HangHoa.find({ _id: { $in: productIds } })
     .select('_id ten_hang don_vi_tinh_id quan_ly_theo_lo')
+    .session(session || null)
     .lean();
   const productMap = products.reduce((map, product) => {
     map[String(product._id)] = product;
@@ -975,6 +984,13 @@ async function validateReturnItems(params) {
   const requestedSlotTotals = {};
 
   for (const item of items) {
+    if (isObjectId(phieuNhapId)) {
+      if (item.phieu_nhap_id && String(item.phieu_nhap_id) !== String(phieuNhapId)) {
+        throw new Error('Dòng trả hàng không khớp với phiếu nhập gốc đã chọn');
+      }
+    } else if (item.phieu_nhap_id || item.ct_phieu_nhap_id) {
+      throw new Error('Vui lòng chọn phiếu nhập gốc để trả theo chi tiết nguồn');
+    }
     const product = productMap[item.hang_hoa_id];
     if (!product) throw new Error('Hàng hóa không hợp lệ');
     if (!Number.isFinite(item.so_luong) || item.so_luong <= 0) {
@@ -985,7 +1001,7 @@ async function validateReturnItems(params) {
     if (!Number.isFinite(item.gia_tra_lai) || item.gia_tra_lai < 0) item.gia_tra_lai = 0;
     if (!Number.isFinite(item.gia_nhap) || item.gia_nhap < 0) item.gia_nhap = item.gia_tra_lai;
 
-    const inventory = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id }).lean();
+    const inventory = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id }).session(session || null).lean();
     if (!inventory || Number(inventory.so_luong || 0) < item.so_luong) {
       throw new Error('Không cho trả vượt tồn kho hiện tại');
     }
@@ -1005,7 +1021,7 @@ async function validateReturnItems(params) {
         throw new Error('Hàng trả không khớp với phiếu nhập gốc');
       }
 
-      const matched = await matchPurchaseReturnSlot(detail, item, khoId);
+      const matched = await matchPurchaseReturnSlot(detail, item, khoId, session);
       resolvedTenQc = matched.resolvedTenQc || '';
       lotId = matched.lotId ? matched.lotId : '';
       tonKhoLoQcIdOut = matched.ton_kho_lo_quy_cach_id;
@@ -1020,11 +1036,11 @@ async function validateReturnItems(params) {
           hang_hoa_id: item.hang_hoa_id,
           lo_hang_id: lotId,
           $or: [{ ten_quy_cach: resolvedTenQc }, { ten_thuoc_tinh: resolvedTenQc }]
-        }).lean();
+        }).session(session || null).lean();
         if (!qcInv || Number(qcInv.so_luong || 0) < item.so_luong) {
           throw new Error('Tồn quy cách trong lô không đủ để trả');
         }
-        const lot = await LoHang.findById(lotId).lean();
+        const lot = await LoHang.findById(lotId).session(session || null).lean();
         if (!lot || Number(lot.so_luong_con_lai || 0) < item.so_luong) {
           throw new Error('Không cho tồn kho/lô âm');
         }
@@ -1035,14 +1051,15 @@ async function validateReturnItems(params) {
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: lotId,
             $or: [{ gia_tri_thuoc_tinh_id: null }, { gia_tri_thuoc_tinh_id: { $exists: false } }]
-          }).lean();
-          const lot = await LoHang.findById(lotId).lean();
+          }).session(session || null).lean();
+          const lot = await LoHang.findById(lotId).session(session || null).lean();
           if (!lotInventory || Number(lotInventory.so_luong || 0) < item.so_luong || !lot || Number(lot.so_luong_con_lai || 0) < item.so_luong) {
             throw new Error('Không cho tồn kho/lô âm');
           }
         } else {
           const availableLots = await TonKhoLo.find({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id, so_luong: { $gt: 0 } })
             .populate('lo_hang_id')
+            .session(session || null)
             .lean();
           const availableQty = availableLots.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
           if (availableQty < item.so_luong) throw new Error('Tồn kho theo lô không đủ để tự chọn FEFO');
@@ -1058,14 +1075,15 @@ async function validateReturnItems(params) {
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: lotId,
             $or: [{ gia_tri_thuoc_tinh_id: null }, { gia_tri_thuoc_tinh_id: { $exists: false } }]
-          }).lean();
-          const lot = await LoHang.findById(lotId).lean();
+          }).session(session || null).lean();
+          const lot = await LoHang.findById(lotId).session(session || null).lean();
           if (!lotInventory || Number(lotInventory.so_luong || 0) < item.so_luong || !lot || Number(lot.so_luong_con_lai || 0) < item.so_luong) {
             throw new Error('Không cho tồn kho/lô âm');
           }
         } else {
           const availableLots = await TonKhoLo.find({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id, so_luong: { $gt: 0 } })
             .populate('lo_hang_id')
+            .session(session || null)
             .lean();
           const availableQty = availableLots.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
           if (availableQty < item.so_luong) throw new Error('Tồn kho theo lô không đủ để tự chọn FEFO');
@@ -1076,7 +1094,7 @@ async function validateReturnItems(params) {
     }
 
     normalized.push({
-      phieu_nhap_id: isObjectId(item.phieu_nhap_id) ? item.phieu_nhap_id : (isObjectId(phieuNhapId) ? phieuNhapId : undefined),
+      phieu_nhap_id: isObjectId(phieuNhapId) ? phieuNhapId : undefined,
       ct_phieu_nhap_id: isObjectId(item.ct_phieu_nhap_id) ? item.ct_phieu_nhap_id : undefined,
       hang_hoa_id: item.hang_hoa_id,
       lo_hang_id: lotId || undefined,
@@ -1621,12 +1639,12 @@ async function buildPurchaseReturnGridItems(purchase, storeId, requestedKhoId, o
     .lean();
 
   const returnRows = await CTPhieuTraHangNhap.find({ phieu_nhap_id: purchase._id })
-    .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai' })
+    .populate({ path: 'phieu_tra_nhap_id', select: 'trang_thai trang_thai_du_lieu deleted_at' })
     .lean();
 
   const returnedBySlot = {};
   returnRows.forEach(row => {
-    if (row.phieu_tra_nhap_id && row.phieu_tra_nhap_id.trang_thai === 'cancelled') return;
+    if (!isEffectiveReturnHeader(row.phieu_tra_nhap_id)) return;
     const retId = row.phieu_tra_nhap_id && (row.phieu_tra_nhap_id._id || row.phieu_tra_nhap_id);
     if (retId && ignoreReturnIds.has(String(retId))) return;
     if (!row.ct_phieu_nhap_id) return;
@@ -2065,7 +2083,7 @@ exports.createSubmit = async function(req, res, next) {
     const requestedReturnDate = body.ngay_tra ? new Date(body.ngay_tra) : null;
     const returnDate = requestedReturnDate && !isNaN(requestedReturnDate.getTime()) ? requestedReturnDate : new Date();
     const rawItems = parseItems(body.items_json || body.items);
-    const detailRows = submitMode === 'completed'
+    let detailRows = submitMode === 'completed'
       ? await validateReturnItems({ items: rawItems, storeId, khoId, phieuNhapId })
       : await validateReturnItems({ items: rawItems, storeId, khoId, phieuNhapId }).catch(error => {
         if (String(error.message || '').includes('tồn kho')) throw error;
@@ -2114,6 +2132,17 @@ exports.createSubmit = async function(req, res, next) {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
+        await acquirePurchaseGroupMutationLock(storeId, session);
+        if (phieuNhapId) {
+          const currentPurchase = await PhieuNhap.findOne(activePurchaseDataFilter({ _id: phieuNhapId, cua_hang_id: storeId }))
+            .select('nha_cung_cap_id').session(session).lean();
+          if (!currentPurchase || getObjectIdValue(currentPurchase.nha_cung_cap_id) !== supplierId) {
+            throw new Error('Phiếu nhập gốc đã thay đổi, vui lòng tải lại trước khi trả hàng');
+          }
+        }
+        detailRows = await validateReturnItems({
+          items: parseItems(body.items_json || body.items), storeId, khoId, phieuNhapId, session
+        });
         const createdRows = await PhieuTraHangNhap.create([{
           cua_hang_id: storeId,
           kho_id: khoId,
@@ -2214,30 +2243,13 @@ exports.detail = async function(req, res, next) {
 
 exports.complete = async function(req, res) {
   try {
-    const returnDoc = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id }));
+    const storeId = await resolveStoreId(req);
+    if (!isObjectId(storeId)) return res.status(400).json({ success: false, message: 'Cửa hàng không hợp lệ' });
+    const returnFilter = activeReturnImportDataFilter({ _id: req.params.id, cua_hang_id: storeId });
+    let returnDoc = await PhieuTraHangNhap.findOne(returnFilter);
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
     if (returnDoc.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (returnDoc.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
-    const rawRows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: returnDoc._id }).lean();
-    const detailRows = await validateReturnItems({
-      items: rawRows.map(row => ({
-        hang_hoa_id: row.hang_hoa_id,
-        lo_hang_id: row.lo_hang_id,
-        phieu_nhap_id: row.phieu_nhap_id,
-        ct_phieu_nhap_id: row.ct_phieu_nhap_id,
-        ten_quy_cach: row.ten_quy_cach || '',
-        ton_kho_lo_quy_cach_id: row.ton_kho_lo_quy_cach_id || '',
-        gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || '',
-        so_luong: row.so_luong,
-        gia_nhap: row.gia_nhap,
-        gia_tra_lai: row.gia_tra_lai || row.don_gia,
-        ghi_chu: row.ghi_chu
-      })),
-      storeId: returnDoc.cua_hang_id,
-      khoId: returnDoc.kho_id,
-      phieuNhapId: returnDoc.phieu_nhap_id,
-      returnId: returnDoc._id
-    });
     const cashBookId = resolveCashBookIdFromBody(req.body || {}) || getObjectIdValue(returnDoc.so_quy_id);
     const payment = normalizePaymentDetail(req.body || {}, returnDoc.ncc_da_tra || 0);
     const paymentDetail = payment.amount > 0 ? payment.detail : (returnDoc.chi_tiet_thanh_toan || null);
@@ -2250,6 +2262,22 @@ exports.complete = async function(req, res) {
     const session = await mongoose.startSession();
     try {
       await session.withTransaction(async () => {
+        await acquirePurchaseGroupMutationLock(storeId, session);
+        returnDoc = await PhieuTraHangNhap.findOne(returnFilter).session(session);
+        if (!returnDoc) throw new Error('Không tìm thấy phiếu trả hàng nhập');
+        if (returnDoc.trang_thai === 'cancelled') throw new Error('Phiếu đã hủy');
+        if (returnDoc.trang_thai === 'completed') return;
+        const rawRows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: returnDoc._id }).session(session).lean();
+        const detailRows = await validateReturnItems({
+          items: rawRows.map(row => ({
+            hang_hoa_id: row.hang_hoa_id, lo_hang_id: row.lo_hang_id,
+            phieu_nhap_id: row.phieu_nhap_id, ct_phieu_nhap_id: row.ct_phieu_nhap_id,
+            ten_quy_cach: row.ten_quy_cach || '', ton_kho_lo_quy_cach_id: row.ton_kho_lo_quy_cach_id || '',
+            gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || '', so_luong: row.so_luong,
+            gia_nhap: row.gia_nhap, gia_tra_lai: row.gia_tra_lai || row.don_gia, ghi_chu: row.ghi_chu
+          })),
+          storeId, khoId: returnDoc.kho_id, phieuNhapId: returnDoc.phieu_nhap_id, returnId: returnDoc._id, session
+        });
         await completeInventory(returnDoc, detailRows, req.user?._id, { session });
         returnDoc.trang_thai = 'completed';
         returnDoc.ngay_tra = completeDate;

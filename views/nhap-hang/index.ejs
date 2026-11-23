@@ -13,7 +13,7 @@
     const paid = Number(ticket.da_tra_ncc ?? 0) || 0;
     return Math.max(0, payable - paid);
   };
-  const summaryTotals = safeTickets.reduce((sum, ticket) => {
+  const summaryTotals = locals.summaryTotals || safeTickets.reduce((sum, ticket) => {
     sum.orderTotal += Number(ticket.tong_tien ?? ticket.can_tra_ncc ?? 0);
     sum.paid += Number(ticket.da_tra_ncc ?? 0);
     sum.debt += purchaseRemainDue(ticket);
@@ -141,13 +141,14 @@
     .radio-pill{flex:1;height:30px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:13px;color:#111827}
     .filter-control{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none}
     .po-main{min-width:0;display:flex;flex-direction:column;gap:10px}
-    .po-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
-    .po-search-group{display:flex;align-items:center;gap:8px;flex:1;max-width:700px}
+    .po-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+    .po-search-group{display:flex;align-items:center;gap:8px;flex:1 1 450px;max-width:700px}
     .po-search{position:relative;flex:1;min-width:220px}
     .po-search input{width:100%;height:31px;border:1px solid #cfd8e3;border-radius:7px;padding:0 38px 0 12px;font-size:13px;outline:none}
     .po-sort-label{font-size:12px;font-weight:800;color:#344054;white-space:nowrap}
     .po-sort-select{height:31px;width:190px;border:1px solid #cfd8e3;border-radius:7px;background:#fff;color:#111827;padding:0 10px;font-size:13px;outline:none}
-    .toolbar-actions{display:flex;align-items:center;gap:8px}
+    .toolbar-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;margin-left:auto}
+    .toolbar-actions .kv-btn{white-space:nowrap}
     .kv-btn{height:31px;border:1px solid #cfd8e3;background:#fff;border-radius:6px;padding:0 12px;color:#111827;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:7px;cursor:pointer;text-decoration:none}
     .kv-btn.primary{border-color:#0070f4;color:#0070f4}
     .kv-btn.danger{border-color:#f04438;color:#b42318;background:#fff}
@@ -156,15 +157,15 @@
     .toolbar-actions .purchase-delete-btn:hover{background:#b42318!important;border-color:#b42318!important}
     .supplier-code-link{color:#0070f4;text-decoration:none;font-weight:700}
     .supplier-code-link:hover{text-decoration:underline}
-    .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-x:auto;overflow-y:auto}
-    .po-table{width:100%;table-layout:fixed;border-collapse:collapse}
+    .po-table-wrap{flex:1;min-height:0;background:#fff;border-radius:6px;overflow-x:auto;overflow-y:auto;container-type:inline-size}
+    .po-table{width:100%;min-width:1240px;table-layout:fixed;border-collapse:collapse}
     .po-table th{height:37px;background:#e8f3ff;color:#111827;font-size:12px;font-weight:800;text-align:left;border-bottom:1px solid #bcd9ff;padding:0 10px;white-space:nowrap;overflow:visible}
     .po-table td{height:43px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;overflow:visible}
     .po-table tbody tr:hover{background:#f7fbff}
     .po-table .num{text-align:right}
-    .check-col,.star-col{width:36px;text-align:center}
+    .po-table>thead>tr>th{white-space:normal;line-height:1.3;padding:8px 10px}
+    .check-col{width:36px;text-align:center}
     .row-check{width:15px;height:15px;accent-color:#0070f4}
-    .star-col{color:#8b95a1}
     .status-badge{display:inline-flex;align-items:center;height:22px;border-radius:4px;background:#dff7e9;color:#008a3d;padding:0 7px;font-size:12px;font-weight:800}
     .status-badge.draft{background:#fff4d6;color:#9a6700}
     .status-badge.merged{background:#f2f4f7;color:#475467}
@@ -172,14 +173,15 @@
     .col-code{width:130px}
     .col-time{width:160px}
     .col-ncc-code{width:95px}
-    .col-order-total{width:130px}
-    .col-paid{width:110px}
-    .col-payable{width:120px}
+    .col-order-total{width:170px}
+    .col-paid{width:120px}
+    .col-payable{width:140px}
     .col-status{width:120px}
     .cell-ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .expand-row{cursor:pointer}
     .po-detail-row td{padding:0;background:#fff}
     .po-detail{border-top:1px solid #dbe4ee;background:#fff}
+    .purchase-group-row+.po-detail-row>td>.po-detail{width:100cqw;max-width:100%;box-sizing:border-box;position:sticky;left:0}
     .po-detail-tabs{display:flex;gap:18px;padding:10px 12px 0;border-bottom:1px solid #e6edf5}
     .po-detail-tab{border:0;background:none;padding:8px 0;font-size:13px;font-weight:700;color:#667085;cursor:pointer;border-bottom:2px solid transparent}
     .po-detail-tab.is-active{color:#0070f4;border-color:#0070f4}
@@ -206,6 +208,27 @@
     .grouped-lot-table .lot-total-cell{width:120px;font-weight:800;color:#006dff;text-align:right;vertical-align:middle}
     .grouped-lot-table .group-total-row td{background:#ffe900;font-weight:800;color:#111827}
     .grouped-lot-table .group-total-row .num{color:#111827}
+    .purchase-group-body>.purchase-group-goods{min-width:0}
+    .purchase-group-body>.summary-card{min-width:0;align-self:start}
+    .purchase-group-body .summary-line{gap:12px}
+    .purchase-group-body .summary-line b{text-align:right}
+    .purchase-source-group{margin-bottom:16px;border:1px solid #dbe4ee;border-radius:6px;overflow:hidden}
+    .purchase-source-group:last-child{margin-bottom:0}
+    .purchase-source-title{padding:10px 12px;background:#e8f3ff;font-size:13px;font-weight:800;color:#111827}
+    .purchase-source-title .ref-link{font-weight:800}
+    .purchase-source-table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .purchase-source-table{width:100%;min-width:680px;table-layout:auto}
+    .purchase-source-table th,.purchase-source-table td{height:auto;padding:8px;white-space:normal}
+    .purchase-source-table .purchase-product-title td{background:#f4f8fc;font-weight:800}
+    .purchase-group-sources-table{table-layout:fixed}
+    .purchase-source-detail-row>td{padding:0}
+    .purchase-source-detail-row .po-detail{width:100%;box-sizing:border-box}
+    .purchase-source-detail-row .detail-body>div{min-width:0}
+    .purchase-source-detail-row .detail-body>div:first-child{overflow-x:auto}
+    .purchase-source-detail-row .summary-card{align-self:start}
+    .purchase-source-detail-row .summary-line{gap:12px}
+    .purchase-source-detail-row .mini-table th,.purchase-source-detail-row .mini-table td{height:auto;padding:8px;white-space:normal}
+    @media(max-width:1350px){.detail-body.purchase-group-body,.purchase-source-detail-row .detail-body{grid-template-columns:minmax(0,1fr)}}
     .lot-note{font-size:11px;color:#667085}
     .summary-card{border:1px solid #e4eaf2;border-radius:6px;padding:10px}
     .summary-line{display:flex;justify-content:space-between;font-size:12px;margin:6px 0}
@@ -225,7 +248,7 @@
     .po-modal textarea{width:100%;min-height:90px;border:1px solid #cfd8e3;border-radius:6px;padding:8px}
     .quick-pay-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
     .quick-pay-grid label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#475467}
-    .quick-pay-grid label.full{grid-column:1/-1}
+    .quick-pay-grid label.full,.quick-pay-grid > .full{grid-column:1/-1}
     .quick-pay-grid input,.quick-pay-grid select,.quick-pay-grid textarea{width:100%;height:36px;border:1px solid #cfd8e3;border-radius:6px;padding:7px 8px;font-size:14px}
     .quick-pay-grid textarea{height:76px;min-height:76px}
     .pay-total-readonly{font-size:15px;font-weight:700;color:#006dff;padding:8px 0}
@@ -275,14 +298,14 @@
       .filter-block{margin-bottom:14px}
       .po-main{flex:none!important;width:100%;min-width:0}
       .po-toolbar{flex-direction:column;align-items:stretch;gap:10px}
-      .po-search-group{flex-direction:column;align-items:stretch;max-width:none!important;width:100%;gap:8px}
+      .po-search-group{flex:none;flex-direction:column;align-items:stretch;max-width:none!important;width:100%;gap:8px}
       .po-search{min-width:0!important;width:100%}
       .po-sort-label{margin-top:2px}
       .po-sort-select{width:100%!important;max-width:none}
       .toolbar-actions{width:100%;flex-wrap:wrap;justify-content:flex-start;gap:8px}
       .toolbar-actions .kv-btn{flex:1 1 calc(50% - 4px);min-width:0;justify-content:center}
       .po-table-wrap{flex:none!important;min-height:220px;max-height:none!important;overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch}
-      .po-table{min-width:920px;table-layout:auto}
+      .po-table{table-layout:auto}
       .detail-grid{grid-template-columns:1fr 1fr!important}
       .detail-grid .item[style*="grid-column"]{grid-column:auto!important}
       .detail-body{grid-template-columns:1fr!important}
@@ -348,6 +371,14 @@
       <aside class="po-sidebar">
         <h1 class="po-title">Nhập hàng</h1>
         <div class="filter-block">
+          <div class="filter-title">Loại chứng từ</div>
+          <select class="filter-control" name="view_mode" aria-label="Loại chứng từ nhập hàng" onchange="submitPoFilters()">
+            <option value="" <%= !safeFilters.view_mode ? 'selected' : '' %>>Phiếu tổng hợp và phiếu độc lập</option>
+            <option value="sources" <%= safeFilters.view_mode === 'sources' ? 'selected' : '' %>>Tất cả phiếu nguồn</option>
+            <option value="groups" <%= safeFilters.view_mode === 'groups' ? 'selected' : '' %>>Chỉ phiếu tổng hợp</option>
+          </select>
+        </div>
+        <div class="filter-block">
           <div class="filter-title">Trạng thái</div>
           <label class="check-line"><input type="checkbox" name="trang_thai" value="draft" <%= selectedStatuses.includes('draft') ? 'checked' : '' %> onchange="submitPoFilters()"> Phiếu tạm</label>
           <label class="check-line"><input type="checkbox" name="trang_thai" value="completed" <%= selectedStatuses.includes('completed') ? 'checked' : '' %> onchange="submitPoFilters()"> Đã nhập hàng</label>
@@ -397,10 +428,10 @@
             </select>
           </div>
           <div class="toolbar-actions">
+            <button type="button" class="kv-btn" id="openPurchaseMergeModal">Gộp phiếu</button>
+            <button class="kv-btn" type="button">Xuất file ▾</button>
             <button type="button" class="kv-btn danger purchase-delete-btn" id="openPurchaseTrashModal"><i class="fa-solid fa-trash-can"></i> Xóa</button>
             <a class="kv-btn primary" href="/nhap-hang/create">+ Nhập hàng</a>
-            <button type="button" class="kv-btn" id="openPurchaseMergeModal">Gộp đơn</button>
-            <button class="kv-btn" type="button">Xuất file ▾</button>
           </div>
         </div>
 
@@ -409,7 +440,6 @@
             <thead>
               <tr>
                 <th class="check-col"><input class="row-check" type="checkbox"></th>
-                <th class="star-col">☆</th>
                 <th class="col-code">Mã nhập hàng</th>
                 <th class="col-time">Thời gian</th>
                 <th class="col-ncc-code">Mã NCC</th>
@@ -422,9 +452,8 @@
             </thead>
             <tbody>
               <tr class="customer-summary-row">
-                <td class="check-col"></td>
-                <td class="star-col"></td>
-                <td colspan="4" style="text-align: right; font-weight: bold; color: #1e293b;">Tổng cộng:</td>
+                <td colspan="4"></td>
+                <td style="font-weight: bold; color: #1e293b;">Tổng cộng:</td>
                 <td class="num"><strong><%= fmtMoney(summaryTotals.orderTotal) %></strong></td>
                 <td class="num"><strong><%= fmtMoney(summaryTotals.paid) %></strong></td>
                 <td class="num"><strong><%= fmtMoney(summaryTotals.debt) %></strong></td>
@@ -432,12 +461,36 @@
               </tr>
               <% if (safeTickets.length) { %>
                 <% safeTickets.forEach(function(t) { %>
+                  <% if (t.record_type === 'group') { %>
+                    <tr class="expand-row purchase-group-row" data-expand-id="<%= t._id %>" data-purchase-group-id="<%= t._id %>">
+                      <td class="check-col"></td>
+                      <td class="cell-ellipsis"><a class="ref-link group-code-link" href="/nhap-hang?group=<%= encodeURIComponent(String(t._id)) %>"><%= t.ma_phieu_nhap || t.ma_phieu_tong_hop %></a><small style="display:block;color:#667085">Tổng hợp <%= Number(t.source_count || (t.phieu_nguon_ids || []).length || 0) %> phiếu nguồn</small></td>
+                      <td class="cell-ellipsis"><%= formatDate(t.ngay_nhap || t.ngay_gop || t.created_at) %></td>
+                      <td class="cell-ellipsis">
+                        <% if (t.nha_cung_cap_id && t.nha_cung_cap_id._id) { %>
+                          <%- refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '--', 'onclick="event.stopPropagation()"') %>
+                        <% } else { %>
+                          <%= t.nha_cung_cap_id && t.nha_cung_cap_id.ma_ncc || '--' %>
+                        <% } %>
+                      </td>
+                      <td class="cell-ellipsis"><%= t.nha_cung_cap_id && t.nha_cung_cap_id.ten_ncc || '--' %></td>
+                      <td class="num"><%= fmtMoney(t.tong_tien || 0) %><small style="display:block;color:#667085">Đã nhập: <%= fmtMoney(t.tong_da_nhap || 0) %><br>Phiếu tạm: <%= fmtMoney(t.tong_du_kien || 0) %></small></td>
+                      <td class="num"><%= fmtMoney(t.da_tra_ncc || 0) %></td>
+                      <td class="num"><%= fmtMoney(purchaseRemainDue(t)) %><% if (t.debt_warning) { %> <span title="Có phiếu nguồn quá hạn trả NCC">⚠️</span><% } %></td>
+                      <td><span class="status-badge"><%= t.trang_thai_label || 'Phiếu tổng hợp' %></span><small style="display:block;color:#667085">Kho: <%= t.stock_status_label || 'Theo phiếu nguồn' %></small></td>
+                    </tr>
+                    <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
+                      <td colspan="9"><%- include('_group-detail', { group: t, fmt: fmt, fmtMoney: fmtMoney, formatDate: formatDate, statusBadge: statusBadge, statusLabel: statusLabel, lotLabel: lotLabel, detailGroups: detailGroups, detailRowsForGroup: detailRowsForGroup, refLink: refLink }) %></td>
+                    </tr>
+                  <% } else { %>
                   <tr class="expand-row purchase-row"
                     data-expand-id="<%= t._id %>"
                     data-purchase-id="<%= t._id %>"
                     data-purchase-code="<%= t.ma_phieu_nhap || '' %>"
                     data-purchase-date="<%= new Date(t.ngay_nhap || t.created_at).toISOString() %>"
                     data-purchase-status="<%= t.trang_thai || '' %>"
+                    data-grouped="<%= t.group_url ? '1' : '0' %>"
+                    data-warehouse-id="<%= t.kho_id && (t.kho_id._id || t.kho_id) || '' %>"
                     data-has-return="<%= t.has_return ? '1' : '0' %>"
                     data-supplier-id="<%= t.nha_cung_cap_id ? t.nha_cung_cap_id._id : '' %>"
                     data-supplier-code="<%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ma_ncc || '') : '' %>"
@@ -446,8 +499,7 @@
                     data-paid="<%= Number(t.da_tra_ncc ?? 0) %>"
                   >
                     <td class="check-col"><input class="row-check purchase-select-check" type="checkbox" value="<%= t._id %>" onclick="event.stopPropagation()"></td>
-                    <td class="star-col">☆</td>
-                    <td class="cell-ellipsis"><%- refLink('purchase', t, t.ma_phieu_nhap || '') %></td>
+                    <td class="cell-ellipsis"><%- refLink('purchase', t, t.ma_phieu_nhap || '') %><% if (t.group_url) { %><small style="display:block"><a class="ref-link" href="<%= t.group_url %>" onclick="event.stopPropagation()"><%= t.ma_phieu_tong_hop || 'Phiếu tổng hợp' %></a></small><% } %></td>
                     <td class="cell-ellipsis"><%= formatDate(t.ngay_nhap || t.created_at) %></td>
                     <td class="cell-ellipsis">
                       <% if (t.nha_cung_cap_id && t.nha_cung_cap_id._id) { %>
@@ -481,175 +533,14 @@
                     <td><span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span></td>
                   </tr>
                   <tr class="po-detail-row" id="detail-<%= t._id %>" style="display:none">
-                    <td colspan="10">
-                      <div class="po-detail">
-                        <div class="po-detail-tabs">
-                          <button class="po-detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
-                          <button class="po-detail-tab" type="button" data-tab-target="payment">Lịch sử thanh toán</button>
-                        </div>
-                        <div class="po-detail-pane is-active" data-tab-pane="info">
-                          <div class="detail-head">
-                            <div>
-                              <div class="detail-title"><%- refLink('purchase', t, t.ma_phieu_nhap || '--') %></div>
-                              <span class="status-badge <%= statusBadge(t.trang_thai) %>"><%= statusLabel(t.trang_thai) %></span>
-                            </div>
-                            <div><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></div>
-                          </div>
-                          <div class="detail-grid">
-                            <div class="item">Người tạo<b><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || t.nguoi_tao_id.email || '--') : '--' %></b></div>
-                            <div class="item">Người nhập<b><%= t.nguoi_tao_id ? (t.nguoi_tao_id.ho_ten || '--') : '--' %></b></div>
-                            <div class="item">Ngày nhập<b><%= formatDate(t.ngay_nhap || t.created_at) %></b></div>
-                            <div class="item">Kho nhập<b><%= t.kho_id ? (t.kho_id.ten_kho || t.kho_id.ma_kho || '--') : '--' %></b></div>
-                            <div class="item">Tên NCC<b><%= t.nha_cung_cap_id ? (t.nha_cung_cap_id.ten_ncc || '--') : '--' %></b></div>
-                            <div class="item">Mã NCC<b>
-                              <% if (t.nha_cung_cap_id && t.nha_cung_cap_id._id) { %>
-                                <%- refLink('supplier', t.nha_cung_cap_id, t.nha_cung_cap_id.ma_ncc || '--') %>
-                              <% } else { %>
-                                --
-                              <% } %>
-                            </b></div>
-                            <div class="item" style="grid-column: span 2;">Ghi chú<b><%= t.ghi_chu || '--' %></b></div>
-                          </div>
-                          <div class="detail-body">
-                            <div>
-                              <% if (t.trang_thai === 'completed' && (t.vat_chua_lines || []).length) { %>
-                                <div class="purchase-vat-chua-box">
-                                  <div class="purchase-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa đã nhập</div>
-                                  <table class="mini-table purchase-vat-chua-table">
-                                    <thead>
-                                      <tr>
-                                        <th>Mã chứng từ</th>
-                                        <th>Loại</th>
-                                        <th>Mã vật chứa</th>
-                                        <th>Tên vật chứa</th>
-                                        <th class="num">Số lượng</th>
-                                        <th>Chứng từ liên kết</th>
-                                        <th>Thời gian</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      <% (t.vat_chua_lines || []).forEach(function(line) { %>
-                                        <tr>
-                                          <td>
-                                            <% if (line.doc_href && line.doc_id) { %>
-                                              <%- refLink('nhap_vat_chua', { _id: line.doc_id }, line.ma_chung_tu || '--') %>
-                                            <% } else { %>
-                                              <%= line.ma_chung_tu || '--' %>
-                                            <% } %>
-                                          </td>
-                                          <td><%= line.doc_kind_label || '--' %></td>
-                                          <td><%= line.ma_vat_chua || '--' %></td>
-                                          <td><%= line.ten_vat_chua || '--' %></td>
-                                          <td class="num"><%= fmt(line.so_luong || 0) %></td>
-                                          <td>
-                                            <% if (line.source_href && line.source_code) { %>
-                                              <a class="ref-link" href="<%= line.source_href %>"><%= line.source_code %></a>
-                                            <% } else { %>
-                                              <%= line.source_code || '--' %>
-                                            <% } %>
-                                          </td>
-                                          <td><%= formatDate(line.created_at) %></td>
-                                        </tr>
-                                      <% }) %>
-                                    </tbody>
-                                  </table>
-                                </div>
-                              <% } %>
-                              <% if (!(t.detail_rows || []).length) { %>
-                                <table class="mini-table"><tbody><tr><td>Không có chi tiết hàng.</td></tr></tbody></table>
-                              <% } %>
-                              <% detailGroups(t.detail_rows || []).forEach(function(group) { %>
-                                <div class="lot-group-title">
-                                  <%- group.product ? (refLink('product', group.product, group.product.ma_hang || '--') + ' - ' + (group.product.ten_hang || '--')) : '--' %>
-                                </div>
-                                <table class="mini-table grouped-lot-table">
-                                  <thead>
-                                    <tr>
-                                      <th>Ngày / Lô</th>
-                                      <th>Thuộc tính</th>
-                                      <th class="num">Số Kg</th>
-                                      <th class="num">Đơn giá</th>
-                                      <th class="num">Thành tiền</th>
-                                      <th class="num">Tổng theo lô</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    <% var displayRows = detailRowsForGroup(group); %>
-                                    <% displayRows.forEach(function(r, rowIndex) { %>
-                                      <tr>
-                                        <% if (rowIndex === 0) { %>
-                                          <td class="lot-cell" rowspan="<%= displayRows.length %>"><%- group.lot_label %></td>
-                                        <% } %>
-                                        <td class="attr-cell">
-                                          <div><%= r.ten_thuoc_tinh || '--' %></div>
-                                        </td>
-                                        <td class="num"><%= fmt(r.so_luong || 0) %></td>
-                                        <td class="num"><%= fmtMoney(r.don_gia_nhap || 0) %></td>
-                                        <td class="num"><%= fmtMoney(r.thanh_tien || 0) %></td>
-                                        <% if (rowIndex === 0) { %>
-                                          <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmtMoney(group.total || 0) %></td>
-                                        <% } %>
-                                      </tr>
-                                    <% }) %>
-                                    <tr class="group-total-row">
-                                      <td colspan="4" class="num">TỔNG CỘNG</td>
-                                      <td class="num"><%= fmtMoney(group.total || 0) %></td>
-                                      <td class="num"><%= fmtMoney(group.total || 0) %></td>
-                                    </tr>
-                                  </tbody>
-                                </table>
-                              <% }) %>
-                            </div>
-                            <div class="summary-card">
-                              <div class="summary-line"><span>Số lượng mặt hàng</span><b><%= fmt(t?.detail_summary?.tong_mat_hang || 0) %></b></div>
-                              <div class="summary-line"><span>Tổng tiền hàng</span><b><%= fmtMoney(t.tong_tien_hang || 0) %></b></div>
-                              <div class="summary-line"><span>Giảm giá</span><b><%= (t.kieu_giam_gia === 'percent' ? ((t.giam_gia || 0) + '%') : fmtMoney(t.giam_gia || 0)) %></b></div>
-                              <div class="summary-line"><span>Tổng cộng / Cần trả NCC</span><b><%= fmtMoney(t.can_tra_ncc || t.tong_tien || 0) %></b></div>
-                              <div class="summary-line"><span>Tiền đã trả NCC</span><b><%= fmtMoney(t.da_tra_ncc || 0) %></b></div>
-                              <div class="summary-line"><span>Nợ NCC</span><b><%= fmtMoney(t.con_no_ncc || 0) %></b></div>
-                              <% if (Number(t.con_no_ncc || 0) > 0) { %>
-                                <button type="button" class="kv-btn primary" style="width:100%;justify-content:center;margin-top:10px" onclick="openPaySupplierModal('<%= t._id %>')">Trả NCC</button>
-                              <% } %>
-                            </div>
-                          </div>
-                          <div class="page-actions page-actions--bordered detail-actions">
-                            <button type="button" class="kv-btn primary" onclick="openPurchase('<%= t._id %>')">Chỉnh sửa</button>
-                            <button type="button" class="kv-btn" onclick="cancelPurchase('<%= t._id %>')" <%= t.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
-                            <button type="button" class="kv-btn" onclick="copyPurchase('<%= t._id %>')">Sao chép</button>
-                            <a class="kv-btn" href="/nhap-hang/<%= t._id %>/export.xlsx">Xuất file</a>
-                            <a class="kv-btn" href="/phieu-nhap/<%= t._id %>/in-tong-hop" target="_blank">In phiếu + 02/TNDN</a>
-                            <button type="button" class="kv-btn" onclick="returnPurchase('<%= t._id %>')">Trả hàng nhập</button>
-                            <button type="button" class="kv-btn" onclick="openLabelModal('<%= t._id %>')">In tem mã</button>
-                          </div>
-                        </div>
-                        <div class="po-detail-pane" data-tab-pane="payment">
-                          <table class="mini-table">
-                            <thead>
-                              <tr><th>Ngày</th><th>Mã phiếu chi</th><th>Số tiền</th><th>Sổ quỹ</th><th>Người tạo</th><th>Ghi chú</th></tr>
-                            </thead>
-                            <tbody>
-                              <% if (!(t.payment_rows || []).length) { %>
-                                <tr><td colspan="6">Chưa có lịch sử thanh toán.</td></tr>
-                              <% } %>
-                              <% (t.payment_rows || []).forEach(function(p) { %>
-                                <tr>
-                                  <td><%= formatDate(p.thoi_gian) %></td>
-                                  <td><%- p._id ? refLink('receipt', p._id, p.ma_phieu || '--') : (p.ma_phieu || '--') %></td>
-                                  <td><%= fmtMoney(p.tien_chi || 0) %></td>
-                                  <td><%= p.so_quy || '--' %></td>
-                                  <td><%= p.nguoi_tao || '--' %></td>
-                                  <td><%= p.ghi_chu || '--' %></td>
-                                </tr>
-                              <% }) %>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
+                    <td colspan="9">
+                      <%- include('_purchase-detail', { t: t, fmt: fmt, fmtMoney: fmtMoney, formatDate: formatDate, statusBadge: statusBadge, statusLabel: statusLabel, lotLabel: lotLabel, detailGroups: detailGroups, detailRowsForGroup: detailRowsForGroup, refLink: refLink }) %>
                     </td>
                   </tr>
+                  <% } %>
                 <% }) %>
               <% } else { %>
-                <tr><td colspan="10" class="po-empty">Chưa có phiếu nhập hàng</td></tr>
+                <tr><td colspan="9" class="po-empty">Chưa có phiếu nhập hàng</td></tr>
               <% } %>
             </tbody>
           </table>
@@ -678,6 +569,7 @@
       </main>
     </div>
   </form>
+  <%- include('_group-payment-modal') %>
   <div id="purchaseTrashModalOverlay" class="purchase-trash-overlay" aria-hidden="true">
     <div class="purchase-trash-modal" role="dialog" aria-labelledby="purchaseTrashModalTitle" aria-modal="true">
       <div class="purchase-trash-head">
@@ -710,21 +602,25 @@
   <div id="purchaseMergeModalOverlay" class="purchase-merge-overlay">
     <div class="purchase-merge-modal" role="dialog" aria-labelledby="purchaseMergeModalTitle" aria-modal="true">
       <div class="purchase-merge-head">
-        <h3 id="purchaseMergeModalTitle">Gộp phiếu nhập hàng</h3>
+        <h3 id="purchaseMergeModalTitle">Tạo phiếu tổng hợp A + B = C</h3>
         <button type="button" class="purchase-merge-close" id="purchaseMergeModalClose" aria-label="Đóng">×</button>
       </div>
       <div class="purchase-merge-body">
-        <p class="purchase-merge-desc">Chọn <strong>nhà cung cấp</strong> rồi gộp các phiếu nhập <strong>chưa phát sinh trả hàng</strong> của NCC đó thành 1 phiếu nhập hàng</p>
+        <p class="purchase-merge-desc">Chọn các phiếu cùng <strong>nhà cung cấp và kho</strong>, chưa có trả hàng còn hiệu lực. Phiếu tổng hợp C giữ nguyên các chứng từ nguồn, kho và thanh toán. Bạn có thể chọn phiếu ở nhiều trang.</p>
         <div class="purchase-merge-filter">
           <label for="purchaseMergeSupplierSelect">Nhà cung cấp</label>
-          <select id="purchaseMergeSupplierSelect"></select>
+          <select id="purchaseMergeSupplierSelect"><option value="">Tất cả nhà cung cấp</option><% safeSuppliers.forEach(function(s) { %><option value="<%= s._id %>"><%= [s.ma_ncc,s.ten_ncc].filter(Boolean).join(' - ') %></option><% }) %></select>
+          <input class="filter-control" id="purchaseMergeSearch" placeholder="Tìm mã phiếu nhập" aria-label="Tìm phiếu để gộp">
         </div>
+        <div id="purchaseMergeAlert" class="purchase-trash-alert is-error" role="alert" style="display:none"></div>
+        <p><strong id="purchaseMergeSelectionCount">Đã chọn 0 phiếu</strong> <button type="button" class="kv-btn" id="purchaseMergeClear">Bỏ chọn tất cả</button></p>
         <table class="purchase-merge-table">
           <thead>
             <tr>
               <th class="purchase-merge-check"><input id="purchaseMergeCheckAll" type="checkbox"></th>
               <th>Mã nhập hàng</th>
               <th>Thời gian</th>
+              <th>Kho / Trạng thái</th>
               <th class="num">Cần trả NCC</th>
               <th class="num">Đã thanh toán</th>
               <th>Mã NCC</th>
@@ -733,15 +629,19 @@
           </thead>
           <tbody id="purchaseMergeRows"></tbody>
         </table>
+        <div class="po-footer"><span id="purchaseMergePageInfo"></span><div><button type="button" class="kv-btn" id="purchaseMergePrev">Trước</button> <button type="button" class="kv-btn" id="purchaseMergeNext">Sau</button></div></div>
         <div id="purchaseMergeEmpty" class="purchase-merge-empty">
           <div class="empty-icon">📦</div>
           <strong id="purchaseMergeEmptyTitle">Không có phiếu nhập có thể gộp</strong>
           <span id="purchaseMergeEmptyDesc"></span>
         </div>
+        <label class="purchase-merge-filter">Ghi chú <input class="filter-control" id="purchaseMergeNote" placeholder="Ghi chú tổng hợp"></label>
+        <div id="purchaseMergePreview" class="purchase-trash-alert is-warn" style="display:none"></div>
       </div>
       <div id="purchaseMergeFoot" class="purchase-merge-foot">
         <button type="button" class="kv-btn" id="purchaseMergeCancel">Bỏ qua</button>
-        <button type="button" class="kv-btn primary" id="purchaseMergeSubmit">Gộp đơn</button>
+        <button type="button" class="kv-btn" id="purchaseMergePreviewButton">Xem trước</button>
+        <button type="button" class="kv-btn primary" id="purchaseMergeSubmit" disabled>Tạo phiếu tổng hợp</button>
       </div>
     </div>
   </div>
@@ -796,6 +696,7 @@
   <script id="purchaseData" type="application/json"><%- JSON.stringify(safeTickets || []).replace(/</g, '\\u003c') %></script>
   <script id="supplierData" type="application/json"><%- JSON.stringify(locals.suppliers || []).replace(/</g, '\\u003c') %></script>
   <script id="warehouseData" type="application/json"><%- JSON.stringify(locals.warehouses || []).replace(/</g, '\\u003c') %></script>
+  <script src="/javascripts/purchase-group.js"></script>
   <script id="cashBookData" type="application/json"><%- JSON.stringify(locals.cashBooks || []).replace(/</g, '\\u003c') %></script>
   <script id="vatChuaData" type="application/json"><%- JSON.stringify(locals.vatChuaList || []).replace(/</g, '\\u003c') %></script>
   <script>
@@ -810,6 +711,15 @@
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
     function moneyText(value){ return money(value) + ' VNĐ'; }
     function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0; }
+    function purchaseEditPriceValue(value) {
+      if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+      const raw = String(value || '0').replace(/\s/g, '');
+      const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.')
+        : (/^\d{1,3}(\.\d{3})+$/.test(raw) ? raw.replace(/\./g, '') : raw);
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    function purchaseEditPriceText(value) { return Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 20 }); }
     function normalizeEditQuyCachItems(items) {
       return (Array.isArray(items) ? items : [])
         .map(row => {
@@ -836,7 +746,7 @@
       return normalizeEditQuyCachItems(Array.from(document.querySelectorAll(editQcParentSelector(rowId))).map(rowEl => ({
         ten_quy_cach: rowEl.querySelector('[data-edit-qc-field="ten_quy_cach"]')?.value || '',
         so_luong: numberValue(rowEl.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0),
-        don_gia_nhap: numberValue(rowEl.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0),
+        don_gia_nhap: purchaseEditPriceValue(rowEl.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0),
         ghi_chu: rowEl.querySelector('[data-edit-qc-field="ghi_chu"]')?.value || ''
       })));
     }
@@ -846,7 +756,7 @@
         <tr data-edit-qc-parent="${escapeHtml(rowId)}">
           <td><input data-edit-qc-field="ten_quy_cach" value="${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '')}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
           <td><input data-edit-qc-field="so_luong" class="js-purchase-edit-number" inputmode="numeric" value="${money(qc.so_luong || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
-          <td><input data-edit-qc-field="don_gia_nhap" class="js-purchase-edit-number" inputmode="numeric" value="${money(qc.don_gia_nhap || qc.gia_von || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td><input data-edit-qc-field="don_gia_nhap" class="js-purchase-edit-price" inputmode="decimal" value="${purchaseEditPriceText(qc.don_gia_nhap || qc.gia_von || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
           <td class="num" data-edit-qc-total>${moneyText(qc.thanh_tien || ((qc.so_luong || 0) * (qc.don_gia_nhap || qc.gia_von || 0)))}</td>
           <td><input data-edit-qc-field="ghi_chu" value="${escapeHtml(qc.ghi_chu || '')}" ${disabled ? 'disabled' : ''}></td>
           <td><button type="button" class="kv-btn danger" style="height:28px;padding:0 8px" onclick="removeEditQuyCachRow(this)" ${disabled ? 'disabled' : ''}>Xóa</button></td>
@@ -917,6 +827,14 @@
     }
     function bindPurchaseEditNumberInputs(root) {
       (root || document).querySelectorAll('.js-purchase-edit-number').forEach(bindPurchaseEditNumberInput);
+      (root || document).querySelectorAll('.js-purchase-edit-price').forEach(input => {
+        if (input.dataset.vnEditPriceBound === '1') return;
+        input.dataset.vnEditPriceBound = '1';
+        input.addEventListener('blur', function() {
+          input.value = purchaseEditPriceText(purchaseEditPriceValue(input.value));
+          calculatePurchaseEditTotals();
+        });
+      });
     }
     function setPaySupplierError(message) {
       const el = document.getElementById('paySupplierError');
@@ -1004,7 +922,15 @@
     function escapeHtml(value){
       return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     }
-    function findPurchase(id){ return purchases.find(item => String(item._id) === String(id)); }
+    function findPurchase(id){
+      const key = String(id);
+      const direct = purchases.find(item => item.record_type !== 'group' && String(item._id) === key);
+      if (direct) return direct;
+      for (const item of purchases) {
+        const source = (item.sources || []).find(row => String(row._id) === key);
+        if (source) return source;
+      }
+    }
     async function postJson(url, body){
       const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body || {}) });
       const text = await res.text();
@@ -1116,7 +1042,7 @@
               <td>${escapeHtml(product.ma_hang || '')}</td>
               <td>${escapeHtml(product.ten_hang || '')}</td>
               <td><input data-edit-field="so_luong" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.so_luong || 1)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
-              <td><input data-edit-field="don_gia_nhap" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="don_gia_nhap" class="js-purchase-edit-price" inputmode="decimal" value="${purchaseEditPriceText(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><input data-edit-field="giam_gia_dong" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.giam_gia_dong || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><select data-edit-field="kieu_giam_gia_dong" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${discountType === 'vnd' ? 'selected' : ''}>VND</option><option value="percent" ${discountType === 'percent' ? 'selected' : ''}>%</option></select></td>
               <td class="num" data-edit-total>${moneyText(row.thanh_tien || 0)}</td>
@@ -1137,7 +1063,7 @@
             <div class="edit-field"><label>Giảm giá phiếu</label><input id="editDiscount" class="js-purchase-edit-number" inputmode="numeric" value="${money(ticket.giam_gia || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
             <div class="edit-field"><label>Kiểu giảm giá</label><select id="editDiscountType" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${ticket.kieu_giam_gia !== 'percent' ? 'selected' : ''}>VND</option><option value="percent" ${ticket.kieu_giam_gia === 'percent' ? 'selected' : ''}>%</option></select></div>
             <div class="edit-field"><label>Cần trả NCC</label><input id="editPayable" class="js-purchase-edit-number" inputmode="numeric" value="${money(ticket.can_tra_ncc || ticket.tong_tien || 0)}" oninput="this.dataset.touched='1';calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
-            <div class="edit-field"><label>Đã trả NCC</label><input id="editPaid" class="js-purchase-edit-number" inputmode="numeric" value="${money(ticket.da_tra_ncc || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></div>
+            <div class="edit-field"><label>Đã trả NCC</label><input id="editPaid" value="${purchaseEditPriceText(ticket.da_tra_ncc || 0)}" readonly><small>Ghi nhận thanh toán bằng nút Trả NCC.</small></div>
             <div class="edit-field full"><label>Ghi chú phiếu</label><textarea id="purchaseNote" ${readonly ? 'disabled' : ''}>${escapeHtml(ticket.ghi_chu || '')}</textarea></div>
           </div>
           ${vatChuaSection}
@@ -1170,17 +1096,17 @@
         const qtyInput = rowEl.querySelector('[data-edit-field="so_luong"]');
         const priceInput = rowEl.querySelector('[data-edit-field="don_gia_nhap"]');
         if (qtyInput) qtyInput.value = money(Math.floor(qcQty));
-        if (priceInput) priceInput.value = qcQty > 0 ? money(Math.round(qcTotal / qcQty)) : '0';
+        if (priceInput) priceInput.value = qcQty > 0 ? purchaseEditPriceText(qcTotal / qcQty) : '0';
         document.querySelectorAll(editQcParentSelector(rowId)).forEach(qcRow => {
           const qty = numberValue(qcRow.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0);
-          const price = numberValue(qcRow.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0);
+          const price = purchaseEditPriceValue(qcRow.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0);
           const totalCell = qcRow.querySelector('[data-edit-qc-total]');
           if (totalCell) totalCell.textContent = moneyText(qty * price);
         });
         return Math.max(0, Math.floor(qcTotal));
       }
       const qty = Math.max(0, Math.floor(numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0)));
-      const price = numberValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0);
+      const price = purchaseEditPriceValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0);
       const discount = numberValue(rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0);
       const type = rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd';
       const base = qty * price;
@@ -1201,8 +1127,8 @@
       const total = Math.max(0, goodsTotal - discountMoney);
       const payableInput = document.getElementById('editPayable');
       if (payableInput && !payableInput.dataset.touched) payableInput.value = money(total);
-      const payable = Math.min(numberValue(payableInput?.value || total), total);
-      const paid = Math.min(numberValue(document.getElementById('editPaid')?.value || 0), payable);
+      const payable = Math.min(purchaseEditPriceValue(payableInput?.value || total), total);
+      const paid = Number(currentPurchaseEdit && currentPurchaseEdit.ticket && currentPurchaseEdit.ticket.da_tra_ncc || 0);
       const goodsEl = document.getElementById('editGoodsTotal');
       const totalEl = document.getElementById('editTotal');
       const debtEl = document.getElementById('editDebt');
@@ -1240,7 +1166,7 @@
           const item = {
             _id: rowId,
             so_luong: rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0,
-            don_gia_nhap: rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0,
+            don_gia_nhap: purchaseEditPriceValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0),
             giam_gia_dong: rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0,
             kieu_giam_gia_dong: rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd',
             ghi_chu: rowEl.querySelector('[data-edit-field="ghi_chu"]')?.value || ''
@@ -1263,8 +1189,7 @@
           ngay_nhap: document.getElementById('editImportDate')?.value || '',
           giam_gia: document.getElementById('editDiscount')?.value || 0,
           kieu_giam_gia: document.getElementById('editDiscountType')?.value || 'vnd',
-          can_tra_ncc: document.getElementById('editPayable')?.value || 0,
-          da_tra_ncc: document.getElementById('editPaid')?.value || 0,
+          can_tra_ncc: purchaseEditPriceValue(document.getElementById('editPayable')?.value || 0),
           ghi_chu: document.getElementById('purchaseNote')?.value || '',
           items
         };
@@ -1580,11 +1505,13 @@
       }
       bindPurchaseDebtWarnTips(document);
 
-      var rows = Array.prototype.slice.call(document.querySelectorAll('.expand-row'));
+      var rows = Array.prototype.slice.call(document.querySelectorAll('.po-table>tbody>.expand-row'));
       rows.forEach(function(row) {
         row.addEventListener('click', function(e) {
+          if (e.target && e.target.closest('.expand-row') !== row) return;
           if (e.target && e.target.closest('input[type="checkbox"]')) return;
           if (e.target && e.target.closest('.js-purchase-debt-warn')) return;
+          if (e.target && e.target.closest('.group-code-link')) e.preventDefault();
           var id = row.getAttribute('data-expand-id');
           var detail = document.getElementById('detail-' + id);
           if (!detail) return;
@@ -1592,11 +1519,12 @@
         });
       });
       var params = new URLSearchParams(window.location.search);
-      var purchaseId = params.get('purchase');
-      if (params.get('export') === '1' && purchaseId) {
+      var sourcePurchaseId = params.get('purchase');
+      var purchaseId = params.get('group') || sourcePurchaseId;
+      if (params.get('export') === '1' && sourcePurchaseId) {
         var exportFrame = document.createElement('iframe');
         exportFrame.style.display = 'none';
-        exportFrame.src = '/nhap-hang/' + encodeURIComponent(purchaseId) + '/export.xlsx';
+        exportFrame.src = '/nhap-hang/' + encodeURIComponent(sourcePurchaseId) + '/export.xlsx';
         document.body.appendChild(exportFrame);
         setTimeout(function() { exportFrame.remove(); }, 120000);
         params.delete('export');
@@ -1613,8 +1541,8 @@
       }
       var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.po-detail'));
       detailBlocks.forEach(function(block) {
-        var tabs = Array.prototype.slice.call(block.querySelectorAll('.po-detail-tab'));
-        var panes = Array.prototype.slice.call(block.querySelectorAll('.po-detail-pane'));
+        var tabs = Array.prototype.slice.call(block.querySelectorAll('.po-detail-tab')).filter(function(tab) { return tab.closest('.po-detail') === block; });
+        var panes = Array.prototype.slice.call(block.querySelectorAll('.po-detail-pane')).filter(function(pane) { return pane.closest('.po-detail') === block; });
         tabs.forEach(function(tab) {
           tab.addEventListener('click', function(ev) {
             ev.stopPropagation();
@@ -1622,216 +1550,15 @@
             tabs.forEach(function(t) { t.classList.remove('is-active'); });
             panes.forEach(function(p) { p.classList.remove('is-active'); });
             tab.classList.add('is-active');
-            var pane = block.querySelector('.po-detail-pane[data-tab-pane="' + target + '"]');
+            var pane = panes.find(function(item) { return item.getAttribute('data-tab-pane') === target; });
             if (pane) pane.classList.add('is-active');
           });
         });
       });
     });
 
-    (function initPurchaseMergeModal() {
-      var overlay = document.getElementById('purchaseMergeModalOverlay');
-      var openBtn = document.getElementById('openPurchaseMergeModal');
-      var closeBtn = document.getElementById('purchaseMergeModalClose');
-      var cancelBtn = document.getElementById('purchaseMergeCancel');
-      var rowsEl = document.getElementById('purchaseMergeRows');
-      var emptyEl = document.getElementById('purchaseMergeEmpty');
-      var emptyTitleEl = document.getElementById('purchaseMergeEmptyTitle');
-      var emptyDescEl = document.getElementById('purchaseMergeEmptyDesc');
-      var footEl = document.getElementById('purchaseMergeFoot');
-      var supplierSelect = document.getElementById('purchaseMergeSupplierSelect');
-      var modalCheckAll = document.getElementById('purchaseMergeCheckAll');
-      var submitBtn = document.getElementById('purchaseMergeSubmit');
-      var selectAll = document.querySelector('.po-table thead .row-check');
-      var purchaseChecks = Array.prototype.slice.call(document.querySelectorAll('.purchase-select-check'));
-      var modalPurchases = [];
-
-      function escapeHtml(value) {
-        return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
-          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char];
-        });
-      }
-      function moneyText(value) {
-        return Number(value || 0).toLocaleString('vi-VN') + ' VNĐ';
-      }
-      function readPurchase(row) {
-        return {
-          id: row.dataset.purchaseId || '',
-          code: row.dataset.purchaseCode || '',
-          date: new Date(row.dataset.purchaseDate || ''),
-          status: row.dataset.purchaseStatus || '',
-          hasReturn: row.dataset.hasReturn === '1',
-          supplierId: row.dataset.supplierId || '',
-          supplierCode: row.dataset.supplierCode || '',
-          supplierName: row.dataset.supplierName || '--',
-          supplierKey: row.dataset.supplierId || row.dataset.supplierCode || '',
-          payable: Number(row.dataset.payable || 0),
-          paid: Number(row.dataset.paid || 0)
-        };
-      }
-      function isMergeablePurchase(purchase) {
-        if (!purchase || !purchase.id) return false;
-        if (['cancelled', 'merged'].indexOf(purchase.status) >= 0) return false;
-        if (purchase.hasReturn) return false;
-        if (!purchase.supplierKey) return false;
-        return ['draft', 'completed'].indexOf(purchase.status) >= 0;
-      }
-      function getModalSuppliers(purchases) {
-        var map = {};
-        purchases.forEach(function(purchase) {
-          if (!purchase.supplierKey) return;
-          if (!map[purchase.supplierKey]) {
-            map[purchase.supplierKey] = {
-              key: purchase.supplierKey,
-              code: purchase.supplierCode,
-              name: purchase.supplierName || '--'
-            };
-          }
-        });
-        return Object.keys(map).map(function(key) { return map[key]; }).sort(function(a, b) {
-          return a.name.localeCompare(b.name, 'vi');
-        });
-      }
-      function getPageSupplierFilterKey() {
-        var pageSelect = document.querySelector('#poFilterForm select[name="nha_cung_cap_id"]');
-        return pageSelect ? String(pageSelect.value || '').trim() : '';
-      }
-      function resolveInitialSupplierKey(suppliers) {
-        var pageKey = getPageSupplierFilterKey();
-        if (pageKey && suppliers.some(function(supplier) { return supplier.key === pageKey; })) {
-          return pageKey;
-        }
-        if (suppliers.length === 1) return suppliers[0].key;
-        return '';
-      }
-      function renderSupplierOptions(purchases) {
-        if (!supplierSelect) return;
-        var suppliers = getModalSuppliers(purchases);
-        supplierSelect.innerHTML = '<option value="">— Chọn nhà cung cấp —</option>' + suppliers.map(function(supplier) {
-          var label = [supplier.code, supplier.name].filter(Boolean).join(' - ');
-          return '<option value="' + escapeHtml(supplier.key) + '">' + escapeHtml(label) + '</option>';
-        }).join('');
-      }
-      function getFilteredModalPurchases() {
-        var supplierKey = supplierSelect ? supplierSelect.value : '';
-        if (!supplierKey) return [];
-        return modalPurchases.filter(function(p) { return p.supplierKey === supplierKey; });
-      }
-      function updateModalCheckAll() {
-        if (!modalCheckAll) return;
-        var rowChecks = Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check'));
-        modalCheckAll.checked = rowChecks.length > 0 && rowChecks.every(function(cb) { return cb.checked; });
-        modalCheckAll.indeterminate = rowChecks.some(function(cb) { return cb.checked; }) && !modalCheckAll.checked;
-      }
-      function renderRows(purchases, emptyTitle, emptyDesc) {
-        if (!rowsEl || !emptyEl || !footEl) return;
-        var hasRows = purchases.length > 0;
-        rowsEl.innerHTML = hasRows ? purchases.map(function(purchase) {
-          return '<tr>' +
-            '<td class="purchase-merge-check"><input class="purchase-merge-row-check" type="checkbox" value="' + escapeHtml(purchase.id) + '" data-supplier-key="' + escapeHtml(purchase.supplierKey) + '"></td>' +
-            '<td>' + escapeHtml(purchase.code) + '</td>' +
-            '<td>' + escapeHtml(Number.isFinite(purchase.date.getTime()) ? purchase.date.toLocaleString('vi-VN') : '') + '</td>' +
-            '<td class="num">' + moneyText(purchase.payable) + '</td>' +
-            '<td class="num">' + moneyText(purchase.paid) + '</td>' +
-            '<td>' + escapeHtml(purchase.supplierCode) + '</td>' +
-            '<td>' + escapeHtml(purchase.supplierName) + '</td>' +
-          '</tr>';
-        }).join('') : '';
-        if (emptyTitleEl) emptyTitleEl.textContent = emptyTitle || 'Không có phiếu nhập có thể gộp';
-        if (emptyDescEl) emptyDescEl.textContent = emptyDesc || '';
-        emptyEl.style.display = hasRows ? 'none' : 'flex';
-        footEl.style.display = hasRows ? 'flex' : 'none';
-        updateModalCheckAll();
-        Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check')).forEach(function(cb) {
-          cb.addEventListener('change', updateModalCheckAll);
-        });
-      }
-      function refreshModalRows() {
-        var supplierKey = supplierSelect ? supplierSelect.value : '';
-        if (!supplierKey) {
-          renderRows([], 'Chưa chọn nhà cung cấp', 'Vui lòng chọn nhà cung cấp để xem danh sách phiếu nhập có thể gộp.');
-          return;
-        }
-        var filtered = getFilteredModalPurchases();
-        renderRows(filtered, 'Không có phiếu nhập có thể gộp', 'Nhà cung cấp này chưa có phiếu nhập hợp lệ trong danh sách hiện tại (đã loại phiếu hủy, đã gộp hoặc đã trả hàng).');
-      }
-      async function submitMergePurchases() {
-        var supplierKey = supplierSelect ? supplierSelect.value : '';
-        if (!supplierKey) {
-          return alert('Vui lòng chọn nhà cung cấp trước khi gộp phiếu nhập.');
-        }
-        var selectedIds = Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check:checked')).map(function(cb) { return cb.value; }).filter(Boolean);
-        if (selectedIds.length < 2) {
-          return alert('Vui lòng chọn ít nhất 2 phiếu nhập để gộp.');
-        }
-        var selectedSupplierKeys = {};
-        Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check:checked')).forEach(function(cb) {
-          var key = cb.dataset.supplierKey || '';
-          if (key) selectedSupplierKeys[key] = true;
-        });
-        if (Object.keys(selectedSupplierKeys).length > 1) {
-          return alert('Chỉ được gộp các phiếu thuộc cùng một nhà cung cấp.');
-        }
-        if (submitBtn) submitBtn.disabled = true;
-        try {
-          var res = await fetch('/api/nhap-hang/gop-phieu-nhap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phieu_nhap_ids: selectedIds })
-          });
-          var data = await res.json();
-          if (!data.success) return alert(data.message || 'Không gộp được phiếu nhập.');
-          window.location.href = '/nhap-hang?purchase=' + encodeURIComponent(data.data && data.data.phieu_nhan_id ? data.data.phieu_nhan_id : selectedIds[0]);
-        } catch (error) {
-          alert('Không gộp được phiếu nhập.');
-        } finally {
-          if (submitBtn) submitBtn.disabled = false;
-        }
-      }
-      function openModal() {
-        if (!overlay) return;
-        var allRows = Array.prototype.slice.call(document.querySelectorAll('.purchase-row'));
-        modalPurchases = allRows.map(readPurchase).filter(isMergeablePurchase);
-        renderSupplierOptions(modalPurchases);
-        if (supplierSelect) {
-          supplierSelect.value = resolveInitialSupplierKey(getModalSuppliers(modalPurchases));
-        }
-        refreshModalRows();
-        overlay.style.display = 'flex';
-      }
-      function closeModal() {
-        if (overlay) overlay.style.display = 'none';
-      }
-      if (selectAll) {
-        selectAll.addEventListener('click', function(e) {
-          e.stopPropagation();
-          purchaseChecks.forEach(function(cb) { cb.checked = selectAll.checked; });
-        });
-      }
-      purchaseChecks.forEach(function(cb) {
-        cb.addEventListener('change', function() {
-          if (!selectAll) return;
-          selectAll.checked = purchaseChecks.length > 0 && purchaseChecks.every(function(item) { return item.checked; });
-          selectAll.indeterminate = purchaseChecks.some(function(item) { return item.checked; }) && !selectAll.checked;
-        });
-      });
-      if (openBtn) openBtn.addEventListener('click', openModal);
-      if (closeBtn) closeBtn.addEventListener('click', closeModal);
-      if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
-      if (submitBtn) submitBtn.addEventListener('click', submitMergePurchases);
-      if (supplierSelect) supplierSelect.addEventListener('change', refreshModalRows);
-      if (modalCheckAll) {
-        modalCheckAll.addEventListener('change', function() {
-          Array.prototype.slice.call(document.querySelectorAll('.purchase-merge-row-check')).forEach(function(cb) {
-            cb.checked = modalCheckAll.checked;
-          });
-          updateModalCheckAll();
-        });
-      }
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && overlay && overlay.style.display === 'flex') closeModal();
-      });
-    })();
+    window.PurchaseGroups.initMerge();
+    window.PurchaseGroups.initDetail();
 
     (function initPurchaseTrashModal() {
       var openBtn = document.getElementById('openPurchaseTrashModal');

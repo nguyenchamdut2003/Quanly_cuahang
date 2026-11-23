@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/stylesheets/responsive.css">
   <link rel="stylesheet" href="/stylesheets/global-loading.css">
   <style>
+    <%- include('partials/_purchase-inline-styles') %>
     .detail-pane{display:none}
     .detail-pane.is-active{display:block}
     .text-right { text-align: right; }
@@ -323,6 +324,13 @@
       color: #64748b;
     }
     .supplier-muted-cell { color: #475569; }
+    .supplier-history-filter { margin: 0 0 12px; justify-content: flex-start; }
+    .supplier-history-filter .form-control { width: auto; min-width: 150px; }
+    .supplier-history-filter input { flex: 1; }
+    .supplier-history-code { display: inline-flex; align-items: center; gap: 6px; }
+    .supplier-history-source-number { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; box-sizing: border-box; border: 1px solid currentColor; border-radius: 50%; color: #667085; font-size: 12px; font-weight: 600; line-height: 1; }
+    .supplier-purchase-history .lot-detail-row > td { padding: 12px 16px !important; }
+    .supplier-purchase-history .lot-detail-row .supplier-history-code { padding-left: 28px; }
 
     .supplier-address-expand { background: #f8fafc !important; }
     .supplier-address-expand-grid {
@@ -2697,13 +2705,18 @@
         if (detailRoot.getAttribute && detailRoot.getAttribute('data-lazy-tabs-bound') === '1') return;
         if (detailRoot.setAttribute) detailRoot.setAttribute('data-lazy-tabs-bound', '1');
 
-        function loadPane(pane) {
-          if (!pane || pane.getAttribute('data-lazy-loaded') === '1' || pane.getAttribute('data-lazy-loading') === '1') return;
-          var url = pane.getAttribute('data-lazy-tab-url') || '';
+        function loadPane(pane, requestedUrl) {
+          if (!pane || (!requestedUrl && pane.getAttribute('data-lazy-loaded') === '1') || pane.getAttribute('data-lazy-loading') === '1') return;
+          var url = requestedUrl || pane.getAttribute('data-lazy-tab-url') || '';
           if (!url) return;
+          pane.removeAttribute('data-lazy-loaded');
           pane.setAttribute('data-lazy-loading', '1');
           pane.innerHTML = '<div class="empty-cell supplier-lazy-tab-placeholder">Đang tải dữ liệu...</div>';
-          fetch(url + (window.location.search || ''), {
+          var requestUrl = new URL(url, window.location.origin);
+          new URLSearchParams(window.location.search).forEach(function(value, key) {
+            if (!requestUrl.searchParams.has(key)) requestUrl.searchParams.append(key, value);
+          });
+          fetch(requestUrl.pathname + requestUrl.search, {
             credentials: 'same-origin',
             headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'text/html' }
           })
@@ -2735,10 +2748,32 @@
             loadPane(pane);
           });
         });
+        detailRoot.addEventListener('submit', function(event) {
+          var form = event.target.closest('[data-supplier-history-filter]');
+          if (!form) return;
+          event.preventDefault();
+          var url = new URL(form.action, window.location.origin);
+          new FormData(form).forEach(function(value, key) { url.searchParams.set(key, value); });
+          url.searchParams.set('history_page', '1');
+          loadPane(form.closest('[data-detail-pane="history"]'), url.pathname + url.search);
+        });
+        detailRoot.addEventListener('change', function(event) {
+          if (!event.target.matches('[name="history_status"], [name="history_limit"]')) return;
+          var form = event.target.closest('[data-supplier-history-filter]');
+          if (form) form.requestSubmit();
+        });
+        detailRoot.addEventListener('click', function(event) {
+          var link = event.target.closest('[data-supplier-history-page]');
+          if (!link) return;
+          event.preventDefault();
+          if (link.getAttribute('aria-disabled') === 'true') return;
+          loadPane(link.closest('[data-detail-pane="history"]'), link.getAttribute('href'));
+        });
       }
       function bindSupplierInlinePanel(rootEl) {
         var wrap = rootEl.classList.contains('supplier-inline-detail') ? rootEl : rootEl.querySelector('.supplier-inline-detail');
         if (!wrap) return;
+        if (window.kvInlineBindExpandRows) window.kvInlineBindExpandRows(wrap);
         if (window.KvDebtPeriodExport) window.KvDebtPeriodExport.bind(wrap);
         applySupplierDebtRowWarnings(wrap);
       }

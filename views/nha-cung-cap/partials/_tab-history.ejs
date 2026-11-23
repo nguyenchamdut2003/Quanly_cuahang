@@ -1,78 +1,111 @@
-        <div class="supplier-pane-table-wrap table-wrap">
-          <% var supplierPurchaseHistoryTotal=(supplierPurchaseHistory || []).reduce(function(sum, row) { var
-            sign=row.loai==='tra' ? -1 : 1; return sum + sign * Number(row.tong_cong || 0); }, 0); %>
-            <table class="admin-table warehouse-table">
-              <thead>
-                <tr>
-                  <th class="text-center">Mã phiếu</th>
-                  <th class="text-center">Thời gian</th>
-                  <th class="text-center">Người tạo</th>
-                  <th class="text-center">
-                    Tổng cộng
-                    <% if ((supplierPurchaseHistory || []).length> 0) { %>
-                      <div class="supplier-column-total <%= supplierPurchaseHistoryTotal < 0 ? 'is-return' : '' %>">
-                        <%= supplierPurchaseHistoryTotal.toLocaleString('vi-VN') %> VNĐ
-                      </div>
-                      <% } %>
-                  </th>
-                  <th class="text-center">Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                <% if ((supplierPurchaseHistory || []).length===0) { %>
-                  <tr>
-                    <td colspan="5" class="empty-cell">Chưa có lịch sử nhập/trả hàng hóa.</td>
-                  </tr>
-                  <% } %>
-                    <% (supplierPurchaseHistory || []).forEach(function(row) { %>
-                      <% var isReturnHistory=row.loai==='tra' ; var historyHref='#' ; if (row.loai==='nhap' &&
-                        row.phieu_nhap_id) historyHref=refUrl('purchase', row.phieu_nhap_id); else if (row.loai==='tra'
-                        && row.phieu_tra_hang_nhap_id) historyHref='/tra-hang-nhap?q=' + encodeURIComponent(String(row.ma_phieu || '')) + '&openReturn=' + encodeURIComponent(String(row.phieu_tra_hang_nhap_id)); var
-                        historyTypeLabel=typeof mapSupplierPurchaseHistoryType==='function' ?
-                        mapSupplierPurchaseHistoryType(row.loai) : (isReturnHistory ? 'Trả hàng hóa' : 'Nhập hàng hóa'
-                        ); %>
-                        <tr>
-                          <td class="text-center">
-                            <a href="<%= historyHref %>" class="table-code-link ref-link">
-                              <% if (!isReturnHistory) { %>
-                                <i class="fa-solid fa-file-import history-type-icon" title="Nhập hàng"></i>
-                                <% } else { %>
-                                  <i class="fa-solid fa-arrow-rotate-left history-type-icon history-type-icon--return"
-                                    title="Trả hàng"></i>
-                                  <% } %>
-                                    <%= row.ma_phieu || '--' %>
-                            </a>
-                          </td>
-                          <td class="supplier-muted-cell text-center">
-                            <%= formatDate(row.thoi_gian) %>
-                          </td>
-                          <td class="text-center">
-                            <div class="history-creator">
-                              <span class="history-creator-avatar">
-                                <%= (row.nguoi_tao || 'U' ).charAt(0).toUpperCase() %>
-                              </span>
-                              <%= row.nguoi_tao || '--' %>
-                            </div>
-                          </td>
-                          <td class="text-center">
-                            <span class="history-amount <%= isReturnHistory ? 'is-return' : '' %>">
-                              <%= isReturnHistory ? '-' : '' %>
-                                <%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ
-                            </span>
-                          </td>
-                          <td class="text-center">
-                            <% var statusClass='status-pill' ; var statusLabelText=row.trang_thai==='draft' ? 'Phiếu tạm' :
-                              (row.trang_thai==='cancelled' ? 'Đã hủy' : historyTypeLabel); if
-                              (row.trang_thai==='completed' ) statusClass +=' is-active' ; else if
-                              (row.trang_thai==='active' ) statusClass +=' is-active' ; else if
-                              (row.trang_thai==='draft' ) statusClass +=' is-draft' ; else if
-                              (row.trang_thai==='cancelled' ) statusClass +=' is-cancelled' ; %>
-                              <span class="<%= statusClass %>">
-                                <%= statusLabelText %>
-                              </span>
-                          </td>
-                        </tr>
-                        <% }) %>
-              </tbody>
-            </table>
-        </div>
+<%
+  var historyRows = supplierPurchaseHistory || [];
+  var historyTotal = typeof supplierPurchaseHistoryTotal === 'number' ? supplierPurchaseHistoryTotal : historyRows.reduce(function(sum, row) {
+    return sum + (row.loai === 'tra' ? -1 : 1) * Number(row.tong_cong || 0);
+  }, 0);
+  var historyFilters = typeof supplierPurchaseHistoryFilters !== 'undefined' ? supplierPurchaseHistoryFilters : {};
+  var historyPagination = typeof supplierPurchaseHistoryPagination !== 'undefined' ? supplierPurchaseHistoryPagination : null;
+  var historyPath = '/nha-cung-cap/api/' + encodeURIComponent(String(selectedSupplier._id)) + '/tab/history';
+  function historyPageUrl(page) {
+    return historyPath + '?history_q=' + encodeURIComponent(historyFilters.q || '')
+      + '&history_status=' + encodeURIComponent(historyFilters.status || '')
+      + '&history_limit=' + encodeURIComponent(historyFilters.limit || 10) + '&history_page=' + page;
+  }
+  // Only parents participate in filtering, pagination and the column total.
+  var historyDisplayRows = [];
+  historyRows.forEach(function(row) {
+    historyDisplayRows.push({ row: row, isChild: false });
+    (row.children || []).forEach(function(child, index) {
+      historyDisplayRows.push({ row: child, isChild: true, groupKey: String(row.phieu_tong_hop_id), sourceNumber: index + 1 });
+    });
+  });
+%>
+<form class="supplier-history-filter supplier-debt-actions" data-supplier-history-filter method="get" action="<%= historyPath %>">
+  <input class="form-control" type="search" name="history_q" value="<%= historyFilters.q || '' %>" placeholder="Tìm mã GPN, PN hoặc phiếu trả" aria-label="Tìm mã phiếu nhập/trả">
+  <select class="form-control" name="history_status" aria-label="Lọc trạng thái phiếu nhập/trả">
+    <option value="">Tất cả trạng thái</option>
+    <option value="completed" <%= historyFilters.status === 'completed' ? 'selected' : '' %>>Đã hoàn thành</option>
+    <option value="draft" <%= historyFilters.status === 'draft' ? 'selected' : '' %>>Phiếu tạm</option>
+    <option value="cancelled" <%= historyFilters.status === 'cancelled' ? 'selected' : '' %>>Đã hủy</option>
+  </select>
+  <select class="form-control" name="history_limit" aria-label="Số phiếu mỗi trang">
+    <% [10, 20, 50].forEach(function(limit) { %>
+      <option value="<%= limit %>" <%= Number(historyFilters.limit || 10) === limit ? 'selected' : '' %>><%= limit %> phiếu/trang</option>
+    <% }); %>
+  </select>
+  <button class="btn btn-light" type="submit">Lọc</button>
+</form>
+<div class="supplier-pane-table-wrap table-wrap supplier-purchase-history">
+  <table class="admin-table warehouse-table" data-supplier-purchase-history>
+    <thead>
+      <tr>
+        <th class="text-center">Mã phiếu</th>
+        <th class="text-center">Thời gian</th>
+        <th class="text-center">Người tạo</th>
+        <th class="text-center">
+          Tổng cộng
+          <% if (!historyPagination || historyPagination.total > 0) { %>
+            <div class="supplier-column-total <%= historyTotal < 0 ? 'is-return' : '' %>"><%= historyTotal.toLocaleString('vi-VN') %> VNĐ</div>
+          <% } %>
+        </th>
+        <th class="text-center">Trạng thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!historyRows.length) { %>
+        <tr><td colspan="5" class="empty-cell">Chưa có lịch sử nhập/trả hàng hóa phù hợp.</td></tr>
+      <% } %>
+      <% historyDisplayRows.forEach(function(entry) {
+        var row = entry.row;
+        var isGroup = row.loai === 'tong_hop';
+        var isReturn = row.loai === 'tra';
+        var isPurchase = row.loai === 'nhap' && row.phieu_nhap_id;
+        var historyHref = '#';
+        if (isGroup) historyHref = row.phieu_tong_hop_href;
+        else if (row.loai === 'nhap' && row.phieu_nhap_id) historyHref = refUrl('purchase', row.phieu_nhap_id);
+        else if (isReturn && row.phieu_tra_hang_nhap_id) historyHref = '/tra-hang-nhap?q=' + encodeURIComponent(String(row.ma_phieu || '')) + '&openReturn=' + encodeURIComponent(String(row.phieu_tra_hang_nhap_id));
+        var historyTypeLabel = isGroup ? 'Phiếu tổng hợp' : (typeof mapSupplierPurchaseHistoryType === 'function' ? mapSupplierPurchaseHistoryType(row.loai) : (isReturn ? 'Trả hàng hóa' : 'Nhập hàng hóa'));
+        var statusClass = 'status-pill';
+        var statusText = row.trang_thai === 'draft' ? 'Phiếu tạm' : (row.trang_thai === 'cancelled' ? 'Đã hủy' : historyTypeLabel);
+        if (row.trang_thai === 'completed' || row.trang_thai === 'active') statusClass += ' is-active';
+        else if (row.trang_thai === 'draft') statusClass += ' is-draft';
+        else if (row.trang_thai === 'cancelled') statusClass += ' is-cancelled';
+      %>
+        <tr data-supplier-history-row="<%= entry.isChild ? 'child' : 'parent' %>" <% if (isPurchase) { %>data-supplier-purchase-id="<%= String(row.phieu_nhap_id) %>" data-supplier-purchase-detail-url="/nha-cung-cap/api/<%= encodeURIComponent(String(selectedSupplier._id)) %>/purchase/<%= encodeURIComponent(String(row.phieu_nhap_id)) %>/detail"<% } %> <% if (entry.isChild) { %>class="lot-detail-row" data-lot-detail="<%= entry.groupKey %>" data-supplier-history-group="<%= entry.groupKey %>" hidden<% } %>>
+          <td class="text-center">
+            <span class="supplier-history-code">
+              <% if (isGroup) { %>
+                <button type="button" class="lot-expand-btn" data-lot-expand="<%= row.phieu_tong_hop_id %>" aria-expanded="false" aria-label="Xem phiếu nguồn của <%= row.ma_phieu %>" title="Chi tiết phiếu tổng hợp">+</button>
+              <% } else if (entry.isChild) { %>
+                <span class="supplier-history-source-number" title="Phiếu nguồn số <%= entry.sourceNumber %>"><%= entry.sourceNumber %></span>
+              <% } %>
+              <a href="<%= historyHref %>" class="table-code-link <%= isGroup ? '' : 'ref-link' %>" <% if (isPurchase) { %>data-supplier-purchase-toggle aria-expanded="false"<% } %>>
+                <i class="fa-solid <%= isReturn ? 'fa-arrow-rotate-left history-type-icon history-type-icon--return' : 'fa-file-import history-type-icon' %>" title="<%= historyTypeLabel %>"></i>
+                <%= row.ma_phieu || '--' %>
+              </a>
+            </span>
+          </td>
+          <td class="supplier-muted-cell text-center"><%= formatDate(row.thoi_gian) %></td>
+          <td class="text-center">
+            <div class="history-creator">
+              <span class="history-creator-avatar"><%= (row.nguoi_tao || 'U').charAt(0).toUpperCase() %></span>
+              <%= row.nguoi_tao || '--' %>
+            </div>
+          </td>
+          <td class="text-center"><span class="history-amount <%= isReturn ? 'is-return' : '' %>"><%= isReturn ? '-' : '' %><%= Number(row.tong_cong || 0).toLocaleString('vi-VN') %> VNĐ</span></td>
+          <td class="text-center"><span class="<%= statusClass %>"><%= statusText %></span></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<% if (historyPagination) { %>
+  <div class="supplier-pagination">
+    <div>Hiển thị <strong><%= historyPagination.from %>-<%= historyPagination.to %></strong> / <strong><%= historyPagination.total %></strong> phiếu</div>
+    <div class="supplier-pagination__actions" aria-label="Phân trang nhập/trả hàng hóa">
+      <a class="supplier-page-link <%= historyPagination.page <= 1 ? 'is-disabled' : '' %>" data-supplier-history-page href="<%= historyPageUrl(Math.max(1, historyPagination.page - 1)) %>" aria-label="Trang trước" aria-disabled="<%= historyPagination.page <= 1 %>">‹</a>
+      <span>Trang <%= historyPagination.page %>/<%= historyPagination.totalPages %></span>
+      <a class="supplier-page-link <%= historyPagination.page >= historyPagination.totalPages ? 'is-disabled' : '' %>" data-supplier-history-page href="<%= historyPageUrl(Math.min(historyPagination.totalPages, historyPagination.page + 1)) %>" aria-label="Trang sau" aria-disabled="<%= historyPagination.page >= historyPagination.totalPages %>">›</a>
+    </div>
+  </div>
+<% } %>

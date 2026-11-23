@@ -473,14 +473,99 @@
 
   }
 
+  var supplierPurchaseDetailSequence = 0;
+
+  function closeSupplierPurchaseDetail(row) {
+    var detail = row.nextElementSibling;
+    if (detail && detail.hasAttribute('data-supplier-purchase-detail')) detail.hidden = true;
+    if (row._supplierPurchaseRequest) {
+      row._supplierPurchaseRequest.abort();
+      row._supplierPurchaseRequest = null;
+    }
+    row._supplierPurchaseOpen = false;
+    var link = row.querySelector('[data-supplier-purchase-toggle]');
+    if (link) link.setAttribute('aria-expanded', 'false');
+  }
+
+  function bindSupplierPurchaseTabs(detail) {
+    detail.querySelectorAll('.po-detail').forEach(function(panel) {
+      var tabs = Array.from(panel.querySelectorAll('.po-detail-tab')).filter(function(tab) { return tab.closest('.po-detail') === panel; });
+      var panes = Array.from(panel.querySelectorAll('[data-tab-pane]')).filter(function(pane) { return pane.closest('.po-detail') === panel; });
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function(event) {
+          event.preventDefault();
+          event.stopPropagation();
+          tabs.forEach(function(item) { item.classList.toggle('is-active', item === tab); });
+          panes.forEach(function(pane) { pane.classList.toggle('is-active', pane.dataset.tabPane === tab.dataset.tabTarget); });
+        });
+      });
+    });
+  }
+
+  function initSupplierPurchaseDetails(root) {
+    root.querySelectorAll('[data-supplier-purchase-history]').forEach(function(table) {
+      if (table._supplierPurchaseDetailsBound) return;
+      table._supplierPurchaseDetailsBound = true;
+      table.addEventListener('click', function(event) {
+        var row = event.target.closest('[data-supplier-purchase-id]');
+        if (!row || row.closest('table') !== table) return;
+        var link = event.target.closest('[data-supplier-purchase-toggle]');
+        if (!link && event.target.closest('a,button,input,select,textarea,label')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (row._supplierPurchaseOpen) {
+          closeSupplierPurchaseDetail(row);
+          return;
+        }
+        var detail = row.nextElementSibling;
+        if (!detail || !detail.hasAttribute('data-supplier-purchase-detail')) {
+          detail = document.createElement('tr');
+          detail.className = 'supplier-purchase-inline-row';
+          detail.setAttribute('data-supplier-purchase-detail', row.dataset.supplierPurchaseId);
+          detail.id = 'supplier-purchase-detail-' + (++supplierPurchaseDetailSequence);
+          var cell = document.createElement('td');
+          cell.colSpan = row.cells.length;
+          detail.appendChild(cell);
+          row.after(detail);
+        }
+        row._supplierPurchaseOpen = true;
+        detail.hidden = false;
+        link = row.querySelector('[data-supplier-purchase-toggle]');
+        if (link) {
+          link.setAttribute('aria-expanded', 'true');
+          link.setAttribute('aria-controls', detail.id);
+        }
+        if (detail._supplierPurchaseLoaded) return;
+        var td = detail.cells[0];
+        td.innerHTML = '<div class="supplier-purchase-inline-loading" role="status">Đang tải phiếu nhập...</div>';
+        var request = typeof AbortController === 'function' ? new AbortController() : null;
+        row._supplierPurchaseRequest = request;
+        fetch(row.dataset.supplierPurchaseDetailUrl, {
+          credentials: 'same-origin', signal: request ? request.signal : undefined,
+          headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(response) {
+          if (!response.ok) throw new Error('HTTP ' + response.status);
+          return response.text();
+        }).then(function(html) {
+          if (!row.isConnected || !row._supplierPurchaseOpen || row._supplierPurchaseRequest !== request) return;
+          td.innerHTML = html;
+          if (!td.querySelector('.po-detail')) throw new Error('Missing purchase detail');
+          bindSupplierPurchaseTabs(detail);
+          detail._supplierPurchaseLoaded = true;
+          row._supplierPurchaseRequest = null;
+        }).catch(function(error) {
+          if (error.name === 'AbortError' || !row.isConnected || !row._supplierPurchaseOpen || row._supplierPurchaseRequest !== request) return;
+          td.innerHTML = '<div class="supplier-purchase-inline-loading" role="status">Không tải được phiếu nhập. Bấm mã phiếu để đóng rồi mở lại.</div>';
+          row._supplierPurchaseRequest = null;
+        });
+      });
+    });
+  }
+
   function initLotExpandRows(root) {
     if (!root) return;
-    var pane = root.matches && root.matches('[data-tab-panel="product-lots"]')
-      ? root
-      : root.querySelector('[data-tab-panel="product-lots"]');
-    if (!pane) return;
-
-    pane.querySelectorAll('[data-lot-expand]').forEach(function(btn) {
+    initSupplierPurchaseDetails(root);
+    root.querySelectorAll('[data-lot-expand]').forEach(function(btn) {
       if (btn._lotExpandBound) return;
       btn._lotExpandBound = true;
       btn.addEventListener('click', function(event) {
@@ -488,10 +573,17 @@
         event.stopPropagation();
         var lotId = btn.getAttribute('data-lot-expand');
         if (!lotId) return;
-        var detailRow = pane.querySelector('[data-lot-detail="' + lotId + '"]');
-        if (!detailRow) return;
-        var willOpen = detailRow.hidden;
-        detailRow.hidden = !willOpen;
+        // Keep each table independent, including lazily loaded supplier history.
+        var pane = btn.closest('table') || root;
+        var detailRows = Array.prototype.filter.call(pane.querySelectorAll('[data-lot-detail]'), function(row) {
+          return row.getAttribute('data-lot-detail') === lotId;
+        });
+        if (!detailRows.length) return;
+        var willOpen = detailRows[0].hidden;
+        detailRows.forEach(function(row) {
+          row.hidden = !willOpen;
+          if (!willOpen && row.hasAttribute('data-supplier-purchase-id')) closeSupplierPurchaseDetail(row);
+        });
         btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
         btn.textContent = willOpen ? '-' : '+';
       });
@@ -693,6 +785,7 @@
 
   global.KvInlineDetail = KvInlineDetail;
   global.kvInlineBindDetailTabs = bindDetailTabs;
+  global.kvInlineBindExpandRows = initLotExpandRows;
 
   document.addEventListener('click', function(e) {
     var a = e.target.closest('a.ref-link[href^="/hang-hoa/"]');
