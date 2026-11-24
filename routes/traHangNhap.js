@@ -13,6 +13,8 @@ router.post('/', controller.createSubmit);
 router.post('/deactivate', controller.deactivateSelected);
 router.post('/trash/preview', controller.previewTrash);
 router.post('/trash/move', controller.moveToTrash);
+router.post('/tong-hop/:id/complete', controller.completeGroup);
+router.post('/tong-hop/:id/phieu-thu', controller.createGroupReceipt);
 router.get('/:id/export.xlsx', controller.exportOneExcel);
 router.get('/:id/in/pdf', controller.printPdf);
 router.get('/:id/in', controller.print);

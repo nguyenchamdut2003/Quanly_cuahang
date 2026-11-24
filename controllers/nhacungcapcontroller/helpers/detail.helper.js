@@ -4,6 +4,8 @@ const { aggregateSupplierPurchaseTotals, applySupplierTotalsFromMap, normalizeDe
 const { isVisibleSupplierDebtRow, isIncludedInSupplierDebtHistory, getDebtDocumentInfo, getSupplierDebtAmountInfo, getLegacySupplierDebtDelta, getDebtEventTime, getDebtDisplayDate, sortDebtLedgerAsc, enrichSupplierDebtHistory, mapSupplierDebtTransactionLabel, resolveSupplierDaThanhToan, loadSupplierPayableDocuments, sumInvoiceDebt, buildDebtReconciliation, loadActiveCashBooks, dedupeSupplierDebtSourceRows, applySupplierDebtHistoryDisplayTotals, attachManualNhapVatChuaPaidAmounts, loadManualNhapVatChuaDebtSourceRows, loadManualXuatVatChuaDebtSourceRows } = require('./debt.helper');
 const { buildProfitBySupplierAddressReport } = require('../../../services/profitReport.service');
 const { PhieuNhapTongHop } = require('../../../models/phieunhap.model');
+const { PhieuTraHangTongHop } = require('../../../models/kiot.model');
+const { buildReturnManagementList } = require('../../../services/purchaseReturnGroupList.service');
 
 async function loadPurchaseGroupNavigation(purchases, storeId) {
     var navigation = Object.create(null);
@@ -202,7 +204,7 @@ async function loadSupplierDetailRenderLocals(req, supplierId) {
         .populate({ path: 'xuat_vat_chua_id', select: 'ma_xuat_vat_chua created_at tong_tien tong_so_luong trang_thai source_type loai_xuat' })
         .populate({
             path: 'phieu_tra_nhap_id',
-            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai trang_thai_du_lieu',
+            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra ncc_con_phai_tra gia_tri_can_tru_cong_no phieu_nhap_id trang_thai trang_thai_du_lieu',
             populate: { path: 'phieu_nhap_id', select: 'ngay_nhap created_at' }
         })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi trang_thai' })
@@ -475,7 +477,17 @@ async function loadSupplierPurchaseHistory(selectedSupplier, storeId) {
             .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
             .sort({ ngay_tra: -1, created_at: -1 })
             .lean();
-        supplierPurchaseHistory = supplierPurchaseHistory.concat(traRows.map(function(row) {
+        var returnGroupIds = [...new Set(traRows.map(function(row) {
+            return getRelatedId(row.phieu_tra_tong_hop_id);
+        }).filter(Boolean))];
+        var returnGroups = returnGroupIds.length && storeId && mongoose.Types.ObjectId.isValid(storeId)
+            ? await PhieuTraHangTongHop.find({
+                _id: { $in: returnGroupIds },
+                cua_hang_id: storeId,
+                nha_cung_cap_id: selectedSupplier._id
+            }).populate({ path: 'nguoi_tao_id', select: 'ho_ten email' }).lean()
+            : [];
+        function returnHistorySource(row) {
             return {
                 loai: 'tra',
                 phieu_tra_hang_nhap_id: row._id,
@@ -486,7 +498,22 @@ async function loadSupplierPurchaseHistory(selectedSupplier, storeId) {
                 tong_cong: Number(row.tong_tien_tra || 0),
                 trang_thai: row.trang_thai || 'completed'
             };
-        }));
+        }
+        var returnHistory = buildReturnManagementList(traRows, returnGroups).items.map(function(row) {
+            if (row.record_type !== 'group') return returnHistorySource(row);
+            return {
+                loai: 'tra_tong_hop',
+                phieu_tra_tong_hop_id: row._id,
+                ma_phieu: row.ma_phieu_tra_nhap || '--',
+                phieu_tra_tong_hop_href: '/tra-hang-nhap?q=' + encodeURIComponent(row.ma_phieu_tra_nhap || '') + '&openReturn=' + encodeURIComponent(String(row._id)),
+                thoi_gian: row.ngay_tra || row.created_at,
+                nguoi_tao: row?.nguoi_tao_id?.ho_ten || row?.nguoi_tao_id?.email || '--',
+                tong_cong: Number(row.tong_tien_tra || 0),
+                trang_thai: row.trang_thai,
+                children: (row.children || []).map(returnHistorySource)
+            };
+        });
+        supplierPurchaseHistory = supplierPurchaseHistory.concat(returnHistory);
     }
     return supplierPurchaseHistory.sort(function(a, b) {
         var timeA = new Date(a.thoi_gian || 0).getTime() || 0;
@@ -515,7 +542,7 @@ function buildSupplierPurchaseHistoryView(rows, query) {
     return {
         supplierPurchaseHistory: filtered.slice((page - 1) * limit, page * limit),
         supplierPurchaseHistoryTotal: filtered.reduce(function(sum, row) {
-            return sum + (row.loai === 'tra' ? -1 : 1) * row.tong_cong;
+            return sum + (row.loai === 'tra' || row.loai === 'tra_tong_hop' ? -1 : 1) * row.tong_cong;
         }, 0),
         supplierPurchaseHistoryFilters: { q: keyword, status: status, limit: limit },
         supplierPurchaseHistoryPagination: {
@@ -591,7 +618,7 @@ async function loadSupplierDebtHistory(selectedSupplier, storeId, debtWarnSettin
         .populate({ path: 'xuat_vat_chua_id', select: 'ma_xuat_vat_chua created_at tong_tien tong_so_luong trang_thai source_type loai_xuat' })
         .populate({
             path: 'phieu_tra_nhap_id',
-            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra phieu_nhap_id trang_thai trang_thai_du_lieu',
+            select: 'ma_phieu_tra_nhap ngay_tra created_at tong_tien_tra ncc_can_tra ncc_da_tra ncc_con_phai_tra gia_tri_can_tru_cong_no phieu_nhap_id trang_thai trang_thai_du_lieu',
             populate: { path: 'phieu_nhap_id', select: 'ngay_nhap created_at' }
         })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi trang_thai' })
@@ -791,6 +818,7 @@ function mapCongNoDirection(value) {
 }
 
 function mapSupplierPurchaseHistoryType(value) {
+    if (value === 'tra_tong_hop') return 'Trả hàng tổng hợp';
     if (value === 'tra') return 'Tr\u1ea3 h\u00e0ng h\u00f3a';
     if (value === 'nhap_vat_chua') return 'Nh\u1eadp v\u1eadt ch\u1ee9a';
     if (value === 'tra_vat_chua') return 'Tr\u1ea3 v\u1eadt ch\u1ee9a';

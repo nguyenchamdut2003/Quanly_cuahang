@@ -19,6 +19,7 @@ router.post('/tong-hop/preview', groupController.preview);
 router.get('/tong-hop', groupController.list);
 router.post('/tong-hop', groupController.create);
 router.get('/tong-hop/:id/return', groupController.returnToSource);
+router.post('/tong-hop/:id/return', groupController.createReturn);
 router.post('/tong-hop/:id/pay', groupController.pay);
 router.post('/tong-hop/:id/cancel', groupController.cancel);
 router.get('/tong-hop/:id', groupController.detail);

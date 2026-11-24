@@ -4,6 +4,7 @@
   const safeReceipts = Array.isArray(locals.receipts) ? locals.receipts : [];
   const creatorName = user ? (user.ho_ten || user.email || 'Người dùng') : 'Người dùng';
   const copyFromErrorMsg = typeof locals.copyFromError === 'string' ? locals.copyFromError : '';
+  const groupReturnContext = locals.purchaseGroupReturn || null;
 %>
 <!DOCTYPE html>
 <html lang="vi">
@@ -31,6 +32,12 @@
     .return-import-grid th{height:auto;min-height:34px;background:#e8f3ff;border-bottom:1px solid #bcd9ff;color:#111827;font-size:12px;font-weight:800;padding:8px;text-align:left;vertical-align:top;box-sizing:border-box}
     .return-import-grid td{min-height:40px;height:auto;border-bottom:1px solid #edf1f5;padding:8px;font-size:13px;color:#111827;vertical-align:top;box-sizing:border-box;word-wrap:break-word}
     .return-import-grid td.merge-cell{vertical-align:middle}
+    [data-group-return-field][hidden]{display:none}
+    .return-import-grid.is-group-return>table>thead{display:none}
+    .return-import-grid .return-source-container{padding:10px;border:0;background:#f3f6f9}
+    .return-source-box{border:1px solid #dbe4ee;border-radius:6px;overflow:hidden;background:#fff}
+    .return-source-title{margin:0;padding:10px 12px;background:#e8f3ff;color:#0070f4;font-size:13px;font-weight:800}
+    .return-import-grid .return-source-box table{width:100%;min-width:0}
     .return-import-grid .col-name{min-width:168px;max-width:260px}
     .return-import-grid .col-unit{min-width:52px;width:1%;white-space:nowrap;color:#111827}
     .num{text-align:right}.center{text-align:center}.stt{width:52px}.code{width:110px}.unit{width:70px}.attr{width:92px}.lot{width:118px}.smallqty{width:104px}.qty{width:105px}.money{width:122px}.remove{width:42px}
@@ -78,11 +85,11 @@
     <section class="left">
       <div class="topline">
         <a class="back" href="/tra-hang-nhap">‹</a>
-        <div class="title">Trả hàng nhập</div>
+        <div class="title" id="returnTitle"><%= groupReturnContext ? 'Trả hàng ' + groupReturnContext.ma_phieu_tong_hop : 'Trả hàng nhập' %></div>
         <input id="productSearch" class="search" placeholder="Tìm hàng hóa theo mã hoặc tên (F3)" autocomplete="off">
         <div id="productPop" class="product-pop"></div>
       </div>
-      <div class="grid-wrap return-import-grid">
+      <div class="grid-wrap return-import-grid" id="returnItemsGrid">
         <table>
           <thead>
             <tr>
@@ -90,8 +97,8 @@
               <th class="code">Mã hàng</th>
               <th class="col-name">Tên hàng</th>
               <th class="unit col-unit">ĐVT</th>
-              <th class="attr">Thuộc tính</th>
               <th class="lot">Lô hàng</th>
+              <th class="attr">Thuộc tính</th>
               <th class="smallqty num" title="Tồn kho hiện tại theo lô/thuộc tính đang chọn.">Tồn</th>
               <th class="qty num">Số lượng trả</th>
               <th class="money num">Giá nhập</th>
@@ -132,7 +139,7 @@
         <input type="hidden" id="nccId" name="nha_cung_cap_id" value="">
         <a id="nccLink" class="supplier-link is-empty" href="#" tabindex="-1">Tự động theo phiếu nhập</a>
       </div>
-      <div class="field"><label>Mã trả hàng nhập</label><input id="maPhieu" class="control" value="<%= nextCode %>" placeholder="Mã phiếu tự động"></div>
+      <div class="field"><label>Mã trả hàng nhập</label><input id="maPhieu" class="control" value="<%= groupReturnContext ? '' : nextCode %>" placeholder="Mã phiếu tự động" <%= groupReturnContext ? 'readonly' : '' %>></div>
       <div class="field"><label>Trạng thái</label><div>Phiếu tạm</div></div>
       <div class="field"><label>Tổng tiền hàng</label><div class="readonly" id="tongTienHang">0</div></div>
       <div class="field">
@@ -143,6 +150,9 @@
         </div>
       </div>
       <div class="field"><label>Nhà cung cấp cần trả</label><div class="readonly blue" id="nccCanTra">0</div></div>
+      <div class="field" data-group-return-field hidden><label>Cấn trừ công nợ</label><div class="readonly" id="groupReturnOffset">0</div></div>
+      <div class="field" data-group-return-field hidden><label>Phân bổ tiền hoàn</label><div class="readonly" id="groupReturnAllocated">0</div></div>
+      <div class="field" data-group-return-field hidden><label>Chênh lệch tiền hoàn</label><div class="readonly" id="groupReturnDifference">0</div></div>
       <div class="field">
         <label>Sổ quỹ <span id="cashBookRequiredMark" style="display:none;color:#d92d20">*</span></label>
         <select id="cashBookId" class="control" disabled>
@@ -207,6 +217,14 @@
   <script src="/javascripts/global-loading.js"></script>
   <script>
     window.__returnAllowNoPurchase = false;
+    const initialPurchaseGroupReturn = <%- JSON.stringify(groupReturnContext).replace(/</g, '\\u003c') %>;
+    let purchaseGroupReturn = null;
+    let groupReturnRequestKey = '';
+    let purchaseListSequence = 0;
+    let purchaseDetailSequence = 0;
+    let loadingPurchaseDetail = false;
+    const defaultReturnCode = <%- JSON.stringify(nextCode || '').replace(/</g, '\\u003c') %>;
+    const idOf = value => String(value && value._id || value || '');
     let copyDraft = null;
     (function() {
       var el = document.getElementById('copy-draft-embed');
@@ -320,15 +338,34 @@
       link.tabIndex = 0;
       link.classList.remove('is-empty');
     }
-    function resetReturnState() {
+    function setGroupReturnContext(context) {
+      purchaseGroupReturn = context || null;
+      groupReturnRequestKey = context ? (window.crypto.randomUUID ? window.crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(16).slice(2)) : '';
+      document.getElementById('returnTitle').textContent = context ? 'Trả hàng ' + context.ma_phieu_tong_hop : 'Trả hàng nhập';
+      document.getElementById('returnItemsGrid').classList.toggle('is-group-return', Boolean(context));
+      document.querySelectorAll('[data-group-return-field]').forEach(field => { field.hidden = !context; });
+      document.getElementById('vatChuaRow').style.display = context ? 'none' : '';
+      const code = document.getElementById('maPhieu');
+      code.readOnly = Boolean(context);
+      code.value = context ? '' : defaultReturnCode;
+    }
+    function resetReturnState(options = {}) {
+      purchaseDetailSequence += 1;
+      loadingPurchaseDetail = false;
+      window.__returnAllowNoPurchase = false;
+      setGroupReturnContext(null);
       items = [];
       selectedPurchaseSupplierId = '';
       setSupplierLink(null);
-      document.getElementById('phieuNhapId').value = '';
+      if (!options.preservePurchase) document.getElementById('phieuNhapId').value = '';
       document.getElementById('giamGia').value = 0;
+      document.getElementById('kieuGiamGia').value = 'vnd';
       document.getElementById('nccDaTra').value = 0;
       document.getElementById('paymentCash').value = 0;
       document.getElementById('paymentTransfer').value = 0;
+      document.getElementById('vatChuaId').value = '';
+      document.getElementById('vatChuaQty').value = '';
+      document.getElementById('cashBookId').value = '';
       ['cashBookCashId', 'cashBookBankId'].forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -337,8 +374,25 @@
         }
       });
       isPayAllMode = false;
+      payAllTarget = 'cash';
+      paymentPriority = 'cash';
+      search.value = '';
+      search.disabled = false;
+      pop.style.display = 'none';
       renderItems();
       renderTotals();
+    }
+    function applyGroupReturn(context) {
+      setGroupReturnContext(context);
+      const supplier = context.nha_cung_cap || context.nha_cung_cap_id;
+      selectedPurchaseSupplierId = idOf(supplier);
+      setSupplierLink(supplier && supplier._id ? supplier : { _id: selectedPurchaseSupplierId });
+      search.disabled = true;
+      items = (context.sources || []).flatMap(source => (source.items || []).map(row => Object.assign({}, row, {
+        phieu_nhap_id: idOf(source._id), ma_phieu_nhap: source.ma_phieu_nhap,
+        so_luong: '', gia_nhap: Number(row.gia_nhap || 0), gia_tra_lai: Number(row.gia_tra_lai ?? row.gia_nhap ?? 0), thanh_tien: 0, ghi_chu: row.ghi_chu || ''
+      })));
+      renderItems();
     }
     function setPurchasePlaceholder(text, disabled) {
       const select = document.getElementById('phieuNhapId');
@@ -360,8 +414,10 @@
     }
     async function loadPurchasesByWarehouse(khoId) {
       const select = document.getElementById('phieuNhapId');
+      const request = ++purchaseListSequence;
       if (!khoId) {
         setPurchasePlaceholder('Chọn kho trước', true);
+        loadingPurchases = false;
         return;
       }
       loadingPurchases = true;
@@ -369,6 +425,7 @@
       try {
         const res = await fetch('/api/phieu-nhap?kho_id=' + encodeURIComponent(khoId));
         const data = await res.json();
+        if (request !== purchaseListSequence || khoId !== currentKho()) return false;
         if (!data.success) {
           setPurchasePlaceholder('Không tải được phiếu nhập', true);
           showError(data.message || 'Không thể tải phiếu nhập theo kho');
@@ -383,15 +440,18 @@
           const supplier = row.nha_cung_cap || {};
           const supplierName = supplier.ten_ncc || supplier.ma_ncc || '';
           const lotNames = Array.isArray(row.lot_names) ? row.lot_names.filter(Boolean).join(', ') : '';
-          const label = [row.ma_phieu_nhap || '', lotNames, supplierName].filter(Boolean).join(' - ');
-          return `<option value="${row._id}" data-ncc="${row.nha_cung_cap_id || ''}" data-kho="${row.kho_id || ''}">${label}</option>`;
+          const label = [row.ma_phieu_tong_hop || row.ma_phieu_nhap || '', lotNames, supplierName].filter(Boolean).join(' - ');
+          return `<option value="${escapeHtml(idOf(row._id))}" data-record-type="${row.record_type === 'group' ? 'group' : 'purchase'}" data-ncc="${escapeHtml(idOf(row.nha_cung_cap_id))}" data-kho="${escapeHtml(idOf(row.kho_id))}">${escapeHtml(label)}</option>`;
         }).join('');
         select.disabled = false;
+        return true;
+        return true;
       } catch (error) {
+        if (request !== purchaseListSequence || khoId !== currentKho()) return false;
         setPurchasePlaceholder('Không tải được phiếu nhập', true);
         showError('Lỗi kết nối khi tải phiếu nhập theo kho');
       } finally {
-        loadingPurchases = false;
+        if (request === purchaseListSequence) loadingPurchases = false;
       }
     }
 
@@ -463,11 +523,12 @@
 
     function renderItems() {
       if (!items.length) {
-        body.innerHTML = '<tr><td colspan="13"><div class="empty"><b>Chọn phiếu nhập gốc để lấy hàng trả</b><small>Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập</small></div></td></tr>';
+        body.innerHTML = '<tr><td colspan="13"><div class="empty"><b>' + (purchaseGroupReturn ? 'Không có hàng nguồn đủ điều kiện trả' : 'Chọn phiếu nhập gốc để lấy hàng trả') + '</b><small>' + (purchaseGroupReturn ? 'Chỉ trả từ phiếu đã nhập, còn hiệu lực và trong hạn trả.' : 'Hệ thống sẽ tự điền nhà cung cấp và danh sách hàng đã nhập') + '</small></div></td></tr>';
         renderTotals();
         return;
       }
       const groupKeys = items.map(it => [
+        it.phieu_nhap_id || '',
         it.hang_hoa_id || '',
         it.ma_hang || '',
         it.ten_hang || '',
@@ -485,7 +546,7 @@
         while (idx + span < items.length && groupKeys[idx + span] === groupKeys[idx]) span++;
         groupSpans[idx] = span;
       });
-      body.innerHTML = items.map((it, idx) => {
+      const renderedRows = items.map((it, idx) => {
         const line = Number(it.so_luong || 0) * Number(it.gia_tra_lai || 0);
         const ghiChuVal = String(it.ghi_chu || '').replace(/"/g, '&quot;');
         const attrLabel = it.thuoc_tinh_label || it.ten_quy_cach || it.ten_thuoc_tinh || '--';
@@ -502,11 +563,11 @@
           <td class="col-name merge-cell" rowspan="${groupSpan}">${escapeHtml(it.ten_hang || '')}${it.quan_ly_theo_lo && !it.ct_phieu_nhap_id ? `<select class="lot-select" onchange="updateItem(${idx}, 'lo_hang_id', this.value)">${lotOptions(it)}</select>` : ''}</td>
           <td class="col-unit merge-cell" rowspan="${groupSpan}">${escapeHtml(it.don_vi_tinh || '')}</td>` : '';
         const mergedLotCell = groupSpan ? `<td class="merge-cell" rowspan="${groupSpan}">${loCell}</td>` : '';
-        return `<tr>
+        return `<tr class="return-item-row" data-return-item-index="${idx}">
           <td class="center">${idx + 1}</td>
           ${mergedBeforeAttr}
-          <td>${escapeHtml(attrLabel)}</td>
           ${mergedLotCell}
+          <td>${escapeHtml(attrLabel)}</td>
           <td class="num" title="Tồn hiện tại theo lô/thuộc tính: ${fmt(tonHienTai)}">${fmt(tonHienTai)}</td>
           <td><input class="cell-input" type="number" min="0" max="${toiDaTra}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
           <td><input class="cell-input" inputmode="numeric" value="${fmt(it.gia_nhap || 0)}" oninput="applyVNNumberFormat(this)" onchange="updateItem(${idx}, 'gia_nhap', this.value)" ${it.ct_phieu_nhap_id ? 'readonly' : ''}></td>
@@ -515,7 +576,17 @@
           <td><input class="cell-input cell-input-left line-note" type="text" value="${ghiChuVal}" placeholder="—" onchange="updateItem(${idx}, 'ghi_chu', this.value)"></td>
           <td class="center"><button type="button" class="danger" onclick="removeItem(${idx})">×</button></td>
         </tr>`;
-      }).join('');
+      });
+      if (purchaseGroupReturn) {
+        const header = document.querySelector('#returnItemsGrid>table>thead').innerHTML;
+        body.innerHTML = (purchaseGroupReturn.sources || []).map(source => {
+          const sourceRows = renderedRows.filter((row, index) => idOf(items[index].phieu_nhap_id) === idOf(source._id));
+          if (!sourceRows.length) return '';
+          return `<tr><td colspan="13" class="return-source-container"><section class="return-source-box" data-return-source-id="${escapeHtml(idOf(source._id))}"><h3 class="return-source-title">${escapeHtml(source.ma_phieu_nhap || '--')}</h3><table><thead>${header}</thead><tbody>${sourceRows.join('')}</tbody></table></section></td></tr>`;
+        }).join('');
+      } else {
+        body.innerHTML = renderedRows.join('');
+      }
       renderTotals();
     }
 
@@ -523,7 +594,7 @@
       if (!items[idx]) return;
       if (field === 'so_luong') {
         const maxQty = Math.max(0, maxReturnQty(items[idx]));
-        const nextQty = money(value);
+        const nextQty = purchaseGroupReturn ? Math.max(0, Number(value) || 0) : money(value);
         if (nextQty > maxQty) showError('Số lượng trả không được vượt quá số tối đa trả.');
         items[idx][field] = Math.min(nextQty, maxQty);
       } else if (['gia_nhap', 'gia_tra_lai'].includes(field)) items[idx][field] = money(value);
@@ -533,12 +604,54 @@
     }
     function removeItem(idx) { items.splice(idx, 1); renderItems(); }
 
+    function sourceAllocationAmount(value) {
+      const raw = String(value == null ? '' : value).trim();
+      return /^[\d.,\s]*$/.test(raw) ? money(raw) : NaN;
+    }
+    function returnDiscountValue() {
+      const raw = document.getElementById('giamGia').value;
+      return document.getElementById('kieuGiamGia').value === 'percent'
+        ? Number(String(raw || '0').replace(/\s/g, '').replace(',', '.')) : sourceAllocationAmount(raw);
+    }
+    function splitReturnAmount(amount, weights) {
+      const total = weights.reduce((sum, value) => sum + value, 0);
+      const target = Math.min(Math.max(0, Math.floor(Number(amount) || 0)), total);
+      let cumulative = 0, allocated = 0;
+      return weights.map(value => {
+        cumulative += value;
+        const next = total ? Math.floor(target * cumulative / total) : 0;
+        const share = next - allocated;
+        allocated = next;
+        return share;
+      });
+    }
+    function groupReturnAllocations(refundAmount) {
+      if (!purchaseGroupReturn) return [];
+      const sources = purchaseGroupReturn.sources.map(source => {
+        const selectedItems = items.filter(item => String(item.phieu_nhap_id) === String(source._id) && Number(item.so_luong) > 0);
+        return { source, items: selectedItems, gross: Math.floor(selectedItems.reduce((sum, item) => sum + Number(item.so_luong) * Number(item.gia_tra_lai || 0), 0)) };
+      });
+      const gross = sources.reduce((sum, row) => sum + row.gross, 0);
+      const discount = Math.max(0, returnDiscountValue() || 0);
+      const discountMoney = document.getElementById('kieuGiamGia').value === 'percent'
+        ? Math.floor(gross * Math.min(discount, 100) / 100) : Math.min(discount, gross);
+      const discounts = splitReturnAmount(discountMoney, sources.map(row => row.gross));
+      const net = sources.map((row, index) => row.gross - discounts[index]);
+      const refunds = splitReturnAmount(refundAmount == null ? money(document.getElementById('nccDaTra').value) : refundAmount, net);
+      return sources.map((row, index) => {
+        return { phieu_nhap_id: idOf(row.source._id), items: row.items, giam_gia: discounts[index], kieu_giam_gia: 'vnd',
+          gia_tri_can_tru_cong_no: 0, ncc_da_tra: refunds[index], total: net[index], discountMoney: discounts[index], source: row.source };
+      });
+    }
+
     function renderTotals() {
       const total = items.reduce((sum, it) => sum + Number(it.so_luong || 0) * Number(it.gia_tra_lai || 0), 0);
       const type = document.getElementById('kieuGiamGia').value;
       const discount = money(document.getElementById('giamGia').value);
       const discountMoney = type === 'percent' ? Math.floor(total * Math.min(100, discount) / 100) : Math.min(discount, total);
-      const canPay = Math.max(0, total - discountMoney);
+      const sourceAllocations = groupReturnAllocations();
+      const offsetTotal = sourceAllocations.reduce((sum, row) => sum + row.gia_tri_can_tru_cong_no, 0);
+      const canPay = purchaseGroupReturn ? sourceAllocations.reduce((sum, row) => sum + row.total, 0) - offsetTotal : Math.max(0, total - discountMoney);
       const cashInput = document.getElementById('paymentCash');
       const transferInput = document.getElementById('paymentTransfer');
       let tienMat = money(cashInput ? cashInput.value : 0);
@@ -593,6 +706,12 @@
       }
       if (requiredMark) requiredMark.style.display = tienMat > 0 ? 'inline' : 'none';
       if (bankRequiredMark) bankRequiredMark.style.display = chuyenKhoan > 0 ? 'inline' : 'none';
+      if (purchaseGroupReturn) {
+        const allocated = groupReturnAllocations(paid).reduce((sum, row) => sum + row.ncc_da_tra, 0);
+        document.getElementById('groupReturnOffset').textContent = fmt(offsetTotal);
+        document.getElementById('groupReturnAllocated').textContent = fmt(allocated);
+        document.getElementById('groupReturnDifference').textContent = fmt(paid - allocated);
+      }
     }
 
     function validateVatChuaExport(mode) {
@@ -619,13 +738,14 @@
 
     async function submitReturn(mode) {
       clearError();
+      if (loadingPurchases || loadingPurchaseDetail) return showError('Vui lòng chờ tải xong phiếu nhập');
       const sendItems = items.filter(it => Number(it.so_luong || 0) > 0);
       if (!sendItems.length) return showError('Vui lòng nhập số lượng trả cho ít nhất một hàng hóa');
       if (!validateVatChuaExport(mode)) return;
       if (!document.getElementById('khoId').value) return showError('Vui lòng chọn kho trả hàng');
       const purchaseId = document.getElementById('phieuNhapId').value;
       const allowNoPurchase = window.__returnAllowNoPurchase === true;
-      if (!purchaseId && !allowNoPurchase) return showError('Vui lòng chọn phiếu nhập gốc');
+      if (!purchaseGroupReturn && !purchaseId && !allowNoPurchase) return showError('Vui lòng chọn phiếu nhập gốc');
       if (purchaseId && selectedPurchaseSupplierId && document.getElementById('nccId').value !== selectedPurchaseSupplierId) {
         return showError('Không cho chọn nhà cung cấp khác với phiếu nhập gốc');
       }
@@ -688,6 +808,24 @@
           ghi_chu: it.ghi_chu || ''
         })))
       };
+      if (purchaseGroupReturn) {
+        if (!Number.isFinite(returnDiscountValue()) || returnDiscountValue() < 0) return showError('Giảm giá phải là số không âm hợp lệ.');
+        const allocations = groupReturnAllocations();
+        for (const allocation of allocations) {
+          if ([allocation.giam_gia, allocation.gia_tri_can_tru_cong_no, allocation.ncc_da_tra].some(value => !Number.isFinite(value) || value < 0)) return showError('Giảm giá, cấn trừ và tiền hoàn phải là số không âm hợp lệ.');
+          if (!allocation.items.length && (allocation.gia_tri_can_tru_cong_no || allocation.ncc_da_tra || allocation.giam_gia)) return showError('Chỉ phân bổ cho phiếu nguồn có hàng trả.');
+          if (allocation.gia_tri_can_tru_cong_no + allocation.ncc_da_tra > allocation.total) return showError('Cấn trừ và tiền hoàn không được vượt giá trị trả của từng PN.');
+        }
+        if (allocations.reduce((sum, allocation) => sum + allocation.ncc_da_tra, 0) !== cashAmount + transferAmount) return showError('Tổng tiền hoàn phân bổ phải bằng tiền mặt + chuyển khoản.');
+        payload.request_key = groupReturnRequestKey;
+        payload.sources = allocations.filter(allocation => allocation.items.length).map(allocation => ({
+          phieu_nhap_id: allocation.phieu_nhap_id, items: allocation.items,
+          giam_gia: allocation.giam_gia, kieu_giam_gia: allocation.kieu_giam_gia,
+          gia_tri_can_tru_cong_no: allocation.gia_tri_can_tru_cong_no, ncc_da_tra: allocation.ncc_da_tra
+        }));
+        delete payload.items_json;
+        delete payload.phieu_nhap_id;
+      }
       const loadingMessage = mode === 'completed' ? 'Đang hoàn thành phiếu trả hàng nhập...' : 'Đang lưu tạm phiếu trả hàng nhập...';
       const loadingShown = window.showGlobalLoading && window.showGlobalLoading(loadingMessage);
       if (loadingShown === false) return;
@@ -697,7 +835,7 @@
       if (completeBtn) completeBtn.disabled = true;
       let shouldNavigate = false;
       try {
-        const res = await fetch('/tra-hang-nhap', {
+        const res = await fetch(purchaseGroupReturn ? '/nhap-hang/tong-hop/' + encodeURIComponent(purchaseGroupReturn._id) + '/return' : '/tra-hang-nhap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -774,61 +912,63 @@
         this.classList.remove('field-invalid');
       });
     });
-    document.getElementById('phieuNhapId').addEventListener('change', async function() {
+    async function loadSelectedPurchase() {
       clearError();
-      const purchaseId = this.value;
-      if (!document.getElementById('khoId').value) {
-        this.value = '';
+      const select = document.getElementById('phieuNhapId');
+      const purchaseId = select.value;
+      const warehouseId = currentKho();
+      const option = select.options[select.selectedIndex];
+      const isGroup = option && option.dataset.recordType === 'group';
+      if (!warehouseId) {
+        select.value = '';
         return showError('Vui lòng chọn kho trả trước');
       }
-      items = [];
-      selectedPurchaseSupplierId = '';
-      setSupplierLink(null);
-      document.getElementById('giamGia').value = 0;
-      document.getElementById('nccDaTra').value = 0;
-      document.getElementById('paymentCash').value = 0;
-      document.getElementById('paymentTransfer').value = 0;
-      isPayAllMode = false;
-      renderItems();
-      if (!purchaseId) {
-        search.disabled = false;
-        return;
-      }
+      resetReturnState({ preservePurchase: true });
+      const request = ++purchaseDetailSequence;
+      if (!purchaseId) return;
+      loadingPurchaseDetail = true;
       search.disabled = true;
+      const isCurrent = () => request === purchaseDetailSequence && warehouseId === currentKho() && purchaseId === select.value;
       try {
-        const res = await fetch('/api/phieu-nhap/' + purchaseId + '/chi-tiet-tra-hang?kho_id=' + encodeURIComponent(document.getElementById('khoId').value));
+        const prefix = isGroup ? '/api/phieu-nhap/tong-hop/' : '/api/phieu-nhap/';
+        const res = await fetch(prefix + encodeURIComponent(purchaseId) + '/chi-tiet-tra-hang?kho_id=' + encodeURIComponent(warehouseId));
         const data = await res.json();
+        if (!isCurrent()) return;
         if (!data.success) return showError(data.message || 'Không thể tải chi tiết phiếu nhập');
         const payload = data.data || {};
-        const ticket = payload.phieu_nhap || {};
-        const supplier = payload.nha_cung_cap || ticket.nha_cung_cap || null;
-        selectedPurchaseSupplierId = supplier && supplier._id ? supplier._id : (ticket.nha_cung_cap_id || '');
-        setSupplierLink(supplier || (selectedPurchaseSupplierId ? { _id: selectedPurchaseSupplierId } : null));
-        if (ticket.kho_id && ticket.kho_id !== document.getElementById('khoId').value) {
-          return showError('Phiếu nhập không thuộc kho trả đã chọn');
+        if (isGroup) {
+          const context = payload.purchase_group_return;
+          if (!context || idOf(context._id) !== purchaseId || idOf(context.kho_id) !== warehouseId) return showError('Phiếu tổng hợp không thuộc kho trả đã chọn');
+          applyGroupReturn(context);
+        } else {
+          const ticket = payload.phieu_nhap || {};
+          const supplier = payload.nha_cung_cap || ticket.nha_cung_cap || null;
+          if (ticket.kho_id && idOf(ticket.kho_id) !== warehouseId) return showError('Phiếu nhập không thuộc kho trả đã chọn');
+          selectedPurchaseSupplierId = supplier && supplier._id ? idOf(supplier) : idOf(ticket.nha_cung_cap_id);
+          setSupplierLink(supplier || (selectedPurchaseSupplierId ? { _id: selectedPurchaseSupplierId } : null));
+          items = (payload.items || payload.chi_tiet || []).map(row => Object.assign({}, row, {
+            so_luong: '', gia_nhap: Number(row.gia_nhap || 0), gia_tra_lai: Number(row.gia_tra_lai || row.gia_nhap || 0), thanh_tien: 0, ghi_chu: row.ghi_chu || ''
+          }));
         }
-        items = (payload.items || payload.chi_tiet || []).map(row => Object.assign({}, row, {
-          so_luong: '',
-          gia_nhap: Number(row.gia_nhap || 0),
-          gia_tra_lai: Number(row.gia_tra_lai || row.gia_nhap || 0),
-          thanh_tien: 0,
-          ghi_chu: row.ghi_chu || ''
-        }));
         renderItems();
       } catch (error) {
-        showError('Lỗi kết nối khi tải chi tiết phiếu nhập');
+        if (isCurrent()) showError('Lỗi kết nối khi tải chi tiết phiếu nhập');
+      } finally {
+        if (request === purchaseDetailSequence) loadingPurchaseDetail = false;
       }
-    });
+    }
+    document.getElementById('phieuNhapId').addEventListener('change', loadSelectedPurchase);
     async function initPreselectedPurchase() {
       if (!preselectedPurchaseId || !preselectedPurchaseKhoId) return;
       const khoSelect = document.getElementById('khoId');
       khoSelect.value = preselectedPurchaseKhoId;
       currentKhoId = preselectedPurchaseKhoId;
-      await loadPurchasesByWarehouse(preselectedPurchaseKhoId);
+      const loaded = await loadPurchasesByWarehouse(preselectedPurchaseKhoId);
+      if (!loaded || currentKho() !== preselectedPurchaseKhoId) return;
       const purchaseSelect = document.getElementById('phieuNhapId');
       purchaseSelect.value = preselectedPurchaseId;
       selectedPurchaseSupplierId = preselectedPurchaseSupplierId;
-      purchaseSelect.dispatchEvent(new Event('change'));
+      await loadSelectedPurchase();
     }
     async function initCopyDraft() {
       if (!copyDraft || !Array.isArray(copyDraft.items) || !copyDraft.items.length) return;
@@ -839,7 +979,9 @@
       const khoSelect = document.getElementById('khoId');
       khoSelect.value = copyDraft.kho_id || '';
       currentKhoId = khoSelect.value;
-      await loadPurchasesByWarehouse(khoSelect.value);
+      const warehouseId = khoSelect.value;
+      const loaded = await loadPurchasesByWarehouse(warehouseId);
+      if (currentKho() !== warehouseId) return;
       const purchaseSelect = document.getElementById('phieuNhapId');
       if (copyDraft.phieu_nhap_id) {
         purchaseSelect.value = copyDraft.phieu_nhap_id;
@@ -868,6 +1010,29 @@
     (async function boot() {
       updateCurrentReturnTime();
       await loadPaymentBooks();
+      if (initialPurchaseGroupReturn) {
+        const context = initialPurchaseGroupReturn;
+        const warehouseId = idOf(context.kho_id);
+        const khoSelect = document.getElementById('khoId');
+        khoSelect.value = warehouseId;
+        currentKhoId = warehouseId;
+        resetReturnState();
+        const detailRequest = purchaseDetailSequence;
+        search.disabled = true;
+        await loadPurchasesByWarehouse(warehouseId);
+        if (currentKho() !== warehouseId || detailRequest !== purchaseDetailSequence) return;
+        const purchaseSelect = document.getElementById('phieuNhapId');
+        const groupId = idOf(context._id);
+        if (!Array.from(purchaseSelect.options).some(option => option.value === groupId)) {
+          const option = new Option(context.ma_phieu_tong_hop || groupId, groupId);
+          option.dataset.recordType = 'group';
+          purchaseSelect.add(option);
+        }
+        purchaseSelect.value = groupId;
+        purchaseSelect.disabled = false;
+        applyGroupReturn(context);
+        return;
+      }
       setPurchasePlaceholder('Chọn kho trước', true);
       if (copyDraft && copyDraft.items && copyDraft.items.length) {
         await initCopyDraft();

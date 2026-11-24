@@ -323,11 +323,11 @@
     .purchase-merge-head h3{margin:0;font-size:21px;font-weight:800;color:#202124}
     .purchase-merge-close{border:0;background:transparent;color:#4b5563;font-size:28px;line-height:1;cursor:pointer}
     .purchase-merge-body{padding:18px 30px 28px;overflow:auto}
-    .purchase-merge-desc{font-size:14px;line-height:1.45;color:#2f343b;margin:0 0 14px}
-    .purchase-merge-desc strong{color:#0070f4}
-    .purchase-merge-filter{display:flex;align-items:center;gap:10px;margin:0 0 14px}
-    .purchase-merge-filter label{font-size:13px;font-weight:700;color:#111827}
-    .purchase-merge-filter select{height:31px;min-width:260px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 9px;font-size:13px;outline:none}
+    .purchase-merge-filter{display:flex;align-items:flex-end;flex-wrap:wrap;gap:10px;margin:0 0 14px}
+    .purchase-merge-filter select{width:100%;height:31px;min-width:0;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#111827;padding:0 9px;font-size:13px;outline:none}
+    .purchase-merge-filter .purchase-merge-supplier{flex:0 1 260px;min-width:220px}
+    .purchase-merge-filter .purchase-merge-status{flex:0 1 190px;min-width:180px}
+    .purchase-merge-filter .purchase-merge-search{flex:1 1 200px;width:auto;min-width:160px}
     .purchase-merge-table{width:100%;border-collapse:collapse;table-layout:fixed}
     .purchase-merge-table th{height:37px;background:#f0f1f3;border-bottom:1px solid #cfd4dc;text-align:left;padding:0 10px;color:#202124;font-size:13px;font-weight:800}
     .purchase-merge-table td{height:38px;border-bottom:1px solid #e5e9ee;padding:0 10px;font-size:13px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -338,7 +338,7 @@
     .purchase-merge-empty strong{font-size:15px;line-height:1.45}
     .purchase-merge-empty span{display:block;margin-top:8px;color:#667085;font-size:13px;line-height:1.4}
     .purchase-merge-foot{display:none;align-items:center;justify-content:flex-end;gap:8px;padding:14px 30px 24px;border-top:1px solid #e5e9ee}
-    @media(max-width:760px){.purchase-merge-overlay{padding:8px}.purchase-merge-head{padding:18px 18px 12px}.purchase-merge-body{padding:14px 18px 22px}.purchase-merge-table{min-width:840px}}
+    @media(max-width:760px){.purchase-merge-overlay{padding:8px}.purchase-merge-head{padding:18px 18px 12px}.purchase-merge-body{padding:14px 18px 22px}.purchase-merge-table{min-width:840px}.purchase-merge-filter .purchase-merge-supplier,.purchase-merge-filter .purchase-merge-status,.purchase-merge-filter .purchase-merge-search{flex:1 1 100%;min-width:0;width:100%}}
     .purchase-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
     .purchase-trash-overlay.is-open{display:flex}
     .purchase-trash-modal{width:min(420px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(15,23,42,.28);display:flex;flex-direction:column;overflow:hidden}
@@ -374,7 +374,6 @@
           <div class="filter-title">Loại chứng từ</div>
           <select class="filter-control" name="view_mode" aria-label="Loại chứng từ nhập hàng" onchange="submitPoFilters()">
             <option value="" <%= !safeFilters.view_mode ? 'selected' : '' %>>Phiếu tổng hợp và phiếu độc lập</option>
-            <option value="sources" <%= safeFilters.view_mode === 'sources' ? 'selected' : '' %>>Tất cả phiếu nguồn</option>
             <option value="groups" <%= safeFilters.view_mode === 'groups' ? 'selected' : '' %>>Chỉ phiếu tổng hợp</option>
           </select>
         </div>
@@ -435,6 +434,11 @@
           </div>
         </div>
 
+        <% if (locals.historicalPurchaseGroup) { %>
+          <section class="detail-card" aria-label="Lịch sử phiếu tổng hợp đã tách">
+            <%- include('_group-detail', { group: locals.historicalPurchaseGroup, fmt: fmt, fmtMoney: fmtMoney, formatDate: formatDate, statusBadge: statusBadge, statusLabel: statusLabel, lotLabel: lotLabel, detailGroups: detailGroups, detailRowsForGroup: detailRowsForGroup, refLink: refLink }) %>
+          </section>
+        <% } %>
         <div class="po-table-wrap">
           <table class="po-table">
             <thead>
@@ -602,18 +606,17 @@
   <div id="purchaseMergeModalOverlay" class="purchase-merge-overlay">
     <div class="purchase-merge-modal" role="dialog" aria-labelledby="purchaseMergeModalTitle" aria-modal="true">
       <div class="purchase-merge-head">
-        <h3 id="purchaseMergeModalTitle">Tạo phiếu tổng hợp A + B = C</h3>
+        <h3 id="purchaseMergeModalTitle">Gộp phiếu theo nhà cung cấp</h3>
         <button type="button" class="purchase-merge-close" id="purchaseMergeModalClose" aria-label="Đóng">×</button>
       </div>
       <div class="purchase-merge-body">
-        <p class="purchase-merge-desc">Chọn các phiếu cùng <strong>nhà cung cấp và kho</strong>, chưa có trả hàng còn hiệu lực. Phiếu tổng hợp C giữ nguyên các chứng từ nguồn, kho và thanh toán. Bạn có thể chọn phiếu ở nhiều trang.</p>
         <div class="purchase-merge-filter">
-          <label for="purchaseMergeSupplierSelect">Nhà cung cấp</label>
-          <select id="purchaseMergeSupplierSelect"><option value="">Tất cả nhà cung cấp</option><% safeSuppliers.forEach(function(s) { %><option value="<%= s._id %>"><%= [s.ma_ncc,s.ten_ncc].filter(Boolean).join(' - ') %></option><% }) %></select>
-          <input class="filter-control" id="purchaseMergeSearch" placeholder="Tìm mã phiếu nhập" aria-label="Tìm phiếu để gộp">
+          <select class="purchase-merge-supplier" id="purchaseMergeSupplierSelect" aria-label="Nhà cung cấp"><% if (!safeSuppliers.length) { %><option value="">Chưa có nhà cung cấp</option><% } %><% safeSuppliers.forEach(function(s) { %><option value="<%= s._id %>"><%= [s.ma_ncc,s.ten_ncc].filter(Boolean).join(' - ') %></option><% }) %></select>
+          <select class="purchase-merge-status" id="purchaseMergeStatusSelect" aria-label="Trạng thái phiếu nhập"><option value="completed" selected>Đã nhập hàng</option><option value="draft">Phiếu tạm</option></select>
+          <input class="filter-control purchase-merge-search" id="purchaseMergeSearch" placeholder="Tìm mã phiếu nhập" aria-label="Tìm phiếu để gộp">
         </div>
         <div id="purchaseMergeAlert" class="purchase-trash-alert is-error" role="alert" style="display:none"></div>
-        <p><strong id="purchaseMergeSelectionCount">Đã chọn 0 phiếu</strong> <button type="button" class="kv-btn" id="purchaseMergeClear">Bỏ chọn tất cả</button></p>
+        <p><strong id="purchaseMergeSelectionCount">Đã chọn 0 phiếu</strong></p>
         <table class="purchase-merge-table">
           <thead>
             <tr>
@@ -635,7 +638,6 @@
           <strong id="purchaseMergeEmptyTitle">Không có phiếu nhập có thể gộp</strong>
           <span id="purchaseMergeEmptyDesc"></span>
         </div>
-        <label class="purchase-merge-filter">Ghi chú <input class="filter-control" id="purchaseMergeNote" placeholder="Ghi chú tổng hợp"></label>
         <div id="purchaseMergePreview" class="purchase-trash-alert is-warn" style="display:none"></div>
       </div>
       <div id="purchaseMergeFoot" class="purchase-merge-foot">
@@ -696,6 +698,8 @@
   <script id="purchaseData" type="application/json"><%- JSON.stringify(safeTickets || []).replace(/</g, '\\u003c') %></script>
   <script id="supplierData" type="application/json"><%- JSON.stringify(locals.suppliers || []).replace(/</g, '\\u003c') %></script>
   <script id="warehouseData" type="application/json"><%- JSON.stringify(locals.warehouses || []).replace(/</g, '\\u003c') %></script>
+  <script src="/js/kv-inline-detail.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', function() { if (window.kvInlineBindExpandRows) window.kvInlineBindExpandRows(document); });</script>
   <script src="/javascripts/purchase-group.js"></script>
   <script id="cashBookData" type="application/json"><%- JSON.stringify(locals.cashBooks || []).replace(/</g, '\\u003c') %></script>
   <script id="vatChuaData" type="application/json"><%- JSON.stringify(locals.vatChuaList || []).replace(/</g, '\\u003c') %></script>
@@ -1519,26 +1523,7 @@
         });
       });
       var params = new URLSearchParams(window.location.search);
-      var sourcePurchaseId = params.get('purchase');
-      var purchaseId = params.get('group') || sourcePurchaseId;
-      if (params.get('export') === '1' && sourcePurchaseId) {
-        var exportFrame = document.createElement('iframe');
-        exportFrame.style.display = 'none';
-        exportFrame.src = '/nhap-hang/' + encodeURIComponent(sourcePurchaseId) + '/export.xlsx';
-        document.body.appendChild(exportFrame);
-        setTimeout(function() { exportFrame.remove(); }, 120000);
-        params.delete('export');
-        var cleanQs = params.toString();
-        history.replaceState({}, '', '/nhap-hang' + (cleanQs ? '?' + cleanQs : ''));
-      }
-      if (purchaseId) {
-        var purchaseRow = document.querySelector('[data-expand-id="' + purchaseId + '"]');
-        var purchaseDetail = document.getElementById('detail-' + purchaseId);
-        if (purchaseRow && purchaseDetail) {
-          purchaseDetail.style.display = 'table-row';
-          purchaseRow.scrollIntoView({ block: 'center' });
-        }
-      }
+      var initialFocus = <%- JSON.stringify(locals.purchaseListFocus || null).replace(/</g, '\\u003c') %>;
       var detailBlocks = Array.prototype.slice.call(document.querySelectorAll('.po-detail'));
       detailBlocks.forEach(function(block) {
         var tabs = Array.prototype.slice.call(block.querySelectorAll('.po-detail-tab')).filter(function(tab) { return tab.closest('.po-detail') === block; });
@@ -1555,6 +1540,38 @@
           });
         });
       });
+      var focusId = initialFocus && initialFocus.record_id || params.get('group') || params.get('purchase');
+      if (!/^[a-f\d]{24}$/i.test(String(focusId || ''))) focusId = '';
+      if (focusId) {
+        var purchaseRow = document.querySelector('[data-expand-id="' + focusId + '"]');
+        var purchaseDetail = document.getElementById('detail-' + focusId);
+        if (purchaseRow && purchaseDetail) {
+          purchaseDetail.style.display = 'table-row';
+          purchaseRow.scrollIntoView({ block: 'center' });
+        }
+        if (initialFocus && initialFocus.source_id) {
+          var groupDetail = document.querySelector('[data-purchase-group-detail="' + focusId + '"]');
+          var sourceLink = groupDetail && Array.from(groupDetail.querySelectorAll('[data-purchase-source-open]')).find(function(link) {
+            return link.dataset.purchaseSourceOpen === initialFocus.source_id;
+          });
+          if (sourceLink) sourceLink.click();
+        }
+      }
+      var exportId = initialFocus && initialFocus.export_id || (params.get('export') === '1' && params.get('purchase'));
+      if (!/^[a-f\d]{24}$/i.test(String(exportId || ''))) exportId = '';
+      if (exportId) {
+        var exportFrame = document.createElement('iframe');
+        exportFrame.style.display = 'none';
+        exportFrame.src = '/nhap-hang/' + encodeURIComponent(exportId) + '/export.xlsx';
+        document.body.appendChild(exportFrame);
+        setTimeout(function() { exportFrame.remove(); }, 120000);
+      }
+      if (focusId || params.has('purchase') || params.has('group') || params.has('success') || params.has('export')) {
+        history.replaceState({}, '', '/nhap-hang');
+      } else if (params.get('view_mode') === 'sources') {
+        params.delete('view_mode');
+        history.replaceState({}, '', '/nhap-hang' + (params.toString() ? '?' + params.toString() : ''));
+      }
     });
 
     window.PurchaseGroups.initMerge();

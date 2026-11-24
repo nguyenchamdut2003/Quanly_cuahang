@@ -5,9 +5,12 @@ const {
     HoaDonBanHang,
     PhieuNhap,
     PhieuTraHang,
+    PhieuTraHangNhap,
     DonHang
 } = require('../models/kiot.model');
 const { numberToVietnameseWords } = require('../utils/numberToVietnameseWords');
+const { summarizeReturnSources } = require('./purchaseReturnGroupList.service');
+const { resolveUserStoreId: resolveStoreId } = require('../utils/storeScope');
 
 const RECEIPT_PRINT_POPULATES = [
     { path: 'nguoi_tao_id', select: 'ho_ten email username' },
@@ -39,6 +42,11 @@ const RECEIPT_PRINT_POPULATES = [
         populate: { path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' }
     },
     {
+        path: 'phieu_tra_tong_hop_id',
+        select: 'ma_phieu_tra_tong_hop ngay_tra trang_thai nha_cung_cap_id',
+        populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+    },
+    {
         path: 'phieu_tra_hang_nhap_id',
         select: 'ma_phieu_tra_nhap ngay_tra tong_tien_tra ncc_can_tra ncc_da_tra trang_thai nha_cung_cap_id',
         populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
@@ -50,6 +58,11 @@ const RECEIPT_PRINT_POPULATES = [
             { path: 'doi_tac_giao_hang_id', select: 'ten_doi_tac ma_doi_tac' },
             { path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' }
         ]
+    },
+    {
+        path: 'allocations.phieu_tra_hang_nhap_id',
+        select: 'ma_phieu_tra_nhap ngay_tra tong_tien_tra ncc_can_tra ncc_da_tra ncc_con_phai_tra trang_thai nha_cung_cap_id phieu_tra_tong_hop_id',
+        populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
     },
     {
         path: 'allocations.phieu_nhap_id',
@@ -229,6 +242,7 @@ function resolvePaymentDetail(receipt) {
 
 function hasReceiptDocRef(receipt) {
     if (!receipt) return false;
+    if (receipt.phieu_tra_tong_hop_id) return true;
     if (receipt.hoa_don_id || receipt.don_hang_id || receipt.phieu_nhap_id) return true;
     if (receipt.phieu_tra_hang_id || receipt.phieu_tra_hang_nhap_id || receipt.van_don_id) return true;
     return Array.isArray(receipt.allocations) && receipt.allocations.length > 0;
@@ -256,7 +270,7 @@ async function attachMissingDocRefs(receipt) {
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
             .lean();
         if (row) receipt.don_hang_id = row;
-    } else if (/^TH(?!N)/i.test(code) && !receipt.phieu_tra_hang_id) {
+    } else if (/^TH(?![NG])/i.test(code) && !receipt.phieu_tra_hang_id) {
         const row = await PhieuTraHang.findOne({ ma_phieu_tra: code, deleted_at: null })
             .select('ma_phieu_tra ngay_tra tong_tien_tra can_tra_khach trang_thai khach_hang_id')
             .populate({ path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' })
@@ -266,11 +280,82 @@ async function attachMissingDocRefs(receipt) {
     return receipt;
 }
 
+async function attachPurchaseReturnGroupTotals(receipt) {
+    const group = relDocObject(receipt && receipt.phieu_tra_tong_hop_id);
+    if (!group || !group._id || !group.ma_phieu_tra_tong_hop) return receipt;
+    const storeId = receipt.cua_hang_id && (receipt.cua_hang_id._id || receipt.cua_hang_id);
+    const supplierId = group.nha_cung_cap_id && (group.nha_cung_cap_id._id || group.nha_cung_cap_id);
+    const children = await PhieuTraHangNhap.find({
+        phieu_tra_tong_hop_id: group._id,
+        cua_hang_id: storeId,
+        ...(supplierId ? { nha_cung_cap_id: supplierId } : {}),
+        trang_thai: { $nin: ['cancelled', 'Cancelled', 'CANCELLED'] },
+        trang_thai_du_lieu: { $ne: 'inactive' },
+        deleted_at: null
+    }).select('tong_tien_hang tong_tien_tra giam_gia kieu_giam_gia ncc_can_tra ncc_da_tra ncc_con_phai_tra gia_tri_can_tru_cong_no trang_thai').lean();
+    Object.assign(group, summarizeReturnSources(children));
+    if (group.trang_thai !== 'cancelled') {
+        group.trang_thai = !children.length ? 'cancelled' : (children.every(row => row.trang_thai === 'completed') ? 'completed' : 'draft');
+    }
+    return receipt;
+}
+
+function refundAllocationSnapshot(allocation) {
+    const amount = Number(allocation.so_tien);
+    const before = Number(allocation.con_no_truoc);
+    const after = Number(allocation.con_no_sau);
+    if (allocation.con_no_truoc == null || allocation.con_no_sau == null || !Number.isFinite(amount)
+        || !Number.isFinite(before) || !Number.isFinite(after) || amount <= 0 || before < amount || after < 0
+        || Math.abs(before - after - amount) > 0.000001) return null;
+    return { before, after };
+}
+
 function buildRelatedVoucherRows(receipt) {
     const rows = [];
     const defaultReceiptValue = receiptPayAmount(receipt);
     const allocations = Array.isArray(receipt.allocations) ? receipt.allocations : [];
     const pushRow = row => rows.push(row);
+
+    const returnGroup = relDocObject(receipt.phieu_tra_tong_hop_id);
+    const refundAllocations = receipt.allocation_type === 'hoan_tien_tra_nhap'
+        ? allocations.filter(alloc => alloc.phieu_tra_hang_nhap_id || alloc.ma_phieu_tra_nhap) : [];
+    if (returnGroup && returnGroup.ma_phieu_tra_tong_hop) {
+        pushRow({
+            typeLabel: 'Phiếu trả hàng nhập gộp',
+            code: returnGroup.ma_phieu_tra_tong_hop,
+            docDate: returnGroup.ngay_tra,
+            partner: partnerLabel(returnGroup.nha_cung_cap_id),
+            docValue: returnGroup.tong_tien_tra ?? null,
+            paidBefore: null,
+            receiptValue: defaultReceiptValue,
+            remainAfter: null,
+            status: getRelatedDocumentStatus('supplier_return', returnGroup),
+            note: refundAllocations.length ? 'Tổng phiếu thu; phân bổ về THN nguồn bên dưới.' : '',
+            isSummary: refundAllocations.length > 0
+        });
+        if (!refundAllocations.length) return rows;
+    }
+    if (refundAllocations.length) {
+        refundAllocations.forEach(alloc => {
+            const child = relDocObject(alloc.phieu_tra_hang_nhap_id) || {};
+            const amount = Number(alloc.so_tien || 0);
+            const snapshot = refundAllocationSnapshot(alloc);
+            pushRow({
+                typeLabel: 'Phiếu trả hàng nhập nguồn',
+                code: String(alloc.ma_phieu_tra_nhap || child.ma_phieu_tra_nhap || '').trim(),
+                docDate: child.ngay_tra,
+                partner: partnerLabel(child.nha_cung_cap_id || receipt.nha_cung_cap_id),
+                docValue: child.ncc_can_tra ?? child.tong_tien_tra ?? null,
+                paidBefore: snapshot && child.ncc_can_tra != null
+                    ? Math.max(0, Number(child.ncc_can_tra) - snapshot.before) : null,
+                receiptValue: amount,
+                remainAfter: snapshot ? snapshot.after : null,
+                status: getRelatedDocumentStatus('supplier_return', child, snapshot ? snapshot.after : null, child.ncc_can_tra),
+                note: alloc.ma_phieu_nhap ? 'Phiếu nhập nguồn: ' + alloc.ma_phieu_nhap : ''
+            });
+        });
+        return rows;
+    }
 
     if (allocations.length) {
         allocations.forEach(alloc => {
@@ -471,6 +556,7 @@ function summarizeRelatedRows(rows) {
     let hasRemain = false;
     let canSumRemain = rows.length > 0;
     rows.forEach(row => {
+        if (row.isSummary) return;
         totalReceiptValue += Number(row.receiptValue || 0);
         if (row.remainAfter != null && !Number.isNaN(Number(row.remainAfter))) {
             hasRemain = true;
@@ -485,15 +571,16 @@ function summarizeRelatedRows(rows) {
     };
 }
 
-async function loadReceiptForPrint(id) {
-    if (!isObjectId(id)) return null;
-    let query = PhieuThuChi.findById(id);
+async function loadReceiptForPrint(id, storeId) {
+    if (!isObjectId(id) || !isObjectId(storeId)) return null;
+    let query = PhieuThuChi.findOne({ _id: id, cua_hang_id: storeId });
     RECEIPT_PRINT_POPULATES.forEach(spec => {
         query = query.populate(spec);
     });
     const receipt = await query.lean();
     if (!receipt) return null;
     await attachMissingDocRefs(receipt);
+    await attachPurchaseReturnGroupTotals(receipt);
     let store = relDocObject(receipt.cua_hang_id);
     if (!store && receipt.cua_hang_id) {
         store = await CuaHang.findById(receipt.cua_hang_id)
@@ -571,7 +658,8 @@ function buildReceiptPrintData(receipt, store, options = {}) {
 }
 
 async function buildReceiptPrintViewData(req, title, options = {}) {
-    const loaded = await loadReceiptForPrint(req.params.id);
+    const storeId = await resolveStoreId(req);
+    const loaded = await loadReceiptForPrint(req.params.id, storeId);
     if (!loaded) return null;
     const embeddedPrint = String(req.query?.embed || '') === '1';
     const printData = buildReceiptPrintData(loaded.receipt, loaded.store, {
@@ -592,6 +680,7 @@ module.exports = {
     RECEIPT_PRINT_POPULATES,
     loadReceiptForPrint,
     attachMissingDocRefs,
+    attachPurchaseReturnGroupTotals,
     buildReceiptPrintData,
     buildRelatedVoucherRows,
     buildReceiptPrintViewData,

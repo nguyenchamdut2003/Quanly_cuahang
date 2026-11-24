@@ -17,6 +17,7 @@ const {
 } = require('../models/kiot.model');
 const { BangLuong, TamUngNhanVien } = require('../models/chamcong.model');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
+const { attachPurchaseReturnGroupTotals } = require('../services/receiptPrint.service');
 const {
     buildReceiptPaymentInfo,
     hasV2PaymentPayload
@@ -31,7 +32,7 @@ const {
     computeScopedTotals,
     attachScopedAmounts
 } = require('../services/cashbookListScope.service');
-const { resolveStoreId } = require('../utils/storeScope');
+const { resolveUserStoreId: resolveStoreId } = require('../utils/storeScope');
 
 function isObjectId(value) {
     return /^[0-9a-fA-F]{24}$/.test(String(value || ''));
@@ -180,7 +181,7 @@ async function loadPartnerLists(storeId) {
 }
 
 function isCustomerReturnDocCode(code) {
-    return /^TH(?!N)/i.test(String(code || '').trim());
+    return /^TH(?![NG])/i.test(String(code || '').trim());
 }
 
 function isPayrollDocCode(code) {
@@ -198,6 +199,12 @@ function normalizePayrollDocCode(code) {
 }
 
 function relatedCode(item) {
+    if (item.phieu_tra_tong_hop_id) return item.phieu_tra_tong_hop_id.ma_phieu_tra_tong_hop || item.ma_chung_tu_goc || '';
+    if (item.allocation_type === 'hoan_tien_tra_nhap') {
+        const allocation = (item.allocations || [])[0] || {};
+        return item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap
+            || allocation.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || allocation.ma_phieu_tra_nhap || item.ma_chung_tu_goc || '';
+    }
     if (item.phieu_nhap_tong_hop_id) return item.phieu_nhap_tong_hop_id.ma_phieu_tong_hop || item.ma_chung_tu_goc || '';
     const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
     const allocPn = firstAlloc?.phieu_nhap_id;
@@ -221,6 +228,7 @@ function relatedCode(item) {
 
 function hasReceiptDocRef(item) {
     if (!item) return false;
+    if (item.phieu_tra_tong_hop_id) return true;
     if (item.hoa_don_id || item.don_hang_id || item.phieu_nhap_id) return true;
     if (item.phieu_tra_hang_id || item.phieu_tra_hang_nhap_id || item.van_don_id) return true;
     if (item.nhap_vat_chua_id || item.xuat_vat_chua_id) return true;
@@ -449,6 +457,8 @@ exports.index = async (req, res, next) => {
                 .populate('phieu_nhap_id')
                 .populate('phieu_tra_hang_id')
                 .populate('phieu_tra_hang_nhap_id')
+                .populate('phieu_tra_tong_hop_id', 'ma_phieu_tra_tong_hop ngay_tra trang_thai nha_cung_cap_id')
+                .populate('allocations.phieu_tra_hang_nhap_id', 'ma_phieu_tra_nhap ngay_tra tong_tien_tra ncc_can_tra ncc_da_tra ncc_con_phai_tra trang_thai nha_cung_cap_id phieu_tra_tong_hop_id')
                 .populate('van_don_id')
                 .populate('nhap_vat_chua_id')
                 .populate('xuat_vat_chua_id')
@@ -512,7 +522,10 @@ exports.getExportCsv = async (req, res, next) => {
         if (!storeId) return res.status(400).send('Chưa chọn cửa hàng');
         const cashBookScope = resolveCashBookFilterScope(req.query);
         const cashBookMeta = await buildCashBookMeta(cashBookScope);
-        const list = await PhieuThuChi.find(await buildFullFilter(req.query, storeId)).populate('so_quy_id').sort({ ngay_lap: -1 });
+        const list = await PhieuThuChi.find(await buildFullFilter(req.query, storeId)).populate('so_quy_id')
+            .populate('phieu_tra_tong_hop_id', 'ma_phieu_tra_tong_hop')
+            .populate('phieu_tra_hang_nhap_id', 'ma_phieu_tra_nhap')
+            .populate('allocations.phieu_tra_hang_nhap_id', 'ma_phieu_tra_nhap').sort({ ngay_lap: -1 });
         attachScopedAmounts(list, cashBookScope, cashBookMeta);
         const escape = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
         const rows = [
@@ -601,6 +614,11 @@ const RECEIPT_DETAIL_POPULATES = [
         populate: { path: 'khach_hang_id', select: 'ten_khach_hang ma_khach_hang' }
     },
     {
+        path: 'phieu_tra_tong_hop_id',
+        select: 'ma_phieu_tra_tong_hop ngay_tra trang_thai nha_cung_cap_id',
+        populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+    },
+    {
         path: 'phieu_tra_hang_nhap_id',
         select: 'ma_phieu_tra_nhap ngay_tra tong_tien_tra ncc_can_tra ncc_da_tra trang_thai nha_cung_cap_id',
         populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
@@ -622,6 +640,11 @@ const RECEIPT_DETAIL_POPULATES = [
         select: 'ma_xuat_vat_chua tong_tien created_at doi_tuong_ten trang_thai items'
     },
     {
+        path: 'allocations.phieu_tra_hang_nhap_id',
+        select: 'ma_phieu_tra_nhap ngay_tra tong_tien_tra ncc_can_tra ncc_da_tra ncc_con_phai_tra trang_thai nha_cung_cap_id phieu_tra_tong_hop_id',
+        populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
+    },
+    {
         path: 'allocations.phieu_nhap_id',
         select: 'ma_phieu_nhap ngay_nhap tong_tien can_tra_ncc da_tra_ncc con_no_ncc trang_thai nha_cung_cap_id',
         populate: { path: 'nha_cung_cap_id', select: 'ten_ncc ma_ncc' }
@@ -640,13 +663,16 @@ const RECEIPT_DETAIL_POPULATES = [
 exports.getIdDetail = async (req, res, next) => {
     try {
         if (!isObjectId(req.params.id)) return res.status(400).json({ success: false, message: 'id không hợp lệ' });
-        let query = PhieuThuChi.findById(req.params.id);
+        const storeId = await resolveStoreId(req);
+        if (!storeId) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng' });
+        let query = PhieuThuChi.findOne({ _id: req.params.id, cua_hang_id: storeId });
         RECEIPT_DETAIL_POPULATES.forEach(spec => {
             query = query.populate(spec);
         });
         const receipt = await query.lean();
         if (!receipt) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu thu chi' });
         await attachMissingDocRefs(receipt);
+        await attachPurchaseReturnGroupTotals(receipt);
         const phieuNhapRef = receipt.phieu_nhap_id;
         const phieuNhapId = phieuNhapRef && (phieuNhapRef._id || phieuNhapRef);
         const items = phieuNhapId
@@ -675,15 +701,40 @@ exports.postAdd = async (req, res, next) => {
             cuaHangId: storeId,
             chiNhanhId: body.chi_nhanh_id
         });
+        const hasReturnRef = Boolean(body.phieu_tra_tong_hop_id || body.phieu_tra_hang_nhap_id);
+        if (hasReturnRef || body.document_type === 'phieu_tra_hang_nhap') {
+            if (body.document_type !== 'phieu_tra_hang_nhap' || body.loai_phieu !== 'thu'
+                || body.nhom_doi_tuong !== 'nha_cung_cap' || !isObjectId(body.doi_tuong_entity_id)
+                || (body.phieu_tra_tong_hop_id && body.phieu_tra_hang_nhap_id)) {
+                throw new Error('Chứng từ trả hàng nhập không hợp lệ');
+            }
+            // Standard refund operations validate scope and balances inside their
+            // transaction, then create the receipt and update received money once.
+            const refundData = Object.assign({}, body, { payment_v2: paymentV2 });
+            let result;
+            if (body.phieu_tra_tong_hop_id) {
+                const { receivePurchaseGroupReturnRefund } = require('../services/purchaseGroupReturn.service');
+                result = await receivePurchaseGroupReturnRefund({ returnGroupId: body.phieu_tra_tong_hop_id,
+                    storeId, userId: req.user?._id, data: refundData });
+            } else {
+                const { receiveStandaloneSupplierRefund } = require('./traHangNhap.controller');
+                result = await receiveStandaloneSupplierRefund({ returnId: body.phieu_tra_hang_nhap_id,
+                    storeId, userId: req.user?._id, data: refundData });
+            }
+            return res.json({ success: true, message: 'Đã tạo phiếu thu hoàn tiền', data: result.receipt });
+        }
         await validateReceiptDocumentAmount({
             cua_hang_id: storeId,
             loai_phieu: body.loai_phieu,
             document_type: body.document_type,
             gia_tri: paymentInfo.gia_tri,
+            nhom_doi_tuong: body.nhom_doi_tuong,
+            doi_tuong_entity_id: body.doi_tuong_entity_id,
             don_hang_id: body.don_hang_id,
             hoa_don_id: body.hoa_don_id,
             phieu_nhap_id: body.phieu_nhap_id,
             phieu_tra_hang_nhap_id: body.phieu_tra_hang_nhap_id,
+            phieu_tra_tong_hop_id: body.phieu_tra_tong_hop_id,
             phieu_tra_hang_id: body.phieu_tra_hang_id,
             van_don_id: body.van_don_id,
         });
@@ -710,6 +761,7 @@ exports.postAdd = async (req, res, next) => {
             hoa_don_id: body.hoa_don_id,
             phieu_nhap_id: body.phieu_nhap_id,
             phieu_tra_hang_nhap_id: body.phieu_tra_hang_nhap_id,
+            phieu_tra_tong_hop_id: body.document_type === 'phieu_tra_hang_nhap' ? body.phieu_tra_tong_hop_id : undefined,
             phieu_tra_hang_id: body.phieu_tra_hang_id,
             van_don_id: body.van_don_id,
             ma_chung_tu_goc: body.ma_chung_tu_goc,
@@ -721,6 +773,6 @@ exports.postAdd = async (req, res, next) => {
         });
         res.json({ success: true, message: `Đã tạo phiếu ${receipt.loai_phieu}`, data: receipt });
     } catch (error) {
-        return res.status(400).json({ success: false, message: receiptErrorMessage(error) });
+        return res.status(error.statusCode || 400).json({ success: false, message: receiptErrorMessage(error) });
     }
 };

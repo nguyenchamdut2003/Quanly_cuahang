@@ -1,6 +1,16 @@
 var mongoose = require('mongoose');
 var { CuaHang } = require('../models/kiot.model');
 
+function resolveUserStoreId(req) {
+  var userStore = req && req.user && req.user.cua_hang_id;
+  var sessionStore = req && req.session && req.session.cua_hang_id;
+  for (var value of [userStore, sessionStore]) {
+    var id = String(value && value._id || value || '').trim();
+    if (mongoose.Types.ObjectId.isValid(id)) return id;
+  }
+  return '';
+}
+
 async function resolveStoreId(req) {
   var sessionStoreId = req && req.session ? String(req.session.cua_hang_id || '').trim() : '';
   if (sessionStoreId && mongoose.Types.ObjectId.isValid(sessionStoreId)) return sessionStoreId;
@@ -20,5 +30,6 @@ function parseDateInput(value) {
 
 module.exports = {
   resolveStoreId,
+  resolveUserStoreId,
   parseDateInput
 };

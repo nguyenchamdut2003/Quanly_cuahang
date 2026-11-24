@@ -221,15 +221,19 @@ async function exportSupplierDetailWorkbook(section, supplier, storeId) {
             if (storeId && mongoose.Types.ObjectId.isValid(storeId)) ptMatch.cua_hang_id = storeId;
             var traRows = await PhieuTraHangNhap.find(ptMatch).sort({ ngay_tra: -1, created_at: -1 }).lean();
             traRows.forEach(function(row) {
-                var can = Number(row.ncc_can_tra || row.tong_tien_tra || 0);
-                var da = Number(row.ncc_da_tra || 0);
+                var can = Number(row.gia_tri_can_tru_cong_no != null
+                    ? (row.ncc_can_tra ?? row.tong_tien_tra ?? 0)
+                    : (row.ncc_can_tra || row.tong_tien_tra || 0));
+                var da = row.trang_thai === 'draft' ? 0 : Number(row.ncc_da_tra || 0);
                 wsH.addRow({
                     loai_phieu: 'Phiếu trả hàng nhập',
                     ma_phieu: row.ma_phieu_tra_nhap || '',
                     ngay: formatExportDate(row.ngay_tra || row.created_at),
                     tong_tien: Number(row.tong_tien_tra || 0),
                     da_tra: da,
-                    con_no: Math.max(0, can - da),
+                    con_no: row.trang_thai === 'draft' ? Math.max(0, can) : row.gia_tri_can_tru_cong_no != null
+                        ? Math.max(0, Number(row.ncc_con_phai_tra ?? (can - da)))
+                        : Math.max(0, can - da),
                     trang_thai: mapTraHangStatus(row.trang_thai)
                 });
             });

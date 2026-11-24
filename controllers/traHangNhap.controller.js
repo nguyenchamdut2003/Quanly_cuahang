@@ -14,12 +14,15 @@ const {
   TonKhoLoQuyCach,
   LoHang,
   PhieuNhap,
+  PhieuNhapTongHop,
   CTPhieuNhap,
   PhieuTraHangNhap,
+  PhieuTraHangTongHop,
   CTPhieuTraHangNhap,
   CongNoNhaCungCap,
   SoQuy,
   PhieuThuChi,
+  Counter,
   VatChua
 } = require('../models/kiot.model');
 const { normalizeQuyCachItems } = require('../services/purchase.service');
@@ -29,7 +32,8 @@ const { loadReturnsLinkedVatChuaMap } = require('../services/vatChuaDetail.servi
 const { truTonKho } = require('../services/kho.service');
 const { taoPhieuThuChi } = require('../services/soQuy.service');
 const { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
-const { acquirePurchaseGroupMutationLock } = require('../services/purchaseGroup.service');
+const { acquirePurchaseGroupMutationLock, findActivePurchaseGroupForSource } = require('../services/purchaseGroup.service');
+const { loadReturnManagementList, discountVnd } = require('../services/purchaseReturnGroupList.service');
 
 function disabledTrashOperation() {
   const error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
@@ -76,6 +80,7 @@ function activeReturnImportDataFilter(extra) {
   return {
     $and: [
       base,
+      { deleted_at: null },
       {
         $or: [
           { trang_thai_du_lieu: 'active' },
@@ -93,6 +98,7 @@ const RETURN_IMPORT_EXPORT_COLUMNS = [
   { header: 'Thời gian trả', key: 'thoi_gian_tra' },
   { header: 'Nhà cung cấp', key: 'nha_cung_cap' },
   { header: 'Mã phiếu nhập', key: 'ma_phieu_nhap' },
+  { header: 'Phiếu trả tổng hợp', key: 'ma_phieu_tra_tong_hop' },
   { header: 'Kho', key: 'kho' },
   { header: 'Người tạo', key: 'nguoi_tao' },
   { header: 'Người trả', key: 'nguoi_tra' },
@@ -356,16 +362,16 @@ async function resolveReturnTenQuyCachFromPayload(item, khoId, hangId, loHangId)
 }
 
 async function resolveStoreId(req) {
-  const sessionStoreId = req && req.session ? String(req.session.cua_hang_id || '').trim() : '';
-  if (isObjectId(sessionStoreId)) return sessionStoreId;
-  const userStoreId = req && req.user ? String(req.user.cua_hang_id || '').trim() : '';
+  const userStoreId = getObjectIdValue(req && req.user && req.user.cua_hang_id);
   if (isObjectId(userStoreId)) return userStoreId;
-  const activeStore = await CuaHang.findOne({ trang_thai: 'active' }).sort({ created_at: 1 }).lean();
-  return activeStore ? String(activeStore._id) : '';
+  const sessionStoreId = getObjectIdValue(req && req.session && req.session.cua_hang_id);
+  if (isObjectId(sessionStoreId)) return sessionStoreId;
+  throw Object.assign(new Error('Chưa có cửa hàng trong phiên đăng nhập.'), { statusCode: 403 });
 }
 
 function parseMoney(raw) {
   if (raw == null) return 0;
+  if (typeof raw === 'number') return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
   const value = Number(String(raw).replace(/\./g, '').replace(/,/g, '').trim());
   if (!Number.isFinite(value) || value < 0) return 0;
   return Math.floor(value);
@@ -373,10 +379,21 @@ function parseMoney(raw) {
 
 function resolveSupplierReturnRemaining(ticket) {
   if (!ticket) return 0;
+  if (ticket.trang_thai === 'draft') return Math.max(0, Number(ticket.ncc_can_tra || 0));
   if (ticket.ncc_con_phai_tra != null && ticket.ncc_con_phai_tra !== '') {
     return Math.max(0, Number(ticket.ncc_con_phai_tra || 0));
   }
   return Math.max(0, Number(ticket.ncc_can_tra || 0) - Number(ticket.ncc_da_tra || 0));
+}
+
+function displayReturnTicket(ticket) {
+  if (!ticket || ticket.trang_thai !== 'draft') return ticket;
+  return { ...ticket,
+    ncc_hoan_du_kien: Number(ticket.ncc_hoan_du_kien ?? ticket.ncc_da_tra ?? 0),
+    ncc_da_tra: 0,
+    ncc_con_phai_tra: Math.max(0, Number(ticket.ncc_can_tra || 0)),
+    chi_tiet_thanh_toan: { tien_mat: 0, chuyen_khoan: 0, tien_tra_khach: 0 }
+  };
 }
 
 function parseItems(raw) {
@@ -389,6 +406,9 @@ function parseItems(raw) {
     }
   }
   if (!Array.isArray(parsed)) return [];
+  // Source unit prices can contain fractions even when final VND totals are
+  // integers. Keep numeric JSON prices until the existing total rounding step.
+  const unitPrice = value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : parseMoney(value);
   return parsed.map(item => ({
     hang_hoa_id: String(item.hang_hoa_id || '').trim(),
     lo_hang_id: String(item.lo_hang_id || '').trim(),
@@ -398,8 +418,8 @@ function parseItems(raw) {
     ten_quy_cach: String(item.ten_quy_cach || '').trim(),
     ton_kho_lo_quy_cach_id: String(item.ton_kho_lo_quy_cach_id || '').trim(),
     so_luong: Number(item.so_luong || 0),
-    gia_nhap: parseMoney(item.gia_nhap || item.don_gia || item.don_gia_nhap || 0),
-    gia_tra_lai: parseMoney(item.gia_tra_lai || item.don_gia || item.don_gia_nhap || 0),
+    gia_nhap: unitPrice(item.gia_nhap ?? item.don_gia ?? item.don_gia_nhap ?? 0),
+    gia_tra_lai: unitPrice(item.gia_tra_lai ?? item.don_gia ?? item.don_gia_nhap ?? 0),
     ghi_chu: String(item.ghi_chu || '').trim()
   })).filter(item => isObjectId(item.hang_hoa_id));
 }
@@ -418,19 +438,25 @@ function computeTotals(items, discountValue, discountType) {
   const nccCanTra = Math.max(0, Math.floor(tongTienHang - discountAmount));
   return {
     tong_tien_hang: Math.floor(tongTienHang),
-    giam_gia: Math.floor(giamGia),
+    giam_gia: discountType === 'percent' ? giamGia : Math.floor(giamGia),
     ncc_can_tra: nccCanTra,
     tong_tien_tra: nccCanTra
   };
 }
 
-async function makeReturnCode() {
+async function makeReturnCode(session) {
   const last = await PhieuTraHangNhap.findOne({ ma_phieu_tra_nhap: /^THN\d+$/ })
     .sort({ ma_phieu_tra_nhap: -1 })
+    .session(session || null)
     .lean();
   const next = last && last.ma_phieu_tra_nhap
     ? Number(String(last.ma_phieu_tra_nhap).replace(/\D/g, '')) + 1
     : 1;
+  if (session) {
+    await Counter.updateOne({ _id: 'phieu_tra_hang_nhap' }, { $max: { seq: next - 1 } }, { upsert: true, session });
+    const counter = await Counter.findOneAndUpdate({ _id: 'phieu_tra_hang_nhap' }, { $inc: { seq: 1 } }, { new: true, upsert: true, session }).lean();
+    return 'THN' + String(counter.seq).padStart(6, '0');
+  }
   return 'THN' + String(next).padStart(6, '0');
 }
 
@@ -488,14 +514,13 @@ function assertPurchaseEligibleForReturnImport(purchase, params = {}) {
  * Không lọc theo tồn kho.
  */
 async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}) {
-  if (!isObjectId(khoId)) return [];
+  if (!isObjectId(storeId) || !isObjectId(khoId)) return [];
   const now = options.at || new Date();
-  const filter = { kho_id: khoId, trang_thai: 'completed' };
-  if (isObjectId(storeId)) filter.cua_hang_id = storeId;
+  const filter = { cua_hang_id: storeId, kho_id: khoId, trang_thai: 'completed', deleted_at: null };
 
   const purchases = await PhieuNhap.find(activePurchaseDataFilter(filter))
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
-    .select('ma_phieu_nhap ngay_nhap created_at kho_id nha_cung_cap_id cua_hang_id trang_thai han_tra_hang_nhap so_ngay_duoc_tra_hang_nhap')
+    .select('ma_phieu_nhap ngay_nhap created_at kho_id nha_cung_cap_id cua_hang_id trang_thai trang_thai_du_lieu deleted_at han_tra_hang_nhap so_ngay_duoc_tra_hang_nhap')
     .sort({ ngay_nhap: -1, created_at: -1 })
     .lean();
 
@@ -562,7 +587,31 @@ async function listEligiblePurchasesForReturnImport(storeId, khoId, options = {}
       eligible.push(p);
     }
   }
-  return eligible;
+  const activeGroups = eligible.length ? await PhieuNhapTongHop.find({ cua_hang_id: storeId, trang_thai: 'active',
+    phieu_nguon_ids: { $in: eligible.map(row => row._id) } })
+    .select('ma_phieu_tong_hop phieu_nguon_ids kho_id nha_cung_cap_id cua_hang_id ngay_gop created_at trang_thai trang_thai_du_lieu deleted_at')
+    .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
+    .sort({ ngay_gop: -1, created_at: -1 }).lean() : [];
+  const groupedIds = new Set(activeGroups.flatMap(group => (group.phieu_nguon_ids || []).map(getObjectIdValue)));
+  const standalone = eligible.filter(row => !groupedIds.has(getObjectIdValue(row._id)))
+    .map(row => Object.assign({}, row, { record_type: 'purchase' }));
+  const eligibleById = new Map(eligible.map(row => [getObjectIdValue(row._id), row]));
+  const groupCandidates = activeGroups.filter(group => group.trang_thai === 'active' && !group.deleted_at && group.trang_thai_du_lieu !== 'inactive'
+    && getObjectIdValue(group.cua_hang_id) === String(storeId) && getObjectIdValue(group.kho_id) === String(khoId)
+    && isObjectId(getObjectIdValue(group.nha_cung_cap_id))).map(group => {
+    const sources = (group.phieu_nguon_ids || []).map(sourceId => eligibleById.get(getObjectIdValue(sourceId)))
+      .filter(source => source && getObjectIdValue(source.nha_cung_cap_id) === getObjectIdValue(group.nha_cung_cap_id));
+    if (!sources.length) return null;
+    return Object.assign({}, group, {
+      record_type: 'group',
+      ma_phieu_nhap: group.ma_phieu_tong_hop || '',
+      ngay_nhap: group.ngay_gop || group.created_at || null,
+      lot_names: [...new Set(sources.flatMap(source => source.lot_names || []))],
+      source_count: (group.phieu_nguon_ids || []).length,
+      eligible_source_count: sources.length
+    });
+  }).filter(Boolean);
+  return standalone.concat(groupCandidates);
 }
 
 function formatDate(value) {
@@ -611,13 +660,14 @@ function buildExportRow(ticket, detail) {
     thoi_gian_tra: formatExportDate(ticket.ngay_tra || ticket.created_at),
     nha_cung_cap: ticket.nha_cung_cap_id ? (ticket.nha_cung_cap_id.ten_ncc || ticket.nha_cung_cap_id.ma_ncc || '') : '',
     ma_phieu_nhap: ticket.phieu_nhap_id ? (ticket.phieu_nhap_id.ma_phieu_nhap || '') : '',
+    ma_phieu_tra_tong_hop: ticket.ma_phieu_tra_tong_hop || '',
     kho: ticket.kho_id ? (ticket.kho_id.ten_kho || ticket.kho_id.ma_kho || '') : '',
     nguoi_tao: getUserName(ticket.nguoi_tao_id),
     nguoi_tra: getUserName(ticket.nguoi_tra_id),
     tong_tien_hang: Number(ticket.tong_tien_hang || 0),
-    giam_gia: Number(ticket.giam_gia || 0),
+    giam_gia: discountVnd(ticket),
     ncc_can_tra: Number(ticket.ncc_can_tra || 0),
-    ncc_da_tra: Number(ticket.ncc_da_tra || 0),
+    ncc_da_tra: ticket.trang_thai === 'draft' ? 0 : Number(ticket.ncc_da_tra || 0),
     ncc_con_phai_tra: resolveSupplierReturnRemaining(ticket),
     tinh_vao_cong_no: ticket.tinh_vao_cong_no ? 'Có' : 'Không',
     tong_tien_tra: Number(ticket.tong_tien_tra || 0),
@@ -681,35 +731,16 @@ function applyWorksheetFormat(worksheet) {
 }
 
 async function buildListFilter(req, storeId) {
+  // Filter the management projection after grouping. Never truncate THG children
+  // with source-code, date, status or pagination predicates in the database.
   const query = {};
   if (isObjectId(storeId)) query.cua_hang_id = storeId;
-  const q = String(req.query.q || '').trim();
-  if (q) query.ma_phieu_tra_nhap = { $regex: q, $options: 'i' };
-
-  const statuses = Array.isArray(req.query.trang_thai)
-    ? req.query.trang_thai
-    : (req.query.trang_thai ? [req.query.trang_thai] : []);
-  const cleanStatuses = statuses.filter(x => ['draft', 'completed', 'cancelled'].includes(x));
-  if (cleanStatuses.length) query.trang_thai = { $in: cleanStatuses };
-
-  const timeType = String(req.query.time_type || '').trim();
-  const dateFrom = String(req.query.date_from || '').trim();
-  const dateTo = String(req.query.date_to || '').trim();
-  if (timeType === 'this_month') {
-    query.ngay_tra = { $gte: startOfMonth(), $lte: endOfDay(new Date()) };
-  } else if (dateFrom || dateTo) {
-    query.ngay_tra = {};
-    if (dateFrom) query.ngay_tra.$gte = new Date(dateFrom + 'T00:00:00');
-    if (dateTo) query.ngay_tra.$lte = endOfDay(dateTo + 'T00:00:00');
-  }
-
-  if (isObjectId(req.query.nguoi_tao)) query.nguoi_tao_id = req.query.nguoi_tao;
-  if (isObjectId(req.query.nguoi_tra)) query.nguoi_tra_id = req.query.nguoi_tra;
+  query.deleted_at = null;
   return activeReturnImportDataFilter(query);
 }
 
-async function loadExportReturns(filter) {
-  const returns = await PhieuTraHangNhap.find(filter)
+async function loadExportReturns(filter, sourceRows) {
+  const returns = sourceRows || await PhieuTraHangNhap.find(filter)
     .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
     .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
     .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
@@ -750,7 +781,13 @@ async function sendReturnImportWorkbook(res, filename, returns, detailMap) {
       worksheet.addRow(buildExportRow(ticket, null));
       return;
     }
-    details.forEach(detail => worksheet.addRow(buildExportRow(ticket, detail)));
+    details.forEach((detail, index) => {
+      const row = buildExportRow(ticket, detail);
+      // A THN may contain many stock lines; its document totals belong on one
+      // row so summing the exported money columns cannot multiply the return.
+      if (index > 0) ['tong_tien_hang', 'giam_gia', 'ncc_can_tra', 'ncc_da_tra', 'ncc_con_phai_tra', 'tong_tien_tra'].forEach(key => { row[key] = null; });
+      worksheet.addRow(row);
+    });
   });
 
   applyWorksheetFormat(worksheet);
@@ -924,6 +961,10 @@ async function validateReturnItems(params) {
       throw new Error('Phiếu nhập không thuộc cửa hàng hiện tại');
     }
     assertPurchaseEligibleForReturnImport(purchase, { khoId });
+    const activeGroup = await findActivePurchaseGroupForSource(phieuNhapId, storeId, { session });
+    if (activeGroup && getObjectIdValue(activeGroup._id) !== String(params.purchaseGroupId || '')) {
+      throw new Error('Phiếu nhập đang thuộc ' + activeGroup.ma_phieu_tong_hop + '. Vui lòng trả hàng từ phiếu tổng hợp.');
+    }
   }
 
   let slotImportedMap = {};
@@ -996,7 +1037,7 @@ async function validateReturnItems(params) {
     if (!Number.isFinite(item.so_luong) || item.so_luong <= 0) {
       throw new Error('Số lượng trả phải lớn hơn 0');
     }
-    item.so_luong = Math.floor(item.so_luong);
+    if (!params.purchaseGroupId) item.so_luong = Math.floor(item.so_luong);
     if (item.so_luong <= 0) throw new Error('Số lượng trả phải lớn hơn 0');
     if (!Number.isFinite(item.gia_tra_lai) || item.gia_tra_lai < 0) item.gia_tra_lai = 0;
     if (!Number.isFinite(item.gia_nhap) || item.gia_nhap < 0) item.gia_nhap = item.gia_tra_lai;
@@ -1011,11 +1052,13 @@ async function validateReturnItems(params) {
     let tonKhoLoQcIdOut = undefined;
     let slotKeyTracked = '';
     let gttOut = undefined;
+    let sourceUnitId;
 
     if (isObjectId(phieuNhapId)) {
       if (!isObjectId(item.ct_phieu_nhap_id)) throw new Error('Dòng trả hàng thiếu chi tiết phiếu nhập gốc');
       const detail = detailById[String(item.ct_phieu_nhap_id)];
       if (!detail) throw new Error('Chi tiết phiếu nhập gốc không hợp lệ');
+      sourceUnitId = detail.don_vi_tinh_id;
       const hangRefId = detail.hang_hoa_id && detail.hang_hoa_id._id ? String(detail.hang_hoa_id._id) : String(detail.hang_hoa_id || '');
       if (hangRefId !== String(item.hang_hoa_id)) {
         throw new Error('Hàng trả không khớp với phiếu nhập gốc');
@@ -1101,7 +1144,7 @@ async function validateReturnItems(params) {
       ten_quy_cach: resolvedTenQc || undefined,
       ton_kho_lo_quy_cach_id: tonKhoLoQcIdOut,
       gia_tri_thuoc_tinh_id: gttOut,
-      don_vi_tinh_id: product.don_vi_tinh_id || undefined,
+      don_vi_tinh_id: sourceUnitId || product.don_vi_tinh_id || undefined,
       so_luong: item.so_luong,
       don_gia: item.gia_tra_lai,
       gia_nhap: item.gia_nhap,
@@ -1135,6 +1178,35 @@ async function persistDetails(returnId, rows, options = {}) {
   );
 }
 
+async function assertCombinedReturnInventory(rows, { khoId, session }) {
+  const products = new Map(), lots = new Map(), specifications = new Map();
+  for (const row of rows) {
+    const productId = getObjectIdValue(row.hang_hoa_id);
+    products.set(productId, (products.get(productId) || 0) + Number(row.so_luong || 0));
+    const lotId = getObjectIdValue(row.lo_hang_id);
+    if (!lotId) continue;
+    lots.set(lotId, (lots.get(lotId) || 0) + Number(row.so_luong || 0));
+    if (row.ten_quy_cach) {
+      const key = productId + '|' + lotId + '|' + row.ten_quy_cach;
+      const current = specifications.get(key) || { productId, lotId, name: row.ten_quy_cach, quantity: 0 };
+      current.quantity += Number(row.so_luong || 0); specifications.set(key, current);
+    }
+  }
+  for (const [productId, quantity] of products) {
+    const inventory = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: productId }).session(session).lean();
+    if (!inventory || Number(inventory.so_luong || 0) < quantity) throw new Error('Tổng số lượng trả từ các PN vượt tồn kho hiện tại.');
+  }
+  for (const [lotId, quantity] of lots) {
+    const lot = await LoHang.findById(lotId).session(session).lean();
+    if (!lot || Number(lot.so_luong_con_lai || 0) < quantity) throw new Error('Tổng số lượng trả từ các PN vượt tồn của lô.');
+  }
+  for (const item of specifications.values()) {
+    const inventory = await TonKhoLoQuyCach.findOne({ kho_id: khoId, hang_hoa_id: item.productId, lo_hang_id: item.lotId,
+      $or: [{ ten_quy_cach: item.name }, { ten_thuoc_tinh: item.name }] }).session(session).lean();
+    if (!inventory || Number(inventory.so_luong || 0) < item.quantity) throw new Error('Tổng số lượng trả vượt tồn quy cách trong lô.');
+  }
+}
+
 async function completeInventory(returnDoc, rows, userId, options = {}) {
   for (const row of rows) {
     const tenQc = String(row.ten_quy_cach || '').trim();
@@ -1161,8 +1233,9 @@ async function applySupplierDebt(returnDoc, options = {}) {
   if (!returnDoc.tinh_vao_cong_no || !returnDoc.nha_cung_cap_id) return;
   const session = options.session;
   const returnValue = Math.max(0, Number(returnDoc.ncc_can_tra || 0));
-  const amount = Math.max(0, Number(returnDoc.ncc_da_tra || 0));
-  if (returnValue <= 0) return;
+  const amount = Math.max(0, Number(options.debtAmount !== undefined ? options.debtAmount : returnDoc.ncc_da_tra || 0));
+  if (options.debtAmount !== undefined && amount <= 0) return;
+  if (returnValue <= 0 && options.debtAmount === undefined) return;
   await CongNoNhaCungCap.create([{
     cua_hang_id: returnDoc.cua_hang_id,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
@@ -1185,41 +1258,6 @@ async function applySupplierDebt(returnDoc, options = {}) {
   }
 }
 
-async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
-  if (!returnDoc.nha_cung_cap_id) return;
-  const amount = Number(returnDoc.ncc_da_tra || 0);
-  if (!Number.isFinite(amount) || amount <= 0) return;
-  const paymentDetail = options.chi_tiet_thanh_toan
-    || returnDoc.chi_tiet_thanh_toan
-    || { tien_mat: amount, chuyen_khoan: 0, tien_tra_khach: 0 };
-  const cashBookId = await resolveSupplierRefundCashBookId(returnDoc, String(options.so_quy_id || '').trim(), paymentDetail);
-  if (!isObjectId(cashBookId)) {
-    throw new Error('Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.');
-  }
-  const existed = await mongoose.models.PhieuThuChi.findOne({
-    phieu_tra_hang_nhap_id: returnDoc._id,
-    loai_phieu: 'thu'
-  }).lean();
-  if (existed) return existed;
-  return taoPhieuThuChi({
-    loai_phieu: 'thu',
-    loai_thu_chi: 'NCC hoan tien tra hang nhap',
-    gia_tri: amount,
-    ngay_lap: returnDoc.ngay_tra || new Date(),
-    so_quy_id: cashBookId,
-    cua_hang_id: returnDoc.cua_hang_id,
-    nguoi_tao_id: userId,
-    nha_cung_cap_id: returnDoc.nha_cung_cap_id,
-    phieu_tra_hang_nhap_id: returnDoc._id,
-    ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
-    nhom_doi_tuong: 'nha_cung_cap',
-    phuong_thuc_thanh_toan: normalizePaymentMethod(options.phuong_thuc_thanh_toan || paymentMethodFromDetail(paymentDetail)),
-    chi_tiet_thanh_toan: paymentDetail,
-    ghi_chu: 'Trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
-    hach_toan: false
-  });
-}
-
 async function requireSupplierRefundReceipt(returnDoc, userId, options = {}) {
   const amount = Number(returnDoc && returnDoc.ncc_da_tra || 0);
   if (!Number.isFinite(amount) || amount <= 0) return null;
@@ -1228,36 +1266,13 @@ async function requireSupplierRefundReceipt(returnDoc, userId, options = {}) {
   return receipt;
 }
 
-async function createSupplierRefundPaymentReceipt(returnDoc, userId, payment, cashBookId) {
-  const amount = Number(payment && payment.amount || 0);
-  if (!returnDoc || !returnDoc.nha_cung_cap_id || !Number.isFinite(amount) || amount <= 0) return null;
-  const paymentDetail = payment.detail || { tien_mat: amount, chuyen_khoan: 0, tien_tra_khach: 0 };
-  return taoPhieuThuChi({
-    loai_phieu: 'thu',
-    loai_thu_chi: 'NCC hoan tien tra hang nhap',
-    gia_tri: amount,
-    ngay_lap: new Date(),
-    so_quy_id: cashBookId,
-    cua_hang_id: returnDoc.cua_hang_id,
-    nguoi_tao_id: userId,
-    nha_cung_cap_id: returnDoc.nha_cung_cap_id,
-    phieu_tra_hang_nhap_id: returnDoc._id,
-    ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
-    nhom_doi_tuong: 'nha_cung_cap',
-    phuong_thuc_thanh_toan: normalizePaymentMethod(paymentMethodFromDetail(paymentDetail)),
-    chi_tiet_thanh_toan: paymentDetail,
-    ghi_chu: 'Nhận tiền trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
-    hach_toan: false
-  });
-}
-
 async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
   if (!returnDoc.nha_cung_cap_id) return;
   const amount = Number(returnDoc.ncc_da_tra || 0);
   if (!Number.isFinite(amount) || amount <= 0) return;
-  const paymentDetail = options.chi_tiet_thanh_toan
+  const paymentDetail = { ...(options.chi_tiet_thanh_toan
     || returnDoc.chi_tiet_thanh_toan
-    || { tien_mat: amount, chuyen_khoan: 0, tien_tra_khach: 0 };
+    || { tien_mat: amount, chuyen_khoan: 0, tien_tra_khach: 0 }) };
   paymentDetail.tien_tra_khach = 0;
   const isV2 = options.payment_v2 === true
     || options.payment_v2 === 'true'
@@ -1269,8 +1284,10 @@ async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
     throw new Error('Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.');
   }
   const existed = await mongoose.models.PhieuThuChi.findOne({
+    cua_hang_id: returnDoc.cua_hang_id,
     phieu_tra_hang_nhap_id: returnDoc._id,
-    loai_phieu: 'thu'
+    loai_phieu: 'thu',
+    trang_thai: { $ne: 'cancelled' }
   }).session(options.session || null).lean();
   if (existed) return existed;
   const payload = {
@@ -1282,6 +1299,7 @@ async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
     cua_hang_id: returnDoc.cua_hang_id,
     nguoi_tao_id: userId,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
+    document_type: 'phieu_tra_hang_nhap',
     phieu_tra_hang_nhap_id: returnDoc._id,
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
@@ -1311,7 +1329,7 @@ async function createSupplierRefundReceipt(returnDoc, userId, options = {}) {
 async function createSupplierRefundPaymentReceipt(returnDoc, userId, payment, cashBookId, options = {}) {
   const amount = Number(payment && payment.amount || 0);
   if (!returnDoc || !returnDoc.nha_cung_cap_id || !Number.isFinite(amount) || amount <= 0) return null;
-  const paymentDetail = payment.detail || { tien_mat: amount, chuyen_khoan: 0, tien_tra_khach: 0 };
+  const paymentDetail = { ...(payment.detail || { tien_mat: amount, chuyen_khoan: 0, tien_tra_khach: 0 }) };
   paymentDetail.tien_tra_khach = 0;
   const isV2 = payment.isV2
     || String(paymentDetail.so_quy_tien_mat_id || '').trim() !== ''
@@ -1319,19 +1337,27 @@ async function createSupplierRefundPaymentReceipt(returnDoc, userId, payment, ca
   if (!isV2 && !isObjectId(cashBookId)) throw new Error('Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.');
   const payload = {
     loai_phieu: 'thu',
-    loai_thu_chi: 'NCC hoan tien tra hang nhap',
+    loai_thu_chi: options.data && options.data.loai_thu_chi || 'NCC hoan tien tra hang nhap',
     gia_tri: amount,
-    ngay_lap: new Date(),
+    ngay_lap: options.data && options.data.ngay_lap || new Date(),
+    ma_phieu: options.data && options.data.ma_phieu,
+    request_key: options.data && options.data.request_key,
     so_quy_id: isV2 ? undefined : cashBookId,
     cua_hang_id: returnDoc.cua_hang_id,
     nguoi_tao_id: userId,
     nha_cung_cap_id: returnDoc.nha_cung_cap_id,
+    document_type: 'phieu_tra_hang_nhap',
     phieu_tra_hang_nhap_id: returnDoc._id,
+    allocation_type: 'hoan_tien_tra_nhap',
+    allocations: [{ phieu_tra_hang_nhap_id: returnDoc._id, ma_phieu_tra_nhap: returnDoc.ma_phieu_tra_nhap,
+      phieu_nhap_id: returnDoc.phieu_nhap_id, so_tien: amount,
+      con_no_truoc: Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0)),
+      con_no_sau: Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0) - amount) }],
     ma_chung_tu_goc: returnDoc.ma_phieu_tra_nhap,
     nhom_doi_tuong: 'nha_cung_cap',
     phuong_thuc_thanh_toan: normalizePaymentMethod(paymentMethodFromDetail(paymentDetail)),
     chi_tiet_thanh_toan: paymentDetail,
-    ghi_chu: 'Nhận tiền trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
+    ghi_chu: options.data && options.data.ghi_chu || 'Nhận tiền trả hàng nhập ' + returnDoc.ma_phieu_tra_nhap,
     hach_toan: false
   };
   if (isV2) {
@@ -1424,7 +1450,7 @@ async function sendSingleReturnDetailWorkbook(res, ticket, details) {
   addPair('Tổng tiền hàng', Number(ticket.tong_tien_hang || 0));
   addPair('Giảm giá', ticket.kieu_giam_gia === 'percent' ? String(ticket.giam_gia || 0) + '%' : Number(ticket.giam_gia || 0));
   addPair('NCC cần trả', Number(ticket.ncc_can_tra || 0));
-  addPair('NCC đã trả', Number(ticket.ncc_da_tra || 0));
+  addPair('NCC đã trả', ticket.trang_thai === 'draft' ? 0 : Number(ticket.ncc_da_tra || 0));
   addPair('Tổng tiền trả', Number(ticket.tong_tien_tra || 0));
 
   ws.getColumn(1).width = 22;
@@ -1444,29 +1470,18 @@ exports.index = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const query = await buildListFilter(req, storeId);
-    let page = parseReturnImportPage(req.query);
+    const requestedPage = parseReturnImportPage(req.query);
     const pageSize = RETURN_IMPORT_PAGE_SIZE;
-    const [total, users, cashBooks] = await Promise.all([
-      PhieuTraHangNhap.countDocuments(query),
+    const [management, users, cashBooks] = await Promise.all([
+      loadReturnManagementList(storeId, req.query || {}, query, { page: requestedPage, pageSize }),
       NguoiDung.find(isObjectId(storeId) ? { cua_hang_id: storeId } : {}).sort({ ho_ten: 1, email: 1 }).lean(),
       SoQuy.find({ trang_thai: 'active' }).sort({ ten_so_quy: 1 }).lean()
     ]);
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    if (page > totalPages) page = totalPages;
+    const { total, totalPages, page } = management;
     const skip = (page - 1) * pageSize;
-    const returns = await PhieuTraHangNhap.find(query)
-      .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
-      .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
-      .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
-      .populate({ path: 'nguoi_tao_id', select: 'ho_ten email' })
-      .populate({ path: 'nguoi_tra_id', select: 'ho_ten email' })
-      .sort({ ngay_tra: -1, created_at: -1 })
-      .skip(skip)
-      .limit(pageSize)
-      .lean();
-    await repairMissingSupplierRefundReceipts(returns, req.user?._id);
-
-    const returnIds = returns.map(row => row._id);
+    const returns = management.items;
+    const sourceRows = returns.flatMap(row => row.children || [row]);
+    const returnIds = sourceRows.map(row => row._id);
     let detailRows = [];
     if (returnIds.length) {
       detailRows = await CTPhieuTraHangNhap.find({ phieu_tra_nhap_id: { $in: returnIds } })
@@ -1483,7 +1498,7 @@ exports.index = async function(req, res, next) {
       return map;
     }, {});
     const vatChuaByReturn = await loadReturnsLinkedVatChuaMap(returnIds, storeId);
-    returns.forEach(row => {
+    sourceRows.forEach(row => {
       row.detail_rows = detailsByReturn[String(row._id)] || [];
       row.vat_chua_lines = vatChuaByReturn[String(row._id)] || [];
       const detailList = row.detail_rows || [];
@@ -1505,6 +1520,7 @@ exports.index = async function(req, res, next) {
       returns,
       users,
       cashBooks,
+      summaryTotals: management.summaryTotals,
       filters: req.query || {},
       formatDate,
       statusLabel,
@@ -1565,6 +1581,8 @@ exports.deactivateSelected = async function(req, res) {
     }
     const filter = { _id: { $in: ids } };
     if (isObjectId(storeId)) filter.cua_hang_id = storeId;
+    const grouped = await PhieuTraHangNhap.findOne(Object.assign({}, filter, { phieu_tra_tong_hop_id: { $ne: null } })).select('_id').lean();
+    if (grouped) throw new Error('Không được xóa hàng loạt phiếu thuộc THG. Chức năng hoàn tác trả hàng hiện đang khóa.');
     const result = await PhieuTraHangNhap.updateMany(
       activeReturnImportDataFilter(filter),
       { $set: { trang_thai_du_lieu: 'inactive', updated_at: new Date() } }
@@ -1580,10 +1598,45 @@ exports.deactivateSelected = async function(req, res) {
   }
 };
 
+async function loadPurchaseGroupReturnContext(groupId, storeId, requestedKhoId = '') {
+  const fail = (statusCode, message) => Object.assign(new Error(message), { statusCode });
+  if (!isObjectId(storeId)) throw fail(400, 'Cửa hàng không hợp lệ.');
+  if (!isObjectId(groupId)) throw fail(400, 'Mã phiếu nhập tổng hợp không hợp lệ.');
+  if (requestedKhoId && !isObjectId(requestedKhoId)) throw fail(400, 'Kho không hợp lệ.');
+  const group = await PhieuNhapTongHop.findOne({ _id: groupId, cua_hang_id: storeId, trang_thai: 'active' })
+    .populate('nha_cung_cap_id', 'ma_ncc ten_ncc')
+    .populate('kho_id', 'ma_kho ten_kho').lean();
+  if (!group || group.trang_thai !== 'active' || getObjectIdValue(group.cua_hang_id) !== String(storeId)
+    || group.deleted_at || group.trang_thai_du_lieu === 'inactive') throw fail(404, 'Không tìm thấy phiếu nhập tổng hợp còn hiệu lực.');
+  const groupKhoId = getObjectIdValue(group.kho_id);
+  const supplierId = getObjectIdValue(group.nha_cung_cap_id);
+  if (!isObjectId(groupKhoId) || !isObjectId(supplierId)) throw fail(400, 'Phiếu nhập tổng hợp thiếu kho hoặc nhà cung cấp hợp lệ.');
+  if (requestedKhoId && groupKhoId !== requestedKhoId) throw fail(400, 'Kho trả không khớp với phiếu nhập tổng hợp.');
+  const balances = await require('../services/purchaseGroupQuery.service').loadPurchaseSourceBalances(group.phieu_nguon_ids || [], storeId);
+  const balancesById = new Map(balances.map(source => [getObjectIdValue(source._id), source]));
+  const sources = [];
+  for (const sourceId of group.phieu_nguon_ids || []) {
+    const source = balancesById.get(getObjectIdValue(sourceId));
+    if (!source || source.trang_thai !== 'completed' || source.trang_thai_du_lieu === 'inactive' || source.deleted_at
+      || getObjectIdValue(source.cua_hang_id) !== String(storeId)
+      || getObjectIdValue(source.kho_id) !== groupKhoId || getObjectIdValue(source.nha_cung_cap_id) !== supplierId) continue;
+    try { assertPurchaseEligibleForReturnImport(source, { khoId: groupKhoId }); } catch (_) { continue; }
+    const items = await buildPurchaseReturnGridItems(source, storeId, groupKhoId, {});
+    if (items.length) sources.push(Object.assign({}, source, { items }));
+  }
+  if (!sources.length) throw fail(400, 'Phiếu nhập tổng hợp không còn phiếu nguồn đủ điều kiện trả hàng.');
+  return Object.assign({}, group, { sources });
+}
+
 exports.createPage = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const data = await loadCreateData(storeId);
+    let purchaseGroupReturn = null;
+    const returnGroupId = String(req.query && req.query.phieu_nhap_tong_hop_id || '').trim();
+    if (returnGroupId) {
+      purchaseGroupReturn = await loadPurchaseGroupReturnContext(returnGroupId, storeId, String(req.query.kho_id || '').trim());
+    }
     const nextCode = await makeReturnCode();
     const copyFromId = String(req.query?.copy_from || '').trim();
     let copyDraft = null;
@@ -1600,6 +1653,10 @@ exports.createPage = async function(req, res, next) {
     const selectedPurchase = !copyDraft && isObjectId(selectedPurchaseId)
       ? await PhieuNhap.findOne(activePurchaseDataFilter({ _id: selectedPurchaseId })).select('_id kho_id nha_cung_cap_id').lean()
       : null;
+    if (selectedPurchase && !purchaseGroupReturn) {
+      const activeGroup = await findActivePurchaseGroupForSource(selectedPurchase._id, storeId);
+      if (activeGroup) return res.redirect('/nhap-hang/tong-hop/' + encodeURIComponent(String(activeGroup._id)) + '/return');
+    }
     const copyDraftJson = copyDraft ? JSON.stringify(copyDraft).replace(/</g, '\\u003c') : '';
     res.render('tra-hang-nhap/create', {
       activeMenu: 'mua-hang',
@@ -1619,7 +1676,8 @@ exports.createPage = async function(req, res, next) {
         ? String(copyDraft.nha_cung_cap._id)
         : (selectedPurchase ? getObjectIdValue(selectedPurchase.nha_cung_cap_id) : ''),
       copyDraftJson,
-      copyFromError
+      copyFromError,
+      purchaseGroupReturn
     });
   } catch (error) {
     next(error);
@@ -1957,6 +2015,18 @@ async function loadReturnCopyDraft(req, storeId, copyFromId) {
   };
 }
 
+exports.apiPurchaseGroupReturnDetail = async function(req, res) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const groupId = String(req.params.id || '').trim();
+    const khoId = String(req.query.kho_id || '').trim();
+    const context = await loadPurchaseGroupReturnContext(groupId, storeId, khoId);
+    return res.json({ success: true, data: { purchase_group_return: context } });
+  } catch (error) {
+    return res.status(Number(error && error.statusCode) || 400).json({ success: false, message: error.message || 'Không thể tải phiếu nhập tổng hợp để trả hàng.' });
+  }
+};
+
 exports.apiPurchaseReturnDetail = async function(req, res) {
   try {
     const storeId = await resolveStoreId(req);
@@ -1976,6 +2046,8 @@ exports.apiPurchaseReturnDetail = async function(req, res) {
     if (!purchase) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
     }
+    const activeGroup = await findActivePurchaseGroupForSource(purchaseId, storeId);
+    if (activeGroup) throw new Error('Phiếu nhập đang thuộc ' + activeGroup.ma_phieu_tong_hop + '. Vui lòng trả hàng từ phiếu tổng hợp.');
 
     try {
       assertPurchaseEligibleForReturnImport(purchase, { khoId: requestedKhoId });
@@ -2024,6 +2096,7 @@ exports.apiPurchaseReturnDetail = async function(req, res) {
 exports.apiPurchasesByWarehouse = async function(req, res) {
   try {
     const storeId = await resolveStoreId(req);
+    if (!isObjectId(storeId)) return res.status(400).json({ success: false, message: 'Cửa hàng không hợp lệ' });
     const khoId = String((req.params && req.params.khoId) || (req.query && req.query.kho_id) || '').trim();
     if (!isObjectId(khoId)) {
       return res.status(400).json({ success: false, message: 'Kho không hợp lệ' });
@@ -2039,16 +2112,21 @@ exports.apiPurchasesByWarehouse = async function(req, res) {
           ten_ncc: row.nha_cung_cap_id.ten_ncc || ''
         }
         : null;
-      const deadlineEnd = getPurchaseReturnDeadlineEnd(row);
+      const isGroup = row.record_type === 'group';
+      const deadlineEnd = isGroup ? null : getPurchaseReturnDeadlineEnd(row);
       return {
         _id: String(row._id),
+        record_type: isGroup ? 'group' : 'purchase',
         ma_phieu_nhap: row.ma_phieu_nhap || '',
+        ma_phieu_tong_hop: isGroup ? row.ma_phieu_tong_hop || '' : '',
         ngay_nhap: row.ngay_nhap || row.created_at || null,
         ngay_het_han_tra: deadlineEnd ? deadlineEnd.toISOString() : null,
         lot_names: Array.isArray(row.lot_names) ? row.lot_names : [],
         kho_id: getObjectIdValue(row.kho_id),
         nha_cung_cap_id: supplier ? supplier._id : '',
-        nha_cung_cap: supplier
+        nha_cung_cap: supplier,
+        source_count: isGroup ? Number(row.source_count || 0) : undefined,
+        eligible_source_count: isGroup ? Number(row.eligible_source_count || 0) : undefined
       };
     });
 
@@ -2205,7 +2283,9 @@ exports.createSubmit = async function(req, res, next) {
 
 exports.detail = async function(req, res, next) {
   try {
-    const ret = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id }))
+    const storeId = await resolveStoreId(req);
+    if (!isObjectId(req.params.id)) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
+    const ret = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id, cua_hang_id: storeId }))
       .populate('nha_cung_cap_id')
       .populate('phieu_nhap_id')
       .populate('kho_id')
@@ -2213,13 +2293,13 @@ exports.detail = async function(req, res, next) {
       .populate('nguoi_tra_id')
       .lean();
     if (!ret) {
-      const accept = String(req.headers.accept || '');
+      const accept = String(req.headers && req.headers.accept || '');
       const wantsHtml = !req.xhr && accept.indexOf('text/html') >= 0;
       if (wantsHtml) return res.redirect('/tra-hang-nhap');
       return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
     }
 
-    const accept = String(req.headers.accept || '');
+    const accept = String(req.headers && req.headers.accept || '');
     const wantsHtml = !req.xhr
       && accept.indexOf('text/html') >= 0
       && (accept.indexOf('application/json') < 0 || accept.indexOf('text/html') < accept.indexOf('application/json'));
@@ -2235,7 +2315,7 @@ exports.detail = async function(req, res, next) {
       .populate('lo_hang_id')
       .populate('don_vi_tinh_id')
       .lean();
-    return res.json({ success: true, data: { ticket: ret, items } });
+    return res.json({ success: true, data: { ticket: displayReturnTicket(ret), items } });
   } catch (error) {
     next(error);
   }
@@ -2248,6 +2328,7 @@ exports.complete = async function(req, res) {
     const returnFilter = activeReturnImportDataFilter({ _id: req.params.id, cua_hang_id: storeId });
     let returnDoc = await PhieuTraHangNhap.findOne(returnFilter);
     if (!returnDoc) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu trả hàng nhập' });
+    if (returnDoc.phieu_tra_tong_hop_id) throw new Error('Vui lòng hoàn thành toàn bộ phiếu trả tổng hợp THG để ghi kho và tiền hoàn đúng một lần.');
     if (returnDoc.trang_thai === 'cancelled') return res.status(400).json({ success: false, message: 'Phiếu đã hủy' });
     if (returnDoc.trang_thai === 'completed') return res.json({ success: true, message: 'Phiếu đã hoàn thành' });
     const cashBookId = resolveCashBookIdFromBody(req.body || {}) || getObjectIdValue(returnDoc.so_quy_id);
@@ -2307,37 +2388,66 @@ exports.complete = async function(req, res) {
   }
 };
 
-exports.createReceipt = async function(req, res) {
+async function receiveStandaloneSupplierRefund({ returnId, storeId, userId, data = {} } = {}) {
   let session = null;
   try {
+    if (!isObjectId(storeId) || !isObjectId(userId)) throw Object.assign(new Error('Cửa hàng hoặc người nhận không hợp lệ.'), { statusCode: 403 });
+    if (!isObjectId(returnId)) throw Object.assign(new Error('Không tìm thấy phiếu trả hàng nhập'), { statusCode: 404 });
+    const requestKey = String(data.request_key || '').trim();
+    if (requestKey.length > 120) throw new Error('Mã yêu cầu không hợp lệ.');
     session = await mongoose.startSession();
     let result;
     await session.withTransaction(async () => {
-      const returnDoc = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: req.params.id })).session(session);
-      if (!returnDoc) throw new Error('Không tìm thấy phiếu trả hàng nhập');
+      await acquirePurchaseGroupMutationLock(storeId, session);
+      const returnDoc = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter({ _id: returnId, cua_hang_id: storeId })).session(session);
+      if (!returnDoc) throw Object.assign(new Error('Không tìm thấy phiếu trả hàng nhập'), { statusCode: 404 });
+      if (returnDoc.phieu_tra_tong_hop_id) throw new Error('Vui lòng nhận tiền tại phiếu THG và xác nhận phân bổ về từng THN.');
       if (returnDoc.trang_thai === 'cancelled') throw new Error('Phiếu đã hủy, không thể tạo phiếu thu');
       if (returnDoc.trang_thai !== 'completed') throw new Error('Chỉ tạo phiếu thu cho phiếu đã trả hàng');
+      if (data.doi_tuong_entity_id && getObjectIdValue(returnDoc.nha_cung_cap_id) !== String(data.doi_tuong_entity_id)) {
+        throw new Error('Phiếu trả hàng nhập không thuộc nhà cung cấp đã chọn.');
+      }
 
       const remaining = Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0));
+      if (requestKey) {
+        const previous = await PhieuThuChi.findOne({ cua_hang_id: storeId, phieu_tra_hang_nhap_id: returnDoc._id,
+          loai_phieu: 'thu', request_key: requestKey, trang_thai: { $ne: 'cancelled' } }).session(session).lean();
+        if (previous) {
+          const replay = normalizePaymentDetail(data, Number.MAX_SAFE_INTEGER);
+          const detail = previous.chi_tiet_thanh_toan || {};
+          if (Number(previous.gia_tri) !== replay.amount || ['tien_mat', 'chuyen_khoan'].some(key => Number(detail[key] || 0) !== Number(replay.detail[key] || 0))
+            || ['so_quy_tien_mat_id', 'so_quy_chuyen_khoan_id'].some(key => replay.detail[key]
+              && getObjectIdValue(detail[key]) !== getObjectIdValue(replay.detail[key]))) {
+            throw Object.assign(new Error('Mã yêu cầu đã được sử dụng cho khoản nhận tiền khác.'), { statusCode: 409 });
+          }
+          result = { receipt: previous, paid: Number(returnDoc.ncc_da_tra || 0), remaining, payment: replay };
+          return;
+        }
+      }
       if (remaining <= 0) throw new Error('Nhà cung cấp đã thanh toán đủ');
-      const payment = normalizePaymentDetail(req.body || {}, remaining);
+      if (data.con_phai_tra_truoc == null || data.con_phai_tra_truoc === ''
+        || !Number.isFinite(Number(data.con_phai_tra_truoc)) || Number(data.con_phai_tra_truoc) !== remaining) {
+        throw Object.assign(new Error('Số NCC còn phải trả đã thay đổi. Vui lòng tải lại và xác nhận khoản nhận tiền.'), { statusCode: 409 });
+      }
+      const payment = normalizePaymentDetail(data, remaining);
       if (payment.amount <= 0) throw new Error('Vui lòng nhập số tiền nhà cung cấp trả');
       if (payment.amount > remaining) throw new Error('Số tiền thu không được vượt số NCC còn phải trả');
-      const cashBookId = resolveCashBookIdFromBody(req.body || {});
+      const cashBookId = resolveCashBookIdFromBody(data);
       if (!payment.isV2 && !isObjectId(cashBookId)) throw new Error('Vui lòng chọn sổ quỹ để nhận tiền nhà cung cấp hoàn.');
 
-      const receipt = await createSupplierRefundPaymentReceipt(returnDoc, req.user?._id, payment, cashBookId, { session });
+      const receipt = await createSupplierRefundPaymentReceipt(returnDoc, userId, payment, cashBookId, { session, data: { ...data, request_key: requestKey || undefined } });
       if (!receipt) throw new Error('Không tạo được phiếu thu');
 
       const currentDetail = returnDoc.chi_tiet_thanh_toan || {};
+      const actualDetail = receipt.chi_tiet_thanh_toan || payment.detail;
       returnDoc.ncc_da_tra = Math.min(Number(returnDoc.ncc_can_tra || 0), Number(returnDoc.ncc_da_tra || 0) + payment.amount);
       returnDoc.ncc_con_phai_tra = Math.max(0, Number(returnDoc.ncc_can_tra || 0) - Number(returnDoc.ncc_da_tra || 0));
       returnDoc.so_quy_id = payment.isV2 ? undefined : cashBookId;
       returnDoc.chi_tiet_thanh_toan = {
-        tien_mat: Number(currentDetail.tien_mat || 0) + Number(payment.detail.tien_mat || 0),
-        so_quy_tien_mat_id: payment.detail.so_quy_tien_mat_id || currentDetail.so_quy_tien_mat_id || null,
-        chuyen_khoan: Number(currentDetail.chuyen_khoan || 0) + Number(payment.detail.chuyen_khoan || 0),
-        so_quy_chuyen_khoan_id: payment.detail.so_quy_chuyen_khoan_id || currentDetail.so_quy_chuyen_khoan_id || null,
+        tien_mat: Number(currentDetail.tien_mat || 0) + Number(actualDetail.tien_mat || 0),
+        so_quy_tien_mat_id: actualDetail.so_quy_tien_mat_id || currentDetail.so_quy_tien_mat_id || null,
+        chuyen_khoan: Number(currentDetail.chuyen_khoan || 0) + Number(actualDetail.chuyen_khoan || 0),
+        so_quy_chuyen_khoan_id: actualDetail.so_quy_chuyen_khoan_id || currentDetail.so_quy_chuyen_khoan_id || null,
         tien_tra_khach: 0
       };
       await returnDoc.save({ session });
@@ -2348,11 +2458,21 @@ exports.createReceipt = async function(req, res) {
         payment
       };
     });
-    return res.json({ success: true, message: 'Đã tạo phiếu thu', data: result });
-  } catch (error) {
-    return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu thu' });
+    return result;
   } finally {
     if (session) await session.endSession();
+  }
+}
+
+exports.receiveStandaloneSupplierRefund = receiveStandaloneSupplierRefund;
+
+exports.createReceipt = async function(req, res) {
+  try {
+    const result = await receiveStandaloneSupplierRefund({ returnId: req.params.id,
+      storeId: await resolveStoreId(req), userId: req.user && req.user._id, data: req.body || {} });
+    return res.json({ success: true, message: 'Đã tạo phiếu thu', data: result });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Không tạo được phiếu thu' });
   }
 };
 
@@ -2371,7 +2491,11 @@ exports.exportExcel = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const query = await buildListFilter(req, storeId);
-    const { returns, detailMap } = await loadExportReturns(query);
+    const management = await loadReturnManagementList(storeId, req.query || {}, query);
+    // Detailed Excel remains source-based: export each real THN once, never THG
+    // plus its children. Parent search/view filters select the complete event.
+    const sourceRows = management.items.flatMap(row => row.children || [row]);
+    const { returns, detailMap } = await loadExportReturns(query, sourceRows);
     await sendReturnImportWorkbook(res, 'tra-hang-nhap.xlsx', returns, detailMap);
   } catch (error) {
     next(error);
@@ -2384,8 +2508,7 @@ exports.exportOneExcel = async function(req, res, next) {
       return res.status(404).send('Không tìm thấy phiếu trả hàng nhập');
     }
     const storeId = await resolveStoreId(req);
-    const query = { _id: req.params.id };
-    if (isObjectId(storeId)) query.cua_hang_id = storeId;
+    const query = { _id: req.params.id, cua_hang_id: storeId };
     const ticket = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter(query))
       .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
       .populate({ path: 'kho_id', select: 'ma_kho ten_kho' })
@@ -2402,7 +2525,7 @@ exports.exportOneExcel = async function(req, res, next) {
       .populate({ path: 'don_vi_tinh_id', select: 'ma_don_vi ten_don_vi' })
       .sort({ created_at: 1 })
       .lean();
-    await sendSingleReturnDetailWorkbook(res, ticket, details);
+    await sendSingleReturnDetailWorkbook(res, displayReturnTicket(ticket), details);
   } catch (error) {
     next(error);
   }
@@ -2412,19 +2535,16 @@ exports.exportCsv = async function(req, res, next) {
   try {
     const storeId = await resolveStoreId(req);
     const query = await buildListFilter(req, storeId);
-    const rows = await PhieuTraHangNhap.find(query)
-      .populate({ path: 'nha_cung_cap_id', select: 'ma_ncc ten_ncc' })
-      .sort({ ngay_tra: -1, created_at: -1 })
-      .lean();
+    const { items: rows } = await loadReturnManagementList(storeId, req.query || {}, query);
     const escape = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
     const csv = [
       ['ma_tra_hang_nhap', 'thoi_gian', 'nha_cung_cap', 'tong_tien_hang', 'giam_gia', 'ncc_can_tra', 'ncc_da_tra', 'ncc_con_phai_tra', 'trang_thai'],
       ...rows.map(row => [
         row.ma_phieu_tra_nhap || '',
-        row.ngay_tra ? row.ngay_tra.toISOString() : '',
+        row.ngay_tra ? new Date(row.ngay_tra).toISOString() : '',
         row.nha_cung_cap_id?.ten_ncc || '',
         row.tong_tien_hang || 0,
-        row.giam_gia || 0,
+        discountVnd(row),
         row.ncc_can_tra || 0,
         row.ncc_da_tra || 0,
         resolveSupplierReturnRemaining(row),
@@ -2440,9 +2560,8 @@ exports.exportCsv = async function(req, res, next) {
 };
 
 async function loadReturnWithItems(id, storeId) {
-  if (!isObjectId(id)) return null;
-  const filter = { _id: id };
-  if (isObjectId(storeId)) filter.cua_hang_id = storeId;
+  if (!isObjectId(id) || !isObjectId(storeId)) return null;
+  const filter = { _id: id, cua_hang_id: storeId };
   const ticket = await PhieuTraHangNhap.findOne(activeReturnImportDataFilter(filter))
     .populate({ path: 'cua_hang_id', select: 'ten_cua_hang ma_cua_hang ma_so_thue dia_chi dia_chi_day_du sdt email' })
     .populate({ path: 'kho_id', select: 'ten_kho ma_kho' })
@@ -2458,7 +2577,7 @@ async function loadReturnWithItems(id, storeId) {
     .populate({ path: 'don_vi_tinh_id', select: 'ten_don_vi ma_don_vi' })
     .sort({ created_at: 1 })
     .lean();
-  return { ticket, items };
+  return { ticket: displayReturnTicket(ticket), items };
 }
 
 async function buildReturnPrintData(req, title) {
@@ -2519,4 +2638,35 @@ exports.print = function(req, res, next) {
 
 exports.printPdf = function(req, res, next) {
   return renderReturnPdf(req, res, next, 'tra-hang-nhap/print', 'In phiếu trả hàng nhập');
+};
+
+// The grouped coordinator reuses the same source validation, pricing and stock
+// operations as ordinary THN; it owns only the multi-document transaction.
+exports.returnOperations = { parseItems, validateReturnItems, computeTotals, normalizePaymentDetail,
+  persistDetails, completeInventory, applySupplierDebt, makeReturnCode, assertCombinedReturnInventory };
+
+exports.createGroupSubmit = async function(req, res) {
+  try {
+    const storeId = await resolveStoreId(req);
+    const result = await require('../services/purchaseGroupReturn.service').createPurchaseGroupReturn({
+      groupId: req.params.id, storeId, userId: req.user && req.user._id, data: req.body || {}
+    }, { operations: exports.returnOperations });
+    return res.json(Object.assign({ success: true, data: result }, result));
+  } catch (error) { return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Không tạo được phiếu trả tổng hợp.' }); }
+};
+exports.completeGroup = async function(req, res) {
+  try {
+    const result = await require('../services/purchaseGroupReturn.service').completePurchaseGroupReturn({
+      returnGroupId: req.params.id, storeId: await resolveStoreId(req), userId: req.user && req.user._id, data: req.body || {}
+    }, { operations: exports.returnOperations });
+    return res.json({ success: true, message: 'Đã hoàn thành phiếu trả tổng hợp.', data: result });
+  } catch (error) { return res.status(error.statusCode || 400).json({ success: false, message: error.message }); }
+};
+exports.createGroupReceipt = async function(req, res) {
+  try {
+    const result = await require('../services/purchaseGroupReturn.service').receivePurchaseGroupReturnRefund({
+      returnGroupId: req.params.id, storeId: await resolveStoreId(req), userId: req.user && req.user._id, data: req.body || {}
+    });
+    return res.json({ success: true, message: 'Đã tạo một phiếu thu và phân bổ về các THN.', data: result });
+  } catch (error) { return res.status(error.statusCode || 400).json({ success: false, message: error.message }); }
 };

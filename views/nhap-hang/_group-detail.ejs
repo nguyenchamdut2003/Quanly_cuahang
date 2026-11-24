@@ -4,6 +4,7 @@
   const sources = Array.isArray(ticket.sources) ? ticket.sources : [];
   const lines = Array.isArray(ticket.lines) ? ticket.lines : [];
   const payments = Array.isArray(ticket.payments) ? ticket.payments : [];
+  const returnHistory = Array.isArray(ticket.return_history) ? ticket.return_history : [];
   const idOf = value => String(value && value._id || value || '');
   const sourceIds = new Set(sources.map(source => idOf(source._id)));
   const supplier = ticket.nha_cung_cap_id || {};
@@ -73,6 +74,7 @@
     <button class="po-detail-tab is-active" type="button" data-tab-target="info">Thông tin</button>
     <button class="po-detail-tab" type="button" data-tab-target="payment">Lịch sử thanh toán</button>
     <button class="po-detail-tab" type="button" data-tab-target="sources">Phiếu nguồn (<%= Number(ticket.source_count || sources.length) %>)</button>
+    <button class="po-detail-tab" type="button" data-tab-target="returns">Lịch sử trả hàng (<%= returnHistory.length %>)</button>
   </div>
   <div class="po-detail-pane is-active" data-tab-pane="info">
     <div class="detail-head">
@@ -137,6 +139,7 @@
     <div class="page-actions page-actions--bordered detail-actions">
       <% if (active) { %><button type="button" class="kv-btn primary" data-purchase-group-pay="<%= ticket._id %>" <%= Number(totals.con_no_ncc || 0) <= 0 ? 'disabled' : '' %>>Thanh toán</button><% } %>
       <% if (active) { %><button type="button" class="kv-btn" data-purchase-group-cancel="<%= ticket._id %>">Tách phiếu tổng hợp</button><% } %>
+      <% if (active) { %><a class="kv-btn" href="/nhap-hang/tong-hop/<%= ticket._id %>/return">Trả hàng</a><% } %>
     </div>
   </div>
   <div class="po-detail-pane" data-tab-pane="payment">
@@ -146,7 +149,12 @@
       <tbody>
         <% if (!payments.length) { %><tr><td colspan="6">Chưa có phiếu chi liên kết.</td></tr><% } %>
         <% payments.forEach(function(payment) { const detail = payment.chi_tiet_thanh_toan || {}; const methods = [Number(detail.tien_mat || 0) > 0 ? 'Tiền mặt' : '', Number(detail.chuyen_khoan || 0) > 0 ? 'Chuyển khoản' : ''].filter(Boolean); const author = payment.nguoi_tao_id || {}; %>
-          <tr><td><%= formatDate(payment.ngay_lap || payment.created_at) %></td><td><%- payment._id ? refLink('receipt', payment._id, payment.ma_phieu || '--') : (payment.ma_phieu || '--') %></td><td class="num"><%= fmtMoney(paymentAmount(payment)) %></td><td><%= payment.so_quy_id && payment.so_quy_id.ten_so_quy || methods.join(' / ') || '--' %></td><td><%= author.ho_ten || author.email || author.ten_dang_nhap || '--' %></td><td><%= payment.trang_thai === 'cancelled' ? 'Đã hủy · ' : '' %><%= payment.ghi_chu || '--' %></td></tr>
+          <tr><td><%= formatDate(payment.ngay_lap || payment.created_at) %></td><td><% if ((payment.allocations || []).length) { %><button type="button" class="lot-expand-btn" data-lot-expand="payment-<%= ticket._id %>-<%= payment._id %>" aria-expanded="false" aria-label="Xem phân bổ phiếu chi">+</button><% } %> <%- payment._id ? refLink('receipt', payment._id, payment.ma_phieu || '--') : (payment.ma_phieu || '--') %></td><td class="num"><%= fmtMoney(paymentAmount(payment)) %></td><td><%= payment.so_quy_id && payment.so_quy_id.ten_so_quy || methods.join(' / ') || '--' %></td><td><%= author.ho_ten || author.email || author.ten_dang_nhap || '--' %></td><td><%= payment.trang_thai === 'cancelled' ? 'Đã hủy · ' : '' %><%= payment.ghi_chu || '--' %></td></tr>
+          <% if ((payment.allocations || []).length) { %>
+            <tr class="lot-detail-row" data-lot-detail="payment-<%= ticket._id %>-<%= payment._id %>" hidden><td colspan="6"><table class="mini-table"><thead><tr><th>Phiếu nguồn</th><th class="num">Số tiền</th></tr></thead><tbody>
+              <% payment.allocations.forEach(function(allocation) { %><tr><td><a href="/nhap-hang?purchase=<%= idOf(allocation.phieu_nhap_id) %>"><%= allocation.ma_phieu_nhap || idOf(allocation.phieu_nhap_id) %></a></td><td class="num"><%= fmtMoney(allocation.so_tien) %></td></tr><% }); %>
+            </tbody></table></td></tr>
+          <% } %>
         <% }) %>
       </tbody>
     </table>
@@ -179,5 +187,19 @@
         <% }) %>
       </tbody>
     </table>
+  </div>
+  <div class="po-detail-pane" data-tab-pane="returns">
+    <table class="mini-table"><thead><tr><th>Mã trả hàng</th><th>Ngày trả</th><th>Phiếu nhập nguồn</th><th class="num">Giá trị trả</th><th class="num">Cấn trừ nợ</th><th class="num">NCC đã hoàn</th><th>Trạng thái</th></tr></thead><tbody>
+      <% if (!returnHistory.length) { %><tr><td colspan="7">Chưa có phiếu trả hàng.</td></tr><% } %>
+      <% returnHistory.forEach(function(returnRow) { const isReturnGroup = returnRow.record_type === 'group'; const historyRows = [returnRow].concat(returnRow.children || []); %>
+        <% historyRows.forEach(function(row, index) { const child = index > 0; %>
+          <tr <% if (child) { %>class="lot-detail-row" data-lot-detail="return-<%= ticket._id %>-<%= returnRow._id %>" hidden<% } %>>
+            <td><% if (isReturnGroup && !child) { %><button type="button" class="lot-expand-btn" data-lot-expand="return-<%= ticket._id %>-<%= row._id %>" aria-expanded="false" aria-label="Xem phiếu trả nguồn">+</button> <a href="/tra-hang-nhap?q=<%= encodeURIComponent(row.ma_phieu_tra_nhap) %>"><%= row.ma_phieu_tra_nhap %></a><% } else { %><a href="/tra-hang-nhap?view_mode=sources&q=<%= encodeURIComponent(row.ma_phieu_tra_nhap) %>&openReturn=<%= row._id %>"><%= child ? '└─ ' : '' %><%= row.ma_phieu_tra_nhap %></a><% } %></td>
+            <td><%= formatDate(row.ngay_tra || row.created_at) %></td><td><% if (row.phieu_nhap_id) { %><a href="<%= sourceHref(row.phieu_nhap_id) %>"><%= row.phieu_nhap_id.ma_phieu_nhap || '--' %></a><% } else { %>--<% } %></td>
+            <td class="num"><%= fmtMoney(row.tong_tien_tra) %></td><td class="num"><%= fmtMoney(row.gia_tri_can_tru_cong_no || 0) %></td><td class="num"><%= fmtMoney(row.ncc_da_tra) %></td><td><%= row.trang_thai === 'draft' ? 'Phiếu tạm' : (row.trang_thai === 'cancelled' ? 'Đã hủy' : (isReturnGroup && !child ? 'Trả hàng tổng hợp' : 'Đã trả hàng')) %></td>
+          </tr>
+        <% }); %>
+      <% }); %>
+    </tbody></table>
   </div>
 </div>

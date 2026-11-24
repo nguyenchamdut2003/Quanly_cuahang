@@ -176,6 +176,7 @@ async function loadReturnDeductionsByPurchase(purchaseIds, storeId) {
     const match = {
         phieu_nhap_id: { $in: purchaseIds },
         trang_thai: 'completed',
+        trang_thai_du_lieu: { $ne: 'inactive' },
         deleted_at: null
     };
     if (storeId && mongoose.Types.ObjectId.isValid(storeId)) {
@@ -183,14 +184,15 @@ async function loadReturnDeductionsByPurchase(purchaseIds, storeId) {
     }
 
     const rows = await PhieuTraHangNhap.find(match)
-        .select('phieu_nhap_id ma_phieu_tra_nhap tong_tien_tra ncc_can_tra tinh_vao_cong_no')
+        .select('phieu_nhap_id ma_phieu_tra_nhap tong_tien_tra ncc_can_tra gia_tri_can_tru_cong_no tinh_vao_cong_no')
         .lean();
 
     rows.forEach((row) => {
         const pid = String(row.phieu_nhap_id || '');
         if (!pid) return;
         if (!map[pid]) map[pid] = { amount: 0, codes: [] };
-        const amount = Math.max(0, Number(row.tong_tien_tra || row.ncc_can_tra || 0));
+        const amount = Math.max(0, Number(row.gia_tri_can_tru_cong_no != null
+            ? row.gia_tri_can_tru_cong_no : (row.tong_tien_tra || row.ncc_can_tra || 0)));
         if (row.tinh_vao_cong_no === false) return;
         map[pid].amount += amount;
         const code = String(row.ma_phieu_tra_nhap || '').trim();
@@ -240,7 +242,7 @@ async function buildSupplierDebtAdminPack(supplier, storeId) {
     const debtRows = await CongNoNhaCungCap.find(debtMatch)
         .populate({ path: 'phieu_nhap_id', select: 'ma_phieu_nhap' })
         .populate({ path: 'nhap_vat_chua_id', select: 'ma_nhap_vat_chua' })
-        .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap ncc_da_tra' })
+        .populate({ path: 'phieu_tra_nhap_id', select: 'ma_phieu_tra_nhap ncc_da_tra gia_tri_can_tru_cong_no' })
         .populate({ path: 'phieu_thu_chi_id', select: 'ma_phieu loai_phieu loai_thu_chi' })
         .sort({ ngay: 1, created_at: 1 })
         .lean();
@@ -257,7 +259,7 @@ async function buildSupplierDebtAdminPack(supplier, storeId) {
     const ledgerRows = debtRows.filter((row) => !row.nhap_vat_chua_id).map((row) => ({
         date: row.ngay || row.created_at,
         kind: row.loai,
-        amount: row.phieu_tra_nhap_id ? Number(row.phieu_tra_nhap_id.ncc_da_tra || 0) : Number(row.so_tien || 0),
+        amount: row.phieu_tra_nhap_id ? Number(row.phieu_tra_nhap_id.gia_tri_can_tru_cong_no ?? row.phieu_tra_nhap_id.ncc_da_tra ?? 0) : Number(row.so_tien || 0),
         docInfo: getDebtDocumentInfo(row),
         note: row.ghi_chu || ''
     })).concat(txRows.filter((row) => !row.nhap_vat_chua_id).map((row) => ({
@@ -418,14 +420,14 @@ async function loadSupplierLedgerRows(supplierId, storeId) {
 
     const legacyRows = await CongNoNhaCungCap.find(debtMatch)
         .select('ngay created_at loai so_tien nhap_vat_chua_id phieu_tra_nhap_id')
-        .populate({ path: 'phieu_tra_nhap_id', select: 'ncc_da_tra' })
+        .populate({ path: 'phieu_tra_nhap_id', select: 'ncc_da_tra gia_tri_can_tru_cong_no' })
         .sort({ ngay: 1, created_at: 1 })
         .lean();
 
     const normalized = legacyRows.filter((row) => !row.nhap_vat_chua_id).map((row) => ({
         ngay: row.ngay || row.created_at,
         loai: row.loai,
-        so_tien: row.phieu_tra_nhap_id ? Number(row.phieu_tra_nhap_id.ncc_da_tra || 0) : row.so_tien
+        so_tien: row.phieu_tra_nhap_id ? Number(row.phieu_tra_nhap_id.gia_tri_can_tru_cong_no ?? row.phieu_tra_nhap_id.ncc_da_tra ?? 0) : row.so_tien
     }));
 
     if (GiaoDichCongNoNhaCungCap) {

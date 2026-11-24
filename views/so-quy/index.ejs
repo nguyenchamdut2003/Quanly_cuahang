@@ -42,6 +42,11 @@
   ? String(safeFilters.so_quy_id)
   : '';
   const codeOf = locals.relatedCode || function(item) {
+  if (item.phieu_tra_tong_hop_id) return item.phieu_tra_tong_hop_id.ma_phieu_tra_tong_hop || item.ma_chung_tu_goc || '';
+  if (item.allocation_type === 'hoan_tien_tra_nhap') {
+  const allocation = (item.allocations || [])[0] || {};
+  return item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || allocation.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || allocation.ma_phieu_tra_nhap || item.ma_chung_tu_goc || '';
+  }
   if (item.phieu_nhap_tong_hop_id) return item.phieu_nhap_tong_hop_id.ma_phieu_tong_hop || item.ma_chung_tu_goc || '';
   const firstAlloc = Array.isArray(item.allocations) ? item.allocations[0] : null;
   const allocPn = firstAlloc?.phieu_nhap_id;
@@ -53,10 +58,16 @@
   item.phieu_tra_hang_nhap_id?.ma_phieu_tra_nhap || item.phieu_tra_hang_id?.ma_phieu_tra || item.van_don_id?.ma_van_don
   || item.nhap_vat_chua_id?.ma_nhap_vat_chua || item.xuat_vat_chua_id?.ma_xuat_vat_chua || item.chung_tu_khac || item.ma_chung_tu_goc || '';
   };
+  const supplierReturnLink = function(doc, code) {
+  const id = String(doc && doc._id || doc || '');
+  const label = String(code || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+  return '<a class="ref-link" href="/tra-hang-nhap?q=' + encodeURIComponent(String(code || '')) + '&amp;openReturn=' + encodeURIComponent(id) + '">' + label + '</a>';
+  };
   const relatedDocLink = function(item) {
   const code = codeOf(item);
+  if (item.phieu_tra_tong_hop_id) return supplierReturnLink(item.phieu_tra_tong_hop_id, code);
   if (item.phieu_nhap_tong_hop_id) return refLink('phieu_nhap_tong_hop', item.phieu_nhap_tong_hop_id, code);
-  if (item.phieu_tra_hang_nhap_id) return refLink('supplier_return', item.phieu_tra_hang_nhap_id, code);
+  if (item.phieu_tra_hang_nhap_id) return supplierReturnLink(item.phieu_tra_hang_nhap_id, code);
   if (item.phieu_tra_hang_id) return refLink('customer_return', item.phieu_tra_hang_id, code);
   if (item.phieu_nhap_id) return refLink('purchase', item.phieu_nhap_id, code);
   if (item.nhap_vat_chua_id) return refLink('nhap_vat_chua', item.nhap_vat_chua_id, code);
@@ -67,6 +78,7 @@
   const allocs = item.allocations || [];
   if (allocs.length) {
   const first = allocs[0];
+  if (item.allocation_type === 'hoan_tien_tra_nhap' && first.phieu_tra_hang_nhap_id) return supplierReturnLink(first.phieu_tra_hang_nhap_id, code || first.ma_phieu_tra_nhap);
   if (first.hoa_don_id) return refLink('invoice', first.hoa_don_id, code || first.ma_hoa_don);
   if (first.nhap_vat_chua_id) return refLink('nhap_vat_chua', first.nhap_vat_chua_id, code || first.ma_nhap_vat_chua);
   if (first.phieu_nhap_id) return refLink('purchase', first.phieu_nhap_id, code || first.ma_phieu_nhap);
@@ -86,8 +98,8 @@
     return '<a class="ref-link" href="' + advanceHref + '">' + escapeLabel(code || 'Tạm ứng') + '</a>';
   }
   if (item._docLinkType && item._docLinkId) return refLink(item._docLinkType, item._docLinkId, code);
-  if (/^THN/i.test(label)) return '<a href="/tra-hang-nhap?q=' + encodeURIComponent(label) + '" class="ref-link">' + escapeLabel(label) + '</a>';
-  if (/^TH(?!N)/i.test(label)) return '<a href="/don-hang/tra-hang?q=' + encodeURIComponent(label) + '" class="ref-link">' + escapeLabel(label) + '</a>';
+  if (/^TH[NG]/i.test(label)) return '<a href="/tra-hang-nhap?q=' + encodeURIComponent(label) + '" class="ref-link">' + escapeLabel(label) + '</a>';
+  if (/^TH(?![NG])/i.test(label)) return '<a href="/don-hang/tra-hang?q=' + encodeURIComponent(label) + '" class="ref-link">' + escapeLabel(label) + '</a>';
   if (/^CC[\s-]?\d{6}/i.test(label)) {
     return '<a href="/cham-cong?tab=payroll&ma_bang_luong=' + encodeURIComponent(label.replace(/\s+/g, '-')) + '" class="ref-link">' + escapeLabel(label) + '</a>';
   }
@@ -2071,6 +2083,7 @@
                           <input type="hidden" name="don_hang_id" id="donHangId"><input type="hidden" name="hoa_don_id"
                             id="hoaDonId"><input type="hidden" name="phieu_nhap_id" id="phieuNhapId"><input
                             type="hidden" name="phieu_tra_hang_nhap_id" id="phieuTraHangNhapId"><input type="hidden"
+                            name="phieu_tra_tong_hop_id" id="phieuTraTongHopId"><input type="hidden"
                             name="phieu_tra_hang_id" id="phieuTraHangId"><input type="hidden" name="van_don_id"
                             id="vanDonId"><input type="hidden" name="ma_chung_tu_goc" id="maChungTuGoc">
                           <input type="hidden" name="gia_tri" id="amountInput" value="0"><input type="hidden"
@@ -2120,9 +2133,7 @@
                         <div class="accounting-wrap">
                           <label class="accounting" id="accountingWrap"><input type="checkbox" name="hach_toan"
                               id="accountingCheck"> Hạch toán công nợ</label>
-                          <div class="partner-hint">Lưu phiếu tạo <strong>PhieuThuChi</strong> vào sổ quỹ; nếu bật hạch
-                            toán thì ghi thêm công nợ KH/NCC. Chưa cập nhật <em>đã trả / còn nợ</em> trên chứng từ gốc
-                            (đơn, phiếu nhập, v.v.).</div>
+                          <div class="partner-hint" id="receiptAccountingHint">Lưu khoản thu/chi vào sổ quỹ. Bật hạch toán công nợ để ghi nhận vào công nợ khách hàng/nhà cung cấp.</div>
                         </div>
                         <div class="modal-foot-actions">
                           <button type="button" class="modal-btn" onclick="closeReceiptModal()">Bỏ qua</button>
@@ -2158,7 +2169,8 @@
                   const chiDocOptions = [{ value: '', label: 'Không chọn' }, { value: 'phieu_nhap', label: 'Phiếu nhập' }, { value: 'phieu_tra_hang', label: 'Phiếu trả hàng bán' }, { value: 'van_don', label: 'Vận đơn/phí giao hàng' }, { value: 'don_hang', label: 'Đơn hàng (hoàn tiền)' }, { value: 'hoa_don', label: 'Hóa đơn (hoàn tiền)' }, { value: 'khac', label: 'Khác' }];
                   let relatedDocRows = [];
                   let selectedRelatedDoc = null;
-                  const DOC_HIDDEN_IDS = ['donHangId', 'hoaDonId', 'phieuNhapId', 'phieuTraHangNhapId', 'phieuTraHangId', 'vanDonId', 'maChungTuGoc'];
+                  let receiptRequestKey = '';
+                  const DOC_HIDDEN_IDS = ['donHangId', 'hoaDonId', 'phieuNhapId', 'phieuTraHangNhapId', 'phieuTraTongHopId', 'phieuTraHangId', 'vanDonId', 'maChungTuGoc'];
                   const fmt = n => Number(n || 0).toLocaleString('vi-VN');
                   const fmtMoney = n => fmt(n) + ' VNĐ';
                   let cashBookState = [];
@@ -2504,6 +2516,7 @@
                   }
                   function showReceiptPaymentMessage(message, type) { const el = receiptPaymentEls().message; if (!el) return; el.textContent = message || ''; el.className = message ? 'receipt-payment-message show ' + (type || 'error') : 'receipt-payment-message' }
                   function resetReceiptPaymentForm() {
+                    receiptRequestKey = window.crypto && window.crypto.randomUUID ? window.crypto.randomUUID() : String(Date.now()) + '-' + Math.random().toString(36).slice(2);
                     const el = receiptPaymentEls();
                     [el.cash, el.bank, el.refund].forEach(input => { if (input) input.value = '' });
                     if (el.amount) el.amount.value = '0';
@@ -2623,19 +2636,23 @@
                       updateSelectedRelatedDocHint();
                     }
                   }
-                  function onDocumentTypeChange() { clearDocumentRefs(); selectedRelatedDoc = null; updateSelectedRelatedDocHint(); fetchRelatedDocuments() }
+                  function onDocumentTypeChange() { clearDocumentRefs(); selectedRelatedDoc = null; updateAccountingOptions(); updateSelectedRelatedDocHint(); fetchRelatedDocuments() }
                   function clearRelatedDocument() { clearDocumentRefs(); selectedRelatedDoc = null; documentType.value = ''; relatedDocRows = []; documentSelect.innerHTML = '<option value="">Chọn chứng từ</option>'; const otherInput = document.getElementById('otherDocumentInput'); if (otherInput) otherInput.value = ''; toggleOtherDocumentInput(); updateSelectedRelatedDocHint() }
                   function openReceiptModal(type) { receiptType.value = type; receiptDate.value = nowLocal(); receiptTitle.textContent = type === 'thu' ? 'Tạo phiếu thu' : 'Tạo phiếu chi'; categoryLabel.textContent = type === 'thu' ? 'Loại thu' : 'Loại chi'; partnerLabel.textContent = type === 'thu' ? 'Người nộp' : 'Người nhận'; receiptCategory.value = ''; receiptCategory.placeholder = type === 'thu' ? 'Nhập loại thu' : 'Nhập loại chi'; subjectGroup.value = type === 'thu' ? 'khach_hang' : 'nha_cung_cap'; buildDocumentTypeOptions(); onSubjectGroupChange(); clearRelatedDocument(); accountingCheck.checked = false; resetReceiptPaymentForm(); document.getElementById('receiptModal').classList.add('open'); if (!receiptPaymentState.loaded) reloadActiveCashBookDropdown(); else updateReceiptPaymentSummary() }
                   function closeReceiptModal() { document.getElementById('receiptModal').classList.remove('open') }
-                  function onSubjectGroupChange() { partnerSelect.value = ''; partnerEntityId.value = ''; partnerNameInput.value = ''; renderPartners(); updateAccountingOptions(); if (documentType.value) fetchRelatedDocuments() }
+                  function onSubjectGroupChange() { partnerSelect.value = ''; partnerEntityId.value = ''; partnerNameInput.value = ''; clearDocumentRefs(); selectedRelatedDoc = null; documentSelect.value = ''; renderPartners(); updateAccountingOptions(); updateSelectedRelatedDocHint(); if (documentType.value) fetchRelatedDocuments() }
                   function renderPartners() { const group = subjectGroup.value; const isOther = group === 'khac'; const rows = partnerLists[group] || []; const partnerRow = document.querySelector('#receiptModal .partner-row'); partnerSelect.innerHTML = '<option value="">Chọn từ danh sách</option>' + rows.map(x => `<option value="${x._id}" data-name="${cashEscape(x.name || '')}">${cashEscape(x.code || '')} - ${cashEscape(x.name || '')} ${x.phone ? '- ' + cashEscape(x.phone) : ''}</option>`).join(''); partnerSelect.disabled = isOther; partnerSelect.style.display = isOther ? 'none' : ''; if (partnerRow) partnerRow.classList.toggle('is-manual-only', isOther); partnerNameInput.disabled = false; partnerNameInput.placeholder = receiptType.value === 'thu' ? 'Nhập tên người nộp' : 'Nhập tên người nhận'; partnerHint.textContent = isOther ? 'Chỉ nhập tay — không tạo mới danh mục.' : 'Chọn danh sách hoặc nhập tay.' }
                   function onPartnerChange(skipRelatedReload) {
                     const opt = partnerSelect.options[partnerSelect.selectedIndex];
                     if (opt && opt.value) { partnerEntityId.value = opt.value; partnerNameInput.value = opt.getAttribute('data-name') || opt.textContent } else { partnerEntityId.value = '' }
                     if (skipRelatedReload) return;
-                    if (documentType.value) { selectedRelatedDoc = null; updateSelectedRelatedDocHint(); fetchRelatedDocuments() }
+                    clearDocumentRefs();
+                    selectedRelatedDoc = null;
+                    documentSelect.value = '';
+                    updateSelectedRelatedDocHint();
+                    if (documentType.value) fetchRelatedDocuments();
                   }
-                  function relatedDocOptionLabel(x) { const total = Number(x.total || 0); const remain = Number(x.amount || 0); return `${cashEscape(x.code || '')} - ${cashEscape(x.partner || '')} - Tổng ${fmtMoney(total)} - còn ${fmtMoney(remain)}` }
+                  function relatedDocOptionLabel(x) { const total = Number(x.total || 0); const remain = Number(x.amount || 0); const kind = documentType.value === 'phieu_tra_hang_nhap' ? (x.record_type === 'group' ? ' (Phiếu gộp)' : ' (Chưa gộp)') : ''; return `${cashEscape(x.code || '')}${kind} - ${cashEscape(x.partner || '')} - Tổng ${fmtMoney(total)} - còn ${fmtMoney(remain)}` }
                   function renderRelatedDocuments(preserveId) {
                     const type = documentType.value;
                     toggleOtherDocumentInput();
@@ -2684,14 +2701,17 @@
                     if (type === 'don_hang') donHangId.value = row._id;
                     if (type === 'hoa_don') hoaDonId.value = row._id;
                     if (type === 'phieu_nhap') phieuNhapId.value = row._id;
-                    if (type === 'phieu_tra_hang_nhap') phieuTraHangNhapId.value = row._id;
+                    if (type === 'phieu_tra_hang_nhap') {
+                      if (row.record_type === 'group') document.getElementById('phieuTraTongHopId').value = row._id;
+                      else phieuTraHangNhapId.value = row._id;
+                    }
                     if (type === 'phieu_tra_hang') phieuTraHangId.value = row._id;
                     if (type === 'van_don') vanDonId.value = row._id;
                     setPartnerFromDoc(row);
                     documentSelect.value = selectedId;
                     updateSelectedRelatedDocHint();
                   }
-                  function updateAccountingOptions() { const group = subjectGroup.value; const canDebt = ['khach_hang', 'nha_cung_cap'].includes(group); accountingWrap.classList.toggle('is-disabled', !canDebt); accountingCheck.disabled = !canDebt; if (!canDebt) accountingCheck.checked = false }
+                  function updateAccountingOptions() { const group = subjectGroup.value; const isRefund = documentType.value === 'phieu_tra_hang_nhap'; const canDebt = !isRefund && ['khach_hang', 'nha_cung_cap'].includes(group); accountingWrap.classList.toggle('is-disabled', !canDebt); accountingCheck.disabled = !canDebt; if (!canDebt) accountingCheck.checked = false; document.getElementById('receiptAccountingHint').textContent = isRefund ? 'Nhận tiền qua phiếu trả hàng sẽ cập nhật số NCC đã hoàn và số còn phải hoàn; phiếu gộp được phân bổ về các phiếu nguồn.' : 'Lưu khoản thu/chi vào sổ quỹ. Bật hạch toán công nợ để ghi nhận vào công nợ khách hàng/nhà cung cấp.' }
                   function formatAmount(input) { input.value = fmt(String(input.value || '').replace(/\./g, '')) }
                   // TODO: cleanup dead showReceipt (alert + modal) — active handler is assigned below (inline panel).
                   async function showReceipt(id) { const item = receipts.find(x => x._id === id); if (!item) return; try { const res = await fetch('/so-quy/' + id + '/detail'); const json = await res.json(); if (!json.success) throw new Error(json.message || 'Không tải được phiếu'); const receipt = json.data.receipt || {}; const rows = (json.data.items || []).map(row => `- ${(row.hang_hoa_id && row.hang_hoa_id.ma_hang) || ''} ${(row.hang_hoa_id && row.hang_hoa_id.ten_hang) || ''}: ${fmt(row.so_luong || 0)} x ${fmt(row.don_gia_nhap || 0)}`).join('\n'); alert(`${item.ma_phieu}\n${categoryText(item.loai_thu_chi) || (item.loai_phieu === 'thu' ? 'Phiếu thu' : 'Phiếu chi')}\nSổ quỹ: ${item.so_quy}\nNhà cung cấp: ${(receipt.nha_cung_cap_id && receipt.nha_cung_cap_id.ten_ncc) || item.doi_tuong || ''}\nPhiếu nhập: ${(receipt.phieu_nhap_id && receipt.phieu_nhap_id.ma_phieu_nhap) || item.chung_tu || ''}\nGiá trị: ${fmt(item.gia_tri)}\nGhi chú: ${item.ghi_chu || ''}${rows ? '\n\nHàng trong phiếu nhập:\n' + rows : ''}`) } catch (error) { alert(error.message || 'Không tải được phiếu') } }
@@ -2815,14 +2835,19 @@
                   function openReceiptPrint(id) { if (!id) return; window.open('/so-quy/' + encodeURIComponent(String(id)) + '/in-tong-hop', '_blank') }
                   function receiptDocId(doc) { if (!doc) return ''; if (typeof doc === 'string') return String(doc); return doc._id ? String(doc._id) : '' }
                   function receiptDocHref(type, id) { const safeId = String(id || '').trim(); if (!safeId) return ''; const map = { order: '/don-hang?order=', invoice: '/don-hang/hoa-don?invoice=', purchase: '/nhap-hang?purchase=', nhap_vat_chua: '/vat-chua?nhap_vat_chua=', xuat_vat_chua: '/vat-chua?xuat_vat_chua=', supplier_return: '/tra-hang-nhap?openReturn=', phieu_tra_hang_nhap: '/tra-hang-nhap?openReturn=', customer_return: '/don-hang/tra-hang?return=', phieu_tra_hang: '/don-hang/tra-hang?return=', shipment: '/don-hang/van-don/', van_don: '/don-hang/van-don/', payroll: '/cham-cong?tab=payroll&bang_luong=', bang_luong: '/cham-cong?tab=payroll&bang_luong=', advance: '/cham-cong?tab=employees&tam_ung=', tam_ung: '/cham-cong?tab=employees&tam_ung=' }; const base = map[type]; return base ? base + encodeURIComponent(safeId) : '' }
-                  function receiptDocLink(type, id, code) { const label = escapeHtml(code || '—'); const href = receiptDocHref(type, id); return href ? `<a class="receipt-inline-link ref-link" href="${href}">${label}</a>` : label }
+                  function receiptDocLink(type, id, code) { const label = escapeHtml(code || '—'); const href = getRelatedDocumentLink(type, id, code); return href ? `<a class="receipt-inline-link ref-link" href="${escapeHtml(href)}">${label}</a>` : label }
                   function relDocObject(doc) { return doc && typeof doc === 'object' ? doc : null }
                   function relMoneyCell(value) { if (value == null || value === '' || Number.isNaN(Number(value))) return '—'; return fmtMoney(Math.abs(Number(value) || 0)) }
                   function relTextCell(value) { const text = String(value ?? '').trim(); return text ? escapeHtml(text) : '—' }
                   function relPartnerLabel(entity) { if (!entity) return ''; const name = String(entity.ten_khach_hang || entity.ten_ncc || entity.ten_doi_tac || entity.ten_nhan_vien || '').trim(); const code = String(entity.ma_khach_hang || entity.ma_ncc || entity.ma_doi_tac || entity.ma_nhan_vien || '').trim(); if (name && code) return name + ' (' + code + ')'; return name || code }
                   function receiptPayAmount(receipt, override) { const v = override != null ? override : receipt.gia_tri; return Math.abs(Number(v) || 0) }
                   function paidBeforeFromTotal(docTotal, paidTotal, receiptAmount) { const total = Number(docTotal || 0); const paid = Number(paidTotal || 0); const pay = receiptPayAmount({ gia_tri: receiptAmount }, receiptAmount); if (total <= 0 && paid <= 0) return null; if (paid > pay) return paid - pay; if (paid > 0 && pay >= paid) return 0; return paid > 0 ? paid : null }
-                  function getRelatedDocumentLink(type, docId) { return receiptDocHref(type, docId) }
+                  function refundAllocationSnapshot(allocation) {
+                    const amount = Number(allocation.so_tien), before = Number(allocation.con_no_truoc), after = Number(allocation.con_no_sau);
+                    if (allocation.con_no_truoc == null || allocation.con_no_sau == null || !Number.isFinite(amount) || !Number.isFinite(before) || !Number.isFinite(after) || amount <= 0 || before < amount || after < 0 || Math.abs(before - after - amount) > 0.000001) return null;
+                    return { before, after };
+                  }
+                  function getRelatedDocumentLink(type, docId, code) { return ['supplier_return', 'phieu_tra_hang_nhap'].includes(type) && docId && code ? '/tra-hang-nhap?q=' + encodeURIComponent(String(code)) + '&openReturn=' + encodeURIComponent(String(docId)) : receiptDocHref(type, docId) }
                   function formatDocStatusLabel(value) { const key = String(value || '').trim(); if (!key) return '—'; const map = { partial: 'Thanh toán một phần', paid: 'Đã thanh toán', unpaid: 'Chưa thanh toán', draft: 'Phiếu tạm', completed: 'Hoàn thành', cancelled: 'Đã hủy', processing: 'Đang xử lý', shipping: 'Đang giao hàng', failed: 'Không giao được', done: 'Hoàn thành', merged: 'Đã gộp', calculated: 'Đã tính lương', locked: 'Đã khóa', khong_cod: 'Không COD', chua_thu: 'Chưa thu COD', da_thu: 'Đã thu COD', da_doi_soat: 'Đã đối soát COD', active: 'Đang hoạt động', inactive: 'Ngừng hoạt động' }; return map[key] || key }
                   function getRelatedDocumentStatus(type, doc, remainAfter, docTotal) { const remain = remainAfter != null && !Number.isNaN(Number(remainAfter)) ? Number(remainAfter) : null; if (remain != null) { if (remain <= 0) return 'Đã thanh toán'; const total = Number(docTotal || 0); if (total > 0 && remain > 0 && remain < total) return 'Thanh toán một phần'; if (remain > 0) return 'Còn nợ' } const d = relDocObject(doc); if (!d) return '—'; if (type === 'shipment' && d.trang_thai_cod) return formatDocStatusLabel(d.trang_thai_cod); if (d.trang_thai) return formatDocStatusLabel(d.trang_thai); return '—' }
                   function buildRelatedDocumentRows(receipt) {
@@ -2830,6 +2855,20 @@
                     const defaultReceiptValue = receiptPayAmount(receipt);
                     const allocations = Array.isArray(receipt.allocations) ? receipt.allocations : [];
                     const pushRow = (row) => rows.push(row);
+                    const returnGroup = relDocObject(receipt.phieu_tra_tong_hop_id);
+                    const refundAllocations = receipt.allocation_type === 'hoan_tien_tra_nhap' ? allocations.filter(alloc => alloc.phieu_tra_hang_nhap_id || alloc.ma_phieu_tra_nhap) : [];
+                    if (returnGroup && returnGroup.ma_phieu_tra_tong_hop) {
+                      pushRow({ type: 'supplier_return', typeLabel: 'Phiếu trả hàng nhập gộp', code: returnGroup.ma_phieu_tra_tong_hop, docId: receiptDocId(returnGroup), docDate: returnGroup.ngay_tra, partner: relPartnerLabel(returnGroup.nha_cung_cap_id), docValue: returnGroup.tong_tien_tra ?? null, paidBefore: returnGroup.ncc_da_tra ?? null, receiptValue: defaultReceiptValue, remainAfter: null, status: getRelatedDocumentStatus('supplier_return', returnGroup) });
+                      if (!refundAllocations.length) return rows;
+                    }
+                    if (refundAllocations.length) {
+                      refundAllocations.forEach(alloc => {
+                        const child = relDocObject(alloc.phieu_tra_hang_nhap_id) || {};
+                        const snapshot = refundAllocationSnapshot(alloc);
+                        pushRow({ type: 'supplier_return', typeLabel: 'Phiếu trả hàng nhập nguồn', code: String(alloc.ma_phieu_tra_nhap || child.ma_phieu_tra_nhap || '').trim(), docId: receiptDocId(child) || receiptDocId(alloc.phieu_tra_hang_nhap_id), docDate: child.ngay_tra, partner: relPartnerLabel(child.nha_cung_cap_id || receipt.nha_cung_cap_id), docValue: child.ncc_can_tra ?? child.tong_tien_tra ?? null, receiptValue: Number(alloc.so_tien || 0), remainAfter: snapshot ? snapshot.after : null, status: getRelatedDocumentStatus('supplier_return', child, snapshot ? snapshot.after : null, child.ncc_can_tra) });
+                      });
+                      return rows;
+                    }
                     if (allocations.length) {
                       allocations.forEach(alloc => {
                         const hd = relDocObject(alloc.hoa_don_id);
@@ -2939,20 +2978,20 @@
                         }
                       }
                       const href = row.docId
-                        ? getRelatedDocumentLink(row.type, row.docId)
+                        ? getRelatedDocumentLink(row.type, row.docId, row.code)
                         : (/^CC[\s-]?\d{6}/i.test(String(row.code || ''))
                           ? ('/cham-cong?tab=payroll&ma_bang_luong=' + encodeURIComponent(String(row.code).replace(/\s+/g, '-')))
                           : (/^TA\d+/i.test(String(row.code || ''))
                             ? ('/cham-cong?tab=employees&ma_tam_ung=' + encodeURIComponent(String(row.code).toUpperCase()))
                             : ''));
-                      const action = href ? `<a class="receipt-inline-link ref-link" href="${href}">Xem</a>` : '—';
+                      const action = href ? `<a class="receipt-inline-link ref-link" href="${escapeHtml(href)}">Xem</a>` : '—';
                       return `<tr><td>${relTextCell(row.typeLabel)}</td><td>${codeCell}</td><td>${row.docDate ? relTextCell(formatReceiptDate(row.docDate)) : '—'}</td><td>${relTextCell(row.partner)}</td><td class="num">${relMoneyCell(row.receiptValue)}</td><td class="num">${relMoneyCell(row.remainAfter)}</td><td>${relTextCell(row.status)}</td><td>${action}</td></tr>`;
                     }).join('');
                     return `<div class="receipt-inline-allocation"><div class="receipt-inline-allocation-title">Chứng từ liên quan</div><div class="receipt-related-docs-scroll"><table class="receipt-related-docs-table">${head}<tbody>${body}</tbody></table></div></div>`;
                   }
                   function buildReceiptRelatedDocumentsSection(receipt) {
                     const code = String(receipt.chung_tu_khac || receipt.ma_chung_tu_goc || '').trim();
-                    if (String(receipt.chung_tu_khac || '').trim() && !receipt._docLinkType && !/^CC[\s-]?\d{6}/i.test(code) && !/^TA\d+/i.test(code)) {
+                    if (String(receipt.chung_tu_khac || '').trim() && !receipt.phieu_tra_tong_hop_id && receipt.allocation_type !== 'hoan_tien_tra_nhap' && !receipt._docLinkType && !/^CC[\s-]?\d{6}/i.test(code) && !/^TA\d+/i.test(code)) {
                       return '';
                     }
                     return buildRelatedDocumentTable(receipt);
@@ -3044,6 +3083,20 @@
                     }
                     if (docType && docType !== 'khac') {
                       if (selectedRelatedDoc && Number(data.gia_tri) > Number(selectedRelatedDoc.amount || 0)) return alert('Số tiền không được vượt số còn lại của chứng từ (' + fmtMoney(selectedRelatedDoc.amount) + ').');
+                    }
+                    if (docType === 'phieu_tra_hang_nhap') {
+                      if (!selectedRelatedDoc || !documentSelect.value) return alert('Vui lòng chọn phiếu trả hàng nhập còn tiền cần hoàn.');
+                      data.request_key = receiptRequestKey;
+                      data.con_phai_tra_truoc = Number(selectedRelatedDoc.amount || 0);
+                      if (selectedRelatedDoc.record_type === 'group') {
+                        let amountLeft = Number(data.gia_tri);
+                        data.allocations = (selectedRelatedDoc.return_sources || []).map(source => {
+                          const amount = Math.min(amountLeft, Number(source.con_phai_tra_truoc || 0));
+                          amountLeft -= amount;
+                          return { phieu_tra_hang_nhap_id: source.phieu_tra_hang_nhap_id, so_tien: amount, con_phai_tra_truoc: Number(source.con_phai_tra_truoc || 0) };
+                        }).filter(source => source.so_tien > 0);
+                        if (amountLeft > 0) return alert('Vui lòng tải lại danh sách phiếu trả để xác nhận phân bổ tiền hoàn.');
+                      }
                     }
                     DOC_HIDDEN_IDS.forEach(id => { const field = document.getElementById(id); if (!field || !field.name) return; if (field.value) data[field.name] = field.value; else delete data[field.name] });
                     const saveBtn = document.getElementById('receiptSaveBtn');

@@ -148,7 +148,7 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
     var debtRows = await CongNoNhaCungCap.find(debtMatch)
         .populate({ path: 'phieu_nhap_id', select: '_id tong_tien can_tra_ncc con_no_ncc trang_thai trang_thai_du_lieu' })
         .populate({ path: 'nhap_vat_chua_id', select: '_id source_type trang_thai' })
-        .populate({ path: 'phieu_tra_nhap_id', select: '_id ncc_da_tra trang_thai trang_thai_du_lieu' })
+        .populate({ path: 'phieu_tra_nhap_id', select: '_id ncc_da_tra gia_tri_can_tru_cong_no trang_thai trang_thai_du_lieu' })
         .populate({ path: 'phieu_thu_chi_id', select: 'trang_thai' })
         .lean();
     var debtTransactionRows = GiaoDichCongNoNhaCungCap ? await GiaoDichCongNoNhaCungCap.find(debtTransactionMatch)
@@ -161,8 +161,17 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         {
             $group: {
                 _id: '$nha_cung_cap_id',
-                tong_tra_hang: { $sum: { $ifNull: ['$ncc_can_tra', '$tong_tien_tra'] } },
-                da_tra_hang: { $sum: { $ifNull: ['$ncc_da_tra', 0] } }
+                tong_tra_hang: { $sum: { $cond: [
+                    { $eq: [{ $ifNull: ['$gia_tri_can_tru_cong_no', null] }, null] },
+                    { $ifNull: ['$ncc_can_tra', '$tong_tien_tra'] },
+                    { $ifNull: ['$tong_tien_tra', 0] }
+                ] } },
+                // Group offsets are already booked on source PN.con_no_ncc.
+                // Only legacy returns need this separate header deduction.
+                da_tra_hang: { $sum: { $cond: [
+                    { $eq: [{ $ifNull: ['$gia_tri_can_tru_cong_no', null] }, null] },
+                    { $ifNull: ['$ncc_da_tra', 0] }, 0
+                ] } }
             }
         }
     ]) : [];
@@ -205,7 +214,7 @@ async function aggregateSupplierPurchaseTotals(storeId, supplierIds) {
         }
         if (r.loai === 'tang_no') map[key].tong_no += amount;
         if (r.loai === 'giam_no' && r.phieu_tra_nhap_id && typeof r.phieu_tra_nhap_id === 'object') {
-            amount = Number(r.phieu_tra_nhap_id.ncc_da_tra || 0);
+            amount = Number(r.phieu_tra_nhap_id.gia_tri_can_tru_cong_no ?? r.phieu_tra_nhap_id.ncc_da_tra ?? 0);
         }
         if (r.loai === 'giam_no' || r.loai === 'thanh_toan') map[key].tong_no -= amount;
         if (r.loai === 'thanh_toan') map[key].da_tra_tong = Number(map[key].da_tra_tong || 0) + amount;

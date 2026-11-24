@@ -156,7 +156,7 @@ function normalizeNhapHangFilter(query) {
   var warnMinDays = Number.isFinite(warnMinDaysRaw) && warnMinDaysRaw >= 0 ? warnMinDaysRaw : PURCHASE_DEBT_WARN_DEFAULT_DAYS;
   return {
     q: String(query.q || '').trim(),
-    view_mode: ['sources', 'groups'].indexOf(query.view_mode) >= 0 ? query.view_mode : (query.purchase && mongoose.Types.ObjectId.isValid(String(query.purchase)) ? 'sources' : ''),
+    view_mode: query.view_mode === 'groups' ? 'groups' : '',
     statuses: statuses,
     nha_cung_cap_id: supplierId,
     sort: sort,
@@ -306,9 +306,13 @@ exports.index = async function(req, res, next) {
   try {
     var storeId = await resolveStoreId(req);
     var filter = normalizeNhapHangFilter(req.query);
+    var pendingFocus = req.session && req.session.purchaseListFocus;
+    if (pendingFocus && String(pendingFocus.store_id) !== String(storeId)) pendingFocus = null;
+    var focusedPurchaseId = String(req.query && req.query.purchase || pendingFocus && pendingFocus.purchase_id || '');
+    if (!mongoose.Types.ObjectId.isValid(focusedPurchaseId)) focusedPurchaseId = '';
     var focusedGroupId = String(req.query && req.query.group || '');
     if (!mongoose.Types.ObjectId.isValid(focusedGroupId)) focusedGroupId = '';
-    if (focusedGroupId) {
+    if (focusedGroupId || focusedPurchaseId) {
       filter.view_mode = '';
       filter.q = '';
       filter.nha_cung_cap_id = '';
@@ -330,8 +334,18 @@ exports.index = async function(req, res, next) {
       : [];
     var balancesById = new Map(sourceBalances.map(function(row) { return [String(row._id), row]; }));
     sourceRows = sourceRows.map(function(row) { return Object.assign({}, row, balancesById.get(String(row._id)) || {}); });
+    if (focusedPurchaseId && sourceRows.some(function(row) { return String(row._id) === focusedPurchaseId && row.trang_thai === 'cancelled'; })) filter.statuses.push('cancelled');
     var groupRows = await PhieuNhapTongHop.find({ cua_hang_id: storeId, trang_thai: 'active' }).select('_id').lean();
     var groups = await loadPurchaseGroupDetails(groupRows.map(function(row) { return row._id; }), storeId);
+    var focusedSourceGroup = focusedPurchaseId && groups.find(function(group) {
+      return (group.phieu_nguon_ids || []).some(function(sourceId) { return String(sourceId) === focusedPurchaseId; });
+    });
+    if (!focusedGroupId && focusedSourceGroup) focusedGroupId = String(focusedSourceGroup._id);
+    var historicalPurchaseGroup = null;
+    if (focusedGroupId && !groups.some(function(group) { return String(group._id) === focusedGroupId; })) {
+      var historicalGroups = await loadPurchaseGroupDetails([focusedGroupId], storeId);
+      historicalPurchaseGroup = historicalGroups.find(function(group) { return group.trang_thai === 'cancelled'; }) || null;
+    }
     var managementList = buildPurchaseManagementList(sourceRows, groups, filter);
     var importSlips = managementList.items;
 
@@ -344,7 +358,7 @@ exports.index = async function(req, res, next) {
     var pageSize = NHAP_HANG_PAGE_SIZE;
     var totalSlips = importSlips.length;
     var page = parsePurchasePage(req.query);
-    var focusedIndex = importSlips.findIndex(function(row) { return String(row._id) === (focusedGroupId || String(req.query && req.query.purchase || '')); });
+    var focusedIndex = importSlips.findIndex(function(row) { return String(row._id) === (focusedGroupId || focusedPurchaseId); });
     if (focusedIndex >= 0) page = Math.floor(focusedIndex / pageSize) + 1;
     var totalPages = Math.max(1, Math.ceil(totalSlips / pageSize));
     if (page > totalPages) page = totalPages;
@@ -497,6 +511,12 @@ exports.index = async function(req, res, next) {
         .lean();
     }
 
+    var purchaseListFocus = {
+      record_id: focusedGroupId || focusedPurchaseId,
+      source_id: focusedSourceGroup && String(focusedSourceGroup._id) === focusedGroupId ? focusedPurchaseId : '',
+      export_id: focusedPurchaseId && ((pendingFocus && pendingFocus.purchase_id === focusedPurchaseId && pendingFocus.export_after_complete) || String(req.query && req.query.export || '') === '1') ? focusedPurchaseId : ''
+    };
+    if (req.session) delete req.session.purchaseListFocus;
     res.render('nhap-hang/index', {
       pageTitle: 'Nhập hàng',
       activeMenu: 'mua-hang',
@@ -511,6 +531,8 @@ exports.index = async function(req, res, next) {
       vatChuaList: vatChuaList,
       importSlips: importSlips,
       summaryTotals: summaryTotals,
+      historicalPurchaseGroup: historicalPurchaseGroup,
+      purchaseListFocus: purchaseListFocus,
       formatDate: formatDate,
       statusLabel: statusLabel,
       paymentMethodLabel: paymentMethodLabel,
@@ -1242,9 +1264,11 @@ exports.apiProductLots = async function(req, res, next) {
 
 exports.createSubmit = async function(req, res, next) {
   var session = null;
+  var wantsJson = Boolean(req.xhr) || String(req.get ? req.get('accept') : req.headers && req.headers.accept || '').includes('application/json');
   try {
     var storeId = await resolveStoreId(req);
     if (!storeId || !mongoose.Types.ObjectId.isValid(storeId)) {
+      if (wantsJson) return res.status(400).json({ success: false, message: 'Chưa chọn cửa hàng làm việc hợp lệ.' });
       return res.redirect('/nhap-hang?error=invalid_store');
     }
     var purchase;
@@ -1255,12 +1279,13 @@ exports.createSubmit = async function(req, res, next) {
         nguoi_tao_id: req.user && req.user._id ? req.user._id : undefined
       }), { session: session });
     });
-    var redirectUrl = '/nhap-hang?success=created&purchase=' + encodeURIComponent(String(purchase._id));
     var wantExport = req.body && (req.body.exportAfterComplete === '1' || req.body.exportAfterComplete === 'true');
-    if (wantExport) redirectUrl += '&export=1';
-    return res.redirect(redirectUrl);
+    if (req.session) req.session.purchaseListFocus = { purchase_id: String(purchase._id), export_after_complete: Boolean(wantExport), store_id: storeId };
+    if (wantsJson) return res.json({ success: true, redirect: '/nhap-hang', purchase_id: String(purchase._id), export_after_complete: Boolean(wantExport) });
+    return res.redirect('/nhap-hang');
   } catch (error) {
     console.error('[NHAP_HANG][TRANSACTION_FAIL]', error && error.message ? error.message : error);
+    if (wantsJson) return res.status(400).json({ success: false, message: error.message || 'Không tạo được phiếu nhập.' });
     return res.redirect('/nhap-hang/create?error=' + encodeURIComponent(error.message || 'create_failed'));
   } finally {
     if (session) await session.endSession();

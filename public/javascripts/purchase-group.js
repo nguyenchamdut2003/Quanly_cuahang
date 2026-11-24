@@ -39,6 +39,7 @@
     var busy = false;
     var timer;
     var supplier = el('purchaseMergeSupplierSelect');
+    var status = el('purchaseMergeStatusSelect');
     var search = el('purchaseMergeSearch');
     var checkAll = el('purchaseMergeCheckAll');
     var submit = el('purchaseMergeSubmit');
@@ -99,7 +100,14 @@
     async function loadRows() {
       var currentRequest = ++requestNumber;
       errorAt(el('purchaseMergeAlert'), '');
-      var query = new URLSearchParams({ page: String(page), limit: '10', q: search.value || '', nha_cung_cap_id: supplier.value || '' });
+      if (!supplier.value) {
+        rows = [];
+        totalPages = 1;
+        page = 1;
+        renderRows();
+        return;
+      }
+      var query = new URLSearchParams({ page: String(page), limit: '10', q: search.value || '', nha_cung_cap_id: supplier.value, trang_thai: status.value });
       try {
         var result = await json('/nhap-hang/tong-hop/eligible?' + query.toString());
         if (currentRequest !== requestNumber) return;
@@ -111,16 +119,23 @@
     }
     function close() { if (!busy) overlay.style.display = 'none'; }
     el('openPurchaseMergeModal').addEventListener('click', function() {
+      clearTimeout(timer);
       selected.clear();
       previewed = '';
       page = 1;
       search.value = '';
-      el('purchaseMergeNote').value = '';
+      status.value = 'completed';
       var pageSupplier = document.querySelector('#poFilterForm [name="nha_cung_cap_id"]');
-      supplier.value = pageSupplier && pageSupplier.value || '';
+      var checked = Array.from(document.querySelectorAll('.purchase-select-check:checked'));
+      var firstChecked = checked.map(function(input) { return input.closest('.purchase-row'); }).find(function(row) {
+        return row && row.dataset.purchaseStatus === 'completed' && row.dataset.grouped !== '1' && row.dataset.hasReturn !== '1';
+      });
+      var supplierIds = Array.from(supplier.options).map(function(option) { return option.value; }).filter(Boolean);
+      var preferredSuppliers = [pageSupplier && pageSupplier.value, firstChecked && firstChecked.dataset.supplierId, supplier.value].filter(Boolean);
+      supplier.value = preferredSuppliers.find(function(value) { return supplierIds.includes(value); }) || supplierIds[0] || '';
       Array.from(document.querySelectorAll('.purchase-select-check:checked')).forEach(function(input) {
         var row = input.closest('.purchase-row');
-        if (!row || row.dataset.grouped === '1' || row.dataset.hasReturn === '1' || !['draft', 'completed'].includes(row.dataset.purchaseStatus)) return;
+        if (!row || row.dataset.grouped === '1' || row.dataset.hasReturn === '1' || row.dataset.purchaseStatus !== status.value || row.dataset.supplierId !== supplier.value) return;
         choose({ _id: input.value, nha_cung_cap_id: row.dataset.supplierId, kho_id: row.dataset.warehouseId }, true);
       });
       overlay.style.display = 'flex';
@@ -131,8 +146,17 @@
     });
     el('purchaseMergeModalClose').addEventListener('click', close);
     el('purchaseMergeCancel').addEventListener('click', close);
-    el('purchaseMergeClear').addEventListener('click', function() { selected.clear(); invalidatePreview(); renderRows(); });
-    supplier.addEventListener('change', function() { selected.clear(); invalidatePreview(); page = 1; loadRows(); });
+    function resetFilter() {
+      clearTimeout(timer);
+      selected.clear();
+      rows = [];
+      invalidatePreview();
+      page = 1;
+      renderRows();
+      loadRows();
+    }
+    supplier.addEventListener('change', resetFilter);
+    status.addEventListener('change', resetFilter);
     search.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(function() { page = 1; loadRows(); }, 250); });
     el('purchaseMergePrev').addEventListener('click', function() { if (page > 1) { page -= 1; loadRows(); } });
     el('purchaseMergeNext').addEventListener('click', function() { if (page < totalPages) { page += 1; loadRows(); } });
@@ -148,7 +172,7 @@
       var requested = signature();
       errorAt(el('purchaseMergeAlert'), '');
       try {
-        var result = await json('/nhap-hang/tong-hop/preview', { phieu_nhap_ids: Array.from(selected.keys()), ghi_chu: el('purchaseMergeNote').value });
+        var result = await json('/nhap-hang/tong-hop/preview', { phieu_nhap_ids: Array.from(selected.keys()) });
         if (requested !== signature()) return;
         var totals = result.data.totals || {};
         el('purchaseMergePreview').textContent = 'Tổng giá trị: ' + money(totals.tong_tien) + ' · Đã nhập thực tế: ' + money(totals.tong_da_nhap) + ' · Dự kiến (phiếu tạm): ' + money(totals.tong_du_kien) + ' · Đã trả NCC: ' + money(totals.da_tra_ncc) + ' · Cần trả NCC: ' + money(totals.con_no_ncc);
@@ -163,7 +187,7 @@
       updateSelection();
       errorAt(el('purchaseMergeAlert'), '');
       try {
-        var result = await json('/nhap-hang/tong-hop', { phieu_nhap_ids: Array.from(selected.keys()), ghi_chu: el('purchaseMergeNote').value });
+        var result = await json('/nhap-hang/tong-hop', { phieu_nhap_ids: Array.from(selected.keys()) });
         var groupId = result.data && (result.data._id || result.data.phieu_tong_hop_id);
         if (!groupId) throw new Error('Không nhận được mã phiếu tổng hợp.');
         location.href = '/nhap-hang?group=' + encodeURIComponent(groupId);
@@ -233,6 +257,7 @@
     var sequence = 0;
     var form = el('purchaseGroupPayForm');
     var debt = 0;
+    var paymentSources = [];
     var payButton = el('purchaseGroupPaySubmit');
     function base() { return '/nhap-hang/tong-hop/' + encodeURIComponent(groupId); }
     async function books(type, select) {
@@ -242,13 +267,51 @@
       var defaults = rows.filter(function(row) { return row.mac_dinh; });
       if (defaults.length || rows.length === 1) select.value = id((defaults[0] || rows[0])._id);
     }
+    function readAllocations() {
+      return Array.from(el('groupPayAllocations').querySelectorAll('[data-group-pay-source]')).map(function(input) {
+        var source = paymentSources.find(function(row) { return id(row._id) === input.dataset.groupPaySource; });
+        return { phieu_nhap_id: id(source._id), so_tien: amount(input.value), con_no_truoc: source.payment_debt };
+      });
+    }
+    function sameMoney(left, right) {
+      return Math.abs(left - right) <= Number.EPSILON * 8 * Math.max(1, Math.abs(left), Math.abs(right));
+    }
+    function allocationError(allocations, total) {
+      if (!Number.isFinite(total) || total <= 0 || total > debt) return 'Số tiền phải lớn hơn 0 và không vượt công nợ đã phát sinh.';
+      if (allocations.some(function(row) { return !Number.isFinite(row.so_tien) || row.so_tien < 0 || row.so_tien > row.con_no_truoc; })) {
+        return 'Số tiền phân bổ phải từ 0 đến công nợ của từng phiếu nguồn.';
+      }
+      if (!sameMoney(allocations.reduce(function(sum, row) { return sum + row.so_tien; }, 0), total)) return 'Tổng phân bổ phải bằng tổng thanh toán.';
+      return '';
+    }
+    function renderAllocations(sources) {
+      paymentSources = (sources || []).filter(function(source) {
+        return source.trang_thai === 'completed' && source.trang_thai_du_lieu !== 'inactive' && !source.deleted_at;
+      }).map(function(source) {
+        var current = source.payment_current || {};
+        return Object.assign({}, source, { payment_debt: Math.max(0, Number(current.debt ?? source.con_no_ncc) || 0) });
+      });
+      el('groupPayAllocations').innerHTML = paymentSources.map(function(source) {
+        var current = source.payment_current || {};
+        return '<tr><td><a class="ref-link" href="/nhap-hang?purchase=' + encodeURIComponent(id(source._id)) + '">' + escape(source.ma_phieu_nhap) + '</a></td>'
+          + '<td class="num">' + money(current.payable ?? source.can_tra_ncc ?? source.tong_tien) + '</td>'
+          + '<td class="num">' + money(current.paid ?? source.da_tra_ncc) + '</td><td class="num">' + money(source.payment_debt) + '</td>'
+          + '<td><input inputmode="decimal" autocomplete="off" value="0" data-group-pay-source="' + escape(id(source._id)) + '" aria-label="Phân bổ ' + escape(source.ma_phieu_nhap) + '"' + (source.payment_debt <= 0 ? ' disabled' : '') + '></td></tr>';
+      }).join('') || '<tr><td colspan="5" class="empty-cell">Không có phiếu nguồn đã nhập hàng đủ điều kiện thanh toán.</td></tr>';
+    }
     function update() {
       var cash = amount(el('groupPayCash').value);
       var bank = amount(el('groupPayBank').value);
+      var allocations = readAllocations();
+      var allocated = allocations.reduce(function(sum, row) { return sum + row.so_tien; }, 0);
       el('groupPayTotal').textContent = money(cash + bank);
+      el('groupPayAllocated').textContent = money(allocated);
+      el('groupPayDifference').textContent = money(sameMoney(cash + bank, allocated) ? 0 : cash + bank - allocated);
       el('groupPayAfter').textContent = money(Math.max(0, debt - cash - bank));
       el('groupPayCashBook').disabled = cash <= 0;
       el('groupPayBankBook').disabled = bank <= 0;
+      payButton.disabled = busy || loading || cash < 0 || bank < 0 || Boolean(allocationError(allocations, cash + bank))
+        || (cash > 0 && !el('groupPayCashBook').value) || (bank > 0 && !el('groupPayBankBook').value);
     }
     function close() {
       if (busy) return;
@@ -263,6 +326,8 @@
       var request = ++sequence;
       loading = true;
       form.reset();
+      paymentSources = [];
+      el('groupPayAllocations').innerHTML = '';
       errorAt(el('groupPayError'), '');
       debt = 0;
       el('groupPayTitle').textContent = 'Trả NCC';
@@ -276,6 +341,7 @@
         if (request !== sequence) return;
         if (fresh.data.trang_thai !== 'active') throw new Error('Phiếu tổng hợp đã tách, vui lòng thao tác trên phiếu nguồn.');
         debt = Number(fresh.data.totals.con_no_ncc || 0);
+        renderAllocations(fresh.data.sources);
         el('groupPayTitle').textContent = 'Trả NCC - ' + (fresh.data.ma_phieu_tong_hop || '');
         var supplier = fresh.data.nha_cung_cap_id || {};
         el('groupPaySupplier').textContent = [supplier.ma_ncc, supplier.ten_ncc].filter(Boolean).join(' - ');
@@ -290,7 +356,17 @@
       }
     }
     ['groupPayCash', 'groupPayBank'].forEach(function(name) { el(name).addEventListener('input', update); });
-    el('groupPayAll').addEventListener('click', function() { el('groupPayCash').value = Number(debt).toLocaleString('vi-VN', { maximumFractionDigits: 20 }); el('groupPayBank').value = '0'; update(); });
+    ['groupPayCashBook', 'groupPayBankBook'].forEach(function(name) { el(name).addEventListener('change', update); });
+    el('groupPayAllocations').addEventListener('input', update);
+    el('groupPayAll').addEventListener('click', function() {
+      el('groupPayCash').value = Number(debt).toLocaleString('vi-VN', { maximumFractionDigits: 20 });
+      el('groupPayBank').value = '0';
+      Array.from(el('groupPayAllocations').querySelectorAll('[data-group-pay-source]')).forEach(function(input) {
+        var source = paymentSources.find(function(row) { return id(row._id) === input.dataset.groupPaySource; });
+        input.value = source.payment_debt.toLocaleString('vi-VN', { maximumFractionDigits: 20 });
+      });
+      update();
+    });
     el('purchaseGroupPayClose').addEventListener('click', close);
     el('purchaseGroupPayCancel').addEventListener('click', close);
     form.addEventListener('submit', async function(event) {
@@ -298,16 +374,19 @@
       if (busy || loading) return;
       var cash = amount(el('groupPayCash').value);
       var bank = amount(el('groupPayBank').value);
+      var allocations = readAllocations();
       errorAt(el('groupPayError'), '');
       if (!Number.isFinite(cash + bank) || cash < 0 || bank < 0 || cash + bank <= 0 || cash + bank > debt) return errorAt(el('groupPayError'), 'Số tiền phải lớn hơn 0 và không vượt công nợ đã phát sinh.');
+      var invalidAllocation = allocationError(allocations, cash + bank);
+      if (invalidAllocation) return errorAt(el('groupPayError'), invalidAllocation);
       if (cash > 0 && !el('groupPayCashBook').value) return errorAt(el('groupPayError'), 'Vui lòng chọn sổ tiền mặt.');
       if (bank > 0 && !el('groupPayBankBook').value) return errorAt(el('groupPayError'), 'Vui lòng chọn tài khoản chuyển khoản.');
       busy = true;
       payButton.disabled = true;
       try {
-        await json(base() + '/pay', { payment_v2: true, ghi_chu: el('groupPayNote').value, chi_tiet_thanh_toan: { tien_mat: cash, chuyen_khoan: bank, so_quy_tien_mat_id: el('groupPayCashBook').value, so_quy_chuyen_khoan_id: el('groupPayBankBook').value, tien_tra_khach: 0 } });
+        await json(base() + '/pay', { payment_v2: true, allocations: allocations, ghi_chu: el('groupPayNote').value, chi_tiet_thanh_toan: { tien_mat: cash, chuyen_khoan: bank, so_quy_tien_mat_id: el('groupPayCashBook').value, so_quy_chuyen_khoan_id: el('groupPayBankBook').value, tien_tra_khach: 0 } });
         location.href = '/nhap-hang?group=' + encodeURIComponent(groupId);
-      } catch (error) { errorAt(el('groupPayError'), error.message); busy = false; payButton.disabled = false; }
+      } catch (error) { errorAt(el('groupPayError'), error.message); busy = false; update(); }
     });
     document.addEventListener('click', async function(event) {
       var pay = event.target.closest('[data-purchase-group-pay]');

@@ -174,9 +174,13 @@ function getSupplierDebtAmountInfo(row, amount, runningDebt) {
         paid = Number(doc.da_tra_ncc || 0);
         remaining = Number(doc.con_no_ncc || Math.max(0, value - paid));
     } else if (docInfo.type === 'tra_hang_nhap') {
-        value = Number(doc.ncc_can_tra || doc.tong_tien_tra || amount || 0);
+        value = Number(doc.gia_tri_can_tru_cong_no != null
+            ? (doc.ncc_can_tra ?? doc.tong_tien_tra ?? amount ?? 0)
+            : (doc.ncc_can_tra || doc.tong_tien_tra || amount || 0));
         paid = Number(doc.ncc_da_tra || 0);
-        remaining = Math.max(0, value - paid);
+        remaining = doc.gia_tri_can_tru_cong_no != null
+            ? Math.max(0, Number(doc.ncc_con_phai_tra ?? (value - paid)))
+            : Math.max(0, value - paid);
     } else if (docInfo.type === 'nhap_vat_chua') {
         value = Number(doc.tong_tien || amount || 0);
         paid = Number(doc.da_tra || 0);
@@ -207,7 +211,7 @@ function getLegacySupplierDebtDelta(row, amount) {
         value = Number(row.phieu_nhap_id.can_tra_ncc || row.phieu_nhap_id.tong_tien || row.phieu_nhap_id.con_no_ncc || amount || 0);
     }
     if (row && row.loai === 'giam_no' && row.phieu_tra_nhap_id && typeof row.phieu_tra_nhap_id === 'object') {
-        value = Number(row.phieu_tra_nhap_id.ncc_da_tra || 0);
+        value = Number(row.phieu_tra_nhap_id.gia_tri_can_tru_cong_no ?? row.phieu_tra_nhap_id.ncc_da_tra ?? 0);
     }
     if (receiptType === 'thu') return value;
     if (row && row.loai === 'tang_no') return value;

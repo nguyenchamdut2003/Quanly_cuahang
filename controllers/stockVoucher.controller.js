@@ -202,8 +202,10 @@ async function loadSalesReturn(id) {
   };
 }
 
-async function loadPurchaseReturn(id) {
-  var ticket = await PhieuTraHangNhap.findOne({ _id: id })
+async function loadPurchaseReturn(id, storeId) {
+  if (!isObjectId(storeId)) return null;
+  var ticket = await PhieuTraHangNhap.findOne({ _id: id, cua_hang_id: storeId,
+    trang_thai_du_lieu: { $ne: 'inactive' }, deleted_at: null })
     .populate('cua_hang_id')
     .populate('kho_id')
     .populate('nha_cung_cap_id')
@@ -428,7 +430,14 @@ async function buildVoucherData(req) {
   var type = String(req.params.type || '').trim();
   var id = String(req.params.id || '').trim();
   if (!LOADERS[type] || !isObjectId(id)) return null;
-  var voucher = await LOADERS[type](id);
+  var returnStoreId;
+  if (type === 'tra-hang-nhap') {
+    var userStore = req.user && req.user.cua_hang_id;
+    var sessionStore = req.session && req.session.cua_hang_id;
+    returnStoreId = String(userStore && (userStore._id || userStore) || sessionStore || '');
+    if (!isObjectId(returnStoreId)) throw Object.assign(new Error('Chưa có cửa hàng trong phiên đăng nhập.'), { statusCode: 403 });
+  }
+  var voucher = await LOADERS[type](id, returnStoreId);
   if (!voucher) return null;
   var store = asPlain(voucher.store);
   if (!store && voucher.store) store = await CuaHang.findById(voucher.store).lean();

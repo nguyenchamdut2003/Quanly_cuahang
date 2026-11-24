@@ -20,7 +20,15 @@ function normalizePaymentData(data) {
     try { body.chi_tiet_thanh_toan = JSON.parse(body.chi_tiet_thanh_toan); }
     catch (_) { throw fail('Chi tiết thanh toán không hợp lệ.'); }
   }
+  if (typeof body.allocations === 'string') {
+    try { body.allocations = JSON.parse(body.allocations); }
+    catch (_) { throw fail('Phân bổ thanh toán không hợp lệ.'); }
+  }
   return body;
+}
+
+function sameMoney(left, right) {
+  return Math.abs(left - right) <= Number.EPSILON * 8 * Math.max(1, Math.abs(left), Math.abs(right));
 }
 
 // Both individual PN and group C payments use this source-only accounting path.
@@ -73,6 +81,9 @@ async function payPurchaseSources({ sourceIds, storeId, userId, data = {}, group
       if (amount > totalDebt) throw fail('Số tiền thanh toán không được vượt công nợ các phiếu đã nhập.');
 
       const allocations = [];
+      if (group && body.allocations === undefined) {
+        throw fail('Vui lòng xác nhận số tiền phân bổ cho từng phiếu nguồn trước khi thanh toán.');
+      }
       if (body.allocations !== undefined) {
         if (!Array.isArray(body.allocations) || !body.allocations.length) throw fail('Phân bổ thanh toán không hợp lệ.');
         const seen = new Set();
@@ -80,14 +91,24 @@ async function payPurchaseSources({ sourceIds, storeId, userId, data = {}, group
           const sourceId = cleanId(allocation.phieu_nhap_id);
           const source = completed.find(row => String(row._id) === sourceId);
           const value = Number(allocation.so_tien);
-          if (!source || seen.has(sourceId) || !Number.isFinite(value) || value <= 0 || value > debtOf(source)) {
+          if (!source || seen.has(sourceId) || !Number.isFinite(value) || value < 0 || value > debtOf(source)) {
             throw fail('Phân bổ phải thuộc phiếu nguồn đã nhập, không trùng và không vượt công nợ.');
           }
           seen.add(sourceId);
+          if (value === 0) continue;
+          // The displayed balance is part of the user's confirmation. Once the
+          // store lock is acquired, a stale or concurrent repeat cannot pay twice.
+          if (group && (allocation.con_no_truoc === undefined || allocation.con_no_truoc === null
+            || !Number.isFinite(Number(allocation.con_no_truoc))
+            || !sameMoney(Number(allocation.con_no_truoc), debtOf(source)))) {
+            throw fail('Công nợ phiếu ' + source.ma_phieu_nhap + ' đã thay đổi hoặc chưa được xác nhận. Vui lòng mở lại thanh toán để phân bổ.', 409);
+          }
           allocations.push({ phieu_nhap_id: source._id, ma_phieu_nhap: source.ma_phieu_nhap || '', so_tien: value,
             con_no_truoc: debtOf(source), con_no_sau: debtOf(source) - value });
         }
-        if (allocations.reduce((sum, row) => sum + row.so_tien, 0) !== amount) throw fail('Tổng phân bổ phải bằng số tiền thanh toán.');
+        if (!allocations.length || !sameMoney(allocations.reduce((sum, row) => sum + row.so_tien, 0), amount)) {
+          throw fail('Tổng phân bổ phải bằng số tiền thanh toán.');
+        }
       } else {
         let remaining = amount;
         for (const source of completed) {
@@ -122,9 +143,11 @@ async function payPurchaseSources({ sourceIds, storeId, userId, data = {}, group
         const source = completed.find(row => String(row._id) === String(allocation.phieu_nhap_id));
         const paid = Number(source.payment_current ? source.payment_current.paid : source.da_tra_ncc) || 0;
         const payable = Number(source.payment_current ? source.payment_current.payable : source.can_tra_ncc) || 0;
+        const explicitReturnReduction = Math.max(0, Number(source.payment_current && source.payment_current.explicit_return_debt_reduction) || 0);
         await PhieuNhap.updateOne({ _id: source._id, cua_hang_id: store }, {
-          // Return debt reductions are applied separately by existing supplier reports.
-          $set: { da_tra_ncc: paid + allocation.so_tien, con_no_ncc: Math.max(0, payable - paid - allocation.so_tien) }
+          // New THG offsets belong in the stored PN balance. Legacy return
+          // reductions remain outside this header for existing report formulas.
+          $set: { da_tra_ncc: paid + allocation.so_tien, con_no_ncc: Math.max(0, payable - paid - allocation.so_tien - explicitReturnReduction) }
         }, { session });
       }
       result = { receipt, receipt_id: receipt._id, phieu_nhap_tong_hop_id: group ? group._id : undefined,

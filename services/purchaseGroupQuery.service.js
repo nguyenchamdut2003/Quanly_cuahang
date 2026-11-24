@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
-const { PhieuNhap, CTPhieuNhap, PhieuNhapTongHop, PhieuTraHangNhap, PhieuThuChi } = require('../models/kiot.model');
+const { PhieuNhap, CTPhieuNhap, PhieuNhapTongHop, PhieuTraHangNhap, PhieuTraHangTongHop, PhieuThuChi } = require('../models/kiot.model');
+const { buildReturnManagementList } = require('./purchaseReturnGroupList.service');
 
 function refId(value) { return String(value && value._id || value || '').trim(); }
 function money(value) { const amount = Number(value); return Number.isFinite(amount) ? Math.max(0, amount) : 0; }
@@ -100,14 +101,16 @@ async function loadSourceContext(sourceIds, storeId, { session } = {}) {
     const payable = sourceValid ? money(source.can_tra_ncc != null ? source.can_tra_ncc : source.tong_tien) : 0;
     const paid = completed ? (fallback ? money(source.da_tra_ncc) : legacyBaseline + related.reduce((sum, receipt) => sum + receiptAmountForSource(receipt, source), 0)) : 0;
     const effectiveReturns = returns.filter(row => refId(row.phieu_nhap_id) === refId(source._id) && activeData(row) && row.trang_thai === 'completed');
-    // Preserve the existing return ledger convention: only ncc_da_tra reduces supplier debt.
-    const reduction = completed ? effectiveReturns.reduce((sum, row) => sum + (row.tinh_vao_cong_no === false ? 0 : money(row.ncc_da_tra)), 0) : 0;
-    const returnedAmount = effectiveReturns.reduce((sum, row) => sum + money(row.ncc_can_tra != null ? row.ncc_can_tra : row.tong_tien_tra), 0);
+    // Explicit THG offsets reduce debt; actual refunds are separate cash flows.
+    // THN without this field retains its legacy accounting convention.
+    const reduction = completed ? effectiveReturns.reduce((sum, row) => sum + (row.tinh_vao_cong_no === false ? 0 : money(row.gia_tri_can_tru_cong_no ?? row.ncc_da_tra)), 0) : 0;
+    const explicitReduction = completed ? effectiveReturns.reduce((sum, row) => sum + (row.tinh_vao_cong_no === false || row.gia_tri_can_tru_cong_no == null ? 0 : money(row.gia_tri_can_tru_cong_no)), 0) : 0;
+    const returnedAmount = effectiveReturns.reduce((sum, row) => sum + money(row.tong_tien_tra ?? row.ncc_can_tra), 0);
     const debt = completed ? Math.max(0, payable - paid - reduction) : 0;
     return Object.assign({}, source, {
       stored_da_tra_ncc: money(source.da_tra_ncc), stored_con_no_ncc: money(source.con_no_ncc),
       da_tra_ncc: paid, con_no_ncc: debt,
-      payment_current: { payable, paid, debt, return_debt_reduction: reduction, returned_amount: returnedAmount, legacy_paid_fallback: fallback, legacy_paid_baseline: legacyBaseline }
+      payment_current: { payable, paid, debt, return_debt_reduction: reduction, explicit_return_debt_reduction: explicitReduction, returned_amount: returnedAmount, legacy_paid_fallback: fallback, legacy_paid_baseline: legacyBaseline }
     });
   });
   return { sources: enriched, payments, returns };
@@ -178,6 +181,10 @@ async function buildDetails(groups, storeId, { session } = {}) {
   const context = await loadSourceDetailContext(sourceIds, storeId, { session });
   const lines = context.lines;
   const bySource = new Map(context.sources.map(source => [refId(source._id), source]));
+  const returnGroupIds = [...new Set(context.returns.map(row => refId(row.phieu_tra_tong_hop_id)).filter(isValidId))];
+  const returnGroups = returnGroupIds.length ? await scoped(PhieuTraHangTongHop.find({
+    _id: { $in: returnGroupIds }, cua_hang_id: refId(storeId)
+  }).populate('nguoi_tao_id', 'ho_ten email'), session).lean() : [];
   return groups.map(group => {
     const ids = (group.phieu_nguon_ids || []).map(refId);
     const sourceSet = new Set(ids);
@@ -190,6 +197,12 @@ async function buildDetails(groups, storeId, { session } = {}) {
       group_allocated_amount: sources.reduce((sum, source) => sum + receiptAmountForSource(receipt, source), 0),
       group_amount: sources.reduce((sum, source) => sum + receiptAmountForSource(receipt, source), 0)
     }));
+    const sourceReturns = context.returns.filter(row => sourceSet.has(refId(row.phieu_nhap_id))).map(row => Object.assign({}, row, {
+      phieu_nhap_id: bySource.get(refId(row.phieu_nhap_id)) || row.phieu_nhap_id
+    }));
+    const historicalReturnGroups = returnGroups.filter(row => refId(row.phieu_nhap_tong_hop_id) === refId(group._id));
+    const historicalIds = new Set(historicalReturnGroups.map(row => refId(row._id)));
+    const returnHistory = buildReturnManagementList(sourceReturns.filter(row => !row.phieu_tra_tong_hop_id || historicalIds.has(refId(row.phieu_tra_tong_hop_id))), historicalReturnGroups).items;
     return Object.assign({}, group, {
       nha_cung_cap_id: group.nha_cung_cap_id || sources[0] && sources[0].nha_cung_cap_id,
       kho_id: group.kho_id || sources[0] && sources[0].kho_id,
@@ -197,6 +210,7 @@ async function buildDetails(groups, storeId, { session } = {}) {
       lines: groupLines,
       payments,
       returns: context.returns.filter(row => sourceSet.has(refId(row.phieu_nhap_id))),
+      return_history: returnHistory,
       totals: summarizeSources(sources),
       source_count: ids.length,
       missing_source_count: ids.length - sources.length,
@@ -226,8 +240,11 @@ async function previewSourceDetails(sources, storeId, options = {}) {
   return (await buildDetails([{ _id: null, ma_phieu_tong_hop: '', cua_hang_id: storeId, phieu_nguon_ids: sources.map(row => row._id), trang_thai: 'active' }], storeId, options))[0];
 }
 
-async function listEligiblePurchases({ storeId, keyword = '', page = 1, limit = 20, supplierId, warehouseId } = {}) {
+async function listEligiblePurchases({ storeId, keyword = '', page = 1, limit = 20, supplierId, warehouseId, status } = {}) {
   if (!isValidId(storeId)) throw Object.assign(new Error('Chưa chọn cửa hàng làm việc hợp lệ.'), { statusCode: 400 });
+  if (status != null && status !== '' && !['completed', 'draft'].includes(status)) {
+    throw Object.assign(new Error('Trạng thái phiếu nhập lọc không hợp lệ.'), { statusCode: 400 });
+  }
   if ((supplierId && !isValidId(supplierId)) || (warehouseId && !isValidId(warehouseId))) {
     throw Object.assign(new Error('Nhà cung cấp hoặc kho lọc không hợp lệ.'), { statusCode: 400 });
   }
@@ -240,7 +257,7 @@ async function listEligiblePurchases({ storeId, keyword = '', page = 1, limit = 
     .setOptions({ strictQuery: false }).select('phieu_nhap_id').lean();
   const excluded = groupedIds.concat(returns.map(row => row.phieu_nhap_id).filter(Boolean));
   const filter = {
-    cua_hang_id: store, trang_thai: { $in: ['draft', 'completed'] }, trang_thai_du_lieu: { $ne: 'inactive' }, deleted_at: null,
+    cua_hang_id: store, trang_thai: status || { $in: ['draft', 'completed'] }, trang_thai_du_lieu: { $ne: 'inactive' }, deleted_at: null,
     is_merged_purchase: { $ne: true }, merged_to_phieu_nhap_id: null, merged_to_ma_phieu_nhap: { $in: [null, ''] },
     'merged_from_phieu_nhap_ids.0': { $exists: false }, 'merged_from_ma_phieu_nhaps.0': { $exists: false },
     merged_at: null, merged_by: null, merge_note: { $in: [null, ''] },

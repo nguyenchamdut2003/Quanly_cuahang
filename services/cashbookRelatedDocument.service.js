@@ -5,6 +5,7 @@ const {
   HoaDonBanHang,
   PhieuNhap,
   PhieuTraHangNhap,
+  PhieuTraHangTongHop,
   PhieuTraHang,
   VanDon
 } = require('../models/kiot.model');
@@ -12,6 +13,7 @@ const {
   computeNetPaidFromReceiptRows,
   receiptRowsForNetPaidFilter
 } = require('../utils/customerPayment');
+const { buildReturnManagementList } = require('./purchaseReturnGroupList.service');
 
 const CANCELLED_EXCLUDE = { $nin: ['cancelled', 'Cancelled', 'CANCELLED'] };
 
@@ -165,35 +167,61 @@ async function listVanDonThu(storeId, customerId, carrierId) {
   }));
 }
 
+function purchaseReturnRemaining(row) {
+  return Math.max(0, Number(row.ncc_can_tra || 0) - Number(row.ncc_da_tra || 0));
+}
+
 async function listPhieuTraHangNhapThu(storeId, supplierId) {
   const filter = {
     cua_hang_id: storeId,
     nha_cung_cap_id: supplierId,
-    trang_thai: CANCELLED_EXCLUDE,
+    trang_thai: 'completed',
+    trang_thai_du_lieu: { $ne: 'inactive' },
     deleted_at: null
   };
-  const rows = await PhieuTraHangNhap.find(filter)
-    .select('ma_phieu_tra_nhap nha_cung_cap_id ncc_can_tra ncc_da_tra')
+  const sources = await PhieuTraHangNhap.find(filter)
+    .select('ma_phieu_tra_nhap phieu_tra_tong_hop_id nha_cung_cap_id ncc_can_tra ncc_da_tra ngay_tra created_at trang_thai trang_thai_du_lieu')
     .populate('nha_cung_cap_id', 'ten_ncc')
-    .sort({ created_at: -1 })
-    .limit(200)
+    .sort({ ngay_tra: -1, _id: 1 })
     .lean();
+  const groupIds = [...new Set(sources.map(row => String(row.phieu_tra_tong_hop_id || '')).filter(Boolean))];
+  const groups = groupIds.length ? await PhieuTraHangTongHop.find({
+    _id: { $in: groupIds },
+    cua_hang_id: storeId,
+    nha_cung_cap_id: supplierId,
+    trang_thai: 'active'
+  }).populate('nha_cung_cap_id', 'ten_ncc').lean() : [];
+  const { items } = buildReturnManagementList(sources.map(row => ({
+    ...row,
+    ncc_con_phai_tra: purchaseReturnRemaining(row)
+  })), groups);
 
-  return rows
+  return items
+    .filter(row => row.record_type === 'group' || !row.phieu_tra_tong_hop_id)
     .map(row => {
-      const remaining = Math.max(0, Number(row.ncc_can_tra || 0) - Number(row.ncc_da_tra || 0));
+      const remaining = Number(row.ncc_con_phai_tra || 0);
       if (remaining <= 0) return null;
-      return mapRow({
-        _id: row._id,
-        code: row.ma_phieu_tra_nhap,
-        total: Number(row.ncc_can_tra || 0),
-        remaining,
-        nhom: 'nha_cung_cap',
-        entity_id: row.nha_cung_cap_id?._id || row.nha_cung_cap_id,
-        partner: row.nha_cung_cap_id?.ten_ncc || ''
-      });
+      return {
+        ...mapRow({
+          _id: row._id,
+          code: row.ma_phieu_tra_nhap,
+          total: Number(row.ncc_can_tra || 0),
+          remaining,
+          nhom: 'nha_cung_cap',
+          entity_id: row.nha_cung_cap_id?._id || row.nha_cung_cap_id,
+          partner: row.nha_cung_cap_id?.ten_ncc || ''
+        }),
+        record_type: row.record_type,
+        ...(row.record_type === 'group' ? {
+          return_sources: (row.children || []).map(child => ({
+            phieu_tra_hang_nhap_id: String(child._id),
+            con_phai_tra_truoc: purchaseReturnRemaining(child)
+          })).filter(child => child.con_phai_tra_truoc > 0)
+        } : {})
+      };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, 200);
 }
 
 async function listPhieuNhapChi(storeId, supplierId) {
@@ -447,9 +475,12 @@ const DOC_REF_FIELD = {
   van_don: 'van_don_id',
 };
 
-async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, document_id }) {
+async function getDocumentRemaining({
+  cua_hang_id, loai_phieu, document_type, document_id,
+  record_type, phieu_tra_tong_hop_id, nha_cung_cap_id
+}) {
   const storeId = toObjectId(cua_hang_id);
-  const docId = toObjectId(document_id);
+  const docId = toObjectId(phieu_tra_tong_hop_id || document_id);
   const docType = String(document_type || '').trim();
   if (!storeId || !docId || !DOC_REF_FIELD[docType]) {
     return { remaining: 0, found: false };
@@ -477,9 +508,33 @@ async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, do
       return { remaining: Math.max(0, payable - Number(paid || 0)), found: true, code: invoice.ma_hoa_don };
     }
     if (docType === 'phieu_tra_hang_nhap') {
-      const row = await PhieuTraHangNhap.findOne({ _id: docId, cua_hang_id: storeId, deleted_at: null }).lean();
-      if (!row || row.trang_thai === 'cancelled') return { remaining: 0, found: false };
-      const remaining = Math.max(0, Number(row.ncc_can_tra || 0) - Number(row.ncc_da_tra || 0));
+      const scope = {
+        cua_hang_id: storeId,
+        ...(nha_cung_cap_id ? { nha_cung_cap_id: toObjectId(nha_cung_cap_id) } : {})
+      };
+      if (record_type === 'group' || phieu_tra_tong_hop_id) {
+        const group = await PhieuTraHangTongHop.findOne({ _id: docId, ...scope, trang_thai: 'active' }).lean();
+        if (!group) return { remaining: 0, found: false };
+        const children = await PhieuTraHangNhap.find({
+          cua_hang_id: storeId,
+          nha_cung_cap_id: group.nha_cung_cap_id,
+          phieu_tra_tong_hop_id: group._id,
+          trang_thai: 'completed',
+          trang_thai_du_lieu: { $ne: 'inactive' },
+          deleted_at: null
+        }).select('ncc_can_tra ncc_da_tra').lean();
+        const remaining = children.reduce((sum, row) => sum + purchaseReturnRemaining(row), 0);
+        return { remaining, found: remaining > 0, code: group.ma_phieu_tra_tong_hop };
+      }
+      const row = await PhieuTraHangNhap.findOne({
+        _id: docId, ...scope,
+        phieu_tra_tong_hop_id: null,
+        trang_thai: 'completed',
+        trang_thai_du_lieu: { $ne: 'inactive' },
+        deleted_at: null
+      }).lean();
+      if (!row) return { remaining: 0, found: false };
+      const remaining = purchaseReturnRemaining(row);
       return { remaining, found: remaining > 0, code: row.ma_phieu_tra_nhap };
     }
     if (docType === 'van_don') {
@@ -544,9 +599,19 @@ async function getDocumentRemaining({ cua_hang_id, loai_phieu, document_type, do
 
 async function validateReceiptDocumentAmount(data) {
   const docType = String(data.document_type || '').trim();
+  const hasReturnRef = Boolean(data.phieu_tra_tong_hop_id || data.phieu_tra_hang_nhap_id);
+  if (hasReturnRef && docType !== 'phieu_tra_hang_nhap') {
+    throw new Error('Chứng từ trả hàng nhập phải được nhận tiền qua nghiệp vụ hoàn tiền');
+  }
   if (!docType || docType === 'khac') return;
 
-  const field = DOC_REF_FIELD[docType];
+  const isReturnGroup = docType === 'phieu_tra_hang_nhap' && Boolean(data.phieu_tra_tong_hop_id);
+  if (docType === 'phieu_tra_hang_nhap' && (data.loai_phieu !== 'thu'
+    || data.nhom_doi_tuong !== 'nha_cung_cap' || !isObjectId(data.doi_tuong_entity_id)
+    || (isReturnGroup && data.phieu_tra_hang_nhap_id))) {
+    throw new Error('Chứng từ liên quan không hợp lệ');
+  }
+  const field = isReturnGroup ? 'phieu_tra_tong_hop_id' : DOC_REF_FIELD[docType];
   if (!field) return;
 
   const docId = data[field];
@@ -558,7 +623,9 @@ async function validateReceiptDocumentAmount(data) {
     cua_hang_id: data.cua_hang_id,
     loai_phieu: data.loai_phieu,
     document_type: docType,
-    document_id: docId
+    document_id: docId,
+    record_type: isReturnGroup ? 'group' : 'source',
+    nha_cung_cap_id: data.nhom_doi_tuong === 'nha_cung_cap' ? data.doi_tuong_entity_id : undefined
   });
 
   if (!remainingInfo.found || remainingInfo.remaining <= 0) {

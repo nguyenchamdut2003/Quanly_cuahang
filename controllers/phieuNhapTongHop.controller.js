@@ -61,7 +61,8 @@ exports.eligible = async function(req, res) {
       page: req.query.page,
       limit: req.query.limit,
       supplierId: req.query.nha_cung_cap_id,
-      warehouseId: req.query.kho_id
+      warehouseId: req.query.kho_id,
+      status: req.query.trang_thai
     });
     return res.json(Object.assign({ success: true }, result));
   } catch (error) { return fail(res, error); }
@@ -86,9 +87,7 @@ exports.detail = async function(req, res, next) {
     const group = await getPurchaseGroupDetail(groupId(req), await storeScope(req));
     if (!group) throw httpError(404, 'Không tìm thấy phiếu tổng hợp.');
     if (String(req.get('accept') || '').includes('application/json')) return res.json({ success: true, data: group });
-    return res.redirect(group.trang_thai === 'active'
-      ? '/nhap-hang?group=' + encodeURIComponent(String(group._id))
-      : '/nhap-hang?view_mode=sources');
+    return res.redirect('/nhap-hang?group=' + encodeURIComponent(String(group._id)));
   } catch (error) {
     if (String(req.get('accept') || '').includes('application/json')) return fail(res, error);
     error.status = error.status || error.statusCode || 400;
@@ -115,11 +114,10 @@ exports.returnToSource = async function(req, res, next) {
     const group = await getPurchaseGroupDetail(groupId(req), await storeScope(req));
     if (!group) throw httpError(404, 'Không tìm thấy phiếu tổng hợp.');
     if (group.trang_thai !== 'active') throw httpError(400, 'Phiếu tổng hợp đã tách, vui lòng thao tác trên phiếu nguồn.');
-    const sourceId = String(req.query.source_id || '');
-    const source = (group.sources || []).find(row => String(row._id) === sourceId);
-    if (!source || source.trang_thai !== 'completed' || source.trang_thai_du_lieu === 'inactive' || source.deleted_at) {
-      throw httpError(400, 'Vui lòng chọn phiếu nguồn đã nhập hàng còn hiệu lực thuộc nhóm này.');
-    }
-    return res.redirect('/tra-hang-nhap/create?phieu_nhap_id=' + encodeURIComponent(sourceId));
+    return res.redirect('/tra-hang-nhap/create?phieu_nhap_tong_hop_id=' + encodeURIComponent(String(group._id)));
   } catch (error) { return fail(res, error); }
+};
+
+exports.createReturn = function(req, res, next) {
+  return require('./traHangNhap.controller').createGroupSubmit(req, res, next);
 };

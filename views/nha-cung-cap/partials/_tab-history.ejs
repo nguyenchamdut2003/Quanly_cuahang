@@ -1,7 +1,7 @@
 <%
   var historyRows = supplierPurchaseHistory || [];
   var historyTotal = typeof supplierPurchaseHistoryTotal === 'number' ? supplierPurchaseHistoryTotal : historyRows.reduce(function(sum, row) {
-    return sum + (row.loai === 'tra' ? -1 : 1) * Number(row.tong_cong || 0);
+    return sum + (row.loai === 'tra' || row.loai === 'tra_tong_hop' ? -1 : 1) * Number(row.tong_cong || 0);
   }, 0);
   var historyFilters = typeof supplierPurchaseHistoryFilters !== 'undefined' ? supplierPurchaseHistoryFilters : {};
   var historyPagination = typeof supplierPurchaseHistoryPagination !== 'undefined' ? supplierPurchaseHistoryPagination : null;
@@ -16,12 +16,12 @@
   historyRows.forEach(function(row) {
     historyDisplayRows.push({ row: row, isChild: false });
     (row.children || []).forEach(function(child, index) {
-      historyDisplayRows.push({ row: child, isChild: true, groupKey: String(row.phieu_tong_hop_id), sourceNumber: index + 1 });
+      historyDisplayRows.push({ row: child, isChild: true, groupKey: row.loai === 'tra_tong_hop' ? 'return-' + String(row.phieu_tra_tong_hop_id) : String(row.phieu_tong_hop_id), sourceNumber: index + 1 });
     });
   });
 %>
 <form class="supplier-history-filter supplier-debt-actions" data-supplier-history-filter method="get" action="<%= historyPath %>">
-  <input class="form-control" type="search" name="history_q" value="<%= historyFilters.q || '' %>" placeholder="Tìm mã GPN, PN hoặc phiếu trả" aria-label="Tìm mã phiếu nhập/trả">
+  <input class="form-control" type="search" name="history_q" value="<%= historyFilters.q || '' %>" placeholder="Tìm mã GPN, PN, THG hoặc THN" aria-label="Tìm mã phiếu nhập/trả">
   <select class="form-control" name="history_status" aria-label="Lọc trạng thái phiếu nhập/trả">
     <option value="">Tất cả trạng thái</option>
     <option value="completed" <%= historyFilters.status === 'completed' ? 'selected' : '' %>>Đã hoàn thành</option>
@@ -57,14 +57,17 @@
       <% } %>
       <% historyDisplayRows.forEach(function(entry) {
         var row = entry.row;
-        var isGroup = row.loai === 'tong_hop';
-        var isReturn = row.loai === 'tra';
+        var isReturnGroup = row.loai === 'tra_tong_hop';
+        var isGroup = row.loai === 'tong_hop' || isReturnGroup;
+        var groupKey = isReturnGroup ? 'return-' + String(row.phieu_tra_tong_hop_id) : String(row.phieu_tong_hop_id || '');
+        var isReturn = row.loai === 'tra' || isReturnGroup;
         var isPurchase = row.loai === 'nhap' && row.phieu_nhap_id;
         var historyHref = '#';
-        if (isGroup) historyHref = row.phieu_tong_hop_href;
+        if (isReturnGroup) historyHref = row.phieu_tra_tong_hop_href;
+        else if (isGroup) historyHref = row.phieu_tong_hop_href;
         else if (row.loai === 'nhap' && row.phieu_nhap_id) historyHref = refUrl('purchase', row.phieu_nhap_id);
         else if (isReturn && row.phieu_tra_hang_nhap_id) historyHref = '/tra-hang-nhap?q=' + encodeURIComponent(String(row.ma_phieu || '')) + '&openReturn=' + encodeURIComponent(String(row.phieu_tra_hang_nhap_id));
-        var historyTypeLabel = isGroup ? 'Phiếu tổng hợp' : (typeof mapSupplierPurchaseHistoryType === 'function' ? mapSupplierPurchaseHistoryType(row.loai) : (isReturn ? 'Trả hàng hóa' : 'Nhập hàng hóa'));
+        var historyTypeLabel = isReturnGroup ? 'Trả hàng tổng hợp' : (isGroup ? 'Phiếu tổng hợp' : (typeof mapSupplierPurchaseHistoryType === 'function' ? mapSupplierPurchaseHistoryType(row.loai) : (isReturn ? 'Trả hàng hóa' : 'Nhập hàng hóa')));
         var statusClass = 'status-pill';
         var statusText = row.trang_thai === 'draft' ? 'Phiếu tạm' : (row.trang_thai === 'cancelled' ? 'Đã hủy' : historyTypeLabel);
         if (row.trang_thai === 'completed' || row.trang_thai === 'active') statusClass += ' is-active';
@@ -75,7 +78,7 @@
           <td class="text-center">
             <span class="supplier-history-code">
               <% if (isGroup) { %>
-                <button type="button" class="lot-expand-btn" data-lot-expand="<%= row.phieu_tong_hop_id %>" aria-expanded="false" aria-label="Xem phiếu nguồn của <%= row.ma_phieu %>" title="Chi tiết phiếu tổng hợp">+</button>
+                <button type="button" class="lot-expand-btn" data-lot-expand="<%= groupKey %>" aria-expanded="false" aria-label="Xem phiếu nguồn của <%= row.ma_phieu %>" title="Chi tiết phiếu tổng hợp">+</button>
               <% } else if (entry.isChild) { %>
                 <span class="supplier-history-source-number" title="Phiếu nguồn số <%= entry.sourceNumber %>"><%= entry.sourceNumber %></span>
               <% } %>

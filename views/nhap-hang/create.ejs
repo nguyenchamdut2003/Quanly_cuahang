@@ -1684,25 +1684,15 @@
         const response = await fetch(form.action, {
           method: 'POST',
           body: buildUrlEncodedBody(form),
-          redirect: 'follow',
           headers: {
-            'Accept': 'text/html,application/xhtml+xml',
+            'Accept': 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
           }
         });
-        const finalUrl = response.url || '';
-        if (finalUrl.includes('/nhap-hang/create') && finalUrl.includes('error=')) {
-          const url = new URL(finalUrl, window.location.origin);
-          routeFormError(url.searchParams.get('error') || 'Không tạo được phiếu nhập.');
-          return;
-        }
-        if (finalUrl && finalUrl !== window.location.href) {
-          didNavigate = true;
-          window.location.href = finalUrl;
-          return;
-        }
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.message || 'Không tạo được phiếu nhập.');
         didNavigate = true;
-        window.location.href = '/nhap-hang?success=created';
+        window.location.href = '/nhap-hang';
       } catch (error) {
         routeFormError(error.message || 'Không tạo được phiếu nhập.');
       } finally {

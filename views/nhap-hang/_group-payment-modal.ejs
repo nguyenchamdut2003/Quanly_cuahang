@@ -1,25 +1,33 @@
 <div id="purchaseGroupPayOverlay" class="po-modal" role="dialog" aria-modal="true" aria-labelledby="groupPayTitle">
-  <div class="po-modal-card" style="width:min(640px,calc(100vw - 32px))">
+  <div class="po-modal-card" style="width:min(920px,calc(100vw - 32px))">
     <div class="po-modal-head">
       <h3 id="groupPayTitle">Trả NCC</h3>
       <button class="po-modal-close" type="button" id="purchaseGroupPayClose" aria-label="Đóng">×</button>
     </div>
     <form id="purchaseGroupPayForm">
       <div class="quick-pay-grid">
-        <div class="full"><strong id="groupPaySupplier"></strong><div class="pay-total-summary">Phân bổ về các phiếu nguồn đã nhập theo ngày nhập.</div></div>
+        <div class="full"><strong id="groupPaySupplier"></strong><div class="pay-total-summary">Nhập và xác nhận số tiền phân bổ cho từng phiếu nguồn đã nhập hàng. Có thể để 0.</div></div>
         <div class="full pay-info-line"><span>Cần trả NCC</span><b id="groupPayCurrent">0 VNĐ</b></div>
         <label>Tiền mặt<input id="groupPayCash" inputmode="decimal" value="0" autocomplete="off"></label>
         <label>Sổ tiền mặt<select id="groupPayCashBook"><option value="">Chọn sổ tiền mặt</option></select></label>
         <label>Chuyển khoản<input id="groupPayBank" inputmode="decimal" value="0" autocomplete="off"></label>
         <label>Tài khoản chuyển khoản<select id="groupPayBankBook"><option value="">Chọn tài khoản chuyển khoản</option></select></label>
         <div class="full"><button class="kv-btn" id="groupPayAll" type="button">Trả hết bằng tiền mặt</button></div>
+        <div class="full po-table-wrap">
+          <table class="mini-table">
+            <thead><tr><th>Mã PN</th><th class="num">Tổng phải trả</th><th class="num">Đã thanh toán</th><th class="num">Còn nợ</th><th class="num">Số tiền phân bổ</th></tr></thead>
+            <tbody id="groupPayAllocations"></tbody>
+          </table>
+        </div>
         <label class="full">Ghi chú<textarea id="groupPayNote" rows="2"></textarea></label>
+        <div class="full pay-info-line"><span>Tổng phân bổ</span><b id="groupPayAllocated">0 VNĐ</b></div>
         <div class="full pay-info-line"><span>Tổng thanh toán</span><b id="groupPayTotal">0 VNĐ</b></div>
+        <div class="full pay-info-line"><span>Chênh lệch thanh toán − phân bổ</span><b id="groupPayDifference">0 VNĐ</b></div>
         <div class="full pay-info-line"><span>Còn lại</span><b id="groupPayAfter">0 VNĐ</b></div>
         <div id="groupPayError" class="pay-error" role="alert"></div>
       </div>
       <div class="page-actions page-actions--bordered detail-actions">
-        <button class="kv-btn primary" id="purchaseGroupPaySubmit" type="submit">Lưu phiếu chi</button>
+        <button class="kv-btn primary" id="purchaseGroupPaySubmit" type="submit" disabled>Lưu phiếu chi</button>
         <button class="kv-btn" id="purchaseGroupPayCancel" type="button">Bỏ qua</button>
       </div>
     </form>

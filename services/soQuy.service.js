@@ -131,16 +131,19 @@ function normalizeAllocations(value) {
   return value.map(item => {
 
     const phieuNhapId = optionalId(item && item.phieu_nhap_id);
+    const returnId = optionalId(item && item.phieu_tra_hang_nhap_id);
     const nhapVatChuaId = optionalId(item && item.nhap_vat_chua_id);
     const hoaDonId = optionalId(item && item.hoa_don_id);
 
     const amount = parseMoney(item && item.so_tien);
 
-    if ((!phieuNhapId && !nhapVatChuaId && !hoaDonId) || amount <= 0) return null;
+    if ((!phieuNhapId && !returnId && !nhapVatChuaId && !hoaDonId) || amount <= 0) return null;
 
     return {
 
       phieu_nhap_id: phieuNhapId || undefined,
+      phieu_tra_hang_nhap_id: returnId || undefined,
+      ma_phieu_tra_nhap: String(item.ma_phieu_tra_nhap || '').trim(),
 
       nhap_vat_chua_id: nhapVatChuaId || undefined,
 
@@ -558,6 +561,8 @@ async function taoPhieuThuChi(data = {}, options = {}) {
 
     ma_phieu: code,
 
+    request_key: String(data.request_key || '').trim() || undefined,
+
     ngay_lap: data.ngay_lap ? new Date(data.ngay_lap) : new Date(),
 
     loai_phieu: loaiPhieu,
@@ -598,6 +603,7 @@ async function taoPhieuThuChi(data = {}, options = {}) {
 
     // Group C is a navigation reference only; real obligations stay in allocations.
     phieu_nhap_tong_hop_id: optionalId(data.phieu_nhap_tong_hop_id),
+    phieu_tra_tong_hop_id: optionalId(data.phieu_tra_tong_hop_id),
 
     nhap_vat_chua_id: docRefs.nhap_vat_chua_id,
 

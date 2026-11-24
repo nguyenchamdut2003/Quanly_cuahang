@@ -1,0 +1,227 @@
+<%
+  const r = ticket;
+  const isReturnGroup = r.record_type === 'group';
+  const returnDetailSources = isReturnGroup ? (r.children || []) : [r];
+  const plannedRefundTotal = returnDetailSources.filter(child => child.trang_thai === 'draft')
+    .reduce((total, child) => total + Number(child.ncc_hoan_du_kien ?? child.ncc_da_tra ?? 0), 0);
+  const refundSources = returnDetailSources.filter(child => child.trang_thai === 'completed' && supplierRemainDue(child) > 0).map(child => ({ _id: String(child._id), ma_phieu_tra_nhap: child.ma_phieu_tra_nhap, due: supplierRemainDue(child) }));
+  const returnedProducts = new Set(returnDetailSources.filter(child => !isReturnGroup || child.trang_thai !== 'cancelled').flatMap(child => (child.detail_rows || []).map(line => String(line.hang_hoa_id && line.hang_hoa_id._id || line.hang_hoa_id || ''))).filter(Boolean));
+%>
+<div class="detail-card" data-return-detail-panel="<%= r._id %>">
+  <div class="detail-tabs" role="tablist" aria-label="Chi tiết <%= r.ma_phieu_tra_nhap %>">
+    <button class="detail-tab is-active" type="button" role="tab" data-return-tab="info" id="return-tab-<%= r._id %>-info" aria-selected="true" aria-controls="return-pane-<%= r._id %>-info">Thông tin</button>
+    <% if (isReturnGroup) { %><button class="detail-tab" type="button" role="tab" data-return-tab="sources" id="return-tab-<%= r._id %>-sources" aria-selected="false" aria-controls="return-pane-<%= r._id %>-sources" tabindex="-1">Phiếu nguồn (<%= returnDetailSources.length %>)</button><% } %>
+  </div>
+  <div class="is-active" data-return-pane="info" role="tabpanel" id="return-pane-<%= r._id %>-info" aria-labelledby="return-tab-<%= r._id %>-info">
+  <div class="detail-head">
+    <div>
+      <div class="detail-code"><%= r.ma_phieu_tra_nhap || '--' %> <span class="detail-status <%= badgeClass(r.trang_thai) %>"><%= statusLabel(r.trang_thai) %></span></div>
+      <% if (isReturnGroup && r.phieu_nhap_tong_hop_id) { %><div class="detail-branch">Phiếu nhập gốc: <a href="/nhap-hang/tong-hop/<%= r.phieu_nhap_tong_hop_id._id || r.phieu_nhap_tong_hop_id %>"><%= r.phieu_nhap_tong_hop_id.ma_phieu_tong_hop || 'GPN gốc' %></a></div><% } %>
+      <% if (r.phieu_nhap_id) { %>
+        <div class="detail-branch">Phiếu nhập gốc: <%= r.phieu_nhap_id.ma_phieu_nhap || '--' %></div>
+      <% } %>
+      <% if (!isReturnGroup && r.ma_phieu_tra_tong_hop) { %><div class="detail-branch">Phiếu trả tổng hợp: <%= r.ma_phieu_tra_tong_hop %></div><% } %>
+    </div>
+    <div class="detail-branch"><%= r.kho_id ? (r.kho_id.ten_kho || r.kho_id.ma_kho || 'Cửa hàng trung tâm') : 'Cửa hàng trung tâm' %></div>
+  </div>
+  <% if (isReturnGroup) { const supplier = r.nha_cung_cap_id || {}; const warehouse = r.kho_id || {}; const creator = r.nguoi_tao_id || {}; %>
+    <div class="return-detail-grid">
+      <div class="item">Người tạo<b><%= creator.ho_ten || creator.email || '--' %></b></div>
+      <div class="item">Ngày tổng hợp<b><%= formatDate(r.ngay_tra || r.created_at) %></b></div>
+      <div class="item">Kho trả<b><%= warehouse.ten_kho || warehouse.ma_kho || '--' %></b></div>
+      <div class="item">Số phiếu nguồn<b><%= returnDetailSources.length %></b></div>
+      <div class="item">Tên NCC<b><%= supplier.ten_ncc || '--' %></b></div>
+      <div class="item">Mã NCC<b><%- supplier._id ? refLink('supplier', supplier, supplier.ma_ncc || '--') : (supplier.ma_ncc || '--') %></b></div>
+      <div class="item">Ghi chú<b><%= r.ghi_chu || '--' %></b></div>
+    </div>
+  <% } %>
+  <div class="return-detail-split">
+    <div class="return-detail-main">
+      <% if (!isReturnGroup) { %>
+      <div class="detail-info">
+        <div>
+          <div class="info-line"><span>Người tạo:</span><b><%= r.nguoi_tao_id ? (r.nguoi_tao_id.ho_ten || r.nguoi_tao_id.email || '--') : '--' %></b></div>
+          <div class="info-line"><span>Tên NCC:</span><span class="info-value"><%= r.nha_cung_cap_id ? ((r.nha_cung_cap_id.ma_ncc || '') + (r.nha_cung_cap_id.ma_ncc ? ' - ' : '') + (r.nha_cung_cap_id.ten_ncc || '')) : '—' %></span></div>
+        </div>
+        <div>
+          <div class="info-line"><span>Người trả:</span><select disabled><option><%= r.nguoi_tra_id ? (r.nguoi_tra_id.ho_ten || r.nguoi_tra_id.email || '--') : '--' %></option></select></div>
+        </div>
+        <div>
+          <div class="info-line"><span>Ngày trả:</span><input readonly value="<%= formatDate(r.ngay_tra || r.created_at) %>"></div>
+        </div>
+      </div>
+      <% } %>
+      <div class="return-detail-groups-wrap">
+        <% returnDetailSources.forEach(function(sourceReturn) { %>
+        <% if (isReturnGroup) { %>
+          <section class="return-source-box" data-return-source="<%= sourceReturn._id %>">
+            <div class="return-source-title">
+              <a href="/tra-hang-nhap?view_mode=sources&openReturn=<%= sourceReturn._id %>&q=<%= encodeURIComponent(sourceReturn.ma_phieu_tra_nhap || '') %>" data-return-source-open="<%= sourceReturn._id %>"><%= sourceReturn.ma_phieu_tra_nhap %></a>
+              <% if (sourceReturn.phieu_nhap_id) { %><a href="/nhap-hang?purchase=<%= sourceReturn.phieu_nhap_id._id || sourceReturn.phieu_nhap_id %>"><%= sourceReturn.phieu_nhap_id.ma_phieu_nhap || '' %></a><% } %>
+              <span class="status-badge <%= badgeClass(sourceReturn.trang_thai) %>"><%= statusLabel(sourceReturn.trang_thai) %></span>
+            </div>
+        <% } %>
+        <% if (!(sourceReturn.detail_rows || []).length) { %>
+          <table class="mini-table"><tbody><tr><td>Chưa có chi tiết hàng trả.</td></tr></tbody></table>
+        <% } %>
+        <% if (sourceReturn.trang_thai === 'completed' && (sourceReturn.vat_chua_lines || []).length) { %>
+          <div class="return-vat-chua-box">
+            <div class="return-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa đã xuất</div>
+            <table class="return-vat-chua-table">
+              <thead>
+                <tr>
+                  <th>Mã chứng từ</th>
+                  <th>Loại</th>
+                  <th>Mã vật chứa</th>
+                  <th>Tên vật chứa</th>
+                  <th class="num">Số lượng</th>
+                  <th>Chứng từ liên kết</th>
+                  <th class="col-time">Thời gian</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% (sourceReturn.vat_chua_lines || []).forEach(function(line) { %>
+                  <tr>
+                    <td><%= line.ma_chung_tu || '--' %></td>
+                    <td><%= line.doc_kind_label || line.loai_label || '--' %></td>
+                    <td><%= line.ma_vat_chua || '--' %></td>
+                    <td><%= line.ten_vat_chua || '--' %></td>
+                    <td class="num"><%= fmt(line.so_luong || 0) %></td>
+                    <td>
+                      <% if (line.source_href && line.source_code) { %>
+                        <a class="ref-link" href="<%= line.source_href %>"><%= line.source_code %></a>
+                      <% } else { %>
+                        <%= line.source_code || '--' %>
+                      <% } %>
+                    </td>
+                    <td class="col-time"><%= formatDate(line.created_at) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+        <% detailGroupsReturn(sourceReturn.detail_rows || []).forEach(function(group) { %>
+          <div class="lot-group-title">
+            <%- group.product ? (refLink('product', group.product, group.product.ma_hang || '--') + ' - ' + (group.product.ten_hang || '--')) : '--' %>
+          </div>
+          <table class="grouped-lot-table">
+            <colgroup>
+              <col style="width:30%">
+              <col style="width:11%">
+              <col style="width:9%">
+              <col style="width:12%">
+              <col style="width:12%">
+              <col style="width:13%">
+              <col style="width:13%">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Ngày / Lô</th>
+                <th>Thuộc tính</th>
+                <th class="num">Số lượng</th>
+                <th class="num">Giá nhập</th>
+                <th class="num">Giá trả lại</th>
+                <th class="num">Thành tiền</th>
+                <th class="num">Tổng theo lô</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% var displayRows = detailRowsForReturnGroup(group); %>
+              <% displayRows.forEach(function(rowLine, rowIndex) { %>
+                <tr>
+                  <% if (rowIndex === 0) { %>
+                    <td class="lot-cell" rowspan="<%= displayRows.length %>"><%- group.lot_label %></td>
+                  <% } %>
+                  <td class="attr-cell"><div><%= rowLine.ten_thuoc_tinh || '--' %></div></td>
+                  <td class="num"><%= fmt(rowLine.so_luong || 0) %></td>
+                  <td class="num"><%= fmtMoney(rowLine.don_gia_nhap || 0) %></td>
+                  <td class="num"><%= fmtMoney(rowLine.don_gia_tra || 0) %></td>
+                  <td class="num"><%= fmtMoney(rowLine.thanh_tien || 0) %></td>
+                  <% if (rowIndex === 0) { %>
+                    <td class="lot-total-cell" rowspan="<%= displayRows.length %>"><%= fmtMoney(group.total || 0) %></td>
+                  <% } %>
+                </tr>
+              <% }) %>
+              <tr class="group-total-row">
+                <td colspan="5" class="num">TỔNG CỘNG</td>
+                <td class="num"><%= fmtMoney(group.total || 0) %></td>
+                <td class="num"><%= fmtMoney(group.total || 0) %></td>
+              </tr>
+            </tbody>
+          </table>
+        <% }) %>
+        <% if (isReturnGroup) { %></section><% } %>
+        <% }) %>
+      </div>
+      <div class="detail-note"><%= r.ghi_chu ? String(r.ghi_chu) : '—' %></div>
+    </div>
+    <aside class="return-summary-box" aria-label="Tổng kết">
+      <h3 class="return-summary-title">Tổng kết</h3>
+      <div class="return-summary-row">
+        <span>Số lượng mặt hàng</span>
+        <span class="summary-val"><%= fmt(returnedProducts.size) %></span>
+      </div>
+      <div class="return-summary-row">
+        <span>Tổng tiền hàng trả</span>
+        <span class="summary-val"><%= fmtMoney(r.tong_tien_hang || r.tong_tien_tra || 0) %></span>
+      </div>
+      <div class="return-summary-row">
+        <span>Giảm giá</span>
+        <span class="summary-val"><%= r.kieu_giam_gia === 'percent' ? ((r.giam_gia || 0) + '%') : fmtMoney(r.giam_gia || 0) %></span>
+      </div>
+      <div class="return-summary-row">
+        <span>NCC cần trả</span>
+        <span class="summary-val"><%= fmtMoney(supplierPayableTotal(r)) %></span>
+      </div>
+      <div class="return-summary-row">
+        <span>NCC đã trả</span>
+        <span class="summary-val"><%= fmtMoney(r.ncc_da_tra || 0) %></span>
+      </div>
+      <% if (r.trang_thai === 'draft' && plannedRefundTotal > 0) { %>
+        <div class="return-summary-row"><span>NCC dự kiến hoàn</span><span class="summary-val"><%= fmtMoney(plannedRefundTotal) %></span></div>
+      <% } %>
+      <% var nccRemain = supplierRemainDue(r); %>
+      <div class="return-summary-row">
+        <span>NCC còn phải trả</span>
+        <span class="summary-val"><%= fmtMoney(nccRemain) %></span>
+      </div>
+      <% if (r.trang_thai === 'completed' && nccRemain > 0 && !r.phieu_tra_tong_hop_id) { %>
+        <div class="receipt-pay-action">
+          <button type="button" class="btn btn-primary js-return-receipt-pay" data-id="<%= r._id %>" <% if (isReturnGroup) { %>data-group="1" data-sources="<%= JSON.stringify(refundSources) %>"<% } %> data-due="<%= nccRemain %>">Tạo phiếu thu</button>
+        </div>
+      <% } %>
+    </aside>
+  </div>
+  <% if (!isReturnGroup) { %><div class="page-actions page-actions--bordered">
+    <button type="button" class="btn btn-light btn-cancel-outline js-return-cancel" data-id="<%= r._id %>" data-status="<%= r.trang_thai || '' %>" <%= r.trang_thai === 'cancelled' ? 'disabled' : '' %>>Hủy</button>
+    <a class="btn btn-light btn-copy-outline" href="/tra-hang-nhap/create?copy_from=<%= r._id %>">Sao chép</a>
+    <a class="btn btn-primary" href="/tra-hang-nhap/<%= r._id %>/export.xlsx">Xuất file</a>
+    <a class="btn btn-light" href="/tra-hang-nhap/<%= r._id %>/in" target="_blank" rel="noopener">In phiếu</a>
+    <a class="page-actions__link return-open-link" href="/chung-tu-kho/tra-hang-nhap/<%= r._id %>" target="_blank" rel="noopener">Chứng từ kho ↗</a>
+  </div><% } %>
+  </div>
+  <% if (isReturnGroup) { %>
+    <div data-return-pane="sources" role="tabpanel" id="return-pane-<%= r._id %>-sources" aria-labelledby="return-tab-<%= r._id %>-sources" hidden>
+      <table class="return-sources-table">
+        <thead><tr><th>Mã phiếu nguồn</th><th>Ngày trả</th><th>Trạng thái</th><th class="num">Giá trị</th><th class="num">NCC đã trả</th><th class="num">NCC còn phải trả</th></tr></thead>
+        <tbody>
+          <% if (!returnDetailSources.length) { %><tr><td colspan="6">Không tìm thấy phiếu nguồn.</td></tr><% } %>
+          <% returnDetailSources.forEach(function(sourceReturn) { const sourceDetailId = 'return-group-source-detail-' + r._id + '-' + sourceReturn._id; %>
+            <tr class="return-source-row" data-return-source-id="<%= sourceReturn._id %>" data-return-group-id="<%= r._id %>" data-parent-return-group="<%= r._id %>">
+              <td><input class="return-select-check" type="checkbox" value="<%= sourceReturn._id %>" hidden><a href="/tra-hang-nhap?view_mode=sources&openReturn=<%= sourceReturn._id %>&q=<%= encodeURIComponent(sourceReturn.ma_phieu_tra_nhap || '') %>" data-return-source-toggle="<%= sourceReturn._id %>" aria-expanded="false" aria-controls="<%= sourceDetailId %>"><%= sourceReturn.ma_phieu_tra_nhap %></a></td>
+              <td><%= formatDateOnly(sourceReturn.ngay_tra || sourceReturn.created_at) %></td>
+              <td><span class="status-badge <%= badgeClass(sourceReturn.trang_thai) %>"><%= statusLabel(sourceReturn.trang_thai) %></span></td>
+              <td class="num"><%= fmtMoney(supplierPayableTotal(sourceReturn)) %></td>
+              <td class="num"><%= fmtMoney(sourceReturn.ncc_da_tra) %></td>
+              <td class="num"><%= fmtMoney(supplierRemainDue(sourceReturn)) %></td>
+            </tr>
+            <tr class="return-source-detail-row" id="<%= sourceDetailId %>" data-return-source-detail="<%= sourceReturn._id %>" hidden>
+              <td colspan="6"><%- include('./_detail', { ticket: sourceReturn }) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>
