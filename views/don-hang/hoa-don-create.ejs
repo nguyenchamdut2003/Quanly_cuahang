@@ -852,6 +852,9 @@
       cursor: pointer
     }
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 
 <body>
@@ -1000,13 +1003,13 @@
             <span class="money-input-wrap"><input id="shippingFee" class="delivery-input" value="0" inputmode="numeric" oninput="handleManualShippingFee()"><span class="money-unit">VNĐ</span></span>
             <div class="delivery-help" id="shippingFeeHelp">Nhập trực tiếp phí giao hàng.</div>
           </div>
-          <div class="delivery-row" style="margin-top:16px">
+          <div class="delivery-row" style="margin-top:16px" data-vat-chua-payment data-vc-id="invoiceVatChuaId" data-vc-qty="invoiceVatChuaQty" data-vc-direction="thu">
             <label>Vật chứa</label>
             <div class="delivery-vat-chua-combo">
               <select id="invoiceVatChuaId" class="delivery-input" name="vat_chua_id" title="Chọn vật chứa">
                 <option value="">— Chọn —</option>
                 <% (vatChuaList || []).forEach(function(vc) { %>
-                  <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+                  <option value="<%= vc._id %>" data-vc-average-cost="<%= Number(vc.gia_von_binh_quan) || 0 %>"><%= vc.ten_vat_chua || '---' %></option>
                 <% }) %>
               </select>
               <input id="invoiceVatChuaQty" class="delivery-input delivery-vat-chua-qty" name="vat_chua_so_luong" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
@@ -1455,7 +1458,7 @@
           <td class="num">${fmt(metrics.tonThucTe)}</td>
           <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
           <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
-          <td class="num"><span class="qty-input-wrap"><input class="qc-input${warningInputClass(qcWarning)}" type="number" min="0" value="${qty || ''}" onchange="updQuyCachQty(${itemIdx}, ${qcIdx}, this.value)">${warningIconHtml(qcWarning)}</span></td>
+          <td class="num"><span class="qty-input-wrap"><input class="qc-input${warningInputClass(qcWarning)}" type="number" min="0" step="0.000001" inputmode="decimal" value="${qty || ''}" onchange="updQuyCachQty(${itemIdx}, ${qcIdx}, this.value)">${warningIconHtml(qcWarning)}</span></td>
           <td class="num">${loaiGiaCell}</td>
           <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}"${priceLocked ? ' readonly title="Giá đã khóa"' : ''} onchange="updQuyCachPrice(${itemIdx}, ${qcIdx}, this.value)"><span class="money-unit">VNĐ</span></span></td>
           <td class="num"><span class="discount-pair"><input class="qc-input" value="${qc.chiet_khau || 0}" onchange="updQuyCachDiscount(${itemIdx}, ${qcIdx}, this.value)"><select onchange="updQuyCachDiscountType(${itemIdx}, ${qcIdx}, this.value)"><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
@@ -1539,7 +1542,7 @@
         item.so_luong = lineQty(item);
         const metrics = lineInventoryMetrics(item);
         const lineWarning = availabilityWarning(lineQty(item), metrics);
-        const qtyCell = `<span class="qty-input-wrap"><input class="small${warningInputClass(lineWarning)}" value="${item.so_luong}" onchange="updQty('${item.hang_hoa_id}',this.value)">${warningIconHtml(lineWarning)}</span>`;
+        const qtyCell = `<span class="qty-input-wrap"><input class="small${warningInputClass(lineWarning)}" inputmode="decimal" value="${window.KVStockQuantity.format(item.so_luong)}" onchange="updQty('${item.hang_hoa_id}',this.value)">${warningIconHtml(lineWarning)}</span>`;
         const priceCell = `<span class="money-input-wrap"><input class="small" value="${fmt(item.don_gia_ban)}"${item.cho_phep_sua_gia === false ? ' readonly title="Giá đã khóa"' : ''} onchange="updUnitPrice('${item.hang_hoa_id}',this.value)"><span class="money-unit">VNĐ</span></span>`;
         const discountCell = `<span class="discount-pair"><input class="small" value="${item.chiet_khau || 0}" onchange="updLineDiscount('${item.hang_hoa_id}',this.value)"><select onchange="updLineDiscountType('${item.hang_hoa_id}',this.value)"><option value="vnd"${item.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${item.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
         if (maxLots > 0) {
@@ -1735,7 +1738,7 @@
         if (!i) return;
         if (i.has_quy_cach || i.has_lot_items) return alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
         const stock = inventoryMetrics(i, stockFor(id)).tonThucTe;
-        const nextQty = Math.max(1, num(v));
+        const nextQty = Math.max(0, window.KVStockQuantity.parse(v)) || 1;
         if (nextQty > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
         i.so_luong = nextQty;
         renderCart();
@@ -1745,7 +1748,7 @@
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
         const qc = rows[qcIdx];
-        qc.so_luong_dat = Math.max(0, num(value));
+        qc.so_luong_dat = Math.max(0, Number(value) || 0);
         renderCart();
       }
       function updQuyCachPrice(itemIdx, qcIdx, value) {
@@ -2044,7 +2047,7 @@
         if (!vatChuaId) return 'Vui lòng chọn vật chứa';
         const qty = Number(qtyRaw);
         if (!Number.isFinite(qty) || qty <= 0) return 'Số lượng vật chứa phải lớn hơn 0';
-        return '';
+        return window.KVVatChuaPayment.validate('invoiceVatChuaId');
       }
       async function saveOrder() {
         const payButton = document.getElementById('payButton');
@@ -2131,6 +2134,7 @@
           cod_amount: 0,
           vat_chua_id: invoiceVatChuaId ? invoiceVatChuaId.value : '',
           vat_chua_so_luong: invoiceVatChuaQty ? invoiceVatChuaQty.value : '',
+          ...window.KVVatChuaPayment.payload('invoiceVatChuaId'),
           ...paymentFields
         };
         let didNavigate = false;

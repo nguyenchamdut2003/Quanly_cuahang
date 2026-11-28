@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { stockQuantity } = require('../utils/stockQuantity');
 const {
   PhieuNhap,
   CTPhieuNhap,
@@ -18,11 +19,12 @@ const {
 } = require('../models/kiot.model');
 const { taoPhieuThuChi } = require('./soQuy.service');
 const { extractPaymentDetail } = require('./paymentCashBook.service');
-const { syncTonKhoSauQuyCach } = require('./kho.service');
+const { syncTonKhoSauQuyCach, congTonKho, truTonKho } = require('./kho.service');
 const { acquirePurchaseGroupMutationLock, findActivePurchaseGroupForSource } = require('./purchaseGroup.service');
 const {
   assertVatChuaImportInput,
   parseVatChuaImportInput,
+  vatChuaConfigFromParsed,
   importVatChuaWithPurchase,
   cancelNhapVatChuaBySource
 } = require('./vatChuaImport.service');
@@ -193,7 +195,7 @@ function makePurchaseLotCode(purchaseCode, productCode) {
 function normalizeQuyCachItems(items) {
   return (Array.isArray(items) ? items : [])
     .map(item => {
-      const qty = Math.max(0, Number(item && item.so_luong || 0));
+      const qty = stockQuantity(item && item.so_luong);
       const unitCost = parseMoney(item && (item.don_gia_nhap ?? item.don_gia ?? item.gia_von));
       const name = String(item && (item.ten_quy_cach || item.ten_thuoc_tinh) || '').trim();
       return {
@@ -239,27 +241,30 @@ function normalizeLotInfo(raw) {
 }
 
 function validateLotInfoForProduct(item, product) {
-  if (!product || !product.quan_ly_theo_lo) return;
+  if (!product) return;
   const lotInfo = item.lot_info;
-  if (!lotInfo) throw new Error('Hàng quản lý theo lô cần thông tin lô');
+  if (!lotInfo) {
+    if (product.quan_ly_theo_lo) throw new Error('Hàng quản lý theo lô cần thông tin lô');
+    return;
+  }
   const quyCachItems = normalizeQuyCachItems(lotInfo.quy_cach_items);
   for (const row of quyCachItems) {
     if (!row.ten_quy_cach) {
-      throw new Error('Tên quy cách không được để trống khi có số lượng');
+      throw new Error('Tên phân loại không được để trống khi có số lượng');
     }
     if (Number(row.so_luong || 0) <= 0) {
-      throw new Error('Số lượng quy cách phải lớn hơn 0');
+      throw new Error('Số lượng theo phân loại phải lớn hơn 0');
     }
     if (Number(row.don_gia_nhap || 0) < 0) {
-      throw new Error('Đơn giá quy cách không hợp lệ');
+      throw new Error('Đơn giá theo phân loại không hợp lệ');
     }
   }
   if (quyCachItems.length) {
     const total = sumQuyCachItems(quyCachItems);
-    if (Number(item.so_luong || 0) > 0 && Number(item.so_luong || 0) !== total) {
-      throw new Error('Tổng số lượng quy cách phải bằng số lượng dòng hàng');
+    if (Number(item.so_luong || 0) > 0 && Math.abs(Number(item.so_luong || 0) - total) > 0.000001) {
+      throw new Error('Tổng số lượng theo phân loại phải bằng số lượng dòng hàng');
     }
-    item.so_luong = total;
+    item.so_luong = stockQuantity(total);
     item.don_gia_nhap = total > 0 ? Math.round(sumQuyCachAmount(quyCachItems) / total) : item.don_gia_nhap;
     item.lot_info.so_luong_tong = total;
     item.lot_info.tong_tien_quy_cach = sumQuyCachAmount(quyCachItems);
@@ -286,7 +291,7 @@ function normalizeItems(raw) {
     const lotQty = lotInfo ? Number(lotInfo.so_luong_tong || 0) : 0;
     const rawQty = Math.max(0, Number(item.so_luong || 0));
     const qcAmount = lotInfo ? Number(lotInfo.tong_tien_quy_cach || 0) : 0;
-    const qty = Math.floor(lotQty > 0 ? lotQty : rawQty);
+    const qty = stockQuantity(lotQty > 0 ? lotQty : rawQty);
     const rawUnitCost = parseMoney(item.don_gia_nhap ?? item.don_gia);
     return {
       hang_hoa_id: cleanId(item.hang_hoa_id),
@@ -338,13 +343,11 @@ async function calculateMovingAverageCost(productId, quantity, unitCost, session
   const incomingCost = Number(unitCost || 0);
   if (!hangHoaId || incomingQty <= 0) return Math.round(incomingCost);
 
-  const [product, stockRows] = await Promise.all([
-    withSessionQuery(HangHoa.findById(hangHoaId).select('gia_von'), session).lean(),
-    TonKho.aggregate([
+  const product = await withSessionQuery(HangHoa.findById(hangHoaId).select('gia_von'), session).lean();
+  const stockRows = await TonKho.aggregate([
       { $match: { hang_hoa_id: hangHoaId } },
       { $group: { _id: '$hang_hoa_id', total: { $sum: { $ifNull: ['$so_luong', 0] } } } }
-    ]).session(session || null)
-  ]);
+    ]).session(session || null);
 
   const currentStock = Number(stockRows && stockRows[0] ? stockRows[0].total : 0);
   const currentCost = Number(product && product.gia_von ? product.gia_von : 0);
@@ -375,7 +378,7 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
 
   const lotInfo = item.lot_info;
   if (!lotInfo) throw new Error('Hàng quản lý theo lô cần thông tin lô');
-  const lotQty = Math.floor(Number(item.so_luong || 0));
+  const lotQty = stockQuantity(item.so_luong);
   if (lotQty <= 0) throw new Error('Số lượng dòng hàng không hợp lệ');
 
   const maLo = lotInfo.ma_lo || makePurchaseLotCode(purchase.ma_phieu_nhap, product && product.ma_hang);
@@ -443,6 +446,27 @@ async function createLotForLine({ storeId, khoId, supplierId, purchase, ctDoc, p
   return created._id;
 }
 
+async function applyNonLotPurchaseStock(purchase, row, direction, options = {}) {
+  const variants = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
+  const lines = variants.length ? variants : [{ ten_quy_cach: 'Chưa phân loại',
+    so_luong: row.so_luong, gia_von: row.don_gia_nhap }];
+  if (Math.abs(sumQuyCachItems(lines) - Number(row.so_luong)) > 0.000001) {
+    throw new Error('Tổng số lượng theo phân loại phải bằng số lượng dòng hàng');
+  }
+  let inventory;
+  for (const line of lines) {
+    const data = { cua_hang_id: purchase.cua_hang_id, kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id,
+      lo_hang_id: null, ten_quy_cach: line.ten_quy_cach, sync_quy_cach: true,
+      so_luong: stockQuantity(line.so_luong, { allowZero: false }), gia_von: line.gia_von,
+      nguoi_tao_id: options.userId, loai_phieu: direction < 0 ? 'dieu_chinh' : 'nhap_hang',
+      ma_phieu: purchase.ma_phieu_nhap, ngay: purchase.ngay_nhap || new Date(),
+      ghi_chu: direction < 0 ? 'Hoàn tác phiếu nhập' : 'Nhập hàng', session: options.session };
+    const result = direction < 0 ? await truTonKho(data) : await congTonKho(data);
+    inventory = result.inventory || result;
+  }
+  return inventory;
+}
+
 async function applyCompletedEffects(purchase, rows, options = {}) {
   const session = options.session;
   if (purchase.__effectsApplied) throw new Error('Phiếu nhập đã được hoàn tất trước đó');
@@ -456,11 +480,17 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
     const newProductCost = await calculateMovingAverageCost(row.hang_hoa_id, qty, row.don_gia_nhap, session);
     const quyCachItems = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
     let updatedStock = null;
+    let variantHistoryWritten = false;
 
-    if (row.lo_hang_id && quyCachItems.length) {
+    if (!row.lo_hang_id && (quyCachItems.length || await withSessionQuery(TonKhoLoQuyCach.exists({
+      kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: null
+    }), session))) {
+      updatedStock = await applyNonLotPurchaseStock(purchase, row, 1, options);
+      variantHistoryWritten = true;
+    } else if (row.lo_hang_id && quyCachItems.length) {
       const totalQc = sumQuyCachItems(quyCachItems);
-      if (qty > 0 && totalQc !== qty) {
-        throw new Error('Tổng số lượng quy cách phải bằng số lượng dòng hàng');
+      if (qty > 0 && Math.abs(totalQc - qty) > 0.000001) {
+        throw new Error('Tổng số lượng theo phân loại phải bằng số lượng dòng hàng');
       }
       for (const qc of quyCachItems) {
         await withNhapHangLog('TonKhoLoQuyCach', `dong bo ten cu qc=${qc.ten_quy_cach}`, () => TonKhoLoQuyCach.updateMany(
@@ -557,7 +587,7 @@ async function applyCompletedEffects(purchase, rows, options = {}) {
       }
     }
 
-    await withNhapHangLog('LichSuKho', `ghi lich su hang=${row.hang_hoa_id} sl=${qty}`, () => createOne(LichSuKho, {
+    if (!variantHistoryWritten) await withNhapHangLog('LichSuKho', `ghi lich su hang=${row.hang_hoa_id} sl=${qty}`, () => createOne(LichSuKho, {
       cua_hang_id: purchase.cua_hang_id,
       kho_id: purchase.kho_id,
       hang_hoa_id: row.hang_hoa_id,
@@ -675,6 +705,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
     if (qty <= 0) continue;
     const quyCachItems = normalizeQuyCachItems(row.lot_info && row.lot_info.quy_cach_items);
     let updated = null;
+    let variantHistoryWritten = false;
 
     if (isRollback) {
       const stock = await withSessionQuery(TonKho.findOne({
@@ -684,7 +715,12 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
       if (!stock || Number(stock.so_luong || 0) < qty) throw new Error('Tồn kho không đủ để hoàn tác phiếu nhập');
     }
 
-    if (row.lo_hang_id && quyCachItems.length) {
+    if (!row.lo_hang_id && (quyCachItems.length || await withSessionQuery(TonKhoLoQuyCach.exists({
+      kho_id: purchase.kho_id, hang_hoa_id: row.hang_hoa_id, lo_hang_id: null
+    }), session))) {
+      updated = await applyNonLotPurchaseStock(purchase, row, direction, options);
+      variantHistoryWritten = true;
+    } else if (row.lo_hang_id && quyCachItems.length) {
       for (const qc of quyCachItems) {
         const qcFilter = {
           kho_id: purchase.kho_id,
@@ -698,7 +734,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
         if (isRollback) {
           const qcStock = await withSessionQuery(TonKhoLoQuyCach.findOne(qcFilter), session).lean();
           if (!qcStock || Number(qcStock.so_luong || 0) < Number(qc.so_luong || 0)) {
-            throw new Error('Tồn kho quy cách trong lô không đủ để hoàn tác phiếu nhập');
+            throw new Error('Tồn kho theo phân loại trong lô không đủ để hoàn tác phiếu nhập');
           }
         }
         await TonKhoLoQuyCach.findOneAndUpdate(
@@ -766,7 +802,7 @@ async function adjustCompletedPurchaseEffects(purchase, rows, direction, options
       }
     }
 
-    await createOne(LichSuKho, {
+    if (!variantHistoryWritten) await createOne(LichSuKho, {
       cua_hang_id: purchase.cua_hang_id,
       kho_id: purchase.kho_id,
       hang_hoa_id: row.hang_hoa_id,
@@ -807,6 +843,23 @@ async function createPurchase(data = {}, options = {}) {
   const khoId = cleanId(data.kho_id);
   if (!storeId) throw new Error('Cửa hàng không hợp lệ');
   if (!khoId) throw new Error('Vui lòng chọn kho nhập');
+  const containerRequestKey = data.vat_chua_id ? String(data.vat_chua_request_key || '').trim() : '';
+  if (containerRequestKey.length > 120) throw new Error('Mã yêu cầu vật chứa không hợp lệ.');
+  if (containerRequestKey && !session) {
+    const ownSession = await mongoose.startSession();
+    try { let result; await ownSession.withTransaction(async () => { result = await createPurchase(data, { ...options, session: ownSession }); }); return result; }
+    finally { await ownSession.endSession(); }
+  }
+  if (containerRequestKey) {
+    await acquirePurchaseGroupMutationLock(storeId, session);
+    const previous = await PhieuNhap.findOne({ cua_hang_id: storeId, vat_chua_request_key: containerRequestKey }).session(session).lean();
+    if (previous) {
+      if (previous.trang_thai === 'cancelled' || previous.trang_thai_du_lieu === 'inactive') throw new Error('Yêu cầu vật chứa đã được sử dụng cho phiếu đã hủy.');
+      const requested = vatChuaConfigFromParsed(parseVatChuaImportInput(data));
+      if (JSON.stringify(requested) !== JSON.stringify(previous.vat_chua_config)) throw new Error('Mã yêu cầu đã được dùng cho dữ liệu vật chứa khác.');
+      return previous;
+    }
+  }
 
   const items = normalizeItems(data.items_json ?? data.items);
   if (!items.length) throw new Error('Vui lòng chọn hàng hóa');
@@ -855,7 +908,9 @@ async function createPurchase(data = {}, options = {}) {
     const product = productMap.get(String(item.hang_hoa_id));
     if (!product.quan_ly_theo_lo) {
       item.lo_hang_id = undefined;
-      item.lot_info = null;
+      const variants = item.lot_info && item.lot_info.quy_cach_items;
+      item.lot_info = variants && variants.length ? { quy_cach_items: variants,
+        so_luong_tong: sumQuyCachItems(variants), tong_tien_quy_cach: sumQuyCachAmount(variants) } : null;
     }
     validateLotInfoForProduct(item, product);
     if (!product.quan_ly_theo_lo && Number(item.so_luong || 0) <= 0) {
@@ -883,6 +938,8 @@ async function createPurchase(data = {}, options = {}) {
     da_tra_ncc: daTra,
     con_no_ncc: conNo,
     phuong_thuc_thanh_toan: phuongThuc,
+    vat_chua_config: vatChuaImport.vatChuaId ? vatChuaConfigFromParsed(vatChuaImport) : undefined,
+    vat_chua_request_key: containerRequestKey || undefined,
     trang_thai: mode,
     ghi_chu: String(data.ghi_chu || '').trim()
   }, session));
@@ -952,6 +1009,58 @@ async function createPurchase(data = {}, options = {}) {
   }
 
   return purchase;
+}
+
+async function completePurchase(purchaseId, storeId, userId, data = {}) {
+  const id = cleanId(purchaseId), store = cleanId(storeId);
+  if (!id || !store) throw new Error('Phiếu nhập hoặc cửa hàng không hợp lệ.');
+  const session = await mongoose.startSession();
+  let result;
+  try {
+    await session.withTransaction(async () => {
+      await acquirePurchaseGroupMutationLock(store, session);
+      const purchase = await PhieuNhap.findOne({ _id: id, cua_hang_id: store,
+        trang_thai_du_lieu: { $ne: 'inactive' }, deleted_at: null }).session(session);
+      if (!purchase) throw new Error('Không tìm thấy phiếu nhập.');
+      if (purchase.trang_thai === 'completed') { result = purchase; return; }
+      if (purchase.trang_thai !== 'draft') throw new Error('Chỉ hoàn thành phiếu nhập đang lưu tạm.');
+      const rows = await CTPhieuNhap.find({ phieu_nhap_id: purchase._id }).session(session).lean();
+      if (!rows.length) throw new Error('Phiếu nhập chưa có hàng hóa.');
+      const hasPayment = ['chi_tiet_thanh_toan', 'tien_mat', 'chuyen_khoan', 'da_tra_ncc'].some(key => data[key] != null);
+      const paymentInput = hasPayment ? data : { da_tra_ncc: purchase.da_tra_ncc || 0 };
+      const payment = normalizePaymentDetail(paymentInput, purchase.can_tra_ncc);
+      assertCashBookWhenPaying(payment, paymentInput);
+      const containerData = Object.keys(data).some(key => key.startsWith('vat_chua_')) ? data : purchase.vat_chua_config || {};
+      const container = parseVatChuaImportInput(containerData);
+      assertVatChuaImportInput(container);
+      const products = await HangHoa.find({ _id: { $in: rows.map(row => row.hang_hoa_id) } }).session(session).lean();
+      const productsById = new Map(products.map(product => [String(product._id), product]));
+      const lotCache = new Map();
+      for (const row of rows) {
+        const product = productsById.get(String(row.hang_hoa_id));
+        if (!product) throw new Error('Hàng hóa trong phiếu nhập không còn hợp lệ.');
+        if (product.quan_ly_theo_lo && !row.lo_hang_id) {
+          if (!row.lot_info) throw new Error('Hàng quản lý theo lô cần chọn hoặc tạo lô trước khi hoàn thành.');
+          row.lo_hang_id = await createLotForLine({ storeId: store, khoId: purchase.kho_id,
+            supplierId: purchase.nha_cung_cap_id, purchase, ctDoc: row, product, productId: product._id,
+            item: row, now: new Date(), lotCache, session });
+          await CTPhieuNhap.updateOne({ _id: row._id, phieu_nhap_id: purchase._id }, { $set: { lo_hang_id: row.lo_hang_id } }, { session });
+        }
+      }
+      purchase.trang_thai = 'completed';
+      purchase.da_tra_ncc = payment.amount;
+      purchase.con_no_ncc = Math.max(0, Number(purchase.can_tra_ncc || 0) - payment.amount);
+      purchase.vat_chua_config = container.vatChuaId ? vatChuaConfigFromParsed(container) : undefined;
+      await purchase.save({ session });
+      await applyCompletedEffects(purchase, rows, { userId: cleanId(userId), payment,
+        chi_tiet_thanh_toan: payment.detail, so_quy_id: paymentInput.so_quy_id,
+        includeDebt: data.tinh_vao_cong_no !== false, session });
+      if (purchase.vat_chua_config) await importVatChuaWithPurchase(purchase,
+        Object.assign({}, purchase.vat_chua_config, { nguoi_tao_id: cleanId(userId) }), session);
+      result = purchase;
+    });
+    return result;
+  } finally { await session.endSession(); }
 }
 
 function isLegacyMergedPurchase(purchase) {
@@ -1124,6 +1233,7 @@ async function cancelPurchase(id, storeId, userId) {
 
 module.exports = {
   createPurchase,
+  completePurchase,
   cancelPurchase,
   rollbackCompletedPurchaseEffects,
   restoreCompletedPurchaseEffects,

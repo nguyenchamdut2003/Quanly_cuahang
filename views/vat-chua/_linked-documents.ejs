@@ -1,0 +1,38 @@
+<div class="customer-table-wrap vc-documents-wrap">
+  <table class="admin-table customer-table vc-documents-table vc-linked-documents-table">
+    <thead><tr>
+      <th>Thời gian</th><th>Chứng từ nguồn</th><th>Nhóm GPN / THG</th>
+      <th><%= linkedMode === 'purchase' ? 'Nhà cung cấp' : 'Khách hàng' %></th>
+      <th>Vật chứa / Chứng từ</th><th>Biến động</th><th class="text-right">Số lượng</th>
+      <th class="text-right">Đơn giá</th><th class="text-right">Thành tiền</th>
+      <th>Ghi Thu chi?</th><th>Phiếu thu / chi</th>
+      <% if (linkedMode === 'sales') { %><th class="text-right">Đã xuất / Nhận lại / Chênh lệch</th><% } %>
+      <th>Trạng thái</th>
+    </tr></thead>
+    <tbody>
+      <% if (!linkedDocuments.length) { %><tr><td colspan="<%= linkedMode === 'sales' ? 13 : 12 %>" class="empty-cell">Chưa có chứng từ vật chứa thuộc nhóm này.</td></tr><% } %>
+      <% linkedDocuments.forEach(function(doc) { %>
+        <tr data-vc-linked-document="<%= doc.doc_kind %>:<%= doc._id %>">
+          <td><%= formatDate(doc.created_at) %></td>
+          <td>
+            <% const links = doc.source_links || [{ code: doc.source_code, href: doc.source_href }]; %>
+            <% links.forEach(function(link) { %>
+              <% if (link.href) { %><a class="table-code-link" href="<%= link.href %>"><%= link.code || doc.source_type_label || 'Chứng từ nguồn' %></a><br><% } else { %><%= link.code || doc.source_type_label || '—' %><% } %>
+            <% }) %>
+          </td>
+          <td><% if (doc.group_href && doc.group_code) { %><a class="table-code-link" href="<%= doc.group_href %>"><%= doc.group_code %></a><% } else { %>—<% } %></td>
+          <td><% if (doc.partner_href) { %><a class="table-code-link" href="<%= doc.partner_href %>"><%= doc.doi_tuong_ten || '—' %></a><% } else { %><%= doc.doi_tuong_ten || '—' %><% } %></td>
+          <td><%= doc.ten_vat_chua || item.ten_vat_chua || 'Vật chứa' %><br><button type="button" class="table-code-link vc-doc-open-btn" data-vc-doc-open data-vc-doc-kind="<%= doc.doc_kind %>" data-vc-doc-id="<%= doc._id %>"><%= doc.ma_chung_tu || '---' %></button></td>
+          <td><%= doc.doc_kind === 'nhap' ? 'Nhập (+)' : 'Xuất / Trả (−)' %></td>
+          <td class="text-right"><%= doc.doc_kind === 'nhap' ? '+' : '−' %><%= Number(doc.so_luong || 0).toLocaleString('vi-VN') %></td>
+          <td class="text-right"><%= doc.don_gia_giao_dich == null ? 'Nhiều mức giá' : Number(doc.don_gia_giao_dich || 0).toLocaleString('vi-VN') + ' VNĐ' %></td>
+          <td class="text-right"><%= Number(doc.thanh_tien_giao_dich || 0).toLocaleString('vi-VN') %> VNĐ</td>
+          <td><%= doc.ghi_nhan_thu_chi === true ? 'Có' : 'Không' %></td>
+          <td><% if (!(doc.cash_documents || []).length) { %>—<% } %><% (doc.cash_documents || []).forEach(function(receipt) { %><a class="table-code-link" href="<%= receipt.href %>"><%= receipt.ma_phieu %></a><%= receipt.trang_thai === 'cancelled' ? ' (Đã hủy)' : '' %><br><% }) %></td>
+          <% if (linkedMode === 'sales') { %><td class="text-right"><%= doc.chenh_lech == null ? '—' : [doc.so_luong_da_xuat, doc.so_luong_da_nhan_lai, doc.chenh_lech].map(value => Number(value || 0).toLocaleString('vi-VN')).join(' / ') %></td><% } %>
+          <td><span class="vc-status-tag <%= doc.trang_thai === 'cancelled' ? 'is-inactive' : 'is-active' %>"><%= doc.trang_thai_label || 'Hợp lệ' %></span></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>

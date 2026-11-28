@@ -435,8 +435,8 @@ async function buildLotProfitReport(options = {}) {
     filters: { applied: options },
     filterOptions,
     meta: {
-      aggregate_by: 'lo_hang_id + thuộc tính/quy cách',
-      ghi_chu_gia_nhap: 'Báo cáo tổng hợp theo lô/quy cách. Đơn giá nhập = BQGQ từ phiếu nhập hoàn thành. Doanh thu = tổng từ hóa đơn bán (CTHoaDonBanHang, phân bổ lot_allocations).',
+      aggregate_by: 'lo_hang_id + phân loại',
+      ghi_chu_gia_nhap: 'Báo cáo tổng hợp theo lô/phân loại. Đơn giá nhập = BQGQ từ phiếu nhập hoàn thành. Doanh thu = tổng từ hóa đơn bán (CTHoaDonBanHang, phân bổ lot_allocations).',
       tong_dong: visibleRows.length
     }
   };

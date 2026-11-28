@@ -1392,10 +1392,10 @@ async function buildS2cPdfData(query, store, range) {
     });
 
     const notes = [
-        'Giá xuất kho tính theo bình quân gia quyền liên hoàn từ lịch sử kho (cấp tổng kho, không tính trùng bản ghi cấp lô/quy cách).'
+        'Giá xuất kho tính theo bình quân gia quyền liên hoàn từ lịch sử kho (cấp tổng kho, không tính trùng bản ghi cấp lô/phân loại).'
     ];
     if (lotAnnotations.size) {
-        notes.push('Chi tiết lô/quy cách của từng chứng từ được ghi kèm trong cột Diễn giải.');
+        notes.push('Chi tiết lô/phân loại của từng chứng từ được ghi kèm trong cột Diễn giải.');
     }
     if (fallbackUnitCost > 0) {
         notes.push('Chứng từ thiếu giá trị nhập được tạm tính theo giá vốn hiện tại của hàng hóa.');

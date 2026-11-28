@@ -1,6 +1,6 @@
 var mongoose = require('mongoose');
 var { VatChua, Counter, NhaCungCap, KhachHang, NhapVatChua, XuatVatChua } = require('../models/kiot.model');
-var { resolveStoreId } = require('../utils/storeScope');
+var { resolveStoreId, resolveUserStoreId } = require('../utils/storeScope');
 var { importDirectVatChuaFromSupplier, loadAverageCostByVatChuaIds, createNhapVatChuaAndIncreaseStock } = require('../services/vatChuaImport.service');
 var {
   createXuatVatChuaAndDecreaseStock,
@@ -391,9 +391,9 @@ exports.removeSelected = async function(req, res, next) {
 
 exports.apiDetail = async function(req, res, next) {
   try {
-    var storeId = await resolveStoreId(req);
+    var storeId = resolveUserStoreId(req);
     if (!storeId) {
-      return res.status(400).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Chưa chọn cửa hàng làm việc.</p></div>');
+      return res.status(403).type('html').send('<div class="kv-detail-panel product-detail kv-detail-error"><p>Chưa chọn cửa hàng làm việc.</p></div>');
     }
     var ctx = await loadVatChuaDetailContext(req.params && req.params.id, storeId);
     if (!ctx) {
@@ -408,9 +408,9 @@ exports.apiDetail = async function(req, res, next) {
 
 exports.apiDocumentDetail = async function(req, res, next) {
   try {
-    var storeId = await resolveStoreId(req);
+    var storeId = resolveUserStoreId(req);
     if (!storeId) {
-      return res.status(400).type('html').send('<div class="vc-doc-modal-error"><p>Chưa chọn cửa hàng làm việc.</p></div>');
+      return res.status(403).type('html').send('<div class="vc-doc-modal-error"><p>Chưa chọn cửa hàng làm việc.</p></div>');
     }
     var kind = String(req.params && req.params.kind || '').trim();
     var docId = req.params && req.params.id;

@@ -522,6 +522,8 @@ GiaBanHangHoaSchema.index({ cua_hang_id: 1, bang_gia_id: 1, hang_hoa_id: 1, lo_h
 GiaBanHangHoaSchema.index({ hang_hoa_id: 1, lo_hang_id: 1, gia_tri_thuoc_tinh_id: 1, ten_quy_cach: 1 });
 GiaBanHangHoaSchema.index({ hang_hoa_id: 1, trang_thai: 1 });
 const PhieuTraHangNhapSchema = new Schema({
+  vat_chua_request_key: { type: String, trim: true, maxlength: 120 },
+  vat_chua_config: { type: Schema.Types.Mixed, default: undefined },
   cua_hang_id: { type: ObjectId, ref: 'CuaHang', required: true },
   kho_id: { type: ObjectId, ref: 'Kho' },
   ma_phieu_tra_nhap: { type: String, unique: true, sparse: true },
@@ -646,7 +648,7 @@ const LichSuKhoSchema = new Schema({
 
   loai_phieu: {
     type: String,
-    enum: ['nhap_hang', 'tra_hang_nhap', 'tra_hang', 'kiem_kho', 'ban_hang', 'huy_hoa_don', 'rollback_ban_hang', 'dieu_chinh_ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh'],
+    enum: ['nhap_hang', 'tra_hang_nhap', 'tra_hang', 'kiem_kho', 'ban_hang', 'huy_hoa_don', 'rollback_ban_hang', 'dieu_chinh_ban_hang', 'xuat_huy', 'xuat_noi_bo', 'dieu_chinh', 'phan_loai'],
     required: true
   },
 
@@ -934,8 +936,9 @@ const TonKhoLoQuyCachSchema = new Schema({
   lo_hang_id: {
     type: ObjectId,
     ref: 'LoHang',
-    required: true
+    default: null
   },
+  gia_tri_thuoc_tinh_id: { type: ObjectId, ref: 'GiaTriThuocTinh', default: null },
   ten_quy_cach: {
     type: String,
     required: true,
@@ -971,8 +974,47 @@ TonKhoLoQuyCachSchema.index(
   { unique: true }
 );
 
+// A classification is an append-only audit event. Stock remains in the existing
+// TonKhoLoQuyCach collection; purchase and sales documents are never rewritten.
+const LichSuPhanLoaiChiTietSchema = new Schema({
+  ten_quy_cach: { type: String, required: true, trim: true },
+  gia_tri_thuoc_tinh_id: { type: ObjectId, ref: 'GiaTriThuocTinh', default: null },
+  so_luong_truoc: { type: Number, required: true },
+  so_luong_thay_doi: { type: Number, required: true },
+  so_luong_sau: { type: Number, required: true },
+  gia_von: { type: Number, required: true, min: 0 },
+  gia_von_truoc: { type: Number, min: 0 },
+  gia_von_sau: { type: Number, min: 0 },
+  loai_dong: { type: String, enum: ['nguon', 'dich'], required: true }
+}, { _id: false });
+const LichSuPhanLoaiSchema = new Schema({
+  cua_hang_id: { type: ObjectId, ref: 'CuaHang', required: true },
+  ma_phan_loai: { type: String, trim: true, match: /^PL\d{5,}$/ },
+  kho_id: { type: ObjectId, ref: 'Kho', required: true },
+  hang_hoa_id: { type: ObjectId, ref: 'HangHoa', required: true },
+  lo_hang_id: { type: ObjectId, ref: 'LoHang', default: null },
+  nguon_thao_tac: { type: String, enum: ['phieu_nhap', 'ton_kho'], required: true },
+  phieu_nhap_id: { type: ObjectId, ref: 'PhieuNhap', default: null },
+  ct_phieu_nhap_id: { type: ObjectId, ref: 'CtPhieuNhap', default: null },
+  chi_tiet: { type: [LichSuPhanLoaiChiTietSchema], required: true },
+  tong_so_luong_chuyen: { type: Number, required: true, min: 0 },
+  nguoi_thuc_hien_id: { type: ObjectId, ref: 'NguoiDung', required: true },
+  ngay_thuc_hien: { type: Date, default: Date.now },
+  ghi_chu: { type: String, trim: true, maxlength: 2000 },
+  request_key: { type: String, required: true, trim: true, maxlength: 120 },
+  request_digest: { type: String, required: true }
+}, { collection: 'lich_su_phan_loai', timestamps: { createdAt: 'created_at', updatedAt: false } });
+LichSuPhanLoaiSchema.index({ cua_hang_id: 1, request_key: 1 }, { unique: true, name: 'uq_phan_loai_store_request' });
+LichSuPhanLoaiSchema.index({ cua_hang_id: 1, ma_phan_loai: 1 }, {
+  unique: true, name: 'uq_phan_loai_store_code', partialFilterExpression: { ma_phan_loai: { $type: 'string' } }
+});
+LichSuPhanLoaiSchema.index({ cua_hang_id: 1, kho_id: 1, hang_hoa_id: 1, lo_hang_id: 1, ngay_thuc_hien: -1 });
+LichSuPhanLoaiSchema.index({ cua_hang_id: 1, hang_hoa_id: 1, ngay_thuc_hien: -1 });
+
 // DON_HANG
 const DonHangSchema = new Schema({
+  vat_chua_request_key: { type: String, trim: true, maxlength: 120 },
+  vat_chua_config: { type: Schema.Types.Mixed, default: undefined },
   ma_don_hang: { type: String, unique: true },
   bang_gia_id: { type: ObjectId, ref: 'BangGia' },
   ngay_dat: { type: Date, default: Date.now },
@@ -1094,6 +1136,8 @@ CTDonHangSchema.index({
 
 // HOA_DON_BAN_HANG
 const HoaDonBanHangSchema = new Schema({
+  // Optional request identity for one confirmed container delivery event.
+  vat_chua_event_key: { type: String, trim: true, maxlength: 120 },
   ma_hoa_don: { type: String, unique: true },
   ngay_ban: { type: Date, default: Date.now },
   tong_tien: { type: Number },
@@ -1491,6 +1535,8 @@ GopHoaDonSchema.index({ hoa_don_nguon_ids: 1 });
 
 // PHIEU_TRA_HANG
 const PhieuTraHangSchema = new Schema({
+  vat_chua_request_key: { type: String, trim: true, maxlength: 120 },
+  vat_chua_config: { type: Schema.Types.Mixed, default: undefined },
   ma_phieu_tra: { type: String, unique: true },
   ngay_tra: { type: Date, default: Date.now },
   tong_tien_tra: { type: Number },
@@ -1855,6 +1901,8 @@ const CongNoKhachHangSchema = new Schema({
 }, { collection: "cong_no_khach_hang", timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
 const VatChuaNhapXuatItemSchema = new Schema({
+  don_gia_giao_dich: { type: Number, min: 0, default: 0 },
+  thanh_tien_giao_dich: { type: Number, min: 0, default: 0 },
   vat_chua_id: {
     type: ObjectId,
     ref: 'VatChua',
@@ -2444,6 +2492,8 @@ VatChuaSchema.index(
 );
 
 const NhapVatChuaSchema = new Schema({
+  ghi_nhan_thu_chi: { type: Boolean, default: false },
+  operation_key: { type: String, trim: true },
   ma_nhap_vat_chua: {
     type: String,
     required: true,
@@ -2505,6 +2555,10 @@ const NhapVatChuaSchema = new Schema({
 });
 
 NhapVatChuaSchema.index(
+  { cua_hang_id: 1, operation_key: 1 },
+  { unique: true, name: 'uq_nhap_vat_chua_operation', partialFilterExpression: { operation_key: { $type: 'string' }, trang_thai: 'active' } }
+);
+NhapVatChuaSchema.index(
   { cua_hang_id: 1, ma_nhap_vat_chua: 1 },
   { unique: true, name: 'uq_nhap_vat_chua_store_code' }
 );
@@ -2526,6 +2580,10 @@ NhapVatChuaSchema.index(
 );
 
 const XuatVatChuaSchema = new Schema({
+  don_hang_id: { type: ObjectId, ref: 'DonHang' },
+  hoa_don_id: { type: ObjectId, ref: 'HoaDonBanHang' },
+  ghi_nhan_thu_chi: { type: Boolean, default: false },
+  operation_key: { type: String, trim: true },
   ma_xuat_vat_chua: {
     type: String,
     required: true,
@@ -2586,6 +2644,10 @@ const XuatVatChuaSchema = new Schema({
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
+XuatVatChuaSchema.index(
+  { cua_hang_id: 1, operation_key: 1 },
+  { unique: true, name: 'uq_xuat_vat_chua_operation', partialFilterExpression: { operation_key: { $type: 'string' }, trang_thai: 'active' } }
+);
 XuatVatChuaSchema.index(
   { cua_hang_id: 1, ma_xuat_vat_chua: 1 },
   { unique: true, name: 'uq_xuat_vat_chua_store_code' }
@@ -2670,6 +2732,7 @@ if (mongoose.connection.readyState === 1) {
 const CongNoKhachHang = mongoose.models.CongNoKhachHang || mongoose.model("CongNoKhachHang", CongNoKhachHangSchema);
 const CongNoNhaCungCap = mongoose.models.CongNoNhaCungCap || mongoose.model("CongNoNhaCungCap", CongNoNhaCungCapSchema);
 const LichSuKho = mongoose.models.LichSuKho || mongoose.model("LichSuKho", LichSuKhoSchema);
+const LichSuPhanLoai = mongoose.models.LichSuPhanLoai || mongoose.model('LichSuPhanLoai', LichSuPhanLoaiSchema);
 const PhieuXuatNoiBo = mongoose.models.PhieuXuatNoiBo || mongoose.model("PhieuXuatNoiBo", PhieuXuatNoiBoSchema);
 const CTXuatNoiBo = mongoose.models.CTXuatNoiBo || mongoose.model("CTXuatNoiBo", CTXuatNoiBoSchema);
 const LoaiXuatNoiBo = mongoose.models.LoaiXuatNoiBo || mongoose.model("LoaiXuatNoiBo", LoaiXuatNoiBoSchema);
@@ -2703,7 +2766,7 @@ module.exports = {
   PhieuTraHang, CTPhieuTraHang,
   PhieuKiemKho, CTPhieuKiemKho,
   SoQuy, PhieuThuChi,
-  CongNoKhachHang, CongNoNhaCungCap, LichSuKho,
+  CongNoKhachHang, CongNoNhaCungCap, LichSuKho, LichSuPhanLoai,
   PhieuXuatNoiBo, CTXuatNoiBo, LoaiXuatNoiBo, PhieuXuatHuy, CTXuatHuy,
   PhanBoHang, CTPhanBoHang,
   PhiVanChuyenKhachHang,

@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
   <link rel="stylesheet" href="/stylesheets/global-loading.css">
+  <link rel="stylesheet" href="/stylesheets/phan-loai-hang.css">
   <style>
     #productCreateForm .product-vn-num { text-align: right; }
     .product-trash-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:1450;align-items:center;justify-content:center;padding:16px}
@@ -291,7 +292,7 @@
                 <tr class="product-list-row" data-kv-detail-id="<%= item._id %>">
                   <td class="check-cell" onclick="event.stopPropagation()"><input class="product-checkbox" type="checkbox" name="ids" value="<%= item._id %>" aria-label="Chọn hàng hóa"></td>
                   <td><a class="table-code-link kv-detail-code-link" href="<%= listBase %>"><%= item.ma_hang || '---' %></a></td>
-                  <td><strong><%= item.ten_hang || '---' %></strong></td>
+                  <td><strong><%= item.ten_hang || '---' %></strong><div class="classification-line-action"><button type="button" class="btn btn-light btn-sm stock-classify-trigger" data-classify-open data-hang-hoa-id="<%= item._id %>">Phân loại</button></div></td>
                   <td class="text-right" data-product-metric="gia_von_trung_binh">Đang tải...</td>
                   <td class="text-right" data-product-metric="gia_ban_trung_binh">Đang tải...</td>
                   <td data-product-metric="ton_kho">Đang tải...</td>
@@ -469,6 +470,7 @@
   <script id="unitTypesSeed" type="application/json"><%- JSON.stringify(units || []) %></script>
   <script src="/javascripts/global-loading.js"></script>
   <script src="/js/kv-inline-detail.js"></script>
+  <script src="/javascripts/phan-loai-hang.js"></script>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {

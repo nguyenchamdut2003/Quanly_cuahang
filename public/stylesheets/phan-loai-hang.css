@@ -1,0 +1,46 @@
+.stock-classify-trigger{white-space:nowrap}
+.classification-line-action{display:grid;gap:5px;margin-top:7px;justify-items:start}
+.classification-line-action small{display:block;max-width:320px;font-size:12px;line-height:1.4;color:#667085;white-space:normal}
+.classification-overlay{position:fixed;inset:0;z-index:2200;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+.classification-overlay[hidden]{display:none!important}
+.classification-dialog{width:min(860px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;background:#fff;border-radius:10px;box-shadow:0 20px 70px #0f172a40;color:#172b4d;font:14px Arial,sans-serif;overflow:hidden}
+.classification-dialog *{box-sizing:border-box}
+.classification-head,.classification-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:17px 22px;border-bottom:1px solid #e5e9ef}
+.classification-head h2{font-size:20px;margin:0}
+.classification-close{border:0;background:none;font-size:27px;color:#667085;cursor:pointer;padding:0 3px}
+.classification-body{padding:18px 22px;overflow:auto;min-height:150px}
+.classification-foot{border-top:1px solid #e5e9ef;border-bottom:0;justify-content:flex-end}
+.classification-dialog .classification-btn,.classification-history .classification-btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;border:1px solid #cfd8e3;border-radius:5px;padding:7px 12px;background:#fff;color:#172b4d;font:inherit;cursor:pointer;text-decoration:none}
+.classification-dialog .classification-btn.primary{background:#0070f4;border-color:#0070f4;color:#fff;font-weight:700}
+.classification-dialog button:disabled,.classification-history button:disabled{opacity:.55;cursor:not-allowed}
+.classification-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 16px}
+.classification-field{display:grid;gap:6px;margin:0;font-weight:400}
+.classification-field select,.classification-field input,.classification-field textarea,.classification-target select,.classification-target input{min-width:0;width:100%;border:1px solid #cfd8e3;border-radius:5px;min-height:36px;padding:7px 10px;background:#fff;color:#172b4d;font:inherit}
+.classification-field input[readonly]{background:#f7f9fc}
+.classification-span{grid-column:1/-1}
+.classification-meta{margin:0 0 16px;padding:12px;background:#f5f8fc;border-radius:6px;line-height:1.6}
+.classification-stats{display:flex;flex-wrap:wrap;gap:10px 28px;margin:12px 0;padding:12px;border:1px solid #e3e8ef;border-radius:6px;font-variant-numeric:tabular-nums}
+.classification-stats strong{margin-left:8px}
+.classification-section-head{display:flex;align-items:center;justify-content:space-between;margin:20px 0 10px;gap:10px}
+.classification-section-head h3{font-size:15px;margin:0}
+.classification-target{display:grid;grid-template-columns:minmax(0,1fr) 160px 36px;gap:10px;margin-bottom:10px;align-items:center}
+.classification-target [data-classify-target-name]{text-align:left}
+.classification-target [data-classify-target-qty]{text-align:right;font-variant-numeric:tabular-nums}
+.classification-target button{height:36px;border:1px solid #e1e6ed;border-radius:5px;background:#fff;font-size:21px;color:#667085;cursor:pointer}
+.classification-summary{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;margin:15px 0;font-variant-numeric:tabular-nums}
+.classification-summary strong{margin-left:10px}
+.classification-status{line-height:1.5;margin:10px 0;white-space:pre-line}
+.classification-status:empty{display:none}
+.classification-status.is-error{color:#b42318;background:#fff5f5;border:1px solid #fecaca;padding:10px;border-radius:5px}
+.classification-status.is-info{color:#475467;background:#f5f8fc;padding:10px;border-radius:5px}
+.classification-history{padding:12px 0}
+.classification-history-toolbar,.classification-history-pages{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.classification-history-table-wrap{overflow:auto}
+.classification-history table,.classification-dialog table{width:100%;border-collapse:collapse;font-size:13px}
+.classification-history th,.classification-history td,.classification-dialog th,.classification-dialog td{padding:10px;border:1px solid #e5e9ef;text-align:left;line-height:1.45}
+.classification-history th,.classification-dialog th{background:#f3f7fc;white-space:nowrap}
+.classification-history .num,.classification-dialog .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.classification-history-pages{justify-content:flex-end;margin-top:12px}
+.classification-toast{position:fixed;z-index:2300;right:24px;bottom:24px;max-width:calc(100vw - 48px);padding:13px 18px;border-radius:7px;background:#ecfdf3;border:1px solid #abefc6;color:#067647;box-shadow:0 5px 25px #0f172a20;font-size:14px}
+@media(max-width:600px){.classification-overlay{padding:8px}.classification-dialog{max-height:calc(100vh - 16px)}.classification-head,.classification-foot,.classification-body{padding:14px}.classification-grid{grid-template-columns:1fr}.classification-target{grid-template-columns:minmax(0,1fr) 95px 32px;gap:6px}.classification-target select,.classification-target input{padding:7px 6px}.classification-head h2{font-size:18px}}
+@media print{.stock-classify-trigger,.classification-overlay,.classification-toast{display:none!important}}

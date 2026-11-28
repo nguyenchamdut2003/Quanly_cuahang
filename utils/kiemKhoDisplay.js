@@ -23,7 +23,7 @@ function nccLabel(ncc) {
 
 function pickUnitCost({ qcCost, tonLoCost, loCost, productCost }) {
     const qc = Number(qcCost);
-    if (Number.isFinite(qc) && qc > 0) return qc;
+    if (Number.isFinite(qc) && qc >= 0) return qc;
     const tonLo = Number(tonLoCost);
     if (Number.isFinite(tonLo) && tonLo > 0) return tonLo;
     const lo = Number(loCost);
@@ -48,7 +48,8 @@ function buildStockMaps({ products, tonLoList, qcList, loList }) {
     const qcByKey = (qcList || []).reduce((acc, row) => {
         const tenQc = normalizeTenQuyCach(row.ten_quy_cach || row.ten_thuoc_tinh);
         if (!tenQc) return acc;
-        acc[`${String(row.lo_hang_id)}::${tenQc}`] = row;
+        acc[`${String(row.hang_hoa_id)}::${String(row.lo_hang_id || '')}::${tenQc}`] = row;
+        if (row.lo_hang_id) acc[`${String(row.lo_hang_id)}::${tenQc}`] = row;
         return acc;
     }, {});
 
@@ -68,8 +69,9 @@ function resolveDonGiaVon(row, maps) {
     let qcCost;
     let tonLoCost;
     let loCost;
-    if (lotId && tenQc) {
-        const qc = maps.qcByKey[`${lotId}::${tenQc}`];
+    if (tenQc) {
+        const qc = maps.qcByKey[`${String(row.hang_hoa_id)}::${lotId}::${tenQc}`]
+            || (lotId ? maps.qcByKey[`${lotId}::${tenQc}`] : null);
         qcCost = qc?.gia_von;
     }
     if (lotId) {
@@ -124,8 +126,9 @@ async function loadMapsForKiemKho(khoId, rows, models) {
         lotIds.length && khoId
             ? TonKhoLo.find({ kho_id: khoId, lo_hang_id: { $in: lotIds } }).lean()
             : [],
-        lotIds.length && khoId
-            ? TonKhoLoQuyCach.find({ kho_id: khoId, lo_hang_id: { $in: lotIds } }).lean()
+        hangIds.length && khoId
+            ? TonKhoLoQuyCach.find({ kho_id: khoId, hang_hoa_id: { $in: hangIds },
+                $or: [{ lo_hang_id: { $in: lotIds } }, { lo_hang_id: null }] }).lean()
             : [],
         lotIds.length
             ? LoHang.find({ _id: { $in: lotIds } })

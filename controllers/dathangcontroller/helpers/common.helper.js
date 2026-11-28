@@ -54,12 +54,18 @@ const {
     getReservedQuantitiesForSale
 } = require('../../../services/availability.service');
 const { normalizeAddress } = require('../../../utils/address');
-const { resolveStoreId } = require('../../../utils/storeScope');
+const { resolveUserStoreId } = require('../../../utils/storeScope');
 const { resolveCashBookForPayment } = require('../../../services/paymentCashBook.service');
 const { resolveSalePrice, normalizeUnitPrice } = require('../../../services/salePrice.service');
-const { parseVatChuaImportInput, parseVatChuaSignedInput, assertVatChuaImportInput, assertVatChuaSignedInput, importVatChuaWithSalesReturn, cancelNhapVatChuaBySource } = require('../../../services/vatChuaImport.service');
+const { addAverageCostToVatChuaOptions, parseVatChuaImportInput, parseVatChuaSignedInput, assertVatChuaImportInput, assertVatChuaSignedInput, importVatChuaWithSalesReturn, cancelNhapVatChuaBySource } = require('../../../services/vatChuaImport.service');
 const { exportVatChuaWithOrderDelivery, exportVatChuaWithInvoice, exportVatChuaWithSalesReturn, cancelXuatVatChuaBySource } = require('../../../services/vatChuaExport.service');
-const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines } = require('../../../services/vatChuaDetail.service');
+const { loadOrderLinkedVatChuaLines, loadInvoiceLinkedVatChuaLines, loadSalesReturnLinkedNhapVatChuaLines, buildVatChuaEditState } = require('../../../services/vatChuaDetail.service');
+
+async function resolveStoreId(req) {
+    const storeId = resolveUserStoreId(req);
+    if (!storeId) throw Object.assign(new Error('Chưa chọn cửa hàng trong phiên đăng nhập.'), { statusCode: 403 });
+    return storeId;
+}
 
 function disabledTrashOperation() {
     const error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
@@ -536,11 +542,13 @@ async function deductStockForInvoiceLines({
     ma_hoa_don,
     lineRefs = [],
     nguoi_tao_id,
+    session,
     ghi_chu_prefix = 'Xuat kho HD'
 } = {}) {
     const stockAppliedLines = [];
     for (const { invoiceLineId, item } of lineRefs) {
         const stockResult = await truTonKho({
+            session,
             kho_id,
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: item.lo_hang_id || undefined,
@@ -555,7 +563,7 @@ async function deductStockForInvoiceLines({
         });
         const lotPatch = applyLotAllocationsToInvoiceLine(stockResult.allocations);
         if (invoiceLineId) {
-            await CTHoaDonBanHang.updateOne({ _id: invoiceLineId }, { $set: lotPatch });
+            await CTHoaDonBanHang.updateOne({ _id: invoiceLineId }, { $set: lotPatch }, session ? { session } : {});
         }
         stockAppliedLines.push({
             hang_hoa_id: item.hang_hoa_id,
@@ -575,6 +583,7 @@ async function restoreStockLine(khoId, line, options = {}) {
     if (!qty || !khoId || !line.hang_hoa_id) return;
 
     const base = {
+        session: options.session,
         kho_id: khoId,
         hang_hoa_id: line.hang_hoa_id,
         ten_quy_cach: line.ten_quy_cach || line.ten_thuoc_tinh || '',
@@ -618,6 +627,7 @@ async function deductStockLine(khoId, line, options = {}) {
     if (!qty || !khoId || !line.hang_hoa_id) return;
 
     const base = {
+        session: options.session,
         kho_id: khoId,
         hang_hoa_id: line.hang_hoa_id,
         ten_quy_cach: line.ten_quy_cach || line.ten_thuoc_tinh || '',
@@ -694,7 +704,8 @@ async function recordSalesReturnRefundReceipt({
     storeId,
     customerId,
     hoa_don_id,
-    userId
+    userId,
+    session
 }) {
     if (!refund || refund <= 0) return null;
     if (!storeId) throw new Error('Thiếu cửa hàng để ghi phiếu chi hoàn tiền trả hàng.');
@@ -743,7 +754,7 @@ async function recordSalesReturnRefundReceipt({
             phuong_thuc_thanh_toan: tienMat > 0 && chuyenKhoan > 0
                 ? 'tien_mat_chuyen_khoan'
                 : (chuyenKhoan > 0 ? 'chuyen_khoan' : 'tien_mat')
-        }));
+        }), { session });
     }
 
     const bookId = refundCashBookId || cashBookId || bankBookId;
@@ -752,7 +763,7 @@ async function recordSalesReturnRefundReceipt({
         gia_tri: refund,
         so_quy_id: bookId,
         phuong_thuc_thanh_toan: returnPaymentMethod
-    }));
+    }), { session });
 }
 
 function returnStockLineKey(row) {
@@ -1595,17 +1606,16 @@ function normalizeDiscount(value, type, baseAmount) {
     return Math.min(amount, base);
 }
 
-async function getSellableStock(khoId, product) {
+async function getSellableStock(khoId, product, options = {}) {
     if (!product?.quan_ly_theo_lo) {
-        const stock = await TonKho.findOne({ kho_id: khoId, hang_hoa_id: product._id }).lean();
+        const stock = await customerReadSession(TonKho.findOne({ kho_id: khoId, hang_hoa_id: product._id }), options).lean();
         return Number(stock?.so_luong || 0);
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const lotRows = await TonKhoLo.find({ kho_id: khoId, hang_hoa_id: product._id, so_luong: { $gt: 0 } })
-        .populate('lo_hang_id')
-        .lean();
+    const lotRows = await customerReadSession(TonKhoLo.find({ kho_id: khoId, hang_hoa_id: product._id, so_luong: { $gt: 0 } })
+        .populate('lo_hang_id'), options).lean();
 
     return lotRows.reduce((total, row) => {
         const lot = row.lo_hang_id;
@@ -1619,8 +1629,12 @@ async function getSellableStock(khoId, product) {
     }, 0);
 }
 
-async function getOrderLineActualStock(khoId, item) {
-    const tenQuyCach = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
+async function getOrderLineActualStock(khoId, item, options = {}) {
+    let tenQuyCach = String(item.ten_quy_cach || item.ten_thuoc_tinh || '').trim();
+    if (!tenQuyCach && item.product && !item.product.quan_ly_theo_lo) {
+        const variantsExist = await customerReadSession(TonKhoLoQuyCach.exists({ kho_id: khoId, hang_hoa_id: item.hang_hoa_id, lo_hang_id: null }), options);
+        if (variantsExist) tenQuyCach = 'Chưa phân loại';
+    }
     if (tenQuyCach) {
         const filter = {
             kho_id: khoId,
@@ -1628,28 +1642,30 @@ async function getOrderLineActualStock(khoId, item) {
             $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
         };
         if (item.lo_hang_id) filter.lo_hang_id = item.lo_hang_id;
-        const rows = await TonKhoLoQuyCach.find(filter).lean();
+        else if (item.product && !item.product.quan_ly_theo_lo) filter.lo_hang_id = null;
+        const rows = await customerReadSession(TonKhoLoQuyCach.find(filter), options).lean();
         return rows.reduce((sum, row) => sum + Number(row.so_luong || 0), 0);
     }
 
     if (item.lo_hang_id) {
-        const lotStock = await TonKhoLo.findOne({
+        const lotStock = await customerReadSession(TonKhoLo.findOne({
             kho_id: khoId,
             hang_hoa_id: item.hang_hoa_id,
             lo_hang_id: item.lo_hang_id
-        }).lean();
+        }), options).lean();
         return Number(lotStock?.so_luong || 0);
     }
 
-    return getSellableStock(khoId, item.product);
+    return getSellableStock(khoId, item.product, options);
 }
 
-async function validateOrderAvailability({ khoId, normalizedItems, exclude_don_hang_id = null, exclude_hoa_don_id = null }) {
+async function validateOrderAvailability({ khoId, normalizedItems, exclude_don_hang_id = null, exclude_hoa_don_id = null, session }) {
     const reserved = await getReservedQuantitiesForSale({
         kho_id: khoId,
         hang_hoa_ids: normalizedItems.map(item => item.hang_hoa_id),
         exclude_don_hang_id,
-        exclude_hoa_don_id
+        exclude_hoa_don_id,
+        session
     });
     const warnings = [];
 
@@ -1677,10 +1693,12 @@ async function validateOrderAvailability({ khoId, normalizedItems, exclude_don_h
         const variantReserved = reservedKey
             ? Number((reserved.byVariant[reservedKey] || reserved.byVariant[fallbackReservedKey])?.so_luong_khach_dat || 0)
             : 0;
-        const soLuongKhachDat = lotKey
-            ? lotReserved
-            : (reservedKey ? variantReserved : productReserved);
-        const tonThucTe = await getOrderLineActualStock(khoId, item);
+        const soLuongKhachDat = tenQuyCach || !item.product?.quan_ly_theo_lo
+            ? require('../../../services/availability.service').getReservedQuantityForStock(reserved, {
+                hang_hoa_id: item.hang_hoa_id, lo_hang_id: item.lo_hang_id || null,
+                ten_quy_cach: tenQuyCach || 'Chưa phân loại', gia_tri_thuoc_tinh_id: item.gia_tri_thuoc_tinh_id || null })
+            : (lotKey ? lotReserved : productReserved);
+        const tonThucTe = await getOrderLineActualStock(khoId, item, { session });
         const khaDung = tonThucTe - soLuongKhachDat;
         const soLuongDat = Number(item.so_luong || 0);
         const label = [
@@ -1690,7 +1708,7 @@ async function validateOrderAvailability({ khoId, normalizedItems, exclude_don_h
         ].filter(Boolean).join(' - ');
 
         if (tenQuyCach && !item.gia_tri_thuoc_tinh_id && !item.ten_quy_cach) {
-            warnings.push(`Dòng hàng quy cách ${label} thiếu gia_tri_thuoc_tinh_id và ten_quy_cach, chỉ có thể đối chiếu theo dữ liệu còn lại.`);
+            warnings.push(`Dòng hàng thuộc phân loại ${label} thiếu gia_tri_thuoc_tinh_id và ten_quy_cach, chỉ có thể đối chiếu theo dữ liệu còn lại.`);
         }
         if (soLuongDat > tonThucTe) {
             const message = `Số lượng đặt vượt tồn thực tế. Khi giao có thể thiếu hàng. Dòng [${label}] tồn ${tonThucTe}, khách đặt ${soLuongDat}.`;
@@ -1867,21 +1885,23 @@ function isEnabled(value) {
     return value === true || value === 'true' || value === 'on' || value === '1';
 }
 
-async function getOrderPaidAmount(orderId, extraFilter = {}) {
+function customerReadSession(query, options = {}) { return options.session ? query.session(options.session) : query; }
+
+async function getOrderPaidAmount(orderId, extraFilter = {}, options = {}) {
     if (!orderId) return 0;
     const linkOr = [{ don_hang_id: orderId }];
     const orderCode = String(extraFilter.ma_chung_tu_goc || '').trim();
     if (orderCode) {
         linkOr.push({ ma_chung_tu_goc: orderCode });
     } else {
-        const order = await DonHang.findById(orderId).select('ma_don_hang').lean();
+        const order = await customerReadSession(DonHang.findById(orderId).select('ma_don_hang'), options).lean();
         const maDonHang = String(order?.ma_don_hang || '').trim();
         if (maDonHang) linkOr.push({ ma_chung_tu_goc: maDonHang });
     }
     const { ma_chung_tu_goc: _maChungTuGoc, ...restFilter } = extraFilter;
-    const receipts = await PhieuThuChi.find(
+    const receipts = await customerReadSession(PhieuThuChi.find(
         receiptRowsForNetPaidFilter({ $or: linkOr, ...restFilter })
-    ).select('loai_phieu loai_thu_chi gia_tri trang_thai').lean();
+    ).select('loai_phieu loai_thu_chi gia_tri trang_thai'), options).lean();
     return computeNetPaidFromReceiptRows(receipts);
 }
 
@@ -1910,7 +1930,7 @@ function parseCustomerPaymentFromRequest(body, soTienConPhaiThu, requirePayment 
     });
 }
 
-async function recordCustomerPaymentReceipts(data, payment) {
+async function recordCustomerPaymentReceipts(data, payment, options = {}) {
     if (!payment || payment.tong_khach_dua <= 0) {
         return { thu: null, chi: null };
     }
@@ -1926,16 +1946,16 @@ async function recordCustomerPaymentReceipts(data, payment) {
             payload.document_type = 'van_don';
         }
     }
-    return taoPhieuThuKhachHang(Object.assign({}, payload, { payment }));
+    return taoPhieuThuKhachHang(Object.assign({}, payload, { payment, ...(options.session ? { session: options.session } : {}) }));
 }
 
-async function computeOrderPaymentBalance(orderId, orderFallback = {}) {
-    const invoices = await HoaDonBanHang.find({
+async function computeOrderPaymentBalance(orderId, orderFallback = {}, options = {}) {
+    const invoices = await customerReadSession(HoaDonBanHang.find({
         don_hang_id: orderId,
         trang_thai_du_lieu: 'active',
         trang_thai: { $ne: 'cancelled' }
-    }).select('thanh_toan').lean();
-    const tong_da_thu_receipts = await getOrderPaidAmount(orderId);
+    }).select('thanh_toan'), options).lean();
+    const tong_da_thu_receipts = await getOrderPaidAmount(orderId, {}, options);
     const storedPaid = Math.max(0, Number(orderFallback.khach_thanh_toan || 0));
     const tong_da_thu = tong_da_thu_receipts > 0 ? tong_da_thu_receipts : storedPaid;
     const tong_phai_thu = invoices.length
@@ -1949,14 +1969,14 @@ async function computeOrderPaymentBalance(orderId, orderFallback = {}) {
     };
 }
 
-async function applyOrderPaymentBalance(order, orderId = order?._id) {
-    const balance = await computeOrderPaymentBalance(orderId, order);
+async function applyOrderPaymentBalance(order, orderId = order?._id, options = {}) {
+    const balance = await computeOrderPaymentBalance(orderId, order, options);
     order.khach_thanh_toan = balance.khach_thanh_toan;
     order.khach_can_tra = balance.khach_can_tra;
     return balance;
 }
 
-async function computeDeliveryPaymentDue(orderId, batchPayable, orderFallback = {}) {
+async function computeDeliveryPaymentDue(orderId, batchPayable, orderFallback = {}, options = {}) {
     const payable = Math.max(Number(batchPayable || 0), 0);
     if (!orderId || payable <= 0) {
         return {
@@ -1968,13 +1988,13 @@ async function computeDeliveryPaymentDue(orderId, batchPayable, orderFallback = 
         };
     }
 
-    const invoices = await HoaDonBanHang.find({
+    const invoices = await customerReadSession(HoaDonBanHang.find({
         don_hang_id: orderId,
         trang_thai_du_lieu: 'active',
         trang_thai: { $ne: 'cancelled' }
-    }).select('thanh_toan').lean();
+    }).select('thanh_toan'), options).lean();
     const invoicedPayable = invoices.reduce((sum, row) => sum + Number(row.thanh_toan || 0), 0);
-    const orderPaid = await getOrderPaidAmount(orderId);
+    const orderPaid = await getOrderPaidAmount(orderId, {}, options);
     const storedPaid = Math.max(0, Number(orderFallback.khach_thanh_toan || 0));
     const tongDaThu = orderPaid > 0 ? orderPaid : storedPaid;
     const prepaymentCredit = Math.max(tongDaThu - invoicedPayable, 0);
@@ -2107,15 +2127,16 @@ async function getSellableQuyCachQuantity(khoId, hangHoaId, tenQuyCach, loHangId
         ? await TonKhoLo.find({ kho_id: khoId, hang_hoa_id: hangHoaId, lo_hang_id: { $in: lotIds } }).lean()
         : [];
     const lotStockMap = lotStocks.reduce((map, row) => {
-        map[String(row.lo_hang_id)] = Number(row.so_luong || 0);
+        map[String(row.lo_hang_id)] = (map[String(row.lo_hang_id)] || 0) + Number(row.so_luong || 0);
         return map;
     }, {});
     return qcRows
-        .filter(row => isSellableStockLot(row.lo_hang_id))
+        .filter(row => !row.lo_hang_id || isSellableStockLot(row.lo_hang_id))
         .sort(sortStockLotsFefo)
         .reduce((sum, row) => {
             const lotId = String(row.lo_hang_id?._id || row.lo_hang_id || '');
             const qcQty = Number(row.so_luong || 0);
+            if (!lotId) return sum + Math.max(qcQty, 0);
             const lotQty = Number(lotStockMap[lotId] || 0);
             const lotRemain = row.lo_hang_id ? Number(row.lo_hang_id.so_luong_con_lai ?? lotQty) : lotQty;
             return sum + Math.max(Math.min(qcQty, lotQty, lotRemain), 0);
@@ -2242,7 +2263,7 @@ async function validateDeliveryStockPreflight(khoId, warehouse, deliveryLines) {
     }
 
     for (const group of groups.values()) {
-        if (!group.quan_ly_theo_lo) continue;
+        if (!group.quan_ly_theo_lo && !group.ten_quy_cach && !group.gia_tri_thuoc_tinh_id) continue;
         if (group.ten_quy_cach || group.gia_tri_thuoc_tinh_id) {
             const available = group.ten_quy_cach
                 ? await getSellableQuyCachQuantity(khoId, group.hang_hoa_id, group.ten_quy_cach, group.lo_hang_id)
@@ -2361,59 +2382,56 @@ async function rollbackDeliveryInvoice(invoiceId, options = {}) {
     await HoaDonBanHang.findByIdAndDelete(invoiceId);
 }
 
-async function generateInvoiceCode() {
-    const lastInvoice = await HoaDonBanHang.findOne({ ma_hoa_don: /^HD\d+$/ })
+async function generateInvoiceCode(options = {}) {
+    const lastInvoice = await customerReadSession(HoaDonBanHang.findOne({ ma_hoa_don: /^HD\d+$/ })
         .sort({ ma_hoa_don: -1 })
-        .select('ma_hoa_don')
-        .lean();
+        .select('ma_hoa_don'), options).lean();
     const currentMax = Number(String(lastInvoice?.ma_hoa_don || '').replace(/^HD/, '')) || 0;
     await Counter.updateOne(
         { _id: 'hoa_don_ban_hang' },
         { $max: { seq: currentMax } },
-        { upsert: true }
+        { upsert: true, ...(options.session ? { session: options.session } : {}) }
     );
     const counter = await Counter.findOneAndUpdate(
         { _id: 'hoa_don_ban_hang' },
         { $inc: { seq: 1 } },
-        { new: true }
+        { new: true, ...(options.session ? { session: options.session } : {}) }
     ).lean();
     return 'HD' + String(counter.seq).padStart(6, '0');
 }
 
-async function generateOrderCode() {
-    const lastOrder = await DonHang.findOne({ ma_don_hang: /^DH\d+$/ })
+async function generateOrderCode(options = {}) {
+    const lastOrder = await customerReadSession(DonHang.findOne({ ma_don_hang: /^DH\d+$/ })
         .sort({ ma_don_hang: -1 })
-        .select('ma_don_hang')
-        .lean();
+        .select('ma_don_hang'), options).lean();
     const currentMax = Number(String(lastOrder?.ma_don_hang || '').replace(/^DH/, '')) || 0;
     await Counter.updateOne(
         { _id: 'don_hang' },
         { $max: { seq: currentMax } },
-        { upsert: true }
+        { upsert: true, ...(options.session ? { session: options.session } : {}) }
     );
     const counter = await Counter.findOneAndUpdate(
         { _id: 'don_hang' },
         { $inc: { seq: 1 } },
-        { new: true, upsert: true }
+        { new: true, upsert: true, ...(options.session ? { session: options.session } : {}) }
     ).lean();
     return 'DH' + String(counter.seq).padStart(6, '0');
 }
 
-async function generateShipmentCode() {
-    const lastShipment = await VanDon.findOne({ ma_van_don: /^VD\d+$/ })
+async function generateShipmentCode(options = {}) {
+    const lastShipment = await customerReadSession(VanDon.findOne({ ma_van_don: /^VD\d+$/ })
         .sort({ ma_van_don: -1 })
-        .select('ma_van_don')
-        .lean();
+        .select('ma_van_don'), options).lean();
     const currentMax = Number(String(lastShipment?.ma_van_don || '').replace(/^VD/, '')) || 0;
     await Counter.updateOne(
         { _id: 'van_don' },
         { $max: { seq: currentMax } },
-        { upsert: true }
+        { upsert: true, ...(options.session ? { session: options.session } : {}) }
     );
     const counter = await Counter.findOneAndUpdate(
         { _id: 'van_don' },
         { $inc: { seq: 1 } },
-        { new: true, upsert: true }
+        { new: true, upsert: true, ...(options.session ? { session: options.session } : {}) }
     ).lean();
     return 'VD' + String(counter.seq).padStart(6, '0');
 }
@@ -3218,7 +3236,7 @@ function parseInvoiceMoneyInput(raw) {
 }
 
 function calcInvoiceDetailLineTotal(line) {
-    const qty = Math.max(0, Math.floor(Number(line.so_luong || 0)));
+    const qty = require('../../../utils/stockQuantity').stockQuantity(line.so_luong);
     const price = Number(line.don_gia || 0);
     const base = qty * price;
     const discount = Math.max(0, Number(line.chiet_khau || 0));
@@ -3230,24 +3248,27 @@ async function loadInvoiceVatChuaEditState(invoiceId, orderId, storeId) {
     const invoiceOid = invoiceId && mongoose.Types.ObjectId.isValid(String(invoiceId)) ? invoiceId : null;
     if (!store || !invoiceOid) return { vat_chua_id: '', so_luong: 0 };
 
-    const sourceOr = [{ source_type: 'hoa_don', source_id: invoiceOid }];
+    const sourceOr = [{ source_type: 'hoa_don', source_id: invoiceOid }, { hoa_don_id: invoiceOid }];
     const orderOid = orderId && mongoose.Types.ObjectId.isValid(String(orderId)) ? orderId : null;
-    if (orderOid) sourceOr.push({ source_type: 'don_hang', source_id: orderOid });
 
-    const xuatDoc = await XuatVatChua.findOne({
+    let xuatDoc = await XuatVatChua.findOne({
         cua_hang_id: store,
         trang_thai: 'active',
         $or: sourceOr
     }).sort({ created_at: -1 }).lean();
+    if (!xuatDoc && orderOid) {
+        const legacy = await XuatVatChua.find({ cua_hang_id: store, trang_thai: 'active',
+            source_type: 'don_hang', source_id: orderOid, hoa_don_id: null }).lean();
+        if (legacy.length > 1) return { vat_chua_id: '', so_luong: 0, locked: true,
+            lock_reason: 'Có nhiều lần giao vật chứa; vui lòng mở chứng từ vật chứa tương ứng.' };
+        xuatDoc = legacy[0] || null;
+    }
 
     if (!xuatDoc || !Array.isArray(xuatDoc.items) || !xuatDoc.items.length) {
         return { vat_chua_id: '', so_luong: 0 };
     }
-    const item = xuatDoc.items[0];
-    return {
-        vat_chua_id: String(item.vat_chua_id || ''),
-        so_luong: Number(item.so_luong || 0)
-    };
+    const receipts = await PhieuThuChi.find({ cua_hang_id: store, xuat_vat_chua_id: xuatDoc._id }).lean();
+    return buildVatChuaEditState(xuatDoc, receipts);
 }
 
 function applyInvoiceDebtWarningList(invoices, settings) {
@@ -3981,6 +4002,7 @@ module.exports = {
     parseInvoiceMoneyInput,
     parseItems,
     parseOrderDateInput,
+    addAverageCostToVatChuaOptions,
     parseVatChuaImportInput,
     parseVatChuaSignedInput,
     pickOrderExportRowValues,

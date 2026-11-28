@@ -147,6 +147,8 @@ async function createPurchaseGroupReturn({ groupId, storeId, userId, data = {} }
   if (!Array.isArray(entries) || !entries.length) throw fail('Vui lòng chọn hàng trả từ ít nhất một phiếu nguồn.');
   const ids = entries.map(row => ref(row.phieu_nhap_id));
   if (ids.some(id => !valid(id)) || new Set(ids).size !== ids.length) throw fail('Phiếu nguồn không hợp lệ hoặc bị trùng.');
+  // A shared container row belongs to one actual THN, never to its THG header.
+  if (data.vat_chua_id && entries.some(entry => entry.vat_chua_id)) throw fail('Chỉ chọn vật chứa chung hoặc vật chứa theo phiếu nguồn.');
   const requestKey = String(data.request_key || '').trim();
   if (!requestKey || requestKey.length > 120) throw fail('Mã yêu cầu không hợp lệ. Vui lòng tải lại biểu mẫu trả hàng.');
   return transaction(storeId, userId, async session => {
@@ -173,9 +175,16 @@ async function createPurchaseGroupReturn({ groupId, storeId, userId, data = {} }
       const totals = ops.computeTotals(rows, nonnegative(entry.giam_gia, 'Giảm giá'), discountType);
       const offset = nonnegative(entry.gia_tri_can_tru_cong_no, 'Cấn trừ công nợ');
       const refund = nonnegative(entry.ncc_da_tra, 'NCC hoàn tiền');
+      const containerInput = entry.vat_chua_id ? entry : (entry === entries[0] && data.vat_chua_id ? data : null);
+      let vatChuaConfig;
+      if (containerInput) {
+        const container = ops.parseVatChuaImportInput(containerInput);
+        ops.assertVatChuaImportInput(container);
+        vatChuaConfig = ops.vatChuaConfigFromParsed(container);
+      }
       const debt = Number(source.payment_current ? source.payment_current.debt : source.con_no_ncc) || 0;
       if (offset > debt || offset + refund > totals.tong_tien_tra) throw fail('Cấn trừ không được vượt nợ PN; cấn trừ và tiền hoàn không được vượt giá trị trả.');
-      planned.push({ source, rows, totals, offset, refund, discountType });
+      planned.push({ source, rows, totals, offset, refund, discountType, vatChuaConfig });
     }
     if (ops.assertCombinedReturnInventory) await ops.assertCombinedReturnInventory(planned.flatMap(row => row.rows), { khoId: ref(group.kho_id), session });
     const refundTotal = planned.reduce((sum, row) => sum + row.refund, 0);
@@ -204,11 +213,14 @@ async function createPurchaseGroupReturn({ groupId, storeId, userId, data = {} }
         chi_tiet_hoan_du_kien: mode === 'draft' ? plannedDetail : undefined,
         so_quy_id: !payment.isV2 && valid(data.so_quy_id) ? ref(data.so_quy_id) : undefined,
         chi_tiet_thanh_toan: mode === 'completed' ? plannedDetail : { tien_mat: 0, chuyen_khoan: 0, tien_tra_khach: 0 },
+        vat_chua_config: plan.vatChuaConfig,
         trang_thai: mode, ghi_chu: returnGroup.ghi_chu, nguoi_tao_id: ref(userId), nguoi_tra_id: ref(userId)
       }], { session });
       const child = childRows[0];
       await ops.persistDetails(child._id, plan.rows, { session });
       if (mode === 'completed') await applyChildEffects(child, plan.rows, plan.source, ops, userId, session);
+      if (mode === 'completed' && child.vat_chua_config) await ops.exportVatChuaWithPurchaseReturn(child,
+        Object.assign({}, child.vat_chua_config, { nguoi_tao_id: ref(userId) }), session);
       if (plan.refund > 0) allocations.push(refundAllocation(child, plan.source, plan.refund, child.ncc_can_tra));
       children.push(child);
     }
@@ -282,6 +294,8 @@ async function completePurchaseGroupReturn({ returnGroupId, storeId, userId, dat
       plan.child.chi_tiet_hoan_du_kien = undefined;
       plan.child.trang_thai = 'completed'; plan.child.nguoi_tra_id = ref(userId);
       await plan.child.save({ session });
+      if (plan.child.vat_chua_config) await ops.exportVatChuaWithPurchaseReturn(plan.child,
+        Object.assign({}, plan.child.vat_chua_config, { nguoi_tao_id: ref(userId) }), session);
     }
     return resultOf(group, children, receipt);
   });

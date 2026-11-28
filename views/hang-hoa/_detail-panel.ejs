@@ -5,6 +5,7 @@
       <button class="detail-tab" type="button" data-tab-target="product-note">M&ocirc; t&#7843;, ghi ch&uacute;</button>
       <button class="detail-tab" type="button" data-tab-target="product-card">Th&#7867; kho</button>
       <button class="detail-tab" type="button" data-tab-target="product-stock">T&#7891;n kho</button>
+      <button class="detail-tab" type="button" data-tab-target="product-classification-history">Lịch sử phân loại</button>
       <% if (item.quan_ly_theo_lo) { %>
         <button class="detail-tab" type="button" data-tab-target="product-lots">L&ocirc; HSD</button>
         <button class="detail-tab" type="button" data-tab-target="product-lot-profit">L&#7901;i l&#7895; theo
@@ -155,6 +156,9 @@
       <section class="detail-pane" data-tab-panel="product-stock" data-product-lazy-tab="product-stock"
         data-lazy-url="/hang-hoa/api/<%= item._id %>/stock">
         <div class="empty-cell">Chọn tab để tải tồn kho.</div>
+      </section>
+      <section class="detail-pane" data-tab-panel="product-classification-history" data-classification-history data-product-id="<%= item._id %>">
+        <div class="empty-cell">Chọn tab để tải lịch sử phân loại.</div>
       </section>
 
       <% if (item.quan_ly_theo_lo) { %>

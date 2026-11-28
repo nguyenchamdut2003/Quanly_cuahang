@@ -162,6 +162,9 @@
     .btn-complete{border:0;background:#0070f4;color:#fff}
     @media(max-width:1150px){.purchase-page{padding:10px 30px 0;grid-template-columns:minmax(0,1fr) 360px}}
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body class="admin-body">
   <div id="appRoot">
@@ -293,13 +296,13 @@
         <div id="purchaseFormError" class="form-error"></div>
         <div class="summary-line"><span>Cần trả NCC</span><span class="num payable" id="supplierPayable">0</span></div>
         <div class="summary-line"><span>Đã trả NCC</span><span class="num payable" id="supplierPaid">0</span></div>
-        <div class="summary-line" id="vatChuaRow">
+        <div class="summary-line" id="vatChuaRow" data-vat-chua-payment data-vc-id="vatChuaId" data-vc-qty="vatChuaQty" data-vc-direction="chi">
           <span>Vật chứa</span>
           <div class="vat-chua-combo">
             <select id="vatChuaId" class="side-input" name="vat_chua_id" title="Chọn vật chứa">
               <option value="">— Chọn —</option>
               <% (vatChuaList || []).forEach(function(vc) { %>
-                <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+                <option value="<%= vc._id %>" data-vc-average-cost="<%= Number(vc.gia_von_binh_quan) || 0 %>"><%= vc.ten_vat_chua || '---' %></option>
               <% }) %>
             </select>
             <input id="vatChuaQty" class="side-input vat-chua-qty" name="vat_chua_so_luong" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
@@ -377,7 +380,7 @@
         </label>
         <label>
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Số lượng lô</div>
-          <input id="lotTotalQtyInput" class="lot-input vn-number-input" inputmode="numeric" placeholder="Nhập nếu không chia thuộc tính">
+          <input id="lotTotalQtyInput" class="lot-input vn-number-input" inputmode="decimal" placeholder="Nhập nếu không chia thuộc tính">
         </label>
         <label>
           <div style="font-size:12px;margin-bottom:4px;color:#475467">Đơn giá lô</div>
@@ -465,6 +468,8 @@
     let payAllTarget = 'cash';
     let paymentPriority = 'cash';
     const fmt = n => Number(n || 0).toLocaleString('vi-VN');
+    const quantityValue = value => Math.max(0, window.KVStockQuantity.parse(value));
+    const quantityText = value => window.KVStockQuantity.format(value);
     const numeric = v => Math.max(0, Number(String(v || '').replace(/\./g,'').replace(/,/g,'').trim()) || 0);
     const formatNumInput = v => {
       if (v === '' || v === null || v === undefined) return '';
@@ -472,7 +477,7 @@
       return n ? fmt(n) : '';
     };
     function applyLiveVNFormat(el) {
-      if (!el) return;
+      if (!el || el.dataset.field === 'qty' || el.dataset.field === 'so_luong' || el.id === 'lotTotalQtyInput') return;
       const start = el.selectionStart == null ? el.value.length : el.selectionStart;
       const digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
       const raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
@@ -506,8 +511,9 @@
         applyLiveVNFormat(el);
       });
       el.addEventListener('blur', function() {
-        const n = numeric(el.value);
-        el.value = n ? fmt(n) : '';
+        const isQty = el.dataset.field === 'qty' || el.dataset.field === 'so_luong' || el.id === 'lotTotalQtyInput';
+        const n = isQty ? quantityValue(el.value) : numeric(el.value);
+        el.value = n ? (isQty ? quantityText(n) : fmt(n)) : '';
       });
     }
     const productSearch = document.getElementById('productSearch');
@@ -837,7 +843,7 @@
         ? cleanQuyCachItems(item.lot_info.quy_cach_items).reduce((sum, row) => sum + numeric(row.thanh_tien), 0)
         : 0;
       if (qcTotal > 0) return qcTotal;
-      const qty = numeric(item.so_luong);
+      const qty = quantityValue(item.so_luong);
       const price = numeric(item.don_gia_nhap);
       const base = qty * price;
       const type = item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd';
@@ -874,7 +880,7 @@
       return (Array.isArray(items) ? items : [])
         .map(row => ({
           ten_quy_cach: String(row && (row.ten_quy_cach || row.ten_thuoc_tinh) || '').trim(),
-          so_luong: numeric(row && row.so_luong),
+          so_luong: quantityValue(row && row.so_luong),
           don_gia_nhap: numeric(row && row.don_gia_nhap),
           thanh_tien: numeric(row && row.thanh_tien)
         }));
@@ -882,7 +888,7 @@
 
     function cleanQuyCachItems(items) {
       return normalizeQuyCachItems(items)
-        .map(row => Object.assign({}, row, { thanh_tien: numeric(row.so_luong) * numeric(row.don_gia_nhap) }))
+        .map(row => Object.assign({}, row, { thanh_tien: quantityValue(row.so_luong) * numeric(row.don_gia_nhap) }))
         .filter(row => row.ten_quy_cach || row.so_luong > 0 || row.don_gia_nhap > 0);
     }
 
@@ -900,9 +906,9 @@
       lotQcRows.innerHTML = rows.map((row, index) => `
         <div class="lot-qc-row" data-index="${index}">
           <input class="lot-input" data-field="ten_quy_cach" value="${escapeHtml(row.ten_quy_cach)}" placeholder="VD: Nhỏ, To, Loại 1">
-          <input class="lot-input vn-number-input" data-field="so_luong" value="${formatNumInput(row.so_luong)}" inputmode="numeric" placeholder="0">
+          <input class="lot-input vn-number-input" data-field="so_luong" value="${quantityText(row.so_luong)}" inputmode="decimal" placeholder="0">
           <input class="lot-input vn-number-input" data-field="don_gia_nhap" value="${formatNumInput(row.don_gia_nhap)}" inputmode="numeric" placeholder="0">
-          <input class="lot-input lot-readonly" data-field="thanh_tien" value="${fmt(numeric(row.so_luong) * numeric(row.don_gia_nhap))}" readonly>
+          <input class="lot-input lot-readonly" data-field="thanh_tien" value="${fmt(quantityValue(row.so_luong) * numeric(row.don_gia_nhap))}" readonly>
           <button type="button" class="lot-qc-delete" data-action="delete-qc" title="Xóa dòng"><i class="fa-solid fa-xmark"></i></button>
         </div>
       `).join('');
@@ -914,18 +920,18 @@
       const item = selectedItems.find(i => String(i.row_id) === String(lotEditItemId));
       const unit = getItemUnit(item);
       const rows = cleanQuyCachItems(getLotDraftItems());
-      const allocated = rows.reduce((sum, row) => sum + numeric(row.so_luong), 0);
+      const allocated = rows.reduce((sum, row) => sum + quantityValue(row.so_luong), 0);
       const amount = rows.reduce((sum, row) => sum + numeric(row.thanh_tien), 0);
       if (lotQcAllocated) lotQcAllocated.textContent = `${fmt(allocated)} ${unit}`;
       if (lotTotalQtyText) {
-        const plainQty = numeric(lotTotalQtyInput ? lotTotalQtyInput.value : item && item.so_luong || 0);
+        const plainQty = quantityValue(lotTotalQtyInput ? lotTotalQtyInput.value : item && item.so_luong || 0);
         const plainCost = numeric(lotUnitCostInput ? lotUnitCostInput.value : item && item.don_gia_nhap || 0);
         lotTotalQtyText.textContent = rows.length
           ? `Tổng thuộc tính: ${fmt(allocated)} ${unit} / ${fmt(amount)}`
           : `Tổng số lượng lô: ${fmt(plainQty)} ${unit} / ${fmt(plainQty * plainCost)}`;
       }
       Array.from(lotQcRows ? lotQcRows.querySelectorAll('.lot-qc-row') : []).forEach(row => {
-        const qty = numeric(row.querySelector('[data-field="so_luong"]')?.value || 0);
+        const qty = quantityValue(row.querySelector('[data-field="so_luong"]')?.value || 0);
         const price = numeric(row.querySelector('[data-field="don_gia_nhap"]')?.value || 0);
         const amountInput = row.querySelector('[data-field="thanh_tien"]');
         if (amountInput) amountInput.value = fmt(qty * price);
@@ -1261,8 +1267,8 @@
         const lineDiscountValue = clampDiscountValue(item.giam_gia || 0, lineDiscountType);
         const hasQuyCach = item.quan_ly_theo_lo && cleanQuyCachItems(item.lot_info ? item.lot_info.quy_cach_items : []).length > 0;
         const qtyInput = item.quan_ly_theo_lo
-          ? `<input class="input-small qty-input" value="${fmt(item.so_luong)}" readonly disabled>`
-          : `<input class="input-small qty-input vn-number-input" value="${fmt(item.so_luong)}" data-row-id="${item.row_id}" data-field="qty" inputmode="numeric">`;
+          ? `<input class="input-small qty-input" value="${quantityText(item.so_luong)}" readonly disabled>`
+          : `<input class="input-small qty-input vn-number-input" value="${quantityText(item.so_luong)}" data-row-id="${item.row_id}" data-field="qty" inputmode="decimal">`;
         const priceInput = hasQuyCach
           ? `<input class="input-small lot-readonly" value="${fmt(item.don_gia_nhap)}" readonly disabled>`
           : `<input class="input-small vn-number-input" value="${fmt(item.don_gia_nhap)}" data-row-id="${item.row_id}" data-field="price" inputmode="numeric">`;
@@ -1380,7 +1386,7 @@
       itemsJsonInput.value = JSON.stringify(selectedItems.map(item => ({
         hang_hoa_id: item.hang_hoa_id,
         lo_hang_id: item.lot_info ? String(item.lot_info.lo_hang_id || '').trim() : '',
-        so_luong: numeric(item.so_luong),
+        so_luong: quantityValue(item.so_luong),
         don_gia: numeric(item.don_gia_nhap),
         giam_gia_dong: clampDiscountValue(item.giam_gia, item.kieu_giam_gia_dong),
         kieu_giam_gia_dong: item.kieu_giam_gia_dong === 'percent' ? 'percent' : 'vnd',
@@ -1391,7 +1397,7 @@
           ngay_nhap: String(item.lot_info.ngay_nhap || '').trim(),
           han_su_dung: String(item.lot_info.han_su_dung || '').trim(),
           ghi_chu: String(item.lot_info.ghi_chu || '').trim(),
-          so_luong_tong: numeric(item.lot_info.so_luong_tong || item.so_luong),
+          so_luong_tong: quantityValue(item.lot_info.so_luong_tong || item.so_luong),
           don_gia_nhap: numeric(item.lot_info.don_gia_nhap || item.don_gia_nhap),
           quy_cach_items: cleanQuyCachItems(item.lot_info.quy_cach_items)
         } : null
@@ -1401,7 +1407,7 @@
     function updateQty(rowId, val) {
       const item = selectedItems.find(i => i.row_id === rowId);
       if (item) {
-        const nextQty = Math.max(1, Math.floor(numeric(val)));
+        const nextQty = quantityValue(val) || 1;
         item.so_luong = nextQty;
       }
       renderItems();
@@ -1468,7 +1474,7 @@
       if (lotModeNew) lotModeNew.checked = !Boolean(lo.lo_hang_id);
       await loadLotsForItem(item.hang_hoa_id, lo.lo_hang_id);
       if (lotUnitNameInput) lotUnitNameInput.value = getItemUnit(item);
-      if (lotTotalQtyInput) lotTotalQtyInput.value = formatNumInput(lo.so_luong_tong || item.so_luong);
+      if (lotTotalQtyInput) lotTotalQtyInput.value = quantityText(lo.so_luong_tong || item.so_luong);
       if (lotUnitCostInput) lotUnitCostInput.value = formatNumInput(lo.don_gia_nhap || item.don_gia_nhap);
       const lotNgayNhapValue = lo.ngay_nhap || today;
       document.getElementById('lotMaLo').value = lo.ma_lo || '';
@@ -1485,12 +1491,12 @@
       const item = selectedItems.find(i => i.row_id === lotEditItemId);
       if (!item) return;
       const quyCachItems = cleanQuyCachItems(getLotDraftItems());
-      const validQuyCachItems = quyCachItems.filter(row => numeric(row.so_luong) > 0 || row.ten_quy_cach || numeric(row.don_gia_nhap) > 0);
-      const totalQty = validQuyCachItems.reduce((sum, row) => sum + numeric(row.so_luong), 0);
+      const validQuyCachItems = quyCachItems.filter(row => quantityValue(row.so_luong) > 0 || row.ten_quy_cach || numeric(row.don_gia_nhap) > 0);
+      const totalQty = validQuyCachItems.reduce((sum, row) => sum + quantityValue(row.so_luong), 0);
       const totalAmount = validQuyCachItems.reduce((sum, row) => sum + numeric(row.thanh_tien), 0);
       const invalidName = validQuyCachItems.find(row => !row.ten_quy_cach);
-      const invalidQty = validQuyCachItems.find(row => numeric(row.so_luong) <= 0);
-      const plainQty = numeric(lotTotalQtyInput ? lotTotalQtyInput.value : item.so_luong);
+      const invalidQty = validQuyCachItems.find(row => quantityValue(row.so_luong) <= 0);
+      const plainQty = quantityValue(lotTotalQtyInput ? lotTotalQtyInput.value : item.so_luong);
       const plainCost = numeric(lotUnitCostInput ? lotUnitCostInput.value : item.don_gia_nhap);
       if (validQuyCachItems.length && invalidName) {
         alert('Tên thuộc tính không được để trống nếu dòng đó có số lượng hoặc đơn giá.');
@@ -1579,7 +1585,7 @@
       document.getElementById('nhapHangCreateForm').submit();
     }
 
-    function validateVatChuaImport() {
+    function validateVatChuaImport(mode) {
       const id = vatChuaIdInput ? String(vatChuaIdInput.value || '').trim() : '';
       const rawQty = vatChuaQtyInput ? String(vatChuaQtyInput.value || '').replace(/\./g, '').replace(/,/g, '').trim() : '';
       const qty = Math.floor(Number(rawQty || 0));
@@ -1596,6 +1602,8 @@
       if (vatChuaQtyInput && rawQty) {
         vatChuaQtyInput.value = String(qty);
       }
+      const error = window.KVVatChuaPayment.validate('vatChuaId', { draft: mode === 'draft' });
+      if (error) { showFormError(error); return false; }
       return true;
     }
 
@@ -1668,7 +1676,7 @@
       if (paymentV2Input) paymentV2Input.value = '1';
       if (paymentReturnInput) paymentReturnInput.value = '0';
       if (!validateKhoNhap()) return;
-      if (!validateVatChuaImport()) return;
+      if (!validateVatChuaImport(mode)) return;
       if (!validateCashBookForPayment()) return;
       submitModeInput.value = mode;
       if (exportAfterCompleteInput) exportAfterCompleteInput.value = exportAfter ? '1' : '0';
@@ -1849,8 +1857,9 @@
         if (!el || !el.classList || !el.classList.contains('vn-number-input')) return;
         const rowId = el.dataset.rowId;
         const field = el.dataset.field;
-        const n = numeric(el.value);
-        el.value = n ? fmt(n) : '';
+        const isQty = el.dataset.field === 'qty' || el.dataset.field === 'so_luong' || el.id === 'lotTotalQtyInput';
+        const n = isQty ? quantityValue(el.value) : numeric(el.value);
+        el.value = n ? (isQty ? quantityText(n) : fmt(n)) : '';
         if (field === 'qty' && rowId) updateQty(rowId, n);
         else if (field === 'price' && rowId) updatePrice(rowId, n);
         else if (field === 'lineDiscount' && rowId) updateLineDiscount(rowId, n);

@@ -23,7 +23,7 @@ const {
 } = require('../models/kiot.model');
 const { layTonKhoTheoKho, layTonKhoTheoLo } = require('../services/kho.service');
 const { resolveSalePrice } = require('../services/salePrice.service');
-const { resolveStoreId } = require('../utils/storeScope');
+const { resolveStoreId, resolveUserStoreId } = require('../utils/storeScope');
 const { tinhPhiGiaoHang } = require('../services/phiGiaoHang.service');
 const {
     formatLotName,
@@ -33,8 +33,35 @@ const {
 const {
     buildVariantKey,
     buildLotKey,
-    getReservedQuantitiesForSale
+    getReservedQuantitiesForSale,
+    getReservedQuantityForStock
 } = require('../services/availability.service');
+
+async function classificationWarehouseScope(req, warehouseId) {
+    const storeId = resolveUserStoreId(req);
+    if (!storeId) throw Object.assign(new Error('Chưa chọn cửa hàng trong phiên đăng nhập.'), { statusCode: 403 });
+    const warehouse = await Kho.findOne({ _id: warehouseId, cua_hang_id: storeId, trang_thai: { $ne: 'inactive' } }).lean();
+    if (!warehouse) throw Object.assign(new Error('Kho không thuộc cửa hàng đang làm việc hoặc đã ngừng hoạt động.'), { statusCode: 403 });
+    return storeId;
+}
+
+function collapseLotStockRows(rows) {
+    const groups = new Map();
+    for (const row of rows) {
+        const lotId = String(row.lo_hang_id?._id || row.lo_hang_id || '');
+        const productId = String(row.hang_hoa_id?._id || row.hang_hoa_id || '');
+        const key = productId + '|' + lotId;
+        if (!groups.has(key)) groups.set(key, { ...row, so_luong: 0, _classificationValue: 0 });
+        const group = groups.get(key), qty = Number(row.so_luong || 0);
+        group.so_luong += qty;
+        group._classificationValue += qty * Number(row.gia_von ?? row.lo_hang_id?.gia_von ?? 0);
+    }
+    return Array.from(groups.values()).map(row => {
+        const { _classificationValue, ...result } = row;
+        result.gia_von = result.so_luong > 0 ? _classificationValue / result.so_luong : Number(row.gia_von || 0);
+        return result;
+    });
+}
 
 function parseItems(rawItems) {
     if (Array.isArray(rawItems)) return rawItems;
@@ -261,6 +288,7 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
         if (!khoId) {
             return res.status(400).json({ success: false, message: 'Thiếu kho_id' });
         }
+        const storeId = await classificationWarehouseScope(req, khoId);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -305,7 +333,7 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
             .populate({ path: 'lo_hang_id', select: 'ma_lo ten_lo ngay_nhap han_su_dung so_luong_con_lai trang_thai' })
             .lean();
 
-        const validLotRows = lotRows
+        const validLotRows = collapseLotStockRows(lotRows
             .filter(row => {
                 if (!row.hang_hoa_id || !row.hang_hoa_id.quan_ly_theo_lo || row.hang_hoa_id.trang_thai === 'inactive') return false;
                 if (!row.lo_hang_id || row.lo_hang_id.trang_thai === 'huy') return false;
@@ -313,7 +341,7 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
                 const expiry = new Date(row.lo_hang_id.han_su_dung);
                 expiry.setHours(0, 0, 0, 0);
                 return expiry.getTime() >= today.getTime();
-            });
+            }));
         const validLotMap = validLotRows.reduce((map, row) => {
             map[String(row.lo_hang_id?._id || row.lo_hang_id || '')] = row;
             return map;
@@ -347,7 +375,8 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
                 products.set(id, current);
             });
 
-        const activeProducts = await HangHoa.find({ trang_thai: { $ne: 'inactive' } })
+        const activeProducts = await HangHoa.find({ trang_thai: { $ne: 'inactive' },
+            $or: [{ cua_hang_id: storeId }, { cua_hang_id: null }] })
             .select('_id ma_hang ten_hang gia_co_dinh quan_ly_theo_lo nha_cung_cap_id')
             .populate('nha_cung_cap_id', 'ma_ncc ten_ncc ten_cong_ty')
             .lean();
@@ -371,16 +400,19 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
             const name = String(row.ten_quy_cach || row.ten_thuoc_tinh || '').trim();
             const lotId = String(row.lo_hang_id || '');
             const lotStock = validLotMap[lotId];
-            if (!productId || !name || !lotStock) return;
+            if (!productId || !name) return;
             const product = products.get(productId);
             if (!product) return;
+            if (product.quan_ly_theo_lo ? !lotStock : Boolean(lotId)) return;
             if (!Array.isArray(product.quy_cach_items)) product.quy_cach_items = [];
             product.quy_cach_items.push({
                 lo_hang_id: lotId,
-                ma_lo: lotStock.lo_hang_id?.ma_lo || '',
-                ten_lo: lotStock.lo_hang_id?.ten_lo || '',
-                ngay_nhap: lotStock.lo_hang_id?.ngay_nhap || '',
-                han_su_dung: lotStock.lo_hang_id?.han_su_dung || '',
+                gia_tri_thuoc_tinh_id: row.gia_tri_thuoc_tinh_id || null,
+                ton_kho_lo_quy_cach_id: row._id,
+                ma_lo: lotStock?.lo_hang_id?.ma_lo || '',
+                ten_lo: lotStock?.lo_hang_id?.ten_lo || '',
+                ngay_nhap: lotStock?.lo_hang_id?.ngay_nhap || '',
+                han_su_dung: lotStock?.lo_hang_id?.han_su_dung || '',
                 ten_quy_cach: name,
                 ten_thuoc_tinh: String(row.ten_thuoc_tinh || name),
                 ton_hien_tai: Number(row.so_luong || 0),
@@ -419,15 +451,10 @@ exports.getKhoIdHangBanHang = async (req, res, next) => {
             if (Array.isArray(product.quy_cach_items)) {
                 product.quy_cach_items = product.quy_cach_items.map(qc => {
                     const qcTonThucTe = Number(qc.ton_kho ?? qc.ton_hien_tai ?? qc.ton ?? 0);
-                    const variantKey = buildVariantKey({
-                        hang_hoa_id: productId,
-                        gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
-                        ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || ''
+                    const qcKhachDat = getReservedQuantityForStock(reserved, {
+                        hang_hoa_id: productId, gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || '',
+                        ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '', lo_hang_id: qc.lo_hang_id || null
                     });
-                    const lotKey = qc.lo_hang_id
-                        ? buildLotKey(productId, qc.lo_hang_id)
-                        : '';
-                    const qcKhachDat = Number(reserved.byVariant[variantKey]?.so_luong_khach_dat || 0);
                     return Object.assign({}, qc, {
                         ton_kho: qcTonThucTe,
                         ton_thuc_te: qcTonThucTe,
@@ -453,6 +480,7 @@ exports.getKhoIdHangKiemKho = async (req, res, next) => {
         if (!khoId) {
             return res.status(400).json({ success: false, message: 'Thiếu kho_id' });
         }
+        await classificationWarehouseScope(req, khoId);
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -468,7 +496,7 @@ exports.getKhoIdHangKiemKho = async (req, res, next) => {
             .sort({ updated_at: -1, created_at: -1 })
             .lean();
 
-        const normalRows = totalRows
+        let normalRows = totalRows
             .filter(row => row.hang_hoa_id && !row.hang_hoa_id.quan_ly_theo_lo)
             .map(row => ({
                 hang_hoa_id: row.hang_hoa_id._id,
@@ -499,7 +527,7 @@ exports.getKhoIdHangKiemKho = async (req, res, next) => {
             .sort({ updated_at: -1, created_at: -1 })
             .lean();
 
-        const validLots = lotRows
+        const validLots = collapseLotStockRows(lotRows
             .filter(row => {
                 if (!row.hang_hoa_id || !row.hang_hoa_id.quan_ly_theo_lo || !row.lo_hang_id) return false;
                 if (row.lo_hang_id.trang_thai === 'huy') return false;
@@ -507,16 +535,22 @@ exports.getKhoIdHangKiemKho = async (req, res, next) => {
                 const expiry = new Date(row.lo_hang_id.han_su_dung);
                 expiry.setHours(0, 0, 0, 0);
                 return expiry.getTime() >= today.getTime();
-            });
+            }));
 
         const lotIds = validLots.map(row => row.lo_hang_id._id).filter(Boolean);
-        const qcRows = lotIds.length
-            ? await TonKhoLoQuyCach.find({
+        const qcRows = await TonKhoLoQuyCach.find({
                 kho_id: khoId,
-                lo_hang_id: { $in: lotIds },
+                $or: [{ lo_hang_id: { $in: lotIds } }, { lo_hang_id: null }],
                 so_luong: { $gt: 0 }
-            }).lean()
-            : [];
+            }).lean();
+        normalRows = normalRows.flatMap(row => {
+            const variants = qcRows.filter(qc => !qc.lo_hang_id && String(qc.hang_hoa_id) === String(row.hang_hoa_id));
+            if (!variants.length) return [row];
+            return variants.map(qc => ({ ...row, ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || null,
+                ton_kho_lo_quy_cach_id: qc._id, gia_von: Number(qc.gia_von || 0),
+                ton_kho_he_thong: Number(qc.so_luong || 0) }));
+        });
         const qcByLot = qcRows.reduce((map, row) => {
             const key = String(row.lo_hang_id);
             if (!map[key]) map[key] = [];

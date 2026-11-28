@@ -9,11 +9,12 @@
       <th>Dự kiến hết hàng</th>
       <th>Trạng thái</th>
       <th>Cập nhật</th>
+      <th>Phân loại</th>
     </tr>
   </thead>
   <tbody>
     <% if (!selectedProductInventory || selectedProductInventory.length === 0) { %>
-      <tr><td colspan="8" class="empty-cell">Chưa có tồn kho theo kho.</td></tr>
+      <tr><td colspan="9" class="empty-cell">Chưa có tồn kho theo kho.</td></tr>
     <% } %>
     <% (selectedProductInventory || []).forEach(function(row) { %>
       <%
@@ -29,7 +30,15 @@
         <td><%= row.du_kien_het_hang ? formatDate(row.du_kien_het_hang) : '---' %></td>
         <td><span class="lot-status-badge <%= warehouseStatus === 'active' ? 'is-active' : (warehouseStatus === 'inactive' ? 'is-cancelled' : '') %>"><%- warehouseStatusLabel %></span></td>
         <td><%= formatDate(row.updated_at || row.created_at) %></td>
+        <td><button type="button" class="btn btn-light btn-sm stock-classify-trigger" data-classify-open data-hang-hoa-id="<%= row.hang_hoa_id && (row.hang_hoa_id._id || row.hang_hoa_id) || '' %>" data-kho-id="<%= row.kho_id && (row.kho_id._id || row.kho_id) || '' %>" <%= warehouseStatus === 'inactive' ? 'disabled' : '' %>>Phân loại</button></td>
       </tr>
+      <% if ((row.quy_cach_rows || []).length) { %>
+        <tr><td colspan="9"><details><summary>Tồn theo phân loại</summary><table class="admin-table product-inner-table"><thead><tr><th>Phân loại</th><th>Lô</th><th class="text-right">Thực tế</th><th class="text-right">KH đang đặt</th><th class="text-right">Khả dụng</th><th class="text-right">Giá vốn</th><th></th></tr></thead><tbody>
+          <% row.quy_cach_rows.forEach(function(qc) { %>
+            <tr><td><%= qc.ten_quy_cach || 'Chưa phân loại' %></td><td><%= qc.ten_lo || qc.ma_lo || (qc.lo_hang_id ? 'Có lô' : 'Không lô') %></td><td class="text-right"><%= Number(qc.so_luong || 0).toLocaleString('vi-VN') %></td><td class="text-right"><%= Number(qc.so_luong_dang_dat || 0).toLocaleString('vi-VN') %></td><td class="text-right"><%= Number(qc.so_luong_kha_dung || 0).toLocaleString('vi-VN') %></td><td class="text-right"><%= Number(qc.gia_von || 0).toLocaleString('vi-VN') %></td><td><button type="button" class="btn btn-light btn-sm stock-classify-trigger" data-classify-open data-hang-hoa-id="<%= row.hang_hoa_id && (row.hang_hoa_id._id || row.hang_hoa_id) || '' %>" data-kho-id="<%= row.kho_id && (row.kho_id._id || row.kho_id) || '' %>" data-lo-hang-id="<%= qc.lo_hang_id && (qc.lo_hang_id._id || qc.lo_hang_id) || '' %>" data-ten-quy-cach="<%= qc.ten_quy_cach || 'Chưa phân loại' %>" <%= warehouseStatus === 'inactive' ? 'disabled' : '' %>>Phân loại</button></td></tr>
+          <% }) %>
+        </tbody></table></details></td></tr>
+      <% } %>
     <% }) %>
   </tbody>
 </table>

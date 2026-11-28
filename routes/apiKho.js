@@ -2,8 +2,13 @@ var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
 var apiKhoController = require('../controllers/apiKho.controller');
+var phanLoaiHangController = require('../controllers/phanLoaiHang.controller');
 
 router.use(isAuthenticated);
+router.get('/kho/phan-loai/context', phanLoaiHangController.context);
+router.post('/kho/phan-loai', phanLoaiHangController.classify);
+router.get('/kho/phan-loai/history', phanLoaiHangController.history);
+router.get('/kho/phan-loai/history/:historyId', phanLoaiHangController.historyDetail);
 router.post('/giao-hang/tinh-phi', apiKhoController.postGiaoHangTinhPhi);
 router.get('/kho', apiKhoController.getKho);
 router.get('/cua-hang/:id/kho', apiKhoController.getCuaHangIdKho);

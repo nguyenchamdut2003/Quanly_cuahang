@@ -106,6 +106,8 @@ const {
     loadProductContractData,
     loadProductDetailById
 } = require('../helpers/common.helper');
+const { addAverageCostToVatChuaOptions } = require('../../../services/vatChuaImport.service');
+const { getReservedQuantityForScope } = require('../../../services/availability.service');
 function resolveQuyCachImportPrice(qc) {
     if (!qc) return 0;
     if (qc.don_gia_nhap != null && qc.don_gia_nhap !== '') {
@@ -130,6 +132,10 @@ function buildAllocationLineKey(parts) {
 function resolveLineReservedQty(reserved, line) {
     var productId = String(line && line.product_id ? line.product_id : '');
     if (!productId || !reserved) return 0;
+    if (!line.lo_hang_id && line.ten_quy_cach && line.ten_quy_cach !== '---') {
+        return getReservedQuantityForScope(reserved, { hang_hoa_id: productId, lo_hang_id: null,
+            ten_quy_cach: line.ten_quy_cach, gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id });
+    }
     var tenQuyCach = String(line.ten_quy_cach || '').trim();
     if (tenQuyCach === '---') tenQuyCach = '';
     var variantKey = buildVariantKey({
@@ -224,7 +230,7 @@ async function loadAllocationPageData(req) {
         .sort({ updated_at: -1, created_at: -1 })
         .lean();
 
-    var qcQuery = { hang_hoa_id: { $in: productIds }, so_luong: { $gt: 0 } };
+    var qcQuery = { hang_hoa_id: { $in: productIds } };
     if (hasStoreScope) qcQuery.cua_hang_id = storeId;
     var qcRows = await TonKhoLoQuyCach.find(qcQuery).sort({ ten_quy_cach: 1, updated_at: -1 }).lean();
     var qcByLot = qcRows.reduce(function(map, row) {
@@ -232,6 +238,13 @@ async function loadAllocationPageData(req) {
         if (!lotId) return map;
         if (!map[lotId]) map[lotId] = [];
         map[lotId].push(row);
+        return map;
+    }, {});
+    var qcWithoutLot = qcRows.reduce(function(map, row) {
+        if (row.lo_hang_id) return map;
+        var key = String(row.kho_id || '') + '|' + String(row.hang_hoa_id || '');
+        if (!map[key]) map[key] = [];
+        map[key].push(row);
         return map;
     }, {});
     var lotsByProduct = lotStockRows.reduce(function(map, row) {
@@ -348,25 +361,37 @@ async function loadAllocationPageData(req) {
         }
         warehouseRows.forEach(function(row) {
             var qty = normalizeStockNumber(row.so_luong);
-            lines.push(Object.assign({
-                product_id: product._id,
-                ma_hang: product.ma_hang || '---',
-                ten_hang: product.ten_hang || '---',
-                don_vi_tinh_ten: donVi,
-                ma_lo: '---',
-                ten_lo: 'Không theo lô',
-                ten_quy_cach: '---',
-                kho_ten: warehouseMap[String(row.kho_id || '')] || '---',
-                ngay_nhap: null,
-                han_su_dung: null,
-                so_luong_ban_dau: 0,
-                ton_thuc_te: qty,
-                ton_co_the_giao: qty,
-                ton_het_han: 0,
-                gia_von: Number(product.gia_von || 0),
-                ma_phieu_nhap: '---',
-                trang_thai_lo: '---'
-            }, buildAllocationLineExtras(product, row, null, null)));
+            var variants = qcWithoutLot[String(row.kho_id || '') + '|' + productId] || [];
+            if (variants.length) {
+                var variantTotal = variants.reduce(function(sum, qc) { return sum + Number(qc.so_luong || 0); }, 0);
+                if (Math.abs(variantTotal - qty) > 0.000001 || variants.some(function(qc) { return !Number.isFinite(Number(qc.so_luong)) || Number(qc.so_luong) < 0; })) {
+                    throw new Error('Tồn theo phân loại không lô chưa khớp tồn tổng. Vui lòng đối soát trước khi phân bổ.');
+                }
+            } else {
+                variants = [{ ten_quy_cach: 'Chưa phân loại', so_luong: qty, gia_von: Number(product.gia_von || 0) }];
+            }
+            variants.forEach(function(qc) {
+                var variantQty = normalizeStockNumber(qc.so_luong);
+                lines.push(Object.assign({
+                    product_id: product._id,
+                    ma_hang: product.ma_hang || '---',
+                    ten_hang: product.ten_hang || '---',
+                    don_vi_tinh_ten: donVi,
+                    ma_lo: '---',
+                    ten_lo: 'Không theo lô',
+                    ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || 'Chưa phân loại',
+                    kho_ten: warehouseMap[String(row.kho_id || '')] || '---',
+                    ngay_nhap: null,
+                    han_su_dung: null,
+                    so_luong_ban_dau: 0,
+                    ton_thuc_te: variantQty,
+                    ton_co_the_giao: variantQty,
+                    ton_het_han: 0,
+                    gia_von: Number(qc.gia_von ?? qc.don_gia_nhap ?? product.gia_von ?? 0),
+                    ma_phieu_nhap: '---',
+                    trang_thai_lo: '---'
+                }, buildAllocationLineExtras(product, row, null, qc)));
+            });
         });
     });
 
@@ -394,10 +419,18 @@ async function loadAllocationPageData(req) {
     lines = lines.map(function(line) {
         var khoId = String(line.kho_id || '');
         var reserved = khoId ? reservedByKho[khoId] : null;
+        var held = resolveLineReservedQty(reserved, line);
         return Object.assign({}, line, {
-            so_luong_khach_dat: resolveLineReservedQty(reserved, line)
+            so_luong_khach_dat: held,
+            ton_kha_dung: Math.max(0, Number(line.ton_co_the_giao || 0) - held)
         });
     });
+    await Promise.all(lines.filter(function(line) { return !line.lo_hang_id && line.ten_quy_cach && line.ten_quy_cach !== '---'; }).map(async function(line) {
+        var product = products.find(function(item) { return String(item._id) === String(line.product_id); });
+        var resolved = await resolveSalePrice({ hang_hoa_id: line.product_id, product: product, cua_hang_id: storeId,
+            lo_hang_id: null, gia_tri_thuoc_tinh_id: line.gia_tri_thuoc_tinh_id, ten_quy_cach: line.ten_quy_cach });
+        line.gia_ban_mac_dinh = Number(resolved.gia_ban || 0);
+    }));
 
     return { lines: lines, filter: filter, filterQueryString: buildFilterQueryString(filter) };
 }
@@ -447,6 +480,7 @@ async function allocationPage(req, res, next) {
             .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
             .select('ma_vat_chua ten_vat_chua so_luong_ton')
             .lean();
+        if (vatChuaList.length) await addAverageCostToVatChuaOptions(storeId, vatChuaList);
         res.render('hang-hoa/phan-bo', {
             pageTitle: 'Phân bổ hàng tồn kho',
             activeMenu: 'hang-hoa',

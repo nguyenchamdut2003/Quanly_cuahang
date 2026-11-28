@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const { VatChua, NhapVatChua, NhaCungCap, CongNoNhaCungCap } = require('../models/kiot.model');
 const { extractPaymentDetail } = require('./paymentCashBook.service');
 const { taoPhieuThuChi } = require('./soQuy.service');
+const { LINKED_SOURCES, money, parseLinkedMoney, linkedOptions, inTransaction, operationKey,
+  loadLinkedMovement, assertLinkedCashCanChange, createLinkedContainerReceipt } = require('./vatChuaLinkedMoney.service');
 
 function isObjectId(value) {
   return mongoose.Types.ObjectId.isValid(String(value || '').trim());
@@ -47,24 +49,25 @@ function parseVatChuaImportInput(data = {}) {
   const vatChuaId = cleanId(data.vat_chua_id);
   const rawQty = String(data.vat_chua_so_luong ?? data.so_luong ?? '').replace(/\./g, '').replace(/,/g, '').trim();
   const qty = Math.floor(Number(rawQty || 0));
-  return { vatChuaId, qty, hasQtyInput: rawQty !== '' };
+  return { vatChuaId, qty, hasQtyInput: rawQty !== '', ...parseLinkedMoney(data, qty) };
 }
 
 function parseVatChuaSignedInput(data = {}) {
   const vatChuaId = cleanId(data.vat_chua_id);
   const rawQty = String(data.vat_chua_so_luong ?? data.so_luong ?? '').replace(/\./g, '').replace(/,/g, '').trim();
   if (rawQty === '' || rawQty === '-') {
-    return { vatChuaId, qty: 0, hasQtyInput: rawQty !== '' };
+    return { vatChuaId, qty: 0, hasQtyInput: rawQty !== '', ...parseLinkedMoney(data, 0) };
   }
   const qty = Math.floor(Number(rawQty));
   if (!Number.isFinite(qty)) {
-    return { vatChuaId, qty: 0, hasQtyInput: true };
+    return { vatChuaId, qty: 0, hasQtyInput: true, ...parseLinkedMoney(data, 0) };
   }
-  return { vatChuaId, qty, hasQtyInput: true };
+  return { vatChuaId, qty, hasQtyInput: true, ...parseLinkedMoney(data, qty) };
 }
 
 function assertVatChuaImportInput(parsed) {
   if (!parsed) return;
+  if (!Number.isFinite(parsed.qty) || !Number.isInteger(parsed.qty)) throw new Error('Số lượng vật chứa không hợp lệ');
   if (parsed.vatChuaId && parsed.qty <= 0) {
     throw new Error('Số lượng vật chứa phải lớn hơn 0');
   }
@@ -75,12 +78,21 @@ function assertVatChuaImportInput(parsed) {
 
 function assertVatChuaSignedInput(parsed) {
   if (!parsed) return;
+  if (!Number.isFinite(parsed.qty) || !Number.isInteger(parsed.qty)) throw new Error('Số lượng vật chứa không hợp lệ');
   if (parsed.vatChuaId && parsed.hasQtyInput && parsed.qty === 0) {
     throw new Error('Số lượng vật chứa không được bằng 0');
   }
   if (!parsed.vatChuaId && parsed.hasQtyInput && parsed.qty !== 0) {
     throw new Error('Vui lòng chọn vật chứa');
   }
+}
+
+function vatChuaConfigFromParsed(parsed) {
+  if (!parsed || !parsed.vatChuaId) return undefined;
+  return { vat_chua_id: parsed.vatChuaId, vat_chua_so_luong: parsed.qty,
+    vat_chua_don_gia_giao_dich: parsed.transactionPrice || 0,
+    vat_chua_ghi_nhan_thu_chi: parsed.recognizeCash === true,
+    vat_chua_thanh_toan: { ...(parsed.payment || {}) } };
 }
 
 function parseGiaVonInput(value) {
@@ -176,12 +188,15 @@ async function applySupplierDebtForNhapVatChua(nhapDoc, options = {}, session) {
 }
 
 async function createNhapVatChuaAndIncreaseStock(options = {}, session) {
+  const linked = LINKED_SOURCES.has(options.sourceType);
+  if (linked && !session) return inTransaction(null, activeSession => createNhapVatChuaAndIncreaseStock(options, activeSession));
   const storeId = cleanId(options.storeId);
   const vatChuaId = cleanId(options.vatChuaId);
   const qty = Math.floor(Number(options.qty || 0));
   if (!storeId || !vatChuaId || qty <= 0) {
     throw new Error('Thiếu thông tin nhập vật chứa');
   }
+  const existing = linked ? await loadLinkedMovement(NhapVatChua, { ...options, storeId, vatChuaId, qty }, 'nhap', session) : null;
 
   const vatChua = await withSessionQuery(
     VatChua.findOne({
@@ -200,8 +215,9 @@ async function createNhapVatChuaAndIncreaseStock(options = {}, session) {
     throw new Error('Vui lòng nhập giá vốn lớn hơn 0');
   }
   const thanhTien = zeroCost ? 0 : Math.round(giaVon * qty);
-  const maNhap = await makeNhapVatChuaCode(storeId, session);
-  const nhapDoc = await createOne(NhapVatChua, {
+  const transactionPrice = money(options.transactionPrice ?? giaVon ?? 0);
+  const maNhap = existing ? existing.ma_nhap_vat_chua : await makeNhapVatChuaCode(storeId, session);
+  const values = {
     ma_nhap_vat_chua: maNhap,
     loai_nhap: options.loaiNhap || 'mua_moi',
     doi_tuong_type: options.doiTuongType || 'none',
@@ -210,25 +226,44 @@ async function createNhapVatChuaAndIncreaseStock(options = {}, session) {
     source_type: options.sourceType || 'manual',
     source_id: options.sourceId || undefined,
     source_code: options.sourceCode || undefined,
+    operation_key: operationKey(options),
+    ghi_nhan_thu_chi: linked && options.recognizeCash === true,
     items: [{
       vat_chua_id: vatChua._id,
       ma_vat_chua: vatChua.ma_vat_chua || '',
       ten_vat_chua: vatChua.ten_vat_chua || '',
       so_luong: qty,
       gia_von: giaVon,
-      thanh_tien: thanhTien
+      thanh_tien: thanhTien,
+      don_gia_giao_dich: transactionPrice,
+      thanh_tien_giao_dich: transactionPrice * qty
     }],
     tong_so_luong: qty,
     tong_tien: thanhTien,
     ghi_chu: String(options.ghiChu || '').trim(),
     trang_thai: 'active',
     cua_hang_id: storeId
-  }, session);
-
-  await withSessionQuery(
-    VatChua.updateOne({ _id: vatChua._id }, { $inc: { so_luong_ton: qty } }),
-    session
-  );
+  };
+  let nhapDoc;
+  if (existing) {
+    const oldLine = (existing.items || [])[0] || {};
+    const oldId = cleanId(oldLine.vat_chua_id), oldQty = Number(oldLine.so_luong || 0);
+    if (oldId && oldId !== vatChuaId && oldQty > 0) {
+      const restored = await VatChua.updateOne({ _id: oldId, cua_hang_id: storeId, so_luong_ton: { $gte: oldQty } }, { $inc: { so_luong_ton: -oldQty } }, { session });
+      if (!restored || Number(restored.modifiedCount || 0) < 1) throw new Error('Tồn vật chứa không đủ để điều chỉnh phiếu nhập.');
+    }
+    const delta = oldId === vatChuaId ? qty - oldQty : qty;
+    if (delta) {
+      const updated = await VatChua.updateOne({ _id: vatChuaId, cua_hang_id: storeId, ...(delta < 0 ? { so_luong_ton: { $gte: -delta } } : {}) },
+        { $inc: { so_luong_ton: delta } }, { session });
+      if (!updated || Number(updated.modifiedCount || 0) < 1) throw new Error('Tồn vật chứa không đủ để điều chỉnh phiếu nhập.');
+    }
+    Object.assign(existing, values); await existing.save(withSessionOptions({}, session)); nhapDoc = existing;
+  } else {
+    nhapDoc = await createOne(NhapVatChua, values, session);
+    await withSessionQuery(VatChua.updateOne({ _id: vatChua._id, cua_hang_id: storeId }, { $inc: { so_luong_ton: qty } }), session);
+  }
+  if (linked) await createLinkedContainerReceipt(nhapDoc, 'nhap', options, session);
 
   return nhapDoc;
 }
@@ -238,6 +273,7 @@ async function createNhapVatChuaAndIncreaseStock(options = {}, session) {
  */
 async function importVatChuaWithSalesReturn(returnSlip, data = {}, session) {
   if (!returnSlip || !returnSlip._id || !returnSlip.cua_hang_id) return null;
+  if (['draft', 'cancelled'].includes(returnSlip.trang_thai)) return null;
 
   const parsed = parseVatChuaImportInput(data);
   assertVatChuaImportInput(parsed);
@@ -250,6 +286,7 @@ async function importVatChuaWithSalesReturn(returnSlip, data = {}, session) {
     storeId: returnSlip.cua_hang_id,
     vatChuaId: parsed.vatChuaId,
     qty: parsed.qty,
+    ...linkedOptions(parsed, data),
     zeroCost: true,
     loaiNhap: 'doi_tra_hang',
     doiTuongType: returnSlip.khach_hang_id ? 'khach_hang' : 'none',
@@ -263,6 +300,7 @@ async function importVatChuaWithSalesReturn(returnSlip, data = {}, session) {
 }
 
 async function cancelNhapVatChuaBySource(storeId, sourceType, sourceId, session) {
+  if (!session) return inTransaction(null, activeSession => cancelNhapVatChuaBySource(storeId, sourceType, sourceId, activeSession));
   const store = cleanId(storeId);
   const source = cleanId(sourceId);
   if (!store || !source || !sourceType) return;
@@ -279,15 +317,14 @@ async function cancelNhapVatChuaBySource(storeId, sourceType, sourceId, session)
   );
 
   for (const nhapDoc of nhapRows) {
+    await assertLinkedCashCanChange(nhapDoc, 'nhap', session);
     const items = Array.isArray(nhapDoc.items) ? nhapDoc.items : [];
     for (const item of items) {
       const vatChuaId = cleanId(item.vat_chua_id);
       const qty = Math.floor(Number(item.so_luong || 0));
       if (!vatChuaId || qty <= 0) continue;
-      await withSessionQuery(
-        VatChua.updateOne({ _id: vatChuaId }, { $inc: { so_luong_ton: -qty } }),
-        session
-      );
+      const updated = await withSessionQuery(VatChua.updateOne({ _id: vatChuaId, cua_hang_id: store, so_luong_ton: { $gte: qty } }, { $inc: { so_luong_ton: -qty } }), session);
+      if (!updated || Number(updated.modifiedCount || 0) < 1) throw new Error('Tồn vật chứa không đủ để hủy phiếu nhập.');
     }
     nhapDoc.trang_thai = 'cancelled';
     await nhapDoc.save(withSessionOptions({}, session));
@@ -335,6 +372,7 @@ async function createExpenseReceiptForNhapVatChua(nhapDoc, options = {}, session
  */
 async function importVatChuaWithPurchase(purchase, data = {}, session) {
   if (!purchase || !purchase._id || !purchase.cua_hang_id) return null;
+  if (['draft', 'cancelled'].includes(purchase.trang_thai)) return null;
 
   const parsed = parseVatChuaImportInput(data);
   assertVatChuaImportInput(parsed);
@@ -353,6 +391,7 @@ async function importVatChuaWithPurchase(purchase, data = {}, session) {
     storeId: purchase.cua_hang_id,
     vatChuaId: parsed.vatChuaId,
     qty: parsed.qty,
+    ...linkedOptions(parsed, data),
     zeroCost: true,
     loaiNhap: 'kem_phieu_nhap_hang',
     doiTuongType: purchase.nha_cung_cap_id ? 'nha_cung_cap' : 'none',
@@ -489,8 +528,15 @@ async function loadAverageCostByVatChuaIds(storeId, vatChuaIds = []) {
   return map;
 }
 
+async function addAverageCostToVatChuaOptions(storeId, rows = []) {
+  const costs = await loadAverageCostByVatChuaIds(storeId, rows.map(row => row._id));
+  rows.forEach(row => { row.gia_von_binh_quan = costs[String(row._id)] || 0; });
+  return rows;
+}
+
 module.exports = {
   parseVatChuaImportInput,
+  vatChuaConfigFromParsed,
   parseVatChuaSignedInput,
   assertVatChuaImportInput,
   assertVatChuaSignedInput,
@@ -499,5 +545,6 @@ module.exports = {
   importVatChuaWithSalesReturn,
   cancelNhapVatChuaBySource,
   importDirectVatChuaFromSupplier,
-  loadAverageCostByVatChuaIds
+  loadAverageCostByVatChuaIds,
+  addAverageCostToVatChuaOptions
 };

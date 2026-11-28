@@ -182,7 +182,7 @@
             <td class="num"><%= fmtMoney(effective ? current.debt ?? source.con_no_ncc ?? 0 : 0) %></td>
           </tr>
           <tr class="purchase-source-detail-row" id="<%= detailId %>" data-purchase-source-detail="<%= sourceId %>" hidden>
-            <td colspan="6"><%- include('_purchase-detail', { t: sourceDetail, showPurchaseActions: false }) %></td>
+            <td colspan="6"><%- include('_purchase-detail', { t: sourceDetail, showPurchaseActions: false, showPurchaseClassification: true }) %></td>
           </tr>
         <% }) %>
       </tbody>

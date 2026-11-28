@@ -20,8 +20,12 @@ function buildLotKey(hang_hoa_id, lo_hang_id) {
   return `${String(hang_hoa_id || '')}|${String(lo_hang_id || '')}`;
 }
 
+function buildLotVariantKey({ hang_hoa_id, gia_tri_thuoc_tinh_id, ten_quy_cach, lo_hang_id }) {
+  return buildVariantKey({ hang_hoa_id, gia_tri_thuoc_tinh_id, ten_quy_cach }) + '|' + String(lo_hang_id || '');
+}
+
 function createReservedMaps() {
-  return { byProduct: {}, byVariant: {}, byLot: {} };
+  return { byProduct: {}, byVariant: {}, byLot: {}, byLotVariant: {}, reservationRows: [] };
 }
 
 function addReservedQuantity(maps, {
@@ -33,6 +37,12 @@ function addReservedQuantity(maps, {
 }) {
   const qty = Math.max(0, Number(quantity) || 0);
   if (!hangHoaId || qty <= 0) return maps;
+  const reservation = { hang_hoa_id: hangHoaId, gia_tri_thuoc_tinh_id: giaTriThuocTinhId,
+    ten_quy_cach: tenQuyCach, lo_hang_id: loHangId, so_luong_khach_dat: qty };
+  maps.reservationRows.push(reservation);
+  const lotVariantKey = buildLotVariantKey(reservation);
+  if (!maps.byLotVariant[lotVariantKey]) maps.byLotVariant[lotVariantKey] = { ...reservation, so_luong_khach_dat: 0 };
+  maps.byLotVariant[lotVariantKey].so_luong_khach_dat += qty;
 
   if (!maps.byProduct[hangHoaId]) {
     maps.byProduct[hangHoaId] = { hang_hoa_id: hangHoaId, so_luong_khach_dat: 0 };
@@ -87,6 +97,11 @@ function addReservedQuantity(maps, {
 }
 
 function mergeReservedMaps(target, source) {
+  for (const row of source.reservationRows || []) target.reservationRows.push(row);
+  Object.entries(source.byLotVariant || {}).forEach(([key, row]) => {
+    if (!target.byLotVariant[key]) target.byLotVariant[key] = { ...row, so_luong_khach_dat: 0 };
+    target.byLotVariant[key].so_luong_khach_dat += Number(row.so_luong_khach_dat || 0);
+  });
   Object.entries(source?.byProduct || {}).forEach(([key, row]) => {
     if (!target.byProduct[key]) {
       target.byProduct[key] = {
@@ -136,6 +151,31 @@ function rowsToReservedMaps(rows = []) {
     });
   });
   return maps;
+}
+
+// Reservations without an assigned lot still need stock in a selected lot.
+// Count those conservatively, alongside reservations assigned to this lot,
+// while never subtracting an unrelated lot or variant.
+function getReservedQuantityForStock(maps, scope = {}) {
+  const product = String(scope.hang_hoa_id || '');
+  const lot = String(scope.lo_hang_id || '');
+  const attr = String(scope.gia_tri_thuoc_tinh_id || '');
+  const name = String(scope.ten_quy_cach || scope.ten_thuoc_tinh || '').trim() || 'Chưa phân loại';
+  if (Array.isArray(maps && maps.reservationRows)) {
+    return maps.reservationRows.reduce((sum, row) => {
+      if (String(row.hang_hoa_id || '') !== product) return sum;
+      const rowLot = String(row.lo_hang_id || '');
+      if (rowLot && rowLot !== lot) return sum;
+      const rowAttr = String(row.gia_tri_thuoc_tinh_id || '');
+      const rowName = String(row.ten_quy_cach || '').trim() || (rowAttr ? '' : 'Chưa phân loại');
+      const sameVariant = attr && rowAttr ? attr === rowAttr : rowName === name;
+      return sameVariant ? sum + Math.max(0, Number(row.so_luong_khach_dat || 0)) : sum;
+    }, 0);
+  }
+  const variant = maps && maps.byVariant || {};
+  const byId = variant[buildVariantKey({ hang_hoa_id: product, gia_tri_thuoc_tinh_id: attr, ten_quy_cach: scope.ten_quy_cach || '' })];
+  const byName = variant[buildVariantKey({ hang_hoa_id: product, ten_quy_cach: scope.ten_quy_cach || '' })];
+  return Number((byId || byName || {}).so_luong_khach_dat || 0);
 }
 
 async function getReservedQuantitiesByOrder({
@@ -257,6 +297,7 @@ async function getReservedQuantitiesByDirectInvoice({
       $match: {
         'hoa_don.kho_id': khoId,
         'hoa_don.trang_thai': { $ne: 'cancelled' },
+        'hoa_don.trang_thai_du_lieu': { $ne: 'inactive' },
         $and: [
           {
             $or: [
@@ -295,10 +336,10 @@ async function getReservedQuantitiesByDirectInvoice({
 }
 
 async function getReservedQuantitiesForSale(options = {}) {
-  const [orderReserved, invoiceReserved] = await Promise.all([
-    getReservedQuantitiesByOrder(options),
-    getReservedQuantitiesByDirectInvoice(options)
-  ]);
+  // MongoDB sessions must not run independent operations concurrently.
+  const [orderReserved, invoiceReserved] = options.session
+    ? [await getReservedQuantitiesByOrder(options), await getReservedQuantitiesByDirectInvoice(options)]
+    : await Promise.all([getReservedQuantitiesByOrder(options), getReservedQuantitiesByDirectInvoice(options)]);
   const merged = createReservedMaps();
   mergeReservedMaps(merged, orderReserved);
   mergeReservedMaps(merged, invoiceReserved);
@@ -308,6 +349,9 @@ async function getReservedQuantitiesForSale(options = {}) {
 module.exports = {
   buildVariantKey,
   buildLotKey,
+  buildLotVariantKey,
+  getReservedQuantityForStock,
+  getReservedQuantityForScope: getReservedQuantityForStock,
   getReservedQuantitiesByOrder,
   getReservedQuantitiesByDirectInvoice,
   getReservedQuantitiesForSale

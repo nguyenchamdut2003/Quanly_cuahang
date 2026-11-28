@@ -81,6 +81,8 @@
         : [];
       if (!attrs.length) {
         result.push({
+          classification: row.classification || null,
+          ct_phieu_nhap_id: row._id,
           ten_thuoc_tinh: '--',
           so_luong: Number(row.so_luong || 0),
           don_gia_nhap: Number(row.don_gia_nhap || 0),
@@ -92,6 +94,8 @@
         const qty = Number(item.so_luong || 0);
         const price = Number(item.don_gia_nhap || item.gia_von || row.don_gia_nhap || 0);
         result.push({
+          classification: row.classification || null,
+          ct_phieu_nhap_id: row._id,
           ten_thuoc_tinh: item.ten_quy_cach || item.ten_thuoc_tinh || '--',
           so_luong: qty,
           don_gia_nhap: price,
@@ -110,6 +114,7 @@
   <title>Nhập hàng</title>
   <link rel="stylesheet" href="/stylesheets/style.css">
   <link rel="stylesheet" href="/stylesheets/responsive.css">
+  <link rel="stylesheet" href="/stylesheets/phan-loai-hang.css">
   <style>
     .po-page{height:calc(100vh - 98px);background:#f3f6f9;display:flex;flex-direction:column}
     .po-shell{flex:1;min-height:0;display:grid;grid-template-columns:236px minmax(0,1fr);gap:12px;padding:14px 30px 0}
@@ -361,6 +366,9 @@
     .purchase-trash-foot .kv-btn.danger{background:#d92d20;color:#fff;border-color:#d92d20}
     .purchase-trash-loading{text-align:center;padding:28px 12px;color:#667085;font-size:13px}
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
@@ -655,7 +663,8 @@
       </div>
       <div id="purchaseModalBody"></div>
       <div class="page-actions page-actions--bordered detail-actions">
-        <button class="kv-btn primary" type="button" onclick="savePurchaseNote()">Lưu</button>
+        <button class="kv-btn" type="button" id="purchaseCompleteBtn" onclick="savePurchaseNote(true)" hidden>Hoàn thành</button>
+        <button class="kv-btn primary" type="button" id="purchaseEditSaveBtn" onclick="savePurchaseNote()">Lưu</button>
         <button class="kv-btn" type="button" onclick="closePurchaseModal()">Đóng</button>
       </div>
     </div>
@@ -701,6 +710,7 @@
   <script src="/js/kv-inline-detail.js"></script>
   <script>document.addEventListener('DOMContentLoaded', function() { if (window.kvInlineBindExpandRows) window.kvInlineBindExpandRows(document); });</script>
   <script src="/javascripts/purchase-group.js"></script>
+  <script src="/javascripts/phan-loai-hang.js"></script>
   <script id="cashBookData" type="application/json"><%- JSON.stringify(locals.cashBooks || []).replace(/</g, '\\u003c') %></script>
   <script id="vatChuaData" type="application/json"><%- JSON.stringify(locals.vatChuaList || []).replace(/</g, '\\u003c') %></script>
   <script>
@@ -712,8 +722,11 @@
     const paySupplierBookCache = { tien_mat: null, chuyen_khoan: null };
     let currentPurchaseId = '';
     let currentPurchaseEdit = null;
+    let purchaseEditSaving = false;
     function money(value){ return Number(value || 0).toLocaleString('vi-VN'); }
     function moneyText(value){ return money(value) + ' VNĐ'; }
+    const quantityValue = value => Math.max(0, window.KVStockQuantity.parse(value));
+    const quantityText = value => window.KVStockQuantity.format(value);
     function numberValue(value){ return Number(String(value || '0').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0; }
     function purchaseEditPriceValue(value) {
       if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -749,7 +762,7 @@
     function collectEditQuyCachItems(rowId) {
       return normalizeEditQuyCachItems(Array.from(document.querySelectorAll(editQcParentSelector(rowId))).map(rowEl => ({
         ten_quy_cach: rowEl.querySelector('[data-edit-qc-field="ten_quy_cach"]')?.value || '',
-        so_luong: numberValue(rowEl.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0),
+        so_luong: quantityValue(rowEl.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0),
         don_gia_nhap: purchaseEditPriceValue(rowEl.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0),
         ghi_chu: rowEl.querySelector('[data-edit-qc-field="ghi_chu"]')?.value || ''
       })));
@@ -759,7 +772,7 @@
       return `
         <tr data-edit-qc-parent="${escapeHtml(rowId)}">
           <td><input data-edit-qc-field="ten_quy_cach" value="${escapeHtml(qc.ten_quy_cach || qc.ten_thuoc_tinh || '')}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
-          <td><input data-edit-qc-field="so_luong" class="js-purchase-edit-number" inputmode="numeric" value="${money(qc.so_luong || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
+          <td><input data-edit-qc-field="so_luong" class="js-purchase-edit-number" inputmode="decimal" value="${quantityText(qc.so_luong || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
           <td><input data-edit-qc-field="don_gia_nhap" class="js-purchase-edit-price" inputmode="decimal" value="${purchaseEditPriceText(qc.don_gia_nhap || qc.gia_von || 0)}" oninput="calculatePurchaseEditTotals()" ${disabled ? 'disabled' : ''}></td>
           <td class="num" data-edit-qc-total>${moneyText(qc.thanh_tien || ((qc.so_luong || 0) * (qc.don_gia_nhap || qc.gia_von || 0)))}</td>
           <td><input data-edit-qc-field="ghi_chu" value="${escapeHtml(qc.ghi_chu || '')}" ${disabled ? 'disabled' : ''}></td>
@@ -783,7 +796,7 @@
       return String(rowId).replace(/"/g, '&quot;');
     }
     function applyLiveVNFormat(el) {
-      if (!el) return;
+      if (!el || el.dataset.editField === 'so_luong' || el.dataset.editQcField === 'so_luong') return;
       const start = el.selectionStart == null ? el.value.length : el.selectionStart;
       const digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
       const raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
@@ -968,6 +981,8 @@
       const modal = document.getElementById('purchaseModal');
       const title = document.getElementById('purchaseModalTitle');
       const body = document.getElementById('purchaseModalBody');
+      currentPurchaseEdit = null;
+      document.getElementById('purchaseCompleteBtn').hidden = true;
       body.innerHTML = 'Đang tải phiếu nhập...';
       modal.classList.add('open');
       try {
@@ -977,6 +992,7 @@
         const ticket = data.data.ticket;
         const readonly = ticket.trang_thai === 'cancelled';
         currentPurchaseEdit = { ticket, items: data.data.items || [] };
+        document.getElementById('purchaseCompleteBtn').hidden = ticket.trang_thai !== 'draft';
         title.textContent = `Chỉnh sửa ${ticket.ma_phieu_nhap || 'phiếu nhập'}`;
         const supplierOptions = suppliers.map(s => {
           const selected = String(s._id) === String(ticket.nha_cung_cap_id?._id || ticket.nha_cung_cap_id || '');
@@ -988,7 +1004,7 @@
         }).join('');
         const vcEdit = data.data.vat_chua_edit || {};
         const vcLines = data.data.vat_chua_lines || [];
-        const canEditVatChua = !readonly && ticket.trang_thai === 'completed' && (vatChuaList.length > 0 || vcLines.length > 0);
+        const canEditVatChua = !readonly && ['draft', 'completed'].includes(ticket.trang_thai) && (vatChuaList.length > 0 || vcLines.length > 0);
         let vatChuaSection = '';
         if (canEditVatChua) {
           const vcIds = new Set(vatChuaList.map(vc => String(vc._id || '')));
@@ -1005,14 +1021,14 @@
               const id = String(vc._id || '');
               const selected = currentVcId && id === currentVcId ? 'selected' : '';
               const label = (vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '') + (vc.ten_vat_chua || '---');
-              return `<option value="${escapeHtml(id)}" ${selected}>${escapeHtml(label)}</option>`;
+              return `<option value="${escapeHtml(id)}" data-vc-average-cost="${Number(vc.gia_von_binh_quan) || 0}" ${selected}>${escapeHtml(label)}</option>`;
             }))
             .join('');
           const vcQty = Number(vcEdit.so_luong || 0) > 0 ? String(Math.floor(Number(vcEdit.so_luong || 0))) : '';
           vatChuaSection = `
           <div class="purchase-vat-chua-box edit-vat-chua-box">
             <div class="purchase-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa</div>
-            <div class="edit-vat-chua-row">
+            <div class="edit-vat-chua-row" data-vat-chua-payment data-vc-id="editVatChuaId" data-vc-qty="editVatChuaQty" data-vc-direction="chi">
               <label for="editVatChuaId">Vật chứa</label>
               <div class="vat-chua-combo">
                 <select id="editVatChuaId" title="Chọn vật chứa">${vatChuaOptions}</select>
@@ -1030,7 +1046,7 @@
             <tr>
               <td class="edit-qc-cell" colspan="9">
                 <div class="edit-qc-box" data-edit-qc-box="${escapeHtml(row._id)}">
-                  <div class="edit-qc-title"><span>Thuộc tính / quy cách trong lô</span><button type="button" class="kv-btn primary" style="height:26px;padding:0 8px" onclick="addEditQuyCachRow('${escapeHtml(row._id)}')" ${readonly ? 'disabled' : ''}>Thêm</button></div>
+                  <div class="edit-qc-title"><span>Phân loại trong lô</span><button type="button" class="kv-btn primary" style="height:26px;padding:0 8px" onclick="addEditQuyCachRow('${escapeHtml(row._id)}')" ${readonly ? 'disabled' : ''}>Thêm</button></div>
                   <table class="edit-qc-table">
                     <thead><tr><th>Thuộc tính</th><th>Số lượng</th><th>Đơn giá</th><th>Thành tiền</th><th>Ghi chú</th><th></th></tr></thead>
                     <tbody>
@@ -1045,7 +1061,7 @@
               <td>${index + 1}</td>
               <td>${escapeHtml(product.ma_hang || '')}</td>
               <td>${escapeHtml(product.ten_hang || '')}</td>
-              <td><input data-edit-field="so_luong" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.so_luong || 1)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
+              <td><input data-edit-field="so_luong" class="js-purchase-edit-number" inputmode="decimal" value="${quantityText(row.so_luong || 1)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><input data-edit-field="don_gia_nhap" class="js-purchase-edit-price" inputmode="decimal" value="${purchaseEditPriceText(row.don_gia_nhap || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><input data-edit-field="giam_gia_dong" class="js-purchase-edit-number" inputmode="numeric" value="${money(row.giam_gia_dong || 0)}" oninput="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}></td>
               <td><select data-edit-field="kieu_giam_gia_dong" onchange="calculatePurchaseEditTotals()" ${readonly ? 'disabled' : ''}><option value="vnd" ${discountType === 'vnd' ? 'selected' : ''}>VND</option><option value="percent" ${discountType === 'percent' ? 'selected' : ''}>%</option></select></td>
@@ -1084,6 +1100,7 @@
           </div>
           <p class="lot-note">${readonly ? 'Phiếu đã hủy: không thể chỉnh sửa.' : 'Phiếu đã nhập hàng: khi đổi số lượng hoặc kho, hệ thống sẽ điều chỉnh tồn kho theo chênh lệch.'}</p>
         `;
+        window.KVVatChuaPayment.hydrate('editVatChuaId', vcEdit);
         bindPurchaseEditNumberInputs(body);
         calculatePurchaseEditTotals();
       } catch (error) {
@@ -1099,17 +1116,17 @@
       if (qcItems.length) {
         const qtyInput = rowEl.querySelector('[data-edit-field="so_luong"]');
         const priceInput = rowEl.querySelector('[data-edit-field="don_gia_nhap"]');
-        if (qtyInput) qtyInput.value = money(Math.floor(qcQty));
+        if (qtyInput) qtyInput.value = quantityText(qcQty);
         if (priceInput) priceInput.value = qcQty > 0 ? purchaseEditPriceText(qcTotal / qcQty) : '0';
         document.querySelectorAll(editQcParentSelector(rowId)).forEach(qcRow => {
-          const qty = numberValue(qcRow.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0);
+          const qty = quantityValue(qcRow.querySelector('[data-edit-qc-field="so_luong"]')?.value || 0);
           const price = purchaseEditPriceValue(qcRow.querySelector('[data-edit-qc-field="don_gia_nhap"]')?.value || 0);
           const totalCell = qcRow.querySelector('[data-edit-qc-total]');
           if (totalCell) totalCell.textContent = moneyText(qty * price);
         });
         return Math.max(0, Math.floor(qcTotal));
       }
-      const qty = Math.max(0, Math.floor(numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0)));
+      const qty = quantityValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0);
       const price = purchaseEditPriceValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0);
       const discount = numberValue(rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0);
       const type = rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd';
@@ -1155,11 +1172,25 @@
         document.getElementById('editVatChuaId')?.focus();
         return false;
       }
+      const error = window.KVVatChuaPayment.validate('editVatChuaId', { draft: currentPurchaseEdit?.ticket?.trang_thai === 'draft' });
+      if (error) { alert(error); return false; }
       return true;
     }
-    async function savePurchaseNote(){
-      if (!currentPurchaseId) return;
+    async function savePurchaseNote(complete){
+      if (!currentPurchaseId || !currentPurchaseEdit || purchaseEditSaving) return;
       if (!validateVatChuaEdit()) return;
+      if (complete) {
+        if (currentPurchaseEdit?.ticket?.trang_thai !== 'draft') return;
+        const error = window.KVVatChuaPayment.validate('editVatChuaId');
+        if (error) return alert(error);
+        const container = window.KVVatChuaPayment.payload('editVatChuaId');
+        const payment = container.vat_chua_thanh_toan || {};
+        const actualContainerMoney = Number(payment.tien_mat || 0) + Number(payment.chuyen_khoan || 0);
+        if (actualContainerMoney > 0 && !confirm('Hoàn thành phiếu nhập và xác nhận đã chi ' + moneyText(actualContainerMoney) + ' cho vật chứa?')) return;
+      }
+      purchaseEditSaving = true;
+      const buttons = [document.getElementById('purchaseCompleteBtn'), document.getElementById('purchaseEditSaveBtn')];
+      buttons.forEach(button => { if (button) button.disabled = true; });
       try {
         const items = Array.from(document.querySelectorAll('[data-edit-row]')).map(rowEl => {
           const rowId = rowEl.dataset.editRow;
@@ -1169,7 +1200,7 @@
           const qcItems = collectEditQuyCachItems(rowId);
           const item = {
             _id: rowId,
-            so_luong: rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0,
+            so_luong: quantityValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0),
             don_gia_nhap: purchaseEditPriceValue(rowEl.querySelector('[data-edit-field="don_gia_nhap"]')?.value || 0),
             giam_gia_dong: rowEl.querySelector('[data-edit-field="giam_gia_dong"]')?.value || 0,
             kieu_giam_gia_dong: rowEl.querySelector('[data-edit-field="kieu_giam_gia_dong"]')?.value || 'vnd',
@@ -1201,12 +1232,17 @@
         if (editVatChuaEl) {
           payload.vat_chua_id = editVatChuaEl.value || '';
           payload.vat_chua_so_luong = document.getElementById('editVatChuaQty')?.value || '';
+          Object.assign(payload, window.KVVatChuaPayment.payload('editVatChuaId'));
         }
-        const data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', payload);
+        let data = await postJson('/nhap-hang/' + currentPurchaseId + '/save', payload);
+        if (complete) data = await postJson('/nhap-hang/' + currentPurchaseId + '/complete', {});
         alert(data.message || 'Đã lưu');
         location.reload();
       } catch (error) {
         alert(error.message || 'Không lưu được phiếu nhập');
+      } finally {
+        purchaseEditSaving = false;
+        buttons.forEach(button => { if (button) button.disabled = false; });
       }
     }
     function returnPurchase(id){

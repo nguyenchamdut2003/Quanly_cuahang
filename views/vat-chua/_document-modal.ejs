@@ -22,7 +22,10 @@
       <% } %>
     </strong></div>
     <div><span>Tổng số lượng</span><strong><%= Number(tong_so_luong || 0).toLocaleString('vi-VN') %></strong></div>
-    <div><span>Tổng tiền</span><strong><%= Number(tong_tien || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
+    <div><span>Giá trị giá vốn</span><strong><%= Number(tong_tien || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
+    <div><span>Thành tiền giao dịch</span><strong><%= Number(locals.thanh_tien_giao_dich || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
+    <div><span>Ghi vào Thu chi</span><strong><%= locals.ghi_nhan_thu_chi === true ? 'Có' : 'Không' %></strong></div>
+    <div><span>Thực thu / chi</span><strong><%= Number(locals.thuc_thu_chi || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
     <div class="span-2"><span>Ghi chú</span><strong><%= ghi_chu || '—' %></strong></div>
   </div>
 
@@ -34,14 +37,16 @@
           <th>Tên vật chứa</th>
           <th class="text-right">Số lượng</th>
           <th class="text-right">Giá vốn</th>
-          <th class="text-right">Thành tiền</th>
+          <th class="text-right">Giá trị giá vốn</th>
+          <th class="text-right">Đơn giá giao dịch</th>
+          <th class="text-right">Thành tiền giao dịch</th>
           <th>Ghi chú</th>
         </tr>
       </thead>
       <tbody>
         <% if (!items || items.length === 0) { %>
           <tr>
-            <td colspan="6" class="empty-cell">Không có dòng chi tiết.</td>
+            <td colspan="8" class="empty-cell">Không có dòng chi tiết.</td>
           </tr>
         <% } %>
         <% (items || []).forEach(function(line) { %>
@@ -51,6 +56,8 @@
             <td class="text-right"><%= Number(line.so_luong || 0).toLocaleString('vi-VN') %></td>
             <td class="text-right"><%= Number(line.gia_von || 0) ? Number(line.gia_von).toLocaleString('vi-VN') : '—' %></td>
             <td class="text-right"><%= Number(line.thanh_tien || 0).toLocaleString('vi-VN') %> VNĐ</td>
+            <td class="text-right"><%= Number(line.don_gia_giao_dich || 0).toLocaleString('vi-VN') %> VNĐ</td>
+            <td class="text-right"><%= Number(line.thanh_tien_giao_dich || 0).toLocaleString('vi-VN') %> VNĐ</td>
             <td><%= line.ghi_chu || '—' %></td>
           </tr>
         <% }) %>

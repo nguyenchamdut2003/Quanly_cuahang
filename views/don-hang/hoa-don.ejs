@@ -158,6 +158,9 @@
     .invoice-trip-pane[data-trip-pane="without"] .invoice-trip-actions{margin-top:12px}
     .invoice-trip-detail-scroll{width:100%;max-width:100%;overflow-x:auto;min-width:0;box-sizing:border-box}
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body>
   <%- include('../partials/header') %>
@@ -576,9 +579,11 @@
     const money = value => Number(value || 0).toLocaleString('vi-VN');
     const moneyText = value => money(value) + ' VNĐ';
     const num = value => Number(String(value || '').replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '')) || 0;
+    const quantityValue = value => Math.max(0, window.KVStockQuantity.parse(value));
+    const quantityText = value => window.KVStockQuantity.format(value);
     const numberValue = value => num(value);
     function applyLiveVNFormat(el) {
-      if (!el) return;
+      if (!el || el.dataset.editField === 'so_luong') return;
       const start = el.selectionStart == null ? el.value.length : el.selectionStart;
       const digitsBefore = String(el.value).slice(0, start).replace(/\D/g, '').length;
       const raw = String(el.value).replace(/\./g, '').replace(/,/g, '').replace(/[^\d]/g, '');
@@ -1085,7 +1090,7 @@
     }
 
     function calcInvoiceEditLineTotal(rowEl) {
-      const qty = Math.max(0, Math.floor(numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0)));
+      const qty = quantityValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0);
       const price = numberValue(rowEl.querySelector('[data-edit-field="don_gia"]')?.value || 0);
       const discount = numberValue(rowEl.querySelector('[data-edit-field="chiet_khau"]')?.value || 0);
       return Math.max(0, Math.floor(qty * price - discount));
@@ -1120,6 +1125,8 @@
         document.getElementById('editInvoiceVatChuaId')?.focus();
         return false;
       }
+      const error = window.KVVatChuaPayment.validate('editInvoiceVatChuaId');
+      if (error) { alert(error); return false; }
       return true;
     }
 
@@ -1165,14 +1172,14 @@
               const vcId = String(vc._id || '');
               const selected = currentVcId && vcId === currentVcId ? 'selected' : '';
               const label = (vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '') + (vc.ten_vat_chua || '---');
-              return `<option value="${escapeHtml(vcId)}" ${selected}>${escapeHtml(label)}</option>`;
+              return `<option value="${escapeHtml(vcId)}" data-vc-average-cost="${Number(vc.gia_von_binh_quan) || 0}" ${selected}>${escapeHtml(label)}</option>`;
             }))
             .join('');
           const vcQty = Number(vcEdit.so_luong || 0) > 0 ? String(Math.floor(Number(vcEdit.so_luong || 0))) : '';
           vatChuaSection = `
           <div class="invoice-vat-chua-box edit-vat-chua-box">
             <div class="invoice-vat-chua-title"><i class="fa-solid fa-box"></i> Vật chứa</div>
-            <div class="edit-vat-chua-row">
+            <div class="edit-vat-chua-row" data-vat-chua-payment data-vc-id="editInvoiceVatChuaId" data-vc-qty="editInvoiceVatChuaQty" data-vc-direction="thu">
               <label for="editInvoiceVatChuaId">Vật chứa</label>
               <div class="vat-chua-combo">
                 <select id="editInvoiceVatChuaId" title="Chọn vật chứa">${vatChuaOptions}</select>
@@ -1189,7 +1196,7 @@
               <td>${index + 1}</td>
               <td>${escapeHtml(product.ma_hang || '')}</td>
               <td>${escapeHtml(product.ten_hang || '')}</td>
-              <td><input data-edit-field="so_luong" class="js-invoice-edit-number" inputmode="numeric" value="${money(row.so_luong || 1)}" oninput="calculateInvoiceEditTotals()"></td>
+              <td><input data-edit-field="so_luong" class="js-invoice-edit-number" inputmode="decimal" value="${quantityText(row.so_luong || 1)}" oninput="calculateInvoiceEditTotals()"></td>
               <td><input data-edit-field="don_gia" class="js-invoice-edit-number" inputmode="numeric" value="${money(row.don_gia || 0)}" oninput="calculateInvoiceEditTotals()"></td>
               <td><input data-edit-field="chiet_khau" class="js-invoice-edit-number" inputmode="numeric" value="${money(row.chiet_khau || 0)}" oninput="calculateInvoiceEditTotals()"></td>
               <td class="num" data-edit-total>${moneyText(row.thanh_tien || 0)}</td>
@@ -1229,6 +1236,7 @@
           </div>
           <p class="lot-note">Khi đổi số lượng, hệ thống sẽ điều chỉnh tồn kho theo chênh lệch (nếu hóa đơn đã trừ tồn).</p>
         `;
+        window.KVVatChuaPayment.hydrate('editInvoiceVatChuaId', vcEdit);
         bindInvoiceEditNumberInputs(body);
         calculateInvoiceEditTotals();
       } catch (error) {
@@ -1242,7 +1250,7 @@
       try {
         const items = Array.from(document.querySelectorAll('#invoiceEditModal [data-edit-row]')).map(rowEl => ({
           _id: rowEl.dataset.editRow,
-          so_luong: numberValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0),
+          so_luong: quantityValue(rowEl.querySelector('[data-edit-field="so_luong"]')?.value || 0),
           don_gia: numberValue(rowEl.querySelector('[data-edit-field="don_gia"]')?.value || 0),
           chiet_khau: numberValue(rowEl.querySelector('[data-edit-field="chiet_khau"]')?.value || 0)
         }));
@@ -1255,6 +1263,7 @@
         if (editVatChuaEl) {
           payload.vat_chua_id = editVatChuaEl.value || '';
           payload.vat_chua_so_luong = numberValue(document.getElementById('editInvoiceVatChuaQty')?.value || 0);
+          Object.assign(payload, window.KVVatChuaPayment.payload('editInvoiceVatChuaId'));
         }
         const res = await fetch('/don-hang/hoa-don/' + currentInvoiceEditId + '/save', {
           method: 'POST',

@@ -449,13 +449,13 @@ async function loadProductStockTab(productId, req) {
     }, {});
 
     var reservedRows = await Promise.all(rows.map(function(row) {
-        return getReservedQuantitiesByOrder({
+        return getReservedQuantitiesForSale({
             kho_id: row.kho_id,
             hang_hoa_ids: [tab.item._id]
         }).then(function(reserved) {
             return {
                 khoId: String(row.kho_id || ''),
-                qty: Number((reserved.byProduct[String(tab.item._id)] || {}).so_luong_khach_dat || 0)
+                qty: Number((reserved.byProduct[String(tab.item._id)] || {}).so_luong_khach_dat || 0), reserved: reserved
             };
         });
     }));
@@ -463,6 +463,13 @@ async function loadProductStockTab(productId, req) {
         map[row.khoId] = row.qty;
         return map;
     }, {});
+    var reservedMapsByWarehouse = reservedRows.reduce(function(map, row) { map[row.khoId] = row.reserved; return map; }, {});
+    var variantQuery = { hang_hoa_id: tab.item._id, kho_id: { $in: warehouseIds } };
+    if (tab.hasStoreScope) variantQuery.cua_hang_id = tab.storeId;
+    var variants = warehouseIds.length ? await TonKhoLoQuyCach.find(variantQuery)
+        .select('kho_id lo_hang_id ten_quy_cach ten_thuoc_tinh gia_tri_thuoc_tinh_id so_luong gia_von')
+        .sort({ ten_quy_cach: 1 }).lean() : [];
+    var reservationForStock = require('../../../services/availability.service').getReservedQuantityForStock;
 
     var expiryMap = {};
     var stockSummaryByWarehouse = {};
@@ -523,6 +530,18 @@ async function loadProductStockTab(productId, req) {
         row.ton_thuc_te = activeLotQty;
         row.ton_co_the_giao = Math.max((tab.item.quan_ly_theo_lo && summary ? summary.sellable : rawQty) - reservedQty, 0);
         row.ton_het_han = tab.item.quan_ly_theo_lo && summary ? summary.expired : 0;
+        row.hang_hoa_id = tab.item._id;
+        row.quan_ly_theo_lo = Boolean(tab.item.quan_ly_theo_lo);
+        row.quy_cach_rows = variants.filter(function(qc) { return String(qc.kho_id) === warehouseId; })
+            .map(function(qc) {
+                var reservedQty = reservationForStock(reservedMapsByWarehouse[warehouseId], {
+                    hang_hoa_id: tab.item._id, lo_hang_id: qc.lo_hang_id || null,
+                    ten_quy_cach: qc.ten_quy_cach || qc.ten_thuoc_tinh || '',
+                    gia_tri_thuoc_tinh_id: qc.gia_tri_thuoc_tinh_id || null
+                });
+                return { ...qc, so_luong_dang_dat: reservedQty,
+                    so_luong_kha_dung: Math.max(0, Number(qc.so_luong || 0) - reservedQty) };
+            });
         return row;
     });
 

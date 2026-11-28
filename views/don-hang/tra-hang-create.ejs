@@ -141,6 +141,9 @@
     .filter-input,.invoice-table th,.invoice-table td,.choose,.quick{font-size:var(--text-base)}
     .close{font-size:var(--text-lg)}
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body>
   <div id="appRoot">
@@ -232,7 +235,7 @@
       <input id="discountType" type="hidden" value="vnd">
       <div class="sum-line"><span class="sum-label">Phí trả hàng</span><input id="returnFee" class="num-input" value="0" inputmode="numeric" oninput="handleNumInput(this, renderTotals)"></div>
       <div id="pickupFeeNote" class="fee-note">Phí lấy hàng do cửa hàng trả, không trừ vào tiền trả khách.</div>
-      <div class="return-section">
+      <div class="return-section" data-vat-chua-payment data-vc-id="returnVatChuaId" data-vc-qty="returnVatChuaQty" data-vc-direction="signed">
         <div class="section-title vat-chua-title">
           <span>Vật chứa</span>
           <span class="vat-chua-help" tabindex="0" aria-label="Giải thích số lượng vật chứa">
@@ -249,7 +252,7 @@
           <select id="returnVatChuaId" title="Chọn vật chứa">
             <option value="">— Chọn vật chứa —</option>
             <% (Array.isArray(locals.vatChuaList) ? locals.vatChuaList : []).forEach(function(vc) { %>
-              <option value="<%= vc._id %>"><%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %></option>
+              <option value="<%= vc._id %>" data-vc-average-cost="<%= Number(vc.gia_von_binh_quan) || 0 %>"><%= vc.ma_vat_chua ? vc.ma_vat_chua + ' - ' : '' %><%= vc.ten_vat_chua || '---' %></option>
             <% }) %>
           </select>
           <input id="returnVatChuaQty" class="num-input signed-num-input" value="" inputmode="numeric" placeholder="SL" title="Nhập dương để nhập kho, âm để xuất kho" data-allow-empty="1" data-allow-signed="1" oninput="handleSignedNumInput(this)">
@@ -373,7 +376,7 @@
       return qty < 0 ? '-' + abs : abs;
     };
     function handleNumInput(input, callback) {
-      if (!input) return;
+      if (!input || input.inputMode === 'decimal') return;
       const raw = String(input.value || '').trim();
       if (raw === '' && input.dataset.allowEmpty === '1') {
         if (typeof callback === 'function') callback();
@@ -400,6 +403,7 @@
       const scope = root && root.querySelectorAll ? root : document;
       scope.querySelectorAll('input.num-input, input.line-input, input.payment-input, .cart-table input.small, .cart-table input.qc-input').forEach(el => {
         if (el.readOnly || el.type === 'hidden') return;
+        if (el.inputMode === 'decimal') { el.value = window.KVStockQuantity.format(el.value); return; }
         const raw = String(el.value || '').trim();
         if (raw === '' && el.dataset.allowEmpty === '1') return;
         if (el.dataset.allowSigned === '1') {
@@ -655,7 +659,7 @@
         <td class="num">${fmt(metrics.tonThucTe)}</td>
         <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
         <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
-        <td class="num"><input class="qc-input" inputmode="numeric" value="${qty > 0 ? fmt(qty) : ''}" oninput="handleNumInput(this)" onchange="updSwapDetailQty(${itemIdx}, ${qcIdx}, this.value)"></td>
+        <td class="num"><input class="qc-input" inputmode="decimal" value="${qty > 0 ? window.KVStockQuantity.format(qty) : ''}" oninput="handleNumInput(this)" onchange="updSwapDetailQty(${itemIdx}, ${qcIdx}, this.value)"></td>
         <td class="num">${loaiGiaCell}</td>
         <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}"${priceLocked ? ' readonly title="Giá đã khóa"' : ''} oninput="handleNumInput(this)" onchange="updSwapDetailPrice(${itemIdx}, ${qcIdx}, this.value)"><span class="money-unit">VNĐ</span></span></td>
         <td class="num"><span class="discount-pair"><input class="qc-input" inputmode="numeric" value="${fmt(qc.chiet_khau || 0)}" oninput="handleNumInput(this)" onchange="updSwapDetailDiscount(${itemIdx}, ${qcIdx}, this.value)"><select onchange="updSwapDetailDiscountType(${itemIdx}, ${qcIdx}, this.value)"><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
@@ -731,7 +735,7 @@
           <td>${escapeHtml(item.ten_hang || '')}</td>
           <td colspan="${maxLots}" class="lot-inline-normal">
             <div class="inline-detail-grid">
-              <div><div class="inline-label">SL</div><div class="num"><input class="small" inputmode="numeric" value="${fmt(item.so_luong)}" oninput="handleNumInput(this)" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"></div></div>
+              <div><div class="inline-label">SL</div><div class="num"><input class="small" inputmode="decimal" value="${window.KVStockQuantity.format(item.so_luong)}" oninput="handleNumInput(this)" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"></div></div>
               <div><div class="inline-label">Tồn</div><div class="num">${fmt(metrics.tonThucTe)}</div></div>
               <div><div class="inline-label">Khách khác đã đặt</div><div class="num">${fmt(metrics.soLuongKhachDat)}</div></div>
               <div><div class="inline-label">Khả dụng</div><div class="num">${fmt(metrics.soLuongKhaDung)}</div></div>
@@ -747,7 +751,7 @@
         <td>${idx + 1}</td>
         <td>${escapeHtml(item.ma_hang || '')}<span class="stock-text">Tồn: ${fmt(metrics.tonThucTe)}</span></td>
         <td>${escapeHtml(item.ten_hang || '')}</td>
-        <td class="num"><input class="small" inputmode="numeric" value="${fmt(item.so_luong)}" oninput="handleNumInput(this)" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"></td>
+        <td class="num"><input class="small" inputmode="decimal" value="${window.KVStockQuantity.format(item.so_luong)}" oninput="handleNumInput(this)" onchange="setSwapQty('${item.hang_hoa_id}',this.value)"></td>
         <td class="num">${fmt(metrics.tonThucTe)}</td>
         <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
         <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
@@ -775,7 +779,7 @@
       const rows = swapItemDetailRows(item);
       const row = rows[qcIdx];
       if (!row) return;
-      row.so_luong_dat = Math.max(0, num(value));
+      row.so_luong_dat = Math.max(0, window.KVStockQuantity.parse(value));
       item.so_luong = swapLineQty(item);
       renderSwapItems();
     }
@@ -1268,7 +1272,7 @@
       const q = itemSearchEl ? itemSearchEl.value.trim().toLowerCase() : '';
       const rows = returnItems.filter(i => !q || i.ma_hang.toLowerCase().includes(q) || i.ten_hang.toLowerCase().includes(q));
       const returnItemsEl = document.getElementById('returnItems');
-      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.ten_thuoc_tinh ? `<div class="origin">Thuộc tính: ${item.ten_thuoc_tinh}</div>` : ''}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" inputmode="numeric" value="${fmt(item.so_luong)}" oninput="handleNumInput(this)" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${fmt(item.so_luong_goc)}</div></div><input class="line-input" inputmode="numeric" value="${fmt(item.don_gia)}" oninput="handleNumInput(this)" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
+      returnItemsEl.innerHTML = rows.length ? rows.map((item, index) => `<div class="return-row"><i class="fa-regular fa-trash-can" onclick="removeItem('${item.line_key || item.hang_hoa_id}')" style="cursor:pointer"></i><div class="code">${item.ma_hang}</div><div class="name">${item.ten_hang}${item.ten_thuoc_tinh ? `<div class="origin">Thuộc tính: ${item.ten_thuoc_tinh}</div>` : ''}${item.lo_hang ? `<div class="origin">Lô: ${item.lo_hang}</div>` : ''}</div><div class="qty-wrap"><input class="line-input" inputmode="decimal" value="${window.KVStockQuantity.format(item.so_luong)}" oninput="handleNumInput(this)" onchange="setQty('${item.line_key || item.hang_hoa_id}',this.value)"><div class="origin">/ ${fmt(item.so_luong_goc)}</div></div><input class="line-input" inputmode="numeric" value="${fmt(item.don_gia)}" oninput="handleNumInput(this)" onchange="setPrice('${item.line_key || item.hang_hoa_id}',this.value)"><div class="num">${fmtMoney(item.so_luong * item.don_gia)}</div><i class="fa-solid fa-ellipsis-vertical"></i></div>`).join('') : '<div style="height:320px;display:flex;align-items:center;justify-content:center;color:#667085">Chọn hóa đơn để lấy hàng trả</div>';
       renderTotals();
     }
     function renderSwapItems(){
@@ -1294,7 +1298,7 @@
     function setQty(id, value){
       const item = returnItems.find(i => String(i.line_key || i.hang_hoa_id) === String(id));
       if(!item) return;
-      item.so_luong = Math.max(0, Math.min(num(value), item.so_luong_goc));
+      item.so_luong = Math.max(0, Math.min(window.KVStockQuantity.parse(value), item.so_luong_goc));
       renderItems();
     }
     function setPrice(id, value){
@@ -1335,7 +1339,7 @@
       const product = swapAvailableProducts.find(p => String(p._id) === String(id));
       const maxQty = product ? swapProductMetrics(product).soLuongKhaDung : item.so_luong_goc;
       item.so_luong_goc = Math.max(0, maxQty);
-      item.so_luong = Math.max(0, Math.min(num(value), item.so_luong_goc));
+      item.so_luong = Math.max(0, Math.min(window.KVStockQuantity.parse(value), item.so_luong_goc));
       renderSwapItems();
     }
     function setSwapPrice(id, value){
@@ -1537,7 +1541,8 @@
         so_quy_id: cashBookEl?.value || bankBookEl?.value || '',
         refund_so_quy_id: cashBookEl?.value || bankBookEl?.value || '',
         vat_chua_id: $('returnVatChuaId')?.value || '',
-        vat_chua_so_luong: $('returnVatChuaQty')?.value || ''
+        vat_chua_so_luong: $('returnVatChuaQty')?.value || '',
+        ...window.KVVatChuaPayment.payload('returnVatChuaId')
       };
     }
     function validateReturnVatChuaInput() {
@@ -1548,7 +1553,7 @@
       if (!qtyRaw || qtyRaw === '-') return 'Vui lòng nhập số lượng vật chứa';
       const qty = numSigned(qtyRaw);
       if (!qty) return 'Số lượng vật chứa không được bằng 0';
-      return '';
+      return window.KVVatChuaPayment.validate('returnVatChuaId');
     }
     function renderTotals(){
       const origin = returnItems.reduce((sum, item) => sum + item.thanh_tien_goc, 0);

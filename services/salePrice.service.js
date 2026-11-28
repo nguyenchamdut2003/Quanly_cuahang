@@ -65,6 +65,7 @@ function pickPriceFromGiaBanRow(row, loaiGiaBan) {
 function buildGiaBanMatchQuery(base) {
     const q = {
         hang_hoa_id: base.hang_hoa_id,
+        cua_hang_id: base.cua_hang_id || null,
         trang_thai: 'active',
         bang_gia_id: base.bang_gia_id || null,
         lo_hang_id: base.lo_hang_id || null
@@ -87,7 +88,9 @@ function buildGiaBanMatchQuery(base) {
 
 async function findGiaBanRow(criteria) {
     const q = buildGiaBanMatchQuery(criteria);
-    return GiaBanHangHoa.findOne(q).sort({ updated_at: -1 }).lean();
+    const row = await GiaBanHangHoa.findOne(q).sort({ updated_at: -1 }).lean();
+    if (row || !criteria.cua_hang_id) return row;
+    return GiaBanHangHoa.findOne({ ...q, cua_hang_id: null }).sort({ updated_at: -1 }).lean();
 }
 
 function resolvedFromGiaBanRow(row, loaiGiaBan, level) {
@@ -272,7 +275,13 @@ async function loadGiaBanMapForLines(lines, options) {
 
     const rows = await GiaBanHangHoa.find(query).lean();
     rows.forEach(row => {
-        map.set(makeGiaBanLookupKey(row), row);
+        const key = makeGiaBanLookupKey(row), previous = map.get(key);
+        const currentStoreRow = storeId && String(row.cua_hang_id || '') === String(storeId);
+        const previousStoreRow = previous && storeId && String(previous.cua_hang_id || '') === String(storeId);
+        if (previousStoreRow && !currentStoreRow) return;
+        if (previous && Boolean(previousStoreRow) === Boolean(currentStoreRow)
+            && new Date(previous.updated_at || 0).getTime() > new Date(row.updated_at || 0).getTime()) return;
+        map.set(key, row);
     });
     return map;
 }
@@ -326,16 +335,17 @@ async function buildPriceSetupLines(products, options) {
     if (!products || !products.length) return lines;
 
     const productIds = products.map(p => p._id);
-    const lots = await LoHang.find({
+    const scopeFilter = options && options.cua_hang_id ? { cua_hang_id: options.cua_hang_id } : {};
+    const lots = await LoHang.find(Object.assign({
         hang_hoa_id: { $in: productIds },
         trang_thai: { $ne: 'huy' }
-    })
+    }, scopeFilter))
         .select('hang_hoa_id ma_lo ten_lo gia_von don_gia_nhap han_su_dung')
         .sort({ ngay_nhap: -1 })
         .lean();
 
-    const qcRows = await TonKhoLoQuyCach.find({ hang_hoa_id: { $in: productIds } })
-        .select('hang_hoa_id lo_hang_id ten_quy_cach ten_thuoc_tinh gia_von don_gia_nhap gia_tri_thuoc_tinh_id')
+    const qcRows = await TonKhoLoQuyCach.find(Object.assign({ hang_hoa_id: { $in: productIds } }, scopeFilter))
+        .select('hang_hoa_id kho_id lo_hang_id so_luong ten_quy_cach ten_thuoc_tinh gia_von don_gia_nhap gia_tri_thuoc_tinh_id')
         .lean();
 
     const giaBanMap = await loadGiaBanMapForLines(
@@ -375,7 +385,28 @@ async function buildPriceSetupLines(products, options) {
             lines.push(line);
         };
 
-        if (!product.quan_ly_theo_lo || !productLots.length) {
+        if (!product.quan_ly_theo_lo) {
+            const variants = new Map();
+            qcRows.filter(row => String(row.hang_hoa_id) === pid && !row.lo_hang_id).forEach(row => {
+                const label = normalizeSpecLabel(row.ten_quy_cach || row.ten_thuoc_tinh) || 'Chưa phân loại';
+                const key = String(row.gia_tri_thuoc_tinh_id || '') + '|' + label;
+                if (!variants.has(key)) variants.set(key, { label, attr: row.gia_tri_thuoc_tinh_id || null,
+                    qty: 0, value: 0, cost: Number(row.gia_von ?? row.don_gia_nhap ?? product.gia_von ?? 0) });
+                const variant = variants.get(key);
+                const qty = Number(row.so_luong || 0);
+                variant.qty += qty;
+                variant.value += qty * Number(row.gia_von ?? row.don_gia_nhap ?? product.gia_von ?? 0);
+            });
+            if (variants.size) {
+                variants.forEach(variant => pushLine({ row_kind: 'product_qc', lo_hang_id: null,
+                    lo_label: 'Không theo lô', ten_quy_cach: variant.label, gia_tri_thuoc_tinh_id: variant.attr,
+                    ton_kho: variant.qty, gia_von: variant.qty > 0 ? variant.value / variant.qty : variant.cost }));
+            } else {
+                pushLine({ row_kind: 'product', gia_von: Number(product.gia_von || 0) });
+            }
+            return;
+        }
+        if (!productLots.length) {
             pushLine({
                 row_kind: 'product',
                 gia_von: Number(product.gia_von || 0)

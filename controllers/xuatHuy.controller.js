@@ -53,7 +53,7 @@ const XUAT_HUY_EXPORT_COLUMNS = [
   { header: 'Thương hiệu', key: 'thuong_hieu' },
   { header: 'Đơn vị tính', key: 'don_vi_tinh' },
   { header: 'Lô hàng', key: 'lo_hang' },
-  { header: 'Quy cách', key: 'quy_cach' },
+  { header: 'Phân loại', key: 'quy_cach' },
   { header: 'Số lượng', key: 'so_luong', style: { numFmt: '#,##0.##' } },
   { header: 'Giá vốn', key: 'gia_von', style: { numFmt: '#,##0' } },
   { header: 'Thành tiền', key: 'thanh_tien', style: { numFmt: '#,##0' } }
@@ -91,7 +91,7 @@ function parseQuyCachItems(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.map(item => ({
     ten_quy_cach: normalizeTenQuyCach(item.ten_quy_cach || item.ten_thuoc_tinh),
-    so_luong: Math.floor(Number(item.so_luong || 0)),
+    so_luong: require('../utils/stockQuantity').stockQuantity(item.so_luong),
     gia_von: parseMoney(item.gia_von || 0)
   })).filter(item => item.ten_quy_cach && item.so_luong > 0);
 }
@@ -370,7 +370,7 @@ async function validateTonKhoQuyCach(khoId, hangHoaId, lotId, tenQuyCach, qty) {
     $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
   }).lean();
   if (!qcStock || Number(qcStock.so_luong || 0) < qty) {
-    throw new Error('Không cho hủy vượt tồn quy cách');
+    throw new Error('Không cho hủy vượt tồn theo phân loại');
   }
   return qcStock;
 }
@@ -404,7 +404,7 @@ async function normalizeRows(items, khoId, skipStockCheck) {
     if (!quyCachItems.length && item.ten_quy_cach && Number(item.so_luong || 0) > 0) {
       quyCachItems = [{
         ten_quy_cach: normalizeTenQuyCach(item.ten_quy_cach),
-        so_luong: Math.floor(Number(item.so_luong || 0)),
+        so_luong: require('../utils/stockQuantity').stockQuantity(item.so_luong),
         gia_von: parseMoney(item.gia_von || 0)
       }];
     }
@@ -417,7 +417,7 @@ async function normalizeRows(items, khoId, skipStockCheck) {
 
       if (hasQc) {
         if (!quyCachItems.length) {
-          throw new Error('Lô có quy cách, vui lòng nhập số lượng theo từng quy cách');
+          throw new Error('Lô có phân loại, vui lòng nhập số lượng theo từng phân loại');
         }
         let lineTotal = 0;
         for (const qc of quyCachItems) {
@@ -445,7 +445,7 @@ async function normalizeRows(items, khoId, skipStockCheck) {
         continue;
       }
 
-      const qty = Math.floor(Number(item.so_luong || 0));
+      const qty = require('../utils/stockQuantity').stockQuantity(item.so_luong);
       if (!Number.isFinite(qty) || qty <= 0) continue;
       if (!skipStockCheck) {
         await validateTonKhoTong(khoId, item.hang_hoa_id, qty);
@@ -463,9 +463,20 @@ async function normalizeRows(items, khoId, skipStockCheck) {
     }
 
     lotId = '';
+    if (quyCachItems.length) {
+      for (const qc of quyCachItems) {
+        const qty = require('../utils/stockQuantity').stockQuantity(qc.so_luong, { allowZero: false });
+        const qcStock = !skipStockCheck
+          ? await validateTonKhoQuyCach(khoId, item.hang_hoa_id, null, qc.ten_quy_cach, qty) : null;
+        const qcCost = qcStock ? quyCachStockCost(qcStock) : Number(qc.gia_von || cost);
+        rows.push({ hang_hoa_id: item.hang_hoa_id, lo_hang_id: null, ten_quy_cach: qc.ten_quy_cach,
+          so_luong: qty, gia_von: qcCost, thanh_tien: qty * qcCost, ghi_chu: lineGhiChu });
+      }
+      continue;
+    }
     const qty = quyCachItems.length
       ? quyCachItems.reduce((sum, qc) => sum + qc.so_luong, 0)
-      : Math.floor(Number(item.so_luong || 0));
+      : require('../utils/stockQuantity').stockQuantity(item.so_luong);
     if (!Number.isFinite(qty) || qty <= 0) continue;
     if (!skipStockCheck) await validateTonKhoTong(khoId, item.hang_hoa_id, qty);
     rows.push({
@@ -1084,6 +1095,6 @@ exports.apiLotQuyCachTon = async function(req, res) {
       }
     });
   } catch (error) {
-    return res.status(400).json({ success: false, message: error.message || 'Không thể tải quy cách' });
+    return res.status(400).json({ success: false, message: error.message || 'Không thể tải phân loại' });
   }
 };

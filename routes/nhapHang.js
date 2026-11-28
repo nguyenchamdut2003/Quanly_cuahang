@@ -3,8 +3,13 @@ var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
 var nhapHangController = require('../controllers/nhapHang.controller');
 var groupController = require('../controllers/phieuNhapTongHop.controller');
+var phanLoaiHangController = require('../controllers/phanLoaiHang.controller');
 
 router.use(isAuthenticated);
+router.get('/:purchaseId/items/:lineId/phan-loai/context', function(req, res) {
+  req.query.nguon_thao_tac = 'phieu_nhap';
+  return phanLoaiHangController.context(req, res);
+});
 
 router.get('/', nhapHangController.index);
 router.get('/create', nhapHangController.createPage);
@@ -38,6 +43,7 @@ router.get('/:id', nhapHangController.redirectDetail);
 router.get('/:id/export.csv', nhapHangController.exportOneCsv);
 router.get('/:id/export.xlsx', nhapHangController.exportOneExcel);
 router.post('/:id/cancel', nhapHangController.cancel);
+router.post('/:id/complete', nhapHangController.complete);
 router.post('/:id/copy', nhapHangController.copy);
 router.post('/:id/pay-supplier', nhapHangController.paySupplier);
 router.post('/:id/save', nhapHangController.save);

@@ -235,6 +235,9 @@
       }
     }
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
@@ -405,7 +408,7 @@
       }
 
       function handleAllocNumInput(input) {
-        if (!input) return;
+        if (!input || input.classList.contains('alloc-qty-input')) return;
         var raw = String(input.value || '').trim();
         if (!raw) {
           input.value = '';
@@ -468,7 +471,7 @@
           if (!id) return;
           var label = (item.ten_vat_chua || item.ma_vat_chua || '---')
             + ' (tồn ' + fmt(item.so_luong_ton) + ')';
-          html += '<option value="' + escapeHtml(id) + '"' + (String(selectedId || '') === id ? ' selected' : '') + '>'
+          html += '<option value="' + escapeHtml(id) + '" data-vc-average-cost="' + (Number(item.gia_von_binh_quan) || 0) + '"' + (String(selectedId || '') === id ? ' selected' : '') + '>'
             + escapeHtml(label) + '</option>';
         });
         return html;
@@ -483,6 +486,7 @@
           customerVatChuaDraft[customerId].vat_chua_id = String(select.value || '');
           var qtyInput = tableHeadRow.querySelector('.alloc-vat-chua-qty[data-customer-id="' + customerId + '"]');
           customerVatChuaDraft[customerId].vat_chua_so_luong = qtyInput ? parseAllocNum(qtyInput.value) : 0;
+          Object.assign(customerVatChuaDraft[customerId], window.KVVatChuaPayment.payload(select.id));
         });
       }
 
@@ -501,6 +505,8 @@
         if (!hasId && qty > 0) {
           throw new Error('Vui lòng chọn vật chứa cho ' + name + '.');
         }
+        var paymentError = window.KVVatChuaPayment.validate('allocVatChua-' + customer.id, { draft: true });
+        if (paymentError) throw new Error(name + ': ' + paymentError);
       }
 
       function getTableColCount() {
@@ -536,7 +542,7 @@
             var priceInput = cell.querySelector('.alloc-price-input');
             if (!customerId || !qtyInput || !priceInput) return;
             allocDraft[lineKey][customerId] = {
-              qty: parseAllocNum(qtyInput.value),
+              qty: Math.max(0, window.KVStockQuantity.parse(qtyInput.value)),
               price: parseAllocNum(priceInput.value)
             };
           });
@@ -562,14 +568,15 @@
             + '<span class="alloc-customer-col-title">' + escapeHtml(customer.ten_khach_hang || '---') + '</span>'
             + '<button type="button" class="alloc-customer-col-remove" data-customer-id="' + escapeHtml(customer.id) + '" title="Bỏ cột khách hàng">&times;</button>'
             + '</div>'
-            + '<div class="alloc-customer-vat-chua" title="Xuất vật chứa cho khách này">'
-            + '<select class="alloc-vat-chua-select" data-customer-id="' + escapeHtml(customer.id) + '">'
+            + '<div class="alloc-customer-vat-chua" data-vat-chua-payment data-vc-id="allocVatChua-' + escapeHtml(customer.id) + '" data-vc-qty="allocVatChuaQty-' + escapeHtml(customer.id) + '" data-vc-direction="thu">'
+            + '<select id="allocVatChua-' + escapeHtml(customer.id) + '" class="alloc-vat-chua-select" data-customer-id="' + escapeHtml(customer.id) + '">'
             + buildVatChuaSelectOptions(vatDraft.vat_chua_id)
             + '</select>'
-            + '<input type="text" class="alloc-vat-chua-qty" data-customer-id="' + escapeHtml(customer.id) + '" inputmode="numeric" autocomplete="off" value="' + escapeHtml(displayAllocInputValue(vatDraft.vat_chua_so_luong)) + '" placeholder="SL" title="SL vật chứa">'
+            + '<input id="allocVatChuaQty-' + escapeHtml(customer.id) + '" type="text" class="alloc-vat-chua-qty" data-customer-id="' + escapeHtml(customer.id) + '" inputmode="numeric" autocomplete="off" value="' + escapeHtml(displayAllocInputValue(vatDraft.vat_chua_so_luong)) + '" placeholder="SL" title="SL vật chứa">'
             + '</div></th>';
         }).join('');
         tableHeadRow.innerHTML = fixedHtml + customerHtml;
+        selectedCustomers.forEach(function(customer) { window.KVVatChuaPayment.hydrate('allocVatChua-' + customer.id, getCustomerVatChuaDraft(customer.id), { preserveRequestKey: true }); });
         tableHeadRow.querySelectorAll('.alloc-customer-col-remove').forEach(function(btn) {
           btn.addEventListener('click', function(event) {
             event.stopPropagation();
@@ -651,7 +658,7 @@
       function isFloatFieldFilled(input) {
         if (!input) return false;
         if (input.classList.contains('alloc-qty-input') || input.classList.contains('alloc-price-input')) {
-          return parseAllocNum(input.value) > 0;
+          return (input.classList.contains('alloc-qty-input') ? window.KVStockQuantity.parse(input.value) : parseAllocNum(input.value)) > 0;
         }
         var val = String(input.value || '').trim();
         if (val === '') return false;
@@ -683,7 +690,7 @@
         var total = 0;
         if (!row) return 0;
         row.querySelectorAll('.alloc-qty-input').forEach(function(input) {
-          total += parseAllocNum(input.value);
+          total += Math.max(0, window.KVStockQuantity.parse(input.value));
         });
         return total;
       }
@@ -828,7 +835,7 @@
             + '<div class="alloc-input-group">'
             + '<label class="alloc-float-field alloc-qty-field' + (qtyFilled ? ' is-filled' : '') + '">'
             + '<div class="alloc-qty-field-row">'
-            + '<input type="text" class="alloc-qty-input" inputmode="decimal" autocomplete="off" value="' + escapeHtml(displayAllocInputValue(draft.qty)) + '">'
+            + '<input type="text" class="alloc-qty-input" inputmode="decimal" autocomplete="off" value="' + escapeHtml(window.KVStockQuantity.format(draft.qty)) + '">'
             + '</div>'
             + '<span class="alloc-float-label">Số lượng</span>'
             + '</label>'
@@ -890,7 +897,7 @@
             if (!lineKey || !customerId || !qtyInput || !priceInput) return;
             if (!allocDraft[lineKey]) allocDraft[lineKey] = {};
             allocDraft[lineKey][customerId] = {
-              qty: parseAllocNum(qtyInput.value),
+              qty: Math.max(0, window.KVStockQuantity.parse(qtyInput.value)),
               price: parseAllocNum(priceInput.value)
             };
             syncFloatFieldState(input.closest('.alloc-float-field'));
@@ -1097,6 +1104,10 @@
             vat_chua_id: vatDraft.vat_chua_id || '',
             vat_chua_ten: getVatChuaName(vatDraft.vat_chua_id),
             vat_chua_so_luong: Number(vatDraft.vat_chua_so_luong || 0),
+            vat_chua_don_gia_giao_dich: Number(vatDraft.vat_chua_don_gia_giao_dich || 0),
+            vat_chua_ghi_nhan_thu_chi: vatDraft.vat_chua_ghi_nhan_thu_chi === true,
+            vat_chua_thanh_toan: vatDraft.vat_chua_thanh_toan || {},
+            vat_chua_request_key: vatDraft.vat_chua_request_key || '',
             items: items
           };
         }).filter(function(batch) { return batch.items.length > 0; });
@@ -1193,6 +1204,12 @@
         if (!pendingSubmitBatches.length) return;
         var modeInput = document.querySelector('input[name="allocCreateMode"]:checked');
         var mode = modeInput ? modeInput.value : 'don_hang';
+        if (mode === 'hoa_don') {
+          for (var batch of pendingSubmitBatches) {
+            var paymentError = window.KVVatChuaPayment.validate('allocVatChua-' + batch.khach_hang_id);
+            if (paymentError) return alert((batch.ten_khach_hang || '') + ': ' + paymentError);
+          }
+        }
         if (modalConfirm) {
           modalConfirm.disabled = true;
           modalConfirm.textContent = 'Đang xử lý...';
@@ -1208,6 +1225,10 @@
                   khach_hang_id: batch.khach_hang_id,
                   vat_chua_id: batch.vat_chua_id || '',
                   vat_chua_so_luong: Number(batch.vat_chua_so_luong || 0),
+                  vat_chua_don_gia_giao_dich: Number(batch.vat_chua_don_gia_giao_dich || 0),
+                  vat_chua_ghi_nhan_thu_chi: batch.vat_chua_ghi_nhan_thu_chi === true,
+                  vat_chua_thanh_toan: batch.vat_chua_thanh_toan || {},
+                  vat_chua_request_key: batch.vat_chua_request_key || '',
                   items: batch.items
                 };
               })

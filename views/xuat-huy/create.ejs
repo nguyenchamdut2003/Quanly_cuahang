@@ -22,6 +22,7 @@
     .btn.is-loading .btn-spinner{display:inline-block}
     @keyframes xhSpin{to{transform:rotate(360deg)}}
   </style>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body class="admin-body">
   <%- include('../partials/header', { activeMenu: activeMenu, user: user }) %>
@@ -77,7 +78,7 @@
     }
 
     function formatNumericInput(input) {
-      if (!input) return;
+      if (!input || input.inputMode === 'decimal') return;
       const value = money(input.value);
       input.value = value > 0 ? value.toLocaleString('vi-VN') : '';
     }
@@ -152,14 +153,14 @@
         <tr>
           <th>${qc.ten_quy_cach}</th>
           <td class="num">${fmt(qc.ton_hien_tai || 0)}</td>
-          <td><input class="cell-input" type="text" inputmode="numeric" value="${formatInputNumber(qc.so_luong_huy || 0)}" oninput="formatNumericInput(this)" onchange="updateQuyCach(${realIndex}, ${qcIdx}, this.value)"></td>
+          <td><input class="cell-input" type="text" inputmode="decimal" value="${window.KVStockQuantity.format(qc.so_luong_huy || 0)}" oninput="formatNumericInput(this)" onchange="updateQuyCach(${realIndex}, ${qcIdx}, this.value)"></td>
           <td class="num">${fmtMoney(qc.gia_von || 0)}</td>
           <td class="num"><b>${fmtMoney(Number(qc.so_luong_huy || 0) * Number(qc.gia_von || 0))}</b></td>
         </tr>
       `).join('');
       return `<tr class="qc-row"><td colspan="10">
         <table class="qc-table">
-          <thead><tr><th>Quy cách</th><th class="num">Tồn</th><th class="num">SL hủy</th><th class="num">Giá vốn</th><th class="num">Thành tiền</th></tr></thead>
+          <thead><tr><th>Phân loại</th><th class="num">Tồn</th><th class="num">SL hủy</th><th class="num">Giá vốn</th><th class="num">Thành tiền</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </td></tr>`;
@@ -257,7 +258,7 @@
         const line = lineValue(it);
         const qtyCell = it.has_quy_cach
           ? `<span class="num">${fmt(qty)}</span>`
-          : `<input class="cell-input" type="text" inputmode="numeric" value="${formatInputNumber(it.so_luong || 0)}" oninput="formatNumericInput(this)" onchange="updateItem(${realIndex},'so_luong',this.value)">`;
+          : `<input class="cell-input" type="text" inputmode="decimal" value="${window.KVStockQuantity.format(it.so_luong || 0)}" oninput="formatNumericInput(this)" onchange="updateItem(${realIndex},'so_luong',this.value)">`;
         const costCell = it.has_quy_cach
           ? '<span>Theo thuộc tính</span>'
           : `<input class="cell-input" type="text" inputmode="numeric" value="${formatInputNumber(it.gia_von || 0)}" oninput="formatNumericInput(this)" onchange="updateItem(${realIndex},'gia_von',this.value)">`;
@@ -282,7 +283,7 @@
     function updateItem(idx, field, value) {
       if (!allItems[idx]) return;
       if (field === 'so_luong') {
-        allItems[idx][field] = Math.min(money(value), Number(allItems[idx].ton_hien_tai || 0));
+        allItems[idx][field] = Math.min(Math.max(0, window.KVStockQuantity.parse(value)), Number(allItems[idx].ton_hien_tai || 0));
       } else if (field === 'gia_von') {
         allItems[idx][field] = money(value);
       }
@@ -293,10 +294,10 @@
       const it = allItems[idx];
       if (!it || !it.quy_cach_items || !it.quy_cach_items[qcIdx]) return;
       const max = Number(it.quy_cach_items[qcIdx].ton_hien_tai || 0);
-      it.quy_cach_items[qcIdx].so_luong_huy = Math.min(money(value), max);
+      it.quy_cach_items[qcIdx].so_luong_huy = Math.min(Math.max(0, window.KVStockQuantity.parse(value)), max);
       const total = lineQty(it);
       if (total > Number(it.ton_hien_tai || 0)) {
-        showError('Tổng số lượng hủy theo quy cách vượt tồn lô');
+        showError('Tổng số lượng hủy theo phân loại vượt tồn lô');
       } else {
         clearError();
       }
@@ -360,7 +361,7 @@
         }
         if (src.has_quy_cach) {
           const hasQcQty = (src.quy_cach_items || []).some(qc => Number(qc.so_luong_huy || 0) > 0);
-          if (!hasQcQty) return showError('Lô ' + (src.ten_lo || src.ma_lo || '') + ' có quy cách — vui lòng nhập SL theo quy cách');
+          if (!hasQcQty) return showError('Lô ' + (src.ten_lo || src.ma_lo || '') + ' đã có phân loại — vui lòng nhập số lượng theo từng phân loại');
         }
       }
 

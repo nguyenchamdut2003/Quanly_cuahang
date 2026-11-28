@@ -298,6 +298,12 @@
       padding: 0 6px
     }
 
+    .order-create [data-order-field="price"]:disabled {
+      background: #f1f5f9;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+
     .discount-pair {
       display: inline-flex;
       gap: 6px;
@@ -838,6 +844,7 @@
       cursor: pointer
     }
   </style>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 
 <body>
@@ -874,8 +881,8 @@
           <div class="totals">
             <div class="total-line"><span>Tổng tiền hàng</span><span id="subtotal">0 VNĐ</span></div>
             <div class="total-line"><span>Giảm giá</span>
-              <span class="discount-pair"><input id="discount" class="small" value="0" oninput="renderCart()"><select
-                  id="orderDiscountType" onchange="renderCart()">
+              <span class="discount-pair"><input id="discount" class="small" value="0" inputmode="numeric" data-order-field="discount" data-order-scope="order" data-order-input-key="order-discount" oninput="handleOrderNumericInput(this, event)"><select
+                  id="orderDiscountType" onchange="handleOrderDiscountTypeChange()">
                   <option value="vnd">VNĐ</option>
                   <option value="phan_tram">%</option>
                 </select></span>
@@ -926,19 +933,19 @@
               style="width:100%;margin-top:12px" placeholder="Phường/Xã">
             <div class="middle-payment">
               <div class="payment-title">Chi tiết thanh toán</div>
-              <div class="middle-payment-row"><span>Tiền mặt</span><span class="money-input-wrap"><input id="cashCustomerGiven" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput(this, 'cash')"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillOrderPaymentAll('cash')">Tất cả</button></span></div>
+              <div class="middle-payment-row"><span>Tiền mặt</span><span class="money-input-wrap"><input id="cashCustomerGiven" class="payment-input" value="0" inputmode="numeric" data-order-field="money" data-order-scope="cash" data-order-input-key="cash" oninput="handleOrderNumericInput(this, event)"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillOrderPaymentAll('cash')">Tất cả</button></span></div>
               <div class="middle-payment-row"><span>Sổ tiền mặt <span id="cashBookRequiredMark" class="required-mark" style="display:none">*</span></span>
                 <select id="cashBookId" class="payment-select" disabled>
                   <option value="">Chọn sổ tiền mặt</option>
                 </select>
               </div>
-              <div class="middle-payment-row"><span>Chuyển khoản</span><span class="money-input-wrap"><input id="transferCustomerGiven" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput(this, 'transfer')"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillOrderPaymentAll('transfer')">Tất cả</button></span></div>
+              <div class="middle-payment-row"><span>Chuyển khoản</span><span class="money-input-wrap"><input id="transferCustomerGiven" class="payment-input" value="0" inputmode="numeric" data-order-field="money" data-order-scope="transfer" data-order-input-key="transfer" oninput="handleOrderNumericInput(this, event)"><span class="money-unit">VNĐ</span><button type="button" class="btn-pay-all" onclick="fillOrderPaymentAll('transfer')">Tất cả</button></span></div>
               <div class="middle-payment-row"><span>Tài khoản ngân hàng <span id="bankBookRequiredMark" class="required-mark" style="display:none">*</span></span>
                 <select id="bankBookId" class="payment-select" disabled>
                   <option value="">Chọn tài khoản</option>
                 </select>
               </div>
-              <div class="middle-payment-row"><span>Tiền thừa</span><span class="money-input-wrap"><input id="changeReturnedToCustomer" class="payment-input" value="0" inputmode="numeric" oninput="handleCustomerPaymentInput(this, 'change')"><span class="money-unit">VNĐ</span></span></div>
+              <div class="middle-payment-row"><span>Tiền thừa</span><span class="money-input-wrap"><input id="changeReturnedToCustomer" class="payment-input" value="0" inputmode="numeric" data-order-field="money" data-order-scope="change" data-order-input-key="change" oninput="handleOrderNumericInput(this, event)"><span class="money-unit">VNĐ</span></span></div>
               <div class="middle-payment-row"><span>Khách cần trả</span><strong id="customerPayable">0 VNĐ</strong></div>
               <div class="middle-payment-row"><span>Khách đã trả</span><strong id="customerPaid">0 VNĐ</strong></div>
               <div class="middle-payment-row middle-payment-total"><span id="remainingTotalLabel">Còn phải thu</span><strong id="remainingTotal">0 VNĐ</strong></div>
@@ -977,7 +984,7 @@
           </div>
           <div class="delivery-row" style="margin-top:16px">
             <label>Phí giao hàng</label>
-            <span class="money-input-wrap"><input id="shippingFee" class="delivery-input" value="0" inputmode="numeric" oninput="handleManualShippingFee()"><span class="money-unit">VNĐ</span></span>
+            <span class="money-input-wrap"><input id="shippingFee" class="delivery-input" value="0" inputmode="numeric" data-order-field="money" data-order-scope="shipping" data-order-input-key="shipping" oninput="handleOrderNumericInput(this, event)"><span class="money-unit">VNĐ</span></span>
             <div class="delivery-help" id="shippingFeeHelp">Nhập trực tiếp phí giao hàng.</div>
           </div>
         </div>
@@ -993,6 +1000,7 @@
       let expandedLotKeyByItem = {};
       let codEnabled = false;
       let lastTotals = { khachCanTra: 0, khachThanhToan: 0, codAmount: 0, tienThuaTraKhach: 0, tongKhachDua: 0 };
+      let cartPayable = 0;
       let availableProducts = [];
       let previousKhoId = '';
       let paymentPriority = 'cash';
@@ -1012,7 +1020,85 @@
       const copyFromError = <%- JSON.stringify(copyFromError || '') %>;
       const fmt = n => Number(n || 0).toLocaleString('vi-VN');
       const moneyFmt = n => `${fmt(n)} VNĐ`;
-      const num = v => Number(String(v || '').replace(/[^\d-]/g, '')) || 0;
+      const num = v => typeof v === 'number' ? (Number.isFinite(v) ? v : 0)
+        : Number(String(v || '').replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')) || 0;
+      function orderDiscountValue() {
+        return orderDiscountType.value === 'phan_tram' ? window.KVStockQuantity.parse(discount.value) : num(discount.value);
+      }
+      function handleOrderDiscountTypeChange() {
+        const value = Math.max(0, window.KVStockQuantity.parse(discount.value));
+        discount.value = orderDiscountType.value === 'phan_tram' ? window.KVStockQuantity.format(value) : fmt(Math.floor(value));
+        renderCart();
+      }
+      const orderNumericValue = value => typeof value === 'number' && Number.isFinite(value) ? value : num(value);
+      function formatOrderNumericInput(input, decimal, event) {
+        let raw = input.value;
+        const caret = input.selectionStart ?? raw.length;
+        const end = input.selectionEnd ?? caret;
+        // A typed decimal point becomes the Vietnamese decimal comma. Dots
+        // already inserted by this formatter remain thousands separators.
+        if (decimal && event?.data === '.' && raw[caret - 1] === '.' && !raw.includes(',')) {
+          raw = raw.slice(0, caret - 1) + ',' + raw.slice(caret);
+        } else if (decimal && !raw.includes(',') && /^-?0\.\d*$/.test(raw)) {
+          raw = raw.replace('.', ',');
+        }
+        const negative = raw.trim().startsWith('-');
+        const comma = decimal ? raw.indexOf(',') : -1;
+        let digits = (comma >= 0 ? raw.slice(0, comma) : raw).replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+        const fraction = comma >= 0 ? raw.slice(comma + 1).replace(/\D/g, '').slice(0, 6) : '';
+        if (comma >= 0 && !digits) digits = '0';
+        const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        const formatted = (negative ? '-' : '') + grouped + (comma >= 0 ? ',' + fraction : '');
+        const meaningful = text => (text.match(/[\d,-]/g) || []).length;
+        const position = count => {
+          if (!count) return 0;
+          let seen = 0;
+          for (let index = 0; index < formatted.length; index++) {
+            if (/[\d,-]/.test(formatted[index]) && ++seen === count) return index + 1;
+          }
+          return formatted.length;
+        };
+        input.value = formatted;
+        input.setSelectionRange(position(meaningful(raw.slice(0, caret))), position(meaningful(raw.slice(0, end))));
+        const value = Number((negative ? '-' : '') + (digits || '0') + (comma >= 0 ? '.' + fraction : ''));
+        return Number.isFinite(value) ? value : 0;
+      }
+      function handleOrderNumericInput(input, event) {
+        if (input.disabled || input.readOnly || event?.isComposing) return;
+        const field = input.dataset.orderField;
+        const scope = input.dataset.orderScope;
+        const percentage = field === 'discount' && input.closest('.discount-pair')?.querySelector('select')?.value === 'phan_tram';
+        const value = formatOrderNumericInput(input, field === 'qty' || percentage, event);
+        const editing = { key: input.dataset.orderInputKey, value: input.value,
+          start: input.selectionStart, end: input.selectionEnd };
+        if (scope === 'cash' || scope === 'transfer' || scope === 'change') {
+          handleCustomerPaymentInput(input, scope);
+        } else if (scope === 'order' || scope === 'shipping') {
+          renderCart();
+        } else {
+          const itemIndex = Number(input.dataset.itemIndex);
+          const detail = input.dataset.detailIndex;
+          const item = cart[itemIndex];
+          if (!item) return;
+          if (detail !== undefined) {
+            if (field === 'qty') updQuyCachQty(itemIndex, Number(detail), value);
+            else if (field === 'price') updQuyCachPrice(itemIndex, Number(detail), value);
+            else if (field === 'discount') updQuyCachDiscount(itemIndex, Number(detail), value);
+          } else {
+            if (field === 'qty') updQty(item.hang_hoa_id, value);
+            else if (field === 'price') updUnitPrice(item.hang_hoa_id, value);
+            else if (field === 'discount') updLineDiscount(item.hang_hoa_id, value);
+          }
+        }
+        // Cart totals/warnings render on each keystroke. Restore the same input
+        // and logical caret after replacing its row, including a trailing comma.
+        const current = document.querySelector('[data-order-input-key="' + editing.key + '"]');
+        if (current && !current.disabled && !current.readOnly) {
+          if (document.activeElement !== current) current.focus({ preventScroll: true });
+          current.value = editing.value;
+          current.setSelectionRange(editing.start, editing.end);
+        }
+      }
       const formatDateVi = value => value ? new Date(value).toLocaleDateString('vi-VN') : '';
       function toDateTimeLocalValue(date = new Date()) {
         const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -1124,10 +1210,10 @@
       }
       function lineQty(item) {
         if (item.has_quy_cach && Array.isArray(item.quy_cach_items)) {
-          return item.quy_cach_items.reduce((sum, qc) => sum + Number(qc.so_luong_dat || qc.so_luong || 0), 0);
+          return item.quy_cach_items.reduce((sum, qc) => sum + Number(qc.so_luong_dat ?? qc.so_luong ?? 0), 0);
         }
         if (item.has_lot_items && Array.isArray(item.lot_items)) {
-          return item.lot_items.reduce((sum, lot) => sum + Number(lot.so_luong_dat || lot.so_luong || 0), 0);
+          return item.lot_items.reduce((sum, lot) => sum + Number(lot.so_luong_dat ?? lot.so_luong ?? 0), 0);
         }
         return Number(item.so_luong || 0);
       }
@@ -1331,7 +1417,7 @@
       function lotGroupSummary(lot) {
         const ton = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).tonThucTe, 0);
         const khaDung = lot.items.reduce((sum, entry) => sum + inventoryMetrics(entry.row).soLuongKhaDung, 0);
-        const dat = lot.items.reduce((sum, entry) => sum + Number(entry.row.so_luong_dat || entry.row.so_luong || 0), 0);
+        const dat = lot.items.reduce((sum, entry) => sum + Number(entry.row.so_luong_dat ?? entry.row.so_luong ?? 0), 0);
         const datePart = [lot.ngay_nhap ? `Ngày lô ${formatDateVi(lot.ngay_nhap)}` : '', lot.han_su_dung ? `HSD ${formatDateVi(lot.han_su_dung)}` : ''].filter(Boolean).join(' - ') || '—';
         return { ton, khaDung, dat, datePart };
       }
@@ -1401,7 +1487,7 @@
       function renderDetailRowHtml(item, qc, qcIdx, itemIdx, options = {}) {
         const showLotColumn = options.showLotColumn === true;
         const showAttrColumn = options.showAttrColumn !== false;
-        const qty = Number(qc.so_luong_dat || qc.so_luong || 0);
+        const qty = Number(qc.so_luong_dat ?? qc.so_luong ?? 0);
         const metrics = inventoryMetrics(qc);
         const qcWarning = availabilityWarning(qty, metrics);
         const unitPrice = Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
@@ -1419,10 +1505,10 @@
           <td class="num">${fmt(metrics.tonThucTe)}</td>
           <td class="num">${fmt(metrics.soLuongKhachDat)}</td>
           <td class="num">${fmt(metrics.soLuongKhaDung)}</td>
-          <td class="num"><span class="qty-input-wrap"><input class="qc-input${warningInputClass(qcWarning)}" type="number" min="0" value="${qty || ''}" onchange="updQuyCachQty(${itemIdx}, ${qcIdx}, this.value)">${warningIconHtml(qcWarning)}</span></td>
+          <td class="num"><span class="qty-input-wrap"><input class="qc-input${warningInputClass(qcWarning)}" type="text" inputmode="decimal" aria-label="Số lượng quy cách" data-order-field="qty" data-item-index="${itemIdx}" data-detail-index="${qcIdx}" data-order-input-key="item-${itemIdx}-detail-${qcIdx}-qty" value="${qty ? window.KVStockQuantity.format(qty) : ''}" oninput="handleOrderNumericInput(this, event)">${warningIconHtml(qcWarning)}</span></td>
           <td class="num">${loaiGiaCell}</td>
-          <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" value="${fmt(unitPrice)}"${priceLocked ? ' readonly title="Giá đã khóa"' : ''} onchange="updQuyCachPrice(${itemIdx}, ${qcIdx}, this.value)"><span class="money-unit">VNĐ</span></span></td>
-          <td class="num"><span class="discount-pair"><input class="qc-input" value="${qc.chiet_khau || 0}" onchange="updQuyCachDiscount(${itemIdx}, ${qcIdx}, this.value)"><select onchange="updQuyCachDiscountType(${itemIdx}, ${qcIdx}, this.value)"><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
+          <td class="num"><span class="money-input-wrap"><input class="qc-input" inputmode="numeric" aria-label="Đơn giá quy cách" data-order-field="price" data-item-index="${itemIdx}" data-detail-index="${qcIdx}" data-order-input-key="item-${itemIdx}-detail-${qcIdx}-price" value="${fmt(unitPrice)}"${priceLocked ? ' readonly title="Giá đã khóa"' : ''} oninput="handleOrderNumericInput(this, event)"><span class="money-unit">VNĐ</span></span></td>
+          <td class="num"><span class="discount-pair"><input class="qc-input" inputmode="decimal" aria-label="Giảm giá quy cách" data-order-field="discount" data-item-index="${itemIdx}" data-detail-index="${qcIdx}" data-order-input-key="item-${itemIdx}-detail-${qcIdx}-discount" value="${window.KVStockQuantity.format(qc.chiet_khau || 0)}" oninput="handleOrderNumericInput(this, event)"><select onchange="updQuyCachDiscountType(${itemIdx}, ${qcIdx}, this.value)"><option value="vnd"${qc.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${qc.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span></td>
           <td class="num"><b>${moneyFmt(total)}</b></td>
         </tr>`;
       }
@@ -1463,11 +1549,11 @@
       function computeLineTotals(item) {
         const detailRows = itemDetailRows(item);
         const lineBase = detailRows.length
-          ? detailRows.reduce((sum, qc) => sum + Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0), 0)
+          ? detailRows.reduce((sum, qc) => sum + Number(qc.so_luong_dat ?? qc.so_luong ?? 0) * Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0), 0)
           : lineQty(item) * Number(item.don_gia_ban || 0);
         const lineDiscount = detailRows.length
           ? detailRows.reduce((sum, qc) => {
-              const qcBase = Number(qc.so_luong_dat || qc.so_luong || 0) * Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
+              const qcBase = Number(qc.so_luong_dat ?? qc.so_luong ?? 0) * Number(qc.don_gia_ban ?? item.don_gia_ban ?? 0);
               return sum + discountAmount(qc.chiet_khau || 0, qc.kieu_chiet_khau || 'vnd', qcBase);
             }, 0)
           : discountAmount(item.chiet_khau, item.kieu_chiet_khau, lineBase);
@@ -1503,9 +1589,12 @@
         item.so_luong = lineQty(item);
         const metrics = lineInventoryMetrics(item);
         const lineWarning = availabilityWarning(lineQty(item), metrics);
-        const qtyCell = `<span class="qty-input-wrap"><input class="small${warningInputClass(lineWarning)}" value="${item.so_luong}" onchange="updQty('${item.hang_hoa_id}',this.value)">${warningIconHtml(lineWarning)}</span>`;
-        const priceCell = `<span class="money-input-wrap"><input class="small" value="${fmt(item.don_gia_ban)}"${item.cho_phep_sua_gia === false ? ' readonly title="Giá đã khóa"' : ''} onchange="updUnitPrice('${item.hang_hoa_id}',this.value)"><span class="money-unit">VNĐ</span></span>`;
-        const discountCell = `<span class="discount-pair"><input class="small" value="${item.chiet_khau || 0}" onchange="updLineDiscount('${item.hang_hoa_id}',this.value)"><select onchange="updLineDiscountType('${item.hang_hoa_id}',this.value)"><option value="vnd"${item.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${item.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
+        const hasDetailInputs = Boolean((item.has_quy_cach && item.quy_cach_items?.length) || (item.has_lot_items && item.lot_items?.length));
+        const qtyCell = hasDetailInputs
+          ? `<span data-order-qty-summary title="Tổng số lượng từ các dòng quy cách/lô">${window.KVStockQuantity.format(item.so_luong)}</span>`
+          : `<span class="qty-input-wrap"><input class="small${warningInputClass(lineWarning)}" inputmode="decimal" aria-label="Số lượng hàng hóa" data-order-field="qty" data-item-index="${idx}" data-order-input-key="item-${idx}-qty" value="${window.KVStockQuantity.format(item.so_luong)}" oninput="handleOrderNumericInput(this, event)">${warningIconHtml(lineWarning)}</span>`;
+        const priceCell = `<span class="money-input-wrap"><input class="small" inputmode="numeric" aria-label="Đơn giá hàng hóa" data-order-field="price" data-item-index="${idx}" data-order-input-key="item-${idx}-price" value="${fmt(item.don_gia_ban)}"${hasDetailInputs ? ' disabled readonly title="Nhập đơn giá ở từng quy cách/lô"' : (item.cho_phep_sua_gia === false ? ' readonly title="Giá đã khóa"' : '')} oninput="handleOrderNumericInput(this, event)"><span class="money-unit">VNĐ</span></span>`;
+        const discountCell = `<span class="discount-pair"><input class="small" inputmode="decimal" aria-label="Giảm giá hàng hóa" data-order-field="discount" data-item-index="${idx}" data-order-input-key="item-${idx}-discount" value="${window.KVStockQuantity.format(item.chiet_khau || 0)}" oninput="handleOrderNumericInput(this, event)"><select onchange="updLineDiscountType('${item.hang_hoa_id}',this.value)"><option value="vnd"${item.kieu_chiet_khau !== 'phan_tram' ? ' selected' : ''}>VNĐ</option><option value="phan_tram"${item.kieu_chiet_khau === 'phan_tram' ? ' selected' : ''}>%</option></select></span>`;
         if (maxLots > 0) {
           return `<tr>
             <td>${idx + 1}</td>
@@ -1551,10 +1640,11 @@
           }
           return renderNormalProductRow(item, idx, maxLots, line) + renderQuyCachBlock(item, idx);
         }).join('');
-        const orderDiscount = discountAmount(num(discount.value), orderDiscountType.value, subtotal);
+        const orderDiscount = discountAmount(orderDiscountValue(), orderDiscountType.value, subtotal);
         const shippingFeeValue = num(shippingFee.value);
         const shippingFeeForCustomer = 0;
         const total = Math.max(subtotal - orderDiscount + shippingFeeForCustomer, 0);
+        cartPayable = total;
         document.getElementById('subtotal').textContent = moneyFmt(subtotal);
         grandTotal.textContent = moneyFmt(total);
         renderPaymentSummary();
@@ -1606,7 +1696,7 @@
         renderPaymentSummary();
       }
       function fillOrderPaymentAll(mode) {
-        const due = Math.max(0, num(grandTotal.textContent));
+        const due = Math.max(0, cartPayable);
         isPayAllMode = due > 0;
         payAllTarget = mode === 'transfer' ? 'transfer' : 'cash';
         paymentPriority = payAllTarget;
@@ -1621,7 +1711,7 @@
         renderPaymentSummary();
       }
       function renderPaymentSummary() {
-        const khachCanTra = num(grandTotal.textContent);
+        const khachCanTra = cartPayable;
         let tienMat = Math.max(0, num(cashCustomerGiven.value));
         let chuyenKhoan = Math.max(0, num(transferCustomerGiven.value));
         if (isPayAllMode && khachCanTra > 0) {
@@ -1698,9 +1788,7 @@
         const i = cart.find(x => x.hang_hoa_id === id);
         if (!i) return;
         if (i.has_quy_cach || i.has_lot_items) return alert('Hàng hóa có lô/thuộc tính, vui lòng nhập số lượng theo bảng bên dưới.');
-        const stock = inventoryMetrics(i, stockFor(id)).tonThucTe;
-        const nextQty = Math.max(1, num(v));
-        if (nextQty > stock) alert('Đơn này đang đặt vượt tồn hiện có.');
+        const nextQty = Math.max(0, window.KVStockQuantity.parse(v));
         i.so_luong = nextQty;
         renderCart();
       }
@@ -1709,7 +1797,7 @@
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
         const qc = rows[qcIdx];
-        qc.so_luong_dat = Math.max(0, num(value));
+        qc.so_luong_dat = Math.max(0, Number(value) || 0);
         renderCart();
       }
       function updQuyCachPrice(itemIdx, qcIdx, value) {
@@ -1717,7 +1805,7 @@
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
         if (rows[qcIdx].cho_phep_sua_gia === false) return alert('Dòng này không cho phép sửa giá.');
-        rows[qcIdx].don_gia_ban = Math.max(0, num(value));
+        rows[qcIdx].don_gia_ban = Math.max(0, orderNumericValue(value));
         renderCart();
       }
       async function updQuyCachLoaiGia(itemIdx, qcIdx, value) {
@@ -1738,7 +1826,7 @@
         const item = cart[itemIdx];
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
-        rows[qcIdx].chiet_khau = num(value);
+        rows[qcIdx].chiet_khau = Math.max(0, orderNumericValue(value));
         renderCart();
       }
       function updQuyCachDiscountType(itemIdx, qcIdx, value) {
@@ -1746,17 +1834,19 @@
         const rows = item && item.has_quy_cach ? item.quy_cach_items : item && item.has_lot_items ? item.lot_items : [];
         if (!rows || !rows[qcIdx]) return;
         rows[qcIdx].kieu_chiet_khau = value === 'phan_tram' ? 'phan_tram' : 'vnd';
+        if (rows[qcIdx].kieu_chiet_khau === 'vnd') rows[qcIdx].chiet_khau = Math.floor(rows[qcIdx].chiet_khau || 0);
         renderCart();
       }
       function updUnitPrice(id, v) {
         const i = cart.find(x => x.hang_hoa_id === id);
         if (!i) return;
+        if (i.has_quy_cach || i.has_lot_items) return;
         if (i.cho_phep_sua_gia === false) return alert('Dòng này không cho phép sửa giá.');
-        i.don_gia_ban = Math.max(0, num(v));
+        i.don_gia_ban = Math.max(0, orderNumericValue(v));
         renderCart();
       }
-      function updLineDiscount(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.chiet_khau = num(v); renderCart(); }
-      function updLineDiscountType(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.kieu_chiet_khau = v === 'phan_tram' ? 'phan_tram' : 'vnd'; renderCart(); }
+      function updLineDiscount(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) i.chiet_khau = Math.max(0, orderNumericValue(v)); renderCart(); }
+      function updLineDiscountType(id, v) { const i = cart.find(x => x.hang_hoa_id === id); if (i) { i.kieu_chiet_khau = v === 'phan_tram' ? 'phan_tram' : 'vnd'; if (i.kieu_chiet_khau === 'vnd') i.chiet_khau = Math.floor(i.chiet_khau || 0); } renderCart(); }
       function removeProduct(id) {
         delete expandedLotKeyByItem[id];
         cart = cart.filter(i => i.hang_hoa_id !== id);
@@ -2043,7 +2133,7 @@
                   }))
               : []
           })),
-          chiet_khau: num(discount.value),
+          chiet_khau: orderDiscountValue(),
           kieu_giam_gia: orderDiscountType.value,
           phi_van_chuyen: num(shippingFee.value),
           diem_di: getShippingStartPoint(),

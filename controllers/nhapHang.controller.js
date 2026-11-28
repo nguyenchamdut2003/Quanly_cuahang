@@ -5,7 +5,9 @@ var {
   importVatChuaWithPurchase,
   cancelNhapVatChuaBySource,
   parseVatChuaImportInput,
-  assertVatChuaImportInput
+  vatChuaConfigFromParsed,
+  assertVatChuaImportInput,
+  addAverageCostToVatChuaOptions
 } = require('../services/vatChuaImport.service');
 var { taoPhieuThuChi } = require('../services/soQuy.service');
 var { buildReceiptPaymentInfo } = require('../services/paymentCashBook.service');
@@ -17,7 +19,7 @@ var { payPurchaseSources } = require('../services/purchaseGroupPayment.service')
 var { PhieuNhapTongHop } = require('../models/phieunhap.model');
 var { buildPurchaseManagementList, sumPurchaseListTotals } = require('../services/purchaseGroupList.service');
 var pdfService = require('../services/pdf.service');
-var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines } = require('../services/vatChuaDetail.service');
+var { loadPurchasesLinkedVatChuaMap, loadPurchaseLinkedVatChuaLines, buildVatChuaEditState } = require('../services/vatChuaDetail.service');
 
 function disabledTrashOperation() {
   var error = new Error('Chức năng xóa/đưa vào thùng rác đã được tắt.');
@@ -294,12 +296,13 @@ async function makeLoCode() {
 }
 
 async function resolveStoreId(req) {
-  var sessionStoreId = req && req.session ? String(req.session.cua_hang_id || '').trim() : '';
-  if (sessionStoreId && mongoose.Types.ObjectId.isValid(sessionStoreId)) return sessionStoreId;
-  var userStoreId = req && req.user ? String(req.user.cua_hang_id || '').trim() : '';
-  if (userStoreId && mongoose.Types.ObjectId.isValid(userStoreId)) return userStoreId;
-  var activeStore = await CuaHang.findOne({ trang_thai: 'active' }).sort({ created_at: 1 }).lean();
-  return activeStore ? String(activeStore._id) : '';
+  var userStore = req && req.user && req.user.cua_hang_id;
+  var sessionStore = req && req.session && req.session.cua_hang_id;
+  for (var value of [userStore, sessionStore]) {
+    var id = String(value && value._id || value || '').trim();
+    if (mongoose.Types.ObjectId.isValid(id)) return id;
+  }
+  throw Object.assign(new Error('Chưa chọn cửa hàng trong phiên đăng nhập.'), { statusCode: 403 });
 }
 
 exports.index = async function(req, res, next) {
@@ -509,6 +512,7 @@ exports.index = async function(req, res, next) {
         .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
         .select('ma_vat_chua ten_vat_chua so_luong_ton')
         .lean();
+      if (vatChuaList.length) await addAverageCostToVatChuaOptions(storeId, vatChuaList);
     }
 
     var purchaseListFocus = {
@@ -597,7 +601,7 @@ function normalizeItemsPayload(raw) {
         && x.don_gia >= 0;
     })
     .map(function(x) {
-      x.so_luong = Math.floor(x.so_luong);
+      x.so_luong = require('../utils/stockQuantity').stockQuantity(x.so_luong);
       if (!mongoose.Types.ObjectId.isValid(x.gia_tri_thuoc_tinh_id)) x.gia_tri_thuoc_tinh_id = '';
       if (!Number.isFinite(x.don_gia) || x.don_gia < 0) x.don_gia = 0;
       if (!Number.isFinite(x.giam_gia_dong) || x.giam_gia_dong < 0) x.giam_gia_dong = 0;
@@ -991,6 +995,7 @@ exports.createPage = async function(req, res, next) {
         .sort({ ten_vat_chua: 1, ma_vat_chua: 1 })
         .select('ma_vat_chua ten_vat_chua so_luong_ton')
         .lean();
+      if (vatChuaList.length) await addAverageCostToVatChuaOptions(storeId, vatChuaList);
     }
 
     res.render('nhap-hang/create', {
@@ -1297,12 +1302,33 @@ exports.detail = async function(req, res, next) {
     var loaded = await loadPurchaseWithItems(req.params.id, storeId);
     if (!loaded) return res.status(404).json({ success: false, message: 'Không tìm thấy phiếu nhập' });
     const ticketObj = loaded.ticket.toObject ? loaded.ticket.toObject() : loaded.ticket;
+    const classificationService = require('../services/phanLoaiHang.service');
+    const detailItems = await Promise.all(loaded.items.map(async function(item) {
+      const row = item.toObject ? item.toObject() : { ...item };
+      const source = { cua_hang_id: storeId, kho_id: ticketObj.kho_id && (ticketObj.kho_id._id || ticketObj.kho_id),
+        hang_hoa_id: row.hang_hoa_id && (row.hang_hoa_id._id || row.hang_hoa_id),
+        lo_hang_id: row.lo_hang_id && (row.lo_hang_id._id || row.lo_hang_id) || null,
+        phieu_nhap_id: ticketObj._id, ct_phieu_nhap_id: row._id, nguon_thao_tac: 'phieu_nhap' };
+      let eligibility;
+      try { eligibility = await classificationService.validatePurchaseClassification(source); }
+      catch (error) { eligibility = { allowed: false, reason: error.message + ' Vui lòng kiểm tra nguồn hoặc sử dụng Phân loại tại kho.' }; }
+      row.classification = { ...source, allowed: eligibility.allowed, reason: eligibility.reason || '' };
+      return row;
+    }));
     var purchaseGroup = await findActivePurchaseGroupForSource(ticketObj._id, storeId);
     const vatChuaLines = await loadPurchaseLinkedVatChuaLines(
       loaded.ticket._id,
       storeId || ticketObj.cua_hang_id
     );
     var vatChuaEdit = { vat_chua_id: '', so_luong: 0 };
+    if (ticketObj.vat_chua_config) {
+      var savedVc = ticketObj.vat_chua_config;
+      vatChuaEdit = { vat_chua_id: savedVc.vat_chua_id || '', so_luong: Number(savedVc.vat_chua_so_luong || 0),
+        don_gia_giao_dich: Number(savedVc.vat_chua_don_gia_giao_dich || 0),
+        thanh_tien_giao_dich: Number(savedVc.vat_chua_don_gia_giao_dich || 0) * Math.abs(Number(savedVc.vat_chua_so_luong || 0)),
+        ghi_nhan_thu_chi: savedVc.vat_chua_ghi_nhan_thu_chi === true,
+        vat_chua_thanh_toan: savedVc.vat_chua_thanh_toan || {} };
+    }
     var storeOid = storeId || ticketObj.cua_hang_id;
     if (storeOid && mongoose.Types.ObjectId.isValid(String(storeOid))) {
       var nhapVatChua = await NhapVatChua.findOne({
@@ -1313,10 +1339,9 @@ exports.detail = async function(req, res, next) {
       }).lean();
       if (nhapVatChua && Array.isArray(nhapVatChua.items) && nhapVatChua.items.length) {
         var vcItem = nhapVatChua.items[0];
-        vatChuaEdit = {
-          vat_chua_id: String(vcItem.vat_chua_id || ''),
-          so_luong: Number(vcItem.so_luong || 0)
-        };
+        var cashRows = await mongoose.models.PhieuThuChi.find({ cua_hang_id: storeOid,
+          nhap_vat_chua_id: nhapVatChua._id }).lean();
+        vatChuaEdit = buildVatChuaEditState(nhapVatChua, cashRows);
       }
     }
     return res.json({
@@ -1325,7 +1350,7 @@ exports.detail = async function(req, res, next) {
         ticket: ticketObj,
         group: purchaseGroup ? { _id: purchaseGroup._id, ma_phieu_tong_hop: purchaseGroup.ma_phieu_tong_hop,
           url: '/nhap-hang/tong-hop/' + encodeURIComponent(String(purchaseGroup._id)) } : null,
-        items: loaded.items.map(function(item) { return item.toObject ? item.toObject() : item; }),
+        items: detailItems,
         vat_chua_lines: vatChuaLines,
         vat_chua_edit: vatChuaEdit
       }
@@ -1497,7 +1522,7 @@ async function ensureCanDecreaseQuyCach(khoId, productId, lotId, deltas, session
       ten_quy_cach: row.ten_quy_cach
     }), session).lean();
     if (!stock || Number(stock.so_luong || 0) < Math.abs(row.deltaQty)) {
-      throw new Error('Tồn kho quy cách trong lô không đủ để giảm số lượng dòng hàng');
+      throw new Error('Tồn kho theo phân loại trong lô không đủ để giảm số lượng dòng hàng');
     }
   }
 }
@@ -1674,7 +1699,7 @@ async function validatePurchaseSourceReturnQuantities(ticket, pairs, storeId, se
     var items = normalizeEditQuyCachItems(pair.next.lot_info && pair.next.lot_info.quy_cach_items);
     Object.keys(summary.quyCach).forEach(function(name) {
       var item = items.find(function(row) { return row.ten_quy_cach === name; });
-      if (!item || Number(item.so_luong || 0) < summary.quyCach[name]) throw purchaseSourceEditError(400, 'Số lượng quy cách không được nhỏ hơn số lượng đã trả hàng.');
+      if (!item || Number(item.so_luong || 0) < summary.quyCach[name]) throw purchaseSourceEditError(400, 'Số lượng theo phân loại không được nhỏ hơn số lượng đã trả hàng.');
     });
   });
   return true;
@@ -1698,6 +1723,7 @@ exports.save = async function(req, res, next) {
       throw purchaseSourceEditError(400, 'Phiếu thuộc cơ chế gộp cũ, cần đối soát trước khi chỉnh sửa.');
     }
     var body = req.body || {};
+    var hasVatChuaInput = Object.keys(body).some(function(key) { return key.indexOf('vat_chua_') === 0; });
     var oldTicket = loaded.ticket.toObject ? loaded.ticket.toObject() : loaded.ticket;
     var oldKhoId = String(oldTicket.kho_id?._id || oldTicket.kho_id || '');
     var newKhoId = String(body.kho_id || oldKhoId).trim();
@@ -1727,6 +1753,12 @@ exports.save = async function(req, res, next) {
     }
     var parsedVatChua = parseVatChuaImportInput(body);
     assertVatChuaImportInput(parsedVatChua);
+    if (oldTicket.trang_thai === 'completed' && hasVatChuaInput) {
+      await require('../services/vatChuaLinkedMoney.service').assertLinkedContainerChange({
+        storeId: storeId, sourceType: 'phieu_nhap', sourceId: loaded.ticket._id,
+        data: body, direction: 'nhap'
+      }, session);
+    }
     var rowsById = new Map((loaded.items || []).map(function(row) {
       var plain = row.toObject ? row.toObject() : row;
       return [String(plain._id), plain];
@@ -1739,24 +1771,24 @@ exports.save = async function(req, res, next) {
       var oldRow = rowsById.get(String(raw._id || ''));
       if (!oldRow || editedIds.has(String(raw._id))) throw purchaseSourceEditError(400, 'Chi tiết phiếu nhập không hợp lệ hoặc bị trùng.');
       editedIds.add(String(raw._id));
-      var qty = Math.max(0, Math.floor(Number(raw.so_luong || 0)));
+      var qty = require('../utils/stockQuantity').stockQuantity(raw.so_luong);
       var price = parsePurchaseSourceUnitPrice(raw.don_gia_nhap == null ? oldRow.don_gia_nhap : raw.don_gia_nhap);
       var lotInfo = normalizeEditLotInfo(raw.lot_info, oldRow.lot_info, qty, price);
       var qcItems = lotInfo && Array.isArray(lotInfo.quy_cach_items) ? lotInfo.quy_cach_items : [];
       var oldRowQcItems = normalizeEditQuyCachItems(oldRow.lot_info && oldRow.lot_info.quy_cach_items);
       if (oldRowQcItems.length && raw.lot_info && Array.isArray(raw.lot_info.quy_cach_items) && !qcItems.length) {
-        throw purchaseSourceEditError(400, 'Lô đang có thuộc tính/quy cách, cần giữ ít nhất một dòng thuộc tính');
+        throw purchaseSourceEditError(400, 'Lô đang có phân loại, cần giữ ít nhất một dòng phân loại');
       }
       if (qcItems.length) {
         for (var q = 0; q < qcItems.length; q++) {
           if (!qcItems[q].ten_quy_cach) {
-            throw purchaseSourceEditError(400, 'Tên thuộc tính/quy cách không được để trống');
+            throw purchaseSourceEditError(400, 'Tên phân loại không được để trống');
           }
           if (Number(qcItems[q].so_luong || 0) <= 0) {
-            throw purchaseSourceEditError(400, 'Số lượng thuộc tính/quy cách phải lớn hơn 0');
+            throw purchaseSourceEditError(400, 'Số lượng theo phân loại phải lớn hơn 0');
           }
         }
-        qty = Math.floor(sumEditQuyCachQty(qcItems));
+        qty = require('../utils/stockQuantity').stockQuantity(sumEditQuyCachQty(qcItems));
         var qcAmount = sumEditQuyCachAmount(qcItems);
         price = qty > 0 ? qcAmount / qty : price;
         lotInfo.so_luong_tong = qty;
@@ -1767,7 +1799,7 @@ exports.save = async function(req, res, next) {
       if (!Number.isFinite(lineDiscount) || lineDiscount < 0) lineDiscount = 0;
       var lineDiscountType = ['vnd', 'percent'].indexOf(String(raw.kieu_giam_gia_dong || '').trim()) >= 0 ? String(raw.kieu_giam_gia_dong).trim() : 'vnd';
       if (lineDiscountType === 'percent' && lineDiscount > 100) lineDiscount = 100;
-      if (!Number.isSafeInteger(qty) || qty <= 0 || !Number.isFinite(price) || price < 0) throw purchaseSourceEditError(400, 'Số lượng hoặc đơn giá không hợp lệ.');
+      if (!Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0) throw purchaseSourceEditError(400, 'Số lượng hoặc đơn giá không hợp lệ.');
       var normalized = {
         _id: oldRow._id,
         hang_hoa_id: oldRow.hang_hoa_id?._id || oldRow.hang_hoa_id,
@@ -1821,6 +1853,33 @@ exports.save = async function(req, res, next) {
         var attributeValueId = pair.next.gia_tri_thuoc_tinh_id || undefined;
         var oldQcItems = normalizeEditQuyCachItems(pair.oldRow.lot_info && pair.oldRow.lot_info.quy_cach_items);
         var nextQcItems = normalizeEditQuyCachItems(pair.next.lot_info && pair.next.lot_info.quy_cach_items);
+        const warehouseStockService = require('../services/kho.service');
+        if (!lotId && (oldQcItems.length || nextQcItems.length || await TonKhoLoQuyCach.exists({
+          kho_id: oldKhoId, hang_hoa_id: productId, lo_hang_id: null
+        }).session(session))) {
+          const oldVariants = oldQcItems.length ? oldQcItems : [{ ten_quy_cach: 'Chưa phân loại',
+            so_luong: Number(pair.oldRow.so_luong || 0), don_gia_nhap: Number(pair.oldRow.don_gia_nhap || 0) }];
+          const nextVariants = nextQcItems.length ? nextQcItems : [{ ten_quy_cach: 'Chưa phân loại',
+            so_luong: Number(pair.next.so_luong || 0), don_gia_nhap: Number(pair.next.don_gia_nhap || 0) }];
+          const applyVariant = async function(khoId, name, deltaQty, cost) {
+            if (Math.abs(deltaQty) < 0.000001) return;
+            const params = { cua_hang_id: storeId, kho_id: khoId, hang_hoa_id: productId, lo_hang_id: null,
+              ten_quy_cach: name, sync_quy_cach: true, so_luong: Math.abs(deltaQty), gia_von: cost,
+              nguoi_tao_id: req.user && req.user._id, loai_phieu: 'dieu_chinh', ma_phieu: oldTicket.ma_phieu_nhap,
+              ghi_chu: 'Sửa dòng phiếu nhập theo phân loại', session: session };
+            if (deltaQty < 0) await warehouseStockService.truTonKho(params);
+            else await warehouseStockService.congTonKho(params);
+          };
+          if (String(oldKhoId) === String(newKhoId)) {
+            for (const change of buildQcDeltaRows(oldVariants, nextVariants)) {
+              await applyVariant(oldKhoId, change.ten_quy_cach, change.deltaQty, change.nextPrice);
+            }
+          } else {
+            for (const variant of oldVariants) await applyVariant(oldKhoId, variant.ten_quy_cach, -Number(variant.so_luong), Number(variant.don_gia_nhap || 0));
+            for (const variant of nextVariants) await applyVariant(newKhoId, variant.ten_quy_cach, Number(variant.so_luong), Number(variant.don_gia_nhap || 0));
+          }
+          continue;
+        }
         if (lotId && (oldQcItems.length || nextQcItems.length)) {
           var qcDeltas = buildQcDeltaRows(oldQcItems, nextQcItems);
           var purchaseStoreIdForQc = oldTicket.cua_hang_id?._id || oldTicket.cua_hang_id || storeId;
@@ -1972,6 +2031,7 @@ exports.save = async function(req, res, next) {
         da_tra_ncc: daTra,
         con_no_ncc: conNo,
         phuong_thuc_thanh_toan: phuongThuc,
+        vat_chua_config: hasVatChuaInput ? (parsedVatChua.vatChuaId ? vatChuaConfigFromParsed(parsedVatChua) : null) : oldTicket.vat_chua_config,
         ghi_chu: String(body.ghi_chu || '').trim()
       }
     }, { session: session });
@@ -2010,16 +2070,15 @@ exports.save = async function(req, res, next) {
       );
     }
 
-    var hasVatChuaInput = Object.prototype.hasOwnProperty.call(body, 'vat_chua_id')
-      || Object.prototype.hasOwnProperty.call(body, 'vat_chua_so_luong');
     if (oldTicket.trang_thai === 'completed' && hasVatChuaInput) {
       var purchaseStoreId = oldTicket.cua_hang_id?._id || oldTicket.cua_hang_id || storeId;
-      await cancelNhapVatChuaBySource(purchaseStoreId, 'phieu_nhap', loaded.ticket._id, session);
       if (parsedVatChua.vatChuaId && parsedVatChua.qty > 0) {
         var updatedPurchase = await PhieuNhap.findOne({ _id: loaded.ticket._id, cua_hang_id: storeId }).session(session).lean();
         if (updatedPurchase) {
-          await importVatChuaWithPurchase(updatedPurchase, body, session);
+          await importVatChuaWithPurchase(updatedPurchase, Object.assign({}, body, { nguoi_tao_id: req.user && req.user._id }), session);
         }
+      } else {
+        await cancelNhapVatChuaBySource(purchaseStoreId, 'phieu_nhap', loaded.ticket._id, session);
       }
     }
 
@@ -2029,6 +2088,16 @@ exports.save = async function(req, res, next) {
     return res.status(Number(error && error.statusCode) || 400).json({ success: false, message: error && error.message || 'Không lưu được phiếu nhập.' });
   } finally {
     if (session) await session.endSession();
+  }
+};
+
+exports.complete = async function(req, res) {
+  try {
+    var storeId = await resolveStoreId(req);
+    var purchase = await purchaseService.completePurchase(req.params.id, storeId, req.user && req.user._id, req.body || {});
+    return res.json({ success: true, message: 'Đã hoàn thành phiếu nhập', data: { _id: purchase._id } });
+  } catch (error) {
+    return res.status(error.statusCode || 400).json({ success: false, message: error.message || 'Không hoàn thành được phiếu nhập.' });
   }
 };
 

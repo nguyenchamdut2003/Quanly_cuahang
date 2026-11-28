@@ -152,6 +152,8 @@
     .order-page-current{font-weight:800;color:#111827}
     @media(max-width:760px){.actions{flex-wrap:wrap;justify-content:flex-end}.order-merge-overlay{padding:8px}.order-merge-head{padding:18px 18px 12px}.order-merge-body{padding:14px 18px 22px}.order-merge-head h3{font-size:20px}.order-merge-desc{font-size:15px}.order-merge-table{min-width:840px}.order-merge-empty{min-height:260px}.order-merge-empty .empty-icon{width:112px;height:112px;font-size:40px;box-shadow:inset 0 0 0 16px #dcecff}}
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
 </head>
 <body>
   <%- include('../partials/header') %>
@@ -352,13 +354,13 @@
       <div class="delivery-confirm-head">
         <div>
           <h3 id="deliveryConfirmTitle">Xác nhận giao hàng</h3>
-          <div class="delivery-confirm-vat-chua">
+          <div class="delivery-confirm-vat-chua" data-vat-chua-payment data-vc-id="deliveryVatChuaId" data-vc-qty="deliveryVatChuaQty" data-vc-direction="thu">
             <span class="delivery-confirm-vat-label">Vật chứa</span>
             <div class="delivery-confirm-vat-combo">
               <select id="deliveryVatChuaId" title="Chọn vật chứa">
                 <option value="">— Chọn —</option>
                 <% (vatChuaList || []).forEach(function(vc) { %>
-                  <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+                  <option value="<%= vc._id %>" data-vc-average-cost="<%= Number(vc.gia_von_binh_quan) || 0 %>"><%= vc.ten_vat_chua || '---' %></option>
                 <% }) %>
               </select>
               <input id="deliveryVatChuaQty" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
@@ -519,6 +521,7 @@
       return 'Không có';
     }
     const orderDetailCache = {};
+    let pendingDeliveryContainerRequestKey = '';
     let pendingDeliveryOrderId = '';
     let pendingDeliveryBatchPayable = 0;
     let pendingDeliveryPrepaidCredit = 0;
@@ -1115,6 +1118,8 @@
       }).filter(Boolean).join('');
       if (!rows) return alert('Đơn hàng không còn dòng cần giao.');
       pendingDeliveryOrderId = id;
+      pendingDeliveryContainerRequestKey = window.crypto && window.crypto.randomUUID
+        ? window.crypto.randomUUID() : 'container-delivery-' + Date.now() + '-' + Math.random().toString(36).slice(2);
       document.getElementById('deliveryConfirmBody').innerHTML = rows;
       refreshDeliveryModalTotals();
       document.getElementById('deliveryCashInput').value = '0';
@@ -1123,8 +1128,10 @@
       document.getElementById('deliveryCashBookId').value = '';
       const vatChuaIdEl = document.getElementById('deliveryVatChuaId');
       const vatChuaQtyEl = document.getElementById('deliveryVatChuaQty');
-      if (vatChuaIdEl) vatChuaIdEl.value = '';
-      if (vatChuaQtyEl) vatChuaQtyEl.value = '';
+      const containerPlan = (detail.vat_chua_lines || []).length ? {} : (order.vat_chua_config || {});
+      if (vatChuaIdEl) vatChuaIdEl.value = containerPlan.vat_chua_id || '';
+      if (vatChuaQtyEl) vatChuaQtyEl.value = containerPlan.vat_chua_so_luong || containerPlan.so_luong || '';
+      window.KVVatChuaPayment.hydrate('deliveryVatChuaId', containerPlan);
       setDeliveryConfirmSubmitting(false);
       refreshDeliveryPaymentSummary();
       document.getElementById('deliveryConfirmError').style.display = 'none';
@@ -1134,6 +1141,7 @@
     function closeDeliveryConfirmModal() {
       if (pendingDeliverySubmitting) return;
       pendingDeliveryOrderId = '';
+      pendingDeliveryContainerRequestKey = '';
       pendingDeliveryBatchPayable = 0;
       pendingDeliveryPrepaidCredit = 0;
       pendingDeliveryPaymentDue = 0;
@@ -1209,7 +1217,9 @@
         const qtyInput = document.getElementById('deliveryVatChuaQty');
         if (qtyInput) qtyInput.value = String(qty);
       }
-      return { vat_chua_id: id, vat_chua_so_luong: id ? String(qty) : '' };
+      const paymentError = window.KVVatChuaPayment.validate('deliveryVatChuaId');
+      if (paymentError) return { error: paymentError };
+      return { vat_chua_id: id, vat_chua_so_luong: id ? String(qty) : '', ...window.KVVatChuaPayment.payload('deliveryVatChuaId') };
     }
 
     async function submitDeliveryConfirmModal() {
@@ -1221,7 +1231,9 @@
       if (vatChuaFields.error) return alert(vatChuaFields.error);
       const body = Object.assign({}, payload.body, {
         vat_chua_id: vatChuaFields.vat_chua_id,
-        vat_chua_so_luong: vatChuaFields.vat_chua_so_luong
+        vat_chua_so_luong: vatChuaFields.vat_chua_so_luong,
+        ...window.KVVatChuaPayment.payload('deliveryVatChuaId'),
+        vat_chua_request_key: pendingDeliveryContainerRequestKey
       });
       setDeliveryConfirmSubmitting(true);
       try {

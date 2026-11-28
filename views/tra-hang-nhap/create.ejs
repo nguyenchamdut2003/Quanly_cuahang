@@ -77,6 +77,9 @@
     .error{display:none;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:6px;padding:8px;font-size:13px}
     @media(max-width:1100px){.create-page{width:100%;grid-template-columns:minmax(0,1fr) 330px}.search{width:330px}.product-pop{left:120px;width:420px}}
   </style>
+  <link rel="stylesheet" href="/stylesheets/vat-chua-linked-payment.css">
+  <script src="/javascripts/vat-chua-linked-payment.js"></script>
+  <script src="/javascripts/stock-quantity.js"></script>
 </head>
 <body class="admin-body">
   <div id="appRoot">
@@ -189,13 +192,13 @@
           <button type="button" class="btn-pay-all" id="payTransferAllBtn">Tất cả</button>
         </div>
       </div>
-      <div class="field" id="vatChuaRow">
+      <div class="field" id="vatChuaRow" data-vat-chua-payment data-vc-id="vatChuaId" data-vc-qty="vatChuaQty" data-vc-direction="thu">
         <label>Vật chứa</label>
         <div class="vat-chua-combo">
           <select id="vatChuaId" class="control" name="vat_chua_id" title="Chọn vật chứa">
             <option value="">— Chọn —</option>
             <% (vatChuaList || []).forEach(function(vc) { %>
-              <option value="<%= vc._id %>"><%= vc.ten_vat_chua || '---' %></option>
+              <option value="<%= vc._id %>" data-vc-average-cost="<%= Number(vc.gia_von_binh_quan) || 0 %>"><%= vc.ten_vat_chua || '---' %></option>
             <% }) %>
           </select>
           <input id="vatChuaQty" class="control vat-chua-qty" name="vat_chua_so_luong" value="" inputmode="numeric" placeholder="SL" title="Số lượng vật chứa">
@@ -569,7 +572,7 @@
           ${mergedLotCell}
           <td>${escapeHtml(attrLabel)}</td>
           <td class="num" title="Tồn hiện tại theo lô/thuộc tính: ${fmt(tonHienTai)}">${fmt(tonHienTai)}</td>
-          <td><input class="cell-input" type="number" min="0" max="${toiDaTra}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
+          <td><input class="cell-input" type="number" min="0" step="0.000001" inputmode="decimal" max="${toiDaTra}" value="${it.so_luong || ''}" onchange="updateItem(${idx}, 'so_luong', this.value)"></td>
           <td><input class="cell-input" inputmode="numeric" value="${fmt(it.gia_nhap || 0)}" oninput="applyVNNumberFormat(this)" onchange="updateItem(${idx}, 'gia_nhap', this.value)" ${it.ct_phieu_nhap_id ? 'readonly' : ''}></td>
           <td><input class="cell-input" inputmode="numeric" value="${fmt(it.gia_tra_lai || 0)}" oninput="applyVNNumberFormat(this)" onchange="updateItem(${idx}, 'gia_tra_lai', this.value)"></td>
           <td class="num"><b>${fmt(line)}</b></td>
@@ -594,7 +597,7 @@
       if (!items[idx]) return;
       if (field === 'so_luong') {
         const maxQty = Math.max(0, maxReturnQty(items[idx]));
-        const nextQty = purchaseGroupReturn ? Math.max(0, Number(value) || 0) : money(value);
+        const nextQty = Math.max(0, Number(value) || 0);
         if (nextQty > maxQty) showError('Số lượng trả không được vượt quá số tối đa trả.');
         items[idx][field] = Math.min(nextQty, maxQty);
       } else if (['gia_nhap', 'gia_tra_lai'].includes(field)) items[idx][field] = money(value);
@@ -715,7 +718,6 @@
     }
 
     function validateVatChuaExport(mode) {
-      if (mode !== 'completed') return true;
       const id = String(document.getElementById('vatChuaId')?.value || '').trim();
       const rawQty = String(document.getElementById('vatChuaQty')?.value || '').replace(/\./g, '').replace(/,/g, '').trim();
       const qty = Math.floor(Number(rawQty || 0));
@@ -733,6 +735,8 @@
         const qtyInput = document.getElementById('vatChuaQty');
         if (qtyInput) qtyInput.value = String(qty);
       }
+      const error = window.KVVatChuaPayment.validate('vatChuaId', { draft: mode !== 'completed' });
+      if (error) { showError(error); return false; }
       return true;
     }
 
@@ -794,6 +798,7 @@
         ghi_chu: document.getElementById('ghiChu').value,
         vat_chua_id: document.getElementById('vatChuaId')?.value || '',
         vat_chua_so_luong: document.getElementById('vatChuaQty')?.value || '',
+        ...window.KVVatChuaPayment.payload('vatChuaId'),
         items_json: JSON.stringify(sendItems.map(it => ({
           ct_phieu_nhap_id: it.ct_phieu_nhap_id,
           phieu_nhap_id: purchaseId || it.phieu_nhap_id || '',
@@ -823,6 +828,8 @@
           giam_gia: allocation.giam_gia, kieu_giam_gia: allocation.kieu_giam_gia,
           gia_tri_can_tru_cong_no: allocation.gia_tri_can_tru_cong_no, ncc_da_tra: allocation.ncc_da_tra
         }));
+        if (payload.sources.length) Object.assign(payload.sources[0], { vat_chua_id: payload.vat_chua_id, vat_chua_so_luong: payload.vat_chua_so_luong }, window.KVVatChuaPayment.payload('vatChuaId'));
+        ['vat_chua_id', 'vat_chua_so_luong', 'vat_chua_don_gia_giao_dich', 'vat_chua_ghi_nhan_thu_chi', 'vat_chua_thanh_toan', 'vat_chua_request_key'].forEach(key => delete payload[key]);
         delete payload.items_json;
         delete payload.phieu_nhap_id;
       }

@@ -9,20 +9,25 @@ async function buildStockAdjustmentContext({ kho, item }) {
         : await TonKho.findOne({ kho_id: kho._id, hang_hoa_id: item.hang_hoa_id });
     const tenQuyCach = normalizeTenQuyCach(item.ten_quy_cach || item.ten_thuoc_tinh || await resolveTenQuyCachFromParams(item));
     const syncQuyCach = await shouldSyncQuyCach(kho._id, item.hang_hoa_id, item.lo_hang_id, tenQuyCach);
-    if (item.lo_hang_id && syncQuyCach && !tenQuyCach) {
-        const error = new Error('Lô có quản lý quy cách, vui lòng kiểm kho theo từng quy cách');
+    if (syncQuyCach && !tenQuyCach) {
+        const error = new Error('Hàng có phân loại, vui lòng kiểm kho theo từng phân loại');
         error.status = 400;
         throw error;
     }
     let systemQuantity = Number(stock?.so_luong || 0);
-    if (item.lo_hang_id && tenQuyCach) {
+    if (tenQuyCach) {
         const qcStock = await TonKhoLoQuyCach.findOne({
             kho_id: kho._id,
             hang_hoa_id: item.hang_hoa_id,
-            lo_hang_id: item.lo_hang_id,
+            lo_hang_id: item.lo_hang_id || null,
             $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
         });
         systemQuantity = Number(qcStock?.so_luong || 0);
+        if (!qcStock && !item.lo_hang_id && tenQuyCach === 'Chưa phân loại') {
+            const hasVariants = await TonKhoLoQuyCach.exists({ kho_id: kho._id,
+                hang_hoa_id: item.hang_hoa_id, lo_hang_id: null });
+            if (!hasVariants) systemQuantity = Number(stock?.so_luong || 0);
+        }
     }
     return { systemQuantity, tenQuyCach, syncQuyCach };
 }

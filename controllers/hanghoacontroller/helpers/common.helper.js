@@ -696,6 +696,7 @@ function labelStockTransactionType(type, quantity) {
         xuat_huy: 'Xuất hủy',
         xuat_noi_bo: 'Xuất dùng nội bộ',
         dieu_chinh: Number(quantity || 0) === 0 ? 'Cập nhật giá vốn' : 'Điều chỉnh tồn',
+        phan_loai: 'Phân loại hàng hóa',
         rollback_ban_hang: 'Hoàn tồn bán hàng',
         huy_hoa_don: 'Hủy hóa đơn'
     };
@@ -734,6 +735,7 @@ function labelChungTuDocumentType(chungTuType, loaiPhieu, maPhieu) {
         xuat_huy: 'Xuất hủy',
         xuat_noi_bo: 'Xuất nội bộ',
         dieu_chinh: 'Điều chỉnh tồn',
+        phan_loai: 'Phân loại hàng hóa',
         rollback_ban_hang: 'Hoàn tồn bán hàng',
         huy_hoa_don: 'Hủy hóa đơn'
     };

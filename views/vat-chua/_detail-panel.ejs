@@ -1,9 +1,21 @@
+<%
+  const allDocuments = Array.isArray(locals.documents) ? locals.documents : [];
+  const purchaseTypes = ['phieu_nhap', 'phieu_tra_hang_nhap'];
+  const salesTypes = ['don_hang', 'hoa_don', 'tra_hang_ban'];
+  const safeManualDocuments = Array.isArray(locals.manualDocuments) ? locals.manualDocuments : allDocuments.filter(doc => !purchaseTypes.concat(salesTypes).includes(doc.source_type));
+  const safePurchaseDocuments = Array.isArray(locals.purchaseDocuments) ? locals.purchaseDocuments : allDocuments.filter(doc => purchaseTypes.includes(doc.source_type));
+  const safeSalesDocuments = Array.isArray(locals.salesDocuments) ? locals.salesDocuments : allDocuments.filter(doc => salesTypes.includes(doc.source_type));
+  const safeCashDocuments = Array.isArray(locals.cashDocuments) ? locals.cashDocuments : (Array.isArray(locals.chiDocuments) ? locals.chiDocuments : []);
+  const safeCashTotals = locals.cashTotals || safeCashDocuments.filter(doc => doc.is_valid !== false && !['cancelled', 'inactive'].includes(doc.trang_thai)).reduce((total, doc) => { total[doc.loai_phieu === 'thu' ? 'thu' : 'chi'] += Number(doc.gia_tri_lien_quan ?? doc.gia_tri ?? 0); return total; }, { thu: 0, chi: 0 });
+%>
 <div class="kv-detail-panel product-detail" data-vat-chua-id="<%= item._id %>">
   <div class="detail-tabs">
     <div class="detail-tab-list">
       <button class="detail-tab is-active" type="button" data-detail-tab="info">Thông tin</button>
-      <button class="detail-tab" type="button" data-detail-tab="documents">Chứng từ liên quan</button>
-      <button class="detail-tab" type="button" data-detail-tab="payment-chi">Phiếu chi</button>
+      <button class="detail-tab" type="button" data-detail-tab="documents">Thủ công</button>
+      <button class="detail-tab" type="button" data-detail-tab="purchases">Nhập / Trả NCC</button>
+      <button class="detail-tab" type="button" data-detail-tab="sales">Đặt / Bán hàng</button>
+      <button class="detail-tab" type="button" data-detail-tab="payment-chi">Thu / Chi</button>
     </div>
   </div>
 
@@ -30,7 +42,7 @@
         <div><span>Giá vốn</span><strong><%= Number(item.gia_von_trung_binh || 0).toLocaleString('vi-VN') %> VNĐ</strong></div>
         <div><span>Phiếu nhập</span><strong><%= Number(nhapCount || 0).toLocaleString('vi-VN') %></strong></div>
         <div><span>Phiếu xuất</span><strong><%= Number(xuatCount || 0).toLocaleString('vi-VN') %></strong></div>
-        <div><span>Phiếu chi</span><strong><%= Number(chiCount || 0).toLocaleString('vi-VN') %></strong></div>
+        <div><span>Phiếu thu / chi</span><strong><%= Number(locals.cashCount ?? safeCashDocuments.length).toLocaleString('vi-VN') %></strong></div>
         <div><span>Thời gian tạo</span><strong><%= formatDate(item.created_at) %></strong></div>
       </div>
     </section>
@@ -46,20 +58,21 @@
               <th title="Nhà cung cấp">Nhà cung cấp</th>
               <th>Chứng từ liên kết</th>
               <th class="text-right">Số lượng</th>
-              <th class="text-right">Giá vốn</th>
+              <th class="text-right">Đơn giá</th>
               <th class="text-right">Thành tiền</th>
+              <th class="text-right">Thực thu / chi</th>
               <th class="text-right" title="Cần trả nhà cung cấp">Cần trả NCC</th>
               <th>Trạng thái</th>
               <th>Thao tác</th>
             </tr>
           </thead>
           <tbody>
-            <% if (!documents || documents.length === 0) { %>
+            <% if (safeManualDocuments.length === 0) { %>
               <tr>
-                <td colspan="11" class="empty-cell">Chưa có chứng từ liên quan.</td>
+                <td colspan="12" class="empty-cell">Chưa có chứng từ thủ công hoặc điều chỉnh.</td>
               </tr>
             <% } %>
-            <% (documents || []).forEach(function(doc) { %>
+            <% safeManualDocuments.forEach(function(doc) { %>
               <%
                 var isActive = doc.trang_thai !== 'cancelled';
                 var isManualNhap = doc.doc_kind === 'nhap' && doc.source_type === 'manual';
@@ -94,8 +107,9 @@
                   <% } %>
                 </td>
                 <td class="text-right"><%= doc.so_luong ? Number(doc.so_luong).toLocaleString('vi-VN') : '—' %></td>
-                <td class="text-right"><%= doc.gia_von ? Number(doc.gia_von).toLocaleString('vi-VN') + ' VNĐ' : '—' %></td>
-                <td class="text-right"><%= Number(doc.thanh_tien || 0).toLocaleString('vi-VN') %> VNĐ</td>
+                <td class="text-right"><%= Number(doc.don_gia_giao_dich ?? doc.gia_von ?? 0).toLocaleString('vi-VN') %> VNĐ</td>
+                <td class="text-right"><%= Number(doc.thanh_tien_giao_dich ?? doc.thanh_tien ?? 0).toLocaleString('vi-VN') %> VNĐ</td>
+                <td class="text-right"><%= Number(doc.thuc_thu_chi ?? doc.da_tra_ncc ?? 0).toLocaleString('vi-VN') %> VNĐ</td>
                 <td class="text-right" title="<%= doc.can_tra_ncc == null ? '—' : (Number(doc.can_tra_ncc || 0).toLocaleString('vi-VN') + ' VNĐ') %>">
                   <% if (doc.can_tra_ncc == null) { %>
                     —
@@ -164,60 +178,38 @@
       </div>
     </section>
 
+    <section class="detail-pane" data-detail-pane="purchases">
+      <%- include('_linked-documents', { linkedDocuments: safePurchaseDocuments, linkedMode: 'purchase' }) %>
+    </section>
+    <section class="detail-pane" data-detail-pane="sales">
+      <%- include('_linked-documents', { linkedDocuments: safeSalesDocuments, linkedMode: 'sales' }) %>
+    </section>
     <section class="detail-pane" data-detail-pane="payment-chi">
       <div class="customer-table-wrap">
-        <table class="admin-table customer-table">
-          <thead>
-            <tr>
-              <th>Thời gian</th>
-              <th>Mã phiếu chi</th>
-              <th>Loại thu chi</th>
-              <th>Đối tượng</th>
-              <th>Chứng từ liên kết</th>
-              <th class="text-right">Giá trị</th>
-              <th>Trạng thái</th>
-              <th>Ghi chú</th>
-            </tr>
-          </thead>
+        <table class="admin-table customer-table vc-cash-documents-table">
+          <thead><tr><th>Thời gian</th><th>Mã phiếu</th><th>Thu / Chi</th><th>Đối tượng</th><th>Chứng từ vật chứa</th><th>Chứng từ hàng hóa nguồn</th><th class="text-right">Giá trị</th><th>Phương thức</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead>
           <tbody>
-            <% if (!chiDocuments || chiDocuments.length === 0) { %>
-              <tr>
-                <td colspan="8" class="empty-cell">Chưa có phiếu chi liên quan.</td>
-              </tr>
-            <% } %>
-            <% (chiDocuments || []).forEach(function(doc) { %>
-              <tr>
+            <% if (!safeCashDocuments.length) { %><tr><td colspan="10" class="empty-cell">Chưa có phiếu thu/chi liên quan.</td></tr><% } %>
+            <% safeCashDocuments.forEach(function(doc) { %>
+              <tr data-vc-cash-document="<%= doc._id %>">
                 <td><%= formatDate(doc.created_at) %></td>
-                <td>
-                  <% if (doc._id) { %>
-                    <a class="table-code-link" href="/so-quy/phieu-thu-chi/<%= doc._id %>" target="_blank" rel="noopener"><%= doc.ma_phieu || '---' %></a>
-                  <% } else { %>
-                    <strong><%= doc.ma_phieu || '---' %></strong>
-                  <% } %>
-                </td>
-                <td><%= doc.loai_thu_chi_label || '---' %></td>
+                <td><a class="table-code-link" href="/so-quy/phieu-thu-chi/<%= doc._id %>" target="_blank" rel="noopener"><%= doc.ma_phieu || '---' %></a></td>
+                <td><strong><%= doc.loai_phieu === 'thu' ? 'Thu' : 'Chi' %></strong><br><%= doc.loai_thu_chi_label || '---' %></td>
                 <td><%= doc.doi_tuong_ten || '---' %></td>
-                <td>
-                  <% if (doc.linked_href && doc.linked_code) { %>
-                    <a class="table-code-link" href="<%= doc.linked_href %>"><%= doc.linked_code %></a>
-                  <% } else if (doc.linked_code) { %>
-                    <%= doc.linked_code %>
-                  <% } else { %>
-                    —
-                  <% } %>
+                <td><% (doc.linked_documents || [{ code: doc.linked_code, href: doc.linked_href }]).forEach(function(link) { %>
+                  <% if (link.href) { %><a class="table-code-link" href="<%= link.href %>"><%= link.code || 'Chứng từ vật chứa' %></a><br><% } else { %><%= link.code || '—' %><% } %>
+                <% }) %></td>
+                <td><% if (!(doc.source_documents || []).length) { %>—<% } %><% (doc.source_documents || []).forEach(function(link) { %><a class="table-code-link" href="<%= link.href %>"><%= link.code %></a><br><% }) %></td>
+                <td class="text-right"><%= Number(doc.gia_tri_lien_quan ?? doc.gia_tri ?? 0).toLocaleString('vi-VN') %> VNĐ
+                  <% if (doc.gia_tri_lien_quan != null && Number(doc.gia_tri_lien_quan) !== Number(doc.gia_tri)) { %><br><small>Trong phiếu <%= Number(doc.gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</small><% } %>
                 </td>
-                <td class="text-right"><%= Number(doc.gia_tri || 0).toLocaleString('vi-VN') %> VNĐ</td>
-                <td>
-                  <% if (doc.trang_thai === 'cancelled') { %>
-                    <span class="vc-status-tag is-inactive">Đã hủy</span>
-                  <% } else { %>
-                    <span class="vc-status-tag is-active"><%= doc.trang_thai_label || 'Đã thanh toán' %></span>
-                  <% } %>
-                </td>
+                <td><%= doc.phuong_thuc || '—' %></td>
+                <td><span class="vc-status-tag <%= doc.trang_thai === 'cancelled' ? 'is-inactive' : 'is-active' %>"><%= doc.trang_thai_label || (doc.trang_thai === 'cancelled' ? 'Đã hủy' : 'Đã thanh toán') %></span></td>
                 <td><%= doc.ghi_chu || '—' %></td>
               </tr>
             <% }) %>
           </tbody>
+          <tfoot><tr><td colspan="10">Tổng thu hợp lệ: <strong><%= Number(safeCashTotals.thu || 0).toLocaleString('vi-VN') %> VNĐ</strong> · Tổng chi hợp lệ: <strong><%= Number(safeCashTotals.chi || 0).toLocaleString('vi-VN') %> VNĐ</strong></td></tr></tfoot>
         </table>
       </div>
     </section>

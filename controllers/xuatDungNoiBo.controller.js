@@ -238,7 +238,7 @@ function parseVatChuaItems(rawItems) {
     const map = new Map();
     items.forEach(function(item) {
         const id = String(item.vat_chua_id || item._id || '').trim();
-        const qty = Math.floor(Number(item.so_luong || item.qty || 0));
+        const qty = require('../utils/stockQuantity').stockQuantity(item.so_luong ?? item.qty);
         if (!mongoose.Types.ObjectId.isValid(id) || qty <= 0) return;
         map.set(id, Number(map.get(id) || 0) + qty);
     });
@@ -861,7 +861,7 @@ exports.postAdd = async (req, res, next) => {
                         $or: [{ ten_quy_cach: tenQuyCach }, { ten_thuoc_tinh: tenQuyCach }]
                     }).lean();
                     if (!qcStock || Number(qcStock.so_luong || 0) < soLuong) {
-                        return res.status(400).json({ success: false, message: 'Số lượng xuất theo quy cách không đủ tồn kho' });
+                        return res.status(400).json({ success: false, message: 'Số lượng xuất vượt tồn kho của phân loại' });
                     }
 
                     const giaVon = Number(qcStock.gia_von || qcStock.don_gia_nhap || product.gia_von || 0);

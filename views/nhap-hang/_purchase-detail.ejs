@@ -98,6 +98,13 @@
                   <% } %>
                   <td class="attr-cell">
                     <div><%= r.ten_thuoc_tinh || '--' %></div>
+                    <% if ((locals.showPurchaseActions !== false || locals.showPurchaseClassification === true) && r.ct_phieu_nhap_id) { %>
+                      <% var classification = r.classification || {}; var classificationAllowed = classification.allowed !== false && t.trang_thai === 'completed' && t.trang_thai_du_lieu !== 'inactive'; var classificationReason = classification.reason || (t.trang_thai !== 'completed' ? 'Chỉ phân loại phiếu nhập đã hoàn thành. Hãy sử dụng Phân loại tại kho nếu phù hợp.' : (t.trang_thai_du_lieu === 'inactive' ? 'Phiếu nhập không còn hiệu lực. Hãy sử dụng Phân loại tại kho.' : '')); %>
+                      <div class="classification-line-action">
+                        <button type="button" class="kv-btn stock-classify-trigger" data-classify-open data-nguon-thao-tac="phieu_nhap" data-phieu-nhap-id="<%= t._id %>" data-ct-phieu-nhap-id="<%= r.ct_phieu_nhap_id %>" data-hang-hoa-id="<%= classification.hang_hoa_id || (group.product && group.product._id) || '' %>" data-kho-id="<%= classification.kho_id || (t.kho_id && (t.kho_id._id || t.kho_id)) || '' %>" data-lo-hang-id="<%= classification.lo_hang_id || (group.lot && (group.lot._id || group.lot)) || '' %>" data-ten-quy-cach="<%= r.ten_thuoc_tinh === '--' ? 'Chưa phân loại' : r.ten_thuoc_tinh %>" data-purchase-code="<%= t.ma_phieu_nhap || '' %>" <%= classificationAllowed ? '' : 'disabled' %> <%- classification.allowed == null && classificationAllowed ? 'data-classify-check' : '' %>>Phân loại</button>
+                        <small data-classify-reason <%= classificationReason ? '' : 'hidden' %>><%= classificationReason %></small>
+                      </div>
+                    <% } %>
                   </td>
                   <td class="num"><%= fmt(r.so_luong || 0) %></td>
                   <td class="num"><%= fmtMoney(r.don_gia_nhap || 0) %></td>

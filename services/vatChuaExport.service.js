@@ -6,6 +6,8 @@ const {
   loadAverageCostByVatChuaIds
 } = require('./vatChuaImport.service');
 const { taoPhieuThuChi } = require('./soQuy.service');
+const { LINKED_SOURCES, money, linkedOptions, inTransaction, operationKey,
+  loadLinkedMovement, assertLinkedCashCanChange, createLinkedContainerReceipt } = require('./vatChuaLinkedMoney.service');
 
 function cleanId(value) {
   const id = String(value || '').trim();
@@ -161,12 +163,15 @@ async function createReceiptForXuatVatChua(xuatDoc, options = {}, session) {
 }
 
 async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
+  const linked = LINKED_SOURCES.has(options.sourceType);
+  if (linked && !session) return inTransaction(null, activeSession => createXuatVatChuaAndDecreaseStock(options, activeSession));
   const storeId = cleanId(options.storeId);
   const vatChuaId = cleanId(options.vatChuaId);
   const qty = Math.floor(Number(options.qty || 0));
   if (!storeId || !vatChuaId || qty <= 0) {
     throw new Error('Thiếu thông tin xuất vật chứa');
   }
+  const existing = linked ? await loadLinkedMovement(XuatVatChua, { ...options, storeId, vatChuaId, qty }, 'xuat', session) : null;
 
   const vatChua = await withSessionQuery(
     VatChua.findOne({
@@ -179,7 +184,9 @@ async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
   if (!vatChua) throw new Error('Vật chứa không hợp lệ hoặc đã ngừng sử dụng');
 
   const tonKho = Math.max(0, Number(vatChua.so_luong_ton || 0));
-  if (tonKho < qty) {
+  const oldLine = existing && (existing.items || [])[0] || {};
+  const restoredQty = cleanId(oldLine.vat_chua_id) === vatChuaId ? Number(oldLine.so_luong || 0) : 0;
+  if (tonKho + restoredQty < qty) {
     throw new Error('Tồn vật chứa không đủ để xuất (còn ' + tonKho + ', cần ' + qty + ')');
   }
 
@@ -187,41 +194,57 @@ async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
   const requestedGiaVon = options.giaVon != null ? Number(options.giaVon) : NaN;
   const giaVon = Number.isFinite(requestedGiaVon) && requestedGiaVon >= 0
     ? requestedGiaVon
-    : Math.max(0, Number(costMap[String(vatChuaId)] || 0));
+    : restoredQty && oldLine.gia_von != null ? Math.max(0, Number(oldLine.gia_von))
+      : Math.max(0, Number(costMap[String(vatChuaId)] || 0));
   const thanhTien = Math.round(giaVon * qty);
-  const maXuat = await makeXuatVatChuaCode(storeId, session);
-
-  const xuatDoc = await createOne(XuatVatChua, {
+  const transactionPrice = money(options.transactionPrice ?? giaVon);
+  const maXuat = existing ? existing.ma_xuat_vat_chua : await makeXuatVatChuaCode(storeId, session);
+  const values = {
     ma_xuat_vat_chua: maXuat,
     loai_xuat: options.loaiXuat || 'ban_hang',
     doi_tuong_type: options.doiTuongType || 'none',
     doi_tuong_id: options.doiTuongId || undefined,
     doi_tuong_ten: options.doiTuongTen || undefined,
-    source_type: options.sourceType || 'manual',
-    source_id: options.sourceId || undefined,
-    source_code: options.sourceCode || undefined,
+    source_type: existing && existing.source_type || options.sourceType || 'manual',
+    source_id: existing && existing.source_id || options.sourceId || undefined,
+    source_code: existing && existing.source_code || options.sourceCode || undefined,
+    operation_key: existing && existing.operation_key || operationKey(options),
+    don_hang_id: options.relatedOrderId || existing && existing.don_hang_id || undefined,
+    hoa_don_id: options.relatedInvoiceId || existing && existing.hoa_don_id || undefined,
+    ghi_nhan_thu_chi: linked && options.recognizeCash === true,
     items: [{
       vat_chua_id: vatChua._id,
       ma_vat_chua: vatChua.ma_vat_chua || '',
       ten_vat_chua: vatChua.ten_vat_chua || '',
       so_luong: qty,
       gia_von: giaVon,
-      thanh_tien: thanhTien
+      thanh_tien: thanhTien,
+      don_gia_giao_dich: transactionPrice,
+      thanh_tien_giao_dich: transactionPrice * qty
     }],
     tong_so_luong: qty,
     tong_tien: thanhTien,
     ghi_chu: String(options.ghiChu || '').trim(),
     trang_thai: 'active',
     cua_hang_id: storeId
-  }, session);
-
-  const stockUpdate = await withSessionQuery(
-    VatChua.updateOne({ _id: vatChua._id }, { $inc: { so_luong_ton: -qty } }),
-    session
-  );
-  if (!stockUpdate || Number(stockUpdate.modifiedCount || 0) < 1) {
-    throw new Error('Không trừ được tồn vật chứa khi xuất.');
+  };
+  let xuatDoc;
+  if (existing) {
+    const oldId = cleanId(oldLine.vat_chua_id), oldQty = Number(oldLine.so_luong || 0);
+    if (oldId && oldId !== vatChuaId && oldQty > 0) await VatChua.updateOne({ _id: oldId, cua_hang_id: storeId }, { $inc: { so_luong_ton: oldQty } }, { session });
+    const delta = oldId === vatChuaId ? qty - oldQty : qty;
+    if (delta) {
+      const updated = await VatChua.updateOne({ _id: vatChuaId, cua_hang_id: storeId, ...(delta > 0 ? { so_luong_ton: { $gte: delta } } : {}) },
+        { $inc: { so_luong_ton: -delta } }, { session });
+      if (!updated || Number(updated.modifiedCount || 0) < 1) throw new Error('Tồn vật chứa không đủ để điều chỉnh phiếu xuất.');
+    }
+    Object.assign(existing, values); await existing.save(withSessionOptions({}, session)); xuatDoc = existing;
+  } else {
+    xuatDoc = await createOne(XuatVatChua, values, session);
+    const stockUpdate = await withSessionQuery(VatChua.updateOne({ _id: vatChua._id, cua_hang_id: storeId, so_luong_ton: { $gte: qty } }, { $inc: { so_luong_ton: -qty } }), session);
+    if (!stockUpdate || Number(stockUpdate.modifiedCount || 0) < 1) throw new Error('Không trừ được tồn vật chứa khi xuất.');
   }
+  if (linked) await createLinkedContainerReceipt(xuatDoc, 'xuat', options, session);
 
   return xuatDoc;
 }
@@ -231,6 +254,7 @@ async function createXuatVatChuaAndDecreaseStock(options = {}, session) {
  */
 async function exportVatChuaWithOrderDelivery(order, invoice, data = {}, session) {
   if (!order || !order._id || !order.cua_hang_id) return null;
+  if (order.trang_thai === 'cancelled' || invoice && ['draft', 'cancelled'].includes(invoice.trang_thai)) return null;
 
   const parsed = parseVatChuaImportInput(data);
   assertVatChuaImportInput(parsed);
@@ -244,6 +268,9 @@ async function exportVatChuaWithOrderDelivery(order, invoice, data = {}, session
     storeId: order.cua_hang_id,
     vatChuaId: parsed.vatChuaId,
     qty: parsed.qty,
+    ...linkedOptions(parsed, data),
+    relatedOrderId: order._id,
+    relatedInvoiceId: invoice && invoice._id,
     loaiXuat: invoice && invoice._id ? 'hoa_don' : 'ban_hang',
     doiTuongType: order.khach_hang_id ? 'khach_hang' : 'none',
     doiTuongId: order.khach_hang_id || undefined,
@@ -260,6 +287,7 @@ async function exportVatChuaWithOrderDelivery(order, invoice, data = {}, session
  */
 async function exportVatChuaWithPurchaseReturn(returnDoc, data = {}, session) {
   if (!returnDoc || !returnDoc._id || !returnDoc.cua_hang_id) return null;
+  if (['draft', 'cancelled'].includes(returnDoc.trang_thai)) return null;
 
   const parsed = parseVatChuaImportInput(data);
   assertVatChuaImportInput(parsed);
@@ -272,6 +300,7 @@ async function exportVatChuaWithPurchaseReturn(returnDoc, data = {}, session) {
     storeId: returnDoc.cua_hang_id,
     vatChuaId: parsed.vatChuaId,
     qty: parsed.qty,
+    ...linkedOptions(parsed, data),
     loaiXuat: 'tra_hang_nhap',
     doiTuongType: returnDoc.nha_cung_cap_id ? 'nha_cung_cap' : 'none',
     doiTuongId: returnDoc.nha_cung_cap_id || undefined,
@@ -288,6 +317,7 @@ async function exportVatChuaWithPurchaseReturn(returnDoc, data = {}, session) {
  */
 async function exportVatChuaWithInvoice(invoice, data = {}, session) {
   if (!invoice || !invoice._id || !invoice.cua_hang_id) return null;
+  if (['draft', 'cancelled'].includes(invoice.trang_thai)) return null;
 
   const parsed = parseVatChuaImportInput(data);
   assertVatChuaImportInput(parsed);
@@ -300,6 +330,9 @@ async function exportVatChuaWithInvoice(invoice, data = {}, session) {
     storeId: invoice.cua_hang_id,
     vatChuaId: parsed.vatChuaId,
     qty: parsed.qty,
+    ...linkedOptions(parsed, data),
+    relatedOrderId: invoice.don_hang_id || data.don_hang_id,
+    relatedInvoiceId: invoice._id,
     loaiXuat: 'hoa_don',
     doiTuongType: invoice.khach_hang_id ? 'khach_hang' : 'none',
     doiTuongId: invoice.khach_hang_id || undefined,
@@ -313,6 +346,7 @@ async function exportVatChuaWithInvoice(invoice, data = {}, session) {
 
 async function exportVatChuaWithSalesReturn(returnSlip, data = {}, session) {
   if (!returnSlip || !returnSlip._id || !returnSlip.cua_hang_id) return null;
+  if (['draft', 'cancelled'].includes(returnSlip.trang_thai)) return null;
 
   const parsed = parseVatChuaImportInput(data);
   assertVatChuaImportInput(parsed);
@@ -325,6 +359,7 @@ async function exportVatChuaWithSalesReturn(returnSlip, data = {}, session) {
     storeId: returnSlip.cua_hang_id,
     vatChuaId: parsed.vatChuaId,
     qty: parsed.qty,
+    ...linkedOptions(parsed, data),
     loaiXuat: 'doi_tra_hang',
     doiTuongType: returnSlip.khach_hang_id ? 'khach_hang' : 'none',
     doiTuongId: returnSlip.khach_hang_id || undefined,
@@ -337,6 +372,7 @@ async function exportVatChuaWithSalesReturn(returnSlip, data = {}, session) {
 }
 
 async function cancelXuatVatChuaBySource(storeId, sourceType, sourceId, session) {
+  if (!session) return inTransaction(null, activeSession => cancelXuatVatChuaBySource(storeId, sourceType, sourceId, activeSession));
   const store = cleanId(storeId);
   const source = cleanId(sourceId);
   if (!store || !source || !sourceType) return;
@@ -344,8 +380,8 @@ async function cancelXuatVatChuaBySource(storeId, sourceType, sourceId, session)
   const xuatRows = await withSessionQuery(
     XuatVatChua.find({
       cua_hang_id: store,
-      source_type: sourceType,
-      source_id: source,
+      ...(sourceType === 'hoa_don' ? { $or: [{ source_type: sourceType, source_id: source }, { hoa_don_id: source }] }
+        : { source_type: sourceType, source_id: source }),
       trang_thai: 'active',
       deleted_at: null
     }),
@@ -353,13 +389,14 @@ async function cancelXuatVatChuaBySource(storeId, sourceType, sourceId, session)
   );
 
   for (const xuatDoc of xuatRows) {
+    await assertLinkedCashCanChange(xuatDoc, 'xuat', session);
     const items = Array.isArray(xuatDoc.items) ? xuatDoc.items : [];
     for (const item of items) {
       const vatChuaId = cleanId(item.vat_chua_id);
       const qty = Math.floor(Number(item.so_luong || 0));
       if (!vatChuaId || qty <= 0) continue;
       await withSessionQuery(
-        VatChua.updateOne({ _id: vatChuaId }, { $inc: { so_luong_ton: qty } }),
+        VatChua.updateOne({ _id: vatChuaId, cua_hang_id: store }, { $inc: { so_luong_ton: qty } }),
         session
       );
     }

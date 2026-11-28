@@ -2,8 +2,11 @@ var express = require('express');
 var router = express.Router();
 var { isAuthenticated } = require('../middlewares/auth.middleware');
 var hangHoaController = require('../controllers/hanghoacontroller');
+var phanLoaiHangController = require('../controllers/phanLoaiHang.controller');
 
 router.use(isAuthenticated);
+router.get('/api/:productId/phan-loai/context', phanLoaiHangController.context);
+router.get('/api/:productId/phan-loai/history', phanLoaiHangController.history);
 
 router.get('/api/table-metrics', hangHoaController.tableMetrics);
 router.get('/api/filter-options', hangHoaController.filterOptions);

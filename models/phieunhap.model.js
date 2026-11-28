@@ -84,6 +84,10 @@ const PhieuNhapSchema = new Schema({
     default: ''
   },
 
+  // Container selection is retained on drafts without creating stock or cash.
+  vat_chua_config: { type: Schema.Types.Mixed, default: undefined },
+  vat_chua_request_key: { type: String, trim: true, maxlength: 120 },
+
   trang_thai: {
     type: String,
     enum: ['draft', 'completed', 'cancelled', 'merged'],
