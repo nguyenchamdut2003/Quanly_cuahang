@@ -71,6 +71,9 @@
             <a href="<%= storeEditUrl %>" class="dropdown-item">
               <i class="fa-solid fa-store"></i> Xem và sửa cửa hàng
             </a>
+            <a href="/profile" class="dropdown-item" id="personalInfoLink">
+              <i class="fa-solid fa-user"></i> Thông tin cá nhân
+            </a>
             <% if (locals.user && locals.user.vai_tro === 'super_admin') { %>
               <a href="/phan-quyen-tai-khoan" class="dropdown-item">
                 <i class="fa-solid fa-user-shield"></i> Ph&acirc;n quy&#7873;n t&agrave;i kho&#7843;n

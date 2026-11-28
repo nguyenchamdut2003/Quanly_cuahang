@@ -86,6 +86,12 @@ passport.use(new GoogleStrategy({
             if (!isUserAllowed(user)) {
                 return done(null, false, { message: 'Tài khoản đã bị khóa hoặc ngừng hoạt động.' });
             }
+            // A login alias changed by the owner does not verify ownership of
+            // the matching Google email. Existing Google links are handled by
+            // google_id above; never create a new link to the highest account.
+            if (user.vai_tro === 'super_admin') {
+                return done(null, false, { message: 'Vui lòng đăng nhập tài khoản quản trị cao nhất bằng tài khoản và mật khẩu.' });
+            }
             user.google_id = profile.id;
             user.anh_dai_dien = profile.photos?.[0]?.value || user.anh_dai_dien;
             user.lan_dang_nhap_cuoi = new Date();

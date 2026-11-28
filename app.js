@@ -243,8 +243,12 @@ app.use(async (req, res, next) => {
     else if (sid && activeIds.has(sid)) selectedId = sid;
     else if (stores.length) selectedId = String(stores[0]._id);
 
-    if (sid && !activeIds.has(sid) && req.session) {
-      delete req.session.cua_hang_id;
+    // The header and business controllers must share the same active store,
+    // including the default chosen after creating/importing stores or a reset.
+    req.user.cua_hang_id = selectedId || null;
+    if (req.session) {
+      if (selectedId) req.session.cua_hang_id = selectedId;
+      else delete req.session.cua_hang_id;
     }
 
     res.locals.currentStore = selectedId
@@ -326,7 +330,7 @@ app.use(function(err, req, res, next) {
   res.locals.error = req.app.get('env') === 'development' ? err : {};
 
   // render the error page
-  res.status(err.status || 500);
+  res.status(err.status || err.statusCode || 500);
   res.render('error');
 });
 

@@ -1,0 +1,27 @@
+.personal-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.personal-info-field{display:grid;gap:6px;margin:0;color:#344054;font-size:13px;font-weight:600}
+.personal-info-field.is-wide{grid-column:1/-1}
+.personal-info-field input{box-sizing:border-box;width:100%;min-width:0;height:39px;padding:8px 10px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#172033;font-family:inherit;font-size:14px;font-weight:400}
+.personal-info-field input:focus{outline:2px solid #bfdbfe;outline-offset:1px;border-color:#2563eb}
+.personal-info-field small,.personal-info-note{font-size:13px;font-weight:400;color:#64748b;line-height:1.5}
+.personal-info-field[hidden]{display:none!important}
+.personal-info-note{margin:0 0 16px}
+.personal-info-form fieldset{border:0;padding:0;margin:0;min-width:0}
+.personal-info-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.personal-info-button{min-height:38px;padding:8px 15px;border:1px solid #cfd8e3;border-radius:6px;background:#fff;color:#172033;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.personal-info-button.is-primary{border-color:#0070f4;background:#0070f4;color:#fff}
+.personal-info-button:disabled{opacity:.55;cursor:wait}
+.personal-info-button:focus-visible{outline:2px solid #2563eb;outline-offset:3px}
+.personal-info-status{margin:0 22px 20px;padding:10px 12px;border-radius:6px;background:#eff6ff;color:#1e40af;font-size:14px;line-height:1.5}
+.personal-info-status.is-error{background:#fff1f2;color:#b91c1c}
+.personal-info-status.is-success{background:#ecfdf3;color:#067647}
+.personal-info-readonly{display:grid;grid-template-columns:minmax(130px,.7fr) 1fr;gap:12px 16px;margin:0}
+.personal-info-readonly dt{font-size:13px;color:#64748b}
+.personal-info-readonly dd{margin:0;overflow-wrap:anywhere;font-size:14px;color:#172033}
+.personal-info-role{margin:0 0 16px;padding:10px 12px;border-radius:6px;background:#f6f9fc;font-size:13px;color:#475467}
+.personal-profile-page{max-width:760px;margin:28px auto;padding:0 18px 28px}
+.personal-profile-panel{padding:24px;background:#fff;border:1px solid #d8e1ec;border-radius:8px;margin-bottom:20px}
+.personal-profile-panel h1,.personal-profile-panel h2{margin:0 0 20px;font-size:22px;color:#172033}
+.personal-profile-panel .personal-info-status{margin:0 0 18px}
+.personal-profile-panel .personal-info-field{margin-bottom:14px}
+@media(max-width:600px){.personal-info-grid{grid-template-columns:1fr}.personal-info-readonly{grid-template-columns:1fr;gap:4px}.personal-info-readonly dd{margin-bottom:12px}.personal-profile-panel{padding:18px}}

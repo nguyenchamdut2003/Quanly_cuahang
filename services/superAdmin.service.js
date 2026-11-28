@@ -7,36 +7,32 @@ var SUPER_ADMIN_PASSWORD = 'admin';
 var SALT_ROUNDS = 12;
 
 async function ensureSuperAdminAccount() {
-  var user = await NguoiDung.findOne({ email: SUPER_ADMIN_USERNAME }).select('+password_hash');
-  if (user) {
-    var changed = false;
-    if (user.vai_tro !== 'super_admin') {
-      user.vai_tro = 'super_admin';
-      changed = true;
-    }
-    if (user.trang_thai !== 'active') {
-      user.trang_thai = 'active';
-      changed = true;
-    }
-    if (!user.password_hash) {
-      user.password_hash = await bcrypt.hash(SUPER_ADMIN_PASSWORD, SALT_ROUNDS);
-      user.must_change_password = true;
-      changed = true;
-    }
-    if (changed) await user.save();
-    return user;
-  }
+  // The login name is editable. Finding by the old default name would create
+  // another privileged account after a rename, or promote its new owner.
+  var user = await NguoiDung.findOne({ vai_tro: 'super_admin' })
+    .sort({ created_at: 1, _id: 1 }).select('+password_hash');
+  if (user) return user;
+
+  // Bootstrap is only for a new installation. A public login request must not
+  // restore a revoked role, reactivate an account, or reset its credentials.
+  if (await NguoiDung.exists({})) return null;
 
   var passwordHash = await bcrypt.hash(SUPER_ADMIN_PASSWORD, SALT_ROUNDS);
-  return NguoiDung.create({
-    cua_hang_id: null,
-    email: SUPER_ADMIN_USERNAME,
-    password_hash: passwordHash,
-    ho_ten: SUPER_ADMIN_LOGIN,
-    vai_tro: 'super_admin',
-    trang_thai: 'active',
-    must_change_password: true
-  });
+  try {
+    return await NguoiDung.create({
+      cua_hang_id: null,
+      email: SUPER_ADMIN_USERNAME,
+      password_hash: passwordHash,
+      ho_ten: SUPER_ADMIN_LOGIN,
+      vai_tro: 'super_admin',
+      trang_thai: 'active',
+      must_change_password: true
+    });
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    // Concurrent first logins share the account created by the winning request.
+    return NguoiDung.findOne({ vai_tro: 'super_admin' }).sort({ created_at: 1, _id: 1 }).select('+password_hash');
+  }
 }
 
 function isSuperAdminLogin(value) {

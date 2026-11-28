@@ -37,6 +37,10 @@ const NguoiDungSchema = new Schema({
   ho_ten: { type: String },
   anh_dai_dien: { type: String },
   sdt: { type: String },
+  dia_chi_chi_tiet: { type: String, trim: true },
+  phuong_xa: { type: String, trim: true },
+  tinh_thanh: { type: String, trim: true },
+  dia_chi_day_du: { type: String, trim: true },
   vai_tro: {
     type: String,
     enum: ['super_admin', 'admin', 'quan_ly', 'nhan_vien', 'user'],

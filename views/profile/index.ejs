@@ -1,155 +1,77 @@
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="vi">
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Thông tin cá nhân</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel='stylesheet' href='/stylesheets/style.css' />
-    <style>
-      .profile-container {
-        max-width: 600px;
-        margin: 40px auto;
-        background: #fff;
-        padding: 30px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-      }
-      .form-group {
-        margin-bottom: 20px;
-      }
-      .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: 500;
-        color: #333;
-      }
-      .form-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        font-size: 14px;
-      }
-      .form-group input:focus {
-        border-color: #0070f4;
-        outline: none;
-      }
-      .btn-submit {
-        background-color: #0070f4;
-        color: white;
-        padding: 10px 20px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: 500;
-      }
-      .btn-submit:hover {
-        background-color: #0056bd;
-      }
-      .success-message {
-        background-color: #d4edda;
-        color: #155724;
-        padding: 15px;
-        margin-bottom: 20px;
-        border: 1px solid #c3e6cb;
-        border-radius: 4px;
-      }
-    </style>
-  </head>
-  <body>
-    <%- include('../partials/header') %>
-
-    <div class="profile-container">
-      <h2 style="margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">Cập nhật thông tin cá nhân</h2>
-      
-      <form action="/profile/update" method="POST">
-        <div class="form-group">
-          <label>Email (Đăng nhập bằng Google)</label>
-          <input type="text" value="<%= user.email %>" disabled style="background-color: #f5f5f5; cursor: not-allowed;">
-        </div>
-
-        <div class="form-group">
-          <label>Họ và tên *</label>
-          <input type="text" name="ho_ten" value="<%= user.ho_ten %>" required>
-        </div>
-
-        <div class="form-group">
-          <label>Số điện thoại</label>
-          <input type="text" name="sdt" value="<%= user.sdt || '' %>" placeholder="Nhập số điện thoại">
-        </div>
-
-        <div class="form-group">
-          <label>Địa chỉ chi tiết</label>
-          <input type="text" name="dia_chi_chi_tiet" value="<%= user.dia_chi_chi_tiet || '' %>" placeholder="Số nhà, đường, thôn/xóm">
-        </div>
-        <div class="form-group">
-          <label>Phường/Xã</label>
-          <input type="text" name="phuong_xa" value="<%= user.phuong_xa || '' %>" placeholder="Phường/Xã">
-        </div>
-        <div class="form-group">
-          <label>Tỉnh/Thành phố</label>
-          <input type="text" name="tinh_thanh" value="<%= user.tinh_thanh || '' %>" placeholder="Tỉnh/Thành phố">
-        </div>
-
-        <div style="text-align: right;">
-          <button type="submit" class="btn-submit"><i class="fa-solid fa-save"></i> Lưu thông tin</button>
-        </div>
+  <title>Thông tin cá nhân</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/stylesheets/style.css">
+  <link rel="stylesheet" href="/stylesheets/personal-info.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%
+    var profileUser = user || {};
+    var editable = locals.canEdit === true;
+    var profileRole = ({super_admin:'Quản trị cao nhất',admin:'Quản lý',quan_ly:'Quản lý',nhan_vien:'Nhân viên',user:'Khách'})[profileUser.vai_tro] || profileUser.vai_tro || '---';
+    var profileStatus = ({active:'Đang hoạt động',inactive:'Ngừng hoạt động',blocked:'Đã khóa'})[profileUser.trang_thai] || profileUser.trang_thai || '---';
+  %>
+  <main class="personal-profile-page">
+    <section class="personal-profile-panel">
+      <h1>Thông tin cá nhân</h1>
+      <p class="personal-info-role"><%= profileRole %> · <%= profileStatus %></p>
+      <% if (locals.profileError) { %><p class="personal-info-status is-error" role="alert"><%= locals.profileError %></p><% } %>
+      <% if (locals.profileSuccess) { %><p class="personal-info-status is-success" role="status"><%= locals.profileSuccess %></p><% } %>
+      <% if (editable) { %>
+        <form action="/profile/update" method="post" class="personal-info-form">
+          <div class="personal-info-grid">
+            <label class="personal-info-field"><span>Tài khoản đăng nhập *</span><input type="text" name="email" value="<%= profileUser.email || '' %>" autocomplete="username" maxlength="254" required></label>
+            <label class="personal-info-field"><span>Họ và tên *</span><input type="text" name="ho_ten" value="<%= profileUser.ho_ten || '' %>" autocomplete="name" maxlength="150" required></label>
+            <label class="personal-info-field"><span>Số điện thoại</span><input type="tel" name="sdt" value="<%= profileUser.sdt || '' %>" autocomplete="tel" maxlength="30"></label>
+            <label class="personal-info-field is-wide"><span>Địa chỉ chi tiết</span><input type="text" name="dia_chi_chi_tiet" value="<%= profileUser.dia_chi_chi_tiet || '' %>" autocomplete="street-address" maxlength="500"></label>
+            <label class="personal-info-field"><span>Phường/Xã</span><input type="text" name="phuong_xa" value="<%= profileUser.phuong_xa || '' %>" maxlength="150"></label>
+            <label class="personal-info-field"><span>Tỉnh/Thành phố</span><input type="text" name="tinh_thanh" value="<%= profileUser.tinh_thanh || '' %>" autocomplete="address-level1" maxlength="150"></label>
+            <label class="personal-info-field is-wide"><span>Mật khẩu hiện tại</span><input type="password" name="current_password" autocomplete="current-password"><small>Chỉ cần nhập khi thay đổi tài khoản đăng nhập.</small></label>
+          </div>
+          <div class="personal-info-actions"><button type="submit" class="personal-info-button is-primary">Lưu thông tin</button></div>
+        </form>
+      <% } else { %>
+        <p class="personal-info-note">Chỉ quản trị cao nhất được chỉnh sửa thông tin tài khoản.</p>
+        <dl class="personal-info-readonly">
+          <dt>Tài khoản đăng nhập</dt><dd><%= profileUser.email || '---' %></dd>
+          <dt>Họ và tên</dt><dd><%= profileUser.ho_ten || '---' %></dd>
+          <dt>Số điện thoại</dt><dd><%= profileUser.sdt || '---' %></dd>
+          <dt>Địa chỉ chi tiết</dt><dd><%= profileUser.dia_chi_chi_tiet || '---' %></dd>
+          <dt>Phường/Xã</dt><dd><%= profileUser.phuong_xa || '---' %></dd>
+          <dt>Tỉnh/Thành phố</dt><dd><%= profileUser.tinh_thanh || '---' %></dd>
+          <dt>Vai trò</dt><dd><%= profileRole %></dd>
+        </dl>
+      <% } %>
+    </section>
+    <section class="personal-profile-panel">
+      <h2>Đổi mật khẩu</h2>
+      <p class="personal-info-status" id="profilePasswordMessage" role="status" hidden></p>
+      <form action="/profile/change-password" method="post" class="personal-info-form">
+        <label class="personal-info-field"><span>Mật khẩu hiện tại *</span><input type="password" name="current_password" autocomplete="current-password" required></label>
+        <label class="personal-info-field"><span>Mật khẩu mới *</span><input type="password" name="password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required></label>
+        <label class="personal-info-field"><span>Xác nhận mật khẩu mới *</span><input type="password" name="confirm_password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required></label>
+        <div class="personal-info-actions"><button type="submit" class="personal-info-button is-primary">Lưu mật khẩu</button></div>
       </form>
-      <h2 style="margin: 28px 0 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">&Dstrok;&#7893;i m&#7853;t kh&#7849;u</h2>
-      <form action="/profile/change-password" method="POST">
-        <div class="form-group">
-          <label>M&#7853;t kh&#7849;u hi&#7879;n t&#7841;i *</label>
-          <input type="password" name="current_password" autocomplete="current-password" required>
-        </div>
-        <div class="form-group">
-          <label>M&#7853;t kh&#7849;u m&#7899;i *</label>
-          <input type="password" name="password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required>
-        </div>
-        <div class="form-group">
-          <label>X&aacute;c nh&#7853;n m&#7853;t kh&#7849;u m&#7899;i *</label>
-          <input type="password" name="confirm_password" autocomplete="new-password" minlength="8" pattern="(?=.*[A-Za-z])(?=.*\d).{8,}" required>
-        </div>
-        <div style="text-align: right;">
-          <button type="submit" class="btn-submit"><i class="fa-solid fa-key"></i> L&#432;u m&#7853;t kh&#7849;u</button>
-        </div>
-      </form>
-    </div>
-    
-    <script>
-      // Xử lý báo thành công dựa trên URL
-      document.addEventListener('DOMContentLoaded', function() {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('success') === '1') {
-          const successDiv = document.createElement('div');
-          successDiv.className = 'success-message';
-          successDiv.innerText = 'Cập nhật thông tin thành công!';
-          const container = document.querySelector('.profile-container');
-          container.insertBefore(successDiv, container.childNodes[2]);
-          
-          // Xóa param khỏi URL để không hiện lại khi f5
-          window.history.replaceState(null, '', window.location.pathname);
-        }
-        if (urlParams.get('password_success') === '1' || urlParams.get('password_error')) {
-          const messageDiv = document.createElement('div');
-          messageDiv.className = 'success-message';
-          if (urlParams.get('password_error')) {
-            messageDiv.style.background = '#fff0f0';
-            messageDiv.style.color = '#b91c1c';
-            messageDiv.style.borderColor = '#fecaca';
-            const code = urlParams.get('password_error');
-            messageDiv.innerText = code === 'current'
-              ? 'Mật khẩu hiện tại không đúng.'
-              : (code === 'weak' ? 'Mật khẩu mới phải có ít nhất 8 ký tự, gồm chữ và số.' : 'Xác nhận mật khẩu mới không khớp.');
-          } else {
-            messageDiv.innerText = 'Đổi mật khẩu thành công!';
-          }
-          const container = document.querySelector('.profile-container');
-          container.insertBefore(messageDiv, container.childNodes[2]);
-          window.history.replaceState(null, '', window.location.pathname);
-        }
-      });
-    </script>
-  </body>
+    </section>
+  </main>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var params = new URLSearchParams(window.location.search), passwordMessage = document.getElementById('profilePasswordMessage');
+      if (params.get('success') === '1' && !document.querySelector('.personal-profile-panel .is-success')) {
+        var note = document.createElement('p'); note.className = 'personal-info-status is-success'; note.setAttribute('role', 'status'); note.textContent = 'Đã cập nhật thông tin cá nhân.'; document.querySelector('.personal-profile-panel').prepend(note);
+      }
+      if (params.get('password_success') === '1' || params.get('password_error')) {
+        var code = params.get('password_error'); passwordMessage.hidden = false;
+        passwordMessage.className = 'personal-info-status ' + (code ? 'is-error' : 'is-success');
+        passwordMessage.textContent = code ? (code === 'current' ? 'Mật khẩu hiện tại không đúng.' : code === 'weak' ? 'Mật khẩu mới phải có ít nhất 8 ký tự, gồm chữ và số.' : 'Xác nhận mật khẩu mới không khớp.') : 'Đổi mật khẩu thành công!';
+      }
+      if (params.has('success') || params.has('password_success') || params.has('password_error')) window.history.replaceState(null, '', window.location.pathname);
+    });
+  </script>
+</body>
 </html>

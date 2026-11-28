@@ -295,19 +295,21 @@ async function makeLoCode() {
   return 'LO' + String(nextNumber).padStart(6, '0');
 }
 
-async function resolveStoreId(req) {
+async function resolveStoreId(req, options = {}) {
   var userStore = req && req.user && req.user.cua_hang_id;
   var sessionStore = req && req.session && req.session.cua_hang_id;
   for (var value of [userStore, sessionStore]) {
     var id = String(value && value._id || value || '').trim();
     if (mongoose.Types.ObjectId.isValid(id)) return id;
   }
+  if (options.optional) return '';
   throw Object.assign(new Error('Chưa chọn cửa hàng trong phiên đăng nhập.'), { statusCode: 403 });
 }
 
 exports.index = async function(req, res, next) {
   try {
-    var storeId = await resolveStoreId(req);
+    var storeId = await resolveStoreId(req, { optional: true });
+    if (!storeId) return res.redirect('/cua-hang');
     var filter = normalizeNhapHangFilter(req.query);
     var pendingFocus = req.session && req.session.purchaseListFocus;
     if (pendingFocus && String(pendingFocus.store_id) !== String(storeId)) pendingFocus = null;
@@ -934,7 +936,8 @@ function csvEscape(value) {
 
 exports.createPage = async function(req, res, next) {
   try {
-    var storeId = await resolveStoreId(req);
+    var storeId = await resolveStoreId(req, { optional: true });
+    if (!storeId) return res.redirect('/cua-hang');
     var warehouses = await Kho.find(
       storeId && mongoose.Types.ObjectId.isValid(storeId) ? { cua_hang_id: storeId } : {}
     )
